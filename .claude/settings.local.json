@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest add form sonner -y)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)"
+    ]
+  },
+  "enabledPlugins": {
+    "developer-kit@giuseppe.trisciuoglio": true
+  }
+}
