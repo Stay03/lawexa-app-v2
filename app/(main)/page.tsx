@@ -1,91 +1,131 @@
 'use client';
 
-import { useGreeting } from '@/lib/hooks/useGreeting';
-import { useAuthStore } from '@/lib/stores/authStore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { useGreetingParts } from '@/lib/hooks/useGreeting';
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputActions,
+  PromptInputAction,
+} from '@/components/ui/prompt-input';
+import {
+  FileUpload,
+  FileUploadTrigger,
+  FileUploadContent,
+} from '@/components/ui/file-upload';
+import { ArrowUp, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Scale, FileText, Bookmark, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
-
-const quickLinks = [
-  {
-    title: 'Browse Cases',
-    description: 'Search and explore Nigerian law cases',
-    icon: Scale,
-    href: '/cases',
-  },
-  {
-    title: 'Read Notes',
-    description: 'Access legal notes and study materials',
-    icon: FileText,
-    href: '/notes',
-  },
-  {
-    title: 'Bookmarks',
-    description: 'View your saved cases and notes',
-    icon: Bookmark,
-    href: '/bookmarks',
-  },
-];
 
 export default function HomePage() {
-  const greeting = useGreeting();
-  const { isAuthenticated, isGuest } = useAuthStore();
+  const [input, setInput] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const { greeting, name } = useGreetingParts();
+
+  const handleSubmit = () => {
+    if (input.trim() || files.length > 0) {
+      console.log('Submitted:', input, files);
+      setInput('');
+      setFiles([]);
+    }
+  };
+
+  const handleFilesAdded = (newFiles: File[]) => {
+    setFiles((prev) => [...prev, ...newFiles]);
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   return (
-    <div className="space-y-8">
-      {/* Greeting section */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
-        <p className="mt-2 text-muted-foreground">
-          {isAuthenticated && !isGuest
-            ? 'Welcome back to Lawexa. What would you like to explore today?'
-            : 'Welcome to Lawexa. Start exploring Nigerian legal resources.'}
-        </p>
-      </div>
+    <div className="flex min-h-[calc(100vh-120px)] flex-col items-center justify-center px-4">
+      {/* Greeting */}
+      <h1 className="mb-8 text-[36px] font-medium">
+        {greeting}
+        {name && (
+          <>
+            , <span className="text-primary">{name}!</span>
+          </>
+        )}
+      </h1>
 
-      {/* Quick links */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {quickLinks.map((link) => (
-          <Card key={link.href} className="group transition-colors hover:border-primary/50">
-            <CardHeader className="pb-3">
-              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <link.icon className="h-5 w-5" />
+      {/* Prompt Input with FileUpload wrapper */}
+      <div className="w-full max-w-2xl">
+        <FileUpload onFilesAdded={handleFilesAdded} multiple>
+          <PromptInput
+            value={input}
+            onValueChange={setInput}
+            onSubmit={handleSubmit}
+          >
+            {/* File Previews inside input */}
+            {files.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-3 pt-3">
+                {files.map((file, index) => (
+                  <div
+                    key={index}
+                    className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    <span className="max-w-[120px] truncate">{file.name}</span>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="hover:bg-secondary/50 rounded-full p-1"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <CardTitle className="text-lg">{link.title}</CardTitle>
-              <CardDescription>{link.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="ghost" className="group-hover:text-primary">
-                <Link href={link.href}>
-                  Explore
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            )}
 
-      {/* Guest CTA */}
-      {(!isAuthenticated || isGuest) && (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader>
-            <CardTitle>Create a free account</CardTitle>
-            <CardDescription>
-              Sign up to save bookmarks, track your reading history, and access premium content.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex gap-3">
-            <Button asChild>
-              <Link href="/register">Get started</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/login">Sign in</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+            <PromptInputTextarea
+              placeholder="Ask me anything"
+              className="text-foreground"
+            />
+
+            <PromptInputActions className="flex items-center justify-between px-3 pb-3">
+              {/* Attach button - LEFT */}
+              <PromptInputAction tooltip="Attach files">
+                <FileUploadTrigger asChild>
+                  <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
+                    <Paperclip className="text-primary h-5 w-5" />
+                  </div>
+                </FileUploadTrigger>
+              </PromptInputAction>
+
+              {/* Send button - RIGHT */}
+              <PromptInputAction tooltip="Send message">
+                <Button
+                  size="icon"
+                  className="h-8 w-8 rounded-full bg-primary hover:bg-primary/90"
+                  onClick={handleSubmit}
+                  disabled={!input.trim() && files.length === 0}
+                >
+                  <ArrowUp className="h-5 w-5" />
+                </Button>
+              </PromptInputAction>
+            </PromptInputActions>
+          </PromptInput>
+
+          {/* Drag-and-drop overlay */}
+          <FileUploadContent>
+            <div className="flex min-h-[200px] w-full items-center justify-center">
+              <div className="bg-background/90 m-4 w-full max-w-md rounded-lg border p-8 shadow-lg">
+                <div className="mb-4 flex justify-center">
+                  <Paperclip className="text-muted-foreground h-8 w-8" />
+                </div>
+                <h3 className="mb-2 text-center text-base font-medium">
+                  Drop files to upload
+                </h3>
+                <p className="text-muted-foreground text-center text-sm">
+                  Release to add files to your message
+                </p>
+              </div>
+            </div>
+          </FileUploadContent>
+        </FileUpload>
+      </div>
     </div>
   );
 }

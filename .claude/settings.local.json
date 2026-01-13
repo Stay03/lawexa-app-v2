@@ -5,7 +5,10 @@
       "Bash(npx shadcn@latest add form sonner -y)",
       "Bash(npx shadcn@latest add:*)",
       "Bash(git checkout:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: complete Phase 2 - Authentication system\n\n- Auth forms: login, register, forgot password, reset password\n- Google OAuth integration with callback handling\n- Email verification page structure\n- Zustand auth store with persistence for user/token state\n- TanStack Query mutations for all auth API calls\n- API client with Axios interceptors \\(token injection, 401 handling\\)\n- Zod validation schemas for all auth forms\n- FingerprintJS integration for guest tracking\n- shadcn/ui sidebar layout \\(sidebar-07 pattern\\)\n- Navigation components: app-sidebar, nav-main, nav-user, nav-secondary\n- Common components: Logo, UserAvatar, ThemeToggle, LoadingSkeleton, EmptyState, ErrorState\n- Theme support with next-themes \\(dark/light mode\\)\n- Time-based greeting system with weighted random selection\n- PWA assets and favicon configuration\n- Project documentation and best practices guides\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git stash:*)",
+      "Bash(ls:*)"
     ]
   },
   "enabledPlugins": {

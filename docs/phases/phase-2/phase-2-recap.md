@@ -162,7 +162,13 @@ lib/
 │   ├── api-error.ts
 │   └── validation.ts
 └── constants/
-    └── greetings.ts
+    └── greetings/
+        ├── index.ts
+        ├── types.ts
+        ├── time-greetings.ts
+        ├── day-greetings.ts
+        ├── holiday-greetings.ts
+        └── fallback-greetings.ts
 
 providers/
 ├── QueryProvider.tsx
@@ -232,6 +238,91 @@ The verification page exists but the actual verification logic depends on the La
 
 - **App Sidebar**: Replaced the Scale icon in the header with the actual Lawexa logo image
 - **Collapsed State**: Logo area hidden when sidebar is collapsed (no fallback icon)
+
+### Home Page Redesign (January 13, 2026)
+
+Redesigned the home page from a card-based layout to a centered chat-style interface using Prompt Kit components.
+
+**Components Added**:
+
+1. **PromptInput** (`components/ui/prompt-input.tsx`)
+   - Installed via: `npx shadcn@latest add "https://prompt-kit.com/c/prompt-input.json"`
+   - Auto-resizing textarea with keyboard submit (Enter)
+   - Exports: `PromptInput`, `PromptInputTextarea`, `PromptInputActions`, `PromptInputAction`
+
+2. **FileUpload** (`components/ui/file-upload.tsx`)
+   - Installed via: `npx shadcn@latest add "https://prompt-kit.com/c/file-upload.json"`
+   - Global drag-and-drop file handling
+   - Exports: `FileUpload`, `FileUploadTrigger`, `FileUploadContent`
+
+**Home Page Changes** (`app/(main)/page.tsx`):
+- **Before**: Card-based layout with quick links grid (Browse Cases, Read Notes, Bookmarks)
+- **After**: Centered chat-style interface with:
+  - Dynamic greeting with user's name in gold/primary color
+  - Chat input with "Ask me anything" placeholder
+  - File upload with drag-and-drop support
+  - Layout: Attach button (left) + Send button (right)
+
+**New Hook**: `useGreetingParts` added to `lib/hooks/useGreeting.ts`
+- Returns `{ greeting: string, name: string }` for split styling
+
+**Features**:
+- Time-based greeting (morning/afternoon/evening)
+- File attachment via click or drag-and-drop
+- File preview chips inside input with remove button
+- Drag-and-drop overlay modal
+
+**Status**: UI placeholder only (submit logs to console, no file upload backend)
+
+### Smart Greeting System (January 13, 2026)
+
+Refactored the greeting system from simple time-based to a comprehensive priority-based system with holidays, day-of-week, and weighted randomness.
+
+**New File Structure**:
+```
+lib/constants/greetings/
+├── index.ts              # Main exports + priority logic
+├── types.ts              # Type definitions (TTimePeriod, TDayOfWeek, THoliday, IGreeting)
+├── time-greetings.ts     # 6 time periods (earlyMorning, lateMorning, afternoon, evening, night, lateNight)
+├── day-greetings.ts      # Weekday variations (monday-friday, weekend)
+├── holiday-greetings.ts  # 7 holidays with date ranges
+└── fallback-greetings.ts # Generic greetings
+```
+
+**Priority System**:
+1. **Holidays** (highest) - Christmas, New Year, Halloween, Thanksgiving, Valentine's, Easter, Independence Day
+2. **Time-based** (75% weight) - Based on hour of day
+3. **Day-based** (25% weight) - Based on day of week
+
+**Key Features**:
+- Weighted randomness: Time-based greetings appear 3x more often than day-based
+- Holiday detection handles year boundaries (New Year: Dec 31 - Jan 2)
+- Each greeting has `withName` and `withoutName` variants for personalization
+- SSR hydration safety preserved in hooks
+
+**Functions Exported**:
+- `getSmartGreeting(userName?)` - Returns full greeting string
+- `getSmartGreetingParts(userName?)` - Returns `{ greeting, name }` for custom styling
+- `getTimePeriod()`, `getDayOfWeek()`, `getActiveHoliday()` - Utility functions
+
+**Hook Updates** (`lib/hooks/useGreeting.ts`):
+- `useGreeting()` - Now uses `getSmartGreeting`
+- `useGreetingParts()` - Now uses `getSmartGreetingParts`
+
+**Removed**: Old `lib/constants/greetings.ts` (single file replaced with modular folder structure)
+
+### Font System Update (January 13, 2026)
+
+Changed the app font from Inter to Comfortaa for a friendlier, more approachable look while maintaining professionalism.
+
+**Changes**:
+- **Layout** (`app/layout.tsx`): Replaced `Inter` with `Comfortaa` from `next/font/google`
+- **Home Page** (`app/(main)/page.tsx`): Updated greeting text size from `text-3xl` (30px) to `text-[36px]`
+
+**Font Choice Rationale**:
+- Comfortaa is a rounded geometric sans-serif that balances friendliness with professionalism
+- Appropriate for a legal platform that wants to be accessible and approachable
+- Good readability across all sizes
 
 ---
 
