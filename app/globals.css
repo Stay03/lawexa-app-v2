@@ -125,3 +125,67 @@
   }
 }
 
+/* Gold Shimmer Animation Keyframes */
+@keyframes gradient-rotate {
+  0% { background-position: 0% 50%; }
+  15% { background-position: 80% 30%; }
+  25% { background-position: 20% 70%; }
+  40% { background-position: 90% 20%; }
+  55% { background-position: 10% 80%; }
+  70% { background-position: 70% 40%; }
+  85% { background-position: 30% 90%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Reusable Gold Shimmer Classes */
+
+/* Border shimmer - use as wrapper with p-[2px] around content */
+.gold-shimmer {
+  background: linear-gradient(135deg, #fef3c7, #facc15, #eab308, #ca8a04, #cadd1d, #ac6407, #ffffff, #ca8a04, #eab308, #facc15, #fef3c7);
+  background-size: 800% 800%;
+  animation: gradient-rotate 25s ease-in-out infinite;
+  transition: background 0.3s ease;
+}
+
+/* Dark mode - more vibrant gold for visibility */
+.dark .gold-shimmer {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #eab308, #d97706, #facc15, #ca8a04, #fcd34d, #b45309, #f59e0b, #eab308, #fbbf24);
+  background-size: 800% 800%;
+  animation: gradient-rotate 25s ease-in-out infinite;
+}
+
+/* Focus variant - lighter with whitish-blue tones */
+.gold-shimmer-focus,
+.gold-shimmer:focus-within {
+  background: linear-gradient(135deg, #ffffff, #c9dde6, #abc6d8, #d4c986, #9eb2c0, #d6b73b, #b0c2c9, #dac56a, #000000, #fef3c7, #ffffff);
+  background-size: 800% 800%;
+  animation: gradient-rotate 45s ease-in-out infinite;
+}
+
+/* Dark mode focus variant */
+.dark .gold-shimmer-focus,
+.dark .gold-shimmer:focus-within {
+  background: linear-gradient(135deg, #fcd34d, #e2e8f0, #cbd5e1, #fbbf24, #94a3b8, #f59e0b, #e2e8f0, #eab308, #64748b, #fef3c7, #fcd34d);
+  background-size: 800% 800%;
+  animation: gradient-rotate 45s ease-in-out infinite;
+}
+
+/* Background shimmer - for badges, buttons, etc */
+.gold-shimmer-bg {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706, #ca8a04, #eab308, #b45309, #f3c547, #ca8a04, #d97706, #f59e0b, #fbbf24);
+  background-size: 800% 800%;
+  animation: gradient-rotate 20s ease-in-out infinite;
+  transition: background 0.3s ease;
+}
+
+/* Text shimmer - for gradient text effect */
+.gold-shimmer-text {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706, #ca8a04, #eab308, #b45309, #f3c547, #ca8a04, #d97706, #f59e0b, #fbbf24);
+  background-size: 800% 800%;
+  animation: gradient-rotate 8s ease-in-out infinite;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+

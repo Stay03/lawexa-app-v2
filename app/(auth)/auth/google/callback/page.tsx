@@ -14,7 +14,7 @@ function GoogleCallbackContent() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      const accessToken = searchParams.get('access_token');
+      const code = searchParams.get('code');
       const error = searchParams.get('error');
 
       // Handle error from Google
@@ -23,14 +23,14 @@ function GoogleCallbackContent() {
         return;
       }
 
-      // Handle missing token
-      if (!accessToken) {
+      // Handle missing code
+      if (!code) {
         router.push('/login?error=missing_token');
         return;
       }
 
       try {
-        const response = await authApi.googleCallback(accessToken);
+        const response = await authApi.googleCallback(code);
         if (response.success && response.data) {
           setAuth(response.data.user, response.data.token);
           router.push('/');

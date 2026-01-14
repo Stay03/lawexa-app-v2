@@ -32,10 +32,10 @@ export const authApi = {
     return response.data;
   },
 
-  googleCallback: async (accessToken: string) => {
+  googleCallback: async (code: string) => {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/auth/google',
-      { access_token: accessToken }
+      { code }
     );
     return response.data;
   },

@@ -311,6 +311,37 @@ lib/constants/greetings/
 
 **Removed**: Old `lib/constants/greetings.ts` (single file replaced with modular folder structure)
 
+### Gold Shimmer Border Effect (January 13, 2026)
+
+Added a reusable animated gold shimmer effect for borders, backgrounds, and text.
+
+**CSS Added** (`app/globals.css`):
+- `@keyframes gradient-rotate` - Smooth background position animation
+- `.gold-shimmer` - Border effect using wrapper technique with `p-[1px]`
+- `.gold-shimmer:focus-within` - Lighter whitish-blue tones on focus
+- `.gold-shimmer-bg` - Solid background shimmer for badges/buttons
+- `.gold-shimmer-text` - Gradient text effect
+- Dark mode variants for all shimmer classes
+
+**Component Updated** (`components/ui/prompt-input.tsx`):
+- Wrapped content with `gold-shimmer rounded-3xl p-[1px]` outer div
+- Inner content div maintains `bg-background` to show shimmer as border
+- Focus state automatically transitions to lighter color palette
+
+**Usage Examples**:
+```tsx
+// Border shimmer (wrapper technique)
+<div className="gold-shimmer p-[1px] rounded-lg">
+  <div className="bg-background rounded-lg p-4">Content</div>
+</div>
+
+// Background shimmer
+<button className="gold-shimmer-bg px-4 py-2 text-white">Button</button>
+
+// Text shimmer
+<span className="gold-shimmer-text text-2xl">Golden Text</span>
+```
+
 ### Font System Update (January 13, 2026)
 
 Changed the app font from Inter to Comfortaa for a friendlier, more approachable look while maintaining professionalism.

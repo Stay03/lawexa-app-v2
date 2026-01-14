@@ -90,15 +90,21 @@ function PromptInput({
         }}
       >
         <div
-          onClick={handleClick}
           className={cn(
-            "border-input bg-background cursor-text rounded-3xl border p-2 shadow-xs",
-            disabled && "cursor-not-allowed opacity-60",
-            className
+            "gold-shimmer rounded-3xl p-[1px]",
+            disabled && "cursor-not-allowed opacity-60"
           )}
-          {...props}
         >
-          {children}
+          <div
+            onClick={handleClick}
+            className={cn(
+              "bg-background cursor-text rounded-3xl p-2 shadow-xs",
+              className
+            )}
+            {...props}
+          >
+            {children}
+          </div>
         </div>
       </PromptInputContext.Provider>
     </TooltipProvider>
