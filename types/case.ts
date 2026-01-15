@@ -49,6 +49,7 @@ export interface Case {
   country: Country | null;
   judgment_date: string | null;
   citation: string | null;
+  views_count: number;
   meta: CaseMeta;
 }
 

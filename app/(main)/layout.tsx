@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import {
   Breadcrumb,
@@ -94,16 +94,18 @@ export default function MainLayout({
             <Breadcrumb>
               <BreadcrumbList>
                 {breadcrumbs.map((crumb, index) => (
-                  <BreadcrumbItem key={crumb.href} className={index === 0 ? "" : "hidden md:block"}>
+                  <React.Fragment key={crumb.href}>
                     {index > 0 && <BreadcrumbSeparator className="hidden md:block" />}
-                    {crumb.isPage ? (
-                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                    ) : (
-                      <BreadcrumbLink href={crumb.href}>
-                        {crumb.label}
-                      </BreadcrumbLink>
-                    )}
-                  </BreadcrumbItem>
+                    <BreadcrumbItem className={index === 0 ? '' : 'hidden md:block'}>
+                      {crumb.isPage ? (
+                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink href={crumb.href}>
+                          {crumb.label}
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  </React.Fragment>
                 ))}
               </BreadcrumbList>
             </Breadcrumb>

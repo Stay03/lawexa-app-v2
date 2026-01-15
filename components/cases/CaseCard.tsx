@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronRight, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Case } from '@/types/case';
 
@@ -15,7 +16,8 @@ interface CaseCardProps {
  * Compact case list item for grouped display
  */
 function CaseCard({ caseItem, className, style }: CaseCardProps) {
-  const { title, slug, court, judgment_date, principles, tags, country } = caseItem;
+  const router = useRouter();
+  const { title, slug, court, judgment_date, principles, tags, country, views_count } = caseItem;
 
   // Format date if available
   const formattedDate = judgment_date
@@ -65,6 +67,15 @@ function CaseCard({ caseItem, className, style }: CaseCardProps) {
           {formattedDate && (
             <span className="tabular-nums">{formattedDate}</span>
           )}
+          {views_count > 0 && (
+            <>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="flex items-center gap-1">
+                <Eye className="h-3 w-3" />
+                {views_count}
+              </span>
+            </>
+          )}
           <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:opacity-100 group-hover:translate-x-0.5" />
         </div>
       </div>
@@ -80,14 +91,18 @@ function CaseCard({ caseItem, className, style }: CaseCardProps) {
       {tags && tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {tags.slice(0, 5).map((tag) => (
-            <Link
+            <button
               key={tag}
-              href={`/cases?tags=${encodeURIComponent(tag)}`}
-              onClick={(e) => e.stopPropagation()}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                router.push(`/cases?tags=${encodeURIComponent(tag)}`);
+              }}
               className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary transition-colors hover:bg-primary/20"
             >
               {tag}
-            </Link>
+            </button>
           ))}
           {tags.length > 5 && (
             <span className="text-xs text-muted-foreground">
