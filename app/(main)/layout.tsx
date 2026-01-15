@@ -17,6 +17,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/common/ThemeToggle"
+import { ShareButton } from "@/components/common/ShareButton"
+import { ReaderModeToggle } from "@/components/cases/ReaderModeToggle"
 import { usePathname } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -110,7 +112,14 @@ export default function MainLayout({
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-          <div className="px-4">
+          <div className="flex items-center gap-2 px-4">
+            {/* Show Reader Mode and Share toggles only on case detail pages */}
+            {pathname.startsWith('/cases/') && pathname.split('/').length === 3 && (
+              <>
+                <ShareButton />
+                <ReaderModeToggle />
+              </>
+            )}
             <ThemeToggle />
           </div>
         </header>

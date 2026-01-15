@@ -12,6 +12,7 @@ import {
   CaseBodyCard,
   CaseMetadataGrid,
   CaseJudgesSection,
+  ReaderModeWrapper,
 } from '@/components/cases';
 import { PageContainer } from '@/components/layout';
 import { useCase } from '@/lib/hooks/useCases';
@@ -84,49 +85,51 @@ function CaseViewPage({ params }: CaseViewPageProps) {
 
   return (
     <PageContainer variant="detail">
-      {/* Hero Header */}
-      <CaseDetailHeader
-        title={caseDetail.title}
-        court={caseDetail.court}
-        country={caseDetail.country}
-        judgmentDate={caseDetail.judgment_date}
-        citation={caseDetail.citation}
-        tags={caseDetail.tags}
-        viewsCount={caseDetail.views_count}
-        animationDelay={ANIMATION_DELAYS.header}
-      />
-
-      {/* Legal Principles (Featured) */}
-      {caseDetail.principles && (
-        <CasePrinciplesCard
-          principles={caseDetail.principles}
-          animationDelay={ANIMATION_DELAYS.principles}
+      <ReaderModeWrapper caseData={caseDetail}>
+        {/* Hero Header */}
+        <CaseDetailHeader
+          title={caseDetail.title}
+          court={caseDetail.court}
+          country={caseDetail.country}
+          judgmentDate={caseDetail.judgment_date}
+          citation={caseDetail.citation}
+          tags={caseDetail.tags}
+          viewsCount={caseDetail.views_count}
+          animationDelay={ANIMATION_DELAYS.header}
         />
-      )}
 
-      {/* Case Body/Summary */}
-      <CaseBodyCard
-        body={caseDetail.body}
-        excerpt={caseDetail.excerpt}
-        animationDelay={ANIMATION_DELAYS.body}
-      />
+        {/* Legal Principles (Featured) */}
+        {caseDetail.principles && (
+          <CasePrinciplesCard
+            principles={caseDetail.principles}
+            animationDelay={ANIMATION_DELAYS.principles}
+          />
+        )}
 
-      {/* Metadata Grid */}
-      <CaseMetadataGrid
-        court={caseDetail.court}
-        country={caseDetail.country}
-        citation={caseDetail.citation}
-        topic={caseDetail.topic}
-        course={caseDetail.course}
-        judicialPrecedent={caseDetail.judicial_precedent}
-        animationStartDelay={ANIMATION_DELAYS.metadataStart}
-      />
+        {/* Case Body/Summary */}
+        <CaseBodyCard
+          body={caseDetail.body}
+          excerpt={caseDetail.excerpt}
+          animationDelay={ANIMATION_DELAYS.body}
+        />
 
-      {/* Judges Section */}
-      <CaseJudgesSection
-        judges={caseDetail.judges}
-        animationDelay={ANIMATION_DELAYS.judges}
-      />
+        {/* Metadata Grid */}
+        <CaseMetadataGrid
+          court={caseDetail.court}
+          country={caseDetail.country}
+          citation={caseDetail.citation}
+          topic={caseDetail.topic}
+          course={caseDetail.course}
+          judicialPrecedent={caseDetail.judicial_precedent}
+          animationStartDelay={ANIMATION_DELAYS.metadataStart}
+        />
+
+        {/* Judges Section */}
+        <CaseJudgesSection
+          judges={caseDetail.judges}
+          animationDelay={ANIMATION_DELAYS.judges}
+        />
+      </ReaderModeWrapper>
     </PageContainer>
   );
 }
