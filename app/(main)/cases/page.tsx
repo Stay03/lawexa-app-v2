@@ -1,18 +1,20 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Scale, BookOpen } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Scale, BookOpen, X, TrendingUp } from 'lucide-react';
+import { AnimatedTabs } from '@/components/ui/animated-tabs';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
   CaseCard,
+  CaseListGroup,
   CaseSearchBar,
   CasePagination,
   CaseListSkeleton,
 } from '@/components/cases';
 import { PageContainer, PageHeader } from '@/components/layout';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useCases } from '@/lib/hooks/useCases';
 
 /**
@@ -21,15 +23,18 @@ import { useCases } from '@/lib/hooks/useCases';
 function CasesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState('recent');
 
   // Read URL state
   const page = Number(searchParams.get('page')) || 1;
   const search = searchParams.get('search') || '';
+  const tags = searchParams.get('tags') || '';
 
   // Fetch cases
-  const { data, isLoading, isError, refetch } = useCases({
+  const { data, isFetching, isError, refetch } = useCases({
     page,
     search: search || undefined,
+    tags: tags || undefined,
     per_page: 15,
   });
 
@@ -53,10 +58,15 @@ function CasesPage() {
   // Handle search change
   const handleSearchChange = useCallback(
     (value: string) => {
-      updateParams({ search: value || null, page: null });
+      updateParams({ search: value || null, page: null, tags: null });
     },
     [updateParams]
   );
+
+  // Handle clear tags filter
+  const handleClearTags = useCallback(() => {
+    updateParams({ tags: null, page: null });
+  }, [updateParams]);
 
   // Handle page change
   const handlePageChange = useCallback(
@@ -66,12 +76,8 @@ function CasesPage() {
     [updateParams]
   );
 
-  // Render case list content
+  // Render case list content (loading state handled by parent)
   const renderContent = () => {
-    if (isLoading) {
-      return <CaseListSkeleton />;
-    }
-
     if (isError) {
       return (
         <ErrorState
@@ -83,18 +89,21 @@ function CasesPage() {
     }
 
     if (!data?.data || data.data.length === 0) {
+      const hasFilter = search || tags;
       return (
         <EmptyState
           icon={Scale}
-          title={search ? 'No cases found' : 'No cases yet'}
+          title={hasFilter ? 'No cases found' : 'No cases yet'}
           description={
-            search
-              ? `No cases match "${search}". Try a different search term.`
-              : 'Cases will appear here once added to the library.'
+            tags
+              ? `No cases found with tag "${tags}".`
+              : search
+                ? `No cases match "${search}". Try a different search term.`
+                : 'Cases will appear here once added to the library.'
           }
           action={
-            search
-              ? { label: 'Clear search', onClick: () => handleSearchChange('') }
+            hasFilter
+              ? { label: 'Clear filters', onClick: () => updateParams({ search: null, tags: null, page: null }) }
               : undefined
           }
         />
@@ -102,10 +111,17 @@ function CasesPage() {
     }
 
     return (
-      <div className="space-y-3">
-        {data.data.map((caseItem) => (
-          <CaseCard key={caseItem.id} caseItem={caseItem} />
-        ))}
+      <>
+        <CaseListGroup>
+          {data.data.map((caseItem, index) => (
+            <CaseCard
+              key={caseItem.id}
+              caseItem={caseItem}
+              className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
+              style={{ animationDelay: `${index * 30}ms` }}
+            />
+          ))}
+        </CaseListGroup>
 
         {data.pagination.last_page > 1 && (
           <CasePagination
@@ -113,10 +129,10 @@ function CasesPage() {
             lastPage={data.pagination.last_page}
             total={data.pagination.total}
             onPageChange={handlePageChange}
-            className="mt-6"
+            className="mt-4"
           />
         )}
-      </div>
+      </>
     );
   };
 
@@ -135,30 +151,64 @@ function CasesPage() {
         className="max-w-md"
       />
 
-      {/* Tabs */}
-      <Tabs defaultValue="recent" className="w-full">
-        <TabsList>
-          <TabsTrigger value="recent">
-            <BookOpen className="mr-1.5 h-4 w-4" />
-            Recent Cases
-          </TabsTrigger>
-          <TabsTrigger value="trending" disabled>
-            Trending
-          </TabsTrigger>
-        </TabsList>
+      {/* Active tag filter */}
+      {tags && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Filtering by tag:</span>
+          <button
+            type="button"
+            onClick={handleClearTags}
+            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-sm text-primary transition-colors hover:bg-primary/20"
+          >
+            {tags}
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
-        <TabsContent value="recent" className="mt-4">
-          {renderContent()}
-        </TabsContent>
-
-        <TabsContent value="trending" className="mt-4">
-          <EmptyState
-            icon={Scale}
-            title="Coming soon"
-            description="Trending cases will be available in a future update."
+      {/* Tabs - show skeleton until data is ready */}
+      {isFetching ? (
+        <div className="space-y-4">
+          <Skeleton className="h-9 w-48 rounded-full" />
+          <CaseListSkeleton />
+        </div>
+      ) : (
+        <>
+          <AnimatedTabs
+            tabs={[
+              {
+                value: 'recent',
+                label: 'Recent Cases',
+                icon: <BookOpen className="h-4 w-4" />,
+              },
+              {
+                value: 'trending',
+                label: 'Trending',
+                icon: <TrendingUp className="h-4 w-4" />,
+              },
+            ]}
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="animate-in slide-in-from-top-2 duration-300"
           />
-        </TabsContent>
-      </Tabs>
+
+          {activeTab === 'recent' && (
+            <div className="mt-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+              {renderContent()}
+            </div>
+          )}
+
+          {activeTab === 'trending' && (
+            <div className="mt-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+              <EmptyState
+                icon={TrendingUp}
+                title="No trending cases"
+                description="Trending cases will appear here based on popularity and engagement."
+              />
+            </div>
+          )}
+        </>
+      )}
     </PageContainer>
   );
 }

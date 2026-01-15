@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { casesApi } from '@/lib/api/cases';
 import type { CaseListParams } from '@/types/case';
 
@@ -20,7 +20,6 @@ export function useCases(params: CaseListParams = {}) {
   return useQuery({
     queryKey: caseKeys.list(params),
     queryFn: () => casesApi.getList(params),
-    placeholderData: keepPreviousData,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

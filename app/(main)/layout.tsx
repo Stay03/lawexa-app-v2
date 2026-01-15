@@ -48,13 +48,13 @@ function LayoutSkeleton({ children }: { children: React.ReactNode }) {
           <Skeleton className="h-8 w-3/4" />
         </div>
       </div>
-      {/* Main content */}
+      {/* Main content - matches real layout structure */}
       <div className="flex-1 flex flex-col">
-        <header className="flex h-16 items-center gap-2 border-b px-4">
+        <header className="flex h-16 shrink-0 items-center gap-2 px-4">
           <Skeleton className="h-8 w-8" />
           <Skeleton className="h-4 w-32" />
         </header>
-        <div className="flex-1 p-4">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           {children}
         </div>
       </div>

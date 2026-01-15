@@ -114,4 +114,5 @@ export interface CaseListParams {
   court_id?: number;
   country_id?: number;
   year?: number;
+  tags?: string; // Filter by tags (comma-separated or single tag)
 }

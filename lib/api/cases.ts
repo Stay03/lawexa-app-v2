@@ -21,6 +21,7 @@ export const casesApi = {
         court_id: params.court_id || undefined,
         country_id: params.country_id || undefined,
         year: params.year || undefined,
+        tags: params.tags || undefined,
       },
     });
     return response.data;
