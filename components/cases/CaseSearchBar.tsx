@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -23,31 +23,45 @@ function CaseSearchBar({
   className,
 }: CaseSearchBarProps) {
   const [localValue, setLocalValue] = useState(value);
+  const isPendingRef = useRef(false);
 
-  // Sync local value with external value
+  // Sync local value with external value ONLY when not actively typing
   useEffect(() => {
-    setLocalValue(value);
+    if (!isPendingRef.current) {
+      setLocalValue(value);
+    }
   }, [value]);
 
   // Debounce the onChange callback
   useEffect(() => {
+    if (localValue === value) {
+      isPendingRef.current = false;
+      return;
+    }
+    isPendingRef.current = true;
     const timer = setTimeout(() => {
-      if (localValue !== value) {
-        onChange(localValue);
-      }
+      isPendingRef.current = false;
+      onChange(localValue);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [localValue, onChange, value]);
+
+  // Handle input change
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    isPendingRef.current = true;
+    setLocalValue(e.target.value);
+  };
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    isPendingRef.current = false;
     onChange(localValue);
   };
 
   // Clear search input
   const handleClear = () => {
+    isPendingRef.current = false;
     setLocalValue('');
     onChange('');
   };
@@ -58,7 +72,7 @@ function CaseSearchBar({
       <Input
         type="text"
         value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
+        onChange={handleChange}
         placeholder={placeholder}
         className="pl-10 pr-10"
       />
