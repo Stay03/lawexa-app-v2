@@ -42,12 +42,6 @@ const navMain = [
     title: "Cases",
     url: "/cases",
     icon: Scale,
-    items: [
-      { title: "Browse All", url: "/cases" },
-      { title: "Supreme Court", url: "/cases?court=supreme" },
-      { title: "Court of Appeal", url: "/cases?court=appeal" },
-      { title: "High Court", url: "/cases?court=high" },
-    ],
   },
   {
     title: "Notes",
