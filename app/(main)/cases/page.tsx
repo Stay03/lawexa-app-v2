@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Scale, BookOpen, X, TrendingUp } from 'lucide-react';
 import { AnimatedTabs } from '@/components/ui/animated-tabs';
@@ -18,9 +18,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCases } from '@/lib/hooks/useCases';
 
 /**
- * Case Library list page
+ * Case Library list page content (uses useSearchParams)
  */
-function CasesPage() {
+function CasesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('recent');
@@ -210,6 +210,31 @@ function CasesPage() {
         </>
       )}
     </PageContainer>
+  );
+}
+
+/**
+ * Case Library list page with Suspense boundary for useSearchParams
+ */
+function CasesPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer variant="list">
+          <PageHeader
+            title="Case Library"
+            description="Browse and search legal cases from our comprehensive database."
+          />
+          <Skeleton className="h-10 max-w-md" />
+          <div className="space-y-4">
+            <Skeleton className="h-9 w-48 rounded-full" />
+            <CaseListSkeleton />
+          </div>
+        </PageContainer>
+      }
+    >
+      <CasesPageContent />
+    </Suspense>
   );
 }
 

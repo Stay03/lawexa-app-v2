@@ -29,9 +29,27 @@ export const casesApi = {
 
   /**
    * Get single case by slug
+   * @param slug - Case slug identifier
+   * @param options - Optional query parameters for including related data
    */
-  getBySlug: async (slug: string): Promise<CaseDetailResponse> => {
-    const response = await apiClient.get<CaseDetailResponse>(`/cases/${slug}`);
+  getBySlug: async (
+    slug: string,
+    options: {
+      includeFullReport?: boolean;
+      includeSimilarCases?: boolean;
+      includeCitedCases?: boolean;
+      includeCitedBy?: boolean;
+    } = {}
+  ): Promise<CaseDetailResponse> => {
+    const params: Record<string, boolean> = {};
+    if (options.includeFullReport) params.include_full_report = true;
+    if (options.includeSimilarCases) params.include_similar_cases = true;
+    if (options.includeCitedCases) params.include_cited_cases = true;
+    if (options.includeCitedBy) params.include_cited_by = true;
+
+    const response = await apiClient.get<CaseDetailResponse>(`/cases/${slug}`, {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    });
     return response.data;
   },
 };

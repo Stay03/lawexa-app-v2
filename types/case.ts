@@ -27,6 +27,27 @@ export interface Judge {
   updated_at: string;
 }
 
+// Full report type (from include_full_report=true)
+export interface FullReport {
+  id: number;
+  case_id: number;
+  full_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Related case type (for similar_cases, cited_cases, cited_by)
+export interface RelatedCase {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  citation: string | null;
+  judgment_date: string | null;
+  court: Court | null;
+  country: Country | null;
+}
+
 // Meta information for SEO
 export interface CaseMeta {
   title: string;
@@ -58,6 +79,12 @@ export interface CaseDetail extends Case {
   body: string;
   judges: Judge[];
   judicial_precedent: string | null;
+  has_full_report?: boolean;
+  full_report?: FullReport | null;
+  similar_cases?: RelatedCase[] | null;
+  cited_cases?: RelatedCase[] | null;
+  cited_by?: RelatedCase[] | null;
+  cited_by_count?: number;
   creator: {
     id: number;
     name: string;

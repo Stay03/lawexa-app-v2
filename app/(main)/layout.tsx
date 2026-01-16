@@ -113,12 +113,13 @@ export default function MainLayout({
             </Breadcrumb>
           </div>
           <div className="flex items-center gap-2 px-4">
-            {/* Show Reader Mode and Share toggles only on case detail pages */}
+            {/* Show Share on case detail and report pages */}
+            {pathname.startsWith('/cases/') && pathname.split('/').length >= 3 && (
+              <ShareButton />
+            )}
+            {/* Show Reader Mode toggle only on case detail page (not report page) */}
             {pathname.startsWith('/cases/') && pathname.split('/').length === 3 && (
-              <>
-                <ShareButton />
-                <ReaderModeToggle />
-              </>
+              <ReaderModeToggle />
             )}
             <ThemeToggle />
           </div>

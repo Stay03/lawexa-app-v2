@@ -13,9 +13,11 @@ import {
   CaseMetadataGrid,
   CaseJudgesSection,
   ReaderModeWrapper,
+  ViewFullReportButton,
+  RelatedCasesSection,
 } from '@/components/cases';
 import { PageContainer } from '@/components/layout';
-import { useCase } from '@/lib/hooks/useCases';
+import { useCaseWithRelated } from '@/lib/hooks/useCases';
 
 /******************************************************************************
                                Constants
@@ -23,10 +25,14 @@ import { useCase } from '@/lib/hooks/useCases';
 
 const ANIMATION_DELAYS = {
   header: 0,
+  viewReportButton: 100,
   principles: 150,
   body: 250,
   metadataStart: 350,
   judges: 550,
+  similarCases: 650,
+  citedCases: 750,
+  citedBy: 850,
 } as const;
 
 /******************************************************************************
@@ -43,7 +49,7 @@ interface CaseViewPageProps {
 function CaseViewPage({ params }: CaseViewPageProps) {
   const { slug } = use(params);
   const router = useRouter();
-  const { data, isLoading, isError, refetch } = useCase(slug);
+  const { data, isLoading, isError, refetch } = useCaseWithRelated(slug);
 
   // Loading state
   if (isLoading) {
@@ -85,7 +91,13 @@ function CaseViewPage({ params }: CaseViewPageProps) {
 
   return (
     <PageContainer variant="detail">
-      <ReaderModeWrapper caseData={caseDetail}>
+      <ReaderModeWrapper
+        caseData={caseDetail}
+        slug={slug}
+        similarCases={caseDetail.similar_cases}
+        citedCases={caseDetail.cited_cases}
+        citedBy={caseDetail.cited_by}
+      >
         {/* Hero Header */}
         <CaseDetailHeader
           title={caseDetail.title}
@@ -97,6 +109,16 @@ function CaseViewPage({ params }: CaseViewPageProps) {
           viewsCount={caseDetail.views_count}
           animationDelay={ANIMATION_DELAYS.header}
         />
+
+        {/* View Full Report Button */}
+        {caseDetail.has_full_report && (
+          <div
+            className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
+            style={{ animationDelay: `${ANIMATION_DELAYS.viewReportButton}ms` }}
+          >
+            <ViewFullReportButton slug={slug} hasFullReport={caseDetail.has_full_report} />
+          </div>
+        )}
 
         {/* Legal Principles (Featured) */}
         {caseDetail.principles && (
@@ -129,6 +151,33 @@ function CaseViewPage({ params }: CaseViewPageProps) {
           judges={caseDetail.judges}
           animationDelay={ANIMATION_DELAYS.judges}
         />
+
+        {/* Similar Cases */}
+        {caseDetail.similar_cases && caseDetail.similar_cases.length > 0 && (
+          <RelatedCasesSection
+            type="similar"
+            cases={caseDetail.similar_cases}
+            animationDelay={ANIMATION_DELAYS.similarCases}
+          />
+        )}
+
+        {/* Cases Cited */}
+        {caseDetail.cited_cases && caseDetail.cited_cases.length > 0 && (
+          <RelatedCasesSection
+            type="cited"
+            cases={caseDetail.cited_cases}
+            animationDelay={ANIMATION_DELAYS.citedCases}
+          />
+        )}
+
+        {/* Cited By */}
+        {caseDetail.cited_by && caseDetail.cited_by.length > 0 && (
+          <RelatedCasesSection
+            type="cited_by"
+            cases={caseDetail.cited_by}
+            animationDelay={ANIMATION_DELAYS.citedBy}
+          />
+        )}
       </ReaderModeWrapper>
     </PageContainer>
   );

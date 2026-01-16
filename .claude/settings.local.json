@@ -12,7 +12,8 @@
       "Bash(npx tsc:*)",
       "Bash(find:*)",
       "Bash(cat:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git commit:*)"
     ]
   },
   "enabledPlugins": {

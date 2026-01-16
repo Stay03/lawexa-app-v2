@@ -4,20 +4,36 @@ import { useState, useEffect } from 'react';
 import { useReaderModeStore } from '@/lib/stores/readerModeStore';
 import { cn } from '@/lib/utils';
 import { CaseDocumentView } from './CaseDocumentView';
-import type { CaseDetail } from '@/types/case';
+import type { CaseDetail, RelatedCase } from '@/types/case';
 
 interface ReaderModeWrapperProps {
   children: React.ReactNode;
   className?: string;
   /** Case data for document view - required for Reader Mode to show document layout */
   caseData?: CaseDetail;
+  /** Case slug for navigation links in document view */
+  slug?: string;
+  /** Similar cases for document view */
+  similarCases?: RelatedCase[] | null;
+  /** Cases cited by this case */
+  citedCases?: RelatedCase[] | null;
+  /** Cases that cite this case */
+  citedBy?: RelatedCase[] | null;
 }
 
 /**
  * Wrapper component that applies document-style reading experience
  * when Reader Mode is enabled. Shows document layout instead of cards.
  */
-function ReaderModeWrapper({ children, className, caseData }: ReaderModeWrapperProps) {
+function ReaderModeWrapper({
+  children,
+  className,
+  caseData,
+  slug,
+  similarCases,
+  citedCases,
+  citedBy,
+}: ReaderModeWrapperProps) {
   const [mounted, setMounted] = useState(false);
   const isReaderModeEnabled = useReaderModeStore((state) => state.isReaderModeEnabled);
 
@@ -43,8 +59,14 @@ function ReaderModeWrapper({ children, className, caseData }: ReaderModeWrapperP
         className
       )}
     >
-      {shouldApplyReaderMode && caseData ? (
-        <CaseDocumentView caseData={caseData} />
+      {shouldApplyReaderMode && caseData && slug ? (
+        <CaseDocumentView
+          caseData={caseData}
+          slug={slug}
+          similarCases={similarCases}
+          citedCases={citedCases}
+          citedBy={citedBy}
+        />
       ) : (
         children
       )}
