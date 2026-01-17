@@ -123,6 +123,17 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Global text selection styling - uses primary/golden color */
+  ::selection {
+    background-color: oklch(0.58 0.14 82 / 0.35);
+    color: inherit;
+  }
+
+  .dark ::selection {
+    background-color: oklch(0.70 0.14 82 / 0.4);
+    color: inherit;
+  }
 }
 
 /* Gold Shimmer Animation Keyframes */
