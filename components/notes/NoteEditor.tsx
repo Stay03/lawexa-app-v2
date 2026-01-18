@@ -10,6 +10,7 @@ import Underline from '@tiptap/extension-underline';
 import { cn } from '@/lib/utils';
 import { EditorToolbar } from './EditorToolbar';
 import { EditorBubbleMenu } from './EditorBubbleMenu';
+import { CaseMention } from './mention';
 
 export interface NoteEditorRef {
   getEditor: () => Editor | null;
@@ -67,6 +68,7 @@ const NoteEditor = memo(forwardRef<NoteEditorRef, NoteEditorProps>(function Note
       Placeholder.configure({
         placeholder,
       }),
+      CaseMention,
     ],
     content,
     editorProps: {
