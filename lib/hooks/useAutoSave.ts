@@ -30,6 +30,8 @@ interface UseAutoSaveReturn {
   noteSlug: string | null;
   /** Manually trigger a save */
   triggerSave: (data: { title: string; content: string }) => void;
+  /** Force an immediate save (bypasses debounce) and return the slug */
+  saveImmediately: (data: { title: string; content: string }) => Promise<string | null>;
   /** Whether there are unsaved changes */
   hasUnsavedChanges: boolean;
 }
@@ -125,6 +127,16 @@ export function useAutoSave({
     },
   });
 
+  // Refs to hold mutation objects to avoid recreating triggerSave callback
+  const createMutationRef = useRef(createMutation);
+  const updateMutationRef = useRef(updateMutation);
+
+  // Keep mutation refs current
+  useEffect(() => {
+    createMutationRef.current = createMutation;
+    updateMutationRef.current = updateMutation;
+  });
+
   // Update relative time display periodically
   useEffect(() => {
     if (!lastSavedAt) return;
@@ -142,7 +154,7 @@ export function useAutoSave({
     return () => clearInterval(interval);
   }, [lastSavedAt]);
 
-  // Trigger save function
+  // Trigger save function (debounced)
   const triggerSave = useCallback(
     (data: { title: string; content: string }) => {
       if (!enabled) return;
@@ -178,8 +190,8 @@ export function useAutoSave({
         lastSavedContentRef.current = { ...data };
 
         if (noteId) {
-          // Update existing note
-          updateMutation.mutate({
+          // Update existing note (use ref to avoid stale closure)
+          updateMutationRef.current.mutate({
             id: noteId,
             data: {
               title: data.title,
@@ -188,8 +200,8 @@ export function useAutoSave({
             },
           });
         } else {
-          // Create new note
-          createMutation.mutate({
+          // Create new note (use ref to avoid stale closure)
+          createMutationRef.current.mutate({
             title: data.title,
             content: data.content,
             status: 'draft',
@@ -197,7 +209,54 @@ export function useAutoSave({
         }
       }, debounceMs);
     },
-    [enabled, noteId, debounceMs, createMutation, updateMutation]
+    [enabled, noteId, debounceMs]
+  );
+
+  // Force immediate save (bypasses debounce) - used for publish flow
+  const saveImmediately = useCallback(
+    async (data: { title: string; content: string }): Promise<string | null> => {
+      // Don't save if title is empty
+      if (!data.title.trim()) {
+        return null;
+      }
+
+      // Clear any pending debounce timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      setSaveStatus('saving');
+
+      // Update the reference to current content
+      lastSavedContentRef.current = { ...data };
+
+      try {
+        if (noteId) {
+          // Update existing note
+          const response = await updateMutationRef.current.mutateAsync({
+            id: noteId,
+            data: {
+              title: data.title,
+              content: data.content,
+              status: 'draft',
+            },
+          });
+          return response.data.slug;
+        } else {
+          // Create new note
+          const response = await createMutationRef.current.mutateAsync({
+            title: data.title,
+            content: data.content,
+            status: 'draft',
+          });
+          return response.data.slug;
+        }
+      } catch {
+        setSaveStatus('error');
+        return null;
+      }
+    },
+    [noteId]
   );
 
   // Cleanup on unmount
@@ -216,6 +275,7 @@ export function useAutoSave({
     noteId,
     noteSlug,
     triggerSave,
+    saveImmediately,
     hasUnsavedChanges,
   };
 }

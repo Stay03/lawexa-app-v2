@@ -30,6 +30,7 @@ export interface Note {
   slug: string;
   content: string | null;
   content_preview: string;
+  content_preview_html?: string;
   is_private: boolean;
   tags: string[] | null;
   price_ngn: string;

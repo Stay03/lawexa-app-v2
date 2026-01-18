@@ -18,5 +18,5 @@ export { NoteAuthorCard } from './NoteAuthorCard';
 export { WriterModeToggle } from './WriterModeToggle';
 export { NotesNavTabs } from './NotesNavTabs';
 export type { NotesTab } from './NotesNavTabs';
-export { NotePublishDialog } from './NotePublishDialog';
-export type { PublishData } from './NotePublishDialog';
+export { NotePublishPage } from './NotePublishPage';
+export type { PublishData } from './NotePublishPage';

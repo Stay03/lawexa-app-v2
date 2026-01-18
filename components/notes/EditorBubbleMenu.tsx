@@ -92,14 +92,13 @@ function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
     editor.registerPlugin(plugin);
 
     // Force re-render when selection changes to update active states
+    // Note: Only listen to selectionUpdate, not transaction (which fires on every keystroke)
     const updateHandler = () => forceUpdate({});
     editor.on('selectionUpdate', updateHandler);
-    editor.on('transaction', updateHandler);
 
     return () => {
       editor.unregisterPlugin('bubbleMenu');
       editor.off('selectionUpdate', updateHandler);
-      editor.off('transaction', updateHandler);
     };
   }, [editor]);
 

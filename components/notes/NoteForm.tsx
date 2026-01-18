@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Editor } from '@tiptap/react';
 import {
   Form,
@@ -17,7 +19,6 @@ import { cn } from '@/lib/utils';
 import { NoteEditor, type NoteEditorRef } from './NoteEditor';
 import { EditorToolbar } from './EditorToolbar';
 import { WriterModeToggle } from './WriterModeToggle';
-import { NotePublishDialog, type PublishData } from './NotePublishDialog';
 import { createNoteSchema, type CreateNoteFormData } from '@/lib/utils/note-validation';
 import { useUploadContentImage } from '@/lib/hooks/useNotes';
 import { useWriterMode } from '@/lib/hooks/useWriterMode';
@@ -39,10 +40,11 @@ function NoteForm({
   onSubmit,
   isSubmitting = false,
 }: NoteFormProps) {
+  const router = useRouter();
   const uploadImage = useUploadContentImage();
   const { isWriterModeEnabled, disableWriterMode } = useWriterMode();
   const [mounted, setMounted] = useState(false);
-  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [isNavigatingToPublish, setIsNavigatingToPublish] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
   const editorRef = useRef<NoteEditorRef>(null);
@@ -73,39 +75,45 @@ function NoteForm({
   const {
     saveStatus,
     lastSavedText,
+    noteSlug,
     triggerSave,
+    saveImmediately,
   } = useAutoSave({
     existingNote: initialData,
     debounceMs: 2000,
     enabled: true,
   });
 
-  // Watch form values for auto-save
-  const watchedTitle = form.watch('title');
-  const watchedContent = form.watch('content');
-
-  // Trigger auto-save when content changes
+  // Subscribe to form changes for auto-save (without causing re-renders)
   useEffect(() => {
-    if (mounted) {
-      triggerSave({ title: watchedTitle, content: watchedContent });
-    }
-  }, [watchedTitle, watchedContent, mounted, triggerSave]);
+    const subscription = form.watch((values) => {
+      if (mounted) {
+        triggerSave({ title: values.title || '', content: values.content || '' });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, mounted, triggerSave]);
 
   // Handle editor ready - store editor instance for toolbar access
   const handleEditorReady = useCallback((editorInstance: Editor) => {
     setEditor(editorInstance);
   }, []);
 
-  // Update character count when content changes
+  // Update character count when content changes (debounced to avoid lag)
   useEffect(() => {
     if (editor) {
+      let timeoutId: NodeJS.Timeout;
       const updateCharCount = () => {
-        setCharacterCount(editor.getText().length);
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setCharacterCount(editor.getText().length);
+        }, 300);
       };
       updateCharCount();
       editor.on('update', updateCharCount);
       return () => {
         editor.off('update', updateCharCount);
+        clearTimeout(timeoutId);
       };
     }
   }, [editor]);
@@ -132,41 +140,49 @@ function NoteForm({
     [uploadImage]
   );
 
-  // Handle publish button click - validate and open dialog
+  // Handle publish button click - save and navigate to publish page
   const handlePublishClick = async () => {
     // Validate title and content
     const isValid = await form.trigger(['title', 'content']);
-    if (isValid) {
-      setShowPublishDialog(true);
+    if (!isValid) return;
+
+    setIsNavigatingToPublish(true);
+
+    try {
+      const title = form.getValues('title');
+      const content = form.getValues('content');
+
+      // If we already have a slug (existing note or auto-saved), use it
+      // Otherwise, save immediately to get a slug
+      let slugToUse: string | undefined = noteSlug || initialData?.slug || undefined;
+
+      if (!slugToUse) {
+        // Force save to get a slug for new notes
+        const savedSlug = await saveImmediately({ title, content });
+        if (!savedSlug) {
+          toast.error('Failed to save note', {
+            description: 'Please try again.',
+          });
+          setIsNavigatingToPublish(false);
+          return;
+        }
+        slugToUse = savedSlug;
+      }
+
+      // Navigate to the appropriate publish page
+      if (initialData?.slug) {
+        // Editing existing note
+        router.push(`/notes/${initialData.slug}/publish`);
+      } else {
+        // New note - use the slug from auto-save
+        router.push(`/notes/publish?slug=${slugToUse}`);
+      }
+    } catch {
+      toast.error('Failed to save note', {
+        description: 'Please try again.',
+      });
+      setIsNavigatingToPublish(false);
     }
-  };
-
-  // Handle publish from dialog
-  const handlePublish = (publishData: PublishData) => {
-    const formData: CreateNoteFormData = {
-      title: form.getValues('title'),
-      content: form.getValues('content'),
-      tags: publishData.tags,
-      is_private: publishData.is_private,
-      price_ngn: publishData.price_ngn,
-      price_usd: publishData.price_usd,
-      status: 'published',
-    };
-    onSubmit(formData);
-  };
-
-  // Handle save as draft from dialog
-  const handleSaveDraft = (publishData: PublishData) => {
-    const formData: CreateNoteFormData = {
-      title: form.getValues('title'),
-      content: form.getValues('content'),
-      tags: publishData.tags,
-      is_private: publishData.is_private,
-      price_ngn: publishData.price_ngn,
-      price_usd: publishData.price_usd,
-      status: 'draft',
-    };
-    onSubmit(formData);
   };
 
   // Get save status display
@@ -210,9 +226,10 @@ function NoteForm({
           <WriterModeToggle />
           <Button
             onClick={handlePublishClick}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isNavigatingToPublish}
             className="bg-green-600 hover:bg-green-700 text-white rounded-full px-6"
           >
+            {isNavigatingToPublish && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Publish
           </Button>
         </div>
@@ -325,23 +342,6 @@ function NoteForm({
           </div>
         </>
       )}
-
-      {/* Publish dialog */}
-      <NotePublishDialog
-        open={showPublishDialog}
-        onOpenChange={setShowPublishDialog}
-        title={form.watch('title')}
-        content={form.watch('content')}
-        initialData={{
-          tags: form.getValues('tags'),
-          is_private: form.getValues('is_private'),
-          price_ngn: form.getValues('price_ngn'),
-          price_usd: form.getValues('price_usd'),
-        }}
-        onPublish={handlePublish}
-        onSaveDraft={handleSaveDraft}
-        isSubmitting={isSubmitting}
-      />
     </>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useCallback, useEffect, useImperativeHandle, forwardRef, memo } from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
@@ -29,8 +29,9 @@ interface NoteEditorProps {
 
 /**
  * Clean, minimal rich text editor for notes using TipTap
+ * Memoized to prevent unnecessary re-renders from parent components
  */
-const NoteEditor = forwardRef<NoteEditorRef, NoteEditorProps>(function NoteEditor(
+const NoteEditor = memo(forwardRef<NoteEditorRef, NoteEditorProps>(function NoteEditor(
   {
     content,
     onChange,
@@ -153,6 +154,6 @@ const NoteEditor = forwardRef<NoteEditorRef, NoteEditorProps>(function NoteEdito
       <EditorContent editor={editor} />
     </div>
   );
-});
+}));
 
 export { NoteEditor };
