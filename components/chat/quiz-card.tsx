@@ -107,7 +107,7 @@ export function QuizCard({
   return (
     <Card
       size="sm"
-      className="w-full max-w-[calc(100vw-3rem)] transition-shadow duration-300 hover:shadow-md sm:max-w-2xl"
+      className="w-full transition-shadow duration-300 hover:shadow-md"
     >
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
@@ -150,7 +150,7 @@ export function QuizCard({
             >
               {option.id}.
             </span>
-            <span className="flex-1">{option.text}</span>
+            <span className="min-w-0 flex-1 break-words">{option.text}</span>
             <div className="flex size-5 shrink-0 items-center justify-center">
               {showResult && option.id === quiz.answer && (
                 <CheckCircle className="size-5 animate-in fade-in zoom-in text-green-500 duration-300" />
@@ -317,57 +317,54 @@ export function QuizCardList({ quizzes }: QuizCardListProps) {
   const canScrollNext = currentIndex < quizzes.length - 1;
 
   return (
-    <div className="my-3 flex flex-col gap-3">
-      {/* Progress indicator */}
-      <div className="text-muted-foreground text-center text-sm">
-        Question {currentIndex + 1} of {quizzes.length}
-      </div>
-
-      {/* Carousel with navigation */}
-      <div className="relative">
-        {/* Left arrow */}
+    <div className="my-3 flex w-full min-w-0 flex-col gap-3 overflow-hidden">
+      {/* Progress indicator with navigation */}
+      <div className="flex items-center justify-center gap-3">
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
           onClick={scrollPrev}
           disabled={!canScrollPrev}
-          className="absolute -left-3 top-1/2 z-10 size-8 -translate-y-1/2 rounded-full shadow-md disabled:opacity-0 sm:-left-4"
+          className="size-8 rounded-full transition-opacity disabled:pointer-events-none disabled:opacity-30"
           aria-label="Previous question"
         >
           <ChevronLeft className="size-4" />
         </Button>
 
-        {/* Carousel container */}
-        <div className="overflow-hidden px-1" ref={emblaRef}>
-          <div className="flex">
-            {quizzes.map((quiz, index) => (
-              <div
-                key={`quiz-${index}`}
-                className="min-w-0 flex-[0_0_100%] pl-0"
-              >
-                <QuizCard
-                  quiz={quiz}
-                  quizNumber={index + 1}
-                  onAnswerSelect={handleAnswerSelect}
-                  selectedAnswer={answers[index]}
-                  showResult={isSubmitted}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <span className="text-muted-foreground text-sm">
+          Question {currentIndex + 1} of {quizzes.length}
+        </span>
 
-        {/* Right arrow */}
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
           onClick={scrollNext}
           disabled={!canScrollNext}
-          className="absolute -right-3 top-1/2 z-10 size-8 -translate-y-1/2 rounded-full shadow-md disabled:opacity-0 sm:-right-4"
+          className="size-8 rounded-full transition-opacity disabled:pointer-events-none disabled:opacity-30"
           aria-label="Next question"
         >
           <ChevronRight className="size-4" />
         </Button>
+      </div>
+
+      {/* Carousel container */}
+      <div className="w-full overflow-hidden" ref={emblaRef}>
+        <div className="flex">
+          {quizzes.map((quiz, index) => (
+            <div
+              key={`quiz-${index}`}
+              className="w-full min-w-0 flex-[0_0_100%]"
+            >
+              <QuizCard
+                quiz={quiz}
+                quizNumber={index + 1}
+                onAnswerSelect={handleAnswerSelect}
+                selectedAnswer={answers[index]}
+                showResult={isSubmitted}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Dot indicators */}

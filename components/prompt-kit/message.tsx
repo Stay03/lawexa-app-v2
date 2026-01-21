@@ -55,7 +55,7 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
         const parsed = parseContent(children);
 
         return (
-          <div ref={ref} className={cn('space-y-3', className)} {...props}>
+          <div ref={ref} className={cn('w-full min-w-0 space-y-3', className)} {...props}>
             {parsed.segments.map((segment, index) => {
               if (segment.type === 'lawyers') {
                 return (
