@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import { useCaseMentionTooltips } from '@/lib/hooks/useCaseMentionTooltips';
 
 interface NoteContentProps {
   content: string | null;
@@ -18,6 +19,13 @@ interface NoteContentProps {
 function NoteContent({ content, animationDelay = 0, className }: NoteContentProps) {
   const router = useRouter();
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Attach hover tooltips to case mentions
+  useCaseMentionTooltips({
+    containerRef: contentRef,
+    enabled: !!content,
+    content,
+  });
 
   // Handle clicks on case mentions for client-side navigation
   const handleMentionClick = useCallback(

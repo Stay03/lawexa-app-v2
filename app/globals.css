@@ -614,6 +614,167 @@
   color: oklch(0.82 0.10 82);
 }
 
+/* =============================================================================
+   Case Mention Tooltip Theme - Rich hover preview for @case mentions
+   ============================================================================= */
+
+.tippy-box[data-theme~='case-mention-tooltip'].tippy-box {
+  background-color: hsl(var(--popover)) !important;
+  color: hsl(var(--popover-foreground)) !important;
+  border-radius: 0.75rem !important;
+  padding: 0 !important;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.25), 0 8px 10px -6px rgb(0 0 0 / 0.2) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  max-width: 380px;
+  backdrop-filter: blur(8px);
+}
+
+/* Dark mode - darker, more opaque background with stronger blur */
+.dark .tippy-box[data-theme~='case-mention-tooltip'].tippy-box {
+  background-color: hsl(220 20% 10% / 0.98) !important;
+  border: 1px solid hsl(220 10% 25% / 0.6) !important;
+  box-shadow: 0 10px 40px -10px rgb(0 0 0 / 0.7), 0 8px 20px -8px rgb(0 0 0 / 0.6), inset 0 1px 0 0 hsl(220 10% 30% / 0.2) !important;
+  backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.tippy-box[data-theme~='case-mention-tooltip'].tippy-box .tippy-content {
+  padding: 0 !important;
+  background-color: transparent !important;
+}
+
+.tippy-box[data-theme~='case-mention-tooltip'].tippy-box .tippy-arrow {
+  display: block !important;
+  color: hsl(var(--popover));
+}
+
+.dark .tippy-box[data-theme~='case-mention-tooltip'].tippy-box .tippy-arrow {
+  color: hsl(220 20% 10% / 0.98);
+}
+
+.tippy-box[data-theme~='case-mention-tooltip'].tippy-box[data-placement^='top'] > .tippy-arrow::before {
+  border-top-color: hsl(var(--popover));
+}
+
+.dark .tippy-box[data-theme~='case-mention-tooltip'].tippy-box[data-placement^='top'] > .tippy-arrow::before {
+  border-top-color: hsl(220 20% 10% / 0.98);
+}
+
+.tippy-box[data-theme~='case-mention-tooltip'].tippy-box[data-placement^='bottom'] > .tippy-arrow::before {
+  border-bottom-color: hsl(var(--popover));
+}
+
+.dark .tippy-box[data-theme~='case-mention-tooltip'].tippy-box[data-placement^='bottom'] > .tippy-arrow::before {
+  border-bottom-color: hsl(220 20% 10% / 0.98);
+}
+
+/* Rich case preview tooltip content */
+.case-preview-tooltip {
+  padding: 1rem;
+  background-color: hsl(var(--popover));
+  border-radius: 0.75rem;
+}
+
+.dark .case-preview-tooltip {
+  background-color: hsl(220 20% 10% / 0.98);
+}
+
+.case-preview-tooltip__header {
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--popover-foreground));
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.case-preview-tooltip__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.case-preview-tooltip__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.case-preview-tooltip__meta-item svg {
+  flex-shrink: 0;
+}
+
+.case-preview-tooltip__content {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: hsl(var(--popover-foreground) / 0.9);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.case-preview-tooltip__footer {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid hsl(var(--border));
+  font-size: 0.6875rem;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+}
+
+/* Loading state */
+.case-preview-tooltip__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.25rem 2rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+  background-color: hsl(var(--popover));
+  border-radius: 0.75rem;
+}
+
+.dark .case-preview-tooltip__loading {
+  background-color: hsl(220 20% 10% / 0.98);
+}
+
+.case-preview-tooltip__spinner {
+  width: 1rem;
+  height: 1rem;
+  animation: case-tooltip-spin 1s linear infinite;
+}
+
+@keyframes case-tooltip-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error state */
+.case-preview-tooltip__error {
+  padding: 1.25rem 2rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+  background-color: hsl(var(--popover));
+  border-radius: 0.75rem;
+}
+
+.dark .case-preview-tooltip__error {
+  background-color: hsl(220 20% 10% / 0.98);
+}
+
 /* Tippy.js customizations for mention dropdown */
 .tippy-box {
   background-color: transparent !important;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useGreetingParts } from '@/lib/hooks/useGreeting';
 import {
   PromptInput,
@@ -13,19 +14,43 @@ import {
   FileUploadTrigger,
   FileUploadContent,
 } from '@/components/ui/file-upload';
-import { ArrowUp, Paperclip, X } from 'lucide-react';
+import { ArrowUp, Paperclip, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { chatApi } from '@/lib/api/chat';
 
 export default function HomePage() {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { greeting, name } = useGreetingParts();
+  const router = useRouter();
 
-  const handleSubmit = () => {
-    if (input.trim() || files.length > 0) {
-      console.log('Submitted:', input, files);
-      setInput('');
-      setFiles([]);
+  const handleSubmit = async () => {
+    if ((!input.trim() && files.length === 0) || isSubmitting) return;
+
+    const message = input.trim();
+    if (!message) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // Start chat to get conversation_id
+      const response = await chatApi.start({
+        message,
+        stream: true,
+      });
+
+      if (response.success) {
+        // Navigate to conversation page with the message and execution_id
+        const conversationId = response.data.conversation_id;
+        const executionId = response.data.execution_id;
+
+        // Pass initial message and execution_id via URL params
+        router.push(`/c/${conversationId}?msg=${encodeURIComponent(message)}&exec=${executionId}`);
+      }
+    } catch (error) {
+      console.error('Failed to start chat:', error);
+      setIsSubmitting(false);
     }
   };
 
@@ -56,6 +81,7 @@ export default function HomePage() {
             value={input}
             onValueChange={setInput}
             onSubmit={handleSubmit}
+            disabled={isSubmitting}
           >
             {/* File Previews inside input */}
             {files.length > 0 && (
@@ -98,11 +124,15 @@ export default function HomePage() {
               <PromptInputAction tooltip="Send message">
                 <Button
                   size="icon"
-                  className="h-8 w-8 rounded-full bg-primary hover:bg-primary/90"
+                  className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
                   onClick={handleSubmit}
-                  disabled={!input.trim() && files.length === 0}
+                  disabled={(!input.trim() && files.length === 0) || isSubmitting}
                 >
-                  <ArrowUp className="h-5 w-5" />
+                  {isSubmitting ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <ArrowUp className="h-5 w-5" />
+                  )}
                 </Button>
               </PromptInputAction>
             </PromptInputActions>

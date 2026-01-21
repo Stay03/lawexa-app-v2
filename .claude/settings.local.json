@@ -15,7 +15,9 @@
       "Bash(git push:*)",
       "Bash(git commit:*)",
       "Bash(dir /s /b \"c:\\\\Users\\\\stayn\\\\OneDrive\\\\Desktop\\\\2023\\\\lawexa-app-v2\\\\lawexa-app\\\\app\\\\\\(main\\)\\\\notes\"\")",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(dir:*)",
+      "Bash(if exist \"src\\\\components\\\\ui\" dir \"src\\\\components\\\\ui\")"
     ]
   },
   "enabledPlugins": {
