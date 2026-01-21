@@ -197,8 +197,9 @@ export function useCaseMentionTooltips({
 
       const instances = Array.from(mentions).map((mention) => {
         // Skip if already has a tippy instance
-        if ((mention as HTMLElement & { _tippy?: TippyInstance })._tippy) {
-          return (mention as HTMLElement & { _tippy: TippyInstance })._tippy;
+        const mentionWithTippy = mention as unknown as HTMLElement & { _tippy?: TippyInstance };
+        if (mentionWithTippy._tippy) {
+          return mentionWithTippy._tippy;
         }
 
         const slug = extractSlug(mention);
@@ -214,7 +215,7 @@ export function useCaseMentionTooltips({
           interactive: true,
           interactiveBorder: 10,
           appendTo: document.body,
-          onShow: async (instance) => {
+          onShow: (instance) => {
             if (!slug) {
               instance.setContent(renderErrorState());
               return;
@@ -227,15 +228,15 @@ export function useCaseMentionTooltips({
               return;
             }
 
-            // Show loading state and fetch
+            // Show loading state and fetch asynchronously
             instance.setContent(renderLoadingState());
-            const caseData = await fetchCaseWithCache(slug);
-
-            if (caseData) {
-              instance.setContent(renderRichContent(caseData));
-            } else {
-              instance.setContent(renderErrorState());
-            }
+            void fetchCaseWithCache(slug).then((caseData) => {
+              if (caseData) {
+                instance.setContent(renderRichContent(caseData));
+              } else {
+                instance.setContent(renderErrorState());
+              }
+            });
           },
         });
       });
