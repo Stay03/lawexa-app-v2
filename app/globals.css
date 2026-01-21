@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "tippy.js/dist/tippy.css";
@@ -135,6 +136,159 @@
     background-color: oklch(0.70 0.14 82 / 0.4);
     color: inherit;
   }
+}
+
+/* =============================================================================
+   Chat Message Prose Styles - Markdown rendering for AI responses
+   ============================================================================= */
+
+.prose {
+  color: var(--foreground);
+  line-height: 1.75;
+}
+
+.prose p {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.prose p:first-child {
+  margin-top: 0;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: inherit;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose h1:first-child, .prose h2:first-child, .prose h3:first-child {
+  margin-top: 0;
+}
+
+.prose h1 { font-size: 1.5em; }
+.prose h2 { font-size: 1.25em; }
+.prose h3 { font-size: 1.125em; }
+
+.prose ul, .prose ol {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.prose ul {
+  list-style-type: disc;
+}
+
+.prose ol {
+  list-style-type: decimal;
+}
+
+.prose li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose li > p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose strong {
+  font-weight: 600;
+  color: inherit;
+}
+
+.prose em {
+  font-style: italic;
+}
+
+.prose blockquote {
+  border-left: 4px solid var(--border);
+  padding-left: 1em;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+.prose code {
+  background-color: var(--muted);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-size: 0.95em;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+.prose pre {
+  background-color: var(--muted);
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875em;
+}
+
+.prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose a:hover {
+  color: var(--primary);
+  opacity: 0.8;
+}
+
+.prose hr {
+  border-color: var(--border);
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+
+/* Prose size variant */
+.prose-sm {
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.prose-sm p, .prose-sm ul, .prose-sm ol, .prose-sm blockquote {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.prose-sm li {
+  margin-top: 0.375em;
+  margin-bottom: 0.375em;
+}
+
+/* Dark mode invert */
+.dark .prose-invert,
+.prose.dark\:prose-invert:is(.dark *) {
+  color: var(--foreground);
+}
+
+.dark .prose-invert code,
+.prose.dark\:prose-invert:is(.dark *) code {
+  background-color: var(--muted);
+}
+
+.dark .prose-invert pre,
+.prose.dark\:prose-invert:is(.dark *) pre {
+  background-color: var(--muted);
 }
 
 /* Gold Shimmer Animation Keyframes */

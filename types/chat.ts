@@ -130,6 +130,44 @@ export interface UseChatStreamOptions {
 export interface ChatState {
   messages: ConversationMessage[];
   isStreaming: boolean;
+  isLoadingHistory: boolean;
   conversationId: number | null;
+  conversationTitle: string | null;
   error: string | null;
+}
+
+// API message from server (different structure than local ChatMessage)
+export interface ApiMessage {
+  id: number;
+  conversation_id: number;
+  agent_id: number | null;
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  metadata: {
+    type?: 'tool_call' | 'tool_result';
+    tool_name?: string;
+    tool_parameters?: Record<string, unknown>;
+    success?: boolean;
+    latency_ms?: number;
+    iteration?: number;
+  } | null;
+  created_at: string;
+}
+
+export interface ConversationData {
+  id: number;
+  user_id: number;
+  agent_id: number;
+  title: string;
+  status: 'active' | 'archived';
+  messages: ApiMessage[];
+  messages_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationResponse {
+  success: boolean;
+  message: string;
+  data: ConversationData;
 }

@@ -1,12 +1,226 @@
-# Chat Streaming API Documentation
+# Chat & SSE Streaming API Documentation
 
-This document describes the Server-Sent Events (SSE) streaming API for real-time AI chat responses.
+This document describes the Chat API and Server-Sent Events (SSE) streaming for real-time AI chat responses.
 
-## Overview
+---
 
-The chat streaming API allows clients to receive AI responses in real-time as they are generated, rather than waiting for the complete response. This provides a better user experience for longer AI interactions.
+## Part 1: Conversations & Messages API
 
-## Flow Diagram
+These endpoints manage chat conversations and retrieve message history.
+
+### 1.1 List Conversations
+
+**GET** `/api/conversations`
+
+Retrieve all conversations for the authenticated user.
+
+#### Request Headers
+
+```
+Authorization: Bearer {token}
+Accept: application/json
+```
+
+#### Query Parameters
+
+| Parameter   | Type    | Required | Description |
+|-------------|---------|----------|-------------|
+| per_page    | integer | No       | Items per page (1-100, default: 15) |
+| status      | string  | No       | Filter by status: `active` or `archived` |
+| sort_by     | string  | No       | Sort field: `created_at`, `updated_at`, `title` (default: `created_at`) |
+| sort_order  | string  | No       | Sort order: `asc` or `desc` (default: `desc`) |
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Conversations retrieved successfully.",
+  "data": [
+    {
+      "id": 57,
+      "user_id": 4,
+      "agent_id": 3,
+      "title": "find me election cases",
+      "status": "active",
+      "agent": {
+        "id": 3,
+        "model_id": 3,
+        "name": "Lawexa Orchestrator",
+        "slug": "lawexa-orchestrator",
+        "description": "The primary AI orchestrator for Lawexa...",
+        "temperature": "0.40",
+        "max_response_tokens": 4096,
+        "is_active": true,
+        "created_at": "2026-01-20T09:24:41+00:00",
+        "updated_at": "2026-01-20T12:06:49+00:00"
+      },
+      "messages_count": 14,
+      "created_at": "2026-01-20T19:19:21+00:00",
+      "updated_at": "2026-01-20T19:19:21+00:00"
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 1,
+    "per_page": 15,
+    "total": 1
+  }
+}
+```
+
+### 1.2 Get Conversation with Messages
+
+**GET** `/api/conversations/{id}`
+
+Retrieve a single conversation with all its messages.
+
+#### Request Headers
+
+```
+Authorization: Bearer {token}
+Accept: application/json
+```
+
+#### Path Parameters
+
+| Parameter | Type    | Required | Description |
+|-----------|---------|----------|-------------|
+| id        | integer | Yes      | The conversation ID |
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Conversation retrieved successfully.",
+  "data": {
+    "id": 57,
+    "user_id": 4,
+    "agent_id": 3,
+    "title": "find me election cases",
+    "status": "active",
+    "agent": {
+      "id": 3,
+      "model_id": 3,
+      "name": "Lawexa Orchestrator",
+      "slug": "lawexa-orchestrator",
+      "description": "The primary AI orchestrator for Lawexa...",
+      "temperature": "0.40",
+      "max_response_tokens": 4096,
+      "is_active": true
+    },
+    "messages": [
+      {
+        "id": 145,
+        "conversation_id": 57,
+        "agent_id": null,
+        "role": "user",
+        "content": "find me election cases",
+        "metadata": null,
+        "created_at": "2026-01-20T19:19:21+00:00"
+      },
+      {
+        "id": 146,
+        "conversation_id": 57,
+        "agent_id": 3,
+        "role": "assistant",
+        "content": "{\"tool_call\":\"search_cases\",\"parameters\":{\"query\":\"election\",\"limit\":15}}",
+        "metadata": {
+          "type": "tool_call",
+          "tool_name": "search_cases",
+          "tool_parameters": {
+            "query": "election",
+            "limit": 15
+          },
+          "iteration": 1
+        },
+        "created_at": "2026-01-20T19:19:44+00:00"
+      },
+      {
+        "id": 147,
+        "conversation_id": 57,
+        "agent_id": 3,
+        "role": "tool",
+        "content": "{\"success\":true,\"message\":\"Cases retrieved successfully.\",\"data\":{\"cases\":[...],\"total\":15}}",
+        "metadata": {
+          "type": "tool_result",
+          "tool_name": "search_cases",
+          "success": true,
+          "latency_ms": 1161,
+          "iteration": 1
+        },
+        "created_at": "2026-01-20T19:19:44+00:00"
+      },
+      {
+        "id": 148,
+        "conversation_id": 57,
+        "agent_id": 3,
+        "role": "assistant",
+        "content": "Here are the election cases I found...",
+        "metadata": null,
+        "created_at": "2026-01-20T19:19:44+00:00"
+      }
+    ],
+    "messages_count": 4,
+    "created_at": "2026-01-20T19:19:21+00:00",
+    "updated_at": "2026-01-20T19:19:21+00:00"
+  }
+}
+```
+
+#### Message Roles
+
+| Role        | Description |
+|-------------|-------------|
+| `user`      | Message sent by the user |
+| `assistant` | Response from the AI agent |
+| `tool`      | Result from a tool execution |
+
+#### Message Metadata Types
+
+| Type          | Description |
+|---------------|-------------|
+| `tool_call`   | AI is calling a tool (contains `tool_name`, `tool_parameters`, `iteration`) |
+| `tool_result` | Result from tool execution (contains `tool_name`, `success`, `latency_ms`, `iteration`) |
+| `null`        | Regular text message (user input or final AI response) |
+
+### 1.3 Archive Conversation
+
+**DELETE** `/api/conversations/{id}`
+
+Archive a conversation (soft delete - changes status to `archived`).
+
+#### Request Headers
+
+```
+Authorization: Bearer {token}
+Accept: application/json
+```
+
+#### Path Parameters
+
+| Parameter | Type    | Required | Description |
+|-----------|---------|----------|-------------|
+| id        | integer | Yes      | The conversation ID |
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Conversation archived successfully.",
+  "data": null
+}
+```
+
+---
+
+## Part 2: SSE Streaming API
+
+The SSE streaming API allows clients to receive AI responses in real-time as they are generated, rather than waiting for the complete response. This provides a better user experience for longer AI interactions.
+
+### Flow Diagram
 
 ```
 ┌──────────┐          ┌──────────┐          ┌──────────┐          ┌──────────┐
@@ -48,9 +262,9 @@ The chat streaming API allows clients to receive AI responses in real-time as th
      │                     │                     │                     │
 ```
 
-## Endpoints
+### SSE Endpoints
 
-### 1. Start Chat (with streaming)
+#### 2.1 Start Chat (with streaming)
 
 **POST** `/api/chat`
 
@@ -90,7 +304,7 @@ Content-Type: application/json
 }
 ```
 
-### 2. Connect to SSE Stream
+#### 2.2 Connect to SSE Stream
 
 **GET** `/api/chat/stream/{execution_id}?token={bearer_token}`
 
@@ -113,7 +327,7 @@ Connection: keep-alive
 X-Accel-Buffering: no
 ```
 
-## SSE Event Types
+### SSE Event Types
 
 Each SSE event has the following format:
 
@@ -239,9 +453,9 @@ data: {json_payload}
 </stream>
 ```
 
-## Frontend Implementation
+### Frontend Implementation
 
-### JavaScript (Vanilla)
+#### JavaScript (Vanilla)
 
 ```javascript
 class ChatStream {
@@ -384,7 +598,7 @@ try {
 }
 ```
 
-### React Hook
+#### React Hook
 
 ```tsx
 import { useState, useCallback, useRef } from 'react';
@@ -590,7 +804,7 @@ function ChatComponent() {
 }
 ```
 
-### Vue 3 Composable
+#### Vue 3 Composable
 
 ```typescript
 import { ref, onUnmounted } from 'vue';
@@ -713,9 +927,9 @@ export function useChatStream(baseUrl: string, token: string) {
 }
 ```
 
-## Error Handling
+### Error Handling
 
-### Common Errors
+#### Common Errors
 
 | Error | Cause | Solution |
 |-------|-------|----------|
@@ -724,7 +938,7 @@ export function useChatStream(baseUrl: string, token: string) {
 | `Execution not found or access denied` | Invalid execution_id or not owner | Verify execution_id and user owns it |
 | `Stream timed out` | No completion within 120s | Retry or check AI service |
 
-### Retry Strategy
+#### Retry Strategy
 
 ```javascript
 async function sendWithRetry(chat, message, options, maxRetries = 3) {
@@ -741,7 +955,7 @@ async function sendWithRetry(chat, message, options, maxRetries = 3) {
 }
 ```
 
-## Best Practices
+### Best Practices
 
 1. **Always handle the `end` event** - Close the EventSource when receiving this event to free resources.
 
@@ -755,7 +969,7 @@ async function sendWithRetry(chat, message, options, maxRetries = 3) {
 
 6. **Clean up on unmount** - Always close EventSource when component unmounts to prevent memory leaks.
 
-## Configuration
+### Configuration
 
 | Config Key | Default | Description |
 |------------|---------|-------------|

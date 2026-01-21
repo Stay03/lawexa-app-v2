@@ -28,7 +28,6 @@ import {
   Copy,
   ThumbsUp,
   ThumbsDown,
-  Wrench,
   Check,
   Loader2,
 } from 'lucide-react';
@@ -36,6 +35,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { isToolMessage, type ToolMessage, type ConversationMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
+import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
+import { useRotatingText } from '@/lib/hooks/useRotatingText';
+import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 
 // Format tool name and parameters into user-friendly text
 function formatToolMessage(
@@ -143,8 +145,12 @@ export default function ConversationPage() {
   const {
     messages,
     isStreaming,
+    isLoadingHistory,
+    conversationTitle,
     error,
     connectToStream,
+    loadConversationHistory,
+    fetchConversationTitle,
     setConversationId,
     addUserMessage,
     disconnect,
@@ -152,7 +158,31 @@ export default function ConversationPage() {
     onError: (err) => console.error('Chat error:', err),
   });
 
-  // Initialize on mount - connect to stream if coming from home page
+  const prevIsStreamingRef = useRef(isStreaming);
+
+  const setOverride = useBreadcrumbStore((state) => state.setOverride);
+  const clearOverride = useBreadcrumbStore((state) => state.clearOverride);
+
+  // Update breadcrumb when conversation title is loaded
+  useEffect(() => {
+    if (conversationTitle) {
+      setOverride(conversationId, conversationTitle);
+    }
+    return () => {
+      clearOverride(conversationId);
+    };
+  }, [conversationId, conversationTitle, setOverride, clearOverride]);
+
+  // Fetch conversation title when streaming ends (for new conversations)
+  useEffect(() => {
+    // When streaming ends and we don't have a title yet, fetch it
+    if (prevIsStreamingRef.current && !isStreaming && !conversationTitle) {
+      fetchConversationTitle(Number(conversationId));
+    }
+    prevIsStreamingRef.current = isStreaming;
+  }, [isStreaming, conversationTitle, conversationId, fetchConversationTitle]);
+
+  // Initialize on mount - connect to stream if coming from home page, or load history
   useEffect(() => {
     // Prevent double initialization in strict mode
     if (initializedRef.current) return;
@@ -163,7 +193,7 @@ export default function ConversationPage() {
     // Set conversation ID
     setConversationId(Number(conversationId));
 
-    // If we have an execution ID, connect to the stream
+    // If we have an execution ID, connect to the stream (coming from home page)
     if (executionId && initialMessage) {
       initializedRef.current = true;
       connectToStream(executionId, initialMessage);
@@ -171,9 +201,11 @@ export default function ConversationPage() {
       // Clean up URL params after connecting
       window.history.replaceState({}, '', `/c/${conversationId}`);
     } else {
+      // Direct navigation - load conversation history
       initializedRef.current = true;
+      loadConversationHistory(Number(conversationId));
     }
-  }, [conversationId, searchParams, connectToStream, setConversationId]);
+  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory]);
 
   const handleSubmit = async () => {
     if ((!input.trim() && files.length === 0) || isStreaming || isSubmitting) return;
@@ -276,11 +308,26 @@ export default function ConversationPage() {
   const lastMessage = messages[messages.length - 1];
   const showThinking = isStreaming && lastMessage && lastMessage.role !== 'assistant';
 
+  // Dynamic rotating thinking text
+  const { currentText: currentThinkingText } = useRotatingText({
+    phrases: THINKING_PHRASES,
+    intervalMs: 5000,
+    mode: 'random',
+    enabled: showThinking,
+  });
+
   return (
     <div className="flex h-[calc(100vh-120px)] flex-col">
       {/* Chat messages */}
       <ChatContainerRoot className="flex-1 overflow-y-auto">
         <ChatContainerContent>
+          {/* Loading history indicator */}
+          {isLoadingHistory && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+            </div>
+          )}
+
           {messages.map(renderMessage)}
 
           {/* Thinking indicator - shown when streaming but no tool calls yet */}
@@ -288,7 +335,7 @@ export default function ConversationPage() {
             <Message role="assistant" className="group">
               <div className="text-muted-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Thinking...</span>
+                <span>{currentThinkingText}</span>
               </div>
             </Message>
           )}
@@ -310,7 +357,7 @@ export default function ConversationPage() {
               value={input}
               onValueChange={setInput}
               onSubmit={handleSubmit}
-              disabled={isStreaming}
+              disabled={isStreaming || isLoadingHistory}
             >
               {/* File Previews */}
               {files.length > 0 && (

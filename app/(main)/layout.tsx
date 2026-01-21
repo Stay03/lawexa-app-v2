@@ -21,8 +21,9 @@ import { ShareButton } from "@/components/common/ShareButton"
 import { ReaderModeToggle } from "@/components/cases/ReaderModeToggle"
 import { usePathname } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useBreadcrumbStore } from "@/lib/stores/breadcrumbStore"
 
-function getBreadcrumbs(pathname: string) {
+function getBreadcrumbs(pathname: string, getOverrideLabel: (segment: string) => string | undefined) {
   const segments = pathname.split('/').filter(Boolean)
 
   if (segments.length === 0) {
@@ -31,8 +32,21 @@ function getBreadcrumbs(pathname: string) {
 
   return segments.map((segment, index) => {
     const href = '/' + segments.slice(0, index + 1).join('/')
-    const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ')
     const isPage = index === segments.length - 1
+
+    // Check for override label first
+    const overrideLabel = getOverrideLabel(segment)
+    if (overrideLabel) {
+      return { label: overrideLabel, href, isPage }
+    }
+
+    // Special case for conversation routes: /c/[id] -> "Conversation"
+    if (segment === 'c') {
+      return { label: 'Conversation', href, isPage }
+    }
+
+    // Default: capitalize and replace hyphens
+    const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ')
     return { label, href, isPage }
   })
 }
@@ -70,7 +84,11 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname()
-  const breadcrumbs = getBreadcrumbs(pathname)
+  // Subscribe to overrides array to trigger re-render when it changes
+  const overrides = useBreadcrumbStore((state) => state.overrides)
+  const getOverrideLabel = useBreadcrumbStore((state) => state.getLabel)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const breadcrumbs = React.useMemo(() => getBreadcrumbs(pathname, getOverrideLabel), [pathname, overrides])
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {

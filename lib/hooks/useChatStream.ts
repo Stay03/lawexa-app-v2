@@ -11,7 +11,10 @@ import type {
   ToolCompleteEvent,
   IterationEvent,
   ToolMessage,
+  ApiMessage,
+  ConversationMessage,
 } from '@/types/chat';
+import { chatApi } from '@/lib/api/chat';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -33,7 +36,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const [state, setState] = useState<ChatState>({
     messages: [],
     isStreaming: false,
+    isLoadingHistory: false,
     conversationId: null,
+    conversationTitle: null,
     error: null,
   });
 
@@ -120,6 +125,136 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     },
     []
   );
+
+  // Transform API messages to local message format
+  const transformApiMessages = useCallback((apiMessages: ApiMessage[]): ConversationMessage[] => {
+    const messages: ConversationMessage[] = [];
+
+    // Build a map of tool results by iteration for matching
+    const toolResultsByIteration = new Map<number, ApiMessage>();
+    apiMessages.forEach(msg => {
+      if (msg.role === 'tool' && msg.metadata?.type === 'tool_result' && msg.metadata.iteration !== undefined) {
+        toolResultsByIteration.set(msg.metadata.iteration, msg);
+      }
+    });
+
+    for (const apiMsg of apiMessages) {
+      // User message
+      if (apiMsg.role === 'user') {
+        messages.push({
+          id: `msg_${apiMsg.id}`,
+          role: 'user',
+          content: apiMsg.content,
+          timestamp: new Date(apiMsg.created_at),
+        } as ChatMessage);
+      }
+      // Assistant tool call - transform to ToolMessage with result
+      else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'tool_call') {
+        const toolResult = apiMsg.metadata.iteration !== undefined
+          ? toolResultsByIteration.get(apiMsg.metadata.iteration)
+          : undefined;
+
+        // Parse tool result if available
+        let parsedToolResult = undefined;
+        if (toolResult) {
+          try {
+            const resultData = JSON.parse(toolResult.content);
+            parsedToolResult = {
+              success: toolResult.metadata?.success ?? resultData.success ?? true,
+              data: resultData.data ?? resultData,
+              error: null,
+            };
+          } catch {
+            parsedToolResult = {
+              success: toolResult.metadata?.success ?? true,
+              data: toolResult.content,
+              error: null,
+            };
+          }
+        }
+
+        messages.push({
+          id: `msg_${apiMsg.id}`,
+          role: 'tool',
+          content: `${apiMsg.metadata.tool_name} completed`,
+          timestamp: new Date(apiMsg.created_at),
+          toolName: apiMsg.metadata.tool_name || 'unknown',
+          toolParameters: apiMsg.metadata.tool_parameters || {},
+          toolResult: parsedToolResult,
+          toolStatus: 'complete',
+          latencyMs: toolResult?.metadata?.latency_ms,
+        } as ToolMessage);
+      }
+      // Skip tool role messages (already captured via tool_call)
+      else if (apiMsg.role === 'tool') {
+        continue;
+      }
+      // Regular assistant message (final response)
+      else if (apiMsg.role === 'assistant' && !apiMsg.metadata?.type) {
+        messages.push({
+          id: `msg_${apiMsg.id}`,
+          role: 'assistant',
+          content: apiMsg.content,
+          timestamp: new Date(apiMsg.created_at),
+        } as ChatMessage);
+      }
+    }
+
+    return messages;
+  }, []);
+
+  // Load conversation history from API
+  const loadConversationHistory = useCallback(async (conversationId: number) => {
+    setState((prev) => ({
+      ...prev,
+      isLoadingHistory: true,
+      error: null,
+      conversationId,
+    }));
+
+    try {
+      const response = await chatApi.getConversation(conversationId);
+
+      if (response.success && response.data.messages) {
+        const transformedMessages = transformApiMessages(response.data.messages);
+        setState((prev) => ({
+          ...prev,
+          messages: transformedMessages,
+          conversationTitle: response.data.title || null,
+          isLoadingHistory: false,
+        }));
+      } else {
+        setState((prev) => ({
+          ...prev,
+          error: response.message || 'Failed to load conversation',
+          isLoadingHistory: false,
+        }));
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to load conversation';
+      setState((prev) => ({
+        ...prev,
+        error: errorMsg,
+        isLoadingHistory: false,
+      }));
+      onError?.(errorMsg);
+    }
+  }, [transformApiMessages, onError]);
+
+  // Fetch only the conversation title (for after streaming completes)
+  const fetchConversationTitle = useCallback(async (convId: number) => {
+    try {
+      const response = await chatApi.getConversation(convId);
+      if (response.success && response.data.title) {
+        setState((prev) => ({
+          ...prev,
+          conversationTitle: response.data.title,
+        }));
+      }
+    } catch {
+      // Silently fail - title is not critical
+    }
+  }, []);
 
   // Connect to existing SSE stream (for when navigating from home page)
   const connectToStream = useCallback(
@@ -289,7 +424,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     setState({
       messages: [],
       isStreaming: false,
+      isLoadingHistory: false,
       conversationId: null,
+      conversationTitle: null,
       error: null,
     });
   }, [disconnect]);
@@ -298,10 +435,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     // State
     messages: state.messages,
     isStreaming: state.isStreaming,
+    isLoadingHistory: state.isLoadingHistory,
     conversationId: state.conversationId,
+    conversationTitle: state.conversationTitle,
     error: state.error,
     // Actions
     connectToStream,
+    loadConversationHistory,
+    fetchConversationTitle,
     setConversationId,
     addUserMessage,
     disconnect,

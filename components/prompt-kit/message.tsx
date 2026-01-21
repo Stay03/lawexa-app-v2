@@ -3,6 +3,8 @@
 import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 
 // Message - wrapper with role-based alignment
 export interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -47,12 +49,16 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
           ref={ref}
           className={cn(
             'prose prose-sm dark:prose-invert max-w-none',
-            'prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-ol:my-2',
+            // Custom overrides for app theme
+            '[&_a]:text-primary [&_a.case-mention]:no-underline',
+            '[&_code]:bg-muted [&_pre]:bg-muted',
             className
           )}
           {...props}
         >
-          <ReactMarkdown>{children}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>
+            {children}
+          </ReactMarkdown>
         </div>
       );
     }
