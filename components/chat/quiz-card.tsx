@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import useEmblaCarousel from 'embla-carousel-react';
 import {
   Card,
   CardContent,
@@ -20,6 +21,8 @@ import {
   XCircle,
   HelpCircle,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   BookOpen,
   Send,
 } from 'lucide-react';
@@ -228,15 +231,59 @@ interface QuizCardListProps {
 
 export function QuizCardList({ quizzes }: QuizCardListProps) {
   const chatContext = useChatContext();
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, watchDrag: true });
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const handleAnswerSelect = useCallback((quizIndex: number, answerId: string) => {
-    if (isSubmitted) return;
-    setAnswers((prev) => ({ ...prev, [quizIndex]: answerId }));
-  }, [isSubmitted]);
+  // Track current slide index
+  useEffect(() => {
+    if (!emblaApi) return;
 
-  const allAnswered = quizzes.length > 0 && Object.keys(answers).length === quizzes.length;
+    const onSelect = () => {
+      setCurrentIndex(emblaApi.selectedScrollSnap());
+    };
+
+    emblaApi.on('select', onSelect);
+    onSelect();
+
+    return () => {
+      emblaApi.off('select', onSelect);
+    };
+  }, [emblaApi]);
+
+  const scrollPrev = useCallback(() => {
+    emblaApi?.scrollPrev();
+  }, [emblaApi]);
+
+  const scrollNext = useCallback(() => {
+    emblaApi?.scrollNext();
+  }, [emblaApi]);
+
+  const scrollTo = useCallback(
+    (index: number) => {
+      emblaApi?.scrollTo(index);
+    },
+    [emblaApi]
+  );
+
+  const handleAnswerSelect = useCallback(
+    (quizIndex: number, answerId: string) => {
+      if (isSubmitted) return;
+      setAnswers((prev) => ({ ...prev, [quizIndex]: answerId }));
+
+      // Auto-advance to next slide after a short delay
+      if (quizIndex < quizzes.length - 1) {
+        setTimeout(() => {
+          emblaApi?.scrollNext();
+        }, 400);
+      }
+    },
+    [isSubmitted, quizzes.length, emblaApi]
+  );
+
+  const allAnswered =
+    quizzes.length > 0 && Object.keys(answers).length === quizzes.length;
 
   const handleSubmitAnswers = useCallback(() => {
     if (!allAnswered || !chatContext) return;
@@ -266,18 +313,81 @@ export function QuizCardList({ quizzes }: QuizCardListProps) {
       }, 0)
     : 0;
 
+  const canScrollPrev = currentIndex > 0;
+  const canScrollNext = currentIndex < quizzes.length - 1;
+
   return (
-    <div className="my-3 flex flex-col gap-4">
-      {quizzes.map((quiz, index) => (
-        <QuizCard
-          key={`quiz-${index}`}
-          quiz={quiz}
-          quizNumber={index + 1}
-          onAnswerSelect={handleAnswerSelect}
-          selectedAnswer={answers[index]}
-          showResult={isSubmitted}
-        />
-      ))}
+    <div className="my-3 flex flex-col gap-3">
+      {/* Progress indicator */}
+      <div className="text-muted-foreground text-center text-sm">
+        Question {currentIndex + 1} of {quizzes.length}
+      </div>
+
+      {/* Carousel with navigation */}
+      <div className="relative">
+        {/* Left arrow */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={scrollPrev}
+          disabled={!canScrollPrev}
+          className="absolute -left-3 top-1/2 z-10 size-8 -translate-y-1/2 rounded-full shadow-md disabled:opacity-0 sm:-left-4"
+          aria-label="Previous question"
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+
+        {/* Carousel container */}
+        <div className="overflow-hidden px-1" ref={emblaRef}>
+          <div className="flex">
+            {quizzes.map((quiz, index) => (
+              <div
+                key={`quiz-${index}`}
+                className="min-w-0 flex-[0_0_100%] pl-0"
+              >
+                <QuizCard
+                  quiz={quiz}
+                  quizNumber={index + 1}
+                  onAnswerSelect={handleAnswerSelect}
+                  selectedAnswer={answers[index]}
+                  showResult={isSubmitted}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right arrow */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={scrollNext}
+          disabled={!canScrollNext}
+          className="absolute -right-3 top-1/2 z-10 size-8 -translate-y-1/2 rounded-full shadow-md disabled:opacity-0 sm:-right-4"
+          aria-label="Next question"
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+
+      {/* Dot indicators */}
+      <div className="flex items-center justify-center gap-2">
+        {quizzes.map((_, index) => (
+          <button
+            key={`dot-${index}`}
+            onClick={() => scrollTo(index)}
+            className={cn(
+              'size-2 rounded-full transition-all duration-200',
+              index === currentIndex
+                ? 'bg-primary scale-125'
+                : answers[index]
+                  ? 'bg-primary/50'
+                  : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+            )}
+            aria-label={`Go to question ${index + 1}`}
+          />
+        ))}
+      </div>
 
       {/* Submit button or score display */}
       <div
