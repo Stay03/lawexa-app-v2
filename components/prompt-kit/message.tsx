@@ -5,6 +5,11 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
+import { LawyerCardList } from '@/components/chat/lawyer-card';
+import {
+  parseLawyerContent,
+  hasLawyerContent,
+} from '@/lib/utils/parse-lawyer-xml';
 
 // Message - wrapper with role-based alignment
 export interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -44,14 +49,49 @@ export interface MessageContentProps
 export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
   ({ children, className, markdown = false, ...props }, ref) => {
     if (markdown && typeof children === 'string') {
+      // Check if content has lawyer XML tags
+      if (hasLawyerContent(children)) {
+        const parsed = parseLawyerContent(children);
+
+        return (
+          <div ref={ref} className={cn('space-y-3', className)} {...props}>
+            {parsed.segments.map((segment, index) => {
+              if (segment.type === 'lawyers') {
+                return (
+                  <LawyerCardList
+                    key={`lawyers-${index}`}
+                    lawyers={segment.lawyers}
+                  />
+                );
+              }
+
+              return (
+                <div
+                  key={`text-${index}`}
+                  className={cn(
+                    'prose prose-sm dark:prose-invert max-w-none overflow-x-hidden break-words',
+                    '[&_a]:text-primary [&_a.case-mention]:no-underline',
+                    '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:overflow-x-auto'
+                  )}
+                >
+                  <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>
+                    {segment.content}
+                  </ReactMarkdown>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
       return (
         <div
           ref={ref}
           className={cn(
-            'prose prose-sm dark:prose-invert max-w-none',
+            'prose prose-sm dark:prose-invert max-w-none overflow-x-hidden break-words',
             // Custom overrides for app theme
             '[&_a]:text-primary [&_a.case-mention]:no-underline',
-            '[&_code]:bg-muted [&_pre]:bg-muted',
+            '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:overflow-x-auto',
             className
           )}
           {...props}
