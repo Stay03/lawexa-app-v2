@@ -14,6 +14,7 @@ import {
   NoteAuthorCard,
 } from '@/components/notes';
 import { PageContainer } from '@/components/layout';
+import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
 import { useNote } from '@/lib/hooks/useNotes';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { canEditNote, isNoteOwner } from '@/lib/utils/note-utils';
@@ -91,8 +92,9 @@ function NoteViewPage({ params }: NoteViewPageProps) {
   const hasFullContent = note.content !== null;
 
   return (
-    <PageContainer variant="detail">
-      {/* Hero Header */}
+    <>
+      <PageContainer variant="detail" className="pb-24">
+        {/* Hero Header */}
       <NoteDetailHeader
         note={note}
         showStatus={isOwner}
@@ -135,12 +137,14 @@ function NoteViewPage({ params }: NoteViewPageProps) {
         </div>
       )}
 
-      {/* Author Card */}
-      <NoteAuthorCard
-        author={note.user}
-        animationDelay={ANIMATION_DELAYS.author}
-      />
-    </PageContainer>
+        {/* Author Card */}
+        <NoteAuthorCard
+          author={note.user}
+          animationDelay={ANIMATION_DELAYS.author}
+        />
+      </PageContainer>
+      <FloatingPromptInput />
+    </>
   );
 }
 

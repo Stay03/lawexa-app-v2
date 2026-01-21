@@ -17,6 +17,7 @@ import {
   RelatedCasesSection,
 } from '@/components/cases';
 import { PageContainer } from '@/components/layout';
+import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
 import { useCaseWithRelated } from '@/lib/hooks/useCases';
 
 /******************************************************************************
@@ -90,8 +91,9 @@ function CaseViewPage({ params }: CaseViewPageProps) {
   const caseDetail = data.data;
 
   return (
-    <PageContainer variant="detail">
-      <ReaderModeWrapper
+    <>
+      <PageContainer variant="detail" className="pb-24">
+        <ReaderModeWrapper
         caseData={caseDetail}
         slug={slug}
         similarCases={caseDetail.similar_cases}
@@ -178,8 +180,10 @@ function CaseViewPage({ params }: CaseViewPageProps) {
             animationDelay={ANIMATION_DELAYS.citedBy}
           />
         )}
-      </ReaderModeWrapper>
-    </PageContainer>
+        </ReaderModeWrapper>
+      </PageContainer>
+      <FloatingPromptInput />
+    </>
   );
 }
 
