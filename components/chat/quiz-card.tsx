@@ -353,7 +353,7 @@ export function QuizCardList({ quizzes }: QuizCardListProps) {
           {quizzes.map((quiz, index) => (
             <div
               key={`quiz-${index}`}
-              className="w-full min-w-0 flex-[0_0_100%]"
+              className="w-full min-w-0 flex-[0_0_100%] px-2 py-3"
             >
               <QuizCard
                 quiz={quiz}
