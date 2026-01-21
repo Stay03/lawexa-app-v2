@@ -6,10 +6,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { LawyerCardList } from '@/components/chat/lawyer-card';
+import { QuizCardList } from '@/components/chat/quiz-card';
 import {
-  parseLawyerContent,
-  hasLawyerContent,
-} from '@/lib/utils/parse-lawyer-xml';
+  parseContent,
+  hasSpecialContent,
+} from '@/lib/utils/parse-content-xml';
 
 // Message - wrapper with role-based alignment
 export interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -49,9 +50,9 @@ export interface MessageContentProps
 export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
   ({ children, className, markdown = false, ...props }, ref) => {
     if (markdown && typeof children === 'string') {
-      // Check if content has lawyer XML tags
-      if (hasLawyerContent(children)) {
-        const parsed = parseLawyerContent(children);
+      // Check if content has special XML tags (lawyers or quizzes)
+      if (hasSpecialContent(children)) {
+        const parsed = parseContent(children);
 
         return (
           <div ref={ref} className={cn('space-y-3', className)} {...props}>
@@ -61,6 +62,15 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
                   <LawyerCardList
                     key={`lawyers-${index}`}
                     lawyers={segment.lawyers}
+                  />
+                );
+              }
+
+              if (segment.type === 'quizzes') {
+                return (
+                  <QuizCardList
+                    key={`quizzes-${index}`}
+                    quizzes={segment.quizzes}
                   />
                 );
               }

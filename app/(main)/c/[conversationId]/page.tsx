@@ -38,6 +38,7 @@ import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useRotatingText } from '@/lib/hooks/useRotatingText';
 import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
+import { ChatProvider } from '@/lib/contexts/chat-context';
 
 // Format tool name and parameters into user-friendly text
 function formatToolMessage(
@@ -251,6 +252,31 @@ export default function ConversationPage() {
     disconnect();
   };
 
+  // Function to send a message programmatically (used by quiz components)
+  const sendMessage = async (message: string) => {
+    if (!message.trim() || isStreaming || isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      addUserMessage(message);
+
+      const response = await chatApi.start({
+        message,
+        stream: true,
+        conversation_id: Number(conversationId),
+      });
+
+      if (response.success) {
+        connectToStream(response.data.execution_id);
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const renderMessage = (message: ConversationMessage) => {
     // Tool message
     if (isToolMessage(message)) {
@@ -317,37 +343,38 @@ export default function ConversationPage() {
   });
 
   return (
-    <div className="flex h-[calc(100vh-120px)] flex-col">
-      {/* Chat messages */}
-      <ChatContainerRoot className="flex-1 overflow-y-auto">
-        <ChatContainerContent>
-          {/* Loading history indicator */}
-          {isLoadingHistory && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
-            </div>
-          )}
-
-          {messages.map(renderMessage)}
-
-          {/* Thinking indicator - shown when streaming but no tool calls yet */}
-          {showThinking && (
-            <Message role="assistant" className="group">
-              <div className="text-muted-foreground flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>{currentThinkingText}</span>
+    <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>
+      <div className="flex h-[calc(100vh-120px)] flex-col">
+        {/* Chat messages */}
+        <ChatContainerRoot className="flex-1 overflow-y-auto">
+          <ChatContainerContent>
+            {/* Loading history indicator */}
+            {isLoadingHistory && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
               </div>
-            </Message>
-          )}
+            )}
 
-          {/* Error display */}
-          {error && (
-            <div className="text-destructive py-2 text-center text-sm">
-              {error}
-            </div>
-          )}
-        </ChatContainerContent>
-      </ChatContainerRoot>
+            {messages.map(renderMessage)}
+
+            {/* Thinking indicator - shown when streaming but no tool calls yet */}
+            {showThinking && (
+              <Message role="assistant" className="group">
+                <div className="text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{currentThinkingText}</span>
+                </div>
+              </Message>
+            )}
+
+            {/* Error display */}
+            {error && (
+              <div className="text-destructive py-2 text-center text-sm">
+                {error}
+              </div>
+            )}
+          </ChatContainerContent>
+        </ChatContainerRoot>
 
       {/* Input area */}
       <div className="w-full px-4 pb-4">
@@ -443,5 +470,6 @@ export default function ConversationPage() {
         </div>
       </div>
     </div>
+    </ChatProvider>
   );
 }
