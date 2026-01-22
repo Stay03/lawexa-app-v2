@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ArrowUp, Loader2, Check, X } from 'lucide-react';
+import { ArrowUp, Loader2, Check, X, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   PromptInput,
   PromptInputTextarea,
@@ -29,6 +30,9 @@ import type {
 
 interface FloatingPromptInputProps {
   className?: string;
+  contextSlug?: string;
+  contextType?: 'case' | 'note';
+  contextTitle?: string;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -127,7 +131,7 @@ function ToolMessageDisplay({ message }: { message: ToolMessage }) {
   );
 }
 
-export function FloatingPromptInput({ className }: FloatingPromptInputProps) {
+export function FloatingPromptInput({ className, contextSlug, contextType, contextTitle }: FloatingPromptInputProps) {
   const [input, setInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -135,6 +139,7 @@ export function FloatingPromptInput({ className }: FloatingPromptInputProps) {
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
 
+  const router = useRouter();
   const { state } = useSidebar();
   const isMobile = useIsMobile();
   const token = useAuthStore((state) => state.token);
@@ -311,12 +316,19 @@ export function FloatingPromptInput({ className }: FloatingPromptInputProps) {
     setInput(''); // Clear input immediately
     setIsSubmitting(true);
 
-    // Add user message to chat immediately
+    // Prepend context slug for the first message only
+    let messageToSend = message;
+    if (!conversationId && contextSlug && contextType) {
+      const slugTag = contextType === 'case' ? 'case_slug' : 'note_slug';
+      messageToSend = `<${slugTag}>${contextSlug}</${slugTag}>\n\n${message}`;
+    }
+
+    // Add user message to chat immediately (display original message without context)
     addUserMessage(message);
 
     try {
       const response = await chatApi.start({
-        message,
+        message: messageToSend,
         stream: true,
         conversation_id: conversationId ?? undefined,
       });
@@ -356,14 +368,35 @@ export function FloatingPromptInput({ className }: FloatingPromptInputProps) {
         <div
           className={cn(
             "transition-all duration-300 ease-out overflow-hidden mb-2",
-            isFocused ? "max-h-[350px] opacity-100" : "max-h-0 opacity-0"
+            isFocused ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"
           )}
           onMouseDown={(e) => e.preventDefault()} // Prevent blur when clicking inside
         >
-          <div
-            ref={chatContainerRef}
-            className="bg-background rounded-t-3xl p-4 shadow-xs h-[350px] overflow-y-auto border border-border"
-          >
+          <div className="bg-background rounded-t-3xl shadow-xs border border-border">
+            {/* Header - Chat about... */}
+            {contextTitle && (
+              <div className="px-4 py-2.5 flex items-center justify-between gap-2">
+                <p className="text-xs truncate">
+                  <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span> <span className="font-medium text-foreground">{contextTitle}</span>
+                </p>
+                {conversationId && (
+                  <button
+                    onClick={() => router.push(`/c/${conversationId}`)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="shrink-0 p-1.5 rounded-md hover:bg-muted transition-colors"
+                    aria-label="Open conversation in full page"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Chat Content */}
+            <div
+              ref={chatContainerRef}
+              className="p-4 h-[350px] overflow-y-auto"
+            >
             {messages.length === 0 ? (
               /* Prompt Suggestions - shown when no messages */
               <div className="flex flex-col gap-2">
@@ -407,6 +440,7 @@ export function FloatingPromptInput({ className }: FloatingPromptInputProps) {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
 

@@ -143,7 +143,11 @@ function NoteViewPage({ params }: NoteViewPageProps) {
           animationDelay={ANIMATION_DELAYS.author}
         />
       </PageContainer>
-      <FloatingPromptInput />
+      <FloatingPromptInput
+        contextSlug={slug}
+        contextType="note"
+        contextTitle={note.title}
+      />
     </>
   );
 }

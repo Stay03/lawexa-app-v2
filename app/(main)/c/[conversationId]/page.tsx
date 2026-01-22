@@ -291,21 +291,28 @@ export default function ConversationPage() {
 
     // User or assistant message (role is guaranteed to be 'user' | 'assistant' here)
     const role = message.role as 'user' | 'assistant';
+
+    // Strip XML tags from user message content if present
+    let displayContent = message.content;
+    if (message.role === 'user') {
+      displayContent = message.content.replace(/<(case_slug|note_slug)>[^<]+<\/\1>\n\n/g, '');
+    }
+
     return (
       <Message key={message.id} role={role} className="group">
         {message.role === 'assistant' ? (
           <>
             {/* Show message content */}
-            {message.content && (
+            {displayContent && (
               <MessageContent
                 className="prose prose-sm dark:prose-invert"
                 markdown
               >
-                {message.content}
+                {displayContent}
               </MessageContent>
             )}
             {/* Message actions (visible on hover) */}
-            {message.content && (
+            {displayContent && (
               <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <button className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-md p-1.5">
                   <Copy className="h-4 w-4" />
@@ -321,7 +328,7 @@ export default function ConversationPage() {
           </>
         ) : (
           <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
-            {message.content}
+            {displayContent}
           </MessageContent>
         )}
       </Message>
@@ -342,12 +349,33 @@ export default function ConversationPage() {
     enabled: showThinking,
   });
 
+  // Extract context from first user message if it contains XML tags
+  const firstUserMessage = messages.find(m => m.role === 'user');
+  const contextMatch = firstUserMessage?.content.match(/<(case_slug|note_slug)>([^<]+)<\/\1>/);
+  const contextType = contextMatch ? contextMatch[1].replace('_slug', '') : null;
+  // Extract just the slug text, removing any XML-like formatting
+  const contextSlug = contextMatch ? contextMatch[2].trim() : null;
+
   return (
     <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>
       <div className="flex h-[calc(100vh-120px)] flex-col">
         {/* Chat messages */}
         <ChatContainerRoot className="flex-1 overflow-y-auto">
           <ChatContainerContent>
+            {/* Context text - Display case/note slug */}
+            {contextSlug && contextType && (
+              <div className="px-4 pb-4">
+                <div className="mx-auto max-w-2xl">
+                  <p className="text-xs">
+                    <span className="text-yellow-600 dark:text-yellow-500">
+                      {contextType.toUpperCase()} CONTEXT:
+                    </span>{' '}
+                    <span className="font-medium text-foreground">{contextSlug}</span>
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Loading history indicator */}
             {isLoadingHistory && (
               <div className="flex items-center justify-center py-8">

@@ -182,7 +182,11 @@ function CaseViewPage({ params }: CaseViewPageProps) {
         )}
         </ReaderModeWrapper>
       </PageContainer>
-      <FloatingPromptInput />
+      <FloatingPromptInput
+        contextSlug={slug}
+        contextType="case"
+        contextTitle={caseDetail.title}
+      />
     </>
   );
 }
