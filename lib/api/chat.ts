@@ -1,5 +1,11 @@
 import { apiClient } from './client';
-import type { ChatStartRequest, ChatStartResponse, ConversationResponse } from '@/types/chat';
+import type {
+  ChatStartRequest,
+  ChatStartResponse,
+  ConversationResponse,
+  ConversationsListResponse,
+  ListConversationsParams
+} from '@/types/chat';
 
 /**
  * Chat API service
@@ -18,6 +24,14 @@ export const chatApi = {
    */
   getConversation: async (id: number): Promise<ConversationResponse> => {
     const response = await apiClient.get<ConversationResponse>(`/conversations/${id}`);
+    return response.data;
+  },
+
+  /**
+   * List all conversations for the authenticated user
+   */
+  listConversations: async (params?: ListConversationsParams): Promise<ConversationsListResponse> => {
+    const response = await apiClient.get<ConversationsListResponse>('/conversations', { params });
     return response.data;
   },
 };

@@ -171,3 +171,36 @@ export interface ConversationResponse {
   message: string;
   data: ConversationData;
 }
+
+// Conversation list item (without full messages)
+export interface ConversationListItem {
+  id: number;
+  user_id: number;
+  agent_id: number;
+  title: string;
+  status: 'active' | 'archived';
+  messages_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// List conversations response
+export interface ConversationsListResponse {
+  success: boolean;
+  message: string;
+  data: ConversationListItem[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
+// Query parameters for listing conversations
+export interface ListConversationsParams {
+  per_page?: number;
+  status?: 'active' | 'archived';
+  sort_by?: 'created_at' | 'updated_at' | 'title';
+  sort_order?: 'asc' | 'desc';
+}

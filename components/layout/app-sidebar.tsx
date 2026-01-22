@@ -4,18 +4,12 @@ import * as React from "react"
 import {
   Scale,
   FileText,
-  Bookmark,
-  LayoutDashboard,
-  Settings,
-  Users,
-  Home,
-  HelpCircle,
-  LifeBuoy,
-  Send,
+  MessageSquarePlus,
+  Library,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/nav-main"
-import { NavSecondary } from "@/components/layout/nav-secondary"
+import { NavConversations } from "@/components/layout/nav-conversations"
 import { NavUser } from "@/components/layout/nav-user"
 import {
   Sidebar,
@@ -34,84 +28,22 @@ import Image from "next/image"
 // Navigation data for Lawexa
 const navMain = [
   {
-    title: "Home",
+    title: "New Chat",
     url: "/",
-    icon: Home,
+    icon: MessageSquarePlus,
   },
   {
-    title: "Cases",
-    url: "/cases",
-    icon: Scale,
-  },
-  {
-    title: "Notes",
-    url: "/notes",
-    icon: FileText,
+    title: "Library",
+    url: "#",
+    icon: Library,
     items: [
-      { title: "Browse All", url: "/notes" },
-      { title: "My Notes", url: "/notes/mine" },
-      { title: "Create Note", url: "/notes/create" },
+      { title: "Cases", url: "/cases" },
+      { title: "Notes", url: "/notes" },
     ],
-  },
-  {
-    title: "Bookmarks",
-    url: "/bookmarks",
-    icon: Bookmark,
-  },
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboard,
-  },
-]
-
-const navAdmin = [
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-    items: [
-      { title: "General", url: "/settings/general" },
-      { title: "Account", url: "/settings/account" },
-      { title: "Privacy", url: "/settings/privacy" },
-      { title: "Billing", url: "/settings/billing" },
-    ],
-  },
-  {
-    title: "Admin",
-    url: "/admin",
-    icon: Users,
-    items: [
-      { title: "Dashboard", url: "/admin" },
-      { title: "Users", url: "/admin/users" },
-      { title: "Content", url: "/admin/content" },
-      { title: "Analytics", url: "/admin/analytics" },
-    ],
-  },
-]
-
-const navSecondary = [
-  {
-    title: "Support",
-    url: "/support",
-    icon: LifeBuoy,
-  },
-  {
-    title: "Feedback",
-    url: "/feedback",
-    icon: Send,
-  },
-  {
-    title: "Help",
-    url: "/help",
-    icon: HelpCircle,
   },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user } = useAuthStore()
-  const isAdmin = user?.role === "admin" || user?.role === "superadmin"
-
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -131,10 +63,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="flex flex-col gap-0">
         <NavMain items={navMain} />
-        {isAdmin && <NavMain items={navAdmin} />}
-        <NavSecondary items={navSecondary} className="mt-auto" />
+        <NavConversations />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
