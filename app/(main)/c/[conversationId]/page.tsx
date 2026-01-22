@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useChatStream } from '@/lib/hooks/useChatStream';
 import {
@@ -19,6 +19,9 @@ import {
   ChatContainerContent,
   Message,
   MessageContent,
+  ChainOfThought,
+  ChainOfThoughtStep,
+  ChainOfThoughtTrigger,
 } from '@/components/prompt-kit';
 import {
   ArrowUp,
@@ -87,47 +90,84 @@ function formatLatency(ms: number): string {
   return `found in ${(ms / 1000).toFixed(2)}s`;
 }
 
-// Tool message display component
-function ToolMessageDisplay({ message }: { message: ToolMessage }) {
-  const isComplete = message.toolStatus === 'complete';
-  const isSuccess = isComplete && message.toolResult?.success;
-  const isError = isComplete && !message.toolResult?.success;
+// Message grouping types
+type MessageGroup =
+  | { type: 'single'; message: ConversationMessage }
+  | { type: 'tool-chain'; messages: ToolMessage[] };
 
-  const { action, detail } = formatToolMessage(
-    message.toolName,
-    message.toolParameters,
-    isComplete
-  );
+// Group consecutive tool messages together
+function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+  let currentToolGroup: ToolMessage[] = [];
 
+  for (const message of messages) {
+    if (isToolMessage(message)) {
+      currentToolGroup.push(message);
+    } else {
+      // Flush any accumulated tool messages
+      if (currentToolGroup.length > 0) {
+        groups.push({ type: 'tool-chain', messages: currentToolGroup });
+        currentToolGroup = [];
+      }
+      groups.push({ type: 'single', message });
+    }
+  }
+
+  // Flush remaining tool messages
+  if (currentToolGroup.length > 0) {
+    groups.push({ type: 'tool-chain', messages: currentToolGroup });
+  }
+
+  return groups;
+}
+
+// Tool chain display component - renders linked tool calls
+function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
   return (
-    <div className="flex items-start gap-3 py-2">
-      <div
-        className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-          isSuccess && 'bg-green-500/10 text-green-600',
-          isError && 'bg-destructive/10 text-destructive',
-          !isComplete && 'bg-muted text-muted-foreground'
-        )}
-      >
-        {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
-        {isSuccess && <Check className="h-4 w-4" />}
-        {isError && <X className="h-4 w-4" />}
-      </div>
-      <div className="min-w-0 flex-1">
-        <span className="text-sm font-medium">
-          {action}
-          {detail && <span className="font-normal"> {detail}</span>}
-        </span>
-        {isComplete && message.latencyMs && (
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {formatLatency(message.latencyMs)}
-          </p>
-        )}
-        {isError && (
-          <p className="text-destructive mt-1 text-sm">
-            Error: {message.toolResult?.error || 'Unknown error'}
-          </p>
-        )}
+    <div className="px-4">
+      <div className="mx-auto max-w-2xl">
+        <ChainOfThought>
+          {messages.map((message, index) => {
+            const isComplete = message.toolStatus === 'complete';
+            const isSuccess = isComplete && message.toolResult?.success;
+            const isError = isComplete && !message.toolResult?.success;
+            const isLast = index === messages.length - 1;
+
+            const status = !isComplete ? 'loading' : isSuccess ? 'success' : 'error';
+
+            const { action, detail } = formatToolMessage(
+              message.toolName,
+              message.toolParameters,
+              isComplete
+            );
+
+            return (
+              <ChainOfThoughtStep
+                key={message.id}
+                isLast={isLast}
+                status={status}
+              >
+                <ChainOfThoughtTrigger
+                  rightContent={
+                    isComplete && message.latencyMs
+                      ? formatLatency(message.latencyMs)
+                      : undefined
+                  }
+                >
+                  <span className="font-medium">{action}</span>
+                  {detail && (
+                    <span className="text-muted-foreground font-normal"> {detail}</span>
+                  )}
+                </ChainOfThoughtTrigger>
+                {isError && (
+                  <p className="text-destructive mt-1 text-sm">
+                    Error: {message.toolResult?.error || 'Unknown error'}
+                  </p>
+                )}
+              </ChainOfThoughtStep>
+            );
+          })}
+        </ChainOfThought>
       </div>
     </div>
   );
@@ -277,18 +317,10 @@ export default function ConversationPage() {
     }
   };
 
-  const renderMessage = (message: ConversationMessage) => {
-    // Tool message
-    if (isToolMessage(message)) {
-      return (
-        <div key={message.id} className="px-4">
-          <div className="mx-auto max-w-2xl">
-            <ToolMessageDisplay message={message} />
-          </div>
-        </div>
-      );
-    }
+  // Group consecutive tool messages for chain display
+  const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
+  const renderMessage = (message: ConversationMessage) => {
     // User or assistant message (role is guaranteed to be 'user' | 'assistant' here)
     const role = message.role as 'user' | 'assistant';
 
@@ -383,7 +415,17 @@ export default function ConversationPage() {
               </div>
             )}
 
-            {messages.map(renderMessage)}
+            {messageGroups.map((group, groupIndex) => {
+              if (group.type === 'tool-chain') {
+                return (
+                  <ToolChainDisplay
+                    key={`tool-chain-${groupIndex}`}
+                    messages={group.messages}
+                  />
+                );
+              }
+              return renderMessage(group.message);
+            })}
 
             {/* Thinking indicator - shown when streaming but no tool calls yet */}
             {showThinking && (
