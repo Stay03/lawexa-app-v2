@@ -59,19 +59,17 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
             {parsed.segments.map((segment, index) => {
               if (segment.type === 'lawyers') {
                 return (
-                  <LawyerCardList
-                    key={`lawyers-${index}`}
-                    lawyers={segment.lawyers}
-                  />
+                  <div key={`lawyers-${index}`} className="not-prose">
+                    <LawyerCardList lawyers={segment.lawyers} />
+                  </div>
                 );
               }
 
               if (segment.type === 'quizzes') {
                 return (
-                  <QuizCardList
-                    key={`quizzes-${index}`}
-                    quizzes={segment.quizzes}
-                  />
+                  <div key={`quizzes-${index}`} className="not-prose">
+                    <QuizCardList quizzes={segment.quizzes} />
+                  </div>
                 );
               }
 
