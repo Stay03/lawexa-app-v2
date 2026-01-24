@@ -27,7 +27,10 @@ export function useAuth() {
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
         queryClient.invalidateQueries({ queryKey: ['auth'] });
-        router.push('/');
+
+        // Check if user needs onboarding
+        const needsOnboarding = !response.data.user.profile?.onboarding_completed;
+        router.push(needsOnboarding ? '/onboarding' : '/');
       }
     },
   });
@@ -38,7 +41,10 @@ export function useAuth() {
     onSuccess: (response) => {
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
-        router.push('/');
+
+        // New users always need onboarding
+        const needsOnboarding = !response.data.user.profile?.onboarding_completed;
+        router.push(needsOnboarding ? '/onboarding' : '/');
       }
     },
   });

@@ -1,6 +1,9 @@
 export type UserRole = 'superadmin' | 'admin' | 'researcher' | 'user' | 'guest' | 'bot';
 export type AuthProvider = 'email' | 'google';
 
+export type UserType = 'lawyer' | 'law_student' | 'other';
+export type CommunicationStyle = 'co_worker' | 'study_guide' | 'assistant';
+
 export interface UserProfile {
   gender?: string;
   date_of_birth?: string;
@@ -8,6 +11,10 @@ export interface UserProfile {
   law_school?: string;
   year_of_call?: number;
   bio?: string;
+  // Onboarding fields
+  user_type?: UserType;
+  communication_style?: CommunicationStyle;
+  onboarding_completed?: boolean;
 }
 
 export interface AreaOfExpertise {

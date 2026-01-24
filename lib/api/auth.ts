@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
-import type { AuthResponse, User, Session } from '@/types/auth';
+import type { AuthResponse, User, Session, UserProfile } from '@/types/auth';
 
 export const authApi = {
   // Public endpoints
@@ -111,6 +111,14 @@ export const authApi = {
 
   revokeAllSessions: async () => {
     const response = await apiClient.delete<ApiResponse<null>>('/auth/sessions');
+    return response.data;
+  },
+
+  updateProfile: async (data: Partial<UserProfile>) => {
+    const response = await apiClient.patch<ApiResponse<User>>(
+      '/auth/profile',
+      data
+    );
     return response.data;
   },
 };

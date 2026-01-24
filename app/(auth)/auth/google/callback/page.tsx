@@ -33,7 +33,10 @@ function GoogleCallbackContent() {
         const response = await authApi.googleCallback(code);
         if (response.success && response.data) {
           setAuth(response.data.user, response.data.token);
-          router.push('/');
+
+          // Check if user needs onboarding
+          const needsOnboarding = !response.data.user.profile?.onboarding_completed;
+          router.push(needsOnboarding ? '/onboarding' : '/');
         }
       } catch {
         router.push('/login?error=google_auth_failed');
