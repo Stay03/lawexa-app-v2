@@ -29,6 +29,15 @@ export function useOnboarding() {
       if (data.country) {
         payload.country = data.country;
       }
+      if (data.countryCode) {
+        payload.country_code = data.countryCode;
+      }
+      if (data.region) {
+        payload.region = data.region;
+      }
+      if (data.city) {
+        payload.city = data.city;
+      }
       if (data.university) {
         payload.university = data.university;
       }
@@ -43,6 +52,9 @@ export function useOnboarding() {
       }
       if (data.bio) {
         payload.bio = data.bio;
+      }
+      if (data.areaOfStudy) {
+        payload.area_of_study = data.areaOfStudy;
       }
       if (data.areasOfExpertise && data.areasOfExpertise.length > 0) {
         payload.areas_of_expertise = data.areasOfExpertise;

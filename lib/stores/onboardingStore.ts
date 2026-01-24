@@ -5,11 +5,15 @@ import type { UserType, CommunicationStyle } from '@/types/auth';
 export interface OnboardingProfileData {
   profession?: string;
   country?: string;
+  countryCode?: string;
+  region?: string;
+  city?: string;
   university?: string;
   level?: string;
   lawSchool?: string;
   yearOfCall?: number;
   bio?: string;
+  areaOfStudy?: string;
 }
 
 export interface OnboardingVerificationData {

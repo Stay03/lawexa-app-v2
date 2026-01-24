@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,6 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Combobox,
+  ComboboxInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxEmpty,
+} from '@/components/ui/combobox';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -22,6 +30,8 @@ import { authApi } from '@/lib/api/auth';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import { PROFESSION_OPTIONS, getLevelOptions } from '@/types/onboarding';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
+import { useCountries } from '@/lib/hooks/useCountries';
+import { useUniversitySearch } from '@/lib/hooks/useUniversities';
 
 export default function OnboardingStep3Page() {
   const router = useRouter();
@@ -41,13 +51,21 @@ export default function OnboardingStep3Page() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const location = (userData?.data as { location?: { country?: string } } | undefined)?.location;
+  const location = (userData?.data as { location?: { country?: string; region?: string; city?: string } } | undefined)?.location;
   const detectedCountry = location?.country || '';
+  const detectedRegion = location?.region || '';
+  const detectedCity = location?.city || '';
 
   // Form state
   const [profession, setProfession] = useState(profileData.profession || '');
+  const [customProfession, setCustomProfession] = useState('');
   const [country, setCountry] = useState(profileData.country || detectedCountry);
+  const [countryCode, setCountryCode] = useState(profileData.countryCode || '');
+  const [countrySearch, setCountrySearch] = useState('');
+  const [region, setRegion] = useState(profileData.region || detectedRegion);
+  const [city, setCity] = useState(profileData.city || detectedCity);
   const [university, setUniversity] = useState(profileData.university || '');
+  const [universitySearch, setUniversitySearch] = useState('');
   const [level, setLevel] = useState(profileData.level || '');
   const [lawSchool, setLawSchool] = useState(profileData.lawSchool || '');
   const [yearOfCall, setYearOfCall] = useState<string>(
@@ -55,12 +73,27 @@ export default function OnboardingStep3Page() {
   );
   const [bio, setBio] = useState(profileData.bio || '');
 
-  // Update country when location is detected
+  // Country dropdown
+  const { data: filteredCountries, isLoading: loadingCountries } = useCountries(countrySearch);
+
+  // University dropdown - filter by country code
+  const { data: universities, isLoading: loadingUniversities } = useUniversitySearch(
+    universitySearch,
+    countryCode
+  );
+
+  // Update location when detected
   useEffect(() => {
     if (detectedCountry && !country) {
       setCountry(detectedCountry);
     }
-  }, [detectedCountry, country]);
+    if (detectedRegion && !region) {
+      setRegion(detectedRegion);
+    }
+    if (detectedCity && !city) {
+      setCity(detectedCity);
+    }
+  }, [detectedCountry, detectedRegion, detectedCity, country, region, city]);
 
   // Redirect if previous steps not completed
   useEffect(() => {
@@ -80,9 +113,9 @@ export default function OnboardingStep3Page() {
   // Auto-set profession for lawyer and law_student
   useEffect(() => {
     if (userType === 'lawyer' && !profession) {
-      setProfession('Lawyer');
+      setProfession('lawyer');
     } else if (userType === 'law_student' && !profession) {
-      setProfession('Law Student');
+      setProfession('student');
     }
   }, [userType, profession]);
 
@@ -90,16 +123,52 @@ export default function OnboardingStep3Page() {
     router.push('/onboarding/step-2');
   };
 
+  const handleCountrySelect = (selectedCountry: { name: string; code: string }) => {
+    setCountry(selectedCountry.name);
+    setCountryCode(selectedCountry.code);
+    setCountrySearch('');
+    // Reset university when country changes
+    setUniversity('');
+    setUniversitySearch('');
+  };
+
+  const handleUniversitySelect = (universityName: string | null) => {
+    setUniversity(universityName || '');
+    setUniversitySearch('');
+  };
+
+  const handleProfessionSelect = (value: string) => {
+    if (value === 'other') {
+      setProfession('');
+    } else {
+      setProfession(value);
+      setCustomProfession('');
+    }
+  };
+
+  const handleCustomProfessionSubmit = () => {
+    if (customProfession.trim()) {
+      setProfession(customProfession.trim());
+    }
+  };
+
   const handleNext = () => {
+    // Determine the actual profession value
+    const finalProfession = isLawyer ? 'lawyer' : isStudent && userType === 'law_student' ? 'student' : profession;
+
     // Save profile data to store
     setProfileData({
-      profession,
+      profession: finalProfession,
       country,
+      countryCode,
+      region,
+      city,
       university: isStudent ? university : undefined,
       level: isStudent ? level : undefined,
       lawSchool: isLawyer ? lawSchool : undefined,
       yearOfCall: isLawyer && yearOfCall ? parseInt(yearOfCall) : undefined,
       bio,
+      areaOfStudy: userType === 'law_student' ? 'law' : undefined,
     });
 
     // Determine next step
@@ -108,11 +177,15 @@ export default function OnboardingStep3Page() {
       submitOnboarding({
         userType,
         communicationStyle: communicationStyle!,
-        profession,
+        profession: finalProfession,
         country,
+        countryCode,
+        region,
+        city,
         university: isStudent ? university : undefined,
         level: isStudent ? level : undefined,
         bio,
+        areaOfStudy: isStudent ? 'law' : undefined,
       });
     } else {
       // Navigate to step 4 for lawyers and law students
@@ -158,43 +231,136 @@ export default function OnboardingStep3Page() {
               />
             </div>
 
-            {/* Profession - Dropdown for "other", auto-set for lawyer/law_student */}
+            {/* Profession - Bubble selection for "other", auto-set for lawyer/law_student */}
             {isOther ? (
               <div className="space-y-2">
-                <Label htmlFor="profession">Profession *</Label>
-                <Select value={profession} onValueChange={setProfession}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select your profession" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROFESSION_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Profession *</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PROFESSION_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleProfessionSelect(option.value)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        profession === option.value
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted hover:bg-muted/80 text-foreground'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {/* Custom profession input */}
+                {(profession === '' || !PROFESSION_OPTIONS.find(o => o.value === profession)) && (
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      placeholder="Type your profession..."
+                      value={customProfession || (PROFESSION_OPTIONS.find(o => o.value === profession) ? '' : profession)}
+                      onChange={(e) => setCustomProfession(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCustomProfessionSubmit();
+                        }
+                      }}
+                    />
+                    {customProfession && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleCustomProfessionSubmit}
+                      >
+                        Add
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {profession && !PROFESSION_OPTIONS.find(o => o.value === profession) && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="px-3 py-1.5 rounded-full text-sm font-medium bg-primary text-primary-foreground flex items-center gap-1">
+                      {profession}
+                      <button
+                        type="button"
+                        onClick={() => setProfession('')}
+                        className="ml-1 hover:bg-primary-foreground/20 rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="profession">Profession</Label>
                 <Input
                   id="profession"
-                  value={profession}
+                  value={isLawyer ? 'Lawyer' : 'Law Student'}
                   disabled
                   className="bg-muted"
                 />
               </div>
             )}
 
-            {/* Country - Pre-filled from location */}
+            {/* Country - Searchable dropdown */}
             <div className="space-y-2">
               <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
+              <Combobox
                 value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                placeholder="Your country"
+                onValueChange={(value) => {
+                  const found = filteredCountries?.find(c => c.name === value);
+                  if (found) {
+                    handleCountrySelect(found);
+                  }
+                }}
+              >
+                <ComboboxInput
+                  id="country"
+                  placeholder="Search for your country..."
+                  value={countrySearch}
+                  onChange={(e) => setCountrySearch(e.target.value)}
+                  showClear={!!country}
+                />
+                <ComboboxContent>
+                  <ComboboxEmpty>
+                    {loadingCountries ? 'Loading countries...' : 'No countries found'}
+                  </ComboboxEmpty>
+                  <ComboboxList>
+                    {filteredCountries?.slice(0, 50).map((c) => (
+                      <ComboboxItem key={c.code} value={c.name}>
+                        {c.name}
+                      </ComboboxItem>
+                    ))}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+              {country && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {country}
+                </p>
+              )}
+            </div>
+
+            {/* Region/State */}
+            <div className="space-y-2">
+              <Label htmlFor="region">State / Region</Label>
+              <Input
+                id="region"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                placeholder="Your state or region"
+              />
+            </div>
+
+            {/* City */}
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Your city"
               />
             </div>
 
@@ -203,12 +369,39 @@ export default function OnboardingStep3Page() {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="university">University *</Label>
-                  <Input
-                    id="university"
+                  <Combobox
                     value={university}
-                    onChange={(e) => setUniversity(e.target.value)}
-                    placeholder="Enter your university"
-                  />
+                    onValueChange={handleUniversitySelect}
+                  >
+                    <ComboboxInput
+                      id="university"
+                      placeholder="Search for your university..."
+                      value={universitySearch}
+                      onChange={(e) => setUniversitySearch(e.target.value)}
+                      showClear={!!university}
+                    />
+                    <ComboboxContent>
+                      <ComboboxEmpty>
+                        {loadingUniversities
+                          ? 'Searching...'
+                          : universitySearch.length < 2
+                            ? 'Type at least 2 characters to search'
+                            : 'No universities found'}
+                      </ComboboxEmpty>
+                      <ComboboxList>
+                        {universities?.map((u) => (
+                          <ComboboxItem key={u.id} value={u.name}>
+                            {u.name}
+                          </ComboboxItem>
+                        ))}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
+                  {university && (
+                    <p className="text-xs text-muted-foreground">
+                      Selected: {university}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

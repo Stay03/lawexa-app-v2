@@ -115,8 +115,8 @@ export const authApi = {
   },
 
   updateProfile: async (data: Partial<UserProfile>) => {
-    const response = await apiClient.patch<ApiResponse<User>>(
-      '/auth/profile',
+    const response = await apiClient.put<ApiResponse<User>>(
+      '/profile',
       data
     );
     return response.data;

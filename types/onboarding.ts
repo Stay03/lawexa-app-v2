@@ -6,11 +6,15 @@ export interface OnboardingFormData {
   // Profile fields
   profession?: string;
   country?: string;
+  countryCode?: string;
+  region?: string;
+  city?: string;
   university?: string;
   level?: string;
   lawSchool?: string;
   yearOfCall?: number;
   bio?: string;
+  areaOfStudy?: string;
   // Expertise
   areasOfExpertise?: number[];
   // Verification (Lawyer only)
