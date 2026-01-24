@@ -22,7 +22,14 @@ import {
   ChainOfThought,
   ChainOfThoughtStep,
   ChainOfThoughtTrigger,
+  ChainOfThoughtContent,
 } from '@/components/prompt-kit';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { ToolCallDetails } from '@/components/chat/tool-call-details';
 import {
   ArrowUp,
   Paperclip,
@@ -123,6 +130,20 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
 
 // Tool chain display component - renders linked tool calls
 function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+
+  const toggleStep = (messageId: string) => {
+    setExpandedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="px-4">
       <div className="mx-auto max-w-2xl">
@@ -132,6 +153,7 @@ function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
             const isSuccess = isComplete && message.toolResult?.success;
             const isError = isComplete && !message.toolResult?.success;
             const isLast = index === messages.length - 1;
+            const isExpanded = expandedSteps.has(message.id);
 
             const status = !isComplete ? 'loading' : isSuccess ? 'success' : 'error';
 
@@ -147,19 +169,35 @@ function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
                 isLast={isLast}
                 status={status}
               >
-                <ChainOfThoughtTrigger
-                  rightContent={
-                    isComplete && message.latencyMs
-                      ? formatLatency(message.latencyMs)
-                      : undefined
-                  }
+                <Collapsible
+                  open={isExpanded}
+                  onOpenChange={() => isComplete && toggleStep(message.id)}
                 >
-                  <span className="font-medium">{action}</span>
-                  {detail && (
-                    <span className="text-muted-foreground font-normal"> {detail}</span>
-                  )}
-                </ChainOfThoughtTrigger>
-                {isError && (
+                  <CollapsibleTrigger asChild disabled={!isComplete}>
+                    <ChainOfThoughtTrigger
+                      isClickable={isComplete}
+                      isExpanded={isExpanded}
+                      rightContent={
+                        isComplete && message.latencyMs
+                          ? formatLatency(message.latencyMs)
+                          : undefined
+                      }
+                    >
+                      <span className="font-medium">{action}</span>
+                      {detail && (
+                        <span className="text-muted-foreground font-normal"> {detail}</span>
+                      )}
+                    </ChainOfThoughtTrigger>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+                    <ChainOfThoughtContent>
+                      <ToolCallDetails message={message} />
+                    </ChainOfThoughtContent>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {isError && !isExpanded && (
                   <p className="text-destructive mt-1 text-sm">
                     Error: {message.toolResult?.error || 'Unknown error'}
                   </p>

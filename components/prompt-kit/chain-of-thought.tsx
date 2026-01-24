@@ -1,6 +1,7 @@
 'use client';
 
 import React, { forwardRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ChainOfThought - Root container for all steps
@@ -97,20 +98,34 @@ export interface ChainOfThoughtTriggerProps extends React.HTMLAttributes<HTMLDiv
   children: React.ReactNode;
   leftIcon?: React.ReactNode;
   rightContent?: React.ReactNode;
+  isExpanded?: boolean;
+  isClickable?: boolean;
 }
 
 export const ChainOfThoughtTrigger = forwardRef<HTMLDivElement, ChainOfThoughtTriggerProps>(
-  ({ children, className, leftIcon, rightContent, ...props }, ref) => {
+  ({ children, className, leftIcon, rightContent, isExpanded, isClickable, ...props }, ref) => {
     return (
       <div
         ref={ref}
-        className={cn('flex items-center gap-2', className)}
+        className={cn(
+          'flex items-center gap-2',
+          isClickable && 'hover:bg-muted/50 -mx-2 cursor-pointer rounded-md px-2 py-1 transition-colors',
+          className
+        )}
         {...props}
       >
         {leftIcon && <span className="shrink-0">{leftIcon}</span>}
         <span className="flex-1 text-sm">{children}</span>
         {rightContent && (
           <span className="text-muted-foreground text-xs">{rightContent}</span>
+        )}
+        {isClickable && (
+          <ChevronDown
+            className={cn(
+              'text-muted-foreground h-4 w-4 transition-transform duration-200',
+              isExpanded && 'rotate-180'
+            )}
+          />
         )}
       </div>
     );
@@ -128,7 +143,7 @@ export const ChainOfThoughtContent = forwardRef<HTMLDivElement, ChainOfThoughtCo
     return (
       <div
         ref={ref}
-        className={cn('mt-1 space-y-1', className)}
+        className={cn('border-muted mt-2 ml-0 space-y-2 border-l-2 pl-3', className)}
         {...props}
       >
         {children}
