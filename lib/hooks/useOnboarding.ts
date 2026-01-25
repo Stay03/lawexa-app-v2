@@ -15,6 +15,17 @@ export function useOnboarding() {
 
   const mutation = useMutation({
     mutationFn: async (data: OnboardingFormData) => {
+      // Derive profession from userType if not explicitly provided
+      // This handles the case when lawyer/law_student skips the profile step
+      let profession = data.profession;
+      if (!profession) {
+        if (data.userType === 'lawyer') {
+          profession = 'lawyer';
+        } else if (data.userType === 'law_student') {
+          profession = 'student';
+        }
+      }
+
       // Build the profile update payload
       const payload: Record<string, unknown> = {
         user_type: data.userType,
@@ -22,9 +33,9 @@ export function useOnboarding() {
         onboarding_completed: true,
       };
 
-      // Add optional profile fields
-      if (data.profession) {
-        payload.profession = data.profession;
+      // Add profession (derived or explicit)
+      if (profession) {
+        payload.profession = profession;
       }
       if (data.country) {
         payload.country = data.country;
@@ -66,7 +77,6 @@ export function useOnboarding() {
       return authApi.updateProfile(payload);
     },
     onSuccess: (response) => {
-      console.log('[useOnboarding] onSuccess called', { response });
       if (response.success && response.data) {
         // Update local store with new user data including profile
         // Ensure onboarding_completed is set to true even if API doesn't return it
@@ -75,28 +85,22 @@ export function useOnboarding() {
           onboarding_completed: true,
         };
 
-        console.log('[useOnboarding] Calling updateUser with:', {
-          profile: profileWithOnboardingFlag,
-          areas_of_expertise: response.data.areas_of_expertise,
-        });
-
         updateUser({
           profile: profileWithOnboardingFlag,
           areas_of_expertise: response.data.areas_of_expertise,
         });
 
-        console.log('[useOnboarding] updateUser called, now resetting onboarding store');
-
         // Clear onboarding store
         reset();
 
-        console.log('[useOnboarding] Invalidating auth queries');
         // Invalidate auth queries to refetch user data
         queryClient.invalidateQueries({ queryKey: ['auth'] });
 
-        console.log('[useOnboarding] Navigating to /');
-        // Redirect to home
-        router.push('/');
+        // Defer navigation to allow store update to propagate
+        // This prevents the OnboardingGuard from seeing stale state
+        setTimeout(() => {
+          router.push('/');
+        }, 0);
       }
     },
   });

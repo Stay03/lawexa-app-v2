@@ -41,16 +41,8 @@ export const useAuthStore = create<AuthStore>()(
 
       updateUser: (userData) => {
         const currentUser = get().user;
-        console.log('[authStore] updateUser called', {
-          currentUser,
-          userData,
-        });
         if (currentUser) {
-          const newUser = { ...currentUser, ...userData };
-          console.log('[authStore] Setting new user:', newUser);
-          set({ user: newUser });
-        } else {
-          console.log('[authStore] No current user, skipping update');
+          set({ user: { ...currentUser, ...userData } });
         }
       },
     }),
