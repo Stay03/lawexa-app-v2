@@ -1,7 +1,6 @@
 'use client';
 
-import { Briefcase, BookOpen, HandHelping, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Briefcase, BookOpen, HandHelping, Loader2, Sparkles } from 'lucide-react';
 import { OnboardingCard } from './OnboardingCard';
 import { Badge } from '@/components/ui/badge';
 import type { UserType, CommunicationStyle } from '@/types/auth';
@@ -39,7 +38,6 @@ const ALL_STYLE_OPTIONS: {
 interface CommunicationStyleStepProps {
   userType: UserType;
   onSelect: (style: CommunicationStyle) => void;
-  onBack: () => void;
   isSubmitting: boolean;
   selectedStyle?: CommunicationStyle | null;
 }
@@ -47,7 +45,6 @@ interface CommunicationStyleStepProps {
 export function CommunicationStyleStep({
   userType,
   onSelect,
-  onBack,
   isSubmitting,
   selectedStyle,
 }: CommunicationStyleStepProps) {
@@ -108,16 +105,6 @@ export function CommunicationStyleStep({
           );
         })}
       </div>
-
-      <Button
-        variant="ghost"
-        onClick={onBack}
-        disabled={isSubmitting}
-        className="w-full"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back
-      </Button>
     </div>
   );
 }

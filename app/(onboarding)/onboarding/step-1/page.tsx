@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Scale, GraduationCap, Briefcase } from 'lucide-react';
 import { OnboardingCard } from '@/components/onboarding/OnboardingCard';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
+import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import type { UserType } from '@/types/auth';
@@ -35,14 +36,16 @@ export default function OnboardingStep1Page() {
 
   const handleSelect = (type: UserType) => {
     setUserType(type);
-    // Small delay to show selection before navigating
-    setTimeout(() => {
+  };
+
+  const handleNext = () => {
+    if (userType) {
       router.push('/onboarding/step-2');
-    }, 150);
+    }
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 md:justify-center">
+    <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress currentStep={1} totalSteps={getTotalSteps(userType)} />
 
@@ -69,6 +72,12 @@ export default function OnboardingStep1Page() {
               />
             ))}
           </div>
+
+          <OnboardingFooter
+            onNext={handleNext}
+            showBack={false}
+            isNextDisabled={!userType}
+          />
         </div>
       </div>
     </div>

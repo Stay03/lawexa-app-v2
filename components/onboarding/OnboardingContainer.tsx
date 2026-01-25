@@ -76,7 +76,6 @@ export function OnboardingContainer() {
               <CommunicationStyleStep
                 userType={userType}
                 onSelect={handleStyleSelect}
-                onBack={handleBack}
                 isSubmitting={isSubmitting}
                 selectedStyle={communicationStyle}
               />

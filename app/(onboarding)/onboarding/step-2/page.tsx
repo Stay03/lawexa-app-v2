@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CommunicationStyleStep } from '@/components/onboarding/CommunicationStyleStep';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
+import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import type { CommunicationStyle } from '@/types/auth';
@@ -21,17 +22,17 @@ export default function OnboardingStep2Page() {
 
   const handleSelect = (style: CommunicationStyle) => {
     if (!userType) return;
-
     setCommunicationStyle(style);
-
-    // Navigate to step 3 after a small delay for selection feedback
-    setTimeout(() => {
-      router.push('/onboarding/step-3');
-    }, 150);
   };
 
   const handleBack = () => {
     router.push('/onboarding/step-1');
+  };
+
+  const handleNext = () => {
+    if (communicationStyle) {
+      router.push('/onboarding/step-3');
+    }
   };
 
   // Don't render until we have a user type
@@ -40,7 +41,7 @@ export default function OnboardingStep2Page() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 md:justify-center">
+    <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress currentStep={2} totalSteps={getTotalSteps(userType)} />
 
@@ -48,10 +49,17 @@ export default function OnboardingStep2Page() {
           <CommunicationStyleStep
             userType={userType}
             onSelect={handleSelect}
-            onBack={handleBack}
             isSubmitting={false}
             selectedStyle={communicationStyle}
           />
+
+          <div className="mt-8">
+            <OnboardingFooter
+              onBack={handleBack}
+              onNext={handleNext}
+              isNextDisabled={!communicationStyle}
+            />
+          </div>
         </div>
       </div>
     </div>
