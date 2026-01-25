@@ -68,8 +68,14 @@ export function useOnboarding() {
     onSuccess: (response) => {
       if (response.success && response.data) {
         // Update local store with new user data including profile
+        // Ensure onboarding_completed is set to true even if API doesn't return it
+        const profileWithOnboardingFlag = {
+          ...response.data.profile,
+          onboarding_completed: true,
+        };
+
         updateUser({
-          profile: response.data.profile,
+          profile: profileWithOnboardingFlag,
           areas_of_expertise: response.data.areas_of_expertise,
         });
 

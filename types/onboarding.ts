@@ -3,17 +3,19 @@ import type { UserType, CommunicationStyle } from './auth';
 export interface OnboardingFormData {
   userType: UserType;
   communicationStyle: CommunicationStyle;
-  // Profile fields
-  profession?: string;
+  // Location fields
   country?: string;
   countryCode?: string;
   region?: string;
   city?: string;
+  // Profile fields
+  profession?: string;
+  bio?: string;
+  // Education fields
   university?: string;
   level?: string;
   lawSchool?: string;
   yearOfCall?: number;
-  bio?: string;
   areaOfStudy?: string;
   // Expertise
   areasOfExpertise?: number[];

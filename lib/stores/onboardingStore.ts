@@ -2,12 +2,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserType, CommunicationStyle } from '@/types/auth';
 
-export interface OnboardingProfileData {
-  profession?: string;
+export interface OnboardingLocationData {
   country?: string;
   countryCode?: string;
   region?: string;
   city?: string;
+  selectedCountryMatchesDetected?: boolean;
+}
+
+export interface OnboardingProfileData {
+  profession?: string;
   university?: string;
   level?: string;
   lawSchool?: string;
@@ -29,17 +33,20 @@ interface OnboardingStore {
   userType: UserType | null;
   // Step 2
   communicationStyle: CommunicationStyle | null;
-  // Step 3
+  // Step 3 - Location
+  locationData: OnboardingLocationData;
+  // Step 4 - Profile
   profileData: OnboardingProfileData;
-  // Step 4
+  // Step 6 - Expertise
   areasOfExpertise: number[];
-  // Step 5 (Lawyer only)
+  // Step 7 (Lawyer only) - Verification
   verificationData: OnboardingVerificationData;
   wantsClientReferrals: boolean | null;
 
   // Actions
   setUserType: (type: UserType) => void;
   setCommunicationStyle: (style: CommunicationStyle) => void;
+  setLocationData: (data: Partial<OnboardingLocationData>) => void;
   setProfileData: (data: Partial<OnboardingProfileData>) => void;
   setAreasOfExpertise: (ids: number[]) => void;
   setVerificationData: (data: Partial<OnboardingVerificationData>) => void;
@@ -50,6 +57,7 @@ interface OnboardingStore {
 const initialState = {
   userType: null,
   communicationStyle: null,
+  locationData: {},
   profileData: {},
   areasOfExpertise: [],
   verificationData: {},
@@ -63,6 +71,10 @@ export const useOnboardingStore = create<OnboardingStore>()(
 
       setUserType: (type) => set({ userType: type }),
       setCommunicationStyle: (style) => set({ communicationStyle: style }),
+      setLocationData: (data) =>
+        set((state) => ({
+          locationData: { ...state.locationData, ...data },
+        })),
       setProfileData: (data) =>
         set((state) => ({
           profileData: { ...state.profileData, ...data },

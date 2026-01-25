@@ -24,8 +24,16 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     // Check if user needs onboarding
     // User needs onboarding if:
     // 1. profile is null/undefined, OR
-    // 2. onboarding_completed is not true
-    const needsOnboarding = !user?.profile || user.profile.onboarding_completed !== true;
+    // 2. No indicators of completed onboarding (profession, user_type, or onboarding_completed flag)
+    // We check multiple fields because the API may not return onboarding_completed in all responses
+    const profile = user?.profile;
+    const hasCompletedOnboarding = profile && (
+      profile.onboarding_completed === true ||
+      // Fallback: if user has profession set, they completed onboarding
+      (profile.profession && profile.profession.length > 0)
+    );
+
+    const needsOnboarding = !hasCompletedOnboarding;
 
     if (needsOnboarding) {
       // Redirect to onboarding - don't set isReady, keep showing loader
