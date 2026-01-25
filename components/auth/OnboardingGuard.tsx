@@ -15,8 +15,16 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    console.log('[OnboardingGuard] useEffect triggered', {
+      isAuthenticated,
+      isGuest,
+      user,
+      userProfile: user?.profile,
+    });
+
     // Skip check for guest users or unauthenticated users
     if (!isAuthenticated || isGuest) {
+      console.log('[OnboardingGuard] Skipping check - not authenticated or is guest');
       setIsReady(true);
       return;
     }
@@ -35,10 +43,20 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
 
     const needsOnboarding = !hasCompletedOnboarding;
 
+    console.log('[OnboardingGuard] Onboarding check:', {
+      profile,
+      onboarding_completed: profile?.onboarding_completed,
+      profession: profile?.profession,
+      hasCompletedOnboarding,
+      needsOnboarding,
+    });
+
     if (needsOnboarding) {
       // Redirect to onboarding - don't set isReady, keep showing loader
+      console.log('[OnboardingGuard] Redirecting to /onboarding');
       router.replace('/onboarding');
     } else {
+      console.log('[OnboardingGuard] User has completed onboarding, setting ready');
       setIsReady(true);
     }
   }, [isAuthenticated, isGuest, user, router]);

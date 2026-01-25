@@ -66,6 +66,7 @@ export function useOnboarding() {
       return authApi.updateProfile(payload);
     },
     onSuccess: (response) => {
+      console.log('[useOnboarding] onSuccess called', { response });
       if (response.success && response.data) {
         // Update local store with new user data including profile
         // Ensure onboarding_completed is set to true even if API doesn't return it
@@ -74,17 +75,26 @@ export function useOnboarding() {
           onboarding_completed: true,
         };
 
+        console.log('[useOnboarding] Calling updateUser with:', {
+          profile: profileWithOnboardingFlag,
+          areas_of_expertise: response.data.areas_of_expertise,
+        });
+
         updateUser({
           profile: profileWithOnboardingFlag,
           areas_of_expertise: response.data.areas_of_expertise,
         });
 
+        console.log('[useOnboarding] updateUser called, now resetting onboarding store');
+
         // Clear onboarding store
         reset();
 
+        console.log('[useOnboarding] Invalidating auth queries');
         // Invalidate auth queries to refetch user data
         queryClient.invalidateQueries({ queryKey: ['auth'] });
 
+        console.log('[useOnboarding] Navigating to /');
         // Redirect to home
         router.push('/');
       }
