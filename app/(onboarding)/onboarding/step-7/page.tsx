@@ -18,7 +18,7 @@ import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
-import { getTotalSteps } from '@/lib/utils/onboarding';
+import { getTotalSteps, shouldSkipProfileStep } from '@/lib/utils/onboarding';
 import { cn } from '@/lib/utils';
 
 interface FileUploadProps {
@@ -118,6 +118,12 @@ export default function OnboardingStep7Page() {
   const [practicingLicense, setPracticingLicense] = useState<File | null>(null);
   const [cv, setCv] = useState<File | null>(null);
 
+  // Check if profile step was skipped
+  const skipProfile = shouldSkipProfileStep(
+    userType,
+    locationData.selectedCountryMatchesDetected || false
+  );
+
   // Redirect if previous steps not completed or not a lawyer
   useEffect(() => {
     if (!userType || !communicationStyle) {
@@ -177,7 +183,10 @@ export default function OnboardingStep7Page() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
-        <OnboardingProgress currentStep={7} totalSteps={getTotalSteps(userType)} />
+        <OnboardingProgress
+          currentStep={skipProfile ? 6 : 7}
+          totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
+        />
 
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           {/* Header */}

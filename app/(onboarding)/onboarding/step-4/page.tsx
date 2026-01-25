@@ -5,11 +5,10 @@ import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
-import { useOnboardingStore, type OnboardingLocationData } from '@/lib/stores/onboardingStore';
+import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
 import {
@@ -34,9 +33,9 @@ export default function OnboardingStep4Page() {
   // Form state
   const [profession, setProfession] = useState(profileData.profession || '');
   const [customProfession, setCustomProfession] = useState('');
+  const [showOtherInput, setShowOtherInput] = useState(false);
   const [region, setRegion] = useState(locationData.region || '');
   const [city, setCity] = useState(locationData.city || '');
-  const [bio, setBio] = useState(profileData.bio || '');
 
   // Redirect if previous steps not completed
   useEffect(() => {
@@ -49,7 +48,9 @@ export default function OnboardingStep4Page() {
   const isLawyer = userType === 'lawyer';
   const isLawStudent = userType === 'law_student';
   const isOther = userType === 'other';
-  const isStudent = isLawStudent || profession === 'student';
+
+  // Check if user has a custom profession (not in predefined options)
+  const hasCustomProfession = profession && !PROFESSION_OPTIONS.find(o => o.value === profession);
 
   // Auto-set profession for lawyer and law_student
   useEffect(() => {
@@ -66,17 +67,28 @@ export default function OnboardingStep4Page() {
 
   const handleProfessionSelect = (value: string) => {
     if (value === 'other') {
+      // Show the input field for custom profession
+      setShowOtherInput(true);
       setProfession('');
+      setCustomProfession('');
     } else {
       setProfession(value);
       setCustomProfession('');
+      setShowOtherInput(false);
     }
   };
 
   const handleCustomProfessionSubmit = () => {
     if (customProfession.trim()) {
       setProfession(customProfession.trim());
+      setShowOtherInput(false);
     }
+  };
+
+  const handleClearCustomProfession = () => {
+    setProfession('');
+    setCustomProfession('');
+    setShowOtherInput(false);
   };
 
   const handleNext = () => {
@@ -93,7 +105,6 @@ export default function OnboardingStep4Page() {
     // Save profile data to store
     setProfileData({
       profession: finalProfession,
-      bio: !isStudent ? bio : undefined, // Hide bio for students
     });
 
     // Determine next step based on user type and profession
@@ -109,7 +120,6 @@ export default function OnboardingStep4Page() {
         region,
         city,
         profession: finalProfession,
-        bio: bio || undefined,
       });
     }
   };
@@ -180,28 +190,27 @@ export default function OnboardingStep4Page() {
             {isOther && (
               <div className="space-y-2">
                 <Label>Profession *</Label>
-                <div className="flex flex-wrap gap-2">
-                  {PROFESSION_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => handleProfessionSelect(option.value)}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                        profession === option.value
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted hover:bg-muted/80 text-foreground'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                {/* Custom profession input */}
-                {(profession === '' || !PROFESSION_OPTIONS.find(o => o.value === profession)) && (
-                  <div className="flex gap-2 mt-2">
+
+                {/* Show custom profession if set */}
+                {hasCustomProfession ? (
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1.5 rounded-full text-sm font-medium bg-primary text-primary-foreground flex items-center gap-1">
+                      {profession}
+                      <button
+                        type="button"
+                        onClick={handleClearCustomProfession}
+                        className="ml-1 hover:bg-primary-foreground/20 rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  </div>
+                ) : showOtherInput ? (
+                  /* Show input for custom profession when "Other" is selected */
+                  <div className="flex gap-2">
                     <Input
                       placeholder="Type your profession..."
-                      value={customProfession || (PROFESSION_OPTIONS.find(o => o.value === profession) ? '' : profession)}
+                      value={customProfession}
                       onChange={(e) => setCustomProfession(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -209,6 +218,7 @@ export default function OnboardingStep4Page() {
                           handleCustomProfessionSubmit();
                         }
                       }}
+                      autoFocus
                     />
                     {customProfession && (
                       <Button
@@ -219,40 +229,34 @@ export default function OnboardingStep4Page() {
                         Add
                       </Button>
                     )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowOtherInput(false)}
+                    >
+                      Cancel
+                    </Button>
                   </div>
-                )}
-                {profession && !PROFESSION_OPTIONS.find(o => o.value === profession) && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="px-3 py-1.5 rounded-full text-sm font-medium bg-primary text-primary-foreground flex items-center gap-1">
-                      {profession}
+                ) : (
+                  /* Show profession options */
+                  <div className="flex flex-wrap gap-2">
+                    {PROFESSION_OPTIONS.map((option) => (
                       <button
+                        key={option.value}
                         type="button"
-                        onClick={() => setProfession('')}
-                        className="ml-1 hover:bg-primary-foreground/20 rounded-full p-0.5"
+                        onClick={() => handleProfessionSelect(option.value)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          profession === option.value
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted hover:bg-muted/80 text-foreground'
+                        }`}
                       >
-                        <X className="h-3 w-3" />
+                        {option.label}
                       </button>
-                    </span>
+                    ))}
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Bio - Optional, hidden for students */}
-            {!isStudent && (
-              <div className="space-y-2">
-                <Label htmlFor="bio">Bio (Optional)</Label>
-                <Textarea
-                  id="bio"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Tell us a bit about yourself..."
-                  className="min-h-[100px] resize-none"
-                  maxLength={2000}
-                />
-                <p className="text-xs text-muted-foreground text-right">
-                  {bio.length}/2000
-                </p>
               </div>
             )}
           </div>

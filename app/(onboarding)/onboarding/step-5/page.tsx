@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, Search, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -12,25 +12,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Combobox,
-  ComboboxInput,
-  ComboboxContent,
-  ComboboxList,
-  ComboboxItem,
-  ComboboxEmpty,
-} from '@/components/ui/combobox';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
-import { useUniversitySearch } from '@/lib/hooks/useUniversities';
+import {
+  useUniversitiesByCountry,
+  useGlobalUniversitySearch,
+} from '@/lib/hooks/useUniversities';
 import {
   getTotalSteps,
   shouldShowEducationStep,
   shouldShowExpertiseStep,
+  shouldSkipProfileStep,
 } from '@/lib/utils/onboarding';
 import { getLevelOptions } from '@/types/onboarding';
+import { cn } from '@/lib/utils';
 
 export default function OnboardingStep5Page() {
   const router = useRouter();
@@ -45,17 +42,35 @@ export default function OnboardingStep5Page() {
 
   // Form state
   const [university, setUniversity] = useState(profileData.university || '');
-  const [universitySearch, setUniversitySearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [level, setLevel] = useState(profileData.level || '');
   const [lawSchool, setLawSchool] = useState(profileData.lawSchool || '');
   const [yearOfCall, setYearOfCall] = useState<string>(
     profileData.yearOfCall?.toString() || ''
   );
 
-  // University dropdown - filter by country code from location
-  const { data: universities, isLoading: loadingUniversities } = useUniversitySearch(
-    universitySearch,
-    locationData.countryCode
+  // Fetch universities from user's country
+  const { data: countryUniversities, isLoading: loadingCountryUniversities } =
+    useUniversitiesByCountry(locationData.countryCode);
+
+  // Search all universities globally when user types in search
+  const { data: searchResults, isLoading: loadingSearch } =
+    useGlobalUniversitySearch(searchQuery);
+
+  // Determine which universities to show
+  const displayUniversities = useMemo(() => {
+    if (searchQuery.length >= 2) {
+      // Show global search results
+      return searchResults || [];
+    }
+    // Show universities from user's country
+    return countryUniversities || [];
+  }, [searchQuery, searchResults, countryUniversities]);
+
+  // Check if profile step was skipped
+  const skipProfile = shouldSkipProfileStep(
+    userType,
+    locationData.selectedCountryMatchesDetected || false
   );
 
   // Redirect if previous steps not completed or education step not needed
@@ -69,18 +84,24 @@ export default function OnboardingStep5Page() {
   }, [userType, communicationStyle, profileData.profession, router]);
 
   const isLawyer = userType === 'lawyer';
-  const isStudent = userType === 'law_student' || profileData.profession === 'student';
+  const isLawStudent = userType === 'law_student';
+  const isStudent = isLawStudent || profileData.profession === 'student';
 
   // Get level options based on country
   const levelOptions = getLevelOptions(locationData.country || '');
 
-  const handleUniversitySelect = (universityName: string | null) => {
-    setUniversity(universityName || '');
-    setUniversitySearch('');
+  const handleUniversitySelect = (universityName: string) => {
+    setUniversity(universityName);
+    setSearchQuery('');
   };
 
   const handleBack = () => {
-    router.push('/onboarding/step-4');
+    // If profile was skipped, go back to location step
+    if (skipProfile) {
+      router.push('/onboarding/step-3');
+    } else {
+      router.push('/onboarding/step-4');
+    }
   };
 
   const handleNext = () => {
@@ -88,9 +109,9 @@ export default function OnboardingStep5Page() {
     setProfileData({
       university: isStudent ? university : undefined,
       level: isStudent ? level : undefined,
-      lawSchool: isLawyer ? lawSchool : undefined,
+      lawSchool: (isLawyer || isLawStudent) ? lawSchool : undefined,
       yearOfCall: isLawyer && yearOfCall ? parseInt(yearOfCall) : undefined,
-      areaOfStudy: userType === 'law_student' ? 'law' : undefined,
+      areaOfStudy: isLawStudent ? 'law' : undefined,
     });
 
     // Determine next step
@@ -106,7 +127,7 @@ export default function OnboardingStep5Page() {
         ...profileData,
         university: isStudent ? university : undefined,
         level: isStudent ? level : undefined,
-        areaOfStudy: userType === 'law_student' ? 'law' : undefined,
+        areaOfStudy: isLawStudent ? 'law' : undefined,
       });
     }
   };
@@ -117,16 +138,22 @@ export default function OnboardingStep5Page() {
     return true;
   };
 
-  if (!userType || !communicationStyle || !shouldShowEducationStep(userType, profileData.profession)) {
+  if (
+    !userType ||
+    !communicationStyle ||
+    !shouldShowEducationStep(userType, profileData.profession)
+  ) {
     return null;
   }
+
+  const isLoading = loadingCountryUniversities || loadingSearch;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress
-          currentStep={5}
-          totalSteps={getTotalSteps(userType, profileData.profession)}
+          currentStep={skipProfile ? 4 : 5}
+          totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
         />
 
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -151,38 +178,68 @@ export default function OnboardingStep5Page() {
             {isStudent && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="university">University *</Label>
-                  <Combobox
-                    value={university}
-                    onValueChange={handleUniversitySelect}
-                  >
-                    <ComboboxInput
-                      id="university"
+                  <Label>University *</Label>
+
+                  {/* Search input */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
                       placeholder="Search for your university..."
-                      value={universitySearch}
-                      onChange={(e) => setUniversitySearch(e.target.value)}
-                      showClear={!!university}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
                     />
-                    <ComboboxContent>
-                      <ComboboxEmpty>
-                        {loadingUniversities
-                          ? 'Searching...'
-                          : universitySearch.length < 2
-                            ? 'Type at least 2 characters to search'
-                            : 'No universities found'}
-                      </ComboboxEmpty>
-                      <ComboboxList>
-                        {universities?.map((u) => (
-                          <ComboboxItem key={u.id} value={u.name}>
-                            {u.name}
-                          </ComboboxItem>
-                        ))}
-                      </ComboboxList>
-                    </ComboboxContent>
-                  </Combobox>
+                  </div>
+
+                  {/* University list */}
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    ) : displayUniversities.length > 0 ? (
+                      displayUniversities.map((uni) => (
+                        <button
+                          key={uni.id}
+                          type="button"
+                          onClick={() => handleUniversitySelect(uni.name)}
+                          className={cn(
+                            'w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all',
+                            'hover:border-primary/50 hover:bg-primary/5',
+                            university === uni.name
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border bg-card'
+                          )}
+                        >
+                          <div>
+                            <span className="font-medium text-sm">{uni.name}</span>
+                            {uni.country && searchQuery && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({uni.country})
+                              </span>
+                            )}
+                          </div>
+                          {university === uni.name && (
+                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                        </button>
+                      ))
+                    ) : searchQuery.length >= 2 ? (
+                      <p className="text-center text-muted-foreground py-4 text-sm">
+                        No universities found for "{searchQuery}"
+                      </p>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-4 text-sm">
+                        {locationData.country
+                          ? `No universities found in ${locationData.country}`
+                          : 'Search for your university'}
+                      </p>
+                    )}
+                  </div>
+
                   {university && (
                     <p className="text-xs text-muted-foreground">
-                      Selected: {university}
+                      Selected: <span className="font-medium">{university}</span>
                     </p>
                   )}
                 </div>
@@ -203,6 +260,19 @@ export default function OnboardingStep5Page() {
                   </Select>
                 </div>
               </>
+            )}
+
+            {/* Law School - For law students (optional) */}
+            {isLawStudent && (
+              <div className="space-y-2">
+                <Label htmlFor="lawSchool">Law School (Optional)</Label>
+                <Input
+                  id="lawSchool"
+                  value={lawSchool}
+                  onChange={(e) => setLawSchool(e.target.value)}
+                  placeholder="e.g., Nigerian Law School"
+                />
+              </div>
             )}
 
             {/* Law School and Year of Call - For lawyers */}

@@ -8,7 +8,7 @@ import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAllExpertise } from '@/lib/hooks/useExpertise';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
-import { getTotalSteps, shouldShowVerificationStep } from '@/lib/utils/onboarding';
+import { getTotalSteps, shouldShowVerificationStep, shouldSkipProfileStep } from '@/lib/utils/onboarding';
 import { cn } from '@/lib/utils';
 
 export default function OnboardingStep6Page() {
@@ -28,6 +28,12 @@ export default function OnboardingStep6Page() {
 
   // Local state for selected expertise
   const [selectedIds, setSelectedIds] = useState<number[]>(areasOfExpertise || []);
+
+  // Check if profile step was skipped
+  const skipProfile = shouldSkipProfileStep(
+    userType,
+    locationData.selectedCountryMatchesDetected || false
+  );
 
   // Redirect if previous steps not completed
   useEffect(() => {
@@ -77,7 +83,10 @@ export default function OnboardingStep6Page() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
-        <OnboardingProgress currentStep={6} totalSteps={getTotalSteps(userType)} />
+        <OnboardingProgress
+          currentStep={skipProfile ? 5 : 6}
+          totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
+        />
 
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="text-center space-y-2">

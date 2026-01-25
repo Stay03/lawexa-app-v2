@@ -107,7 +107,14 @@ export default function OnboardingStep3Page() {
       selectedCountryMatchesDetected: matchesDetected,
     });
 
-    router.push('/onboarding/step-4');
+    // For lawyer/law_student who selected detected country, skip profile step
+    const isLawyerOrLawStudent = userType === 'lawyer' || userType === 'law_student';
+    if (isLawyerOrLawStudent && matchesDetected) {
+      // Skip step 4 (profile), go directly to step 5 (education)
+      router.push('/onboarding/step-5');
+    } else {
+      router.push('/onboarding/step-4');
+    }
   };
 
   if (!userType || !communicationStyle) {
