@@ -88,19 +88,16 @@ export function useOnboarding() {
         console.log('[onboarding] Setting onboardingComplete = true');
         setOnboardingComplete(true);
 
-        // Log the store state right after setting
-        const storeState = useAuthStore.getState();
-        console.log('[onboarding] Store after setOnboardingComplete:', {
-          onboardingComplete: storeState.onboardingComplete,
-          isAuthenticated: storeState.isAuthenticated,
-          isGuest: storeState.isGuest,
-        });
-
-        console.log('[onboarding] Calling reset()');
-        reset();
-
         console.log('[onboarding] Calling router.push("/")');
         router.push('/');
+
+        // Clear onboarding form data AFTER navigation starts
+        // Must be after router.push so the current step's useEffect
+        // doesn't see empty data and redirect back to step-1
+        setTimeout(() => {
+          console.log('[onboarding] Clearing onboarding store');
+          reset();
+        }, 100);
       } else {
         console.log('[onboarding] Condition failed — response.success:', response.success, 'response.data:', response.data);
       }
