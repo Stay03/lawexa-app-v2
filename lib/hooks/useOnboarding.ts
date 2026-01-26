@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/api/auth';
@@ -10,7 +10,6 @@ import type { OnboardingFormData } from '@/types/onboarding';
 
 export function useOnboarding() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { updateUser, setOnboardingComplete } = useAuthStore();
   const { reset } = useOnboardingStore();
 
@@ -89,9 +88,6 @@ export function useOnboarding() {
 
         // Clear onboarding form data
         reset();
-
-        // Invalidate auth queries so other parts of the app get fresh data
-        queryClient.invalidateQueries({ queryKey: ['auth'] });
 
         // Navigate to main page
         router.push('/');
