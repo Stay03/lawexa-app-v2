@@ -11,7 +11,7 @@ import type { OnboardingFormData } from '@/types/onboarding';
 export function useOnboarding() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { updateUser } = useAuthStore();
+  const { updateUser, setOnboardingComplete } = useAuthStore();
   const { reset } = useOnboardingStore();
 
   const mutation = useMutation({
@@ -76,21 +76,24 @@ export function useOnboarding() {
 
       return authApi.updateProfile(payload);
     },
-    onSuccess: async (response) => {
+    onSuccess: (response) => {
       if (response.success && response.data) {
-        // Update local store with new user data including profile
+        // Update local store with new user data
         updateUser({
           profile: response.data.profile,
           areas_of_expertise: response.data.areas_of_expertise,
         });
 
-        // Clear onboarding store
+        // Mark onboarding as complete — this is what the guard checks
+        setOnboardingComplete(true);
+
+        // Clear onboarding form data
         reset();
 
-        // Invalidate auth queries and wait for refetch to complete
-        // so OnboardingGuard sees fresh data when we navigate
-        await queryClient.invalidateQueries({ queryKey: ['auth'] });
+        // Invalidate auth queries so other parts of the app get fresh data
+        queryClient.invalidateQueries({ queryKey: ['auth'] });
 
+        // Navigate to main page
         router.push('/');
       }
     },
