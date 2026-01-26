@@ -106,7 +106,7 @@ export default function HomePage() {
             )}
 
             <PromptInputTextarea
-              placeholder="Ask me anything"
+              placeholder="Ask a legal question"
               className="text-foreground"
             />
 
@@ -137,6 +137,25 @@ export default function HomePage() {
               </PromptInputAction>
             </PromptInputActions>
           </PromptInput>
+
+          {/* Suggested prompts */}
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {[
+              'Explain this law',
+              'Find a case on',
+              'Do I have rights to',
+              'Connect me to a lawyer?',
+            ].map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                className="text-muted-foreground hover:bg-secondary rounded-full border px-4 py-2 text-sm transition-colors"
+                onClick={() => setInput(prompt)}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
 
           {/* Drag-and-drop overlay */}
           <FileUploadContent>
