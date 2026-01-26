@@ -27,6 +27,7 @@ export const useAuthStore = create<AuthStore>()(
       setAuth: (user, token) => {
         // If the user already has a profession, they completed onboarding before
         const hasCompletedOnboarding = !!(user.profile?.profession);
+        console.log('[authStore] setAuth called:', { hasCompletedOnboarding, profession: user.profile?.profession, role: user.role });
         set({
           user,
           token,
@@ -37,6 +38,8 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       clearAuth: () => {
+        console.log('[authStore] clearAuth called');
+        console.trace('[authStore] clearAuth stack trace');
         set({
           user: null,
           token: null,

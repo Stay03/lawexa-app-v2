@@ -76,21 +76,33 @@ export function useOnboarding() {
       return authApi.updateProfile(payload);
     },
     onSuccess: (response) => {
+      console.log('[onboarding] onSuccess fired, response:', { success: response.success, hasData: !!response.data });
+
       if (response.success && response.data) {
-        // Update local store with new user data
+        console.log('[onboarding] Inside if block — updating user');
         updateUser({
           profile: response.data.profile,
           areas_of_expertise: response.data.areas_of_expertise,
         });
 
-        // Mark onboarding as complete — this is what the guard checks
+        console.log('[onboarding] Setting onboardingComplete = true');
         setOnboardingComplete(true);
 
-        // Clear onboarding form data
+        // Log the store state right after setting
+        const storeState = useAuthStore.getState();
+        console.log('[onboarding] Store after setOnboardingComplete:', {
+          onboardingComplete: storeState.onboardingComplete,
+          isAuthenticated: storeState.isAuthenticated,
+          isGuest: storeState.isGuest,
+        });
+
+        console.log('[onboarding] Calling reset()');
         reset();
 
-        // Navigate to main page
+        console.log('[onboarding] Calling router.push("/")');
         router.push('/');
+      } else {
+        console.log('[onboarding] Condition failed — response.success:', response.success, 'response.data:', response.data);
       }
     },
     onError: (error: Error & { response?: { data?: { message?: string } } }) => {
