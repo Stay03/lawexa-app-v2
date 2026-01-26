@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { authApi } from '@/lib/api/auth';
+import type { User } from '@/types/auth';
 import { Loader2 } from 'lucide-react';
 
 interface OnboardingGuardProps {
@@ -36,15 +37,11 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     }
 
     // Check fresh API data for profile
-    // The /me endpoint returns { data: { user: {...}, location: {...} } }
-    const apiData = userData?.data as { user?: { profile?: { onboarding_completed?: boolean; profession?: string } } } | null;
-    const profile = apiData?.user?.profile;
+    // The /me endpoint returns ApiResponse<User>, so data IS the User object directly
+    const user = userData?.data as User | null;
+    const profile = user?.profile;
 
-    const hasCompletedOnboarding = profile && (
-      profile.onboarding_completed === true ||
-      // Fallback: if user has profession set, they completed onboarding
-      (profile.profession && profile.profession.length > 0)
-    );
+    const hasCompletedOnboarding = !!(profile?.profession && profile.profession.length > 0);
 
     if (!hasCompletedOnboarding) {
       // Redirect to onboarding
@@ -63,12 +60,9 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
 
   // Also show loading if redirect is pending (user needs onboarding)
   if (isAuthenticated && !isGuest && userData) {
-    const apiData = userData?.data as { user?: { profile?: { onboarding_completed?: boolean; profession?: string } } } | null;
-    const profile = apiData?.user?.profile;
-    const hasCompletedOnboarding = profile && (
-      profile.onboarding_completed === true ||
-      (profile.profession && profile.profession.length > 0)
-    );
+    const user = userData?.data as User | null;
+    const profile = user?.profile;
+    const hasCompletedOnboarding = !!(profile?.profession && profile.profession.length > 0);
 
     if (!hasCompletedOnboarding) {
       return (

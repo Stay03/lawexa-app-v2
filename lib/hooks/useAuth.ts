@@ -28,8 +28,8 @@ export function useAuth() {
         setAuth(response.data.user, response.data.token);
         queryClient.invalidateQueries({ queryKey: ['auth'] });
 
-        // Check if user needs onboarding
-        const needsOnboarding = !response.data.user.profile?.onboarding_completed;
+        // Check if user needs onboarding (profession is set after completing onboarding)
+        const needsOnboarding = !response.data.user.profile?.profession;
         router.push(needsOnboarding ? '/onboarding' : '/');
       }
     },
@@ -42,8 +42,8 @@ export function useAuth() {
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
 
-        // New users always need onboarding
-        const needsOnboarding = !response.data.user.profile?.onboarding_completed;
+        // New users always need onboarding (profession is set after completing onboarding)
+        const needsOnboarding = !response.data.user.profile?.profession;
         router.push(needsOnboarding ? '/onboarding' : '/');
       }
     },

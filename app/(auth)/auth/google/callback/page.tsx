@@ -34,8 +34,8 @@ function GoogleCallbackContent() {
         if (response.success && response.data) {
           setAuth(response.data.user, response.data.token);
 
-          // Check if user needs onboarding
-          const needsOnboarding = !response.data.user.profile?.onboarding_completed;
+          // Check if user needs onboarding (profession is set after completing onboarding)
+          const needsOnboarding = !response.data.user.profile?.profession;
           router.push(needsOnboarding ? '/onboarding' : '/');
         }
       } catch {

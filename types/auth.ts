@@ -14,7 +14,6 @@ export interface UserProfile {
   // Onboarding fields
   user_type?: UserType;
   communication_style?: CommunicationStyle;
-  onboarding_completed?: boolean;
 }
 
 export interface AreaOfExpertise {

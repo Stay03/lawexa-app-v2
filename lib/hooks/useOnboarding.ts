@@ -31,7 +31,6 @@ export function useOnboarding() {
       const payload: Record<string, unknown> = {
         user_type: data.userType,
         communication_style: data.communicationStyle,
-        onboarding_completed: true,
       };
 
       // Add profession (derived or explicit)
@@ -77,31 +76,22 @@ export function useOnboarding() {
 
       return authApi.updateProfile(payload);
     },
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       if (response.success && response.data) {
         // Update local store with new user data including profile
-        // Ensure onboarding_completed is set to true even if API doesn't return it
-        const profileWithOnboardingFlag = {
-          ...response.data.profile,
-          onboarding_completed: true,
-        };
-
         updateUser({
-          profile: profileWithOnboardingFlag,
+          profile: response.data.profile,
           areas_of_expertise: response.data.areas_of_expertise,
         });
 
         // Clear onboarding store
         reset();
 
-        // Invalidate auth queries to refetch user data
-        queryClient.invalidateQueries({ queryKey: ['auth'] });
+        // Invalidate auth queries and wait for refetch to complete
+        // so OnboardingGuard sees fresh data when we navigate
+        await queryClient.invalidateQueries({ queryKey: ['auth'] });
 
-        // Defer navigation to allow store update to propagate
-        // This prevents the OnboardingGuard from seeing stale state
-        setTimeout(() => {
-          router.push('/');
-        }, 0);
+        router.push('/');
       }
     },
     onError: (error: Error & { response?: { data?: { message?: string } } }) => {
