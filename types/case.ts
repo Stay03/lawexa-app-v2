@@ -71,6 +71,8 @@ export interface Case {
   judgment_date: string | null;
   citation: string | null;
   views_count: number;
+  is_bookmarked: boolean;
+  bookmarks_count: number;
   meta: CaseMeta;
 }
 

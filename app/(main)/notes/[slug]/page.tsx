@@ -15,6 +15,7 @@ import {
 } from '@/components/notes';
 import { PageContainer } from '@/components/layout';
 import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
+import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { useNote } from '@/lib/hooks/useNotes';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { canEditNote, isNoteOwner } from '@/lib/utils/note-utils';
@@ -102,11 +103,23 @@ function NoteViewPage({ params }: NoteViewPageProps) {
       />
 
       {/* Actions */}
-      <NoteActions
-        note={note}
-        canEdit={canEdit}
-        animationDelay={ANIMATION_DELAYS.actions}
-      />
+      <div
+        className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both flex items-center gap-2 duration-200"
+        style={{ animationDelay: `${ANIMATION_DELAYS.actions}ms` }}
+      >
+        <BookmarkButton
+          type="note"
+          id={note.id}
+          isBookmarked={note.is_bookmarked}
+          bookmarksCount={note.bookmarks_count}
+          variant="full"
+        />
+        <NoteActions
+          note={note}
+          canEdit={canEdit}
+          animationDelay={0}
+        />
+      </div>
 
       {/* Price Card (for paid notes when user doesn't have access) */}
       {!hasFullContent && note.is_paid && (

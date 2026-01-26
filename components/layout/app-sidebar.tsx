@@ -6,6 +6,7 @@ import {
   FileText,
   MessageSquarePlus,
   Library,
+  Bookmark,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/nav-main"
@@ -39,6 +40,7 @@ const navMain = [
     items: [
       { title: "Cases", url: "/cases" },
       { title: "Notes", url: "/notes" },
+      { title: "Bookmarks", url: "/bookmarks" },
     ],
   },
 ]

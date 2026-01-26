@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { BookmarkButton } from '@/components/common/BookmarkButton';
 import type { Note } from '@/types/note';
 import {
   formatNotePrice,
@@ -122,6 +123,13 @@ function NoteCard({
             {/* Date */}
             <span className="tabular-nums">{formattedDate}</span>
 
+            <BookmarkButton
+              type="note"
+              id={note.id}
+              isBookmarked={note.is_bookmarked}
+              variant="icon"
+              className="h-7 w-7"
+            />
             <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
           </div>
         </div>

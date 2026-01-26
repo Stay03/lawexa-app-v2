@@ -42,6 +42,8 @@ export interface Note {
   user: NoteUser;
   created_at: string;
   updated_at: string;
+  is_bookmarked: boolean;
+  bookmarks_count: number;
 }
 
 // Query params for public notes list (GET /api/notes)

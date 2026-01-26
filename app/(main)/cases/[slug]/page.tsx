@@ -18,6 +18,8 @@ import {
 } from '@/components/cases';
 import { PageContainer } from '@/components/layout';
 import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
+import { BookmarkButton } from '@/components/common/BookmarkButton';
+import { ShareButton } from '@/components/common/ShareButton';
 import { useCaseWithRelated } from '@/lib/hooks/useCases';
 
 /******************************************************************************
@@ -26,14 +28,15 @@ import { useCaseWithRelated } from '@/lib/hooks/useCases';
 
 const ANIMATION_DELAYS = {
   header: 0,
-  viewReportButton: 100,
-  principles: 150,
-  body: 250,
-  metadataStart: 350,
-  judges: 550,
-  similarCases: 650,
-  citedCases: 750,
-  citedBy: 850,
+  actions: 50,
+  viewReportButton: 150,
+  principles: 200,
+  body: 300,
+  metadataStart: 400,
+  judges: 600,
+  similarCases: 700,
+  citedCases: 800,
+  citedBy: 900,
 } as const;
 
 /******************************************************************************
@@ -111,6 +114,21 @@ function CaseViewPage({ params }: CaseViewPageProps) {
           viewsCount={caseDetail.views_count}
           animationDelay={ANIMATION_DELAYS.header}
         />
+
+        {/* Actions */}
+        <div
+          className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both flex items-center gap-2 duration-200"
+          style={{ animationDelay: `${ANIMATION_DELAYS.actions}ms` }}
+        >
+          <BookmarkButton
+            type="case"
+            id={caseDetail.id}
+            isBookmarked={caseDetail.is_bookmarked}
+            bookmarksCount={caseDetail.bookmarks_count}
+            variant="full"
+          />
+          <ShareButton />
+        </div>
 
         {/* View Full Report Button */}
         {caseDetail.has_full_report && (

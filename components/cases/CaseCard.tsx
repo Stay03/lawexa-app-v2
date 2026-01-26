@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BookmarkButton } from '@/components/common/BookmarkButton';
 import type { Case } from '@/types/case';
 
 interface CaseCardProps {
@@ -76,6 +77,13 @@ function CaseCard({ caseItem, className, style }: CaseCardProps) {
               </span>
             </>
           )}
+          <BookmarkButton
+            type="case"
+            id={caseItem.id}
+            isBookmarked={caseItem.is_bookmarked}
+            variant="icon"
+            className="h-7 w-7"
+          />
           <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:opacity-100 group-hover:translate-x-0.5" />
         </div>
       </div>
