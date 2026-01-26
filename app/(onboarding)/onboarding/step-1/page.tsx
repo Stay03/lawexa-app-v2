@@ -1,12 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { Scale, GraduationCap, Briefcase } from 'lucide-react';
 import { OnboardingCard } from '@/components/onboarding/OnboardingCard';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useCountries } from '@/lib/hooks/useCountries';
+import { authApi } from '@/lib/api/auth';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import type { UserType } from '@/types/auth';
 
@@ -37,6 +39,13 @@ export default function OnboardingStep1Page() {
 
   // Prefetch countries data so step-3 loads instantly
   useCountries();
+
+  // Prefetch user location data so step-3 can show detected country instantly
+  useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => authApi.me(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleSelect = (type: UserType) => {
     setUserType(type);

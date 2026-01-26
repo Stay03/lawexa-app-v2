@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
@@ -102,6 +103,10 @@ export function useOnboarding() {
           router.push('/');
         }, 0);
       }
+    },
+    onError: (error: Error & { response?: { data?: { message?: string } } }) => {
+      const message = error.response?.data?.message || 'Failed to save profile. Please try again.';
+      toast.error(message);
     },
   });
 

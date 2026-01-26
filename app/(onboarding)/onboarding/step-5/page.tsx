@@ -20,6 +20,7 @@ import {
   useUniversitiesByCountry,
   useGlobalUniversitySearch,
 } from '@/lib/hooks/useUniversities';
+import { useAllExpertise } from '@/lib/hooks/useExpertise';
 import {
   getTotalSteps,
   shouldShowEducationStep,
@@ -39,6 +40,9 @@ export default function OnboardingStep5Page() {
     setProfileData,
   } = useOnboardingStore();
   const { submitOnboarding, isSubmitting } = useOnboarding();
+
+  // Prefetch expertise data so step-6 loads instantly
+  useAllExpertise();
 
   // Form state
   const [university, setUniversity] = useState(profileData.university || '');

@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { authApi } from '@/lib/api/auth';
 import { Loader2 } from 'lucide-react';
 
 interface OnboardingGuardProps {
@@ -11,45 +13,70 @@ interface OnboardingGuardProps {
 
 export function OnboardingGuard({ children }: OnboardingGuardProps) {
   const router = useRouter();
-  const { user, isAuthenticated, isGuest } = useAuthStore();
-  const [isReady, setIsReady] = useState(false);
+  const { isAuthenticated, isGuest } = useAuthStore();
+
+  // Fetch fresh user data from API (not stale store data)
+  // This ensures we check the actual server state after login
+  const { data: userData, isLoading } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => authApi.me(),
+    staleTime: 0, // Always fetch fresh on mount
+    enabled: isAuthenticated && !isGuest,
+  });
 
   useEffect(() => {
     // Skip check for guest users or unauthenticated users
     if (!isAuthenticated || isGuest) {
-      setIsReady(true);
       return;
     }
 
-    // Check if user needs onboarding
-    // User needs onboarding if:
-    // 1. profile is null/undefined, OR
-    // 2. No indicators of completed onboarding (profession, user_type, or onboarding_completed flag)
-    // We check multiple fields because the API may not return onboarding_completed in all responses
-    const profile = user?.profile;
+    // Wait for data to load
+    if (isLoading) {
+      return;
+    }
+
+    // Check fresh API data for profile
+    // The /me endpoint returns { data: { user: {...}, location: {...} } }
+    const apiData = userData?.data as { user?: { profile?: { onboarding_completed?: boolean; profession?: string } } } | null;
+    const profile = apiData?.user?.profile;
+
     const hasCompletedOnboarding = profile && (
       profile.onboarding_completed === true ||
       // Fallback: if user has profession set, they completed onboarding
       (profile.profession && profile.profession.length > 0)
     );
 
-    const needsOnboarding = !hasCompletedOnboarding;
-
-    if (needsOnboarding) {
-      // Redirect to onboarding - don't set isReady, keep showing loader
+    if (!hasCompletedOnboarding) {
+      // Redirect to onboarding
       router.replace('/onboarding');
-    } else {
-      setIsReady(true);
     }
-  }, [isAuthenticated, isGuest, user, router]);
+  }, [isAuthenticated, isGuest, userData, isLoading, router]);
 
-  // Show loading while checking onboarding status or redirecting
-  if (!isReady && isAuthenticated && !isGuest) {
+  // Show loading while fetching user data
+  if (isAuthenticated && !isGuest && isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // Also show loading if redirect is pending (user needs onboarding)
+  if (isAuthenticated && !isGuest && userData) {
+    const apiData = userData?.data as { user?: { profile?: { onboarding_completed?: boolean; profession?: string } } } | null;
+    const profile = apiData?.user?.profile;
+    const hasCompletedOnboarding = profile && (
+      profile.onboarding_completed === true ||
+      (profile.profession && profile.profession.length > 0)
+    );
+
+    if (!hasCompletedOnboarding) {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
   }
 
   return <>{children}</>;
