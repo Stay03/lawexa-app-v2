@@ -1,34 +1,32 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, Search, Check } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { GraduationCap, Building2 } from 'lucide-react';
+import { OnboardingCard } from '@/components/onboarding/OnboardingCard';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
-import { useOnboarding } from '@/lib/hooks/useOnboarding';
-import {
-  useUniversitiesByCountry,
-  useGlobalUniversitySearch,
-} from '@/lib/hooks/useUniversities';
-import { useAllExpertise } from '@/lib/hooks/useExpertise';
 import {
   getTotalSteps,
-  shouldShowEducationStep,
-  shouldShowExpertiseStep,
   shouldSkipProfileStep,
+  shouldShowEducationLevelStep,
 } from '@/lib/utils/onboarding';
-import { getLevelOptions } from '@/types/onboarding';
-import { cn } from '@/lib/utils';
+
+const EDUCATION_LEVEL_OPTIONS = [
+  {
+    id: 'university' as const,
+    label: 'University',
+    description: "I'm currently enrolled in university studying law",
+    icon: GraduationCap,
+  },
+  {
+    id: 'law_school' as const,
+    label: 'Law School',
+    description: "I'm currently attending law school",
+    icon: Building2,
+  },
+];
 
 export default function OnboardingStep5Page() {
   const router = useRouter();
@@ -37,70 +35,29 @@ export default function OnboardingStep5Page() {
     communicationStyle,
     locationData,
     profileData,
-    setProfileData,
+    studentEducationLevel,
+    setStudentEducationLevel,
   } = useOnboardingStore();
-  const { submitOnboarding, isSubmitting } = useOnboarding();
 
-  // Prefetch expertise data so step-6 loads instantly
-  useAllExpertise();
-
-  // Form state
-  const [university, setUniversity] = useState(profileData.university || '');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [level, setLevel] = useState(profileData.level || '');
-  const [lawSchool, setLawSchool] = useState(profileData.lawSchool || '');
-  const [yearOfCall, setYearOfCall] = useState<string>(
-    profileData.yearOfCall?.toString() || ''
-  );
-
-  // Fetch universities from user's country
-  const { data: countryUniversities, isLoading: loadingCountryUniversities } =
-    useUniversitiesByCountry(locationData.countryCode);
-
-  // Search all universities globally when user types in search
-  const { data: searchResults, isLoading: loadingSearch } =
-    useGlobalUniversitySearch(searchQuery);
-
-  // Determine which universities to show
-  const displayUniversities = useMemo(() => {
-    if (searchQuery.length >= 2) {
-      // Show global search results
-      return searchResults || [];
-    }
-    // Show universities from user's country
-    return countryUniversities || [];
-  }, [searchQuery, searchResults, countryUniversities]);
-
-  // Check if profile step was skipped
   const skipProfile = shouldSkipProfileStep(
     userType,
     locationData.selectedCountryMatchesDetected || false
   );
 
-  // Redirect if previous steps not completed or education step not needed
+  // Redirect if previous steps not completed or not a law student
   useEffect(() => {
     if (!userType || !communicationStyle) {
       router.replace('/onboarding/step-1');
-    } else if (!shouldShowEducationStep(userType, profileData.profession)) {
-      // Skip education step for non-students who aren't lawyers
-      router.replace('/onboarding/step-4');
+    } else if (!shouldShowEducationLevelStep(userType)) {
+      router.replace('/onboarding/step-6');
     }
-  }, [userType, communicationStyle, profileData.profession, router]);
+  }, [userType, communicationStyle, router, userType]);
 
-  const isLawyer = userType === 'lawyer';
-  const isLawStudent = userType === 'law_student';
-  const isStudent = isLawStudent || profileData.profession === 'student';
-
-  // Get level options based on country
-  const levelOptions = getLevelOptions(locationData.country || '');
-
-  const handleUniversitySelect = (universityName: string) => {
-    setUniversity(universityName);
-    setSearchQuery('');
+  const handleSelect = (level: 'university' | 'law_school') => {
+    setStudentEducationLevel(level);
   };
 
   const handleBack = () => {
-    // If profile was skipped, go back to location step
     if (skipProfile) {
       router.push('/onboarding/step-3');
     } else {
@@ -109,49 +66,14 @@ export default function OnboardingStep5Page() {
   };
 
   const handleNext = () => {
-    // Save education data to store
-    setProfileData({
-      university: isStudent ? university : undefined,
-      level: isStudent ? level : undefined,
-      lawSchool: (isLawyer || isLawStudent) ? lawSchool : undefined,
-      yearOfCall: isLawyer && yearOfCall ? parseInt(yearOfCall) : undefined,
-      areaOfStudy: isLawStudent ? 'law' : undefined,
-    });
-
-    // Determine next step
-    if (shouldShowExpertiseStep(userType)) {
-      // Lawyers and law students go to expertise step
+    if (studentEducationLevel) {
       router.push('/onboarding/step-6');
-    } else {
-      // "Other" users with student profession complete here
-      submitOnboarding({
-        userType: userType!,
-        communicationStyle: communicationStyle!,
-        ...locationData,
-        ...profileData,
-        university: isStudent ? university : undefined,
-        level: isStudent ? level : undefined,
-        areaOfStudy: isLawStudent ? 'law' : undefined,
-      });
     }
   };
 
-  // Validation
-  const isValid = () => {
-    if (isStudent && (!university || !level)) return false;
-    if (isLawyer && !lawSchool) return false;
-    return true;
-  };
-
-  if (
-    !userType ||
-    !communicationStyle ||
-    !shouldShowEducationStep(userType, profileData.profession)
-  ) {
+  if (!userType || !communicationStyle || !shouldShowEducationLevelStep(userType)) {
     return null;
   }
-
-  const isLoading = loadingCountryUniversities || loadingSearch;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
@@ -161,7 +83,7 @@ export default function OnboardingStep5Page() {
           totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
         />
 
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="text-center space-y-2">
             <div className="flex justify-center mb-4">
               <div className="rounded-full bg-primary/10 p-3">
@@ -169,153 +91,31 @@ export default function OnboardingStep5Page() {
               </div>
             </div>
             <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-              {isLawyer ? 'Your legal education' : 'Your education'}
+              Where are you studying?
             </h1>
             <p className="text-muted-foreground">
-              {isLawyer
-                ? 'Tell us about your legal background'
-                : 'Tell us about your current studies'}
+              Tell us about your current education level
             </p>
           </div>
 
-          <div className="space-y-4">
-            {/* University - For students (law_student or other+student) */}
-            {isStudent && (
-              <>
-                <div className="space-y-2">
-                  <Label>University *</Label>
-
-                  {/* Search input */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Search for your university..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-
-                  {/* University list */}
-                  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
-                    {isLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      </div>
-                    ) : displayUniversities.length > 0 ? (
-                      displayUniversities.map((uni) => (
-                        <button
-                          key={uni.id}
-                          type="button"
-                          onClick={() => handleUniversitySelect(uni.name)}
-                          className={cn(
-                            'w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all',
-                            'hover:border-primary/50 hover:bg-primary/5',
-                            university === uni.name
-                              ? 'border-primary bg-primary/10'
-                              : 'border-border bg-card'
-                          )}
-                        >
-                          <div>
-                            <span className="font-medium text-sm">{uni.name}</span>
-                            {uni.country && searchQuery && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                ({uni.country})
-                              </span>
-                            )}
-                          </div>
-                          {university === uni.name && (
-                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                          )}
-                        </button>
-                      ))
-                    ) : searchQuery.length >= 2 ? (
-                      <p className="text-center text-muted-foreground py-4 text-sm">
-                        No universities found for "{searchQuery}"
-                      </p>
-                    ) : (
-                      <p className="text-center text-muted-foreground py-4 text-sm">
-                        {locationData.country
-                          ? `No universities found in ${locationData.country}`
-                          : 'Search for your university'}
-                      </p>
-                    )}
-                  </div>
-
-                  {university && (
-                    <p className="text-xs text-muted-foreground">
-                      Selected: <span className="font-medium">{university}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="level">Level *</Label>
-                  <Select value={level} onValueChange={setLevel}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select your level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {levelOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            {/* Law School - For law students (optional) */}
-            {isLawStudent && (
-              <div className="space-y-2">
-                <Label htmlFor="lawSchool">Law School (Optional)</Label>
-                <Input
-                  id="lawSchool"
-                  value={lawSchool}
-                  onChange={(e) => setLawSchool(e.target.value)}
-                  placeholder="e.g., Nigerian Law School"
-                />
-              </div>
-            )}
-
-            {/* Law School and Year of Call - For lawyers */}
-            {isLawyer && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="lawSchool">Law School *</Label>
-                  <Input
-                    id="lawSchool"
-                    value={lawSchool}
-                    onChange={(e) => setLawSchool(e.target.value)}
-                    placeholder="e.g., Nigerian Law School"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="yearOfCall">Year of Call (Optional)</Label>
-                  <Input
-                    id="yearOfCall"
-                    type="number"
-                    min="1900"
-                    max={new Date().getFullYear()}
-                    value={yearOfCall}
-                    onChange={(e) => setYearOfCall(e.target.value)}
-                    placeholder="e.g., 2015"
-                  />
-                </div>
-              </>
-            )}
+          <div className="grid gap-4">
+            {EDUCATION_LEVEL_OPTIONS.map((option, index) => (
+              <OnboardingCard
+                key={option.id}
+                icon={<option.icon className="h-6 w-6" />}
+                title={option.label}
+                description={option.description}
+                selected={studentEducationLevel === option.id}
+                onClick={() => handleSelect(option.id)}
+                animationDelay={index * 100}
+              />
+            ))}
           </div>
 
-          {/* Navigation buttons */}
           <OnboardingFooter
             onBack={handleBack}
             onNext={handleNext}
-            nextLabel={shouldShowExpertiseStep(userType) ? 'Next' : 'Complete'}
-            isLoading={isSubmitting}
-            isNextDisabled={!isValid()}
+            isNextDisabled={!studentEducationLevel}
           />
         </div>
       </div>

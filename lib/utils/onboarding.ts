@@ -5,11 +5,11 @@ import type { UserType } from '@/types/auth';
  *
  * When lawyer/law_student selects detected country, profile step is skipped:
  * - Lawyer (skip profile): 6 steps (type, communication, location, education, expertise, verification)
- * - Law Student (skip profile): 5 steps (type, communication, location, education, expertise)
+ * - Law Student (skip profile): 6 steps (type, communication, location, education-level, education, expertise)
  *
  * When profile is shown:
  * - Lawyer: 7 steps (type, communication, location, profile, education, expertise, verification)
- * - Law Student: 6 steps (type, communication, location, profile, education, expertise)
+ * - Law Student: 7 steps (type, communication, location, profile, education-level, education, expertise)
  * - Other + Student profession: 5 steps (type, communication, location, profile, education)
  * - Other + Non-student profession: 4 steps (type, communication, location, profile)
  */
@@ -19,7 +19,7 @@ export function getTotalSteps(
   skipProfile?: boolean
 ): number {
   if (userType === 'lawyer') return skipProfile ? 6 : 7;
-  if (userType === 'law_student') return skipProfile ? 5 : 6;
+  if (userType === 'law_student') return skipProfile ? 6 : 7;
   if (userType === 'other') {
     // "Other" users with "student" profession get education step
     if (profession === 'student') return 5;
@@ -64,4 +64,12 @@ export function shouldShowExpertiseStep(userType: UserType | null): boolean {
  */
 export function shouldShowVerificationStep(userType: UserType | null): boolean {
   return userType === 'lawyer';
+}
+
+/**
+ * Check if education level selection step should be shown
+ * Only law_student users see this step to choose between university and law school
+ */
+export function shouldShowEducationLevelStep(userType: UserType | null): boolean {
+  return userType === 'law_student';
 }

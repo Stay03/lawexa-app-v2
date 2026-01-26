@@ -1,5 +1,7 @@
 import type { UserType, CommunicationStyle } from './auth';
 
+export type StudentEducationLevel = 'university' | 'law_school';
+
 export interface OnboardingFormData {
   userType: UserType;
   communicationStyle: CommunicationStyle;
@@ -11,6 +13,8 @@ export interface OnboardingFormData {
   // Profile fields
   profession?: string;
   bio?: string;
+  // Education level (law_student only)
+  studentEducationLevel?: StudentEducationLevel;
   // Education fields
   university?: string;
   level?: string;

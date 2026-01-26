@@ -37,9 +37,11 @@ interface OnboardingStore {
   locationData: OnboardingLocationData;
   // Step 4 - Profile
   profileData: OnboardingProfileData;
-  // Step 6 - Expertise
+  // Step 5 (law_student only) - Education Level
+  studentEducationLevel: 'university' | 'law_school' | null;
+  // Step 7 - Expertise
   areasOfExpertise: number[];
-  // Step 7 (Lawyer only) - Verification
+  // Step 8 (Lawyer only) - Verification
   verificationData: OnboardingVerificationData;
   wantsClientReferrals: boolean | null;
 
@@ -48,6 +50,7 @@ interface OnboardingStore {
   setCommunicationStyle: (style: CommunicationStyle) => void;
   setLocationData: (data: Partial<OnboardingLocationData>) => void;
   setProfileData: (data: Partial<OnboardingProfileData>) => void;
+  setStudentEducationLevel: (level: 'university' | 'law_school') => void;
   setAreasOfExpertise: (ids: number[]) => void;
   setVerificationData: (data: Partial<OnboardingVerificationData>) => void;
   setWantsClientReferrals: (wants: boolean) => void;
@@ -59,6 +62,7 @@ const initialState = {
   communicationStyle: null,
   locationData: {},
   profileData: {},
+  studentEducationLevel: null,
   areasOfExpertise: [],
   verificationData: {},
   wantsClientReferrals: null,
@@ -79,6 +83,7 @@ export const useOnboardingStore = create<OnboardingStore>()(
         set((state) => ({
           profileData: { ...state.profileData, ...data },
         })),
+      setStudentEducationLevel: (level) => set({ studentEducationLevel: level }),
       setAreasOfExpertise: (ids) => set({ areasOfExpertise: ids }),
       setVerificationData: (data) =>
         set((state) => ({

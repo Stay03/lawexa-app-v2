@@ -110,8 +110,14 @@ export default function OnboardingStep3Page() {
     // For lawyer/law_student who selected detected country, skip profile step
     const isLawyerOrLawStudent = userType === 'lawyer' || userType === 'law_student';
     if (isLawyerOrLawStudent && matchesDetected) {
-      // Skip step 4 (profile), go directly to step 5 (education)
-      router.push('/onboarding/step-5');
+      // Skip step 4 (profile)
+      if (userType === 'law_student') {
+        // Law students go to education level selection (step-5)
+        router.push('/onboarding/step-5');
+      } else {
+        // Lawyers go directly to education form (step-6)
+        router.push('/onboarding/step-6');
+      }
     } else {
       router.push('/onboarding/step-4');
     }

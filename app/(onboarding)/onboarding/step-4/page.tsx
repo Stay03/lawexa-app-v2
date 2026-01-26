@@ -109,8 +109,13 @@ export default function OnboardingStep4Page() {
 
     // Determine next step based on user type and profession
     if (shouldShowEducationStep(userType, finalProfession)) {
-      // Go to education step
-      router.push('/onboarding/step-5');
+      if (userType === 'law_student') {
+        // Law students go to education level selection (step-5)
+        router.push('/onboarding/step-5');
+      } else {
+        // Lawyers and other+student go to education form (step-6)
+        router.push('/onboarding/step-6');
+      }
     } else {
       // "Other" users without student profession complete here
       submitOnboarding({
