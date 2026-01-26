@@ -1,7 +1,6 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -9,7 +8,6 @@ import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import type { OnboardingFormData } from '@/types/onboarding';
 
 export function useOnboarding() {
-  const router = useRouter();
   const { updateUser, setOnboardingComplete } = useAuthStore();
   const { reset } = useOnboardingStore();
 
@@ -85,19 +83,17 @@ export function useOnboarding() {
           areas_of_expertise: response.data.areas_of_expertise,
         });
 
-        console.log('[onboarding] Setting onboardingComplete = true');
+        // Mark onboarding as complete
         setOnboardingComplete(true);
 
-        console.log('[onboarding] Calling router.push("/")');
-        router.push('/');
+        // Clear onboarding form data
+        reset();
 
-        // Clear onboarding form data AFTER navigation starts
-        // Must be after router.push so the current step's useEffect
-        // doesn't see empty data and redirect back to step-1
-        setTimeout(() => {
-          console.log('[onboarding] Clearing onboarding store');
-          reset();
-        }, 100);
+        // Hard navigate to home — router.push loses the race to step
+        // page useEffect guards that see cleared store data and redirect
+        // back to step-1. window.location forces a full page load which
+        // reads onboardingComplete: true from persisted localStorage.
+        window.location.href = '/';
       } else {
         console.log('[onboarding] Condition failed — response.success:', response.success, 'response.data:', response.data);
       }
