@@ -28,7 +28,7 @@ const ALL_STYLE_OPTIONS: {
   },
   {
     id: 'assistant',
-    label: 'Friendly Assistant',
+    label: 'Legal Guide',
     description: 'Clear explanations tailored to your profession and needs',
     icon: HandHelping,
     suggestedFor: 'other',

@@ -149,11 +149,7 @@ export default function OnboardingStep6Page() {
             onNext={handleNext}
             nextLabel={userType === 'lawyer' ? 'Next' : 'Complete'}
             isLoading={isSubmitting}
-            skipOption={
-              selectedIds.length === 0
-                ? { label: 'Skip for now', onClick: handleNext }
-                : undefined
-            }
+            isNextDisabled={selectedIds.length === 0}
           />
         </div>
       </div>

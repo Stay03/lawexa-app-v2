@@ -6,6 +6,7 @@ import { OnboardingCard } from '@/components/onboarding/OnboardingCard';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
+import { useCountries } from '@/lib/hooks/useCountries';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import type { UserType } from '@/types/auth';
 
@@ -33,6 +34,9 @@ const USER_TYPE_OPTIONS = [
 export default function OnboardingStep1Page() {
   const router = useRouter();
   const { userType, setUserType } = useOnboardingStore();
+
+  // Prefetch countries data so step-3 loads instantly
+  useCountries();
 
   const handleSelect = (type: UserType) => {
     setUserType(type);

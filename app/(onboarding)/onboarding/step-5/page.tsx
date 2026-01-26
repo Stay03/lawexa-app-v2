@@ -135,6 +135,7 @@ export default function OnboardingStep5Page() {
   // Validation
   const isValid = () => {
     if (isStudent && (!university || !level)) return false;
+    if (isLawyer && !lawSchool) return false;
     return true;
   };
 
@@ -279,7 +280,7 @@ export default function OnboardingStep5Page() {
             {isLawyer && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="lawSchool">Law School (Optional)</Label>
+                  <Label htmlFor="lawSchool">Law School *</Label>
                   <Input
                     id="lawSchool"
                     value={lawSchool}
