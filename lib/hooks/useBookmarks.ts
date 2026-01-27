@@ -4,9 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookmarksApi } from '@/lib/api/bookmarks';
 import { caseKeys } from './useCases';
 import { noteKeys } from './useNotes';
+import { trendingKeys } from './useTrending';
 import type { BookmarkListParams, BookmarkType } from '@/types/bookmark';
 import type { CaseDetailResponse, CaseListResponse } from '@/types/case';
 import type { NoteResponse, NoteListResponse } from '@/types/note';
+import type { TrendingCasesResponse, TrendingNotesResponse } from '@/types/trending';
 
 // Query key factory
 export const bookmarkKeys = {
@@ -64,6 +66,7 @@ export function useToggleBookmark() {
         // Cancel outgoing refetches so they don't overwrite optimistic update
         await queryClient.cancelQueries({ queryKey: caseKeys.details() });
         await queryClient.cancelQueries({ queryKey: caseKeys.lists() });
+        await queryClient.cancelQueries({ queryKey: trendingKeys.cases() });
 
         // Optimistically update case detail caches
         const caseDetailQueries = queryClient.getQueriesData<CaseDetailResponse>({
@@ -107,10 +110,30 @@ export function useToggleBookmark() {
             }
           }
         }
+
+        // Optimistically update trending case caches
+        const trendingCaseQueries = queryClient.getQueriesData<TrendingCasesResponse>({
+          queryKey: trendingKeys.cases(),
+        });
+        for (const [queryKey, data] of trendingCaseQueries) {
+          if (data?.data) {
+            const idx = data.data.findIndex((c) => c.id === id);
+            if (idx !== -1) {
+              snapshots.push({ queryKey, data });
+              const updatedData = [...data.data];
+              updatedData[idx] = {
+                ...updatedData[idx],
+                is_bookmarked: !updatedData[idx].is_bookmarked,
+              };
+              queryClient.setQueryData(queryKey, { ...data, data: updatedData });
+            }
+          }
+        }
       } else {
         // type === 'note'
         await queryClient.cancelQueries({ queryKey: noteKeys.details() });
         await queryClient.cancelQueries({ queryKey: noteKeys.lists() });
+        await queryClient.cancelQueries({ queryKey: trendingKeys.notes() });
 
         // Optimistically update note detail caches
         const noteDetailQueries = queryClient.getQueriesData<NoteResponse>({
@@ -149,6 +172,25 @@ export function useToggleBookmark() {
                 bookmarks_count: item.is_bookmarked
                   ? Math.max(0, item.bookmarks_count - 1)
                   : item.bookmarks_count + 1,
+              };
+              queryClient.setQueryData(queryKey, { ...data, data: updatedData });
+            }
+          }
+        }
+
+        // Optimistically update trending note caches
+        const trendingNoteQueries = queryClient.getQueriesData<TrendingNotesResponse>({
+          queryKey: trendingKeys.notes(),
+        });
+        for (const [queryKey, data] of trendingNoteQueries) {
+          if (data?.data) {
+            const idx = data.data.findIndex((n) => n.id === id);
+            if (idx !== -1) {
+              snapshots.push({ queryKey, data });
+              const updatedData = [...data.data];
+              updatedData[idx] = {
+                ...updatedData[idx],
+                is_bookmarked: !updatedData[idx].is_bookmarked,
               };
               queryClient.setQueryData(queryKey, { ...data, data: updatedData });
             }
