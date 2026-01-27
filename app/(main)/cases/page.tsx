@@ -18,6 +18,7 @@ import { PageContainer, PageHeader } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCases } from '@/lib/hooks/useCases';
 import { useTrendingCases } from '@/lib/hooks/useTrending';
+import { getTrendingLabel } from '@/types/trending';
 
 /**
  * Case Library list page content (uses useSearchParams)
@@ -42,6 +43,9 @@ function CasesPageContent() {
 
   // Fetch trending cases
   const trendingCases = useTrendingCases({ per_page: 15, time_range: 'month' });
+
+  // Dynamic trending tab label from API meta (e.g. "Trending in Ghana")
+  const trendingLabel = getTrendingLabel(trendingCases.data?.meta?.filters_applied);
 
   // Update URL params
   const updateParams = useCallback(
@@ -188,7 +192,7 @@ function CasesPageContent() {
               },
               {
                 value: 'trending',
-                label: 'Trending',
+                label: trendingLabel,
                 icon: <TrendingUp className="h-4 w-4" />,
               },
             ]}

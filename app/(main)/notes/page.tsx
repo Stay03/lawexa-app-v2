@@ -21,12 +21,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNotes } from '@/lib/hooks/useNotes';
 import { useTrendingNotes } from '@/lib/hooks/useTrending';
+import { getTrendingLabel } from '@/types/trending';
 import type { NoteListParams } from '@/types/note';
 
-const librarySubTabs = [
-  { value: 'trending', label: 'Trending', icon: <TrendingUp className="h-4 w-4" /> },
-  { value: 'recent', label: 'Recently Added', icon: <Clock className="h-4 w-4" /> },
-];
+const recentTab = { value: 'recent', label: 'Recently Added', icon: <Clock className="h-4 w-4" /> };
 
 /**
  * Notes marketplace list page content (uses useSearchParams)
@@ -65,6 +63,13 @@ function NotesPageContent() {
   // Active query depends on tab
   const isTrendingTab = tab === 'trending';
   const activeQuery = isTrendingTab ? trendingQuery : notesQuery;
+
+  // Dynamic trending tab label from API meta (e.g. "Trending in Ghana")
+  const trendingLabel = getTrendingLabel(trendingQuery.data?.meta?.filters_applied);
+  const librarySubTabs = [
+    { value: 'trending', label: trendingLabel, icon: <TrendingUp className="h-4 w-4" /> },
+    recentTab,
+  ];
 
   // Update URL params
   const updateParams = useCallback(

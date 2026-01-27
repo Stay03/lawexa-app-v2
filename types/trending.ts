@@ -89,6 +89,17 @@ export interface TrendingNotesResponse {
   };
 }
 
+/**
+ * Build a contextual trending label from the filters applied by the API.
+ * Examples: "Trending in Ghana", "Trending at Ashesi University", "Trending"
+ */
+export function getTrendingLabel(filters: TrendingFiltersApplied | undefined): string {
+  if (!filters) return 'Trending';
+  if (filters.university) return `Trending at ${filters.university}`;
+  if (filters.country) return `Trending in ${filters.country}`;
+  return 'Trending';
+}
+
 // --- Query params ---
 export interface TrendingParams {
   university?: string;
