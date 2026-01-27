@@ -138,10 +138,10 @@ function NoteCard({
             <img
               src={user.avatar_url}
               alt=""
-              className="h-4 w-4 shrink-0 rounded-full object-cover"
+              className="h-5 w-5 shrink-0 rounded-full object-cover"
             />
           ) : (
-            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary text-[8px] font-medium text-primary-foreground">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
               {user.name.charAt(0).toUpperCase()}
             </span>
           )}
