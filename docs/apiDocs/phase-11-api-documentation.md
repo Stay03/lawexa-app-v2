@@ -62,7 +62,10 @@ Get mixed trending content (cases and notes merged), sorted by trending score.
             "slug": "politis-v-plastico-ltd-no-2-1967-african-lr-comm-178",
             "judgment_date": "1967-01-30",
             "citation": "(1967) LAWEXA ELR 8906 GH HC",
+            "principles": "The court held that...",
+            "tags": ["Contract Law", "Commercial"],
             "level": "500L",
+            "is_bookmarked": false,
             "trending_score": 15,
             "views_count": 3,
             "unique_viewers": 2,
@@ -79,6 +82,8 @@ Get mixed trending content (cases and notes merged), sorted by trending score.
             "price_usd": null,
             "is_free": true,
             "thumbnail_url": null,
+            "is_bookmarked": true,
+            "created_at": "2026-01-15T10:30:00.000000Z",
             "trending_score": 8.5,
             "views_count": 4,
             "unique_viewers": 1,
@@ -174,7 +179,10 @@ Get trending cases only, sorted by trending score.
             },
             "judgment_date": "1967-01-30",
             "citation": "(1967) LAWEXA ELR 8906 GH HC",
+            "principles": "The court held that...",
+            "tags": ["Contract Law", "Commercial"],
             "level": "500L",
+            "is_bookmarked": false,
             "trending_score": 15,
             "views_count": 3,
             "unique_viewers": 2,
@@ -240,6 +248,8 @@ Get trending notes only, sorted by trending score.
             "price_usd": null,
             "is_free": true,
             "thumbnail_url": null,
+            "is_bookmarked": false,
+            "created_at": "2026-01-15T10:30:00.000000Z",
             "trending_score": 8.5,
             "views_count": 4,
             "unique_viewers": 1,
@@ -411,7 +421,10 @@ GET /api/trending?time_range=custom&start_date=2026-01-01&end_date=2026-01-15
 | `country` | object\|null | Country `{ name, code }` (loaded on `/cases` endpoint) |
 | `judgment_date` | string\|null | Judgment date (Y-m-d) |
 | `citation` | string\|null | Legal citation |
+| `principles` | string\|null | Key legal principles from the case |
+| `tags` | array\|null | Case tags |
 | `level` | string\|null | Academic level |
+| `is_bookmarked` | boolean | Whether the authenticated user has bookmarked this case (`false` for guests) |
 | `trending_score` | float | Calculated trending score |
 | `views_count` | integer | Total views in period |
 | `unique_viewers` | integer | Distinct viewers in period |
@@ -432,6 +445,8 @@ GET /api/trending?time_range=custom&start_date=2026-01-01&end_date=2026-01-15
 | `price_usd` | string\|null | Price in USD |
 | `is_free` | boolean | Free status |
 | `thumbnail_url` | string\|null | Thumbnail URL |
+| `is_bookmarked` | boolean | Whether the authenticated user has bookmarked this note (`false` for guests) |
+| `created_at` | datetime | ISO 8601 creation timestamp |
 | `trending_score` | float | Calculated trending score |
 | `views_count` | integer | Total views in period |
 | `unique_viewers` | integer | Distinct viewers in period |
@@ -564,6 +579,7 @@ trending:{type}:{md5(filters)}:page:{page}
 - Each page is cached separately
 - No explicit cache invalidation — natural TTL expiry handles freshness
 - Different filter combinations produce different cache keys
+- `is_bookmarked` is hydrated **after** cache retrieval (user-specific, not cached)
 
 ---
 
@@ -747,6 +763,16 @@ The API normalizes level input by stripping trailing `L`/`l` suffix:
 ### Bot Exclusion
 
 All bot views (identified via `views.is_bot = true`) are excluded from trending calculations. This prevents SEO crawlers and automated tools from inflating trending scores.
+
+### Bookmark Hydration
+
+`is_bookmarked` is user-specific and cannot be cached (trending results are shared across users). The controller hydrates bookmark status **after** retrieving cached results using a single batch query:
+
+1. Collect all case IDs and note IDs from the paginated result
+2. Query the `bookmarks` table once for the authenticated user's bookmarks matching those IDs
+3. Set `is_bookmarked` on each item before serialization
+
+For **guests** (unauthenticated), `is_bookmarked` is always `false` — no database query is made.
 
 ### Minimum View Threshold
 

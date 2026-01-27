@@ -24,7 +24,10 @@ export interface TrendingCaseItem extends TrendingItemBase {
   type: 'case';
   judgment_date: string | null;
   citation: string | null;
+  principles: string | null;
+  tags: string[] | null;
   level: string | null;
+  is_bookmarked: boolean;
 }
 
 // --- Trending case from /api/trending/cases (dedicated endpoint) ---
@@ -45,6 +48,8 @@ export interface TrendingNoteItem extends TrendingItemBase {
   price_usd: string | null;
   is_free: boolean;
   thumbnail_url: string | null;
+  is_bookmarked: boolean;
+  created_at: string;
 }
 
 // --- Trending note from /api/trending/notes (dedicated endpoint) ---

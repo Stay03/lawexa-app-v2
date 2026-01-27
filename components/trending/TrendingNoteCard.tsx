@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ChevronRight, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { BookmarkButton } from '@/components/common/BookmarkButton';
+import { formatNoteDate } from '@/lib/utils/note-utils';
 import type { TrendingNoteDetailItem } from '@/types/trending';
 
 interface TrendingNoteCardProps {
@@ -14,9 +17,10 @@ interface TrendingNoteCardProps {
 
 /**
  * Compact trending note list item for grouped display.
- * Similar to NoteCard but uses trending-specific fields.
+ * Matches NoteCard layout using trending-specific field shapes.
  */
 function TrendingNoteCard({ item, className, style }: TrendingNoteCardProps) {
+  const router = useRouter();
   const {
     title,
     slug,
@@ -26,14 +30,18 @@ function TrendingNoteCard({ item, className, style }: TrendingNoteCardProps) {
     price_ngn,
     thumbnail_url,
     author,
+    created_at,
   } = item;
 
   // Format price display
   const priceDisplay = is_free
     ? 'Free'
     : price_ngn
-      ? `₦${price_ngn}`
+      ? `\u20A6${price_ngn}`
       : 'Free';
+
+  // Format date
+  const formattedDate = formatNoteDate(created_at);
 
   // Truncate preview to 200 characters
   const previewText = content_preview
@@ -81,6 +89,16 @@ function TrendingNoteCard({ item, className, style }: TrendingNoteCardProps) {
               {priceDisplay}
             </Badge>
 
+            {/* Date */}
+            <span className="tabular-nums">{formattedDate}</span>
+
+            <BookmarkButton
+              type="note"
+              id={item.id}
+              isBookmarked={item.is_bookmarked}
+              variant="icon"
+              className="h-7 w-7"
+            />
             <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
           </div>
         </div>
@@ -100,16 +118,22 @@ function TrendingNoteCard({ item, className, style }: TrendingNoteCardProps) {
           </p>
         )}
 
-        {/* Tags */}
+        {/* Tags - clickable to filter */}
         {tags && tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {tags.slice(0, 5).map((tag) => (
-              <span
+              <button
                 key={tag}
-                className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/notes?tags=${encodeURIComponent(tag)}`);
+                }}
+                className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary transition-colors hover:bg-primary/20"
               >
                 {tag}
-              </span>
+              </button>
             ))}
             {tags.length > 5 && (
               <span className="text-xs text-muted-foreground">
@@ -118,7 +142,6 @@ function TrendingNoteCard({ item, className, style }: TrendingNoteCardProps) {
             )}
           </div>
         )}
-
       </div>
     </Link>
   );

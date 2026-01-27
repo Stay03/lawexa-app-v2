@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ChevronRight, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BookmarkButton } from '@/components/common/BookmarkButton';
 import type { TrendingCaseDetailItem } from '@/types/trending';
 
 interface TrendingCaseCardProps {
@@ -13,10 +15,11 @@ interface TrendingCaseCardProps {
 
 /**
  * Compact trending case list item for grouped display.
- * Similar to CaseCard but uses trending-specific fields.
+ * Matches CaseCard layout using trending-specific field shapes.
  */
 function TrendingCaseCard({ item, className, style }: TrendingCaseCardProps) {
-  const { title, slug, court, country, judgment_date, citation, views_count } = item;
+  const router = useRouter();
+  const { title, slug, court, country, judgment_date, principles, tags, views_count } = item;
 
   // Format date if available
   const formattedDate = judgment_date
@@ -25,6 +28,13 @@ function TrendingCaseCard({ item, className, style }: TrendingCaseCardProps) {
         month: 'short',
         day: 'numeric',
       })
+    : null;
+
+  // Truncate principles to 300 characters
+  const principlesPreview = principles
+    ? principles.length > 300
+      ? `${principles.slice(0, 300).trim()}...`
+      : principles
     : null;
 
   return (
@@ -61,22 +71,54 @@ function TrendingCaseCard({ item, className, style }: TrendingCaseCardProps) {
           )}
           {views_count > 0 && (
             <>
-              <span className="text-muted-foreground/40">•</span>
+              <span className="text-muted-foreground/40">&bull;</span>
               <span className="flex items-center gap-1">
                 <Eye className="h-3 w-3" />
                 {views_count}
               </span>
             </>
           )}
+          <BookmarkButton
+            type="case"
+            id={item.id}
+            isBookmarked={item.is_bookmarked}
+            variant="icon"
+            className="h-7 w-7"
+          />
           <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:opacity-100 group-hover:translate-x-0.5" />
         </div>
       </div>
 
-      {/* Citation */}
-      {citation && (
-        <p className="line-clamp-1 text-xs text-muted-foreground">
-          {citation}
+      {/* Principles preview */}
+      {principlesPreview && (
+        <p className="line-clamp-2 text-xs text-muted-foreground">
+          {principlesPreview}
         </p>
+      )}
+
+      {/* Tags - clickable to filter */}
+      {tags && tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {tags.slice(0, 5).map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                router.push(`/cases?tags=${encodeURIComponent(tag)}`);
+              }}
+              className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary transition-colors hover:bg-primary/20"
+            >
+              {tag}
+            </button>
+          ))}
+          {tags.length > 5 && (
+            <span className="text-xs text-muted-foreground">
+              +{tags.length - 5} more
+            </span>
+          )}
+        </div>
       )}
     </Link>
   );
