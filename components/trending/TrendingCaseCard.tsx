@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Eye, Flame, Users } from 'lucide-react';
+import { ChevronRight, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TrendingCaseDetailItem } from '@/types/trending';
 
@@ -16,7 +16,7 @@ interface TrendingCaseCardProps {
  * Similar to CaseCard but uses trending-specific fields.
  */
 function TrendingCaseCard({ item, className, style }: TrendingCaseCardProps) {
-  const { title, slug, court, country, judgment_date, citation, trending_score, views_count, unique_viewers } = item;
+  const { title, slug, court, country, judgment_date, citation, views_count } = item;
 
   // Format date if available
   const formattedDate = judgment_date
@@ -59,6 +59,15 @@ function TrendingCaseCard({ item, className, style }: TrendingCaseCardProps) {
           {formattedDate && (
             <span className="tabular-nums">{formattedDate}</span>
           )}
+          {views_count > 0 && (
+            <>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="flex items-center gap-1">
+                <Eye className="h-3 w-3" />
+                {views_count}
+              </span>
+            </>
+          )}
           <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:opacity-100 group-hover:translate-x-0.5" />
         </div>
       </div>
@@ -69,22 +78,6 @@ function TrendingCaseCard({ item, className, style }: TrendingCaseCardProps) {
           {citation}
         </p>
       )}
-
-      {/* Trending stats */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1 text-orange-500">
-          <Flame className="h-3.5 w-3.5" />
-          {trending_score}
-        </span>
-        <span className="flex items-center gap-1">
-          <Eye className="h-3.5 w-3.5" />
-          {views_count} {views_count === 1 ? 'view' : 'views'}
-        </span>
-        <span className="flex items-center gap-1">
-          <Users className="h-3.5 w-3.5" />
-          {unique_viewers} {unique_viewers === 1 ? 'viewer' : 'viewers'}
-        </span>
-      </div>
     </Link>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Eye, Flame, User, Users } from 'lucide-react';
+import { ChevronRight, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import type { TrendingNoteDetailItem } from '@/types/trending';
@@ -26,9 +26,6 @@ function TrendingNoteCard({ item, className, style }: TrendingNoteCardProps) {
     price_ngn,
     thumbnail_url,
     author,
-    trending_score,
-    views_count,
-    unique_viewers,
   } = item;
 
   // Format price display
@@ -122,21 +119,6 @@ function TrendingNoteCard({ item, className, style }: TrendingNoteCardProps) {
           </div>
         )}
 
-        {/* Trending stats */}
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1 text-orange-500">
-            <Flame className="h-3.5 w-3.5" />
-            {trending_score}
-          </span>
-          <span className="flex items-center gap-1">
-            <Eye className="h-3.5 w-3.5" />
-            {views_count} {views_count === 1 ? 'view' : 'views'}
-          </span>
-          <span className="flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" />
-            {unique_viewers} {unique_viewers === 1 ? 'viewer' : 'viewers'}
-          </span>
-        </div>
       </div>
     </Link>
   );
