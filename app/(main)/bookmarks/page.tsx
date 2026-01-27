@@ -10,7 +10,6 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { PageContainer, PageHeader } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useBookmarks } from '@/lib/hooks/useBookmarks';
 import type {
@@ -50,9 +49,13 @@ function BookmarkCard({ bookmark, index }: { bookmark: BookmarkItem; index: numb
     >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="shrink-0 text-[10px]">
-            {isCase ? 'Case' : 'Note'}
-          </Badge>
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted">
+            {isCase ? (
+              <Scale className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </div>
           <h3 className="min-w-0 truncate text-sm font-medium text-foreground group-hover:text-primary">
             {content.title}
           </h3>
