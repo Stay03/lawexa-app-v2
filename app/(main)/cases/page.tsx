@@ -13,9 +13,11 @@ import {
   CasePagination,
   CaseListSkeleton,
 } from '@/components/cases';
+import { TrendingCaseCard, TrendingListSkeleton } from '@/components/trending';
 import { PageContainer, PageHeader } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCases } from '@/lib/hooks/useCases';
+import { useTrendingCases } from '@/lib/hooks/useTrending';
 
 /**
  * Case Library list page content (uses useSearchParams)
@@ -37,6 +39,9 @@ function CasesPageContent() {
     tags: tags || undefined,
     per_page: 15,
   });
+
+  // Fetch trending cases
+  const trendingCases = useTrendingCases({ per_page: 15, time_range: 'month' });
 
   // Update URL params
   const updateParams = useCallback(
@@ -200,11 +205,32 @@ function CasesPageContent() {
 
           {activeTab === 'trending' && (
             <div className="mt-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-              <EmptyState
-                icon={TrendingUp}
-                title="No trending cases"
-                description="Trending cases will appear here based on popularity and engagement."
-              />
+              {trendingCases.isFetching ? (
+                <TrendingListSkeleton />
+              ) : trendingCases.isError ? (
+                <ErrorState
+                  title="Failed to load trending cases"
+                  description="We couldn't load trending cases. Please try again."
+                  retry={() => trendingCases.refetch()}
+                />
+              ) : !trendingCases.data?.data?.length ? (
+                <EmptyState
+                  icon={TrendingUp}
+                  title="No trending cases"
+                  description="Trending cases will appear here based on popularity and engagement."
+                />
+              ) : (
+                <CaseListGroup>
+                  {trendingCases.data.data.map((item, index) => (
+                    <TrendingCaseCard
+                      key={item.id}
+                      item={item}
+                      className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
+                      style={{ animationDelay: `${index * 30}ms` }}
+                    />
+                  ))}
+                </CaseListGroup>
+              )}
             </div>
           )}
         </>
