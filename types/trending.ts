@@ -57,6 +57,7 @@ export interface TrendingNoteDetailItem extends TrendingNoteItem {
   author: {
     id: number;
     name: string;
+    avatar_url: string | null;
   } | null;
 }
 

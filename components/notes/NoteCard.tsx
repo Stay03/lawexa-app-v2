@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   ChevronRight,
   Lock,
-  Globe,
-  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -135,8 +133,18 @@ function NoteCard({
         </div>
 
         {/* Author */}
-        <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-          <User className="h-3 w-3" />
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+          {user.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt=""
+              className="h-4 w-4 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary text-[8px] font-medium text-primary-foreground">
+              {user.name.charAt(0).toUpperCase()}
+            </span>
+          )}
           <span>{user.name}</span>
         </div>
 

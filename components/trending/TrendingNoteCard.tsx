@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, User } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
@@ -105,8 +105,18 @@ function TrendingNoteCard({ item, className, style }: TrendingNoteCardProps) {
 
         {/* Author */}
         {author && (
-          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <User className="h-3 w-3" />
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            {author.avatar_url ? (
+              <img
+                src={author.avatar_url}
+                alt=""
+                className="h-4 w-4 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary text-[8px] font-medium text-primary-foreground">
+                {author.name.charAt(0).toUpperCase()}
+              </span>
+            )}
             <span>{author.name}</span>
           </div>
         )}
