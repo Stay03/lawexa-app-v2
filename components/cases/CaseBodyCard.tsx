@@ -35,7 +35,7 @@ function CaseBodyCard({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="prose prose-sm dark:prose-invert max-w-none">
+        <div className="prose dark:prose-invert max-w-none text-[18px]">
           {hasBody ? (
             <div
               dangerouslySetInnerHTML={{ __html: body }}

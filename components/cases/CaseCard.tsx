@@ -50,11 +50,11 @@ function CaseCard({ caseItem, className, style }: CaseCardProps) {
     >
       {/* Header: Title and metadata */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <h3 className="min-w-0 flex-1 text-sm font-medium text-foreground group-hover:text-primary sm:truncate">
+        <h3 className="min-w-0 flex-1 text-[20px] font-medium text-foreground group-hover:text-primary sm:truncate">
           {title}
         </h3>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground sm:flex-nowrap sm:gap-2.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-[16px] text-muted-foreground sm:flex-nowrap sm:gap-2.5">
           {country && (
             <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
               {country.abbreviation || country.code}
@@ -90,7 +90,7 @@ function CaseCard({ caseItem, className, style }: CaseCardProps) {
 
       {/* Principles preview */}
       {principlesPreview && (
-        <p className="line-clamp-2 text-xs text-muted-foreground">
+        <p className="line-clamp-2 text-[16px] text-muted-foreground">
           {principlesPreview}
         </p>
       )}
@@ -107,13 +107,13 @@ function CaseCard({ caseItem, className, style }: CaseCardProps) {
                 e.stopPropagation();
                 router.push(`/cases?tags=${encodeURIComponent(tag)}`);
               }}
-              className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary transition-colors hover:bg-primary/20"
+              className="rounded-full bg-primary/10 px-2 py-0.5 text-[16px] text-primary transition-colors hover:bg-primary/20"
             >
               {tag}
             </button>
           ))}
           {tags.length > 5 && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[16px] text-muted-foreground">
               +{tags.length - 5} more
             </span>
           )}

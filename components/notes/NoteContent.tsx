@@ -67,7 +67,7 @@ function NoteContent({ content, animationDelay = 0, className }: NoteContentProp
         <div
           ref={contentRef}
           className={cn(
-            'prose prose-sm dark:prose-invert max-w-none',
+            'prose dark:prose-invert max-w-none text-[18px]',
             '[&_p]:my-2 [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:mt-4 [&_h3]:mb-2',
             '[&_ul]:my-2 [&_ol]:my-2 [&_li]:my-1',
             '[&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-muted-foreground/30 [&_blockquote]:pl-4 [&_blockquote]:italic',
