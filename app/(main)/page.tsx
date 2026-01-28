@@ -63,7 +63,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-120px)] flex-col items-center justify-center px-4">
+    <div className="flex min-h-[calc(100vh-120px)] flex-col items-center justify-center px-4" style={{ fontFamily: 'var(--font-comfortaa), sans-serif' }}>
       {/* Greeting */}
       <h1 className="mb-8 text-[36px] font-medium">
         {greeting}

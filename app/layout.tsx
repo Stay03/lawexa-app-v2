@@ -6,7 +6,7 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 
-const comfortaa = Comfortaa({ subsets: ["latin"], variable: "--font-sans" });
+const comfortaa = Comfortaa({ subsets: ["latin"], variable: "--font-comfortaa" });
 
 export const metadata: Metadata = {
   title: "Lawexa - Nigerian Legal Resources",
