@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { GraduationCap, Building2 } from 'lucide-react';
 import { OnboardingCard } from '@/components/onboarding/OnboardingCard';
@@ -30,6 +30,7 @@ const EDUCATION_LEVEL_OPTIONS = [
 
 export default function OnboardingStep5Page() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const {
     userType,
     communicationStyle,
@@ -58,16 +59,20 @@ export default function OnboardingStep5Page() {
   };
 
   const handleBack = () => {
-    if (skipProfile) {
-      router.push('/onboarding/step-3');
-    } else {
-      router.push('/onboarding/step-4');
-    }
+    startTransition(() => {
+      if (skipProfile) {
+        router.push('/onboarding/step-3');
+      } else {
+        router.push('/onboarding/step-4');
+      }
+    });
   };
 
   const handleNext = () => {
     if (studentEducationLevel) {
-      router.push('/onboarding/step-6');
+      startTransition(() => {
+        router.push('/onboarding/step-6');
+      });
     }
   };
 
@@ -116,6 +121,7 @@ export default function OnboardingStep5Page() {
             onBack={handleBack}
             onNext={handleNext}
             isNextDisabled={!studentEducationLevel}
+            isLoading={isPending}
           />
         </div>
       </div>

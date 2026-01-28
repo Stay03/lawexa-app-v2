@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { CommunicationStyleStep } from '@/components/onboarding/CommunicationStyleStep';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
@@ -11,6 +11,7 @@ import type { CommunicationStyle } from '@/types/auth';
 
 export default function OnboardingStep2Page() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const { userType, communicationStyle, setCommunicationStyle } = useOnboardingStore();
 
   // Redirect to step 1 if no user type is selected
@@ -26,12 +27,16 @@ export default function OnboardingStep2Page() {
   };
 
   const handleBack = () => {
-    router.push('/onboarding/step-1');
+    startTransition(() => {
+      router.push('/onboarding/step-1');
+    });
   };
 
   const handleNext = () => {
     if (communicationStyle) {
-      router.push('/onboarding/step-3');
+      startTransition(() => {
+        router.push('/onboarding/step-3');
+      });
     }
   };
 
@@ -58,6 +63,7 @@ export default function OnboardingStep2Page() {
               onBack={handleBack}
               onNext={handleNext}
               isNextDisabled={!communicationStyle}
+              isLoading={isPending}
             />
           </div>
         </div>

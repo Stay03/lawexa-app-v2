@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, Search, Check } from 'lucide-react';
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 
 export default function OnboardingStep3Page() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const {
     userType,
     communicationStyle,
@@ -91,7 +92,9 @@ export default function OnboardingStep3Page() {
   };
 
   const handleBack = () => {
-    router.push('/onboarding/step-2');
+    startTransition(() => {
+      router.push('/onboarding/step-2');
+    });
   };
 
   const handleNext = () => {
@@ -109,18 +112,20 @@ export default function OnboardingStep3Page() {
 
     // For lawyer/law_student who selected detected country, skip profile step
     const isLawyerOrLawStudent = userType === 'lawyer' || userType === 'law_student';
-    if (isLawyerOrLawStudent && matchesDetected) {
-      // Skip step 4 (profile)
-      if (userType === 'law_student') {
-        // Law students go to education level selection (step-5)
-        router.push('/onboarding/step-5');
+    startTransition(() => {
+      if (isLawyerOrLawStudent && matchesDetected) {
+        // Skip step 4 (profile)
+        if (userType === 'law_student') {
+          // Law students go to education level selection (step-5)
+          router.push('/onboarding/step-5');
+        } else {
+          // Lawyers go directly to education form (step-6)
+          router.push('/onboarding/step-6');
+        }
       } else {
-        // Lawyers go directly to education form (step-6)
-        router.push('/onboarding/step-6');
+        router.push('/onboarding/step-4');
       }
-    } else {
-      router.push('/onboarding/step-4');
-    }
+    });
   };
 
   if (!userType || !communicationStyle) {
@@ -241,6 +246,7 @@ export default function OnboardingStep3Page() {
             onBack={handleBack}
             onNext={handleNext}
             isNextDisabled={!selectedCountry}
+            isLoading={isPending}
           />
         </div>
       </div>

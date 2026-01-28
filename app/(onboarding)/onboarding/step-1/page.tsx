@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTransition } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Scale, GraduationCap, Briefcase } from 'lucide-react';
 import { OnboardingCard } from '@/components/onboarding/OnboardingCard';
@@ -35,6 +36,7 @@ const USER_TYPE_OPTIONS = [
 
 export default function OnboardingStep1Page() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const { userType, setUserType } = useOnboardingStore();
 
   // Prefetch countries data so step-3 loads instantly
@@ -53,7 +55,9 @@ export default function OnboardingStep1Page() {
 
   const handleNext = () => {
     if (userType) {
-      router.push('/onboarding/step-2');
+      startTransition(() => {
+        router.push('/onboarding/step-2');
+      });
     }
   };
 
@@ -90,6 +94,7 @@ export default function OnboardingStep1Page() {
             onNext={handleNext}
             showBack={false}
             isNextDisabled={!userType}
+            isLoading={isPending}
           />
         </div>
       </div>
