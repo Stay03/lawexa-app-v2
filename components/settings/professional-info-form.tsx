@@ -46,6 +46,7 @@ interface ProfessionalInfoFormProps {
 
 export function ProfessionalInfoForm({ form }: ProfessionalInfoFormProps) {
   const [countrySearch, setCountrySearch] = useState('');
+  const [isCountrySearching, setIsCountrySearching] = useState(false);
   const { data: countries } = useCountries(countrySearch);
   const { data: expertiseAreas } = useAllExpertise();
 
@@ -130,13 +131,25 @@ export function ProfessionalInfoForm({ form }: ProfessionalInfoFormProps) {
                 onValueChange={(val) => {
                   field.onChange(val);
                   setCountrySearch('');
+                  setIsCountrySearching(false);
                 }}
               >
                 <FormControl>
                   <ComboboxInput
                     placeholder="Search for a country"
-                    value={countrySearch}
-                    onChange={(e) => setCountrySearch(e.target.value)}
+                    value={isCountrySearching ? countrySearch : (field.value || '')}
+                    onChange={(e) => {
+                      setIsCountrySearching(true);
+                      setCountrySearch(e.target.value);
+                    }}
+                    onFocus={() => {
+                      setIsCountrySearching(true);
+                      setCountrySearch('');
+                    }}
+                    onBlur={() => {
+                      setIsCountrySearching(false);
+                      setCountrySearch('');
+                    }}
                     showClear={!!field.value}
                   />
                 </FormControl>
