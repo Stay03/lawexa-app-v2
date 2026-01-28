@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGreetingParts } from '@/lib/hooks/useGreeting';
 import {
@@ -14,7 +14,7 @@ import {
   FileUploadTrigger,
   FileUploadContent,
 } from '@/components/ui/file-upload';
-import { ArrowUp, Paperclip, X, Loader2 } from 'lucide-react';
+import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { chatApi } from '@/lib/api/chat';
 
@@ -24,6 +24,19 @@ export default function HomePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { greeting, name } = useGreetingParts();
   const router = useRouter();
+  const [showLinks, setShowLinks] = useState(false);
+
+  useEffect(() => {
+    // Slide in after a short delay
+    const showTimer = setTimeout(() => setShowLinks(true), 500);
+    // Slide out after 30 seconds
+    const hideTimer = setTimeout(() => setShowLinks(false), 30500);
+
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  }, []);
 
   const handleSubmit = async () => {
     if ((!input.trim() && files.length === 0) || isSubmitting) return;
@@ -65,7 +78,7 @@ export default function HomePage() {
   return (
     <div className="flex min-h-[calc(100vh-120px)] flex-col items-center justify-center px-4" style={{ fontFamily: 'var(--font-comfortaa), sans-serif' }}>
       {/* Greeting */}
-      <h1 className="mb-8 text-[36px] font-medium">
+      <h1 className="mb-6 text-[36px] font-medium">
         {greeting}
         {name && (
           <>
@@ -73,6 +86,31 @@ export default function HomePage() {
           </>
         )}
       </h1>
+
+      {/* Resource Links */}
+      <div
+        className={`mb-8 flex flex-wrap justify-center gap-4 overflow-hidden transition-all duration-700 ease-out ${
+          showLinks ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <a
+          href="/docs/Lawexa State of Legal Intelligence Report.pdf"
+          download
+          className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+        >
+          <FileText className="h-4 w-4" />
+          State of Legal Intelligence Report
+        </a>
+        <a
+          href="https://chat.whatsapp.com/CNDMnd0eWYp4Qiy7k4oVlL"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500/5 px-4 py-2 text-sm text-green-600 transition-colors hover:bg-green-500/10 dark:text-green-400"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Join WhatsApp Community
+        </a>
+      </div>
 
       {/* Prompt Input with FileUpload wrapper */}
       <div className="w-full max-w-2xl">
@@ -144,7 +182,7 @@ export default function HomePage() {
               'Explain this law',
               'Find a case on',
               'Do I have rights to',
-              'Connect me to a lawyer?',
+              'Connect me to a lawyer',
             ].map((prompt) => (
               <button
                 key={prompt}
