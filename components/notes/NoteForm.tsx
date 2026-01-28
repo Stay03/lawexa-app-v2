@@ -308,7 +308,7 @@ function NoteForm({
                       ref={editorRef}
                       content={field.value}
                       onChange={field.onChange}
-                      placeholder="Note it down..."
+                      placeholder="Note it down"
                       onImageUpload={handleImageUpload}
                       showToolbar={!showWriterMode}
                       onEditorReady={handleEditorReady}

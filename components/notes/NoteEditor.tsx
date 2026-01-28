@@ -36,7 +36,7 @@ const NoteEditor = memo(forwardRef<NoteEditorRef, NoteEditorProps>(function Note
   {
     content,
     onChange,
-    placeholder = 'Note it down...',
+    placeholder = 'Note it down',
     className,
     onImageUpload,
     showToolbar = true,

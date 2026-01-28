@@ -94,7 +94,7 @@ export default function HomePage() {
         }`}
       >
         <a
-          href="/docs/Lawexa State of Legal Intelligence Report.pdf"
+          href="/docs/Lawexa_State_of_Legal_Intelligence_Report.pdf"
           download
           className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
         >
