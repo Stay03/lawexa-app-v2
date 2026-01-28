@@ -20,6 +20,8 @@ export const profileFormSchema = z.object({
     },
     { message: 'Date of birth must be in the past' }
   ),
+  user_type: z.enum(['lawyer', 'law_student', 'other']).optional(),
+  student_education_level: z.enum(['university', 'law_school']).nullable().optional(),
   profession: optionalString,
   country: optionalString,
   state: z.string().max(255).optional().or(z.literal('')),

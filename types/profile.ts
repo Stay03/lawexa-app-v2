@@ -1,5 +1,8 @@
+import type { UserType } from './auth';
+
 export interface ProfileUpdatePayload {
   name?: string;
+  user_type?: UserType;
   profession?: string;
   country?: string;
   address?: string;

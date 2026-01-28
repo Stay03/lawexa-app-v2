@@ -99,6 +99,11 @@ export function ProfileOverviewCard({ user }: ProfileOverviewCardProps) {
               <p className="text-sm text-muted-foreground">{user.email}</p>
             )}
             <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+              {user.profile?.user_type && (
+                <Badge variant="outline" className="capitalize">
+                  {user.profile.user_type.replace(/_/g, ' ')}
+                </Badge>
+              )}
               {user.profile?.profession && (
                 <Badge variant="secondary" className="capitalize">
                   {user.profile.profession.replace(/_/g, ' ')}

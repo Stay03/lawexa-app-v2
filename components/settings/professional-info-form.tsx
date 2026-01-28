@@ -39,12 +39,14 @@ import { useAllExpertise } from '@/lib/hooks/useExpertise';
 import { PROFESSION_OPTIONS } from '@/types/onboarding';
 import type { UseFormReturn } from 'react-hook-form';
 import type { ProfileFormValues } from '@/lib/utils/profile-validation';
+import type { ProfileFieldVisibility } from '@/lib/utils/profile-field-config';
 
 interface ProfessionalInfoFormProps {
   form: UseFormReturn<ProfileFormValues>;
+  visibility: ProfileFieldVisibility;
 }
 
-export function ProfessionalInfoForm({ form }: ProfessionalInfoFormProps) {
+export function ProfessionalInfoForm({ form, visibility }: ProfessionalInfoFormProps) {
   const [countrySearch, setCountrySearch] = useState('');
   const [isCountrySearching, setIsCountrySearching] = useState(false);
   const { data: countries } = useCountries(countrySearch);
@@ -92,33 +94,35 @@ export function ProfessionalInfoForm({ form }: ProfessionalInfoFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <FormField
-          control={form.control}
-          name="profession"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Profession</FormLabel>
-              <Select
-                onValueChange={field.onChange}
-                value={field.value || ''}
-              >
-                <FormControl>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select your profession" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {PROFESSION_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {visibility.showProfession && (
+          <FormField
+            control={form.control}
+            name="profession"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Profession</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value || ''}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select your profession" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {PROFESSION_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <FormField
           control={form.control}
@@ -217,37 +221,39 @@ export function ProfessionalInfoForm({ form }: ProfessionalInfoFormProps) {
         />
 
         {/* Areas of Expertise — multi-select */}
-        <FormField
-          control={form.control}
-          name="areas_of_expertise"
-          render={() => (
-            <FormItem>
-              <FormLabel>Areas of Expertise</FormLabel>
-              <ExpertiseSelector
-                expertiseAreas={expertiseAreas ?? []}
-                selectedIds={selectedExpertiseIds}
-                onToggle={handleExpertiseToggle}
-              />
-              {selectedExpertiseItems.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {selectedExpertiseItems.map((e) => (
-                    <Badge key={e.id} variant="secondary" className="gap-1">
-                      {e.name}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExpertise(e.id)}
-                        className="ml-0.5 hover:text-destructive"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {visibility.showAreasOfExpertise && (
+          <FormField
+            control={form.control}
+            name="areas_of_expertise"
+            render={() => (
+              <FormItem>
+                <FormLabel>Areas of Expertise</FormLabel>
+                <ExpertiseSelector
+                  expertiseAreas={expertiseAreas ?? []}
+                  selectedIds={selectedExpertiseIds}
+                  onToggle={handleExpertiseToggle}
+                />
+                {selectedExpertiseItems.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {selectedExpertiseItems.map((e) => (
+                      <Badge key={e.id} variant="secondary" className="gap-1">
+                        {e.name}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExpertise(e.id)}
+                          className="ml-0.5 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
       </CardContent>
     </Card>
   );
