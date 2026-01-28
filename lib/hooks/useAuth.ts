@@ -79,7 +79,7 @@ export function useAuth() {
     : null;
 
   return {
-    user: currentUser?.data || user,
+    user: currentUser?.data?.user || user,
     isAuthenticated,
     isGuest,
     isLoading,

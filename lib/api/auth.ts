@@ -71,13 +71,13 @@ export const authApi = {
 
   // Protected endpoints
   me: async () => {
-    const response = await apiClient.get<ApiResponse<User>>('/auth/me');
+    const response = await apiClient.get<ApiResponse<{ user: User }>>('/auth/me');
     return response.data;
   },
 
   // Silent auth check (won't trigger redirect on 401)
   meSilent: async () => {
-    const response = await apiClient.get<ApiResponse<User>>('/auth/me', {
+    const response = await apiClient.get<ApiResponse<{ user: User }>>('/auth/me', {
       headers: { 'X-Silent-Auth': 'true' },
     });
     return response.data;
