@@ -54,7 +54,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton size="lg" asChild className="group-data-[collapsible=icon]:hidden">
               <Link href="/">
                 <Image
-                  src="/logo.png"
+                  src="/images/logo.png"
                   alt="Lawexa"
                   width={140}
                   height={32}
