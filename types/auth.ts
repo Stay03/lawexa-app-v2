@@ -14,6 +14,24 @@ export interface UserProfile {
   // Onboarding fields
   user_type?: UserType;
   communication_style?: CommunicationStyle;
+  // Location fields
+  country?: string;
+  country_code?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  // Education fields
+  university?: string;
+  level?: string;
+  call_to_bar_year?: number;
+  call_number?: string;
+  other_certifications?: string;
+  work_experience?: string;
+  // Social links
+  linkedin_url?: string;
+  website_url?: string;
+  twitter_url?: string;
+  facebook_url?: string;
 }
 
 export interface AreaOfExpertise {
