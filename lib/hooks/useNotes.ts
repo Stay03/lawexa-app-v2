@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notesApi } from '@/lib/api/notes';
 import type {
   NoteListParams,
@@ -27,6 +27,22 @@ export function useNotes(params: NoteListParams = {}) {
   return useQuery({
     queryKey: noteKeys.list(params),
     queryFn: () => notesApi.getList(params),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+/**
+ * Hook for fetching infinite scrolling public notes list
+ */
+export function useInfiniteNotes(params: Omit<NoteListParams, 'page'> = {}) {
+  return useInfiniteQuery({
+    queryKey: [...noteKeys.lists(), 'infinite', params] as const,
+    queryFn: ({ pageParam }) => notesApi.getList({ ...params, page: pageParam }),
+    getNextPageParam: (lastPage) => {
+      const { current_page, last_page } = lastPage.pagination;
+      return current_page < last_page ? current_page + 1 : undefined;
+    },
+    initialPageParam: 1,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

@@ -1,14 +1,13 @@
 'use client';
 
-import { Suspense, useCallback } from 'react';
+import { Suspense, useCallback, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { X, Plus, TrendingUp, Clock } from 'lucide-react';
+import { X, Plus, TrendingUp, Clock, Loader2 } from 'lucide-react';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
   NoteCard,
   NoteListGroup,
-  NotePagination,
   NoteListSkeleton,
   NoteEmptyState,
   NotesNavTabs,
@@ -19,8 +18,9 @@ import { AnimatedTabs } from '@/components/ui/animated-tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useNotes } from '@/lib/hooks/useNotes';
-import { useTrendingNotes } from '@/lib/hooks/useTrending';
+import { useInfiniteNotes } from '@/lib/hooks/useNotes';
+import { useInfiniteTrendingNotes } from '@/lib/hooks/useTrending';
+import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 import { getTrendingLabel } from '@/types/trending';
 import type { NoteListParams } from '@/types/note';
 
@@ -33,8 +33,7 @@ function NotesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Read URL state
-  const page = Number(searchParams.get('page')) || 1;
+  // Read URL state (no page param needed for infinite scroll)
   const search = searchParams.get('search') || '';
   const tags = searchParams.get('tags') || '';
   const tab = searchParams.get('tab') || 'trending';
@@ -43,9 +42,11 @@ function NotesPageContent() {
   const sort = (searchParams.get('sort') as NoteListParams['sort']) || 'created_at';
   const order = (searchParams.get('order') as NoteListParams['order']) || 'desc';
 
-  // Fetch regular notes (for "Recently Added" tab)
-  const notesQuery = useNotes({
-    page: tab === 'recent' ? page : 1,
+  // Intersection observer for infinite scroll
+  const { ref: loadMoreRef, isIntersecting } = useIntersectionObserver();
+
+  // Fetch regular notes with infinite scroll (for "Recently Added" tab)
+  const notesQuery = useInfiniteNotes({
     search: search || undefined,
     tags: tags || undefined,
     sort,
@@ -53,9 +54,8 @@ function NotesPageContent() {
     per_page: 15,
   });
 
-  // Fetch trending notes (for "Trending" tab)
-  const trendingQuery = useTrendingNotes({
-    page: tab === 'trending' ? page : 1,
+  // Fetch trending notes with infinite scroll (for "Trending" tab)
+  const trendingQuery = useInfiniteTrendingNotes({
     time_range: 'month',
     per_page: 15,
   });
@@ -64,8 +64,15 @@ function NotesPageContent() {
   const isTrendingTab = tab === 'trending';
   const activeQuery = isTrendingTab ? trendingQuery : notesQuery;
 
+  // Auto-fetch next page when sentinel is visible
+  useEffect(() => {
+    if (isIntersecting && activeQuery.hasNextPage && !activeQuery.isFetchingNextPage) {
+      activeQuery.fetchNextPage();
+    }
+  }, [isIntersecting, activeQuery.hasNextPage, activeQuery.isFetchingNextPage, activeQuery.fetchNextPage]);
+
   // Dynamic trending tab label from API meta (e.g. "Trending in Ghana")
-  const trendingLabel = getTrendingLabel(trendingQuery.data?.meta?.filters_applied);
+  const trendingLabel = getTrendingLabel(trendingQuery.data?.pages[0]?.meta?.filters_applied);
   const librarySubTabs = [
     { value: 'trending', label: trendingLabel, icon: <TrendingUp className="h-4 w-4" /> },
     recentTab,
@@ -93,34 +100,32 @@ function NotesPageContent() {
   // Handle search change
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateParams({ search: e.target.value || null, page: null });
+      updateParams({ search: e.target.value || null });
     },
     [updateParams]
   );
 
   // Handle clear tags filter
   const handleClearTags = useCallback(() => {
-    updateParams({ tags: null, page: null });
+    updateParams({ tags: null });
   }, [updateParams]);
-
-  // Handle page change
-  const handlePageChange = useCallback(
-    (newPage: number) => {
-      updateParams({ page: newPage > 1 ? newPage : null });
-    },
-    [updateParams]
-  );
 
   // Handle sub-tab change
   const handleTabChange = useCallback(
     (value: string) => {
-      updateParams({ tab: value === 'trending' ? null : value, page: null });
+      updateParams({ tab: value === 'trending' ? null : value });
     },
     [updateParams]
   );
 
   // Check if any filters are active
   const hasActiveFilters = search || tags;
+
+  // Flatten pages data for trending notes
+  const trendingItems = trendingQuery.data?.pages.flatMap(page => page.data) ?? [];
+
+  // Flatten pages data for regular notes
+  const noteItems = notesQuery.data?.pages.flatMap(page => page.data) ?? [];
 
   // Render trending notes content
   const renderTrendingContent = () => {
@@ -134,7 +139,7 @@ function NotesPageContent() {
       );
     }
 
-    if (!trendingQuery.data?.data || trendingQuery.data.data.length === 0) {
+    if (!trendingQuery.data?.pages[0]?.data || trendingItems.length === 0) {
       return (
         <EmptyState
           icon={TrendingUp}
@@ -147,25 +152,25 @@ function NotesPageContent() {
     return (
       <>
         <NoteListGroup>
-          {trendingQuery.data.data.map((item, index) => (
+          {trendingItems.map((item, index) => (
             <TrendingNoteCard
               key={item.id}
               item={item}
               className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both duration-200"
-              style={{ animationDelay: `${index * 30}ms` }}
+              style={{ animationDelay: `${Math.min(index, 14) * 30}ms` }}
             />
           ))}
         </NoteListGroup>
 
-        {trendingQuery.data.pagination.last_page > 1 && (
-          <NotePagination
-            currentPage={trendingQuery.data.pagination.current_page}
-            lastPage={trendingQuery.data.pagination.last_page}
-            total={trendingQuery.data.pagination.total}
-            onPageChange={handlePageChange}
-            className="mt-4"
-          />
-        )}
+        {/* Infinite scroll sentinel and loading indicator */}
+        <div ref={loadMoreRef} className="flex justify-center py-4">
+          {trendingQuery.isFetchingNextPage && (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          )}
+          {!trendingQuery.hasNextPage && trendingItems.length > 0 && (
+            <p className="text-sm text-muted-foreground">No more notes</p>
+          )}
+        </div>
       </>
     );
   };
@@ -182,7 +187,7 @@ function NotesPageContent() {
       );
     }
 
-    if (!notesQuery.data?.data || notesQuery.data.data.length === 0) {
+    if (!notesQuery.data?.pages[0]?.data || noteItems.length === 0) {
       if (hasActiveFilters) {
         return (
           <NoteEmptyState type="search" />
@@ -194,25 +199,25 @@ function NotesPageContent() {
     return (
       <>
         <NoteListGroup>
-          {notesQuery.data.data.map((note, index) => (
+          {noteItems.map((note, index) => (
             <NoteCard
               key={note.id}
               note={note}
               className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both duration-200"
-              style={{ animationDelay: `${index * 30}ms` }}
+              style={{ animationDelay: `${Math.min(index, 14) * 30}ms` }}
             />
           ))}
         </NoteListGroup>
 
-        {notesQuery.data.pagination.last_page > 1 && (
-          <NotePagination
-            currentPage={notesQuery.data.pagination.current_page}
-            lastPage={notesQuery.data.pagination.last_page}
-            total={notesQuery.data.pagination.total}
-            onPageChange={handlePageChange}
-            className="mt-4"
-          />
-        )}
+        {/* Infinite scroll sentinel and loading indicator */}
+        <div ref={loadMoreRef} className="flex justify-center py-4">
+          {notesQuery.isFetchingNextPage && (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          )}
+          {!notesQuery.hasNextPage && noteItems.length > 0 && (
+            <p className="text-sm text-muted-foreground">No more notes</p>
+          )}
+        </div>
       </>
     );
   };
@@ -279,7 +284,7 @@ function NotesPageContent() {
       </div>
 
       {/* Content */}
-      {activeQuery.isFetching ? (
+      {activeQuery.isLoading ? (
         isTrendingTab ? <TrendingListSkeleton /> : <NoteListSkeleton />
       ) : (
         <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">

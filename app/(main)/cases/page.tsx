@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useState } from 'react';
+import { Suspense, useCallback, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Scale, BookOpen, X, TrendingUp } from 'lucide-react';
+import { Scale, BookOpen, X, TrendingUp, Loader2 } from 'lucide-react';
 import { AnimatedTabs } from '@/components/ui/animated-tabs';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -10,14 +10,14 @@ import {
   CaseCard,
   CaseListGroup,
   CaseSearchBar,
-  CasePagination,
   CaseListSkeleton,
 } from '@/components/cases';
 import { TrendingCaseCard, TrendingListSkeleton } from '@/components/trending';
 import { PageContainer, PageHeader } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCases } from '@/lib/hooks/useCases';
-import { useTrendingCases } from '@/lib/hooks/useTrending';
+import { useInfiniteCases } from '@/lib/hooks/useCases';
+import { useInfiniteTrendingCases } from '@/lib/hooks/useTrending';
+import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 import { getTrendingLabel } from '@/types/trending';
 
 /**
@@ -28,24 +28,39 @@ function CasesPageContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('recent');
 
-  // Read URL state
-  const page = Number(searchParams.get('page')) || 1;
+  // Read URL state (no page param needed for infinite scroll)
   const search = searchParams.get('search') || '';
   const tags = searchParams.get('tags') || '';
 
-  // Fetch cases
-  const { data, isFetching, isError, refetch } = useCases({
-    page,
+  // Intersection observer for infinite scroll
+  const { ref: loadMoreRef, isIntersecting } = useIntersectionObserver();
+
+  // Fetch cases with infinite scroll
+  const casesQuery = useInfiniteCases({
     search: search || undefined,
     tags: tags || undefined,
     per_page: 15,
   });
 
-  // Fetch trending cases
-  const trendingCases = useTrendingCases({ per_page: 15, time_range: 'month' });
+  // Fetch trending cases with infinite scroll
+  const trendingCases = useInfiniteTrendingCases({ per_page: 15, time_range: 'month' });
+
+  // Active query depends on tab
+  const activeQuery = activeTab === 'trending' ? trendingCases : casesQuery;
+
+  // Auto-fetch next page when sentinel is visible
+  useEffect(() => {
+    if (isIntersecting && activeQuery.hasNextPage && !activeQuery.isFetchingNextPage) {
+      activeQuery.fetchNextPage();
+    }
+  }, [isIntersecting, activeQuery.hasNextPage, activeQuery.isFetchingNextPage, activeQuery.fetchNextPage]);
 
   // Dynamic trending tab label from API meta (e.g. "Trending in Ghana")
-  const trendingLabel = getTrendingLabel(trendingCases.data?.meta?.filters_applied);
+  const trendingLabel = getTrendingLabel(trendingCases.data?.pages[0]?.meta?.filters_applied);
+
+  // Flatten pages data
+  const caseItems = casesQuery.data?.pages.flatMap(page => page.data) ?? [];
+  const trendingItems = trendingCases.data?.pages.flatMap(page => page.data) ?? [];
 
   // Update URL params
   const updateParams = useCallback(
@@ -67,37 +82,29 @@ function CasesPageContent() {
   // Handle search change
   const handleSearchChange = useCallback(
     (value: string) => {
-      updateParams({ search: value || null, page: null, tags: null });
+      updateParams({ search: value || null, tags: null });
     },
     [updateParams]
   );
 
   // Handle clear tags filter
   const handleClearTags = useCallback(() => {
-    updateParams({ tags: null, page: null });
+    updateParams({ tags: null });
   }, [updateParams]);
-
-  // Handle page change
-  const handlePageChange = useCallback(
-    (newPage: number) => {
-      updateParams({ page: newPage > 1 ? newPage : null });
-    },
-    [updateParams]
-  );
 
   // Render case list content (loading state handled by parent)
   const renderContent = () => {
-    if (isError) {
+    if (casesQuery.isError) {
       return (
         <ErrorState
           title="Failed to load cases"
           description="We couldn't load the case library. Please try again."
-          retry={() => refetch()}
+          retry={() => casesQuery.refetch()}
         />
       );
     }
 
-    if (!data?.data || data.data.length === 0) {
+    if (!casesQuery.data?.pages[0]?.data || caseItems.length === 0) {
       const hasFilter = search || tags;
       return (
         <EmptyState
@@ -112,7 +119,7 @@ function CasesPageContent() {
           }
           action={
             hasFilter
-              ? { label: 'Clear filters', onClick: () => updateParams({ search: null, tags: null, page: null }) }
+              ? { label: 'Clear filters', onClick: () => updateParams({ search: null, tags: null }) }
               : undefined
           }
         />
@@ -122,25 +129,73 @@ function CasesPageContent() {
     return (
       <>
         <CaseListGroup>
-          {data.data.map((caseItem, index) => (
+          {caseItems.map((caseItem, index) => (
             <CaseCard
               key={caseItem.id}
               caseItem={caseItem}
               className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
-              style={{ animationDelay: `${index * 30}ms` }}
+              style={{ animationDelay: `${Math.min(index, 14) * 30}ms` }}
             />
           ))}
         </CaseListGroup>
 
-        {data.pagination.last_page > 1 && (
-          <CasePagination
-            currentPage={data.pagination.current_page}
-            lastPage={data.pagination.last_page}
-            total={data.pagination.total}
-            onPageChange={handlePageChange}
-            className="mt-4"
-          />
-        )}
+        {/* Infinite scroll sentinel and loading indicator */}
+        <div ref={loadMoreRef} className="flex justify-center py-4">
+          {casesQuery.isFetchingNextPage && (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          )}
+          {!casesQuery.hasNextPage && caseItems.length > 0 && (
+            <p className="text-sm text-muted-foreground">No more cases</p>
+          )}
+        </div>
+      </>
+    );
+  };
+
+  // Render trending cases content
+  const renderTrendingContent = () => {
+    if (trendingCases.isError) {
+      return (
+        <ErrorState
+          title="Failed to load trending cases"
+          description="We couldn't load trending cases. Please try again."
+          retry={() => trendingCases.refetch()}
+        />
+      );
+    }
+
+    if (!trendingCases.data?.pages[0]?.data || trendingItems.length === 0) {
+      return (
+        <EmptyState
+          icon={TrendingUp}
+          title="No trending cases"
+          description="Trending cases will appear here based on popularity and engagement."
+        />
+      );
+    }
+
+    return (
+      <>
+        <CaseListGroup>
+          {trendingItems.map((item, index) => (
+            <TrendingCaseCard
+              key={item.id}
+              item={item}
+              className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
+              style={{ animationDelay: `${Math.min(index, 14) * 30}ms` }}
+            />
+          ))}
+        </CaseListGroup>
+
+        {/* Infinite scroll sentinel and loading indicator */}
+        <div ref={loadMoreRef} className="flex justify-center py-4">
+          {trendingCases.isFetchingNextPage && (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          )}
+          {!trendingCases.hasNextPage && trendingItems.length > 0 && (
+            <p className="text-sm text-muted-foreground">No more cases</p>
+          )}
+        </div>
       </>
     );
   };
@@ -176,7 +231,7 @@ function CasesPageContent() {
       )}
 
       {/* Tabs - show skeleton until data is ready */}
-      {isFetching ? (
+      {activeQuery.isLoading ? (
         <div className="space-y-4">
           <Skeleton className="h-9 w-48 rounded-full" />
           <CaseListSkeleton />
@@ -209,31 +264,10 @@ function CasesPageContent() {
 
           {activeTab === 'trending' && (
             <div className="mt-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-              {trendingCases.isFetching ? (
+              {trendingCases.isLoading ? (
                 <TrendingListSkeleton />
-              ) : trendingCases.isError ? (
-                <ErrorState
-                  title="Failed to load trending cases"
-                  description="We couldn't load trending cases. Please try again."
-                  retry={() => trendingCases.refetch()}
-                />
-              ) : !trendingCases.data?.data?.length ? (
-                <EmptyState
-                  icon={TrendingUp}
-                  title="No trending cases"
-                  description="Trending cases will appear here based on popularity and engagement."
-                />
               ) : (
-                <CaseListGroup>
-                  {trendingCases.data.data.map((item, index) => (
-                    <TrendingCaseCard
-                      key={item.id}
-                      item={item}
-                      className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
-                      style={{ animationDelay: `${index * 30}ms` }}
-                    />
-                  ))}
-                </CaseListGroup>
+                renderTrendingContent()
               )}
             </div>
           )}

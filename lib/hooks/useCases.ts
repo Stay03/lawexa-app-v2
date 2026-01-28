@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { casesApi } from '@/lib/api/cases';
 import type { CaseListParams } from '@/types/case';
 
@@ -22,6 +22,22 @@ export function useCases(params: CaseListParams = {}) {
   return useQuery({
     queryKey: caseKeys.list(params),
     queryFn: () => casesApi.getList(params),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+/**
+ * Hook for fetching infinite scrolling case list
+ */
+export function useInfiniteCases(params: Omit<CaseListParams, 'page'> = {}) {
+  return useInfiniteQuery({
+    queryKey: [...caseKeys.lists(), 'infinite', params] as const,
+    queryFn: ({ pageParam }) => casesApi.getList({ ...params, page: pageParam }),
+    getNextPageParam: (lastPage) => {
+      const { current_page, last_page } = lastPage.pagination;
+      return current_page < last_page ? current_page + 1 : undefined;
+    },
+    initialPageParam: 1,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
