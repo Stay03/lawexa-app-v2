@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useChatStream } from '@/lib/hooks/useChatStream';
 import {
@@ -211,7 +211,7 @@ function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
   );
 }
 
-export default function ConversationPage() {
+function ConversationPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const conversationId = params.conversationId as string;
@@ -594,5 +594,17 @@ export default function ConversationPage() {
         </div>
       </div>
     </ChatProvider>
+  );
+}
+
+export default function ConversationPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <ConversationPageContent />
+    </Suspense>
   );
 }
