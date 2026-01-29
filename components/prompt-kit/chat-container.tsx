@@ -5,7 +5,21 @@ import { cn } from '@/lib/utils';
 import { ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// ChatContainerRoot - scrollable container with manual scroll control
+// Helper to find the scrollable parent element
+const getScrollParent = (element: HTMLElement | null): HTMLElement | null => {
+  if (!element) return null;
+  let parent = element.parentElement;
+  while (parent) {
+    const { overflow, overflowY } = getComputedStyle(parent);
+    if (overflow === 'auto' || overflow === 'scroll' || overflowY === 'auto' || overflowY === 'scroll') {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+  return null;
+};
+
+// ChatContainerRoot - container that delegates scrolling to parent
 export interface ChatContainerRootProps
   extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
@@ -17,15 +31,22 @@ export const ChatContainerRoot = forwardRef<
 >(({ children, className, ...props }, ref) => {
   const innerRef = useRef<HTMLDivElement>(null);
   const containerRef = (ref as React.RefObject<HTMLDivElement>) || innerRef;
+  const scrollParentRef = useRef<HTMLElement | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const prevChildrenRef = useRef(children);
   const isNearBottomRef = useRef(true);
 
+  // Find scroll parent on mount
+  useEffect(() => {
+    scrollParentRef.current = getScrollParent(containerRef.current);
+  }, [containerRef]);
+
   // Check if user is near the bottom of the scroll container
   const checkScrollPosition = useCallback(() => {
-    if (containerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const scrollEl = scrollParentRef.current;
+    if (scrollEl) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollEl;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
       isNearBottomRef.current = distanceFromBottom <= 100;
 
@@ -35,16 +56,16 @@ export const ChatContainerRoot = forwardRef<
         setHasNewMessage(false);
       }
     }
-  }, [containerRef]);
+  }, []);
 
-  // Listen to scroll events
+  // Listen to scroll events on parent
   useEffect(() => {
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('scroll', checkScrollPosition);
-      return () => container.removeEventListener('scroll', checkScrollPosition);
+    const scrollEl = scrollParentRef.current;
+    if (scrollEl) {
+      scrollEl.addEventListener('scroll', checkScrollPosition);
+      return () => scrollEl.removeEventListener('scroll', checkScrollPosition);
     }
-  }, [containerRef, checkScrollPosition]);
+  }, [checkScrollPosition]);
 
   // Detect new messages - only show button if user is not at bottom
   useEffect(() => {
@@ -61,21 +82,22 @@ export const ChatContainerRoot = forwardRef<
 
   // Scroll to bottom handler
   const scrollToBottom = useCallback(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTo({
-        top: containerRef.current.scrollHeight,
+    const scrollEl = scrollParentRef.current;
+    if (scrollEl) {
+      scrollEl.scrollTo({
+        top: scrollEl.scrollHeight,
         behavior: 'smooth',
       });
       setShowScrollButton(false);
       setHasNewMessage(false);
     }
-  }, [containerRef]);
+  }, []);
 
   return (
     <>
       <div
         ref={containerRef}
-        className={cn('h-full overflow-y-auto', className)}
+        className={cn('h-full', className)}
         {...props}
       >
         {children}
