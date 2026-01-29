@@ -23,10 +23,16 @@ export function useAuth() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: (data: LoginFormData) => authApi.login(data),
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
         queryClient.invalidateQueries({ queryKey: ['auth'] });
+
+        // For unverified email users, redirect to check-email page
+        if (response.data.user.auth_provider === 'email' && !response.data.user.is_verified) {
+          router.push(`/check-email?email=${encodeURIComponent(variables.email)}`);
+          return;
+        }
 
         // Check if user needs onboarding (profession is set after completing onboarding)
         const needsOnboarding = !response.data.user.profile?.profession;
