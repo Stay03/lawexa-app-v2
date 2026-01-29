@@ -42,6 +42,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useSidebar } from '@/components/ui/sidebar';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { isToolMessage, type ToolMessage, type ConversationMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
@@ -220,6 +222,11 @@ export default function ConversationPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const initializedRef = useRef(false);
+
+  // Sidebar state for input positioning
+  const { state } = useSidebar();
+  const isMobile = useIsMobile();
+  const sidebarWidth = isMobile ? '0px' : state === 'expanded' ? '16rem' : '3rem';
 
   const {
     messages,
@@ -483,8 +490,11 @@ export default function ConversationPage() {
         </ChatContainerContent>
       </ChatContainerRoot>
 
-      {/* Input area - fixed at bottom */}
-      <div className="bg-background fixed bottom-0 left-0 right-0 border-t px-4 py-3">
+      {/* Input area - fixed at bottom, floating style */}
+      <div
+        className="fixed bottom-4 right-0 z-50 px-4 transition-[left] duration-200 ease-linear"
+        style={{ left: sidebarWidth }}
+      >
         <div className="mx-auto max-w-2xl">
           <FileUpload onFilesAdded={handleFilesAdded} multiple>
             <PromptInput
