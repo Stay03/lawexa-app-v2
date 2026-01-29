@@ -83,7 +83,7 @@ export function AnimatedTabs({
           )}
         >
           {tab.icon}
-          {tab.label}
+          <span className="truncate max-w-[120px] sm:max-w-none">{tab.label}</span>
         </button>
       ))}
     </div>

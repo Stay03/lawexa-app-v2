@@ -242,7 +242,7 @@ function CasesPageContent() {
             tabs={[
               {
                 value: 'recent',
-                label: 'Recent Cases',
+                label: 'Recently Added',
                 icon: <BookOpen className="h-4 w-4" />,
               },
               {

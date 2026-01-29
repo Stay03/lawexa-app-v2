@@ -36,7 +36,7 @@ function NotesPageContent() {
   // Read URL state (no page param needed for infinite scroll)
   const search = searchParams.get('search') || '';
   const tags = searchParams.get('tags') || '';
-  const tab = searchParams.get('tab') || 'trending';
+  const tab = searchParams.get('tab') || 'recent';
 
   // Sort for regular notes tab
   const sort = (searchParams.get('sort') as NoteListParams['sort']) || 'created_at';
@@ -74,8 +74,8 @@ function NotesPageContent() {
   // Dynamic trending tab label from API meta (e.g. "Trending in Ghana")
   const trendingLabel = getTrendingLabel(trendingQuery.data?.pages[0]?.meta?.filters_applied);
   const librarySubTabs = [
-    { value: 'trending', label: trendingLabel, icon: <TrendingUp className="h-4 w-4" /> },
     recentTab,
+    { value: 'trending', label: trendingLabel, icon: <TrendingUp className="h-4 w-4" /> },
   ];
 
   // Update URL params
@@ -113,7 +113,7 @@ function NotesPageContent() {
   // Handle sub-tab change
   const handleTabChange = useCallback(
     (value: string) => {
-      updateParams({ tab: value === 'trending' ? null : value });
+      updateParams({ tab: value === 'recent' ? null : value });
     },
     [updateParams]
   );
@@ -237,8 +237,34 @@ function NotesPageContent() {
       {/* Main navigation tabs */}
       <NotesNavTabs activeTab="library" />
 
-      {/* Full-width search bar (only for Recently Added tab) */}
-      {!isTrendingTab && (
+      {/* Full-width search bar */}
+      {isTrendingTab ? (
+        <button
+          type="button"
+          onClick={() => handleTabChange('recent')}
+          className="w-full relative text-left"
+        >
+          <Input
+            type="text"
+            placeholder="Search notes by title or content..."
+            className="w-full pl-10 cursor-pointer pointer-events-none"
+            readOnly
+          />
+          <svg
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+        </button>
+      ) : (
         <div className="relative">
           <Input
             type="text"
