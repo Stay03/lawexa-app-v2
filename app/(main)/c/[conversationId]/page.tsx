@@ -222,6 +222,7 @@ export default function ConversationPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const initializedRef = useRef(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Sidebar state for input positioning
   const { state } = useSidebar();
@@ -306,6 +307,16 @@ export default function ConversationPage() {
     try {
       // Add user message first
       addUserMessage(message);
+
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: 'smooth',
+          });
+        }
+      }, 100);
 
       // Start new chat in same conversation
       const response = await chatApi.start({
@@ -436,7 +447,7 @@ export default function ConversationPage() {
   return (
     <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>
       {/* Chat messages */}
-      <ChatContainerRoot className="h-[calc(100vh-120px)] overflow-y-auto pb-28">
+      <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28">
           <ChatContainerContent>
             {/* Context text - Display case/note slug */}
             {contextSlug && contextType && (
@@ -490,12 +501,12 @@ export default function ConversationPage() {
         </ChatContainerContent>
       </ChatContainerRoot>
 
-      {/* Input area - fixed at bottom, floating style */}
+      {/* Input area - fixed at bottom, floating style matching notes/cases */}
       <div
         className="fixed bottom-4 right-0 z-50 px-4 transition-[left] duration-200 ease-linear"
         style={{ left: sidebarWidth }}
       >
-        <div className="mx-auto max-w-2xl">
+        <div className="mx-auto max-w-xs sm:max-w-md">
           <FileUpload onFilesAdded={handleFilesAdded} multiple>
             <PromptInput
               value={input}
