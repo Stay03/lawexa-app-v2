@@ -244,9 +244,26 @@ function ConversationPageContent() {
   });
 
   const prevIsStreamingRef = useRef(isStreaming);
+  const prevToolCountRef = useRef(0);
 
   const setOverride = useBreadcrumbStore((state) => state.setOverride);
   const clearOverride = useBreadcrumbStore((state) => state.clearOverride);
+
+  // Auto-scroll only when new tool messages appear (not for text messages)
+  useEffect(() => {
+    const toolMessages = messages.filter(isToolMessage);
+    const currentToolCount = toolMessages.length;
+
+    // Only scroll if we have more tool messages than before
+    if (currentToolCount > prevToolCountRef.current && chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+
+    prevToolCountRef.current = currentToolCount;
+  }, [messages]);
 
   // Update breadcrumb when conversation title is loaded
   useEffect(() => {
