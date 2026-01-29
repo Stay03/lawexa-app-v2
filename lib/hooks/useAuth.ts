@@ -38,11 +38,17 @@ export function useAuth() {
   // Register mutation
   const registerMutation = useMutation({
     mutationFn: (data: RegisterFormData) => authApi.register(data),
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
 
-        // New users always need onboarding (profession is set after completing onboarding)
+        // For email signups, redirect to check-email page to verify
+        if (response.data.user.auth_provider === 'email' && !response.data.user.is_verified) {
+          router.push(`/check-email?email=${encodeURIComponent(variables.email)}`);
+          return;
+        }
+
+        // For OAuth users or verified users, continue to onboarding
         const needsOnboarding = !response.data.user.profile?.profession;
         router.push(needsOnboarding ? '/onboarding' : '/');
       }
