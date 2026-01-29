@@ -22,7 +22,7 @@ export const chatApi = {
   /**
    * Get a conversation with all its messages
    */
-  getConversation: async (id: number): Promise<ConversationResponse> => {
+  getConversation: async (id: string): Promise<ConversationResponse> => {
     const response = await apiClient.get<ConversationResponse>(`/conversations/${id}`);
     return response.data;
   },

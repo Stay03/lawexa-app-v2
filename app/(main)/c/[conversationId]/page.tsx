@@ -256,7 +256,7 @@ export default function ConversationPage() {
   useEffect(() => {
     // When streaming ends and we don't have a title yet, fetch it
     if (prevIsStreamingRef.current && !isStreaming && !conversationTitle) {
-      fetchConversationTitle(Number(conversationId));
+      fetchConversationTitle(conversationId);
     }
     prevIsStreamingRef.current = isStreaming;
   }, [isStreaming, conversationTitle, conversationId, fetchConversationTitle]);
@@ -270,7 +270,7 @@ export default function ConversationPage() {
     const executionId = searchParams.get('exec');
 
     // Set conversation ID
-    setConversationId(Number(conversationId));
+    setConversationId(conversationId);
 
     // If we have an execution ID, connect to the stream (coming from home page)
     if (executionId && initialMessage) {
@@ -282,7 +282,7 @@ export default function ConversationPage() {
     } else {
       // Direct navigation - load conversation history
       initializedRef.current = true;
-      loadConversationHistory(Number(conversationId));
+      loadConversationHistory(conversationId);
     }
   }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory]);
 
@@ -304,7 +304,7 @@ export default function ConversationPage() {
       const response = await chatApi.start({
         message,
         stream: true,
-        conversation_id: Number(conversationId),
+        conversation_id: conversationId,
       });
 
       if (response.success) {
@@ -342,7 +342,7 @@ export default function ConversationPage() {
       const response = await chatApi.start({
         message,
         stream: true,
-        conversation_id: Number(conversationId),
+        conversation_id: conversationId,
       });
 
       if (response.success) {

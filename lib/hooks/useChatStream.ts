@@ -204,7 +204,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   }, []);
 
   // Load conversation history from API
-  const loadConversationHistory = useCallback(async (conversationId: number) => {
+  const loadConversationHistory = useCallback(async (conversationId: string) => {
     setState((prev) => ({
       ...prev,
       isLoadingHistory: true,
@@ -242,7 +242,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   }, [transformApiMessages, onError]);
 
   // Fetch only the conversation title (for after streaming completes)
-  const fetchConversationTitle = useCallback(async (convId: number) => {
+  const fetchConversationTitle = useCallback(async (convId: string) => {
     try {
       const response = await chatApi.getConversation(convId);
       if (response.success && response.data.title) {
@@ -402,7 +402,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   );
 
   // Set conversation ID
-  const setConversationId = useCallback((id: number) => {
+  const setConversationId = useCallback((id: string) => {
     setState((prev) => ({
       ...prev,
       conversationId: id,

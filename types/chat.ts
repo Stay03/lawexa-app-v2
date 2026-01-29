@@ -100,7 +100,7 @@ export interface ErrorEvent {
 export interface ChatStartRequest {
   message: string;
   stream: boolean;
-  conversation_id?: number;
+  conversation_id?: string;
   workflow_id?: number;
   agent_id?: number;
 }
@@ -109,7 +109,7 @@ export interface ChatStartResponse {
   success: boolean;
   message: string;
   data: {
-    conversation_id: number;
+    conversation_id: string;
     workflow_id: number;
     execution_id: string;
     stream_url: string;
@@ -131,7 +131,7 @@ export interface ChatState {
   messages: ConversationMessage[];
   isStreaming: boolean;
   isLoadingHistory: boolean;
-  conversationId: number | null;
+  conversationId: string | null;
   conversationTitle: string | null;
   error: string | null;
 }
@@ -139,7 +139,7 @@ export interface ChatState {
 // API message from server (different structure than local ChatMessage)
 export interface ApiMessage {
   id: number;
-  conversation_id: number;
+  conversation_id: string;
   agent_id: number | null;
   role: 'user' | 'assistant' | 'tool';
   content: string;
@@ -155,7 +155,7 @@ export interface ApiMessage {
 }
 
 export interface ConversationData {
-  id: number;
+  id: string;
   user_id: number;
   agent_id: number;
   title: string;
@@ -174,7 +174,7 @@ export interface ConversationResponse {
 
 // Conversation list item (without full messages)
 export interface ConversationListItem {
-  id: number;
+  id: string;
   user_id: number;
   agent_id: number;
   title: string;

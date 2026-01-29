@@ -38,7 +38,7 @@ Accept: application/json
   "message": "Conversations retrieved successfully.",
   "data": [
     {
-      "id": 57,
+      "id": "2febd677-6511-4ab9-bd10-43315e926bc9",
       "user_id": 4,
       "agent_id": 3,
       "title": "find me election cases",
@@ -84,9 +84,9 @@ Accept: application/json
 
 #### Path Parameters
 
-| Parameter | Type    | Required | Description |
-|-----------|---------|----------|-------------|
-| id        | integer | Yes      | The conversation ID |
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| id        | string | Yes      | The conversation UUID |
 
 #### Response (200 OK)
 
@@ -95,7 +95,7 @@ Accept: application/json
   "success": true,
   "message": "Conversation retrieved successfully.",
   "data": {
-    "id": 57,
+    "id": "2febd677-6511-4ab9-bd10-43315e926bc9",
     "user_id": 4,
     "agent_id": 3,
     "title": "find me election cases",
@@ -113,7 +113,7 @@ Accept: application/json
     "messages": [
       {
         "id": 145,
-        "conversation_id": 57,
+        "conversation_id": "2febd677-6511-4ab9-bd10-43315e926bc9",
         "agent_id": null,
         "role": "user",
         "content": "find me election cases",
@@ -122,7 +122,7 @@ Accept: application/json
       },
       {
         "id": 146,
-        "conversation_id": 57,
+        "conversation_id": "2febd677-6511-4ab9-bd10-43315e926bc9",
         "agent_id": 3,
         "role": "assistant",
         "content": "{\"tool_call\":\"search_cases\",\"parameters\":{\"query\":\"election\",\"limit\":15}}",
@@ -139,7 +139,7 @@ Accept: application/json
       },
       {
         "id": 147,
-        "conversation_id": 57,
+        "conversation_id": "2febd677-6511-4ab9-bd10-43315e926bc9",
         "agent_id": 3,
         "role": "tool",
         "content": "{\"success\":true,\"message\":\"Cases retrieved successfully.\",\"data\":{\"cases\":[...],\"total\":15}}",
@@ -154,7 +154,7 @@ Accept: application/json
       },
       {
         "id": 148,
-        "conversation_id": 57,
+        "conversation_id": "2febd677-6511-4ab9-bd10-43315e926bc9",
         "agent_id": 3,
         "role": "assistant",
         "content": "Here are the election cases I found...",
@@ -200,9 +200,9 @@ Accept: application/json
 
 #### Path Parameters
 
-| Parameter | Type    | Required | Description |
-|-----------|---------|----------|-------------|
-| id        | integer | Yes      | The conversation ID |
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| id        | string | Yes      | The conversation UUID |
 
 #### Response (200 OK)
 
@@ -283,7 +283,7 @@ Content-Type: application/json
 {
   "message": "Search for election cases in Nigeria",
   "stream": true,
-  "conversation_id": 123,        // Optional: continue existing conversation
+  "conversation_id": "2febd677-6511-4ab9-bd10-43315e926bc9",  // Optional: continue existing conversation (UUID)
   "workflow_id": 1,              // Optional: use specific workflow
   "agent_id": 1                  // Optional: use specific agent
 }
@@ -296,7 +296,7 @@ Content-Type: application/json
   "success": true,
   "message": "Execution started. Connect to stream_url for real-time updates.",
   "data": {
-    "conversation_id": 123,
+    "conversation_id": "2febd677-6511-4ab9-bd10-43315e926bc9",
     "workflow_id": 1,
     "execution_id": "c0ab4c63-5ce8-461b-854a-0612142672bd",
     "stream_url": "/api/chat/stream/c0ab4c63-5ce8-461b-854a-0612142672bd"
@@ -586,7 +586,7 @@ const chat = new ChatStream('https://demo-api.lawexa.com', 'your-bearer-token');
 
 try {
   const result = await chat.sendMessage('Search for election cases', {
-    conversation_id: 123,  // Optional
+    conversation_id: '2febd677-6511-4ab9-bd10-43315e926bc9',  // Optional (UUID)
     workflow_id: 1,        // Optional
   });
 
@@ -655,7 +655,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   const sendMessage = useCallback(async (
     content: string,
     chatOptions?: {
-      conversation_id?: number;
+      conversation_id?: string;  // UUID
       workflow_id?: number;
       agent_id?: number;
     }
@@ -784,7 +784,7 @@ function ChatComponent() {
 
   const handleSend = async () => {
     await sendMessage('Search for election cases', {
-      conversation_id: 123,
+      conversation_id: '2febd677-6511-4ab9-bd10-43315e926bc9',  // UUID
     });
   };
 
@@ -830,7 +830,7 @@ export function useChatStream(baseUrl: string, token: string) {
   const sendMessage = async (
     content: string,
     options?: {
-      conversation_id?: number;
+      conversation_id?: string;  // UUID
       workflow_id?: number;
       agent_id?: number;
     }

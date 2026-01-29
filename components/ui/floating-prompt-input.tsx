@@ -136,7 +136,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
-  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
 
   const router = useRouter();
