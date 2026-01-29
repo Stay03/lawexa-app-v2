@@ -1,36 +1,79 @@
 'use client';
 
-import React, { useRef, useEffect, forwardRef } from 'react';
+import React, { useRef, useEffect, forwardRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { ArrowDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-// ChatContainerRoot - scrollable container with auto-scroll behavior
+// ChatContainerRoot - scrollable container with manual scroll control
 export interface ChatContainerRootProps
   extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  autoScroll?: boolean;
 }
 
 export const ChatContainerRoot = forwardRef<
   HTMLDivElement,
   ChatContainerRootProps
->(({ children, className, autoScroll = true, ...props }, ref) => {
+>(({ children, className, ...props }, ref) => {
   const innerRef = useRef<HTMLDivElement>(null);
   const containerRef = (ref as React.RefObject<HTMLDivElement>) || innerRef;
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // Auto-scroll to bottom when content changes
-  useEffect(() => {
-    if (autoScroll && containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+  // Check if user is near the bottom of the scroll container
+  const checkScrollPosition = useCallback(() => {
+    if (containerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      // Show button if more than 100px from bottom
+      setShowScrollButton(distanceFromBottom > 100);
     }
-  }, [children, autoScroll, containerRef]);
+  }, [containerRef]);
+
+  // Listen to scroll events
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkScrollPosition);
+      return () => container.removeEventListener('scroll', checkScrollPosition);
+    }
+  }, [containerRef, checkScrollPosition]);
+
+  // Check scroll position when content changes (new messages)
+  useEffect(() => {
+    checkScrollPosition();
+  }, [children, checkScrollPosition]);
+
+  // Scroll to bottom handler
+  const scrollToBottom = useCallback(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [containerRef]);
 
   return (
-    <div
-      ref={containerRef}
-      className={cn('flex-1 overflow-y-auto', className)}
-      {...props}
-    >
-      {children}
+    <div className="relative flex-1">
+      <div
+        ref={containerRef}
+        className={cn('h-full overflow-y-auto', className)}
+        {...props}
+      >
+        {children}
+      </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollButton && (
+        <Button
+          size="icon"
+          variant="secondary"
+          className="absolute bottom-4 left-1/2 z-10 h-10 w-10 -translate-x-1/2 rounded-full shadow-lg"
+          onClick={scrollToBottom}
+        >
+          <ArrowDown className="h-5 w-5" />
+        </Button>
+      )}
     </div>
   );
 });
