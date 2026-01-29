@@ -428,9 +428,8 @@ export default function ConversationPage() {
 
   return (
     <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>
-      <div className="flex h-[calc(100vh-120px)] flex-col">
-        {/* Chat messages */}
-        <ChatContainerRoot className="flex-1 overflow-y-auto">
+      {/* Chat messages */}
+      <ChatContainerRoot className="h-[calc(100vh-120px)] overflow-y-auto pb-28">
           <ChatContainerContent>
             {/* Context text - Display case/note slug */}
             {contextSlug && contextType && (
@@ -481,11 +480,11 @@ export default function ConversationPage() {
                 {error}
               </div>
             )}
-          </ChatContainerContent>
-        </ChatContainerRoot>
+        </ChatContainerContent>
+      </ChatContainerRoot>
 
-      {/* Input area */}
-      <div className="w-full px-4 pb-4">
+      {/* Input area - fixed at bottom */}
+      <div className="bg-background fixed bottom-0 left-0 right-0 border-t px-4 py-3">
         <div className="mx-auto max-w-2xl">
           <FileUpload onFilesAdded={handleFilesAdded} multiple>
             <PromptInput
@@ -577,7 +576,6 @@ export default function ConversationPage() {
           </FileUpload>
         </div>
       </div>
-    </div>
     </ChatProvider>
   );
 }
