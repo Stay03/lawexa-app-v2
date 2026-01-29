@@ -6,8 +6,6 @@ import { useChatStream } from '@/lib/hooks/useChatStream';
 import {
   PromptInput,
   PromptInputTextarea,
-  PromptInputActions,
-  PromptInputAction,
 } from '@/components/ui/prompt-input';
 import {
   FileUpload,
@@ -513,69 +511,67 @@ export default function ConversationPage() {
               onValueChange={setInput}
               onSubmit={handleSubmit}
               disabled={isStreaming || isLoadingHistory}
+              maxHeight={36}
             >
-              {/* File Previews */}
+              {/* File Previews - only shown when files exist */}
               {files.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-3 pt-3">
+                <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
                   {files.map((file, index) => (
                     <div
                       key={index}
-                      className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
+                      className="bg-secondary flex items-center gap-2 rounded-lg px-2 py-1 text-xs"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Paperclip className="h-4 w-4" />
-                      <span className="max-w-[120px] truncate">{file.name}</span>
+                      <Paperclip className="h-3 w-3" />
+                      <span className="max-w-[100px] truncate">{file.name}</span>
                       <button
                         onClick={() => removeFile(index)}
-                        className="hover:bg-secondary/50 rounded-full p-1"
+                        className="hover:bg-secondary/50 rounded-full p-0.5"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3 w-3" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
 
-              <PromptInputTextarea
-                placeholder="Ask me anything"
-                className="text-foreground"
-              />
+              {/* Inline input with buttons */}
+              <div className="flex items-center gap-2 px-1">
+                {/* Attach button */}
+                <FileUploadTrigger asChild>
+                  <button className="hover:bg-secondary-foreground/10 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-2xl">
+                    <Paperclip className="text-primary h-4 w-4" />
+                  </button>
+                </FileUploadTrigger>
 
-              <PromptInputActions className="flex items-center justify-between px-3 pb-3">
-                {/* Attach button - LEFT */}
-                <PromptInputAction tooltip="Attach files">
-                  <FileUploadTrigger asChild>
-                    <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
-                      <Paperclip className="text-primary h-5 w-5" />
-                    </div>
-                  </FileUploadTrigger>
-                </PromptInputAction>
+                {/* Textarea */}
+                <PromptInputTextarea
+                  placeholder="Ask me anything"
+                  className="text-foreground min-h-[36px] py-2"
+                  disableAutosize
+                />
 
-                {/* Send/Stop button - RIGHT */}
-                <PromptInputAction
-                  tooltip={isStreaming ? 'Stop' : 'Send message'}
-                >
-                  {isStreaming ? (
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      className="h-8 w-8 rounded-full"
-                      onClick={handleStop}
-                    >
-                      <Square className="h-4 w-4" />
-                    </Button>
-                  ) : (
-                    <Button
-                      size="icon"
-                      className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
-                      onClick={handleSubmit}
-                      disabled={!input.trim() && files.length === 0}
-                    >
-                      <ArrowUp className="h-5 w-5" />
-                    </Button>
-                  )}
-                </PromptInputAction>
-              </PromptInputActions>
+                {/* Send/Stop button */}
+                {isStreaming ? (
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="h-7 w-7 shrink-0 rounded-full"
+                    onClick={handleStop}
+                  >
+                    <Square className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="icon"
+                    className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
+                    onClick={handleSubmit}
+                    disabled={!input.trim() && files.length === 0}
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </PromptInput>
 
             {/* Drag-and-drop overlay */}
