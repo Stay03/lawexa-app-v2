@@ -30,6 +30,11 @@ function EmailVerifiedContent() {
       // Fetch fresh user data from the server
       const response = await authApi.me();
 
+      // Check if we got valid data
+      if (!response.data) {
+        throw new Error('No user data received');
+      }
+
       // Update the auth store with the fresh user data (including is_verified: true)
       useAuthStore.getState().updateUser(response.data.user);
 
