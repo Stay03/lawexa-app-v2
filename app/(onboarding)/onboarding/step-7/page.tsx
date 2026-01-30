@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Check } from 'lucide-react';
+import { Loader2, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
+import { Button } from '@/components/ui/button';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAllExpertise } from '@/lib/hooks/useExpertise';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
@@ -24,7 +25,13 @@ export default function OnboardingStep7Page() {
   const { submitOnboarding, isSubmitting } = useOnboarding();
 
   // Fetch all areas of expertise
-  const { data: expertiseList, isLoading: isLoadingExpertise } = useAllExpertise();
+  const {
+    data: expertiseList,
+    isLoading: isLoadingExpertise,
+    isError,
+    error,
+    refetch
+  } = useAllExpertise();
 
   // Local state for selected expertise
   const [selectedIds, setSelectedIds] = useState<number[]>(areasOfExpertise || []);
@@ -34,6 +41,27 @@ export default function OnboardingStep7Page() {
     userType,
     locationData.selectedCountryMatchesDetected || false
   );
+
+  // Debug logging for expertise data loading
+  useEffect(() => {
+    console.log('[Onboarding Step 7] State:', {
+      isLoading: isLoadingExpertise,
+      isError,
+      hasData: !!expertiseList,
+      dataLength: expertiseList?.length,
+      error: error?.message
+    });
+
+    if (isError) {
+      console.error('[Onboarding Step 7] Failed to load expertise:', error);
+    }
+    if (expertiseList) {
+      console.log('[Onboarding Step 7] Loaded expertise:', expertiseList.length, 'items');
+    }
+    if (!isLoadingExpertise && !isError && !expertiseList) {
+      console.warn('[Onboarding Step 7] No error but expertiseList is undefined - possible data structure issue');
+    }
+  }, [isLoadingExpertise, isError, error, expertiseList]);
 
   // Redirect if previous steps not completed
   useEffect(() => {
@@ -110,9 +138,46 @@ export default function OnboardingStep7Page() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
+            ) : isError ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <div className="rounded-full bg-destructive/10 p-3">
+                  <AlertCircle className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-medium text-foreground">
+                    Failed to load areas of expertise
+                  </p>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    {error?.message || 'An unexpected error occurred'}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetch()}
+                    className="mt-4"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            ) : !expertiseList || expertiseList.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <div className="rounded-full bg-muted p-3">
+                  <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-medium text-foreground">
+                    No areas of expertise available
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    The expertise list is currently unavailable
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2">
-                {expertiseList?.map((expertise, index) => {
+                {expertiseList.map((expertise, index) => {
                   const isSelected = selectedIds.includes(expertise.id);
                   return (
                     <button
