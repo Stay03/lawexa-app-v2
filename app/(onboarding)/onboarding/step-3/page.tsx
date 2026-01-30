@@ -119,8 +119,8 @@ export default function OnboardingStep3Page() {
           // Law students go to education level selection (step-5)
           router.push('/onboarding/step-5');
         } else {
-          // Lawyers go directly to education form (step-6)
-          router.push('/onboarding/step-6');
+          // Lawyers skip education and go to expertise (step-7)
+          router.push('/onboarding/step-7');
         }
       } else {
         router.push('/onboarding/step-4');

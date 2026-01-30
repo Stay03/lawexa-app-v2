@@ -66,3 +66,21 @@ export const LEVEL_FORMATS: Record<string, string[]> = {
 export function getLevelOptions(country: string): string[] {
   return LEVEL_FORMATS[country] || LEVEL_FORMATS.default;
 }
+
+// Law school options by country
+export const LAW_SCHOOL_OPTIONS: Record<string, string[]> = {
+  Nigeria: [
+    'Nigerian Law School – Abuja Campus',
+    'Nigerian Law School – Lagos Campus',
+    'Nigerian Law School – Enugu Campus',
+    'Nigerian Law School – Kano Campus',
+    'Nigerian Law School – Yola Campus',
+    'Nigerian Law School – Bayelsa Campus',
+    'Nigerian Law School – Port Harcourt Campus',
+  ],
+  Ghana: ['Ghana School of Law'],
+};
+
+export function getLawSchoolOptions(country: string): string[] | null {
+  return LAW_SCHOOL_OPTIONS[country] || null;
+}

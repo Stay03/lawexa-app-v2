@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, Search, Check } from 'lucide-react';
+import { GraduationCap, Search, Check, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -27,7 +27,7 @@ import {
   shouldShowExpertiseStep,
   shouldSkipProfileStep,
 } from '@/lib/utils/onboarding';
-import { getLevelOptions } from '@/types/onboarding';
+import { getLevelOptions, getLawSchoolOptions } from '@/types/onboarding';
 import { cn } from '@/lib/utils';
 
 export default function OnboardingStep6Page() {
@@ -50,9 +50,6 @@ export default function OnboardingStep6Page() {
   const [searchQuery, setSearchQuery] = useState('');
   const [level, setLevel] = useState(profileData.level || '');
   const [lawSchool, setLawSchool] = useState(profileData.lawSchool || '');
-  const [yearOfCall, setYearOfCall] = useState<string>(
-    profileData.yearOfCall?.toString() || ''
-  );
 
   // Fetch universities from user's country
   const { data: countryUniversities, isLoading: loadingCountryUniversities } =
@@ -88,7 +85,6 @@ export default function OnboardingStep6Page() {
     }
   }, [userType, communicationStyle, profileData.profession, router]);
 
-  const isLawyer = userType === 'lawyer';
   const isLawStudent = userType === 'law_student';
 
   // Determine which form to show based on user type and education level selection
@@ -102,6 +98,9 @@ export default function OnboardingStep6Page() {
 
   // Get level options based on country
   const levelOptions = getLevelOptions(locationData.country || '');
+
+  // Get law school options based on country (null if no predefined options)
+  const lawSchoolOptions = getLawSchoolOptions(locationData.country || '');
 
   const handleUniversitySelect = (universityName: string) => {
     setUniversity(universityName);
@@ -124,8 +123,7 @@ export default function OnboardingStep6Page() {
     setProfileData({
       university: showUniversityForm ? university : undefined,
       level: showUniversityForm ? level : undefined,
-      lawSchool: (isLawyer || showLawSchoolForm) ? lawSchool : undefined,
-      yearOfCall: isLawyer && yearOfCall ? parseInt(yearOfCall) : undefined,
+      lawSchool: showLawSchoolForm ? lawSchool : undefined,
       areaOfStudy: isLawStudent ? 'law' : undefined,
     });
 
@@ -150,7 +148,6 @@ export default function OnboardingStep6Page() {
   // Validation
   const isValid = () => {
     if (showUniversityForm && (!university || !level)) return false;
-    if (isLawyer && !lawSchool) return false;
     if (showLawSchoolForm && !lawSchool) return false;
     return true;
   };
@@ -184,12 +181,10 @@ export default function OnboardingStep6Page() {
               </div>
             </div>
             <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-              {isLawyer ? 'Your legal education' : 'Your education'}
+              Your education
             </h1>
             <p className="text-muted-foreground">
-              {isLawyer
-                ? 'Tell us about your legal background'
-                : 'Tell us about your current studies'}
+              Tell us about your current studies
             </p>
           </div>
 
@@ -245,9 +240,28 @@ export default function OnboardingStep6Page() {
                         </button>
                       ))
                     ) : searchQuery.length >= 2 ? (
-                      <p className="text-center text-muted-foreground py-4 text-sm">
-                        No universities found for &quot;{searchQuery}&quot;
-                      </p>
+                      <div className="space-y-3">
+                        <p className="text-center text-muted-foreground py-2 text-sm">
+                          No universities found for &quot;{searchQuery}&quot;
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleUniversitySelect(searchQuery)}
+                          className={cn(
+                            'w-full flex items-center gap-3 rounded-xl border border-dashed p-3 text-left transition-all',
+                            'hover:border-primary/50 hover:bg-primary/5',
+                            'border-primary/30'
+                          )}
+                        >
+                          <div className="rounded-full bg-primary/10 p-1.5">
+                            <Plus className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <span className="font-medium text-sm">Add &quot;{searchQuery}&quot;</span>
+                            <p className="text-xs text-muted-foreground">Use this as your university</p>
+                          </div>
+                        </button>
+                      </div>
                     ) : (
                       <p className="text-center text-muted-foreground py-4 text-sm">
                         {locationData.country
@@ -286,42 +300,30 @@ export default function OnboardingStep6Page() {
             {showLawSchoolForm && (
               <div className="space-y-2">
                 <Label htmlFor="lawSchool">Law School *</Label>
-                <Input
-                  id="lawSchool"
-                  value={lawSchool}
-                  onChange={(e) => setLawSchool(e.target.value)}
-                  placeholder="e.g., Nigerian Law School"
-                />
-              </div>
-            )}
-
-            {/* Law School and Year of Call - For lawyers */}
-            {isLawyer && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="lawSchool">Law School *</Label>
+                {lawSchoolOptions ? (
+                  <Select value={lawSchool} onValueChange={setLawSchool}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select your law school" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lawSchoolOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
                   <Input
                     id="lawSchool"
                     value={lawSchool}
                     onChange={(e) => setLawSchool(e.target.value)}
-                    placeholder="e.g., Nigerian Law School"
+                    placeholder="Enter your law school"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="yearOfCall">Year of Call (Optional)</Label>
-                  <Input
-                    id="yearOfCall"
-                    type="number"
-                    min="1900"
-                    max={new Date().getFullYear()}
-                    value={yearOfCall}
-                    onChange={(e) => setYearOfCall(e.target.value)}
-                    placeholder="e.g., 2015"
-                  />
-                </div>
-              </>
+                )}
+              </div>
             )}
+
           </div>
 
           {/* Navigation buttons */}
