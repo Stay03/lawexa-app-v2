@@ -3,10 +3,12 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Building2, MapPin, LinkedinIcon, Briefcase } from 'lucide-react';
-import { toast } from 'sonner';
+import { Building2, MapPin, LinkedinIcon, Briefcase, Loader2 } from 'lucide-react';
+import { useSendConnectionRequest } from '@/lib/hooks/useConnection';
 
 export interface LawyerInfo {
+  /** Lawyer's unique UUID identifier */
+  id: string;
   name: string;
   email: string;
   location: string;
@@ -34,18 +36,12 @@ function getFirstName(name: string): string {
   return name.split(' ')[0] || name;
 }
 
-function handleConnect(lawyerName: string) {
-  const toastId = toast.loading('Connecting...');
-
-  setTimeout(() => {
-    toast.success(
-      `Lawexa has contacted ${lawyerName} on your behalf. You'll receive a call or email from them soon.`,
-      { id: toastId, duration: 5000 }
-    );
-  }, 3000);
-}
-
 export function LawyerCard({ lawyer }: { lawyer: LawyerInfo }) {
+  const { mutate: sendConnectionRequest, isPending } = useSendConnectionRequest();
+
+  function handleConnect() {
+    sendConnectionRequest({ lawyerId: lawyer.id });
+  }
   const hasFirm = lawyer.firmName && lawyer.firmName.trim() !== '';
   const hasLocation = lawyer.location && lawyer.location.trim() !== '';
   const hasFirmLogo = lawyer.firmLogoUrl && lawyer.firmLogoUrl.trim() !== '';
@@ -124,9 +120,11 @@ export function LawyerCard({ lawyer }: { lawyer: LawyerInfo }) {
           <Button
             size="xs"
             className="mt-2"
-            onClick={() => handleConnect(lawyer.name)}
+            onClick={handleConnect}
+            disabled={isPending}
           >
-            Connect with {getFirstName(lawyer.name)}
+            {isPending && <Loader2 className="mr-2 size-3 animate-spin" />}
+            {isPending ? 'Connecting...' : `Connect with ${getFirstName(lawyer.name)}`}
           </Button>
         </div>
       </CardContent>
@@ -139,8 +137,8 @@ export function LawyerCardList({ lawyers }: { lawyers: LawyerInfo[] }) {
 
   return (
     <div className="flex flex-wrap gap-3 my-3">
-      {lawyers.map((lawyer, index) => (
-        <LawyerCard key={`${lawyer.email}-${index}`} lawyer={lawyer} />
+      {lawyers.map((lawyer) => (
+        <LawyerCard key={lawyer.id} lawyer={lawyer} />
       ))}
     </div>
   );

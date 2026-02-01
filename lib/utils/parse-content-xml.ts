@@ -19,6 +19,7 @@ function getTagContent(xml: string, tagName: string): string {
 // Lawyer parsing helpers
 function parseSingleLawyer(lawyerXml: string): LawyerInfo {
   return {
+    id: getTagContent(lawyerXml, 'id'),
     name: getTagContent(lawyerXml, 'name'),
     email: getTagContent(lawyerXml, 'email'),
     location: getTagContent(lawyerXml, 'location'),
