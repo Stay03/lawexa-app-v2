@@ -10,6 +10,8 @@ import {
   X,
   BadgeCheck,
   ShieldCheck,
+  Check,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,48 +22,67 @@ import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
 import { getTotalSteps, shouldSkipProfileStep } from '@/lib/utils/onboarding';
 import { cn } from '@/lib/utils';
+import { lawyerVerificationApi, type LawyerProfileDocument } from '@/lib/api/lawyerVerification';
+import { toast } from 'sonner';
 
 interface FileUploadProps {
   label: string;
   description: string;
-  file: File | null;
-  onFileChange: (file: File | null) => void;
+  uploadedDocument: LawyerProfileDocument | null;
+  onFileSelect: (file: File) => Promise<void>;
+  onFileRemove: () => Promise<void>;
+  isUploading: boolean;
   accept?: string;
 }
 
 function FileUpload({
   label,
   description,
-  file,
-  onFileChange,
+  uploadedDocument,
+  onFileSelect,
+  onFileRemove,
+  isUploading,
   accept = '.pdf,.jpg,.jpeg,.png',
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleClick = () => {
-    inputRef.current?.click();
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0] || null;
-    onFileChange(selectedFile);
-  };
-
-  const handleRemove = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onFileChange(null);
-    if (inputRef.current) {
-      inputRef.current.value = '';
+    if (!uploadedDocument && !isUploading) {
+      inputRef.current?.click();
     }
+  };
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      await onFileSelect(selectedFile);
+      // Clear input to allow re-upload of same file
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemove = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await onFileRemove();
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   return (
     <div
       onClick={handleClick}
       className={cn(
-        'relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 cursor-pointer transition-all',
-        'hover:border-primary/50 hover:bg-primary/5',
-        file ? 'border-primary bg-primary/5' : 'border-border'
+        'relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 transition-all min-h-[120px]',
+        isUploading && 'cursor-wait opacity-60',
+        !uploadedDocument && !isUploading && 'cursor-pointer hover:border-primary/50 hover:bg-primary/5',
+        uploadedDocument && 'border-primary bg-primary/5',
+        !uploadedDocument && !isUploading && 'border-border'
       )}
     >
       <input
@@ -70,16 +91,28 @@ function FileUpload({
         accept={accept}
         onChange={handleChange}
         className="hidden"
+        disabled={isUploading || !!uploadedDocument}
       />
-      {file ? (
+      {isUploading ? (
         <>
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
+          <span className="text-sm font-medium">Uploading...</span>
+        </>
+      ) : uploadedDocument ? (
+        <>
+          <div className="absolute top-2 right-2 rounded-full bg-primary p-1">
+            <Check className="h-3 w-3 text-primary-foreground" />
+          </div>
           <FileText className="h-8 w-8 text-primary" />
-          <span className="text-sm font-medium truncate max-w-full px-2">
-            {file.name}
+          <span className="text-xs font-medium truncate max-w-full px-2 text-center">
+            {uploadedDocument.original_name}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {formatFileSize(uploadedDocument.size)}
           </span>
           <button
             onClick={handleRemove}
-            className="absolute top-2 right-2 p-1 rounded-full bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors"
+            className="absolute bottom-2 right-2 p-1 rounded-full bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -113,16 +146,47 @@ export default function OnboardingStep8Page() {
 
   // Form state
   const [callNumber, setCallNumber] = useState(verificationData.callNumber || '');
-  const [meansOfId, setMeansOfId] = useState<File | null>(null);
-  const [callToBarCert, setCallToBarCert] = useState<File | null>(null);
-  const [practicingLicense, setPracticingLicense] = useState<File | null>(null);
-  const [cv, setCv] = useState<File | null>(null);
+  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
+  const [profileCreated, setProfileCreated] = useState(!!verificationData.lawyerProfileId);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Check if profile step was skipped
   const skipProfile = shouldSkipProfileStep(
     userType,
     locationData.selectedCountryMatchesDetected || false
   );
+
+  // Create lawyer profile on mount
+  useEffect(() => {
+    const createProfile = async () => {
+      if (profileCreated || isCreatingProfile) return;
+
+      try {
+        setIsCreatingProfile(true);
+        const response = await lawyerVerificationApi.createProfile();
+        setVerificationData({
+          lawyerProfileId: response.data.id,
+        });
+        setProfileCreated(true);
+      } catch (error: any) {
+        // If profile already exists (403), that's okay
+        if (error.response?.status === 403) {
+          console.log('[Step 8] Lawyer profile already exists');
+          setProfileCreated(true);
+        } else {
+          console.error('[Step 8] Failed to create lawyer profile:', error);
+          toast.error('Failed to initialize verification profile');
+        }
+      } finally {
+        setIsCreatingProfile(false);
+      }
+    };
+
+    if (userType === 'lawyer' && communicationStyle) {
+      createProfile();
+    }
+  }, [userType, communicationStyle, profileCreated, isCreatingProfile, setVerificationData]);
 
   // Redirect if previous steps not completed or not a lawyer
   useEffect(() => {
@@ -137,27 +201,103 @@ export default function OnboardingStep8Page() {
     router.push('/onboarding/step-7');
   };
 
-  const handleVerify = () => {
-    // Save verification data
-    setVerificationData({
-      callNumber,
-      meansOfId,
-      callToBarCert,
-      practicingLicense,
-      cv,
-    });
-    setWantsClientReferrals(true);
+  // File upload handler
+  const handleFileUpload = async (file: File, category: string) => {
+    if (!profileCreated) {
+      toast.error('Please wait while we set up your verification profile');
+      return;
+    }
 
-    // Submit onboarding
-    submitOnboarding({
-      userType: userType!,
-      communicationStyle: communicationStyle!,
-      ...locationData,
-      ...profileData,
-      areasOfExpertise,
-      callNumber,
-      wantsClientReferrals: true,
-    });
+    // Validate file size (10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('File size must not exceed 10 MB');
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only PDF, JPG, JPEG, and PNG files are allowed');
+      return;
+    }
+
+    try {
+      setUploadingFiles(prev => ({ ...prev, [category]: true }));
+      setUploadError(null);
+
+      const response = await lawyerVerificationApi.uploadDocument(file);
+
+      // Add document to store
+      setVerificationData({
+        uploadedDocuments: [...verificationData.uploadedDocuments, response.data],
+      });
+
+      toast.success('Document uploaded successfully');
+    } catch (error: any) {
+      console.error('[Step 8] Upload failed:', error);
+      const message = error.response?.data?.message || 'Failed to upload document';
+      toast.error(message);
+      setUploadError(message);
+    } finally {
+      setUploadingFiles(prev => ({ ...prev, [category]: false }));
+    }
+  };
+
+  // File removal handler
+  const handleFileRemove = async (documentId: number) => {
+    try {
+      await lawyerVerificationApi.deleteDocument(documentId);
+
+      // Remove document from store
+      setVerificationData({
+        uploadedDocuments: verificationData.uploadedDocuments.filter(
+          doc => doc.id !== documentId
+        ),
+      });
+
+      toast.success('Document removed successfully');
+    } catch (error: any) {
+      console.error('[Step 8] Delete failed:', error);
+      const message = error.response?.data?.message || 'Failed to delete document';
+      toast.error(message);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!profileCreated) {
+      toast.error('Please wait while we set up your verification profile');
+      return;
+    }
+
+    if (verificationData.uploadedDocuments.length === 0) {
+      toast.error('Please upload at least one document');
+      return;
+    }
+
+    try {
+      // Submit for verification
+      await lawyerVerificationApi.submitForVerification();
+
+      // Save call number
+      setVerificationData({ callNumber });
+      setWantsClientReferrals(true);
+
+      // Complete onboarding
+      submitOnboarding({
+        userType: userType!,
+        communicationStyle: communicationStyle!,
+        ...locationData,
+        ...profileData,
+        areasOfExpertise,
+        callNumber,
+        wantsClientReferrals: true,
+      });
+    } catch (error: any) {
+      console.error('[Step 8] Verification submission failed:', error);
+      const message = error.response?.data?.message || 'Failed to submit for verification';
+      toast.error(message);
+    }
   };
 
   const handleSkip = () => {
@@ -174,7 +314,14 @@ export default function OnboardingStep8Page() {
     });
   };
 
-  const hasAnyDocument = meansOfId || callToBarCert || practicingLicense || cv || callNumber;
+  // Helper to get uploaded document by original name pattern
+  const getUploadedDocument = (pattern: RegExp): LawyerProfileDocument | null => {
+    return verificationData.uploadedDocuments.find(doc =>
+      pattern.test(doc.original_name.toLowerCase())
+    ) || null;
+  };
+
+  const hasAnyDocument = verificationData.uploadedDocuments.length > 0 || callNumber;
 
   if (!userType || userType !== 'lawyer') {
     return null;
@@ -220,124 +367,165 @@ export default function OnboardingStep8Page() {
             </div>
           </div>
 
-          {/* Verification form */}
-          <div className="space-y-4">
-            {/* Call Number */}
-            <div className="space-y-2">
-              <Label htmlFor="callNumber">Call Number / Enrollment Number</Label>
-              <Input
-                id="callNumber"
-                value={callNumber}
-                onChange={(e) => setCallNumber(e.target.value)}
-                placeholder="e.g., SCN/12345"
-              />
+          {/* Loading state while creating profile */}
+          {isCreatingProfile ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Setting up your verification profile...</p>
             </div>
+          ) : (
+            <>
+              {/* Error message */}
+              {uploadError && (
+                <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
 
-            {/* File uploads - 2x2 grid */}
-            <div className="grid grid-cols-2 gap-3">
-              <FileUpload
-                label="Means of ID"
-                description="NIN, Passport, etc."
-                file={meansOfId}
-                onFileChange={setMeansOfId}
-              />
-              <FileUpload
-                label="Call to Bar Certificate"
-                description="PDF or Image"
-                file={callToBarCert}
-                onFileChange={setCallToBarCert}
-              />
-              <FileUpload
-                label="Practicing License"
-                description="Current license"
-                file={practicingLicense}
-                onFileChange={setPracticingLicense}
-              />
-              <FileUpload
-                label="CV / Resume"
-                description="PDF format"
-                file={cv}
-                onFileChange={setCv}
-                accept=".pdf"
-              />
-            </div>
-          </div>
+              {/* Verification form */}
+              <div className="space-y-4">
+                {/* Call Number */}
+                <div className="space-y-2">
+                  <Label htmlFor="callNumber">Call Number / Enrollment Number (Optional)</Label>
+                  <Input
+                    id="callNumber"
+                    value={callNumber}
+                    onChange={(e) => setCallNumber(e.target.value)}
+                    placeholder="e.g., SCN/12345"
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                {/* File uploads - 2x2 grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <FileUpload
+                    label="Means of ID"
+                    description="NIN, Passport, etc."
+                    uploadedDocument={verificationData.uploadedDocuments[0] || null}
+                    onFileSelect={(file) => handleFileUpload(file, 'id')}
+                    onFileRemove={() => verificationData.uploadedDocuments[0] && handleFileRemove(verificationData.uploadedDocuments[0].id)}
+                    isUploading={uploadingFiles['id'] || false}
+                  />
+                  <FileUpload
+                    label="Call to Bar Certificate"
+                    description="PDF or Image"
+                    uploadedDocument={verificationData.uploadedDocuments[1] || null}
+                    onFileSelect={(file) => handleFileUpload(file, 'certificate')}
+                    onFileRemove={() => verificationData.uploadedDocuments[1] && handleFileRemove(verificationData.uploadedDocuments[1].id)}
+                    isUploading={uploadingFiles['certificate'] || false}
+                  />
+                  <FileUpload
+                    label="Practicing License"
+                    description="Current license"
+                    uploadedDocument={verificationData.uploadedDocuments[2] || null}
+                    onFileSelect={(file) => handleFileUpload(file, 'license')}
+                    onFileRemove={() => verificationData.uploadedDocuments[2] && handleFileRemove(verificationData.uploadedDocuments[2].id)}
+                    isUploading={uploadingFiles['license'] || false}
+                  />
+                  <FileUpload
+                    label="CV / Resume"
+                    description="PDF format"
+                    uploadedDocument={verificationData.uploadedDocuments[3] || null}
+                    onFileSelect={(file) => handleFileUpload(file, 'cv')}
+                    onFileRemove={() => verificationData.uploadedDocuments[3] && handleFileRemove(verificationData.uploadedDocuments[3].id)}
+                    isUploading={uploadingFiles['cv'] || false}
+                    accept=".pdf"
+                  />
+                </div>
+
+                {/* Upload status */}
+                {verificationData.uploadedDocuments.length > 0 && (
+                  <div className="flex items-center gap-2 rounded-lg bg-primary/10 p-3 text-sm text-primary">
+                    <Check className="h-4 w-4 shrink-0" />
+                    <span>
+                      {verificationData.uploadedDocuments.length} document{verificationData.uploadedDocuments.length !== 1 ? 's' : ''} uploaded
+                    </span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Action buttons - Custom layout for verification */}
-          <div className="hidden md:block space-y-3">
-            <Button
-              onClick={handleVerify}
-              disabled={!hasAnyDocument || isSubmitting}
-              className="w-full"
-            >
-              {isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <BadgeCheck className="mr-2 h-4 w-4" />
-              )}
-              Get Verified
-            </Button>
-
-            <div className="flex gap-3">
-              <Button
-                variant="ghost"
-                onClick={handleBack}
-                disabled={isSubmitting}
-                className="flex-1"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleSkip}
-                disabled={isSubmitting}
-                className="flex-1"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Skip for now
-              </Button>
-            </div>
-          </div>
-
-          {/* Mobile footer */}
-          <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4 md:hidden">
-            <div className="max-w-lg mx-auto space-y-3">
-              <Button
-                onClick={handleVerify}
-                disabled={!hasAnyDocument || isSubmitting}
-                className="w-full"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <BadgeCheck className="mr-2 h-4 w-4" />
-                )}
-                Get Verified
-              </Button>
-              <div className="flex gap-3">
+          {!isCreatingProfile && (
+            <>
+              <div className="hidden md:block space-y-3">
                 <Button
-                  variant="ghost"
-                  onClick={handleBack}
-                  disabled={isSubmitting}
-                  className="flex-1"
+                  onClick={handleVerify}
+                  disabled={!hasAnyDocument || isSubmitting || Object.values(uploadingFiles).some(Boolean)}
+                  className="w-full"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
+                  {isSubmitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <BadgeCheck className="mr-2 h-4 w-4" />
+                  )}
+                  Get Verified
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleSkip}
-                  disabled={isSubmitting}
-                  className="flex-1"
-                >
-                  Skip for now
-                </Button>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="ghost"
+                    onClick={handleBack}
+                    disabled={isSubmitting || Object.values(uploadingFiles).some(Boolean)}
+                    className="flex-1"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSkip}
+                    disabled={isSubmitting || Object.values(uploadingFiles).some(Boolean)}
+                    className="flex-1"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Skip for now
+                  </Button>
+                </div>
               </div>
-            </div>
-          </div>
+
+              {/* Mobile footer */}
+              <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4 md:hidden">
+                <div className="max-w-lg mx-auto space-y-3">
+                  <Button
+                    onClick={handleVerify}
+                    disabled={!hasAnyDocument || isSubmitting || Object.values(uploadingFiles).some(Boolean)}
+                    className="w-full"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <BadgeCheck className="mr-2 h-4 w-4" />
+                    )}
+                    Get Verified
+                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="ghost"
+                      onClick={handleBack}
+                      disabled={isSubmitting || Object.values(uploadingFiles).some(Boolean)}
+                      className="flex-1"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleSkip}
+                      disabled={isSubmitting || Object.values(uploadingFiles).some(Boolean)}
+                      className="flex-1"
+                    >
+                      Skip for now
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           <p className="text-xs text-muted-foreground text-center">
             You can complete verification later from your profile settings

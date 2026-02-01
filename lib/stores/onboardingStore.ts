@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserType, CommunicationStyle } from '@/types/auth';
+import type { LawyerProfileDocument } from '@/lib/api/lawyerVerification';
 
 export interface OnboardingLocationData {
   country?: string;
@@ -22,10 +23,8 @@ export interface OnboardingProfileData {
 
 export interface OnboardingVerificationData {
   callNumber?: string;
-  meansOfId?: File | null;
-  callToBarCert?: File | null;
-  practicingLicense?: File | null;
-  cv?: File | null;
+  lawyerProfileId?: number;
+  uploadedDocuments: LawyerProfileDocument[];
 }
 
 interface OnboardingStore {
@@ -64,7 +63,9 @@ const initialState = {
   profileData: {},
   studentEducationLevel: null,
   areasOfExpertise: [],
-  verificationData: {},
+  verificationData: {
+    uploadedDocuments: [],
+  },
   wantsClientReferrals: null,
 };
 
@@ -94,11 +95,13 @@ export const useOnboardingStore = create<OnboardingStore>()(
     }),
     {
       name: 'lawexa-onboarding',
-      // Don't persist File objects
+      // Persist verification data including uploaded documents metadata
       partialize: (state) => ({
         ...state,
         verificationData: {
           callNumber: state.verificationData.callNumber,
+          lawyerProfileId: state.verificationData.lawyerProfileId,
+          uploadedDocuments: state.verificationData.uploadedDocuments,
         },
       }),
     }
