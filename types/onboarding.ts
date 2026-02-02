@@ -67,23 +67,30 @@ export function getLevelOptions(country: string): string[] {
   return LEVEL_FORMATS[country] || LEVEL_FORMATS.default;
 }
 
-// Area of study options for non-law students
+// Area of study options for non-law students (alphabetically sorted)
 export const AREA_OF_STUDY_OPTIONS = [
-  'Engineering',
-  'Medicine',
+  'Accounting',
+  'Agriculture',
+  'Architecture',
+  'Biochemistry',
   'Business Administration',
   'Computer Science',
+  'Criminology',
+  'Cybersecurity',
   'Economics',
-  'Arts & Humanities',
-  'Natural Sciences',
-  'Social Sciences',
   'Education',
-  'Architecture',
-  'Agriculture',
-  'Pharmacy',
-  'Nursing',
+  'Engineering',
+  'Entrepreneurship',
+  'International Relations',
   'Mass Communication',
-  'Accounting',
+  'Medicine',
+  'Nursing',
+  'Pharmacy',
+  'Political Science',
+  'Psychology',
+  'Public Health',
+  'Software Engineering',
+  'Theatre Arts',
 ] as const;
 
 export type AreaOfStudyOption = (typeof AREA_OF_STUDY_OPTIONS)[number];
