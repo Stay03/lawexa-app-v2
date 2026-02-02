@@ -21,8 +21,8 @@ export function getTotalSteps(
   if (userType === 'lawyer') return skipProfile ? 6 : 7;
   if (userType === 'law_student') return skipProfile ? 6 : 7;
   if (userType === 'other') {
-    // "Other" users with "student" profession get education step
-    if (profession === 'student') return 5;
+    // "Other" users with "student" profession get 2 education steps (university, then level+area)
+    if (profession === 'student') return 6;
     return 4;
   }
   return 4; // Default

@@ -67,6 +67,27 @@ export function getLevelOptions(country: string): string[] {
   return LEVEL_FORMATS[country] || LEVEL_FORMATS.default;
 }
 
+// Area of study options for non-law students
+export const AREA_OF_STUDY_OPTIONS = [
+  'Engineering',
+  'Medicine',
+  'Business Administration',
+  'Computer Science',
+  'Economics',
+  'Arts & Humanities',
+  'Natural Sciences',
+  'Social Sciences',
+  'Education',
+  'Architecture',
+  'Agriculture',
+  'Pharmacy',
+  'Nursing',
+  'Mass Communication',
+  'Accounting',
+] as const;
+
+export type AreaOfStudyOption = (typeof AREA_OF_STUDY_OPTIONS)[number];
+
 // Law school options by country
 export const LAW_SCHOOL_OPTIONS: Record<string, string[]> = {
   Nigeria: [

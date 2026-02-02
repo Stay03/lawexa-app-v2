@@ -51,6 +51,9 @@ export default function OnboardingStep6Page() {
   const [level, setLevel] = useState(profileData.level || '');
   const [lawSchool, setLawSchool] = useState(profileData.lawSchool || '');
 
+  // Check if this is a non-law student (other + student profession)
+  const isNonLawStudent = userType === 'other' && profileData.profession === 'student';
+
   // Fetch universities from user's country
   const { data: countryUniversities, isLoading: loadingCountryUniversities } =
     useUniversitiesByCountry(locationData.countryCode);
@@ -119,6 +122,15 @@ export default function OnboardingStep6Page() {
   };
 
   const handleNext = () => {
+    // For non-law students, only save university and go to step-6b for level + area of study
+    if (isNonLawStudent) {
+      setProfileData({
+        university,
+      });
+      router.push('/onboarding/step-6b');
+      return;
+    }
+
     // Save education data to store
     setProfileData({
       university: showUniversityForm ? university : undefined,
@@ -132,7 +144,7 @@ export default function OnboardingStep6Page() {
       // Lawyers and law students go to expertise step
       router.push('/onboarding/step-7');
     } else {
-      // "Other" users with student profession complete here
+      // This branch shouldn't be reached for non-law students anymore
       submitOnboarding({
         userType: userType!,
         communicationStyle: communicationStyle!,
@@ -147,6 +159,10 @@ export default function OnboardingStep6Page() {
 
   // Validation
   const isValid = () => {
+    // Non-law students only need university on this screen (level is on step-6b)
+    if (isNonLawStudent) {
+      return !!university;
+    }
     if (showUniversityForm && (!university || !level)) return false;
     if (showLawSchoolForm && !lawSchool) return false;
     return true;
@@ -278,21 +294,24 @@ export default function OnboardingStep6Page() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="level">Level *</Label>
-                  <Select value={level} onValueChange={setLevel}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select your level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {levelOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Level dropdown - hidden for non-law students (they select in step-6b) */}
+                {!isNonLawStudent && (
+                  <div className="space-y-2">
+                    <Label htmlFor="level">Level *</Label>
+                    <Select value={level} onValueChange={setLevel}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select your level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {levelOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </>
             )}
 
@@ -330,7 +349,7 @@ export default function OnboardingStep6Page() {
           <OnboardingFooter
             onBack={handleBack}
             onNext={handleNext}
-            nextLabel={shouldShowExpertiseStep(userType) ? 'Next' : 'Complete'}
+            nextLabel={shouldShowExpertiseStep(userType) || isNonLawStudent ? 'Next' : 'Complete'}
             isLoading={isSubmitting}
             isNextDisabled={!isValid()}
           />
