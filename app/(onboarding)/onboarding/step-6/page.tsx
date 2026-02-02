@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, Search, Check, Plus } from 'lucide-react';
+import { GraduationCap, Search, Check, Plus, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
@@ -50,6 +51,8 @@ export default function OnboardingStep6Page() {
   const [searchQuery, setSearchQuery] = useState('');
   const [level, setLevel] = useState(profileData.level || '');
   const [lawSchool, setLawSchool] = useState(profileData.lawSchool || '');
+  const [showCustomUniversityInput, setShowCustomUniversityInput] = useState(false);
+  const [customUniversity, setCustomUniversity] = useState('');
 
   // Check if this is a non-law student (other + student profession)
   const isNonLawStudent = userType === 'other' && profileData.profession === 'student';
@@ -108,6 +111,27 @@ export default function OnboardingStep6Page() {
   const handleUniversitySelect = (universityName: string) => {
     setUniversity(universityName);
     setSearchQuery('');
+    setShowCustomUniversityInput(false);
+    setCustomUniversity('');
+  };
+
+  const handleShowCustomInput = () => {
+    setShowCustomUniversityInput(true);
+    setUniversity('');
+    setSearchQuery('');
+  };
+
+  const handleCustomUniversitySubmit = () => {
+    if (customUniversity.trim()) {
+      setUniversity(customUniversity.trim());
+      setShowCustomUniversityInput(false);
+    }
+  };
+
+  const handleClearCustomUniversity = () => {
+    setUniversity('');
+    setCustomUniversity('');
+    setShowCustomUniversityInput(false);
   };
 
   const handleBack = () => {
@@ -211,86 +235,169 @@ export default function OnboardingStep6Page() {
                 <div className="space-y-2">
                   <Label>University *</Label>
 
-                  {/* Search input */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Search for your university..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-
-                  {/* University list */}
-                  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
-                    {isLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      </div>
-                    ) : displayUniversities.length > 0 ? (
-                      displayUniversities.map((uni) => (
-                        <button
-                          key={uni.id}
+                  {/* Show custom university input mode */}
+                  {showCustomUniversityInput ? (
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter your university name..."
+                          value={customUniversity}
+                          onChange={(e) => setCustomUniversity(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCustomUniversitySubmit();
+                            }
+                          }}
+                          autoFocus
+                        />
+                        {customUniversity && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCustomUniversitySubmit}
+                          >
+                            Add
+                          </Button>
+                        )}
+                        <Button
                           type="button"
-                          onClick={() => handleUniversitySelect(uni.name)}
-                          className={cn(
-                            'w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all',
-                            'hover:border-primary/50 hover:bg-primary/5',
-                            university === uni.name
-                              ? 'border-primary bg-primary/10'
-                              : 'border-border bg-card'
-                          )}
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowCustomUniversityInput(false)}
                         >
-                          <div>
-                            <span className="font-medium text-sm">{uni.name}</span>
-                            {uni.country && searchQuery && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                ({uni.country})
-                              </span>
-                            )}
-                          </div>
-                          {university === uni.name && (
-                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                          )}
-                        </button>
-                      ))
-                    ) : searchQuery.length >= 2 ? (
-                      <div className="space-y-3">
-                        <p className="text-center text-muted-foreground py-2 text-sm">
-                          No universities found for &quot;{searchQuery}&quot;
-                        </p>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : university ? (
+                    /* Show selected university with option to clear */
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1.5 rounded-full text-sm font-medium bg-primary text-primary-foreground flex items-center gap-1">
+                        {university}
                         <button
                           type="button"
-                          onClick={() => handleUniversitySelect(searchQuery)}
-                          className={cn(
-                            'w-full flex items-center gap-3 rounded-xl border border-dashed p-3 text-left transition-all',
-                            'hover:border-primary/50 hover:bg-primary/5',
-                            'border-primary/30'
-                          )}
+                          onClick={handleClearCustomUniversity}
+                          className="ml-1 hover:bg-primary-foreground/20 rounded-full p-0.5"
                         >
-                          <div className="rounded-full bg-primary/10 p-1.5">
-                            <Plus className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <span className="font-medium text-sm">Add &quot;{searchQuery}&quot;</span>
-                            <p className="text-xs text-muted-foreground">Use this as your university</p>
-                          </div>
+                          <X className="h-3 w-3" />
                         </button>
+                      </span>
+                    </div>
+                  ) : (
+                    /* Show search and university list */
+                    <>
+                      {/* Search input */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search for your university..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
                       </div>
-                    ) : (
-                      <p className="text-center text-muted-foreground py-4 text-sm">
-                        {locationData.country
-                          ? `No universities found in ${locationData.country}`
-                          : 'Search for your university'}
-                      </p>
-                    )}
-                  </div>
 
-                  {university && (
-                    <p className="text-xs text-muted-foreground">
-                      Selected: <span className="font-medium">{university}</span>
-                    </p>
+                      {/* University list */}
+                      <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+                        {isLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          </div>
+                        ) : displayUniversities.length > 0 ? (
+                          <>
+                            {displayUniversities.map((uni) => (
+                              <button
+                                key={uni.id}
+                                type="button"
+                                onClick={() => handleUniversitySelect(uni.name)}
+                                className={cn(
+                                  'w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all',
+                                  'hover:border-primary/50 hover:bg-primary/5',
+                                  'border-border bg-card'
+                                )}
+                              >
+                                <div>
+                                  <span className="font-medium text-sm">{uni.name}</span>
+                                  {uni.country && searchQuery && (
+                                    <span className="text-xs text-muted-foreground ml-2">
+                                      ({uni.country})
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            ))}
+                            {/* Other option - always show at the end */}
+                            <button
+                              type="button"
+                              onClick={handleShowCustomInput}
+                              className={cn(
+                                'w-full flex items-center gap-3 rounded-xl border border-dashed p-3 text-left transition-all',
+                                'hover:border-primary/50 hover:bg-primary/5',
+                                'border-muted-foreground/30'
+                              )}
+                            >
+                              <div className="rounded-full bg-primary/10 p-1.5">
+                                <Plus className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <span className="font-medium text-sm">Other</span>
+                                <p className="text-xs text-muted-foreground">Enter university manually</p>
+                              </div>
+                            </button>
+                          </>
+                        ) : searchQuery.length >= 2 ? (
+                          <div className="space-y-3">
+                            <p className="text-center text-muted-foreground py-2 text-sm">
+                              No universities found for &quot;{searchQuery}&quot;
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleUniversitySelect(searchQuery)}
+                              className={cn(
+                                'w-full flex items-center gap-3 rounded-xl border border-dashed p-3 text-left transition-all',
+                                'hover:border-primary/50 hover:bg-primary/5',
+                                'border-primary/30'
+                              )}
+                            >
+                              <div className="rounded-full bg-primary/10 p-1.5">
+                                <Plus className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <span className="font-medium text-sm">Add &quot;{searchQuery}&quot;</span>
+                                <p className="text-xs text-muted-foreground">Use this as your university</p>
+                              </div>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-center text-muted-foreground py-4 text-sm">
+                              {locationData.country
+                                ? `No universities found in ${locationData.country}`
+                                : 'Search for your university'}
+                            </p>
+                            {/* Other option - show even when no results */}
+                            <button
+                              type="button"
+                              onClick={handleShowCustomInput}
+                              className={cn(
+                                'w-full flex items-center gap-3 rounded-xl border border-dashed p-3 text-left transition-all',
+                                'hover:border-primary/50 hover:bg-primary/5',
+                                'border-muted-foreground/30'
+                              )}
+                            >
+                              <div className="rounded-full bg-primary/10 p-1.5">
+                                <Plus className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <span className="font-medium text-sm">Other</span>
+                                <p className="text-xs text-muted-foreground">Enter university manually</p>
+                              </div>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
 
