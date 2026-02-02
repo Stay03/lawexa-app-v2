@@ -51,7 +51,6 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { useRotatingText } from '@/lib/hooks/useRotatingText';
 import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { ChatProvider } from '@/lib/contexts/chat-context';
-import { ConversationShareButton } from '@/components/conversations';
 
 // Format tool name and parameters into user-friendly text
 function formatToolMessage(
@@ -225,9 +224,8 @@ function ConversationPageContent() {
   const initializedRef = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Conversation metadata for sharing/ownership
+  // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
-  const [isPrivate, setIsPrivate] = useState(true);
 
   // Get current user for ownership check
   const user = useAuthStore((state) => state.user);
@@ -317,18 +315,16 @@ function ConversationPageContent() {
       // For new conversations, the current user is the owner
       if (user?.id) {
         setConversationOwnerId(user.id);
-        setIsPrivate(true); // New conversations start as private
       }
     } else {
       // Direct navigation - load conversation history
       initializedRef.current = true;
       loadConversationHistory(conversationId);
 
-      // Fetch conversation metadata for ownership/sharing info
+      // Fetch conversation metadata for ownership info
       chatApi.getConversation(conversationId).then((response) => {
         if (response.success && response.data) {
           setConversationOwnerId(response.data.user_id);
-          setIsPrivate(response.data.is_private);
         }
       }).catch(() => {
         // Silently fail - the main loadConversationHistory will handle errors
@@ -491,32 +487,19 @@ function ConversationPageContent() {
       {/* Chat messages */}
       <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28">
           <ChatContainerContent>
-            {/* Header with context and share button */}
-            <div className="px-4 pb-4">
-              <div className="mx-auto max-w-2xl flex items-center justify-between">
-                {/* Context text - Display case/note slug */}
-                {contextSlug && contextType ? (
+            {/* Context display - case/note slug */}
+            {contextSlug && contextType && (
+              <div className="px-4 pb-4">
+                <div className="mx-auto max-w-2xl">
                   <p className="text-xs">
                     <span className="text-yellow-600 dark:text-yellow-500">
                       {contextType.toUpperCase()} CONTEXT:
                     </span>{' '}
                     <span className="font-medium text-foreground">{contextSlug}</span>
                   </p>
-                ) : (
-                  <div /> // Spacer
-                )}
-
-                {/* Share button - only for owners */}
-                {isOwner && (
-                  <ConversationShareButton
-                    conversationId={conversationId}
-                    isPrivate={isPrivate}
-                    onVisibilityChange={setIsPrivate}
-                    className="h-8 w-8"
-                  />
-                )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Loading history indicator */}
             {isLoadingHistory && (

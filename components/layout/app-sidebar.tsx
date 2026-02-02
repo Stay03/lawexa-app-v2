@@ -40,7 +40,7 @@ const navMain = [
     items: [
       { title: "Cases", url: "/cases" },
       { title: "Notes", url: "/notes" },
-      { title: "Shared Chats", url: "/shared" },
+      { title: "Community", url: "/shared" },
       { title: "Bookmarks", url: "/bookmarks" },
     ],
   },

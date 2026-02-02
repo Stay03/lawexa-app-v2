@@ -20,6 +20,7 @@ import {
 import { ThemeToggle } from "@/components/common/ThemeToggle"
 import { ShareButton } from "@/components/common/ShareButton"
 import { ReaderModeToggle } from "@/components/cases/ReaderModeToggle"
+import { ConversationShareHeaderButton } from "@/components/conversations"
 import { usePathname } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useBreadcrumbStore } from "@/lib/stores/breadcrumbStore"
@@ -140,6 +141,10 @@ export default function MainLayout({
             {/* Show Reader Mode toggle only on case detail page (not report page) */}
             {pathname.startsWith('/cases/') && pathname.split('/').length === 3 && (
               <ReaderModeToggle />
+            )}
+            {/* Show conversation share button on conversation pages */}
+            {pathname.startsWith('/c/') && (
+              <ConversationShareHeaderButton />
             )}
             <ThemeToggle />
           </div>
