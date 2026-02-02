@@ -103,6 +103,7 @@ export interface ChatStartRequest {
   conversation_id?: string;
   workflow_id?: number;
   agent_id?: number;
+  study_mode?: boolean;
 }
 
 export interface ChatStartResponse {

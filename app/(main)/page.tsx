@@ -16,15 +16,22 @@ import {
 } from '@/components/ui/file-upload';
 import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { chatApi } from '@/lib/api/chat';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 export default function HomePage() {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [studyMode, setStudyMode] = useState(false);
   const { greeting, name } = useGreetingParts();
   const router = useRouter();
   const [showLinks, setShowLinks] = useState(false);
+  const user = useAuthStore((state) => state.user);
+
+  // Check if user is a student (profession === 'student')
+  const isStudent = user?.profile?.profession === 'student';
 
   useEffect(() => {
     // Slide in after a short delay
@@ -51,6 +58,7 @@ export default function HomePage() {
       const response = await chatApi.start({
         message,
         stream: true,
+        ...(studyMode && { study_mode: true }),
       });
 
       if (response.success) {
@@ -77,6 +85,23 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-[calc(100vh-120px)] flex-col items-center justify-center px-4" style={{ fontFamily: 'var(--font-comfortaa), sans-serif' }}>
+      {/* Study Mode Toggle - Only shown for students */}
+      {isStudent && (
+        <div className="mb-4 flex items-center gap-3">
+          <span className={`text-sm ${!studyMode ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+            Normal
+          </span>
+          <Switch
+            checked={studyMode}
+            onCheckedChange={setStudyMode}
+            size="default"
+          />
+          <span className={`text-sm ${studyMode ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+            Study Mode
+          </span>
+        </div>
+      )}
+
       {/* Greeting */}
       <h1 className="mb-6 text-[36px] font-medium">
         {greeting}
