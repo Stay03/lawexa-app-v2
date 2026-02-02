@@ -1,24 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Globe, Lock, Loader2, Share2, Check } from 'lucide-react';
+import { Globe, Lock, Loader2, Check, Copy } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useToggleConversationVisibility } from '@/lib/hooks/useConversationSharing';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { chatApi } from '@/lib/api/chat';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 /**
  * Share button for conversation pages - to be used in the main layout header.
- * Fetches conversation ownership/visibility state based on current URL.
+ * Opens a dialog with Private/Public options and shareable link.
  * Only renders for conversation owners.
  */
 function ConversationShareHeaderButton() {
@@ -28,10 +31,16 @@ function ConversationShareHeaderButton() {
   const [isOwner, setIsOwner] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
   const toggleVisibility = useToggleConversationVisibility();
 
   // Extract conversation ID from pathname
   const conversationId = pathname.startsWith('/c/') ? pathname.split('/')[2] : null;
+
+  // Generate shareable link
+  const shareableLink = conversationId
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/c/${conversationId}`
+    : '';
 
   // Fetch conversation metadata on mount or when pathname changes
   useEffect(() => {
@@ -65,12 +74,23 @@ function ConversationShareHeaderButton() {
     return null;
   }
 
-  const handleToggleVisibility = async () => {
+  const handleSetPrivate = async () => {
+    if (isPrivate) return; // Already private
     try {
       const result = await toggleVisibility.mutateAsync(conversationId);
-      const newIsPrivate = result.data.is_private;
-      setIsPrivate(newIsPrivate);
-      toast.success(newIsPrivate ? 'Conversation is now private' : 'Conversation is now public');
+      setIsPrivate(result.data.is_private);
+      toast.success('Conversation is now private');
+    } catch (error) {
+      toast.error('Failed to update visibility');
+    }
+  };
+
+  const handleSetPublic = async () => {
+    if (!isPrivate) return; // Already public
+    try {
+      const result = await toggleVisibility.mutateAsync(conversationId);
+      setIsPrivate(result.data.is_private);
+      toast.success('Conversation is now public');
     } catch (error) {
       toast.error('Failed to update visibility');
     }
@@ -78,8 +98,7 @@ function ConversationShareHeaderButton() {
 
   const handleCopyLink = async () => {
     try {
-      const url = `${window.location.origin}/c/${conversationId}`;
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareableLink);
       setCopied(true);
       toast.success('Link copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
@@ -89,58 +108,109 @@ function ConversationShareHeaderButton() {
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
           className="h-8 gap-2"
-          disabled={toggleVisibility.isPending}
         >
-          {toggleVisibility.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : isPrivate ? (
+          {isPrivate ? (
             <Lock className="h-4 w-4" />
           ) : (
             <Globe className="h-4 w-4" />
           )}
           <span>Share</span>
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={handleToggleVisibility} className="gap-2">
-          {isPrivate ? (
-            <>
-              <Globe className="h-4 w-4" />
-              Make Public
-            </>
-          ) : (
-            <>
-              <Lock className="h-4 w-4" />
-              Make Private
-            </>
-          )}
-        </DropdownMenuItem>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Chat shared</DialogTitle>
+          <DialogDescription>
+            Future messages aren't included
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          {/* Private option */}
+          <button
+            onClick={handleSetPrivate}
+            disabled={toggleVisibility.isPending}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors',
+              isPrivate
+                ? 'border-primary bg-primary/5'
+                : 'border-border hover:bg-muted/50'
+            )}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium">Private</p>
+              <p className="text-sm text-muted-foreground">Only you have access</p>
+            </div>
+            {isPrivate && (
+              <Check className="h-5 w-5 text-primary" />
+            )}
+            {toggleVisibility.isPending && !isPrivate && (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            )}
+          </button>
+
+          {/* Public option */}
+          <button
+            onClick={handleSetPublic}
+            disabled={toggleVisibility.isPending}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors',
+              !isPrivate
+                ? 'border-primary bg-primary/5'
+                : 'border-border hover:bg-muted/50'
+            )}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+              <Globe className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium">Public access</p>
+              <p className="text-sm text-muted-foreground">Anyone with the link can view</p>
+            </div>
+            {!isPrivate && (
+              <Check className="h-5 w-5 text-primary" />
+            )}
+            {toggleVisibility.isPending && isPrivate && (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            )}
+          </button>
+        </div>
+
+        {/* Shareable link - only shown when public */}
         {!isPrivate && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleCopyLink} className="gap-2">
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={shareableLink}
+              className="flex-1 text-sm"
+            />
+            <Button
+              onClick={handleCopyLink}
+              variant="default"
+              className="shrink-0"
+            >
               {copied ? (
                 <>
-                  <Check className="h-4 w-4" />
-                  Copied!
+                  <Check className="mr-2 h-4 w-4" />
+                  Copied
                 </>
               ) : (
-                <>
-                  <Share2 className="h-4 w-4" />
-                  Copy Link
-                </>
+                'Copy link'
               )}
-            </DropdownMenuItem>
-          </>
+            </Button>
+          </div>
         )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </DialogContent>
+    </Dialog>
   );
 }
 
