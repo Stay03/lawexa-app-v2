@@ -127,7 +127,8 @@ function ConversationShareHeaderButton() {
         <DialogHeader>
           <DialogTitle>Chat shared</DialogTitle>
           <DialogDescription>
-            Future messages aren't included
+            This conversation may include personal information.
+            Take a moment to check the content before sharing the link.
           </DialogDescription>
         </DialogHeader>
 
