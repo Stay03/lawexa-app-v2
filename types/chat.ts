@@ -160,8 +160,12 @@ export interface ConversationData {
   agent_id: number;
   title: string;
   status: 'active' | 'archived';
+  is_private: boolean;
   messages: ApiMessage[];
   messages_count: number;
+  views_count?: number;
+  author?: ConversationAuthor;
+  agent?: ConversationAgentSummary;
   created_at: string;
   updated_at: string;
 }
@@ -203,4 +207,121 @@ export interface ListConversationsParams {
   status?: 'active' | 'archived';
   sort_by?: 'created_at' | 'updated_at' | 'title';
   sort_order?: 'asc' | 'desc';
+}
+
+// ============================================
+// Conversation Sharing Types
+// ============================================
+
+// Author information for shared conversations
+export interface ConversationAuthor {
+  id: number;
+  name: string;
+  avatar_url: string | null;
+}
+
+// Agent summary for shared conversations
+export interface ConversationAgentSummary {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+// Shared conversation list item (for browse page)
+export interface SharedConversationItem {
+  id: string;
+  title: string;
+  is_private: boolean;
+  messages_count: number;
+  views_count: number;
+  author: ConversationAuthor;
+  agent?: ConversationAgentSummary;
+  created_at: string;
+  updated_at: string;
+}
+
+// Trending conversation item
+export interface TrendingConversationItem extends SharedConversationItem {
+  type: 'conversation';
+  trending_score: number;
+  unique_viewers: number;
+  last_viewed_at: string | null;
+}
+
+// Shared conversations API response
+export interface SharedConversationsResponse {
+  success: boolean;
+  message: string;
+  data: SharedConversationItem[];
+  pagination: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+  };
+  links: {
+    first: string;
+    last: string;
+    prev: string | null;
+    next: string | null;
+  };
+}
+
+// Trending conversations API response
+export interface TrendingConversationsResponse {
+  success: boolean;
+  message: string;
+  data: TrendingConversationItem[];
+  pagination: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+  };
+  links: {
+    first: string;
+    last: string;
+    prev: string | null;
+    next: string | null;
+  };
+  meta?: {
+    filters_applied?: {
+      time_range: string;
+    };
+  };
+}
+
+// Visibility change response
+export interface ConversationVisibilityResponse {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    user_id: number;
+    agent_id: number;
+    title: string;
+    status: 'active' | 'archived';
+    is_private: boolean;
+    created_at: string;
+    updated_at: string;
+  };
+}
+
+// Query params for shared conversations
+export interface SharedConversationsParams {
+  page?: number;
+  per_page?: number;
+  sort_by?: 'created_at' | 'updated_at' | 'title';
+  sort_order?: 'asc' | 'desc';
+}
+
+// Query params for trending conversations
+export interface TrendingConversationsParams {
+  page?: number;
+  per_page?: number;
+  time_range?: 'day' | 'week' | 'month' | 'year' | 'all';
 }

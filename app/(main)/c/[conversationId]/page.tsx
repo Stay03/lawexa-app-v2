@@ -38,6 +38,7 @@ import {
   ThumbsDown,
   Check,
   Loader2,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -46,9 +47,11 @@ import { cn } from '@/lib/utils';
 import { isToolMessage, type ToolMessage, type ConversationMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { useRotatingText } from '@/lib/hooks/useRotatingText';
 import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { ChatProvider } from '@/lib/contexts/chat-context';
+import { ConversationShareButton } from '@/components/conversations';
 
 // Format tool name and parameters into user-friendly text
 function formatToolMessage(
@@ -222,6 +225,14 @@ function ConversationPageContent() {
   const initializedRef = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // Conversation metadata for sharing/ownership
+  const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
+  const [isPrivate, setIsPrivate] = useState(true);
+
+  // Get current user for ownership check
+  const user = useAuthStore((state) => state.user);
+  const isOwner = user?.id != null && conversationOwnerId != null && user.id === conversationOwnerId;
+
   // Sidebar state for input positioning
   const { state } = useSidebar();
   const isMobile = useIsMobile();
@@ -302,12 +313,28 @@ function ConversationPageContent() {
 
       // Clean up URL params after connecting
       window.history.replaceState({}, '', `/c/${conversationId}`);
+
+      // For new conversations, the current user is the owner
+      if (user?.id) {
+        setConversationOwnerId(user.id);
+        setIsPrivate(true); // New conversations start as private
+      }
     } else {
       // Direct navigation - load conversation history
       initializedRef.current = true;
       loadConversationHistory(conversationId);
+
+      // Fetch conversation metadata for ownership/sharing info
+      chatApi.getConversation(conversationId).then((response) => {
+        if (response.success && response.data) {
+          setConversationOwnerId(response.data.user_id);
+          setIsPrivate(response.data.is_private);
+        }
+      }).catch(() => {
+        // Silently fail - the main loadConversationHistory will handle errors
+      });
     }
-  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory]);
+  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, user?.id]);
 
   const handleSubmit = async () => {
     if ((!input.trim() && files.length === 0) || isStreaming || isSubmitting) return;
@@ -464,19 +491,32 @@ function ConversationPageContent() {
       {/* Chat messages */}
       <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28">
           <ChatContainerContent>
-            {/* Context text - Display case/note slug */}
-            {contextSlug && contextType && (
-              <div className="px-4 pb-4">
-                <div className="mx-auto max-w-2xl">
+            {/* Header with context and share button */}
+            <div className="px-4 pb-4">
+              <div className="mx-auto max-w-2xl flex items-center justify-between">
+                {/* Context text - Display case/note slug */}
+                {contextSlug && contextType ? (
                   <p className="text-xs">
                     <span className="text-yellow-600 dark:text-yellow-500">
                       {contextType.toUpperCase()} CONTEXT:
                     </span>{' '}
                     <span className="font-medium text-foreground">{contextSlug}</span>
                   </p>
-                </div>
+                ) : (
+                  <div /> // Spacer
+                )}
+
+                {/* Share button - only for owners */}
+                {isOwner && (
+                  <ConversationShareButton
+                    conversationId={conversationId}
+                    isPrivate={isPrivate}
+                    onVisibilityChange={setIsPrivate}
+                    className="h-8 w-8"
+                  />
+                )}
               </div>
-            )}
+            </div>
 
             {/* Loading history indicator */}
             {isLoadingHistory && (
@@ -516,98 +556,107 @@ function ConversationPageContent() {
         </ChatContainerContent>
       </ChatContainerRoot>
 
-      {/* Input area - fixed at bottom, floating style matching notes/cases */}
+      {/* Input area - fixed at bottom */}
       <div
         className="fixed bottom-4 right-0 z-50 px-4 transition-[left] duration-200 ease-linear"
         style={{ left: sidebarWidth }}
       >
         <div className="mx-auto max-w-xs sm:max-w-md">
-          <FileUpload onFilesAdded={handleFilesAdded} multiple>
-            <PromptInput
-              value={input}
-              onValueChange={setInput}
-              onSubmit={handleSubmit}
-              disabled={isStreaming || isLoadingHistory}
-              maxHeight={36}
-            >
-              {/* File Previews - only shown when files exist */}
-              {files.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
-                  {files.map((file, index) => (
-                    <div
-                      key={index}
-                      className="bg-secondary flex items-center gap-2 rounded-lg px-2 py-1 text-xs"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Paperclip className="h-3 w-3" />
-                      <span className="max-w-[100px] truncate">{file.name}</span>
-                      <button
-                        onClick={() => removeFile(index)}
-                        className="hover:bg-secondary/50 rounded-full p-0.5"
+          {/* Show input for owners, view-only indicator for non-owners */}
+          {isOwner ? (
+            <FileUpload onFilesAdded={handleFilesAdded} multiple>
+              <PromptInput
+                value={input}
+                onValueChange={setInput}
+                onSubmit={handleSubmit}
+                disabled={isStreaming || isLoadingHistory}
+                maxHeight={36}
+              >
+                {/* File Previews - only shown when files exist */}
+                {files.length > 0 && (
+                  <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
+                    {files.map((file, index) => (
+                      <div
+                        key={index}
+                        className="bg-secondary flex items-center gap-2 rounded-lg px-2 py-1 text-xs"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Inline input with buttons */}
-              <div className="flex items-center gap-2 px-1">
-                {/* Attach button */}
-                <FileUploadTrigger asChild>
-                  <button className="hover:bg-secondary-foreground/10 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-2xl">
-                    <Paperclip className="text-primary h-4 w-4" />
-                  </button>
-                </FileUploadTrigger>
-
-                {/* Textarea */}
-                <PromptInputTextarea
-                  placeholder="Ask me anything"
-                  className="text-foreground min-h-[36px] py-2"
-                  disableAutosize
-                />
-
-                {/* Send/Stop button */}
-                {isStreaming ? (
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    className="h-7 w-7 shrink-0 rounded-full"
-                    onClick={handleStop}
-                  >
-                    <Square className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    size="icon"
-                    className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
-                    onClick={handleSubmit}
-                    disabled={!input.trim() && files.length === 0}
-                  >
-                    <ArrowUp className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </PromptInput>
-
-            {/* Drag-and-drop overlay */}
-            <FileUploadContent>
-              <div className="flex min-h-[200px] w-full items-center justify-center">
-                <div className="bg-background/90 m-4 w-full max-w-md rounded-lg border p-8 shadow-lg">
-                  <div className="mb-4 flex justify-center">
-                    <Paperclip className="text-muted-foreground h-8 w-8" />
+                        <Paperclip className="h-3 w-3" />
+                        <span className="max-w-[100px] truncate">{file.name}</span>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="hover:bg-secondary/50 rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                  <h3 className="mb-2 text-center text-base font-medium">
-                    Drop files to upload
-                  </h3>
-                  <p className="text-muted-foreground text-center text-sm">
-                    Release to add files to your message
-                  </p>
+                )}
+
+                {/* Inline input with buttons */}
+                <div className="flex items-center gap-2 px-1">
+                  {/* Attach button */}
+                  <FileUploadTrigger asChild>
+                    <button className="hover:bg-secondary-foreground/10 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-2xl">
+                      <Paperclip className="text-primary h-4 w-4" />
+                    </button>
+                  </FileUploadTrigger>
+
+                  {/* Textarea */}
+                  <PromptInputTextarea
+                    placeholder="Ask me anything"
+                    className="text-foreground min-h-[36px] py-2"
+                    disableAutosize
+                  />
+
+                  {/* Send/Stop button */}
+                  {isStreaming ? (
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="h-7 w-7 shrink-0 rounded-full"
+                      onClick={handleStop}
+                    >
+                      <Square className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="icon"
+                      className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
+                      onClick={handleSubmit}
+                      disabled={!input.trim() && files.length === 0}
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              </div>
-            </FileUploadContent>
-          </FileUpload>
+              </PromptInput>
+
+              {/* Drag-and-drop overlay */}
+              <FileUploadContent>
+                <div className="flex min-h-[200px] w-full items-center justify-center">
+                  <div className="bg-background/90 m-4 w-full max-w-md rounded-lg border p-8 shadow-lg">
+                    <div className="mb-4 flex justify-center">
+                      <Paperclip className="text-muted-foreground h-8 w-8" />
+                    </div>
+                    <h3 className="mb-2 text-center text-base font-medium">
+                      Drop files to upload
+                    </h3>
+                    <p className="text-muted-foreground text-center text-sm">
+                      Release to add files to your message
+                    </p>
+                  </div>
+                </div>
+              </FileUploadContent>
+            </FileUpload>
+          ) : (
+            /* View-only indicator for non-owners */
+            <div className="bg-muted/80 backdrop-blur rounded-full px-4 py-2 text-center text-sm text-muted-foreground border">
+              <Eye className="inline-block h-4 w-4 mr-2" />
+              View Only - This is a shared conversation
+            </div>
+          )}
         </div>
       </div>
     </ChatProvider>
