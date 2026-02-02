@@ -33,6 +33,7 @@ interface FileUploadProps {
   onFileRemove: () => Promise<void>;
   isUploading: boolean;
   accept?: string;
+  required?: boolean;
 }
 
 function FileUpload({
@@ -43,6 +44,7 @@ function FileUpload({
   onFileRemove,
   isUploading,
   accept = '.pdf,.jpg,.jpeg,.png',
+  required = false,
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -120,7 +122,10 @@ function FileUpload({
       ) : (
         <>
           <Upload className="h-8 w-8 text-muted-foreground" />
-          <span className="text-sm font-medium">{label}</span>
+          <span className="text-sm font-medium">
+            {label}
+            {required && <span className="text-destructive ml-1">*</span>}
+          </span>
           <span className="text-xs text-muted-foreground text-center">
             {description}
           </span>
@@ -270,8 +275,14 @@ export default function OnboardingStep8Page() {
       return;
     }
 
-    if (verificationData.uploadedDocuments.length === 0) {
-      toast.error('Please upload at least one document');
+    if (!callNumber.trim()) {
+      toast.error('Please enter your Call Number / Enrollment Number');
+      return;
+    }
+
+    if (verificationData.uploadedDocuments.length < 4) {
+      const missing = 4 - verificationData.uploadedDocuments.length;
+      toast.error(`Please upload all 4 required documents (${missing} remaining)`);
       return;
     }
 
@@ -321,7 +332,7 @@ export default function OnboardingStep8Page() {
     ) || null;
   };
 
-  const hasAnyDocument = verificationData.uploadedDocuments.length > 0 || callNumber;
+  const allRequiredFieldsFilled = verificationData.uploadedDocuments.length === 4 && callNumber.trim() !== '';
 
   if (!userType || userType !== 'lawyer') {
     return null;
@@ -387,7 +398,7 @@ export default function OnboardingStep8Page() {
               <div className="space-y-4">
                 {/* Call Number */}
                 <div className="space-y-2">
-                  <Label htmlFor="callNumber">Call Number / Enrollment Number (Optional)</Label>
+                  <Label htmlFor="callNumber">Call Number / Enrollment Number <span className="text-destructive">*</span></Label>
                   <Input
                     id="callNumber"
                     value={callNumber}
@@ -406,6 +417,7 @@ export default function OnboardingStep8Page() {
                     onFileSelect={(file) => handleFileUpload(file, 'id')}
                     onFileRemove={() => verificationData.uploadedDocuments[0] && handleFileRemove(verificationData.uploadedDocuments[0].id)}
                     isUploading={uploadingFiles['id'] || false}
+                    required
                   />
                   <FileUpload
                     label="Call to Bar Certificate"
@@ -414,6 +426,7 @@ export default function OnboardingStep8Page() {
                     onFileSelect={(file) => handleFileUpload(file, 'certificate')}
                     onFileRemove={() => verificationData.uploadedDocuments[1] && handleFileRemove(verificationData.uploadedDocuments[1].id)}
                     isUploading={uploadingFiles['certificate'] || false}
+                    required
                   />
                   <FileUpload
                     label="Practicing License"
@@ -422,6 +435,7 @@ export default function OnboardingStep8Page() {
                     onFileSelect={(file) => handleFileUpload(file, 'license')}
                     onFileRemove={() => verificationData.uploadedDocuments[2] && handleFileRemove(verificationData.uploadedDocuments[2].id)}
                     isUploading={uploadingFiles['license'] || false}
+                    required
                   />
                   <FileUpload
                     label="CV / Resume"
@@ -431,6 +445,7 @@ export default function OnboardingStep8Page() {
                     onFileRemove={() => verificationData.uploadedDocuments[3] && handleFileRemove(verificationData.uploadedDocuments[3].id)}
                     isUploading={uploadingFiles['cv'] || false}
                     accept=".pdf"
+                    required
                   />
                 </div>
 
@@ -453,7 +468,7 @@ export default function OnboardingStep8Page() {
               <div className="hidden md:block space-y-3">
                 <Button
                   onClick={handleVerify}
-                  disabled={!hasAnyDocument || isSubmitting || Object.values(uploadingFiles).some(Boolean)}
+                  disabled={!allRequiredFieldsFilled || isSubmitting || Object.values(uploadingFiles).some(Boolean)}
                   className="w-full"
                 >
                   {isSubmitting ? (
@@ -493,7 +508,7 @@ export default function OnboardingStep8Page() {
                 <div className="max-w-lg mx-auto space-y-3">
                   <Button
                     onClick={handleVerify}
-                    disabled={!hasAnyDocument || isSubmitting || Object.values(uploadingFiles).some(Boolean)}
+                    disabled={!allRequiredFieldsFilled || isSubmitting || Object.values(uploadingFiles).some(Boolean)}
                     className="w-full"
                   >
                     {isSubmitting ? (
