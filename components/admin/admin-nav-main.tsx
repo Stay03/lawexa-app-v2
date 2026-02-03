@@ -10,6 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar';
 
 export interface AdminNavItem {
@@ -22,6 +23,7 @@ export interface AdminNavItem {
 
 export function AdminNavMain({ items }: { items: AdminNavItem[] }) {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
 
   return (
     <SidebarGroup>
@@ -56,7 +58,7 @@ export function AdminNavMain({ items }: { items: AdminNavItem[] }) {
           return (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                <Link href={item.url}>
+                <Link href={item.url} onClick={() => setOpenMobile(false)}>
                   {item.icon && <item.icon />}
                   <span>{item.title}</span>
                 </Link>

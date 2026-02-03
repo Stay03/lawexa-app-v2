@@ -11,6 +11,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { chatApi } from "@/lib/api/chat"
 import { useAuthStore } from "@/lib/stores/authStore"
@@ -22,6 +23,7 @@ export function NavConversations() {
   const [error, setError] = useState<string | null>(null)
   const pathname = usePathname()
   const { token } = useAuthStore()
+  const { setOpenMobile } = useSidebar()
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -82,7 +84,7 @@ export function NavConversations() {
                     tooltip={conversation.title}
                     isActive={isActive}
                   >
-                    <Link href={`/c/${conversation.id}`}>
+                    <Link href={`/c/${conversation.id}`} onClick={() => setOpenMobile(false)}>
                       <MessageSquare className="h-4 w-4" />
                       <span className="truncate">{conversation.title}</span>
                     </Link>
