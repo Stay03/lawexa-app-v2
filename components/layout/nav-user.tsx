@@ -6,6 +6,7 @@ import {
   CreditCard,
   LogOut,
   Settings,
+  Shield,
   Sparkles,
 } from "lucide-react"
 import Link from "next/link"
@@ -36,6 +37,8 @@ import { Button } from "@/components/ui/button"
 export function NavUser() {
   const { isMobile } = useSidebar()
   const { user, isAuthenticated, isGuest, logout, isLoggingOut } = useAuth()
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
 
   // Show login/register buttons for guests
   if (!isAuthenticated || isGuest) {
@@ -130,6 +133,14 @@ export function NavUser() {
                   Settings
                 </Link>
               </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem asChild>
+                  <Link href="/admin">
+                    <Shield />
+                    Admin
+                  </Link>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
