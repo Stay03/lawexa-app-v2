@@ -57,6 +57,7 @@ function convertAdminMessages(
       timestamp: new Date(msg.created_at),
     };
 
+    // Handle tool_result messages
     if (msg.role === 'tool' && msg.metadata?.type === 'tool_result') {
       return {
         ...base,
@@ -65,6 +66,23 @@ function convertAdminMessages(
         toolParameters: msg.metadata.tool_parameters || {},
         toolResult: {
           success: msg.metadata.success ?? true,
+          data: null,
+          error: null,
+        },
+        toolStatus: 'complete' as const,
+        latencyMs: msg.metadata.latency_ms,
+      } as ToolMessage;
+    }
+
+    // Handle tool_call messages - these are assistant messages requesting tool use
+    if (msg.metadata?.type === 'tool_call') {
+      return {
+        ...base,
+        role: 'tool' as const,
+        toolName: msg.metadata.tool_name || 'unknown',
+        toolParameters: msg.metadata.tool_parameters || {},
+        toolResult: {
+          success: true,
           data: null,
           error: null,
         },

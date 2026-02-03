@@ -9,11 +9,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { formatDistanceToNow } from 'date-fns';
-import { ArrowUpDown, Lock, Globe, Coins, Hash } from 'lucide-react';
+import { formatDistanceToNow, format } from 'date-fns';
+import { ArrowUpDown, Lock, Globe, Coins } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type {
   AdminConversationListItem,
@@ -61,97 +66,122 @@ export function AdminConversationsTable({
 
   if (isLoading) {
     return (
-      <div className="space-y-2">
-        {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
+      <div className="rounded-lg border overflow-hidden">
+        <div className="bg-muted/40 px-4 py-3">
+          <Skeleton className="h-5 w-full max-w-[600px]" />
+        </div>
+        <div className="divide-y divide-border">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="px-4 py-4">
+              <Skeleton className="h-5 w-full" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (conversations.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
+      <div className="rounded-lg border py-12 text-center text-muted-foreground">
         No conversations found
       </div>
     );
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-[300px]">
+          <TableRow className="bg-muted/40 hover:bg-muted/40">
+            <TableHead className="w-[280px] font-semibold">
               <SortButton field="title">Title</SortButton>
             </TableHead>
-            <TableHead>User UUID</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Privacy</TableHead>
-            <TableHead>Agent</TableHead>
-            <TableHead className="text-right">Messages</TableHead>
-            <TableHead className="text-right">
-              <span className="flex items-center justify-end gap-1">
-                <Hash className="h-3 w-3" /> Tokens
+            <TableHead className="w-[120px] font-semibold">User</TableHead>
+            <TableHead className="w-[90px] font-semibold">Status</TableHead>
+            <TableHead className="w-[100px] font-semibold">Privacy</TableHead>
+            <TableHead className="w-[120px] font-semibold">Agent</TableHead>
+            <TableHead className="w-[80px] text-right font-semibold">Messages</TableHead>
+            <TableHead className="w-[100px] text-right font-semibold">
+              <span className="flex items-center justify-end gap-1.5">
+                <Coins className="h-3.5 w-3.5" /> Cost
               </span>
             </TableHead>
-            <TableHead className="text-right">
-              <span className="flex items-center justify-end gap-1">
-                <Coins className="h-3 w-3" /> Cost
-              </span>
-            </TableHead>
-            <TableHead>
+            <TableHead className="w-[140px] font-semibold">
               <SortButton field="created_at">Created</SortButton>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {conversations.map((conversation) => (
+          {conversations.map((conversation, index) => (
             <TableRow
               key={conversation.id}
-              className="cursor-pointer"
+              className={cn(
+                'cursor-pointer transition-colors',
+                index % 2 === 1 && 'bg-muted/20'
+              )}
               onClick={() => handleRowClick(conversation.id)}
             >
-              <TableCell className="font-medium max-w-[300px] truncate">
-                {conversation.title || 'Untitled'}
+              <TableCell className="font-medium max-w-[280px]">
+                <span className="block truncate">
+                  {conversation.title || 'Untitled'}
+                </span>
               </TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">
-                {conversation.user_uuid.slice(0, 8)}...
+              <TableCell>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="font-mono text-xs text-muted-foreground cursor-help">
+                      {conversation.user_uuid.slice(0, 8)}...
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="font-mono text-xs">{conversation.user_uuid}</p>
+                  </TooltipContent>
+                </Tooltip>
               </TableCell>
               <TableCell>
                 <Badge
                   variant={conversation.status === 'active' ? 'default' : 'secondary'}
+                  className="capitalize"
                 >
                   {conversation.status}
                 </Badge>
               </TableCell>
               <TableCell>
                 {conversation.is_private ? (
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Lock className="h-3 w-3" /> Private
+                  <span className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                    <Lock className="h-3.5 w-3.5" /> Private
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-green-600">
-                    <Globe className="h-3 w-3" /> Public
+                  <span className="flex items-center gap-1.5 text-green-600 text-sm">
+                    <Globe className="h-3.5 w-3.5" /> Public
                   </span>
                 )}
               </TableCell>
               <TableCell className="text-sm">
-                {conversation.agent?.name || '-'}
+                <span className="block truncate max-w-[120px]">
+                  {conversation.agent?.name || '-'}
+                </span>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right tabular-nums">
                 {conversation.messages_count}
               </TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {conversation.usage.total_tokens.toLocaleString()}
+              <TableCell className="text-right font-mono text-xs tabular-nums">
+                ${conversation.usage.total_cost.toFixed(4)}
               </TableCell>
-              <TableCell className="text-right font-mono text-xs">
-                ${conversation.usage.total_cost.toFixed(6)}
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {formatDistanceToNow(new Date(conversation.created_at), {
-                  addSuffix: true,
-                })}
+              <TableCell>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-muted-foreground text-sm cursor-help">
+                      {formatDistanceToNow(new Date(conversation.created_at), {
+                        addSuffix: true,
+                      })}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{format(new Date(conversation.created_at), 'PPpp')}</p>
+                  </TooltipContent>
+                </Tooltip>
               </TableCell>
             </TableRow>
           ))}
