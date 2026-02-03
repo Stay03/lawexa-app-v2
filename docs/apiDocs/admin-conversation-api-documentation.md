@@ -4,6 +4,8 @@
 
 This feature provides superadmin endpoints to view all conversations and their messages for moderation and support purposes. User privacy is preserved by only exposing user UUIDs - no names, emails, or other personal information is included in responses.
 
+**Cost Tracking:** Both endpoints include usage/cost data aggregated from AI responses, allowing admins to monitor token usage and estimated costs per conversation and per message.
+
 ---
 
 ## Table of Contents
@@ -33,7 +35,7 @@ All endpoints require authentication and admin role.
 
 ### GET /api/admin/conversations
 
-List all conversations with pagination, filtering, and sorting.
+List all conversations with pagination, filtering, and sorting. Includes aggregated usage/cost data for each conversation.
 
 **Query Parameters:**
 
@@ -92,6 +94,12 @@ GET /api/admin/conversations?status=active&is_private=false&per_page=10
         "updated_at": null
       },
       "messages_count": 14,
+      "usage": {
+        "total_cost": 0.000095,
+        "total_tokens": 490,
+        "prompt_tokens": 442,
+        "completion_tokens": 48
+      },
       "created_at": "2026-01-20T19:19:21+00:00",
       "updated_at": "2026-01-20T19:19:21+00:00"
     },
@@ -115,6 +123,12 @@ GET /api/admin/conversations?status=active&is_private=false&per_page=10
       },
       "workflow": null,
       "messages_count": 0,
+      "usage": {
+        "total_cost": 0,
+        "total_tokens": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0
+      },
       "created_at": "2026-01-31T17:15:20+00:00",
       "updated_at": "2026-01-31T17:15:20+00:00"
     }
@@ -154,7 +168,7 @@ GET /api/admin/conversations?status=archived&is_private=true
 
 ### GET /api/admin/conversations/{uuid}
 
-View a specific conversation with all its messages in chronological order.
+View a specific conversation with all its messages in chronological order. Includes aggregated usage/cost data for the conversation and per-message usage data for assistant messages.
 
 **Path Parameters:**
 
@@ -250,10 +264,23 @@ GET /api/admin/conversations/a0b8d08c-6094-417f-bbf9-9f9425ec4e73
         "role": "assistant",
         "content": "I searched the database for election-related cases but didn't find any results...",
         "metadata": null,
+        "usage": {
+          "prompt_tokens": 150,
+          "completion_tokens": 50,
+          "total_tokens": 200,
+          "estimated_cost": 0.00025,
+          "latency_ms": 1234
+        },
         "created_at": "2026-01-20T19:20:00+00:00"
       }
     ],
     "messages_count": 14,
+    "usage": {
+      "total_cost": 0.000095,
+      "total_tokens": 490,
+      "prompt_tokens": 442,
+      "completion_tokens": 48
+    },
     "created_at": "2026-01-20T19:19:21+00:00",
     "updated_at": "2026-01-20T19:19:21+00:00"
   }
@@ -262,10 +289,12 @@ GET /api/admin/conversations/a0b8d08c-6094-417f-bbf9-9f9425ec4e73
 
 **Notes:**
 - Messages are returned in chronological order (oldest first)
-- User messages have `agent_id: null`
+- User messages have `agent_id: null` and no `usage` field
 - Assistant messages include the `agent_id` that generated them
+- Assistant messages may include `usage` with per-message cost/token data (when linked to an AI response)
 - Tool messages have `role: "tool"` with tool execution results
 - Metadata may contain tool call info, iteration counts, and latency data
+- The conversation-level `usage` aggregates costs from all AI requests in the conversation
 
 ---
 
@@ -322,6 +351,7 @@ Returned when the requested conversation does not exist.
 | `agent` | object\|null | AI agent object (when loaded) |
 | `workflow` | object\|null | Workflow object (when loaded) |
 | `messages_count` | integer | Total message count |
+| `usage` | object | Aggregated usage/cost data |
 | `created_at` | datetime | ISO 8601 timestamp |
 | `updated_at` | datetime | ISO 8601 timestamp |
 
@@ -333,6 +363,15 @@ Same as list, plus:
 |-------|------|-------------|
 | `messages` | array | All messages in chronological order |
 
+### Conversation Usage Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_cost` | float | Total estimated cost in USD |
+| `total_tokens` | integer | Total tokens used (prompt + completion) |
+| `prompt_tokens` | integer | Total input/prompt tokens |
+| `completion_tokens` | integer | Total output/completion tokens |
+
 ### Admin Message Resource
 
 | Field | Type | Description |
@@ -342,7 +381,18 @@ Same as list, plus:
 | `role` | string | `user`, `assistant`, or `tool` |
 | `content` | string | Message content |
 | `metadata` | object\|null | Additional metadata (tool info, iteration, latency) |
+| `usage` | object\|null | Per-message usage data (assistant messages only, when linked) |
 | `created_at` | datetime | ISO 8601 timestamp |
+
+### Message Usage Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `prompt_tokens` | integer | Input/prompt tokens for this message |
+| `completion_tokens` | integer | Output/completion tokens for this message |
+| `total_tokens` | integer | Total tokens for this message |
+| `estimated_cost` | float | Estimated cost in USD |
+| `latency_ms` | integer | Response latency in milliseconds |
 
 ### Agent Object
 
@@ -387,6 +437,7 @@ Same as list, plus:
 | User Avatar | No | Privacy protected |
 | Message Content | Yes | Required for moderation |
 | Message Metadata | Yes | Contains AI usage info |
+| Usage/Cost Data | Yes | Token counts and estimated costs |
 
 **Key Privacy Features:**
 - Users are identified only by their UUID
@@ -408,10 +459,13 @@ Same as list, plus:
 - Debug AI response quality
 - Analyze conversation flow and agent performance
 
-### Analytics
+### Analytics & Cost Monitoring
 - Count conversations by status and privacy
 - Identify high-activity users by UUID
 - Monitor conversation trends over time
+- Track token usage and costs per conversation
+- Identify expensive conversations or users
+- Monitor AI spending patterns
 
 ---
 
@@ -422,5 +476,6 @@ Same as list, plus:
 | List all conversations | Yes | No (403) |
 | View any conversation | Yes | No (403) |
 | View conversation messages | Yes | No (403) |
+| View usage/cost data | Yes | No (403) |
 | See user personal info | No | No |
 | See user UUID | Yes | N/A |

@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowUpDown, Lock, Globe } from 'lucide-react';
+import { ArrowUpDown, Lock, Globe, Coins, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type {
   AdminConversationListItem,
@@ -90,6 +90,16 @@ export function AdminConversationsTable({
             <TableHead>Privacy</TableHead>
             <TableHead>Agent</TableHead>
             <TableHead className="text-right">Messages</TableHead>
+            <TableHead className="text-right">
+              <span className="flex items-center justify-end gap-1">
+                <Hash className="h-3 w-3" /> Tokens
+              </span>
+            </TableHead>
+            <TableHead className="text-right">
+              <span className="flex items-center justify-end gap-1">
+                <Coins className="h-3 w-3" /> Cost
+              </span>
+            </TableHead>
             <TableHead>
               <SortButton field="created_at">Created</SortButton>
             </TableHead>
@@ -131,6 +141,12 @@ export function AdminConversationsTable({
               </TableCell>
               <TableCell className="text-right">
                 {conversation.messages_count}
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground">
+                {conversation.usage.total_tokens.toLocaleString()}
+              </TableCell>
+              <TableCell className="text-right font-mono text-xs">
+                ${conversation.usage.total_cost.toFixed(6)}
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
                 {formatDistanceToNow(new Date(conversation.created_at), {

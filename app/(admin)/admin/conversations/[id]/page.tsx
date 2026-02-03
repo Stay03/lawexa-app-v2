@@ -38,6 +38,8 @@ import {
   Calendar,
   Bot,
   User,
+  Coins,
+  Hash,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { AdminMessage } from '@/types/admin';
@@ -367,7 +369,7 @@ export default function AdminConversationDetailPage({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground mb-1 flex items-center gap-1">
                 <User className="h-3 w-3" /> User UUID
@@ -387,6 +389,24 @@ export default function AdminConversationDetailPage({
                 <MessageSquare className="h-3 w-3" /> Messages
               </p>
               <p>{conversation.messages_count}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1 flex items-center gap-1">
+                <Hash className="h-3 w-3" /> Tokens
+              </p>
+              <p>{conversation.usage.total_tokens.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">
+                {conversation.usage.prompt_tokens.toLocaleString()} in /{' '}
+                {conversation.usage.completion_tokens.toLocaleString()} out
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1 flex items-center gap-1">
+                <Coins className="h-3 w-3" /> Cost
+              </p>
+              <p className="font-mono">
+                ${conversation.usage.total_cost.toFixed(6)}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground mb-1 flex items-center gap-1">

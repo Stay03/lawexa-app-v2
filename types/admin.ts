@@ -1,6 +1,21 @@
 // Admin Conversation Management Types
 // Based on API documentation: /docs/apiDocs/admin-conversation-api-documentation.md
 
+export interface ConversationUsage {
+  total_cost: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+export interface MessageUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  estimated_cost: number;
+  latency_ms: number;
+}
+
 export interface AdminAgent {
   id: number;
   model_id: number | null;
@@ -43,6 +58,7 @@ export interface AdminMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   metadata: AdminMessageMetadata | null;
+  usage?: MessageUsage | null;
   created_at: string;
 }
 
@@ -55,6 +71,7 @@ export interface AdminConversationListItem {
   agent: AdminAgent | null;
   workflow: AdminWorkflow | null;
   messages_count: number;
+  usage: ConversationUsage;
   created_at: string;
   updated_at: string;
 }
