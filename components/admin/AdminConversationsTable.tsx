@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ArrowUpDown, Lock, Globe, Coins } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCost, getCurrencySymbol } from '@/lib/utils/currency';
+import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import type {
   AdminConversationListItem,
   AdminConversationsParams,
@@ -39,6 +41,7 @@ export function AdminConversationsTable({
   onSort,
 }: AdminConversationsTableProps) {
   const router = useRouter();
+  const { exchangeRate, showNGN } = useCurrencyStore();
 
   const handleRowClick = (id: string) => {
     router.push(`/admin/conversations/${id}`);
@@ -102,9 +105,9 @@ export function AdminConversationsTable({
             <TableHead className="w-[100px] font-semibold">Privacy</TableHead>
             <TableHead className="w-[120px] font-semibold">Agent</TableHead>
             <TableHead className="w-[80px] text-right font-semibold">Messages</TableHead>
-            <TableHead className="w-[100px] text-right font-semibold">
+            <TableHead className="w-[110px] text-right font-semibold">
               <span className="flex items-center justify-end gap-1.5">
-                <Coins className="h-3.5 w-3.5" /> Cost
+                <Coins className="h-3.5 w-3.5" /> Cost ({getCurrencySymbol(showNGN)})
               </span>
             </TableHead>
             <TableHead className="w-[140px] font-semibold">
@@ -167,7 +170,11 @@ export function AdminConversationsTable({
                 {conversation.messages_count}
               </TableCell>
               <TableCell className="text-right font-mono text-xs tabular-nums">
-                ${conversation.usage.total_cost.toFixed(4)}
+                {formatCost(conversation.usage.total_cost, {
+                  showNGN,
+                  exchangeRate,
+                  decimals: 4,
+                })}
               </TableCell>
               <TableCell>
                 <Tooltip>

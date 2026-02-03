@@ -30,6 +30,8 @@ import {
 import { ToolCallDetails } from '@/components/chat/tool-call-details';
 import { useAdminConversation } from '@/lib/hooks/useAdmin';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
+import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { formatCost } from '@/lib/utils/currency';
 import {
   ArrowLeft,
   Lock,
@@ -263,6 +265,7 @@ export default function AdminConversationDetailPage({
   const { id } = use(params);
   const { data, isLoading, error } = useAdminConversation(id);
   const { setOverride, clearOverride } = useBreadcrumbStore();
+  const { exchangeRate, showNGN } = useCurrencyStore();
 
   // Set breadcrumb label to conversation title
   useEffect(() => {
@@ -423,7 +426,11 @@ export default function AdminConversationDetailPage({
                 <Coins className="h-3 w-3" /> Cost
               </p>
               <p className="font-mono">
-                ${conversation.usage.total_cost.toFixed(6)}
+                {formatCost(conversation.usage.total_cost, {
+                  showNGN,
+                  exchangeRate,
+                  decimals: 6,
+                })}
               </p>
             </div>
             <div>
