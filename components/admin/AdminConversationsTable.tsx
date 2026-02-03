@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ArrowUpDown, Lock, Globe, Coins } from 'lucide-react';
+import { ArrowUpDown, Lock, Globe, Coins, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCost, getCurrencySymbol } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
@@ -105,6 +105,11 @@ export function AdminConversationsTable({
             <TableHead className="w-[100px] font-semibold">Privacy</TableHead>
             <TableHead className="w-[120px] font-semibold">Agent</TableHead>
             <TableHead className="w-[80px] text-right font-semibold">Messages</TableHead>
+            <TableHead className="w-[100px] text-right font-semibold">
+              <span className="flex items-center justify-end gap-1.5">
+                <Hash className="h-3.5 w-3.5" /> Tokens
+              </span>
+            </TableHead>
             <TableHead className="w-[110px] text-right font-semibold">
               <span className="flex items-center justify-end gap-1.5">
                 <Coins className="h-3.5 w-3.5" /> Cost ({getCurrencySymbol(showNGN)})
@@ -168,6 +173,20 @@ export function AdminConversationsTable({
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {conversation.messages_count}
+              </TableCell>
+              <TableCell className="text-right">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="tabular-nums cursor-help">
+                      {conversation.usage.total_tokens.toLocaleString()}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">
+                      {conversation.usage.prompt_tokens.toLocaleString()} in / {conversation.usage.completion_tokens.toLocaleString()} out
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               </TableCell>
               <TableCell className="text-right font-mono text-xs tabular-nums">
                 {formatCost(conversation.usage.total_cost, {
