@@ -431,6 +431,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     });
   }, [disconnect]);
 
+  // Set error message
+  const setError = useCallback((error: string | null) => {
+    setState((prev) => ({
+      ...prev,
+      error,
+    }));
+  }, []);
+
   return {
     // State
     messages: state.messages,
@@ -447,5 +455,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     addUserMessage,
     disconnect,
     clearChat,
+    setError,
   };
 }

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { chatApi } from '@/lib/api/chat';
 import { cn } from '@/lib/utils';
+import { extractApiError } from '@/lib/utils/api-error';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
@@ -138,6 +139,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
   const { state } = useSidebar();
@@ -345,8 +347,9 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         // Connect to SSE stream to receive messages inline
         connectToStream(executionId);
       }
-    } catch (error) {
-      console.error('Failed to start chat:', error);
+    } catch (err) {
+      const apiError = extractApiError(err);
+      setError(apiError.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -438,6 +441,11 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                     Thinking...
                   </div>
                 )}
+                {error && (
+                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
               </div>
             )}
             </div>
@@ -451,7 +459,10 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         )}>
           <PromptInput
             value={input}
-            onValueChange={setInput}
+            onValueChange={(value) => {
+              setInput(value);
+              if (error) setError(null);
+            }}
             onSubmit={handleSubmit}
             disabled={isSubmitting}
             maxHeight={36}

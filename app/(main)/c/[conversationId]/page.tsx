@@ -48,6 +48,7 @@ import { isToolMessage, type ToolMessage, type ConversationMessage } from '@/typ
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { extractApiError } from '@/lib/utils/api-error';
 import { useRotatingText } from '@/lib/hooks/useRotatingText';
 import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { ChatProvider } from '@/lib/contexts/chat-context';
@@ -248,6 +249,7 @@ function ConversationPageContent() {
     setConversationId,
     addUserMessage,
     disconnect,
+    setError,
   } = useChatStream({
     onError: (err) => console.error('Chat error:', err),
   });
@@ -368,7 +370,8 @@ function ConversationPageContent() {
         connectToStream(response.data.execution_id);
       }
     } catch (err) {
-      console.error('Failed to send message:', err);
+      const apiError = extractApiError(err);
+      setError(apiError.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -405,7 +408,8 @@ function ConversationPageContent() {
         connectToStream(response.data.execution_id);
       }
     } catch (err) {
-      console.error('Failed to send message:', err);
+      const apiError = extractApiError(err);
+      setError(apiError.message);
     } finally {
       setIsSubmitting(false);
     }

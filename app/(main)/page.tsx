@@ -19,12 +19,14 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { extractApiError } from '@/lib/utils/api-error';
 
 export default function HomePage() {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { greeting, name } = useGreetingParts();
   const router = useRouter();
   const [showLinks, setShowLinks] = useState(false);
@@ -69,8 +71,9 @@ export default function HomePage() {
         // Pass initial message and execution_id via URL params
         router.push(`/c/${conversationId}?msg=${encodeURIComponent(message)}&exec=${executionId}`);
       }
-    } catch (error) {
-      console.error('Failed to start chat:', error);
+    } catch (err) {
+      const apiError = extractApiError(err);
+      setError(apiError.message);
       setIsSubmitting(false);
     }
   };
@@ -137,12 +140,22 @@ export default function HomePage() {
         </a>
       </div>
 
+      {/* Error display */}
+      {error && (
+        <div className="mb-4 w-full max-w-2xl rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
       {/* Prompt Input with FileUpload wrapper */}
       <div className="w-full max-w-2xl">
         <FileUpload onFilesAdded={handleFilesAdded} multiple>
           <PromptInput
             value={input}
-            onValueChange={setInput}
+            onValueChange={(value) => {
+              setInput(value);
+              if (error) setError(null);
+            }}
             onSubmit={handleSubmit}
             disabled={isSubmitting}
           >
