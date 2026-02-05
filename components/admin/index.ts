@@ -8,4 +8,3 @@ export { AdminMessageList } from './AdminMessageList';
 export { AdminUserTokenUsage } from './AdminUserTokenUsage';
 export { UserIdentityCard } from './UserIdentityCard';
 export { QuickStatsRow } from './QuickStatsRow';
-export { UserProfileCard } from './UserProfileCard';

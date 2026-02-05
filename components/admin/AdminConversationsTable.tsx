@@ -32,6 +32,7 @@ interface AdminConversationsTableProps {
   isLoading: boolean;
   params: AdminConversationsParams;
   onSort: (sortBy: 'created_at' | 'updated_at' | 'title') => void;
+  hideUserColumn?: boolean;
 }
 
 export function AdminConversationsTable({
@@ -39,6 +40,7 @@ export function AdminConversationsTable({
   isLoading,
   params,
   onSort,
+  hideUserColumn = false,
 }: AdminConversationsTableProps) {
   const router = useRouter();
   const { exchangeRate, showNGN } = useCurrencyStore();
@@ -105,7 +107,9 @@ export function AdminConversationsTable({
             <TableHead className="w-[280px] font-semibold">
               <SortButton field="title">Title</SortButton>
             </TableHead>
-            <TableHead className="w-[120px] font-semibold">User</TableHead>
+            {!hideUserColumn && (
+              <TableHead className="w-[120px] font-semibold">User</TableHead>
+            )}
             <TableHead className="w-[90px] font-semibold">Status</TableHead>
             <TableHead className="w-[100px] font-semibold">Privacy</TableHead>
             <TableHead className="w-[120px] font-semibold">Agent</TableHead>
@@ -140,23 +144,25 @@ export function AdminConversationsTable({
                   {conversation.title || 'Untitled'}
                 </span>
               </TableCell>
-              <TableCell>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={(e) => handleUserClick(e, conversation.user_uuid)}
-                      className="font-mono text-xs text-muted-foreground hover:text-primary hover:underline transition-colors cursor-pointer"
-                    >
-                      {conversation.user_uuid.slice(0, 8)}...
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p className="font-mono text-xs">{conversation.user_uuid}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Click to view user</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TableCell>
+              {!hideUserColumn && (
+                <TableCell>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={(e) => handleUserClick(e, conversation.user_uuid)}
+                        className="font-mono text-xs text-muted-foreground hover:text-primary hover:underline transition-colors cursor-pointer"
+                      >
+                        {conversation.user_uuid.slice(0, 8)}...
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="font-mono text-xs">{conversation.user_uuid}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Click to view user</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableCell>
+              )}
               <TableCell>
                 <Badge
                   variant={conversation.status === 'active' ? 'default' : 'secondary'}
