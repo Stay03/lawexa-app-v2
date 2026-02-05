@@ -3,6 +3,11 @@ import type {
   AdminConversationsParams,
   AdminConversationsListResponse,
   AdminConversationDetailResponse,
+  AdminUserDetailResponse,
+  AdminUserConversationsParams,
+  AdminUserConversationsResponse,
+  AdminUserTokenUsageParams,
+  AdminUserTokenUsageResponse,
 } from '@/types/admin';
 
 export const adminApi = {
@@ -39,6 +44,66 @@ export const adminApi = {
   ): Promise<AdminConversationDetailResponse> => {
     const response = await apiClient.get<AdminConversationDetailResponse>(
       `/admin/conversations/${uuid}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get user details by UUID
+   * Requires admin role
+   */
+  getUser: async (uuid: string): Promise<AdminUserDetailResponse> => {
+    const response = await apiClient.get<AdminUserDetailResponse>(
+      `/admin/users/${uuid}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get all conversations for a specific user
+   * Requires admin role
+   */
+  getUserConversations: async (
+    uuid: string,
+    params: AdminUserConversationsParams = {}
+  ): Promise<AdminUserConversationsResponse> => {
+    const response = await apiClient.get<AdminUserConversationsResponse>(
+      `/admin/users/${uuid}/conversations`,
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          status: params.status,
+          sort_by: params.sort_by ?? 'created_at',
+          sort_order: params.sort_order ?? 'desc',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get token usage statistics for a specific user
+   * Requires admin role
+   */
+  getUserTokenUsage: async (
+    uuid: string,
+    params: AdminUserTokenUsageParams = {}
+  ): Promise<AdminUserTokenUsageResponse> => {
+    const response = await apiClient.get<AdminUserTokenUsageResponse>(
+      `/admin/users/${uuid}/token-usage`,
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          start_date: params.start_date,
+          end_date: params.end_date,
+          agent_slug: params.agent_slug,
+          group_by: params.group_by ?? 'none',
+          sort_by: params.sort_by ?? 'created_at',
+          sort_order: params.sort_order ?? 'desc',
+        },
+      }
     );
     return response.data;
   },

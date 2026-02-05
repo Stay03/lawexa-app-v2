@@ -2,7 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
-import type { AdminConversationsParams } from '@/types/admin';
+import type {
+  AdminConversationsParams,
+  AdminUserConversationsParams,
+  AdminUserTokenUsageParams,
+} from '@/types/admin';
 
 // Query key factory for organized caching
 export const adminKeys = {
@@ -12,6 +16,12 @@ export const adminKeys = {
     [...adminKeys.conversations(), 'list', params] as const,
   conversationDetail: (uuid: string) =>
     [...adminKeys.conversations(), 'detail', uuid] as const,
+  users: () => [...adminKeys.all, 'users'] as const,
+  userDetail: (uuid: string) => [...adminKeys.users(), 'detail', uuid] as const,
+  userConversations: (uuid: string, params: AdminUserConversationsParams) =>
+    [...adminKeys.users(), uuid, 'conversations', params] as const,
+  userTokenUsage: (uuid: string, params: AdminUserTokenUsageParams) =>
+    [...adminKeys.users(), uuid, 'token-usage', params] as const,
 };
 
 /**
@@ -32,6 +42,48 @@ export function useAdminConversation(uuid: string) {
   return useQuery({
     queryKey: adminKeys.conversationDetail(uuid),
     queryFn: () => adminApi.getConversation(uuid),
+    enabled: !!uuid,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching user details
+ */
+export function useAdminUser(uuid: string) {
+  return useQuery({
+    queryKey: adminKeys.userDetail(uuid),
+    queryFn: () => adminApi.getUser(uuid),
+    enabled: !!uuid,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching a user's conversations
+ */
+export function useAdminUserConversations(
+  uuid: string,
+  params: AdminUserConversationsParams = {}
+) {
+  return useQuery({
+    queryKey: adminKeys.userConversations(uuid, params),
+    queryFn: () => adminApi.getUserConversations(uuid, params),
+    enabled: !!uuid,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching user token usage statistics
+ */
+export function useAdminUserTokenUsage(
+  uuid: string,
+  params: AdminUserTokenUsageParams = {}
+) {
+  return useQuery({
+    queryKey: adminKeys.userTokenUsage(uuid, params),
+    queryFn: () => adminApi.getUserTokenUsage(uuid, params),
     enabled: !!uuid,
     staleTime: 30 * 1000, // 30 seconds
   });

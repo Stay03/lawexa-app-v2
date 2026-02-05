@@ -47,6 +47,11 @@ export function AdminConversationsTable({
     router.push(`/admin/conversations/${id}`);
   };
 
+  const handleUserClick = (e: React.MouseEvent, userUuid: string) => {
+    e.stopPropagation();
+    router.push(`/admin/users/${userUuid}/conversations`);
+  };
+
   const SortButton = ({
     field,
     children,
@@ -138,12 +143,17 @@ export function AdminConversationsTable({
               <TableCell>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="font-mono text-xs text-muted-foreground cursor-help">
+                    <button
+                      type="button"
+                      onClick={(e) => handleUserClick(e, conversation.user_uuid)}
+                      className="font-mono text-xs text-muted-foreground hover:text-primary hover:underline transition-colors cursor-pointer"
+                    >
                       {conversation.user_uuid.slice(0, 8)}...
-                    </span>
+                    </button>
                   </TooltipTrigger>
                   <TooltipContent side="top">
                     <p className="font-mono text-xs">{conversation.user_uuid}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click to view user</p>
                   </TooltipContent>
                 </Tooltip>
               </TableCell>

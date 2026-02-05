@@ -42,7 +42,6 @@ const adminNavItems: AdminNavItem[] = [
     title: 'Users',
     url: '/admin/users',
     icon: Users,
-    comingSoon: true,
   },
   {
     title: 'Analytics',
