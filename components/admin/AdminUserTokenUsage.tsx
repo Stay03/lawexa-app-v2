@@ -46,6 +46,7 @@ import type {
 
 interface AdminUserTokenUsageProps {
   userUuid: string;
+  hideSummary?: boolean;
 }
 
 // Type guards for different breakdown record types
@@ -65,7 +66,7 @@ function isConversationRecord(record: TokenUsageBreakdownRecord): record is Toke
   return 'conversation_uuid' in record && 'conversation_title' in record;
 }
 
-export function AdminUserTokenUsage({ userUuid }: AdminUserTokenUsageProps) {
+export function AdminUserTokenUsage({ userUuid, hideSummary = false }: AdminUserTokenUsageProps) {
   const router = useRouter();
   const { exchangeRate, showNGN } = useCurrencyStore();
 
@@ -324,8 +325,8 @@ export function AdminUserTokenUsage({ userUuid }: AdminUserTokenUsageProps) {
 
   return (
     <div className="space-y-4">
-      {/* Summary Card */}
-      {summary && (
+      {/* Summary Card - Hidden when hideSummary is true */}
+      {!hideSummary && summary && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Usage Summary</CardTitle>
