@@ -49,7 +49,7 @@ export function AdminConversationsTable({
 
   const handleUserClick = (e: React.MouseEvent, userUuid: string) => {
     e.stopPropagation();
-    router.push(`/admin/users/${userUuid}/conversations`);
+    router.push(`/admin/users/${userUuid}`);
   };
 
   const SortButton = ({
