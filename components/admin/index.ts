@@ -1,5 +1,6 @@
 export { AdminSidebar } from './admin-sidebar';
 export { AdminNavMain } from './admin-nav-main';
+export { AdminNavAiSection } from './admin-nav-ai';
 export { AdminConversationsTable } from './AdminConversationsTable';
 export { AdminConversationFilters } from './AdminConversationFilters';
 export { AdminUserConversationFilters } from './AdminUserConversationFilters';

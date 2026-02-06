@@ -13,6 +13,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 import { AdminNavMain, type AdminNavItem } from '@/components/admin/admin-nav-main';
+import { AdminNavAiSection } from '@/components/admin/admin-nav-ai';
 import { NavUser } from '@/components/layout/nav-user';
 import {
   Sidebar,
@@ -98,6 +99,7 @@ export function AdminSidebar({
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-0">
         <AdminNavMain items={adminNavItems} />
+        <AdminNavAiSection />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

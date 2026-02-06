@@ -142,6 +142,7 @@ function UserConversationsPageContent({ uuid }: UserConversationsPageContentProp
             <AdminPagination
               pagination={data.pagination}
               onPageChange={handlePageChange}
+              itemLabel="conversations"
             />
           )}
         </CardContent>

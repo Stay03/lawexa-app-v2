@@ -108,6 +108,7 @@ function AdminConversationsPageContent() {
             <AdminPagination
               pagination={data.pagination}
               onPageChange={handlePageChange}
+              itemLabel="conversations"
             />
           )}
         </CardContent>

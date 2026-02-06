@@ -195,6 +195,7 @@ export default function AdminUserDetailPage({
                 <AdminPagination
                   pagination={conversationsData.pagination}
                   onPageChange={handlePageChange}
+                  itemLabel="conversations"
                 />
               )}
             </CardContent>

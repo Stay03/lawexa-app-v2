@@ -7,11 +7,13 @@ import type { AdminConversationsPagination } from '@/types/admin';
 interface AdminPaginationProps {
   pagination: AdminConversationsPagination;
   onPageChange: (page: number) => void;
+  itemLabel?: string;
 }
 
 export function AdminPagination({
   pagination,
   onPageChange,
+  itemLabel = 'items',
 }: AdminPaginationProps) {
   const { current_page, last_page, total, from, to } = pagination;
   const hasPrevious = current_page > 1;
@@ -20,7 +22,7 @@ export function AdminPagination({
   return (
     <div className="flex items-center justify-between border-t border-border pt-4">
       <p className="text-sm text-muted-foreground">
-        Showing {from || 0} - {to || 0} of {total} conversations
+        Showing {from || 0} - {to || 0} of {total} {itemLabel}
       </p>
 
       <div className="flex items-center gap-2">

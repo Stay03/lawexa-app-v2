@@ -466,6 +466,7 @@ export function AdminUserTokenUsage({ userUuid, hideSummary = false }: AdminUser
             <AdminPagination
               pagination={data.pagination}
               onPageChange={handlePageChange}
+              itemLabel="records"
             />
           )}
         </CardContent>
