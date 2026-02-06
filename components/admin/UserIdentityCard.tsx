@@ -18,6 +18,9 @@ import {
   Briefcase,
   MapPin,
   GraduationCap,
+  Building2,
+  Scale,
+  TrendingUp,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -42,8 +45,11 @@ export function UserIdentityCard({ user, className }: UserIdentityCardProps) {
   const hasProfileData =
     profile &&
     (profile.profession ||
+      profile.level ||
       profile.city ||
       profile.country ||
+      profile.university ||
+      profile.law_school ||
       profile.area_of_study);
 
   // Build location string
@@ -153,6 +159,15 @@ export function UserIdentityCard({ user, className }: UserIdentityCardProps) {
                   </span>
                 </div>
               )}
+              {profile?.level && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Level
+                  </span>
+                  <span className="font-medium">{profile.level}</span>
+                </div>
+              )}
               {locationString && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground flex items-center gap-1.5">
@@ -160,6 +175,28 @@ export function UserIdentityCard({ user, className }: UserIdentityCardProps) {
                     Location
                   </span>
                   <span className="font-medium">{locationString}</span>
+                </div>
+              )}
+              {profile?.university && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" />
+                    University
+                  </span>
+                  <span className="font-medium text-right max-w-[140px] truncate">
+                    {profile.university}
+                  </span>
+                </div>
+              )}
+              {profile?.law_school && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Scale className="h-3.5 w-3.5" />
+                    Law School
+                  </span>
+                  <span className="font-medium text-right max-w-[140px] truncate">
+                    {profile.law_school}
+                  </span>
                 </div>
               )}
               {profile?.area_of_study && (
