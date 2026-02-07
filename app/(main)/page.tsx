@@ -36,7 +36,7 @@ export default function HomePage() {
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | undefined>(undefined);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const { greeting, name } = useGreetingParts();
   const router = useRouter();
@@ -56,6 +56,18 @@ export default function HomePage() {
     staleTime: 30 * 1000,
   });
   const workflows = workflowsData?.data ?? [];
+
+  // Pre-select the default workflow when data loads
+  useEffect(() => {
+    if (workflows.length > 0 && !selectedWorkflowId) {
+      const defaultWorkflow = workflows.find((w) => w.is_default);
+      if (defaultWorkflow) {
+        setSelectedWorkflowId(String(defaultWorkflow.id));
+      } else {
+        setSelectedWorkflowId(String(workflows[0].id));
+      }
+    }
+  }, [workflows, selectedWorkflowId]);
 
   useEffect(() => {
     // Slide in after a short delay
@@ -83,7 +95,7 @@ export default function HomePage() {
         message,
         stream: true,
         ...(studyMode && { study_mode: true }),
-        ...(selectedWorkflowId && { workflow_id: Number(selectedWorkflowId) }),
+        ...(selectedWorkflowId && canSelectWorkflow && { workflow_id: Number(selectedWorkflowId) }),
       });
 
       if (response.success) {
@@ -223,16 +235,13 @@ export default function HomePage() {
                 {/* Workflow selector - only for superadmin, admin, researcher */}
                 {canSelectWorkflow && workflows.length > 0 && (
                   <Select
-                    value={selectedWorkflowId ?? 'default'}
-                    onValueChange={(value) =>
-                      setSelectedWorkflowId(value === 'default' ? undefined : value)
-                    }
+                    value={selectedWorkflowId}
+                    onValueChange={setSelectedWorkflowId}
                   >
                     <SelectTrigger size="sm" className="h-7 text-xs border-none bg-transparent hover:bg-secondary-foreground/10 px-2 gap-1">
-                      <SelectValue placeholder="Default" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="default">Default</SelectItem>
                       {workflows.map((workflow) => (
                         <SelectItem key={workflow.id} value={String(workflow.id)}>
                           {workflow.name}
