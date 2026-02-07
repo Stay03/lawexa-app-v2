@@ -43,7 +43,6 @@ import { cn } from '@/lib/utils';
 
 import { useAdminAiWorkflow } from '@/lib/hooks/useAdminAi';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
-import { AiWorkflowFormSheet } from '@/components/admin/ai/AiWorkflowFormSheet';
 import { AiWorkflowDeleteDialog } from '@/components/admin/ai/AiWorkflowDeleteDialog';
 import type { WorkflowAgentRole } from '@/types/admin-ai';
 
@@ -73,7 +72,6 @@ export default function AiWorkflowDetailPage({
   const { data, isLoading, error } = useAdminAiWorkflow(id);
   const { setOverride, clearOverride } = useBreadcrumbStore();
 
-  const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Set breadcrumb label to workflow name
@@ -159,9 +157,11 @@ export default function AiWorkflowDetailPage({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setFormOpen(true)}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
+                  <DropdownMenuItem asChild>
+                    <Link href={`/admin/ai/workflows/${workflow.id}/edit`}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -334,13 +334,6 @@ export default function AiWorkflowDetailPage({
           )}
         </CardContent>
       </Card>
-
-      {/* Edit Sheet */}
-      <AiWorkflowFormSheet
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        workflow={workflow}
-      />
 
       {/* Delete Dialog */}
       <AiWorkflowDeleteDialog

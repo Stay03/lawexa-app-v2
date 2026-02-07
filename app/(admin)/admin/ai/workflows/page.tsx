@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AdminPagination } from '@/components/admin';
 import { AiWorkflowFilters } from '@/components/admin/ai/AiWorkflowFilters';
 import { AiWorkflowsTable } from '@/components/admin/ai/AiWorkflowsTable';
-import { AiWorkflowFormSheet } from '@/components/admin/ai/AiWorkflowFormSheet';
 import { AiWorkflowDeleteDialog } from '@/components/admin/ai/AiWorkflowDeleteDialog';
 import { useAdminAiWorkflows } from '@/lib/hooks/useAdminAi';
 import type { AdminAiWorkflowsParams, AdminAiWorkflow } from '@/types/admin-ai';
@@ -21,8 +21,6 @@ function AiWorkflowsPageContent() {
   const searchParams = useSearchParams();
 
   // Dialog state
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingWorkflow, setEditingWorkflow] = useState<AdminAiWorkflow | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletingWorkflow, setDeletingWorkflow] = useState<AdminAiWorkflow | null>(null);
 
@@ -95,19 +93,16 @@ function AiWorkflowsPageContent() {
     [updateParams]
   );
 
-  const handleEdit = useCallback((workflow: AdminAiWorkflow) => {
-    setEditingWorkflow(workflow);
-    setFormOpen(true);
-  }, []);
+  const handleEdit = useCallback(
+    (workflow: AdminAiWorkflow) => {
+      router.push(`/admin/ai/workflows/${workflow.id}/edit`);
+    },
+    [router]
+  );
 
   const handleDelete = useCallback((workflow: AdminAiWorkflow) => {
     setDeletingWorkflow(workflow);
     setDeleteOpen(true);
-  }, []);
-
-  const handleAddWorkflow = useCallback(() => {
-    setEditingWorkflow(null);
-    setFormOpen(true);
   }, []);
 
   return (
@@ -115,10 +110,12 @@ function AiWorkflowsPageContent() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>AI Workflows</CardTitle>
-          <Button onClick={handleAddWorkflow}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Workflow
-          </Button>
+          <Link href="/admin/ai/workflows/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Workflow
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent className="space-y-4">
           <AiWorkflowFilters
@@ -144,12 +141,6 @@ function AiWorkflowsPageContent() {
           )}
         </CardContent>
       </Card>
-
-      <AiWorkflowFormSheet
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        workflow={editingWorkflow}
-      />
 
       <AiWorkflowDeleteDialog
         open={deleteOpen}
