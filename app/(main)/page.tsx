@@ -17,8 +17,18 @@ import {
 import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useQuery } from '@tanstack/react-query';
+import { adminAiApi } from '@/lib/api/admin-ai';
+import { adminAiKeys } from '@/lib/hooks/useAdminAi';
 import { extractApiError } from '@/lib/utils/api-error';
 
 export default function HomePage() {
@@ -26,6 +36,7 @@ export default function HomePage() {
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const { greeting, name } = useGreetingParts();
   const router = useRouter();
@@ -34,6 +45,17 @@ export default function HomePage() {
 
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
+
+  // Workflow selector - only for superadmin, admin, researcher
+  const canSelectWorkflow = !!user?.role && ['superadmin', 'admin', 'researcher'].includes(user.role);
+  const workflowParams = { active_only: true, per_page: 50 };
+  const { data: workflowsData } = useQuery({
+    queryKey: adminAiKeys.workflowsList(workflowParams),
+    queryFn: () => adminAiApi.getWorkflows(workflowParams),
+    enabled: canSelectWorkflow,
+    staleTime: 30 * 1000,
+  });
+  const workflows = workflowsData?.data ?? [];
 
   useEffect(() => {
     // Slide in after a short delay
@@ -61,6 +83,7 @@ export default function HomePage() {
         message,
         stream: true,
         ...(studyMode && { study_mode: true }),
+        ...(selectedWorkflowId && { workflow_id: Number(selectedWorkflowId) }),
       });
 
       if (response.success) {
@@ -187,14 +210,38 @@ export default function HomePage() {
             />
 
             <PromptInputActions className="flex items-center justify-between px-3 pb-3">
-              {/* Attach button - LEFT */}
-              <PromptInputAction tooltip="Attach files">
-                <FileUploadTrigger asChild>
-                  <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
-                    <Paperclip className="text-primary h-5 w-5" />
-                  </div>
-                </FileUploadTrigger>
-              </PromptInputAction>
+              {/* Left actions: Attach + Workflow selector */}
+              <div className="flex items-center gap-1">
+                <PromptInputAction tooltip="Attach files">
+                  <FileUploadTrigger asChild>
+                    <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
+                      <Paperclip className="text-primary h-5 w-5" />
+                    </div>
+                  </FileUploadTrigger>
+                </PromptInputAction>
+
+                {/* Workflow selector - only for superadmin, admin, researcher */}
+                {canSelectWorkflow && workflows.length > 0 && (
+                  <Select
+                    value={selectedWorkflowId ?? 'default'}
+                    onValueChange={(value) =>
+                      setSelectedWorkflowId(value === 'default' ? undefined : value)
+                    }
+                  >
+                    <SelectTrigger size="sm" className="h-7 text-xs border-none bg-transparent hover:bg-secondary-foreground/10 px-2 gap-1">
+                      <SelectValue placeholder="Default" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Default</SelectItem>
+                      {workflows.map((workflow) => (
+                        <SelectItem key={workflow.id} value={String(workflow.id)}>
+                          {workflow.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
 
               {/* Send button - RIGHT */}
               <PromptInputAction tooltip="Send message">
