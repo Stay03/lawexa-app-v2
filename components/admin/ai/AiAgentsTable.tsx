@@ -41,7 +41,6 @@ interface AiAgentsTableProps {
   isLoading: boolean;
   params: AdminAiAgentsParams;
   onSort: (sortBy: AgentSortField) => void;
-  onEdit: (agent: AdminAiAgent) => void;
   onDelete: (agent: AdminAiAgent) => void;
 }
 
@@ -50,7 +49,6 @@ export function AiAgentsTable({
   isLoading,
   params,
   onSort,
-  onEdit,
   onDelete,
 }: AiAgentsTableProps) {
   const router = useRouter();
@@ -213,7 +211,7 @@ export function AiAgentsTable({
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        onEdit(agent);
+                        router.push(`/admin/ai/agents/${agent.id}/edit`);
                       }}
                     >
                       <Pencil className="mr-2 h-4 w-4" />

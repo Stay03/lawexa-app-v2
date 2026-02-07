@@ -1,8 +1,11 @@
 'use client';
 
-import { use, useEffect, useState, useCallback } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 import {
   Card,
   CardContent,
@@ -32,13 +35,12 @@ import {
   Server,
   DollarSign,
   Bot,
-  ShieldAlert,
+  FileText,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { useAdminAiAgent } from '@/lib/hooks/useAdminAi';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
-import { AiAgentFormSheet } from '@/components/admin/ai/AiAgentFormSheet';
 import { AiAgentDeleteDialog } from '@/components/admin/ai/AiAgentDeleteDialog';
 import type { AdminAiAgent } from '@/types/admin-ai';
 
@@ -62,8 +64,6 @@ export default function AiAgentDetailPage({
   const { data, isLoading, error } = useAdminAiAgent(id);
   const { setOverride, clearOverride } = useBreadcrumbStore();
 
-  // Dialog state
-  const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Set breadcrumb label to agent name
@@ -77,11 +77,6 @@ export default function AiAgentDetailPage({
   }, [data?.data?.name, idParam, setOverride, clearOverride]);
 
   const agentForDialogs: AdminAiAgent | null = data?.data || null;
-
-  const handleDeleteSuccess = useCallback(() => {
-    setDeleteOpen(false);
-    router.push('/admin/ai/agents');
-  }, [router]);
 
   if (isLoading) {
     return (
@@ -150,9 +145,11 @@ export default function AiAgentDetailPage({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setFormOpen(true)}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
+                  <DropdownMenuItem asChild>
+                    <Link href={`/admin/ai/agents/${agent.id}/edit`}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -276,23 +273,38 @@ export default function AiAgentDetailPage({
         </Card>
       )}
 
-      {/* System Prompt Note */}
+      {/* System Prompt Card */}
       <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <ShieldAlert className="h-4 w-4 shrink-0" />
-            <p>System prompt is configured but not displayed in the admin interface.</p>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              System Prompt
+            </CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/admin/ai/agents/${agent.id}/edit`}>
+                <Pencil className="mr-2 h-3 w-3" />
+                Edit
+              </Link>
+            </Button>
           </div>
+        </CardHeader>
+        <CardContent>
+          {agent.system_prompt ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none [&_code]:bg-muted [&_pre]:bg-muted [&_pre]:overflow-x-auto rounded-lg border bg-muted/30 p-4">
+              <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>
+                {agent.system_prompt}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No system prompt configured.
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {/* Dialogs */}
-      <AiAgentFormSheet
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        agent={agentForDialogs}
-      />
-
+      {/* Delete Dialog */}
       <AiAgentDeleteDialog
         open={deleteOpen}
         onOpenChange={(open) => {

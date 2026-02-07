@@ -20,9 +20,8 @@ function AiAgentsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Dialog state
+  // Dialog state - Sheet only used for creating new agents
   const [formOpen, setFormOpen] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<AdminAiAgent | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletingAgent, setDeletingAgent] = useState<AdminAiAgent | null>(null);
 
@@ -97,18 +96,12 @@ function AiAgentsPageContent() {
     [updateParams]
   );
 
-  const handleEdit = useCallback((agent: AdminAiAgent) => {
-    setEditingAgent(agent);
-    setFormOpen(true);
-  }, []);
-
   const handleDelete = useCallback((agent: AdminAiAgent) => {
     setDeletingAgent(agent);
     setDeleteOpen(true);
   }, []);
 
   const handleAddAgent = useCallback(() => {
-    setEditingAgent(null);
     setFormOpen(true);
   }, []);
 
@@ -133,7 +126,6 @@ function AiAgentsPageContent() {
             isLoading={isLoading}
             params={params}
             onSort={handleSort}
-            onEdit={handleEdit}
             onDelete={handleDelete}
           />
 
@@ -150,7 +142,6 @@ function AiAgentsPageContent() {
       <AiAgentFormSheet
         open={formOpen}
         onOpenChange={setFormOpen}
-        agent={editingAgent}
       />
 
       <AiAgentDeleteDialog

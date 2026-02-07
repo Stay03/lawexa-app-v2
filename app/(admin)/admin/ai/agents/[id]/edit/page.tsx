@@ -1,17 +1,25 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { use, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -20,14 +28,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
   Form,
   FormControl,
   FormField,
@@ -35,21 +35,24 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Skeleton } from '@/components/ui/skeleton';
 
 import {
+  useAdminAiAgent,
   useAdminAiModels,
-  useCreateAiAgent,
+  useUpdateAiAgent,
 } from '@/lib/hooks/useAdminAi';
+import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { extractApiError } from '@/lib/utils/api-error';
+import type { AdminAiUpdateAgentData } from '@/types/admin-ai';
 
-interface AiAgentFormSheetProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface AiAgentEditPageProps {
+  params: Promise<{ id: string }>;
 }
 
 const slugRegex = /^[a-z0-9-_]+$/;
 
-const createAgentSchema = z.object({
+const agentEditSchema = z.object({
   model_id: z.number({ message: 'AI model is required' }).int().positive('AI model is required'),
   name: z.string().min(1, 'Agent name is required').max(255),
   slug: z
@@ -58,7 +61,7 @@ const createAgentSchema = z.object({
     .max(100)
     .regex(slugRegex, 'Slug must contain only lowercase letters, numbers, hyphens, and underscores'),
   description: z.string().optional(),
-  system_prompt: z.string().min(1, 'System prompt is required'),
+  system_prompt: z.string().optional(),
   temperature: z
     .number()
     .min(0, 'Temperature must be between 0 and 2')
@@ -73,30 +76,23 @@ const createAgentSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-type CreateAgentFormData = z.infer<typeof createAgentSchema>;
+type AgentEditFormData = z.infer<typeof agentEditSchema>;
 
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-}
+export default function AiAgentEditPage({ params }: AiAgentEditPageProps) {
+  const { id: idParam } = use(params);
+  const id = Number(idParam);
+  const router = useRouter();
+  const { setOverride, clearOverride } = useBreadcrumbStore();
 
-export function AiAgentFormSheet({
-  open,
-  onOpenChange,
-}: AiAgentFormSheetProps) {
-  const slugManuallyEdited = useRef(false);
-
+  const { data, isLoading, error } = useAdminAiAgent(id);
   const { data: modelsData } = useAdminAiModels({ per_page: 100 });
   const models = modelsData?.data || [];
+  const updateMutation = useUpdateAiAgent();
 
-  const createMutation = useCreateAiAgent();
+  const hasResetRef = useRef(false);
 
-  const form = useForm<CreateAgentFormData>({
-    resolver: zodResolver(createAgentSchema),
+  const form = useForm<AgentEditFormData>({
+    resolver: zodResolver(agentEditSchema),
     defaultValues: {
       model_id: undefined,
       name: '',
@@ -109,54 +105,58 @@ export function AiAgentFormSheet({
     },
   });
 
-  // Reset form when sheet opens/closes
+  // Set breadcrumb override
   useEffect(() => {
-    if (open) {
-      slugManuallyEdited.current = false;
+    if (data?.data?.name) {
+      setOverride(idParam, data.data.name);
+    }
+    return () => {
+      clearOverride(idParam);
+    };
+  }, [data?.data?.name, idParam, setOverride, clearOverride]);
+
+  // Reset form with agent data once loaded
+  useEffect(() => {
+    if (data?.data && !hasResetRef.current) {
+      hasResetRef.current = true;
+      const agent = data.data;
       form.reset({
-        model_id: undefined,
-        name: '',
-        slug: '',
-        description: '',
-        system_prompt: '',
-        temperature: 0.7,
-        max_response_tokens: 2048,
-        is_active: true,
+        model_id: agent.model_id,
+        name: agent.name,
+        slug: agent.slug,
+        description: agent.description || '',
+        system_prompt: agent.system_prompt || '',
+        temperature: agent.temperature ? Number(agent.temperature) : 0.7,
+        max_response_tokens: agent.max_response_tokens || 2048,
+        is_active: agent.is_active,
       });
     }
-  }, [open, form]);
+  }, [data, form]);
 
-  const handleNameChange = (value: string, onChange: (v: string) => void) => {
-    onChange(value);
-    if (!slugManuallyEdited.current) {
-      form.setValue('slug', generateSlug(value), { shouldValidate: false });
+  const onSubmit = (formData: AgentEditFormData) => {
+    const submitData: AdminAiUpdateAgentData = { ...formData };
+
+    // Strip empty system_prompt (keep current if not changed)
+    if (!submitData.system_prompt) {
+      delete submitData.system_prompt;
     }
-  };
-
-  const handleSlugChange = (value: string, onChange: (v: string) => void) => {
-    slugManuallyEdited.current = true;
-    onChange(value);
-  };
-
-  const onSubmit = (data: CreateAgentFormData) => {
-    const submitData = { ...data };
     // Strip empty description
     if (!submitData.description) {
       delete submitData.description;
     }
 
-    createMutation.mutate(
-      submitData as { model_id: number; name: string; slug: string; system_prompt: string; description?: string; temperature?: number; max_response_tokens?: number; is_active?: boolean },
+    updateMutation.mutate(
+      { id, data: submitData },
       {
         onSuccess: (response) => {
           toast.success(response.message);
-          onOpenChange(false);
+          router.push(`/admin/ai/agents/${id}`);
         },
         onError: (error) => {
           const apiError = extractApiError(error);
           if (apiError.errors) {
             Object.entries(apiError.errors).forEach(([field, messages]) => {
-              form.setError(field as keyof CreateAgentFormData, {
+              form.setError(field as keyof AgentEditFormData, {
                 message: messages[0],
               });
             });
@@ -168,19 +168,54 @@ export function AiAgentFormSheet({
     );
   };
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Add Agent</SheetTitle>
-          <SheetDescription>
-            Configure a new AI agent linked to a model.
-          </SheetDescription>
-        </SheetHeader>
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-[600px] w-full" />
+      </div>
+    );
+  }
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1">
-            <div className="space-y-4 px-6 py-4 flex-1">
+  if (error || !data?.data) {
+    return (
+      <div className="space-y-4">
+        <Link href="/admin/ai/agents">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Agents
+          </Button>
+        </Link>
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Agent not found
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Back Button */}
+      <Link href={`/admin/ai/agents/${id}`}>
+        <Button variant="ghost" size="sm">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Agent
+        </Button>
+      </Link>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* General Settings Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Edit Agent</CardTitle>
+              <CardDescription>
+                Update the agent configuration and settings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               {/* Model Select */}
               <FormField
                 control={form.control}
@@ -226,48 +261,43 @@ export function AiAgentFormSheet({
                 )}
               />
 
-              {/* Name */}
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g. Legal Research Assistant"
-                        {...field}
-                        onChange={(e) =>
-                          handleNameChange(e.target.value, field.onChange)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Name & Slug Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Legal Research Assistant"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Slug */}
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Slug</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g. legal-research-assistant"
-                        className="font-mono text-sm"
-                        {...field}
-                        onChange={(e) =>
-                          handleSlugChange(e.target.value, field.onChange)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="slug"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Slug</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. legal-research-assistant"
+                          className="font-mono text-sm"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {/* Description */}
               <FormField
@@ -285,25 +315,6 @@ export function AiAgentFormSheet({
                       <Textarea
                         placeholder="Brief description of the agent's purpose"
                         className="min-h-[80px] resize-none"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* System Prompt */}
-              <FormField
-                control={form.control}
-                name="system_prompt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>System Prompt</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Enter the system prompt for this agent..."
-                        className="min-h-[120px] resize-none"
                         {...field}
                       />
                     </FormControl>
@@ -383,27 +394,56 @@ export function AiAgentFormSheet({
                   </FormItem>
                 )}
               />
-            </div>
+            </CardContent>
+          </Card>
 
-            <SheetFooter className="flex-row justify-end gap-2 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={createMutation.isPending}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          {/* System Prompt Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>System Prompt</CardTitle>
+              <CardDescription>
+                The system prompt defines the agent&apos;s behavior and personality. Leave empty to keep the current prompt unchanged.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FormField
+                control={form.control}
+                name="system_prompt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter the system prompt for this agent... Supports markdown formatting."
+                        className="min-h-[300px] font-mono text-sm"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-                Create Agent
-              </Button>
-            </SheetFooter>
-          </form>
-        </Form>
-      </SheetContent>
-    </Sheet>
+              />
+            </CardContent>
+          </Card>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push(`/admin/ai/agents/${id}`)}
+              disabled={updateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateMutation.isPending}>
+              {updateMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
   );
 }

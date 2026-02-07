@@ -172,6 +172,7 @@ export interface AdminAiAgent {
   name: string;
   slug: string;
   description: string | null;
+  system_prompt?: string | null;
   temperature: string;
   max_response_tokens: number;
   is_active: boolean;
