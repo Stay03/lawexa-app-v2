@@ -20,12 +20,28 @@ export interface ToolMessage extends ChatMessage {
   latencyMs?: number;
 }
 
+// Handover message - when orchestrator delegates to a sub-agent
+export interface HandoverMessage extends ChatMessage {
+  role: 'assistant';
+  messageType: 'handover';
+  agentSlug: string;
+  task: string;
+  handoverStatus: 'active' | 'complete';
+  latencyMs?: number;
+  success?: boolean;
+}
+
 // Union type for all message types
-export type ConversationMessage = ChatMessage | ToolMessage;
+export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage;
 
 // Type guard for tool messages
 export function isToolMessage(message: ConversationMessage): message is ToolMessage {
   return message.role === 'tool';
+}
+
+// Type guard for handover messages
+export function isHandoverMessage(message: ConversationMessage): message is HandoverMessage {
+  return (message as HandoverMessage).messageType === 'handover';
 }
 
 // Tool call types (from API spec)
@@ -88,6 +104,24 @@ export interface CompletedEvent {
   timestamp: string;
 }
 
+export interface HandoverStartedEvent {
+  iteration: number;
+  status: 'handover_started';
+  agent_slug: string;
+  query: string;
+  timestamp: string;
+}
+
+export interface HandoverCompleteEvent {
+  iteration: number;
+  status: 'handover_complete';
+  agent_slug: string;
+  success: boolean;
+  response_preview?: string;
+  latency_ms: number;
+  timestamp: string;
+}
+
 export interface HeartbeatEvent {
   timestamp: string;
 }
@@ -145,12 +179,17 @@ export interface ApiMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   metadata: {
-    type?: 'tool_call' | 'tool_result';
+    type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result';
     tool_name?: string;
     tool_parameters?: Record<string, unknown>;
     success?: boolean;
     latency_ms?: number;
     iteration?: number;
+    context?: 'handover';
+    target_agent?: string;
+    agent_slug?: string;
+    task?: string;
+    parent_agent?: number;
   } | null;
   created_at: string;
 }

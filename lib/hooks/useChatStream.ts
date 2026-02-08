@@ -10,7 +10,10 @@ import type {
   ToolCallingEvent,
   ToolCompleteEvent,
   IterationEvent,
+  HandoverStartedEvent,
+  HandoverCompleteEvent,
   ToolMessage,
+  HandoverMessage,
   ApiMessage,
   ConversationMessage,
 } from '@/types/chat';
@@ -100,6 +103,54 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     []
   );
 
+  // Add handover message when sub-agent starts
+  const addHandoverMessage = useCallback(
+    (event: HandoverStartedEvent): string => {
+      const id = generateId();
+      const handoverMsg: HandoverMessage = {
+        id,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        messageType: 'handover',
+        agentSlug: event.agent_slug,
+        task: event.query,
+        handoverStatus: 'active',
+      };
+      setState((prev) => ({
+        ...prev,
+        messages: [...prev.messages, handoverMsg],
+      }));
+      return id;
+    },
+    []
+  );
+
+  // Update handover message when sub-agent completes
+  const updateHandoverMessage = useCallback(
+    (event: HandoverCompleteEvent) => {
+      setState((prev) => ({
+        ...prev,
+        messages: prev.messages.map((msg) => {
+          if (
+            (msg as HandoverMessage).messageType === 'handover' &&
+            (msg as HandoverMessage).agentSlug === event.agent_slug &&
+            (msg as HandoverMessage).handoverStatus === 'active'
+          ) {
+            return {
+              ...msg,
+              handoverStatus: 'complete',
+              latencyMs: event.latency_ms,
+              success: event.success,
+            } as HandoverMessage;
+          }
+          return msg;
+        }),
+      }));
+    },
+    []
+  );
+
   // Update tool message when complete
   const updateToolMessage = useCallback(
     (toolName: string, event: ToolCompleteEvent) => {
@@ -138,6 +189,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       }
     });
 
+    // Build a map of handover results by iteration for matching
+    const handoverResultsByIteration = new Map<number, ApiMessage>();
+    apiMessages.forEach(msg => {
+      if (msg.role === 'assistant' && msg.metadata?.type === 'handover_result' && msg.metadata.iteration !== undefined) {
+        handoverResultsByIteration.set(msg.metadata.iteration, msg);
+      }
+    });
+
     for (const apiMsg of apiMessages) {
       // User message
       if (apiMsg.role === 'user') {
@@ -147,6 +206,30 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           content: apiMsg.content,
           timestamp: new Date(apiMsg.created_at),
         } as ChatMessage);
+      }
+      // Handover message - orchestrator delegating to sub-agent
+      else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'handover') {
+        const iteration = apiMsg.metadata.iteration;
+        const handoverResult = iteration !== undefined
+          ? handoverResultsByIteration.get(iteration)
+          : undefined;
+
+        messages.push({
+          id: `msg_${apiMsg.id}`,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(apiMsg.created_at),
+          messageType: 'handover',
+          agentSlug: apiMsg.metadata.target_agent || 'agent',
+          task: apiMsg.metadata.task || '',
+          handoverStatus: 'complete',
+          latencyMs: handoverResult?.metadata?.latency_ms,
+          success: handoverResult?.metadata?.success ?? true,
+        } as HandoverMessage);
+      }
+      // Skip handover result messages (already captured above)
+      else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'handover_result') {
+        continue;
       }
       // Assistant tool call - transform to ToolMessage with result
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'tool_call') {
@@ -302,6 +385,18 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         onIteration?.(event);
       });
 
+      // Handle handover_started event - sub-agent delegation
+      eventSource.addEventListener('handover_started', (e) => {
+        const event: HandoverStartedEvent = JSON.parse(e.data);
+        addHandoverMessage(event);
+      });
+
+      // Handle handover_complete event - sub-agent finished
+      eventSource.addEventListener('handover_complete', (e) => {
+        const event: HandoverCompleteEvent = JSON.parse(e.data);
+        updateHandoverMessage(event);
+      });
+
       // Handle tool_calling event - add as separate history entry
       eventSource.addEventListener('tool_calling', (e) => {
         const event: ToolCallingEvent = JSON.parse(e.data);
@@ -390,6 +485,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       token,
       addUserMessage,
       addAssistantMessage,
+      addHandoverMessage,
+      updateHandoverMessage,
       addToolMessage,
       updateToolMessage,
       onConnected,
