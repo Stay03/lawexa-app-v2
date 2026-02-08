@@ -142,6 +142,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               handoverStatus: 'complete',
               latencyMs: event.latency_ms,
               success: event.success,
+              handoverResultContent: event.response_preview || undefined,
             } as HandoverMessage;
           }
           return msg;
@@ -214,6 +215,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           ? handoverResultsByIteration.get(iteration)
           : undefined;
 
+        // Extract handover result content if available
+        let handoverResultContent: string | undefined;
+        if (handoverResult) {
+          const content = handoverResult.content;
+          // Only use content if it's not raw JSON (i.e., it's the agent's actual response)
+          if (content && !content.startsWith('{')) {
+            handoverResultContent = content;
+          }
+        }
+
         messages.push({
           id: `msg_${apiMsg.id}`,
           role: 'assistant',
@@ -225,6 +236,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           handoverStatus: 'complete',
           latencyMs: handoverResult?.metadata?.latency_ms,
           success: handoverResult?.metadata?.success ?? true,
+          handoverResultContent,
         } as HandoverMessage);
       }
       // Skip handover result messages (already captured above)

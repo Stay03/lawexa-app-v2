@@ -240,6 +240,7 @@ function HandoverDisplay({
   toolMessages: ToolMessage[];
 }) {
   const [isTaskExpanded, setIsTaskExpanded] = useState(false);
+  const [isResultExpanded, setIsResultExpanded] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
 
   const toggleStep = (messageId: string) => {
@@ -379,6 +380,39 @@ function HandoverDisplay({
                 );
               })}
             </ChainOfThought>
+          </div>
+        )}
+
+        {/* Agent response - expandable section */}
+        {handover.handoverResultContent && isComplete && (
+          <div className="ml-2 mt-1">
+            <Collapsible open={isResultExpanded} onOpenChange={setIsResultExpanded}>
+              <CollapsibleTrigger asChild>
+                <button className="hover:bg-muted/50 flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors">
+                  <Eye className="text-muted-foreground h-3.5 w-3.5" />
+                  <span className="text-muted-foreground text-xs">
+                    {isResultExpanded ? 'Hide' : 'View'} agent response
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'text-muted-foreground h-3 w-3 transition-transform duration-200',
+                      isResultExpanded && 'rotate-180'
+                    )}
+                  />
+                </button>
+              </CollapsibleTrigger>
+
+              <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+                <div className="mt-2 rounded-lg border bg-muted/20 p-4">
+                  <MessageContent
+                    className="prose prose-sm dark:prose-invert"
+                    markdown
+                  >
+                    {handover.handoverResultContent}
+                  </MessageContent>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         )}
       </div>

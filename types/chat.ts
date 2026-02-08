@@ -29,6 +29,7 @@ export interface HandoverMessage extends ChatMessage {
   handoverStatus: 'active' | 'complete';
   latencyMs?: number;
   success?: boolean;
+  handoverResultContent?: string;
 }
 
 // Union type for all message types
