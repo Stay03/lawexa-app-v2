@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { useIsMobile } from "@/hooks/use-mobile"
 import React, {
   createContext,
   useContext,
@@ -160,8 +161,10 @@ function PromptInputTextarea({
     setValue(e.target.value)
   }
 
+  const isMobile = useIsMobile()
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !isMobile) {
       e.preventDefault()
       onSubmit?.()
     }
