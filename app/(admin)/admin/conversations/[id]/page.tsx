@@ -400,7 +400,7 @@ function HandoverDisplay({
               </CollapsibleTrigger>
 
               <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
-                <div className="mt-2 rounded-lg border bg-muted/20 p-4">
+                <div className="mt-2 max-h-60 overflow-y-auto rounded-lg border bg-muted/20 p-4">
                   <MessageContent
                     className="prose prose-sm dark:prose-invert"
                     markdown
