@@ -36,7 +36,7 @@ export function NavConversations() {
         setIsLoading(true)
         setError(null)
         const response = await chatApi.listConversations({
-          per_page: 50,
+          per_page: 15,
           status: 'active',
           sort_by: 'updated_at',
           sort_order: 'desc',

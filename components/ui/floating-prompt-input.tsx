@@ -465,13 +465,13 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             }}
             onSubmit={handleSubmit}
             disabled={isSubmitting}
-            maxHeight={36}
+            maxHeight={isMobile ? 120 : 36}
           >
             <div className="flex items-center gap-2 px-1">
               <PromptInputTextarea
                 placeholder="Ask a question..."
                 className="text-foreground min-h-[36px] py-2"
-                disableAutosize
+                disableAutosize={!isMobile}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
               />
