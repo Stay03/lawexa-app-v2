@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MessageSquare, Loader2 } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -63,9 +63,16 @@ export function NavConversations() {
       <div className="flex-1 overflow-y-auto">
         <SidebarMenu>
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
+            <>
+              {[1, 0.8, 0.5, 0.25, 0.1].map((opacity, i) => (
+                <SidebarMenuItem key={i}>
+                  <div className="flex items-center gap-2 px-2 py-1.5" style={{ opacity }}>
+                    <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-muted" />
+                    <div className="h-3.5 flex-1 animate-pulse rounded bg-muted" />
+                  </div>
+                </SidebarMenuItem>
+              ))}
+            </>
           ) : error ? (
             <div className="px-3 py-2 text-xs text-muted-foreground">
               {error}
