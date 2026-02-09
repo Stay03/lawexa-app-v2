@@ -44,12 +44,17 @@ export interface AdminWorkflow {
 }
 
 export interface AdminMessageMetadata {
-  type?: 'tool_call' | 'tool_result';
+  type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result';
   tool_name?: string;
   tool_parameters?: Record<string, unknown>;
   success?: boolean;
   latency_ms?: number;
   iteration?: number;
+  target_agent?: string;
+  task?: string;
+  agent_slug?: string;
+  parent_agent?: number;
+  context?: 'handover';
 }
 
 export interface AdminMessage {

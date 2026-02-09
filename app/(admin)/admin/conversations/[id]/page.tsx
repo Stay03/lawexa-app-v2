@@ -42,16 +42,34 @@ import {
   User,
   Coins,
   Hash,
+  Eye,
+  ChevronDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import type { AdminMessage } from '@/types/admin';
-import type { ConversationMessage, ToolMessage } from '@/types/chat';
+import type { ConversationMessage, ToolMessage, HandoverMessage } from '@/types/chat';
+import { isHandoverMessage } from '@/types/chat';
 
 // Convert AdminMessage to ConversationMessage for chat components
 function convertAdminMessages(
   adminMessages: AdminMessage[]
 ): ConversationMessage[] {
-  return adminMessages.map((msg) => {
+  const messages: ConversationMessage[] = [];
+
+  // Build a map of handover_result messages by iteration
+  const handoverResultsByIteration = new Map<number, AdminMessage>();
+  adminMessages.forEach((msg) => {
+    if (
+      msg.role === 'assistant' &&
+      msg.metadata?.type === 'handover_result' &&
+      msg.metadata.iteration !== undefined
+    ) {
+      handoverResultsByIteration.set(msg.metadata.iteration, msg);
+    }
+  });
+
+  for (const msg of adminMessages) {
     const base = {
       id: String(msg.id),
       role: msg.role,
@@ -59,9 +77,46 @@ function convertAdminMessages(
       timestamp: new Date(msg.created_at),
     };
 
+    // Handle handover messages - orchestrator delegating to sub-agent
+    if (msg.role === 'assistant' && msg.metadata?.type === 'handover') {
+      const iteration = msg.metadata.iteration;
+      const handoverResult =
+        iteration !== undefined
+          ? handoverResultsByIteration.get(iteration)
+          : undefined;
+
+      let handoverResultContent: string | undefined;
+      if (handoverResult) {
+        const content = handoverResult.content;
+        if (content && !content.startsWith('{')) {
+          handoverResultContent = content;
+        }
+      }
+
+      messages.push({
+        id: String(msg.id),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(msg.created_at),
+        messageType: 'handover',
+        agentSlug: msg.metadata.target_agent || 'agent',
+        task: msg.metadata.task || '',
+        handoverStatus: 'complete',
+        latencyMs: handoverResult?.metadata?.latency_ms,
+        success: handoverResult?.metadata?.success ?? true,
+        handoverResultContent,
+      } as HandoverMessage);
+      continue;
+    }
+
+    // Skip handover_result messages (already captured above)
+    if (msg.role === 'assistant' && msg.metadata?.type === 'handover_result') {
+      continue;
+    }
+
     // Handle tool_result messages
     if (msg.role === 'tool' && msg.metadata?.type === 'tool_result') {
-      return {
+      messages.push({
         ...base,
         role: 'tool' as const,
         toolName: msg.metadata.tool_name || 'unknown',
@@ -73,12 +128,13 @@ function convertAdminMessages(
         },
         toolStatus: 'complete' as const,
         latencyMs: msg.metadata.latency_ms,
-      } as ToolMessage;
+      } as ToolMessage);
+      continue;
     }
 
     // Handle tool_call messages - these are assistant messages requesting tool use
     if (msg.metadata?.type === 'tool_call') {
-      return {
+      messages.push({
         ...base,
         role: 'tool' as const,
         toolName: msg.metadata.tool_name || 'unknown',
@@ -90,11 +146,14 @@ function convertAdminMessages(
         },
         toolStatus: 'complete' as const,
         latencyMs: msg.metadata.latency_ms,
-      } as ToolMessage;
+      } as ToolMessage);
+      continue;
     }
 
-    return base as ConversationMessage;
-  });
+    messages.push(base as ConversationMessage);
+  }
+
+  return messages;
 }
 
 // Type guard for tool messages
@@ -105,27 +164,39 @@ function isToolMessage(message: ConversationMessage): message is ToolMessage {
 // Message grouping types
 type MessageGroup =
   | { type: 'single'; message: ConversationMessage }
-  | { type: 'tool-chain'; messages: ToolMessage[] };
+  | { type: 'tool-chain'; messages: ToolMessage[] }
+  | { type: 'handover-group'; handover: HandoverMessage; toolMessages: ToolMessage[] };
 
-// Group consecutive tool messages together
+// Group consecutive tool messages together, and handover + tool chains into handover groups
 function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
-  let currentToolGroup: ToolMessage[] = [];
+  let i = 0;
 
-  for (const message of messages) {
-    if (isToolMessage(message)) {
-      currentToolGroup.push(message);
-    } else {
-      if (currentToolGroup.length > 0) {
-        groups.push({ type: 'tool-chain', messages: currentToolGroup });
-        currentToolGroup = [];
+  while (i < messages.length) {
+    const msg = messages[i];
+
+    if (isHandoverMessage(msg)) {
+      // Collect subsequent tool messages into the handover group
+      const toolMessages: ToolMessage[] = [];
+      i++;
+      while (i < messages.length && isToolMessage(messages[i])) {
+        toolMessages.push(messages[i] as ToolMessage);
+        i++;
       }
-      groups.push({ type: 'single', message });
+      groups.push({ type: 'handover-group', handover: msg, toolMessages });
+    } else if (isToolMessage(msg)) {
+      // Regular tool chain (not part of a handover)
+      const toolMessages: ToolMessage[] = [msg];
+      i++;
+      while (i < messages.length && isToolMessage(messages[i])) {
+        toolMessages.push(messages[i] as ToolMessage);
+        i++;
+      }
+      groups.push({ type: 'tool-chain', messages: toolMessages });
+    } else {
+      groups.push({ type: 'single', message: msg });
+      i++;
     }
-  }
-
-  if (currentToolGroup.length > 0) {
-    groups.push({ type: 'tool-chain', messages: currentToolGroup });
   }
 
   return groups;
@@ -174,6 +245,176 @@ function formatToolMessage(
 // Format latency in seconds
 function formatLatency(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s`;
+}
+
+// Format agent slug to readable name
+function formatAgentName(slug: string): string {
+  return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Handover display component - renders agent delegation with nested tool calls
+function HandoverDisplay({
+  handover,
+  toolMessages,
+}: {
+  handover: HandoverMessage;
+  toolMessages: ToolMessage[];
+}) {
+  const [isTaskExpanded, setIsTaskExpanded] = useState(false);
+  const [isResultExpanded, setIsResultExpanded] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+
+  const toggleStep = (messageId: string) => {
+    setExpandedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  };
+
+  const agentName = formatAgentName(handover.agentSlug);
+
+  return (
+    <div className="px-4">
+      <div className="mx-auto max-w-2xl">
+        {/* Agent header */}
+        <Collapsible open={isTaskExpanded} onOpenChange={setIsTaskExpanded}>
+          <CollapsibleTrigger asChild>
+            <div className="hover:bg-muted/50 -mx-1 mb-1 flex cursor-pointer items-center gap-2 rounded-md px-1 py-1.5 transition-colors">
+              <div className="bg-primary/10 text-primary flex h-5 w-5 items-center justify-center rounded-full">
+                <Bot className="h-3 w-3" />
+              </div>
+              <span className="text-sm font-medium">{agentName}</span>
+              <div className="flex-1" />
+              {handover.latencyMs && (
+                <span className="text-muted-foreground text-xs">
+                  completed {(handover.latencyMs / 1000).toFixed(1)}s
+                </span>
+              )}
+              <ChevronDown
+                className={cn(
+                  'text-muted-foreground h-3.5 w-3.5 transition-transform duration-200',
+                  isTaskExpanded && 'rotate-180'
+                )}
+              />
+            </div>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+            {handover.task && (
+              <div className="mb-2 ml-7 rounded-md bg-muted/30 px-3 py-2">
+                <p className="text-muted-foreground text-xs italic">
+                  &ldquo;{handover.task}&rdquo;
+                </p>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Nested tool chain */}
+        {toolMessages.length > 0 && (
+          <div className="ml-2">
+            <ChainOfThought>
+              {toolMessages.map((message, index) => {
+                const isSuccess = message.toolResult?.success;
+                const isLast = index === toolMessages.length - 1;
+                const isExpanded = expandedSteps.has(message.id);
+
+                const status = isSuccess ? 'success' : 'error';
+
+                const { action, detail } = formatToolMessage(
+                  message.toolName,
+                  message.toolParameters
+                );
+
+                return (
+                  <ChainOfThoughtStep
+                    key={message.id}
+                    isLast={isLast}
+                    status={status}
+                  >
+                    <Collapsible
+                      open={isExpanded}
+                      onOpenChange={() => toggleStep(message.id)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <ChainOfThoughtTrigger
+                          isClickable={true}
+                          isExpanded={isExpanded}
+                          rightContent={
+                            message.latencyMs
+                              ? formatLatency(message.latencyMs)
+                              : undefined
+                          }
+                        >
+                          <span className="font-medium">{action}</span>
+                          {detail && (
+                            <span className="text-muted-foreground font-normal">
+                              {' '}
+                              {detail}
+                            </span>
+                          )}
+                        </ChainOfThoughtTrigger>
+                      </CollapsibleTrigger>
+
+                      <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+                        <ChainOfThoughtContent>
+                          <ToolCallDetails message={message} />
+                        </ChainOfThoughtContent>
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    {!isSuccess && !isExpanded && (
+                      <p className="text-destructive mt-1 text-sm">
+                        Error: {message.toolResult?.error || 'Unknown error'}
+                      </p>
+                    )}
+                  </ChainOfThoughtStep>
+                );
+              })}
+            </ChainOfThought>
+          </div>
+        )}
+
+        {/* Agent response - expandable section */}
+        {handover.handoverResultContent && (
+          <div className="ml-2 mt-1">
+            <Collapsible open={isResultExpanded} onOpenChange={setIsResultExpanded}>
+              <CollapsibleTrigger asChild>
+                <button className="hover:bg-muted/50 flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors">
+                  <Eye className="text-muted-foreground h-3.5 w-3.5" />
+                  <span className="text-muted-foreground text-xs">
+                    {isResultExpanded ? 'Hide' : 'View'} agent response
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'text-muted-foreground h-3 w-3 transition-transform duration-200',
+                      isResultExpanded && 'rotate-180'
+                    )}
+                  />
+                </button>
+              </CollapsibleTrigger>
+
+              <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+                <div className="mt-2 rounded-lg border bg-muted/20 p-4">
+                  <MessageContent
+                    className="prose prose-sm dark:prose-invert"
+                    markdown
+                  >
+                    {handover.handoverResultContent}
+                  </MessageContent>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Tool chain display component
@@ -460,6 +701,15 @@ export default function AdminConversationDetailPage({
             <ChatContainerRoot className="max-h-[60vh] overflow-y-auto">
               <ChatContainerContent>
                 {messageGroups.map((group, groupIndex) => {
+                  if (group.type === 'handover-group') {
+                    return (
+                      <HandoverDisplay
+                        key={`handover-${groupIndex}`}
+                        handover={group.handover}
+                        toolMessages={group.toolMessages}
+                      />
+                    );
+                  }
                   if (group.type === 'tool-chain') {
                     return (
                       <ToolChainDisplay
