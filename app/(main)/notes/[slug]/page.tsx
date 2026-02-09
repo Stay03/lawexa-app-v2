@@ -16,6 +16,7 @@ import {
 import { PageContainer } from '@/components/layout';
 import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
+import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 import { useNote } from '@/lib/hooks/useNotes';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { canEditNote, isNoteOwner } from '@/lib/utils/note-utils';
@@ -112,6 +113,14 @@ function NoteViewPage({ params }: NoteViewPageProps) {
           id={note.id}
           isBookmarked={note.is_bookmarked}
           bookmarksCount={note.bookmarks_count}
+          variant="full"
+        />
+        <FeedbackButton
+          context={{
+            contentType: 'note',
+            contentId: note.id,
+            contentTitle: note.title,
+          }}
           variant="full"
         />
         <NoteActions

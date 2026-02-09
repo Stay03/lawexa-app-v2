@@ -20,6 +20,7 @@ import { PageContainer } from '@/components/layout';
 import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { ShareButton } from '@/components/common/ShareButton';
+import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 import { useCaseWithRelated } from '@/lib/hooks/useCases';
 
 /******************************************************************************
@@ -128,6 +129,14 @@ function CaseViewPage({ params }: CaseViewPageProps) {
             variant="full"
           />
           <ShareButton />
+          <FeedbackButton
+            context={{
+              contentType: 'case',
+              contentId: caseDetail.id,
+              contentTitle: caseDetail.title,
+            }}
+            variant="full"
+          />
         </div>
 
         {/* View Full Report Button */}
