@@ -109,7 +109,6 @@ export function CaseFormCourtInfo({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
                     {countries.map((country) => (
                       <SelectItem key={country.id} value={String(country.id)}>
                         {country.name}
@@ -154,7 +153,6 @@ export function CaseFormCourtInfo({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
                     {courts.map((court) => (
                       <SelectItem key={court.id} value={String(court.id)}>
                         {court.name}

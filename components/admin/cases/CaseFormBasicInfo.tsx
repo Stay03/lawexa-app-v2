@@ -141,7 +141,6 @@ export function CaseFormBasicInfo({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
                     {courses.map((course) => (
                       <SelectItem key={course.id} value={String(course.id)}>
                         {course.name}
@@ -184,7 +183,6 @@ export function CaseFormBasicInfo({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
                   {ACADEMIC_LEVELS.map((level) => (
                     <SelectItem key={level} value={level}>
                       {level}
