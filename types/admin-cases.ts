@@ -70,7 +70,7 @@ export interface CaseSummary {
   id: number;
   title: string;
   slug: string;
-  court: string | null; // Abbreviation string
+  court: string | Court | null; // Can be abbreviation string or Court object
   judgment_date: string | null;
   citation: string | null;
   is_bookmarked: boolean;

@@ -99,7 +99,7 @@ export function CaseMultiSelect({
                   {caseItem.title}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {caseItem.court && `${caseItem.court} • `}
+                  {caseItem.court && `${typeof caseItem.court === 'string' ? caseItem.court : caseItem.court.abbreviation} • `}
                   {caseItem.judgment_date || 'No date'}
                   {caseItem.citation && ` • ${caseItem.citation}`}
                 </p>
@@ -155,7 +155,7 @@ export function CaseMultiSelect({
                     {caseItem.title}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {caseItem.court && `${caseItem.court} • `}
+                    {caseItem.court && `${typeof caseItem.court === 'string' ? caseItem.court : caseItem.court.abbreviation} • `}
                     {caseItem.judgment_date || 'No date'}
                   </p>
                 </div>

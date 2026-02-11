@@ -167,7 +167,7 @@ export function CasesTable({
               <TableCell>
                 {caseData.court ? (
                   <Badge variant="outline" className="font-mono text-xs">
-                    {caseData.court}
+                    {typeof caseData.court === 'string' ? caseData.court : caseData.court.abbreviation}
                   </Badge>
                 ) : (
                   <span className="text-muted-foreground text-sm">—</span>
