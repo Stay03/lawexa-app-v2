@@ -57,9 +57,12 @@ export const notesApi = {
 
   /**
    * Get single note by slug
+   * @param slug - Note slug identifier
+   * @param searchQuery - Search query for analytics tracking (sent as ?q= parameter)
    */
-  getBySlug: async (slug: string): Promise<NoteResponse> => {
-    const response = await apiClient.get<NoteResponse>(`/notes/${slug}`);
+  getBySlug: async (slug: string, searchQuery?: string): Promise<NoteResponse> => {
+    const params = searchQuery ? { q: searchQuery } : undefined;
+    const response = await apiClient.get<NoteResponse>(`/notes/${slug}`, { params });
     return response.data;
   },
 

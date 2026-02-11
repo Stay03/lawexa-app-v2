@@ -203,6 +203,7 @@ function NotesPageContent() {
             <NoteCard
               key={note.id}
               note={note}
+              searchQuery={search || undefined}
               className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both duration-200"
               style={{ animationDelay: `${Math.min(index, 14) * 30}ms` }}
             />

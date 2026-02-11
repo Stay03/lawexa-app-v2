@@ -11,12 +11,13 @@ interface CaseCardProps {
   caseItem: Case;
   className?: string;
   style?: React.CSSProperties;
+  searchQuery?: string;
 }
 
 /**
  * Compact case list item for grouped display
  */
-function CaseCard({ caseItem, className, style }: CaseCardProps) {
+function CaseCard({ caseItem, className, style, searchQuery }: CaseCardProps) {
   const router = useRouter();
   const { title, slug, court, judgment_date, principles, tags, country, views_count } = caseItem;
 
@@ -36,9 +37,14 @@ function CaseCard({ caseItem, className, style }: CaseCardProps) {
       : principles
     : null;
 
+  // Construct URL with search query if provided
+  const href = searchQuery?.trim()
+    ? `/cases/${slug}?q=${encodeURIComponent(searchQuery)}`
+    : `/cases/${slug}`;
+
   return (
     <Link
-      href={`/cases/${slug}`}
+      href={href}
       className={cn(
         'group flex flex-col gap-3',
         'px-5 py-4',

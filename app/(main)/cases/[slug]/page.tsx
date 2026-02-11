@@ -46,15 +46,17 @@ const ANIMATION_DELAYS = {
 
 interface CaseViewPageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ q?: string }>;
 }
 
 /**
  * Case detail view page with animated sections
  */
-function CaseViewPage({ params }: CaseViewPageProps) {
+function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
   const { slug } = use(params);
+  const { q: searchQuery } = use(searchParams);
   const router = useRouter();
-  const { data, isLoading, isError, refetch } = useCaseWithRelated(slug);
+  const { data, isLoading, isError, refetch } = useCaseWithRelated(slug, searchQuery);
 
   // Loading state
   if (isLoading) {

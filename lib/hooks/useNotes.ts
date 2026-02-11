@@ -60,11 +60,15 @@ export function useMyNotes(params: MyNotesParams = {}) {
 
 /**
  * Hook for fetching single note by slug
+ * @param slug - Note slug identifier
+ * @param searchQuery - Search query for analytics tracking
  */
-export function useNote(slug: string) {
+export function useNote(slug: string, searchQuery?: string) {
   return useQuery({
-    queryKey: noteKeys.detail(slug),
-    queryFn: () => notesApi.getBySlug(slug),
+    queryKey: searchQuery
+      ? [...noteKeys.detail(slug), { q: searchQuery }]
+      : noteKeys.detail(slug),
+    queryFn: () => notesApi.getBySlug(slug, searchQuery),
     enabled: !!slug,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

@@ -70,15 +70,20 @@ export function useCaseWithFullReport(slug: string) {
 /**
  * Hook for fetching single case with related cases (similar, cited, cited_by)
  * Uses separate query key to avoid cache conflicts
+ * @param slug - Case slug identifier
+ * @param searchQuery - Search query for analytics tracking
  */
-export function useCaseWithRelated(slug: string) {
+export function useCaseWithRelated(slug: string, searchQuery?: string) {
   return useQuery({
-    queryKey: caseKeys.detailWithRelated(slug),
+    queryKey: searchQuery
+      ? [...caseKeys.detailWithRelated(slug), { q: searchQuery }]
+      : caseKeys.detailWithRelated(slug),
     queryFn: () =>
       casesApi.getBySlug(slug, {
         includeSimilarCases: true,
         includeCitedCases: true,
         includeCitedBy: true,
+        searchQuery,
       }),
     enabled: !!slug,
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -24,6 +24,7 @@ interface NoteCardProps {
   showPrivacy?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  searchQuery?: string;
 }
 
 /**
@@ -35,6 +36,7 @@ function NoteCard({
   showPrivacy = false,
   className,
   style,
+  searchQuery,
 }: NoteCardProps) {
   const router = useRouter();
   const {
@@ -64,9 +66,15 @@ function NoteCard({
       : content_preview
     : null;
 
+  // Construct URL with search query if provided
+  const baseUrl = getNoteUrl(note);
+  const href = searchQuery?.trim()
+    ? `${baseUrl}?q=${encodeURIComponent(searchQuery)}`
+    : baseUrl;
+
   return (
     <Link
-      href={getNoteUrl(note)}
+      href={href}
       className={cn(
         'group flex gap-4',
         'px-5 py-4',

@@ -39,16 +39,18 @@ const ANIMATION_DELAYS = {
 
 interface NoteViewPageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ q?: string }>;
 }
 
 /**
  * Note detail view page with animated sections
  */
-function NoteViewPage({ params }: NoteViewPageProps) {
+function NoteViewPage({ params, searchParams }: NoteViewPageProps) {
   const { slug } = use(params);
+  const { q: searchQuery } = use(searchParams);
   const router = useRouter();
   const { user } = useAuthStore();
-  const { data, isLoading, isError, refetch } = useNote(slug);
+  const { data, isLoading, isError, refetch } = useNote(slug, searchQuery);
 
   // Loading state
   if (isLoading) {

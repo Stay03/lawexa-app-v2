@@ -133,6 +133,7 @@ function CasesPageContent() {
             <CaseCard
               key={caseItem.id}
               caseItem={caseItem}
+              searchQuery={search || undefined}
               className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
               style={{ animationDelay: `${Math.min(index, 14) * 30}ms` }}
             />
