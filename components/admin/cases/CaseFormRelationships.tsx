@@ -12,14 +12,14 @@ import {
 } from '@/components/ui/form';
 
 import { CaseMultiSelect } from './CaseMultiSelect';
-import type { CaseFormData } from '@/types/admin-cases';
+import type { CaseFormValues } from '@/lib/validations/admin-cases';
 
 /******************************************************************************
                                 Component Props
 ******************************************************************************/
 
 interface CaseFormRelationshipsProps {
-  form: UseFormReturn<CaseFormData>;
+  form: UseFormReturn<CaseFormValues>;
   currentCaseId?: number;
 }
 

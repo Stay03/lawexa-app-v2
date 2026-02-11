@@ -55,8 +55,13 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Fetch case by slug or ID
-  const { data: caseData, isLoading } = useCase(id);
+  // Parse ID (could be numeric ID or slug, try numeric first)
+  const numericId = Number(id);
+  const caseId = isNaN(numericId) ? undefined : numericId;
+
+  // Fetch case by ID
+  const { data: caseResponse, isLoading } = useCase(caseId);
+  const caseData = caseResponse?.data;
 
   const handleDeleteSuccess = () => {
     router.push('/admin/cases');
@@ -373,7 +378,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                   {caseData.similar_cases.map((relatedCase) => (
                     <Link
                       key={relatedCase.id}
-                      href={`/admin/cases/${relatedCase.slug}`}
+                      href={`/admin/cases/${relatedCase.id}`}
                       className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <p className="font-medium text-sm">{relatedCase.title}</p>
@@ -398,7 +403,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                   {caseData.cited_cases.map((relatedCase) => (
                     <Link
                       key={relatedCase.id}
-                      href={`/admin/cases/${relatedCase.slug}`}
+                      href={`/admin/cases/${relatedCase.id}`}
                       className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <p className="font-medium text-sm">{relatedCase.title}</p>
@@ -423,7 +428,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                   {caseData.cited_by.map((relatedCase) => (
                     <Link
                       key={relatedCase.id}
-                      href={`/admin/cases/${relatedCase.slug}`}
+                      href={`/admin/cases/${relatedCase.id}`}
                       className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <p className="font-medium text-sm">{relatedCase.title}</p>

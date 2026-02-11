@@ -13,15 +13,15 @@ import {
 } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
 import { useCaseTopics } from '@/lib/hooks/useAdminCases';
-import { useDebounce } from '@/hooks/use-debounce';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 
 /******************************************************************************
                                 Component Props
 ******************************************************************************/
 
 interface TopicComboboxProps {
-  value: string;
-  onValueChange: (value: string) => void;
+  value: string | null | undefined;
+  onValueChange: (value: string | null) => void;
 }
 
 /******************************************************************************
@@ -41,31 +41,27 @@ export function TopicCombobox({ value, onValueChange }: TopicComboboxProps) {
   const topics = topicsData?.data || [];
 
   // Check if current value exists in suggestions
-  const exactMatch = topics.includes(value);
-  const showCreateOption = search && !topics.includes(search) && search !== value;
+  const currentValue = value || '';
+  const exactMatch = topics.includes(currentValue);
+  const showCreateOption = search && !topics.includes(search) && search !== currentValue;
 
   return (
     <Combobox
-      value={value}
+      value={currentValue}
       onValueChange={(newValue) => {
-        onValueChange(newValue);
+        onValueChange(newValue || null);
         setSearch('');
       }}
     >
       <ComboboxInput
         placeholder="Search or enter a topic..."
-        value={search || value}
+        value={search || currentValue}
         onChange={(e) => setSearch(e.target.value)}
         onBlur={() => {
           // If user typed something but didn't select, use it as the value
           if (search && search !== value) {
             onValueChange(search);
           }
-          setSearch('');
-        }}
-        showClear={!!value}
-        onClear={() => {
-          onValueChange('');
           setSearch('');
         }}
       />

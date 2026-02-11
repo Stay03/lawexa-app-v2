@@ -1,15 +1,7 @@
 'use client';
 
-import { CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -19,7 +11,6 @@ import {
 } from '@/components/ui/select';
 
 import { useCourses, useCourts, useCountries } from '@/lib/hooks/useAdminCases';
-import { cn } from '@/lib/utils';
 import type { AdminCasesParams } from '@/types/admin-cases';
 
 /******************************************************************************
@@ -48,10 +39,6 @@ export function CaseFilters({ params, onParamsChange }: CaseFiltersProps) {
   const courses = coursesData?.data || [];
   const courts = courtsData?.data || [];
   const countries = countriesData?.data || [];
-
-  // Parse date strings to Date objects
-  const fromDate = params.from_date ? new Date(params.from_date) : undefined;
-  const toDate = params.to_date ? new Date(params.to_date) : undefined;
 
   return (
     <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
@@ -132,70 +119,40 @@ export function CaseFilters({ params, onParamsChange }: CaseFiltersProps) {
       </Select>
 
       {/* Date Range: From Date */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              'w-[160px] justify-start text-left font-normal',
-              !fromDate && 'text-muted-foreground'
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {fromDate ? format(fromDate, 'MMM d, yyyy') : 'From Date'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={fromDate}
-            onSelect={(date) =>
-              onParamsChange({
-                from_date: date ? format(date, 'yyyy-MM-dd') : undefined,
-                page: 1,
-              })
-            }
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
+      <Input
+        type="date"
+        value={params.date_from || ''}
+        onChange={(e) =>
+          onParamsChange({
+            date_from: e.target.value || undefined,
+            page: 1,
+          })
+        }
+        className="w-[160px]"
+        placeholder="From Date"
+      />
 
       {/* Date Range: To Date */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              'w-[160px] justify-start text-left font-normal',
-              !toDate && 'text-muted-foreground'
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {toDate ? format(toDate, 'MMM d, yyyy') : 'To Date'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={toDate}
-            onSelect={(date) =>
-              onParamsChange({
-                to_date: date ? format(date, 'yyyy-MM-dd') : undefined,
-                page: 1,
-              })
-            }
-            disabled={(date) => (fromDate ? date < fromDate : false)}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
+      <Input
+        type="date"
+        value={params.date_to || ''}
+        onChange={(e) =>
+          onParamsChange({
+            date_to: e.target.value || undefined,
+            page: 1,
+          })
+        }
+        className="w-[160px]"
+        placeholder="To Date"
+        min={params.date_from}
+      />
 
       {/* Clear Filters Button (only show if filters are active) */}
       {(params.course ||
         params.country ||
         params.court ||
-        params.from_date ||
-        params.to_date) && (
+        params.date_from ||
+        params.date_to) && (
         <Button
           variant="ghost"
           onClick={() =>
@@ -203,8 +160,8 @@ export function CaseFilters({ params, onParamsChange }: CaseFiltersProps) {
               course: undefined,
               country: undefined,
               court: undefined,
-              from_date: undefined,
-              to_date: undefined,
+              date_from: undefined,
+              date_to: undefined,
               page: 1,
             })
           }

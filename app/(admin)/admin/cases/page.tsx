@@ -40,10 +40,8 @@ function CasesPageContent() {
   const params = useMemo<AdminCasesParams>(() => {
     const page = Number(searchParams.get('page')) || 1;
     const per_page = Number(searchParams.get('per_page')) || 15;
-    const sort_by =
-      (searchParams.get('sort_by') as AdminCasesParams['sort_by']) || 'created_at';
-    const sort_order =
-      (searchParams.get('sort_order') as AdminCasesParams['sort_order']) || 'desc';
+    const sort = searchParams.get('sort') || 'created_at';
+    const order = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
     const course = searchParams.get('course')
       ? Number(searchParams.get('course'))
       : undefined;
@@ -53,20 +51,20 @@ function CasesPageContent() {
     const court = searchParams.get('court')
       ? Number(searchParams.get('court'))
       : undefined;
-    const from_date = searchParams.get('from_date') || undefined;
-    const to_date = searchParams.get('to_date') || undefined;
+    const date_from = searchParams.get('date_from') || undefined;
+    const date_to = searchParams.get('date_to') || undefined;
 
     return {
       page,
       per_page,
-      sort_by,
-      sort_order,
+      sort,
+      order,
       search: debouncedSearch || undefined,
       course,
       country,
       court,
-      from_date,
-      to_date,
+      date_from,
+      date_to,
     };
   }, [searchParams, debouncedSearch]);
 
@@ -101,16 +99,16 @@ function CasesPageContent() {
   );
 
   const handleSort = useCallback(
-    (sortBy: 'title' | 'judgment_date' | 'created_at') => {
+    (sortBy: string) => {
       updateParams({
-        sort_by: sortBy,
-        sort_order:
-          params.sort_by === sortBy && params.sort_order === 'asc'
+        sort: sortBy,
+        order:
+          params.sort === sortBy && params.order === 'asc'
             ? 'desc'
             : 'asc',
       });
     },
-    [updateParams, params.sort_by, params.sort_order]
+    [updateParams, params.sort, params.order]
   );
 
   const handlePageChange = useCallback(
@@ -122,7 +120,7 @@ function CasesPageContent() {
 
   const handleEdit = useCallback(
     (caseData: CaseSummary) => {
-      router.push(`/admin/cases/${caseData.slug}/edit`);
+      router.push(`/admin/cases/${caseData.id}/edit`);
     },
     [router]
   );

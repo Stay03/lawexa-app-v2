@@ -25,14 +25,14 @@ import {
 import { TopicCombobox } from './TopicCombobox';
 import { TagsMultiSelect } from './TagsMultiSelect';
 import { useCourses } from '@/lib/hooks/useAdminCases';
-import type { CaseFormData } from '@/types/admin-cases';
+import type { CaseFormValues } from '@/lib/validations/admin-cases';
 
 /******************************************************************************
                                 Component Props
 ******************************************************************************/
 
 interface CaseFormBasicInfoProps {
-  form: UseFormReturn<CaseFormData>;
+  form: UseFormReturn<CaseFormValues>;
   courseDialogOpen: boolean;
   setCourseDialogOpen: (open: boolean) => void;
 }

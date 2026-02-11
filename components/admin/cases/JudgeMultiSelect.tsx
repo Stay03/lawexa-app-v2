@@ -13,7 +13,7 @@ import {
   ComboboxList,
 } from '@/components/ui/combobox';
 import { useJudges } from '@/lib/hooks/useAdminCases';
-import { useDebounce } from '@/hooks/use-debounce';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 
 /******************************************************************************
                                 Component Props

@@ -29,8 +29,8 @@ import { CourseQuickAddDialog } from './CourseQuickAddDialog';
 
 import { useCase, useCreateCase, useUpdateCase } from '@/lib/hooks/useAdminCases';
 import { extractApiError } from '@/lib/utils/api-error';
-import { caseFormSchema } from '@/lib/validations/admin-cases';
-import type { CaseFormData, Country, Court, Course } from '@/types/admin-cases';
+import { caseFormSchema, type CaseFormValues } from '@/lib/validations/admin-cases';
+import type { Country, Court, Course } from '@/types/admin-cases';
 
 /******************************************************************************
                                 Component Props
@@ -68,7 +68,7 @@ export function CaseForm({ caseId, mode }: CaseFormProps) {
   const [courseDialogOpen, setCourseDialogOpen] = useState(false);
 
   // Form setup
-  const form = useForm<CaseFormData>({
+  const form = useForm<CaseFormValues>({
     resolver: zodResolver(caseFormSchema),
     defaultValues: {
       title: '',
@@ -114,7 +114,7 @@ export function CaseForm({ caseId, mode }: CaseFormProps) {
   }, [isEditMode, caseData, form]);
 
   // Submit handler
-  const onSubmit = (data: CaseFormData) => {
+  const onSubmit = (data: CaseFormValues) => {
     // Transform form data to API payload format
     const payload = {
       ...data,
@@ -153,7 +153,7 @@ export function CaseForm({ caseId, mode }: CaseFormProps) {
         // Set field-level errors
         if (apiError.errors) {
           Object.entries(apiError.errors).forEach(([field, messages]) => {
-            form.setError(field as keyof CaseFormData, {
+            form.setError(field as keyof CaseFormValues, {
               message: messages[0],
             });
           });

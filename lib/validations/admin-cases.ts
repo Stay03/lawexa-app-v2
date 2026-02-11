@@ -33,8 +33,7 @@ export const caseFormSchema = z.object({
     .array(
       z.string().max(100, 'Each tag must be 100 characters or less')
     )
-    .optional()
-    .default([]),
+    .optional(),
 
   level: z
     .string()
@@ -60,21 +59,18 @@ export const caseFormSchema = z.object({
 
   judge_ids: z
     .array(z.number().int().positive())
-    .optional()
-    .default([]),
+    .optional(),
 
   // Relationships
   similar_case_ids: z
     .array(z.number().int().positive())
     .max(50, 'Maximum 50 similar cases allowed')
-    .optional()
-    .default([]),
+    .optional(),
 
   cited_case_ids: z
     .array(z.number().int().positive())
     .max(50, 'Maximum 50 cited cases allowed')
-    .optional()
-    .default([]),
+    .optional(),
 
   // Full Report
   full_report: z.string().nullable().optional(),
@@ -129,10 +125,7 @@ export const courtFormSchema = z.object({
     .max(255, 'Name must be 255 characters or less'),
 
   country_id: z
-    .number({
-      required_error: 'Country is required',
-      invalid_type_error: 'Country must be selected',
-    })
+    .number()
     .int()
     .positive('Country is required'),
 

@@ -24,14 +24,14 @@ import {
 
 import { JudgeMultiSelect } from './JudgeMultiSelect';
 import { useCountries, useCourts } from '@/lib/hooks/useAdminCases';
-import type { CaseFormData } from '@/types/admin-cases';
+import type { CaseFormValues } from '@/lib/validations/admin-cases';
 
 /******************************************************************************
                                 Component Props
 ******************************************************************************/
 
 interface CaseFormCourtInfoProps {
-  form: UseFormReturn<CaseFormData>;
+  form: UseFormReturn<CaseFormValues>;
   countryDialogOpen: boolean;
   setCountryDialogOpen: (open: boolean) => void;
   courtDialogOpen: boolean;

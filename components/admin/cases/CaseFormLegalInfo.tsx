@@ -12,14 +12,14 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 
-import type { CaseFormData } from '@/types/admin-cases';
+import type { CaseFormValues } from '@/lib/validations/admin-cases';
 
 /******************************************************************************
                                 Component Props
 ******************************************************************************/
 
 interface CaseFormLegalInfoProps {
-  form: UseFormReturn<CaseFormData>;
+  form: UseFormReturn<CaseFormValues>;
 }
 
 /******************************************************************************
