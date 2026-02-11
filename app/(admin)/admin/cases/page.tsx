@@ -30,7 +30,7 @@ function CasesPageContent() {
   const [searchInput, setSearchInput] = useState(
     searchParams.get('search') || ''
   );
-  const [debouncedSearch] = useDebounce(searchInput, 500);
+  const debouncedSearch = useDebounce(searchInput, 500);
 
   // Dialog state
   const [deleteOpen, setDeleteOpen] = useState(false);
