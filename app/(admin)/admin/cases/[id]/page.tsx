@@ -55,12 +55,11 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Parse ID (could be numeric ID or slug, try numeric first)
-  const numericId = Number(id);
-  const caseId = isNaN(numericId) ? undefined : numericId;
+  // The ID parameter is actually a slug
+  const slug = id;
 
-  // Fetch case by ID
-  const { data: caseResponse, isLoading } = useCase(caseId);
+  // Fetch case by slug
+  const { data: caseResponse, isLoading } = useCase(slug);
   const caseData = caseResponse?.data;
 
   const handleDeleteSuccess = () => {
@@ -121,7 +120,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
           </Button>
         </Link>
         <div className="flex gap-2">
-          <Link href={`/admin/cases/${id}/edit`}>
+          <Link href={`/admin/cases/${slug}/edit`}>
             <Button variant="outline">
               <Pencil className="mr-2 h-4 w-4" />
               Edit Case
@@ -378,7 +377,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                   {caseData.similar_cases.map((relatedCase) => (
                     <Link
                       key={relatedCase.id}
-                      href={`/admin/cases/${relatedCase.id}`}
+                      href={`/admin/cases/${relatedCase.slug}`}
                       className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <p className="font-medium text-sm">{relatedCase.title}</p>
@@ -403,7 +402,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                   {caseData.cited_cases.map((relatedCase) => (
                     <Link
                       key={relatedCase.id}
-                      href={`/admin/cases/${relatedCase.id}`}
+                      href={`/admin/cases/${relatedCase.slug}`}
                       className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <p className="font-medium text-sm">{relatedCase.title}</p>
@@ -428,7 +427,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                   {caseData.cited_by.map((relatedCase) => (
                     <Link
                       key={relatedCase.id}
-                      href={`/admin/cases/${relatedCase.id}`}
+                      href={`/admin/cases/${relatedCase.slug}`}
                       className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <p className="font-medium text-sm">{relatedCase.title}</p>

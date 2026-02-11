@@ -68,8 +68,8 @@ export function CasesTable({
 }: CasesTableProps) {
   const router = useRouter();
 
-  const handleRowClick = (id: number) => {
-    router.push(`/admin/cases/${id}`);
+  const handleRowClick = (slug: string) => {
+    router.push(`/admin/cases/${slug}`);
   };
 
   const SortButton = ({
@@ -149,7 +149,7 @@ export function CasesTable({
                 'cursor-pointer transition-colors',
                 index % 2 === 1 && 'bg-muted/20'
               )}
-              onClick={() => handleRowClick(caseData.id)}
+              onClick={() => handleRowClick(caseData.slug)}
             >
               {/* Case Title */}
               <TableCell className="font-medium max-w-[300px]">
@@ -262,7 +262,7 @@ export function CasesTable({
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/admin/cases/${caseData.id}`);
+                        router.push(`/admin/cases/${caseData.slug}`);
                       }}
                     >
                       <Eye className="mr-2 h-4 w-4" />

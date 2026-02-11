@@ -37,7 +37,7 @@ import type { Country, Court, Course } from '@/types/admin-cases';
 ******************************************************************************/
 
 interface CaseFormProps {
-  caseId?: number;
+  caseSlug?: string;
   mode: 'create' | 'edit';
 }
 
@@ -49,14 +49,17 @@ interface CaseFormProps {
  * Main case form component for creating and editing cases
  * Follows the workflow create page pattern with Card-based sections
  */
-export function CaseForm({ caseId, mode }: CaseFormProps) {
+export function CaseForm({ caseSlug, mode }: CaseFormProps) {
   const router = useRouter();
   const isEditMode = mode === 'edit';
 
   // Fetch case data for edit mode
-  const { data: caseData, isLoading: isCaseLoading } = useCase(caseId, {
-    enabled: isEditMode && !!caseId,
+  const { data: caseData, isLoading: isCaseLoading } = useCase(caseSlug, {
+    enabled: isEditMode && !!caseSlug,
   });
+
+  // Extract case ID for mutations (needed for update)
+  const caseId = caseData?.data?.id;
 
   // Mutations
   const createMutation = useCreateCase();

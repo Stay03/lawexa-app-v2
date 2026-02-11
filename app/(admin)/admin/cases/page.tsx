@@ -120,7 +120,7 @@ function CasesPageContent() {
 
   const handleEdit = useCallback(
     (caseData: CaseSummary) => {
-      router.push(`/admin/cases/${caseData.id}/edit`);
+      router.push(`/admin/cases/${caseData.slug}/edit`);
     },
     [router]
   );

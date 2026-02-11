@@ -25,12 +25,12 @@ interface EditCasePageProps {
  */
 export default function EditCasePage({ params }: EditCasePageProps) {
   const { id } = use(params);
-  const caseId = Number(id);
+  const slug = id; // The URL parameter is actually a slug
 
   return (
     <div className="space-y-6">
       {/* Back Button */}
-      <Link href={`/admin/cases/${id}`}>
+      <Link href={`/admin/cases/${slug}`}>
         <Button variant="ghost" size="sm">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Case
@@ -38,7 +38,7 @@ export default function EditCasePage({ params }: EditCasePageProps) {
       </Link>
 
       {/* Form */}
-      <CaseForm caseId={caseId} mode="edit" />
+      <CaseForm caseSlug={slug} mode="edit" />
     </div>
   );
 }

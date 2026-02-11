@@ -29,7 +29,7 @@ export const adminCasesKeys = {
   list: (params: AdminCasesParams) =>
     [...adminCasesKeys.lists(), params] as const,
   details: () => [...adminCasesKeys.all, 'detail'] as const,
-  detail: (id: number) => [...adminCasesKeys.details(), id] as const,
+  detail: (slugOrId: string | number) => [...adminCasesKeys.details(), slugOrId] as const,
 
   // Files
   files: (caseId: number) => [...adminCasesKeys.detail(caseId), 'files'] as const,
@@ -72,13 +72,13 @@ export function useCases(params: AdminCasesParams = {}) {
 }
 
 /**
- * Get single case by ID
+ * Get single case by slug
  */
-export function useCase(id: number | undefined, options?: { enabled?: boolean }) {
+export function useCase(slug: string | undefined, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: id ? adminCasesKeys.detail(id) : (['admin', 'cases', 'detail', 'undefined'] as const),
-    queryFn: () => adminCasesApi.getCase(id!),
-    enabled: !!id && (options?.enabled !== false),
+    queryKey: slug ? adminCasesKeys.detail(slug) : (['admin', 'cases', 'detail', 'undefined'] as const),
+    queryFn: () => adminCasesApi.getCase(slug!),
+    enabled: !!slug && (options?.enabled !== false),
     staleTime: 60 * 1000, // 1 minute
   });
 }

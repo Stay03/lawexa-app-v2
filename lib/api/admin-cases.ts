@@ -43,11 +43,11 @@ async function getCases(
 }
 
 /**
- * Get single case by ID with all relationships
+ * Get single case by slug with all relationships
  */
-async function getCase(id: number): Promise<ApiResponse<CaseDetail>> {
+async function getCase(slug: string): Promise<ApiResponse<CaseDetail>> {
   const response = await apiClient.get<ApiResponse<CaseDetail>>(
-    `/cases/${id}`
+    `/cases/${slug}`
   );
   return response.data;
 }
