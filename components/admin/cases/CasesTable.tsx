@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -95,20 +96,72 @@ export function CasesTable({
     </Button>
   );
 
-  // Loading State
+  // Loading State with fading skeleton
   if (isLoading) {
+    // Opacity values: first items fully visible, progressively fading out
+    const opacityValues = [1, 0.8, 0.5, 0.25, 0.1];
+
     return (
       <div className="rounded-lg border overflow-hidden">
-        <div className="bg-muted/40 px-4 py-3">
-          <Skeleton className="h-5 w-full max-w-[600px]" />
-        </div>
-        <div className="divide-y divide-border">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="px-4 py-4">
-              <Skeleton className="h-5 w-full" />
-            </div>
-          ))}
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="w-[300px] font-semibold">
+                <SortButton field="title">Case Title</SortButton>
+              </TableHead>
+              <TableHead className="w-[150px] font-semibold">Court</TableHead>
+              <TableHead className="w-[130px] font-semibold">
+                <SortButton field="judgment_date">Judgment Date</SortButton>
+              </TableHead>
+              <TableHead className="w-[200px] font-semibold">Citation</TableHead>
+              <TableHead className="w-[100px] text-center font-semibold">
+                Stats
+              </TableHead>
+              <TableHead className="w-[60px]" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 5 }).map((_, i) => {
+              const opacity = opacityValues[i] ?? 0.25;
+
+              return (
+                <TableRow
+                  key={i}
+                  className={cn(i % 2 === 1 && 'bg-muted/20')}
+                  style={{ opacity }}
+                >
+                  {/* Case Title */}
+                  <TableCell className="max-w-[300px]">
+                    <Skeleton className="h-4 w-full animate-pulse rounded" />
+                  </TableCell>
+                  {/* Court */}
+                  <TableCell>
+                    <Skeleton className="h-5 w-16 animate-pulse rounded" />
+                  </TableCell>
+                  {/* Judgment Date */}
+                  <TableCell>
+                    <Skeleton className="h-4 w-24 animate-pulse rounded" />
+                  </TableCell>
+                  {/* Citation */}
+                  <TableCell className="max-w-[200px]">
+                    <Skeleton className="h-4 w-32 animate-pulse rounded" />
+                  </TableCell>
+                  {/* Stats */}
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-3">
+                      <Skeleton className="h-4 w-8 animate-pulse rounded" />
+                      <Skeleton className="h-4 w-8 animate-pulse rounded" />
+                    </div>
+                  </TableCell>
+                  {/* Actions */}
+                  <TableCell>
+                    <Skeleton className="h-8 w-8 animate-pulse rounded" />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     );
   }
@@ -155,7 +208,13 @@ export function CasesTable({
               <TableCell className="font-medium max-w-[300px]">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="block truncate">{caseData.title}</span>
+                    <Link
+                      href={`/admin/cases/${caseData.slug}`}
+                      className="block truncate hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {caseData.title}
+                    </Link>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[400px]">
                     <p>{caseData.title}</p>
