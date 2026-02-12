@@ -75,7 +75,7 @@ export function CostAndTokensTrendChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) => `$${v.toFixed(2)}`}
+              tickFormatter={(v) => `$${Number(v).toFixed(2)}`}
               domain={[0, (max: number) => Math.ceil(max * 1.15)]}
             />
             <YAxis
@@ -84,9 +84,10 @@ export function CostAndTokensTrendChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) =>
-                v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
-              }
+              tickFormatter={(v) => {
+                const n = Number(v);
+                return n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+              }}
               domain={[0, (max: number) => Math.ceil(max * 1.15)]}
             />
             <ChartTooltip
