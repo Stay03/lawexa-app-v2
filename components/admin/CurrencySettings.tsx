@@ -7,11 +7,11 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Settings2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 
 export function CurrencySettings() {
@@ -19,31 +19,45 @@ export function CurrencySettings() {
     useCurrencyStore();
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="shrink-0">
-          <Settings2 className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-64">
-        <PopoverHeader>
-          <PopoverTitle>Currency Settings</PopoverTitle>
-        </PopoverHeader>
+    <div className="flex items-center gap-1.5">
+      {/* Currency Toggle */}
+      <div className="flex rounded-md border">
+        <button
+          onClick={() => setShowNGN(true)}
+          className={cn(
+            'px-2.5 py-1.5 text-xs font-medium transition-colors rounded-l-md',
+            showNGN
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+          )}
+        >
+          NGN
+        </button>
+        <button
+          onClick={() => setShowNGN(false)}
+          className={cn(
+            'px-2.5 py-1.5 text-xs font-medium transition-colors rounded-r-md border-l',
+            !showNGN
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+          )}
+        >
+          USD
+        </button>
+      </div>
 
-        <div className="space-y-4">
-          {/* Show NGN Toggle */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="show-ngn" className="text-sm">
-              Show in NGN (₦)
-            </Label>
-            <Switch
-              id="show-ngn"
-              checked={showNGN}
-              onCheckedChange={setShowNGN}
-            />
-          </div>
+      {/* Exchange Rate Settings */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" className="shrink-0 h-8 w-8">
+            <Settings2 className="h-3.5 w-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64">
+          <PopoverHeader>
+            <PopoverTitle>Exchange Rate</PopoverTitle>
+          </PopoverHeader>
 
-          {/* Exchange Rate Input */}
           <div className="space-y-2">
             <Label htmlFor="exchange-rate" className="text-sm">
               USD to NGN Rate
@@ -66,8 +80,8 @@ export function CurrencySettings() {
               $1 = ₦{exchangeRate.toLocaleString()}
             </p>
           </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
