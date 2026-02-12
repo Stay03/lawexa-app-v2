@@ -71,6 +71,7 @@ export function DailyCostChart({ data }: DailyCostChartProps) {
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v) => `$${Number(v).toFixed(2)}`}
+              domain={[0, (max: number) => Math.ceil(max * 1.25)]}
             />
             <ChartTooltip
               content={
