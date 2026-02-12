@@ -53,7 +53,7 @@ export function DailyCostChart({ data }: DailyCostChartProps) {
         <CardDescription>Estimated daily API cost</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+        <ChartContainer config={chartConfig} className="aspect-auto h-[300px] w-full">
           <AreaChart data={data} accessibilityLayer margin={{ top: 20 }}>
             <CartesianGrid vertical={false} />
             <XAxis
@@ -72,6 +72,7 @@ export function DailyCostChart({ data }: DailyCostChartProps) {
               tickMargin={8}
               tickFormatter={(v) => `$${Number(v).toFixed(2)}`}
               domain={[0, (max: number) => Math.ceil(max * 1.25)]}
+              padding={{ top: 10 }}
             />
             <ChartTooltip
               content={
