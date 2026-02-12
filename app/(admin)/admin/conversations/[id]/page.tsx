@@ -2,13 +2,6 @@
 
 import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -528,10 +521,22 @@ export default function AdminConversationDetailPage({
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-96 w-full" />
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-28 mb-3" />
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-80 mt-1" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
+        </div>
+        <div>
+          <Skeleton className="h-6 w-36 mb-1" />
+          <Skeleton className="h-4 w-56 mb-4" />
+          <Skeleton className="h-96 w-full rounded-lg" />
+        </div>
       </div>
     );
   }
@@ -540,16 +545,14 @@ export default function AdminConversationDetailPage({
     return (
       <div className="space-y-4">
         <Link href="/admin/conversations">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Conversations
+          <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Conversations
           </Button>
         </Link>
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Conversation not found
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border py-8 text-center text-muted-foreground">
+          Conversation not found
+        </div>
       </div>
     );
   }
@@ -587,117 +590,111 @@ export default function AdminConversationDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* Back Button */}
-      <Link href="/admin/conversations">
-        <Button variant="ghost" size="sm">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Conversations
-        </Button>
-      </Link>
-
-      {/* Metadata Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="truncate">
-                {conversation.title || 'Untitled Conversation'}
-              </CardTitle>
-              <CardDescription className="font-mono text-xs mt-1">
-                ID: {conversation.id}
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge
-                variant={
-                  conversation.status === 'active' ? 'default' : 'secondary'
-                }
-              >
-                {conversation.status}
-              </Badge>
-              {conversation.is_private ? (
-                <Badge variant="outline" className="gap-1">
-                  <Lock className="h-3 w-3" /> Private
-                </Badge>
-              ) : (
-                <Badge
-                  variant="outline"
-                  className="gap-1 text-green-600 border-green-600"
-                >
-                  <Globe className="h-3 w-3" /> Public
-                </Badge>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground mb-1 flex items-center gap-1">
-                <User className="h-3 w-3" /> User UUID
-              </p>
-              <p className="font-mono text-xs break-all">
-                {conversation.user_uuid}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1 flex items-center gap-1">
-                <Bot className="h-3 w-3" /> Agent
-              </p>
-              <p>{conversation.agent?.name || '-'}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1 flex items-center gap-1">
-                <MessageSquare className="h-3 w-3" /> Messages
-              </p>
-              <p>{conversation.messages_count}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1 flex items-center gap-1">
-                <Hash className="h-3 w-3" /> Tokens
-              </p>
-              <p>{conversation.usage.total_tokens.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">
-                {conversation.usage.prompt_tokens.toLocaleString()} in /{' '}
-                {conversation.usage.completion_tokens.toLocaleString()} out
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1 flex items-center gap-1">
-                <Coins className="h-3 w-3" /> Cost
-              </p>
-              <p className="font-mono">
-                {formatCost(conversation.usage.total_cost, {
-                  showNGN,
-                  exchangeRate,
-                  decimals: 6,
-                })}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1 flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> Created
-              </p>
-              <p>{format(new Date(conversation.created_at), 'PPp')}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Chat Messages - using same components as /c/{id} */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Message History</CardTitle>
-          <CardDescription>
-            {conversation.messages.length} messages in chronological order
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {conversation.messages.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">
-              No messages in this conversation
+      {/* Page Header */}
+      <div>
+        <Link href="/admin/conversations">
+          <Button variant="ghost" size="sm" className="mb-3 -ml-2 text-muted-foreground">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Conversations
+          </Button>
+        </Link>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight truncate">
+              {conversation.title || 'Untitled Conversation'}
+            </h1>
+            <p className="text-sm text-muted-foreground font-mono mt-0.5">
+              {conversation.id}
             </p>
-          ) : (
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <Badge
+              variant={
+                conversation.status === 'active' ? 'default' : 'secondary'
+              }
+            >
+              {conversation.status}
+            </Badge>
+            {conversation.is_private ? (
+              <Badge variant="outline" className="gap-1">
+                <Lock className="h-3 w-3" /> Private
+              </Badge>
+            ) : (
+              <Badge
+                variant="outline"
+                className="gap-1 text-green-600 border-green-600"
+              >
+                <Globe className="h-3 w-3" /> Public
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Metadata Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="rounded-lg bg-muted/50 p-4">
+          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+            <User className="h-3.5 w-3.5" /> User UUID
+          </p>
+          <p className="font-mono text-xs break-all">
+            {conversation.user_uuid}
+          </p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-4">
+          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+            <Bot className="h-3.5 w-3.5" /> Agent
+          </p>
+          <p className="text-sm font-medium">{conversation.agent?.name || '-'}</p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-4">
+          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+            <MessageSquare className="h-3.5 w-3.5" /> Messages
+          </p>
+          <p className="text-sm font-medium">{conversation.messages_count}</p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-4">
+          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+            <Hash className="h-3.5 w-3.5" /> Tokens
+          </p>
+          <p className="text-sm font-medium">{conversation.usage.total_tokens.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {conversation.usage.prompt_tokens.toLocaleString()} in /{' '}
+            {conversation.usage.completion_tokens.toLocaleString()} out
+          </p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-4">
+          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+            <Coins className="h-3.5 w-3.5" /> Cost
+          </p>
+          <p className="text-sm font-mono font-medium">
+            {formatCost(conversation.usage.total_cost, {
+              showNGN,
+              exchangeRate,
+              decimals: 6,
+            })}
+          </p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-4">
+          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+            <Calendar className="h-3.5 w-3.5" /> Created
+          </p>
+          <p className="text-sm font-medium">{format(new Date(conversation.created_at), 'PPp')}</p>
+        </div>
+      </div>
+
+      {/* Message History */}
+      <div>
+        <h2 className="text-lg font-semibold">Message History</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          {conversation.messages.length} messages in chronological order
+        </p>
+        {conversation.messages.length === 0 ? (
+          <div className="rounded-lg border py-8 text-center text-muted-foreground">
+            No messages in this conversation
+          </div>
+        ) : (
+          <div className="rounded-lg border overflow-hidden">
             <ChatContainerRoot className="max-h-[60vh] overflow-y-auto">
               <ChatContainerContent>
                 {messageGroups.map((group, groupIndex) => {
@@ -722,9 +719,9 @@ export default function AdminConversationDetailPage({
                 })}
               </ChatContainerContent>
             </ChatContainerRoot>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
