@@ -527,15 +527,13 @@ export default function AdminConversationDetailPage({
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-4 w-80 mt-1" />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-20 rounded-lg" />
-          ))}
-        </div>
-        <div>
-          <Skeleton className="h-6 w-36 mb-1" />
-          <Skeleton className="h-4 w-56 mb-4" />
-          <Skeleton className="h-96 w-full rounded-lg" />
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="lg:w-56 lg:shrink-0 space-y-3">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-lg" />
+            ))}
+          </div>
+          <Skeleton className="flex-1 h-[70vh] rounded-lg" />
         </div>
       </div>
     );
@@ -631,96 +629,101 @@ export default function AdminConversationDetailPage({
         </div>
       </div>
 
-      {/* Metadata Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="rounded-lg bg-muted/50 p-4">
-          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
-            <User className="h-3.5 w-3.5" /> User UUID
-          </p>
-          <p className="font-mono text-xs break-all">
-            {conversation.user_uuid}
-          </p>
-        </div>
-        <div className="rounded-lg bg-muted/50 p-4">
-          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
-            <Bot className="h-3.5 w-3.5" /> Agent
-          </p>
-          <p className="text-sm font-medium">{conversation.agent?.name || '-'}</p>
-        </div>
-        <div className="rounded-lg bg-muted/50 p-4">
-          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
-            <MessageSquare className="h-3.5 w-3.5" /> Messages
-          </p>
-          <p className="text-sm font-medium">{conversation.messages_count}</p>
-        </div>
-        <div className="rounded-lg bg-muted/50 p-4">
-          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
-            <Hash className="h-3.5 w-3.5" /> Tokens
-          </p>
-          <p className="text-sm font-medium">{conversation.usage.total_tokens.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {conversation.usage.prompt_tokens.toLocaleString()} in /{' '}
-            {conversation.usage.completion_tokens.toLocaleString()} out
-          </p>
-        </div>
-        <div className="rounded-lg bg-muted/50 p-4">
-          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
-            <Coins className="h-3.5 w-3.5" /> Cost
-          </p>
-          <p className="text-sm font-mono font-medium">
-            {formatCost(conversation.usage.total_cost, {
-              showNGN,
-              exchangeRate,
-              decimals: 6,
-            })}
-          </p>
-        </div>
-        <div className="rounded-lg bg-muted/50 p-4">
-          <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
-            <Calendar className="h-3.5 w-3.5" /> Created
-          </p>
-          <p className="text-sm font-medium">{format(new Date(conversation.created_at), 'PPp')}</p>
-        </div>
-      </div>
-
-      {/* Message History */}
-      <div>
-        <h2 className="text-lg font-semibold">Message History</h2>
-        <p className="text-sm text-muted-foreground mb-4">
-          {conversation.messages.length} messages in chronological order
-        </p>
-        {conversation.messages.length === 0 ? (
-          <div className="rounded-lg border py-8 text-center text-muted-foreground">
-            No messages in this conversation
+      {/* Main Layout: Sidebar + Content */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Sidebar - Stats */}
+        <div className="lg:w-56 lg:shrink-0 space-y-3">
+          <div className="rounded-lg border border-muted p-3">
+            <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
+              <User className="h-3.5 w-3.5" /> User UUID
+            </p>
+            <p className="font-mono text-xs break-all">
+              {conversation.user_uuid}
+            </p>
           </div>
-        ) : (
-          <div className="rounded-lg border overflow-hidden">
-            <ChatContainerRoot className="max-h-[60vh] overflow-y-auto">
-              <ChatContainerContent>
-                {messageGroups.map((group, groupIndex) => {
-                  if (group.type === 'handover-group') {
-                    return (
-                      <HandoverDisplay
-                        key={`handover-${groupIndex}`}
-                        handover={group.handover}
-                        toolMessages={group.toolMessages}
-                      />
-                    );
-                  }
-                  if (group.type === 'tool-chain') {
-                    return (
-                      <ToolChainDisplay
-                        key={`tool-chain-${groupIndex}`}
-                        messages={group.messages}
-                      />
-                    );
-                  }
-                  return renderMessage(group.message);
+          <div className="rounded-lg border border-muted p-3">
+            <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
+              <Bot className="h-3.5 w-3.5" /> Agent
+            </p>
+            <p className="text-sm font-medium">{conversation.agent?.name || '-'}</p>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+            <div className="rounded-lg border border-muted p-3">
+              <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
+                <MessageSquare className="h-3.5 w-3.5" /> Messages
+              </p>
+              <p className="text-sm font-medium">{conversation.messages_count}</p>
+            </div>
+            <div className="rounded-lg border border-muted p-3">
+              <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
+                <Hash className="h-3.5 w-3.5" /> Tokens
+              </p>
+              <p className="text-sm font-medium">{conversation.usage.total_tokens.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {conversation.usage.prompt_tokens.toLocaleString()} in /{' '}
+                {conversation.usage.completion_tokens.toLocaleString()} out
+              </p>
+            </div>
+            <div className="rounded-lg border border-muted p-3">
+              <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
+                <Coins className="h-3.5 w-3.5" /> Cost
+              </p>
+              <p className="text-sm font-mono font-medium">
+                {formatCost(conversation.usage.total_cost, {
+                  showNGN,
+                  exchangeRate,
+                  decimals: 6,
                 })}
-              </ChatContainerContent>
-            </ChatContainerRoot>
+              </p>
+            </div>
+            <div className="rounded-lg border border-muted p-3">
+              <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
+                <Calendar className="h-3.5 w-3.5" /> Created
+              </p>
+              <p className="text-sm font-medium">{format(new Date(conversation.created_at), 'PPp')}</p>
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* Right Content - Message History */}
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg font-semibold">Message History</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            {conversation.messages.length} messages in chronological order
+          </p>
+          {conversation.messages.length === 0 ? (
+            <div className="rounded-lg border py-8 text-center text-muted-foreground">
+              No messages in this conversation
+            </div>
+          ) : (
+            <div className="rounded-lg border overflow-hidden">
+              <ChatContainerRoot className="max-h-[70vh] overflow-y-auto">
+                <ChatContainerContent>
+                  {messageGroups.map((group, groupIndex) => {
+                    if (group.type === 'handover-group') {
+                      return (
+                        <HandoverDisplay
+                          key={`handover-${groupIndex}`}
+                          handover={group.handover}
+                          toolMessages={group.toolMessages}
+                        />
+                      );
+                    }
+                    if (group.type === 'tool-chain') {
+                      return (
+                        <ToolChainDisplay
+                          key={`tool-chain-${groupIndex}`}
+                          messages={group.messages}
+                        />
+                      );
+                    }
+                    return renderMessage(group.message);
+                  })}
+                </ChatContainerContent>
+              </ChatContainerRoot>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
