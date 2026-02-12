@@ -111,8 +111,8 @@ export default function AdminUserDetailPage({
       <div className="space-y-6">
         <div>
           <Skeleton className="h-8 w-28 mb-3" />
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-36 mt-1" />
+          <Skeleton className="h-8 w-36" />
+          <Skeleton className="h-4 w-64 mt-1" />
         </div>
         <div className="flex flex-col lg:flex-row gap-6">
           <Skeleton className="h-96 w-full lg:w-72" />
@@ -159,8 +159,8 @@ export default function AdminUserDetailPage({
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{user.name}</h1>
-          <p className="text-sm text-muted-foreground">{user.email}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">User Details</h1>
+          <p className="text-sm text-muted-foreground font-mono">{uuid}</p>
         </div>
       </div>
 
