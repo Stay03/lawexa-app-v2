@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useEffect } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { X, Plus, TrendingUp, Clock, Loader2 } from 'lucide-react';
+import { X, Plus, TrendingUp, Clock, Loader2, FileQuestion } from 'lucide-react';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
@@ -22,6 +22,8 @@ import { useInfiniteNotes } from '@/lib/hooks/useNotes';
 import { useInfiniteTrendingNotes } from '@/lib/hooks/useTrending';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 import { getTrendingLabel } from '@/types/trending';
+import { ContentRequestDialog } from '@/components/content-requests';
+import { useAuthStore } from '@/lib/stores/authStore';
 import type { NoteListParams } from '@/types/note';
 
 const recentTab = { value: 'recent', label: 'Recently Added', icon: <Clock className="h-4 w-4" /> };
@@ -32,6 +34,9 @@ const recentTab = { value: 'recent', label: 'Recently Added', icon: <Clock class
 function NotesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuthStore();
+  const isGuest = user?.role === 'guest';
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
 
   // Read URL state (no page param needed for infinite scroll)
   const search = searchParams.get('search') || '';
@@ -190,7 +195,21 @@ function NotesPageContent() {
     if (!notesQuery.data?.pages[0]?.data || noteItems.length === 0) {
       if (hasActiveFilters) {
         return (
-          <NoteEmptyState type="search" />
+          <div className="space-y-2">
+            <NoteEmptyState type="search" />
+            {search && !isGuest && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setIsRequestDialogOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                >
+                  <FileQuestion className="h-4 w-4" />
+                  Can&apos;t find it? Request this content
+                </button>
+              </div>
+            )}
+          </div>
         );
       }
       return <NoteEmptyState type="browse" />;
@@ -318,6 +337,13 @@ function NotesPageContent() {
           {isTrendingTab ? renderTrendingContent() : renderRecentContent()}
         </div>
       )}
+
+      {/* Content request dialog — pre-fills with search query */}
+      <ContentRequestDialog
+        open={isRequestDialogOpen}
+        onOpenChange={setIsRequestDialogOpen}
+        defaultTitle={search || undefined}
+      />
     </PageContainer>
   );
 }

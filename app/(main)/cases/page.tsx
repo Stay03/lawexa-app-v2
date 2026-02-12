@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Scale, BookOpen, X, TrendingUp, Loader2 } from 'lucide-react';
+import { Scale, BookOpen, X, TrendingUp, Loader2, FileQuestion } from 'lucide-react';
 import { AnimatedTabs } from '@/components/ui/animated-tabs';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -19,6 +19,8 @@ import { useInfiniteCases } from '@/lib/hooks/useCases';
 import { useInfiniteTrendingCases } from '@/lib/hooks/useTrending';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 import { getTrendingLabel } from '@/types/trending';
+import { ContentRequestDialog } from '@/components/content-requests';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 /**
  * Case Library list page content (uses useSearchParams)
@@ -26,7 +28,10 @@ import { getTrendingLabel } from '@/types/trending';
 function CasesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuthStore();
+  const isGuest = user?.role === 'guest';
   const [activeTab, setActiveTab] = useState('recent');
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
 
   // Read URL state (no page param needed for infinite scroll)
   const search = searchParams.get('search') || '';
@@ -107,22 +112,36 @@ function CasesPageContent() {
     if (!casesQuery.data?.pages[0]?.data || caseItems.length === 0) {
       const hasFilter = search || tags;
       return (
-        <EmptyState
-          icon={Scale}
-          title={hasFilter ? 'No cases found' : 'No cases yet'}
-          description={
-            tags
-              ? `No cases found with tag "${tags}".`
-              : search
-                ? `No cases match "${search}". Try a different search term.`
-                : 'Cases will appear here once added to the library.'
-          }
-          action={
-            hasFilter
-              ? { label: 'Clear filters', onClick: () => updateParams({ search: null, tags: null }) }
-              : undefined
-          }
-        />
+        <div className="space-y-2">
+          <EmptyState
+            icon={Scale}
+            title={hasFilter ? 'No cases found' : 'No cases yet'}
+            description={
+              tags
+                ? `No cases found with tag "${tags}".`
+                : search
+                  ? `No cases match "${search}". Try a different search term.`
+                  : 'Cases will appear here once added to the library.'
+            }
+            action={
+              hasFilter
+                ? { label: 'Clear filters', onClick: () => updateParams({ search: null, tags: null }) }
+                : undefined
+            }
+          />
+          {search && !isGuest && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setIsRequestDialogOpen(true)}
+                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+              >
+                <FileQuestion className="h-4 w-4" />
+                Can&apos;t find it? Request this content
+              </button>
+            </div>
+          )}
+        </div>
       );
     }
 
@@ -274,6 +293,14 @@ function CasesPageContent() {
           )}
         </>
       )}
+
+      {/* Content request dialog — pre-fills with search query */}
+      <ContentRequestDialog
+        open={isRequestDialogOpen}
+        onOpenChange={setIsRequestDialogOpen}
+        defaultType="case"
+        defaultTitle={search || undefined}
+      />
     </PageContainer>
   );
 }
