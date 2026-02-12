@@ -168,6 +168,20 @@ function CasesPageContent() {
             <p className="text-sm text-muted-foreground">No more cases</p>
           )}
         </div>
+
+        {/* Show request CTA when search yields few results */}
+        {search && !isGuest && caseItems.length <= 3 && !casesQuery.hasNextPage && (
+          <div className="flex justify-center pb-4">
+            <button
+              type="button"
+              onClick={() => setIsRequestDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+            >
+              <FileQuestion className="h-4 w-4" />
+              Can&apos;t find it? Request this content
+            </button>
+          </div>
+        )}
       </>
     );
   };
