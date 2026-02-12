@@ -58,10 +58,10 @@ export function UserIdentityCard({ user, className }: UserIdentityCardProps) {
     .join(', ');
 
   return (
-    <Card className={cn('w-full', className)}>
-      <CardContent className="pt-6 flex flex-col space-y-4">
+    <Card className={cn('w-full shadow-none border-muted', className)}>
+      <CardContent className="pt-5 flex flex-col space-y-3">
         {/* UUID - Primary Identifier */}
-        <div className="text-center">
+        <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
             User UUID
           </p>
@@ -86,7 +86,7 @@ export function UserIdentityCard({ user, className }: UserIdentityCardProps) {
         </div>
 
         {/* Badges */}
-        <div className="flex flex-wrap gap-2 justify-center">
+        <div className="flex flex-wrap gap-2">
           <Badge
             variant={
               user.role === 'admin' || user.role === 'superadmin'

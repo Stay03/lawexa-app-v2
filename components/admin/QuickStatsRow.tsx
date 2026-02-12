@@ -1,6 +1,5 @@
 'use client';
 
-import { Card, CardContent } from '@/components/ui/card';
 import { formatCost } from '@/lib/utils/currency';
 import { MessageSquare, Hash, Coins, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -54,24 +53,22 @@ export function QuickStatsRow({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {stats.map((stat) => (
-        <Card key={stat.label}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <stat.icon className="h-4 w-4" />
-              <span className="text-xs font-medium">{stat.label}</span>
-            </div>
-            <p
-              className={cn('text-2xl font-bold tabular-nums', stat.mono && 'font-mono')}
-            >
-              {stat.value}
+        <div key={stat.label} className="rounded-lg bg-muted/50 p-4">
+          <div className="flex items-center gap-2 text-muted-foreground mb-2">
+            <stat.icon className="h-4 w-4" />
+            <span className="text-xs font-medium">{stat.label}</span>
+          </div>
+          <p
+            className={cn('text-2xl font-bold tabular-nums', stat.mono && 'font-mono')}
+          >
+            {stat.value}
+          </p>
+          {stat.subtext && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {stat.subtext}
             </p>
-            {stat.subtext && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {stat.subtext}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+          )}
+        </div>
       ))}
     </div>
   );

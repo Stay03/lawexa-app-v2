@@ -109,7 +109,11 @@ export default function AdminUserDetailPage({
   if (userLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-40" />
+        <div>
+          <Skeleton className="h-8 w-28 mb-3" />
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-36 mt-1" />
+        </div>
         <div className="flex flex-col lg:flex-row gap-6">
           <Skeleton className="h-96 w-full lg:w-72" />
           <div className="flex-1 space-y-6">
@@ -130,9 +134,9 @@ export default function AdminUserDetailPage({
     return (
       <div className="space-y-4">
         <Link href="/admin/conversations">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Conversations
+          <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Conversations
           </Button>
         </Link>
         <div className="rounded-lg border py-8 text-center text-muted-foreground">
@@ -146,13 +150,19 @@ export default function AdminUserDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* Back Button */}
-      <Link href="/admin/conversations">
-        <Button variant="ghost" size="sm">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Conversations
-        </Button>
-      </Link>
+      {/* Page Header */}
+      <div>
+        <Link href="/admin/conversations">
+          <Button variant="ghost" size="sm" className="mb-3 -ml-2 text-muted-foreground">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Conversations
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{user.name}</h1>
+          <p className="text-sm text-muted-foreground">{user.email}</p>
+        </div>
+      </div>
 
       {/* Main Layout: Sidebar + Content */}
       <div className="flex flex-col lg:flex-row gap-6">
