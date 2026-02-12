@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,7 @@ function ChangePercentBadge({ value }: { value: number | null }) {
 
 function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
   const { showNGN, exchangeRate } = useCurrencyStore();
+  const [showTokens, setShowTokens] = useState(false);
 
   const cards = [
     {
@@ -70,27 +72,26 @@ function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
       color: 'var(--chart-3)',
       format: (v: number) => v.toLocaleString(),
     },
-    {
-      key: 'total_cost' as const,
-      label: 'Total Cost',
-      color: 'var(--chart-4)',
-      format: (v: number) =>
-        formatCost(v, { showNGN, exchangeRate, decimals: 4 }),
-      mono: true,
-    },
   ];
+
+  // 4th card: toggleable between Cost and Tokens
+  const costTokenStat = showTokens ? statCards.total_tokens : statCards.total_cost;
+  const costTokenLabel = showTokens ? 'Total Tokens' : 'Total Cost';
+  const costTokenColor = 'var(--chart-4)';
+  const costTokenValue = showTokens
+    ? costTokenStat.value.toLocaleString()
+    : formatCost(costTokenStat.value, { showNGN, exchangeRate, decimals: 4 });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* First 3 cards */}
       {cards.map((card) => {
         const stat = statCards[card.key];
         return (
           <div
             key={card.key}
-            className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5 border-l-[3px]"
-            style={{ borderLeftColor: card.color }}
+            className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5"
           >
-            {/* Label with colored dot */}
             <div className="flex items-center gap-2">
               <span
                 className="h-2 w-2 rounded-full shrink-0"
@@ -100,18 +101,9 @@ function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
                 {card.label}
               </span>
             </div>
-
-            {/* Value */}
-            <p
-              className={cn(
-                'mt-2 text-2xl font-bold tabular-nums',
-                card.mono && 'font-mono'
-              )}
-            >
+            <p className="mt-2 text-2xl font-bold tabular-nums">
               {card.format(stat.value)}
             </p>
-
-            {/* Change percentage with context */}
             <div className="mt-3 flex items-center gap-1.5">
               <ChangePercentBadge value={stat.change_percent} />
               <span className="text-xs text-muted-foreground">
@@ -121,6 +113,59 @@ function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
           </div>
         );
       })}
+
+      {/* 4th card: Cost / Tokens toggle */}
+      <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span
+              className="h-2 w-2 rounded-full shrink-0"
+              style={{ backgroundColor: costTokenColor }}
+            />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {costTokenLabel}
+            </span>
+          </div>
+          <div className="flex rounded-md border">
+            <button
+              onClick={() => setShowTokens(false)}
+              className={cn(
+                'px-2 py-0.5 text-[10px] font-medium transition-colors rounded-l-md',
+                !showTokens
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              )}
+            >
+              Cost
+            </button>
+            <button
+              onClick={() => setShowTokens(true)}
+              className={cn(
+                'px-2 py-0.5 text-[10px] font-medium transition-colors rounded-r-md border-l',
+                showTokens
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              )}
+            >
+              Tokens
+            </button>
+          </div>
+        </div>
+        <p
+          className={cn(
+            'mt-2 text-2xl font-bold tabular-nums',
+            !showTokens && 'font-mono'
+          )}
+        >
+          {costTokenValue}
+        </p>
+        <div className="mt-3 flex items-center gap-1.5">
+          <ChangePercentBadge value={costTokenStat.change_percent} />
+          <span className="text-xs text-muted-foreground">
+            vs prior period
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

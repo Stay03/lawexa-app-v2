@@ -451,6 +451,7 @@ export interface UserAnalyticsStatCards {
   new_users: AnalyticsStatCard;
   total_conversations: AnalyticsStatCard;
   total_ai_responses: AnalyticsStatCard;
+  total_tokens: AnalyticsStatCard;
   total_cost: AnalyticsStatCard;
 }
 
