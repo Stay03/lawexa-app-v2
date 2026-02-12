@@ -2,11 +2,8 @@
 
 import * as React from 'react';
 import {
-  LayoutDashboard,
   MessageSquare,
   Users,
-  BarChart3,
-  Settings,
   ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -28,13 +25,6 @@ import {
 
 const adminNavItems: AdminNavItem[] = [
   {
-    title: 'Dashboard',
-    url: '/admin',
-    icon: LayoutDashboard,
-    comingSoon: true,
-    exactMatch: true,
-  },
-  {
     title: 'Conversations',
     url: '/admin/conversations',
     icon: MessageSquare,
@@ -43,18 +33,6 @@ const adminNavItems: AdminNavItem[] = [
     title: 'Users',
     url: '/admin/users',
     icon: Users,
-  },
-  {
-    title: 'Analytics',
-    url: '/admin/analytics',
-    icon: BarChart3,
-    comingSoon: true,
-  },
-  {
-    title: 'Settings',
-    url: '/admin/settings',
-    icon: Settings,
-    comingSoon: true,
   },
 ];
 

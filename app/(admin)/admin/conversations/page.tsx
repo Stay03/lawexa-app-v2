@@ -2,7 +2,6 @@
 
 import { Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   AdminConversationsTable,
@@ -87,32 +86,29 @@ function AdminConversationsPageContent() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>All Conversations</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <AdminConversationFilters
-            params={params}
-            onParamsChange={handleParamsChange}
-          />
+      <h1 className="text-2xl font-semibold tracking-tight">All Conversations</h1>
 
-          <AdminConversationsTable
-            conversations={data?.data || []}
-            isLoading={isLoading}
-            params={params}
-            onSort={handleSort}
-          />
+      <AdminConversationFilters
+        params={params}
+        onParamsChange={handleParamsChange}
+      />
 
-          {data?.pagination && (
-            <AdminPagination
-              pagination={data.pagination}
-              onPageChange={handlePageChange}
-              itemLabel="conversations"
-            />
-          )}
-        </CardContent>
-      </Card>
+      <AdminConversationsTable
+        conversations={data?.data || []}
+        isLoading={isLoading}
+        params={params}
+        onSort={handleSort}
+      />
+
+      {data?.pagination && (
+        <AdminPagination
+          pagination={data.pagination}
+          onPageChange={handlePageChange}
+          perPage={params.per_page || 15}
+          onPerPageChange={(perPage) => handleParamsChange({ per_page: perPage, page: 1 })}
+          itemLabel="conversations"
+        />
+      )}
     </div>
   );
 }
@@ -122,24 +118,17 @@ export default function AdminConversationsPage() {
     <Suspense
       fallback={
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Conversations</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-4">
-                <Skeleton className="h-10 w-[200px]" />
-                <Skeleton className="h-10 w-[140px]" />
-                <Skeleton className="h-10 w-[140px]" />
-                <Skeleton className="h-10 w-[100px]" />
-              </div>
-              <div className="space-y-2">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <Skeleton className="h-8 w-[200px]" />
+          <div className="flex flex-wrap gap-4">
+            <Skeleton className="h-10 w-[200px]" />
+            <Skeleton className="h-10 w-[140px]" />
+            <Skeleton className="h-10 w-10" />
+          </div>
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
         </div>
       }
     >

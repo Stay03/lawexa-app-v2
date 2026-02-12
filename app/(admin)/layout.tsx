@@ -134,7 +134,7 @@ export default function AdminLayout({
               <ThemeToggle />
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto min-h-0 p-4 pt-0">
+          <div className="flex flex-1 flex-col gap-6 overflow-x-hidden overflow-y-auto min-h-0 p-4 pt-0 md:p-6 md:pt-0">
             {children}
           </div>
         </SidebarInset>

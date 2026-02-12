@@ -14,7 +14,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -110,8 +109,9 @@ export function AdminConversationsTable({
             {!hideUserColumn && (
               <TableHead className="w-[120px] font-semibold">User</TableHead>
             )}
-            <TableHead className="w-[90px] font-semibold">Status</TableHead>
-            <TableHead className="w-[100px] font-semibold">Privacy</TableHead>
+            <TableHead className="w-[50px] text-center font-semibold">
+              <span className="sr-only">Privacy</span>
+            </TableHead>
             <TableHead className="w-[120px] font-semibold">Agent</TableHead>
             <TableHead className="w-[80px] text-right font-semibold">Messages</TableHead>
             <TableHead className="w-[100px] text-right font-semibold">
@@ -134,8 +134,8 @@ export function AdminConversationsTable({
             <TableRow
               key={conversation.id}
               className={cn(
-                'cursor-pointer transition-colors',
-                index % 2 === 1 && 'bg-muted/20'
+                'cursor-pointer transition-colors hover:bg-muted/40',
+                index % 2 === 1 && 'bg-muted/30'
               )}
               onClick={() => handleRowClick(conversation.id)}
             >
@@ -163,24 +163,19 @@ export function AdminConversationsTable({
                   </Tooltip>
                 </TableCell>
               )}
-              <TableCell>
-                <Badge
-                  variant={conversation.status === 'active' ? 'default' : 'secondary'}
-                  className="capitalize"
-                >
-                  {conversation.status}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {conversation.is_private ? (
-                  <span className="flex items-center gap-1.5 text-muted-foreground text-sm">
-                    <Lock className="h-3.5 w-3.5" /> Private
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-green-600 text-sm">
-                    <Globe className="h-3.5 w-3.5" /> Public
-                  </span>
-                )}
+              <TableCell className="text-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {conversation.is_private ? (
+                      <Lock className="h-4 w-4 text-muted-foreground mx-auto" />
+                    ) : (
+                      <Globe className="h-4 w-4 text-green-600 mx-auto" />
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {conversation.is_private ? 'Private' : 'Public'}
+                  </TooltipContent>
+                </Tooltip>
               </TableCell>
               <TableCell className="text-sm">
                 <span className="block truncate max-w-[120px]">

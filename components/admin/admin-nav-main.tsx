@@ -3,7 +3,6 @@
 import { type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -17,7 +16,6 @@ export interface AdminNavItem {
   title: string;
   url: string;
   icon?: LucideIcon;
-  comingSoon?: boolean;
   exactMatch?: boolean;
 }
 
@@ -33,27 +31,6 @@ export function AdminNavMain({ items }: { items: AdminNavItem[] }) {
           const isActive = item.exactMatch
             ? pathname === item.url
             : pathname.startsWith(item.url);
-
-          if (item.comingSoon) {
-            return (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  tooltip={`${item.title} (Coming Soon)`}
-                  disabled
-                  className="cursor-not-allowed opacity-60"
-                >
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                  <Badge
-                    variant="secondary"
-                    className="ml-auto text-[10px] px-1.5 py-0"
-                  >
-                    Soon
-                  </Badge>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          }
 
           return (
             <SidebarMenuItem key={item.title}>
