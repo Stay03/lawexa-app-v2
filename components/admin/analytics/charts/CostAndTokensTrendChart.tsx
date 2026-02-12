@@ -58,7 +58,7 @@ export function CostAndTokensTrendChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <AreaChart data={data} accessibilityLayer margin={{ top: 10 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
@@ -76,6 +76,7 @@ export function CostAndTokensTrendChart({
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v) => `$${v.toFixed(2)}`}
+              domain={[0, (max: number) => Math.ceil(max * 1.15)]}
             />
             <YAxis
               yAxisId="tokens"
@@ -86,6 +87,7 @@ export function CostAndTokensTrendChart({
               tickFormatter={(v) =>
                 v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
               }
+              domain={[0, (max: number) => Math.ceil(max * 1.15)]}
             />
             <ChartTooltip
               content={
