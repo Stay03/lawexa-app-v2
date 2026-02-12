@@ -1,13 +1,6 @@
 'use client';
 
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Popover,
   PopoverContent,
   PopoverHeader,
@@ -20,60 +13,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Settings2 } from 'lucide-react';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import type { AdminUserConversationsParams } from '@/types/admin';
 
-interface AdminUserConversationFiltersProps {
-  params: AdminUserConversationsParams;
-  onParamsChange: (params: Partial<AdminUserConversationsParams>) => void;
-}
-
-export function AdminUserConversationFilters({
-  params,
-  onParamsChange,
-}: AdminUserConversationFiltersProps) {
+export function AdminUserConversationFilters() {
   const { exchangeRate, showNGN, setExchangeRate, setShowNGN } =
     useCurrencyStore();
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3">
-      {/* Status Filter */}
-      <Select
-        value={params.status || 'all'}
-        onValueChange={(value) =>
-          onParamsChange({
-            status: value === 'all' ? undefined : (value as 'active' | 'archived'),
-            page: 1,
-          })
-        }
-      >
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="archived">Archived</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {/* Per Page Selector */}
-      <Select
-        value={String(params.per_page || 15)}
-        onValueChange={(value) =>
-          onParamsChange({ per_page: parseInt(value), page: 1 })
-        }
-      >
-        <SelectTrigger className="w-[100px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="10">10 / page</SelectItem>
-          <SelectItem value="15">15 / page</SelectItem>
-          <SelectItem value="25">25 / page</SelectItem>
-          <SelectItem value="50">50 / page</SelectItem>
-        </SelectContent>
-      </Select>
-
+    <div className="flex justify-end">
       {/* Currency Settings */}
       <Popover>
         <PopoverTrigger asChild>

@@ -3,13 +3,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import {
   Table,
   TableBody,
   TableCell,
@@ -305,172 +298,146 @@ export function AdminUserTokenUsage({ userUuid, hideSummary = false }: AdminUser
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-4">
-            <Skeleton className="h-10 w-40" />
-            <Skeleton className="h-10 w-32" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-          <Skeleton className="h-64 w-full" />
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Skeleton className="h-6 w-48" />
+        <div className="flex gap-4">
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-32" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
     );
   }
 
   const summary = data?.data?.summary;
 
   return (
-    <div className="space-y-4">
-      {/* Summary Card - Hidden when hideSummary is true */}
+    <div className="space-y-6">
+      {/* Summary - Hidden when hideSummary is true */}
       {!hideSummary && summary && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Usage Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground mb-1 flex items-center gap-1">
-                  <Hash className="h-3 w-3" /> Total Tokens
-                </p>
-                <p className="font-semibold text-lg">{summary.total_tokens.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">Prompt Tokens</p>
-                <p className="font-semibold">{summary.prompt_tokens.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">Completion Tokens</p>
-                <p className="font-semibold">{summary.completion_tokens.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1 flex items-center gap-1">
-                  <Coins className="h-3 w-3" /> Total Cost
-                </p>
-                <p className="font-mono font-semibold text-lg">
-                  {formatCost(summary.total_cost, { showNGN, exchangeRate, decimals: 4 })}
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">Total Requests</p>
-                <p className="font-semibold text-lg">{summary.total_requests}</p>
-              </div>
+        <div className="rounded-lg border p-4">
+          <h2 className="text-lg font-semibold mb-4">Usage Summary</h2>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <div>
+              <p className="text-muted-foreground mb-1 flex items-center gap-1">
+                <Hash className="h-3 w-3" /> Total Tokens
+              </p>
+              <p className="font-semibold text-lg">{summary.total_tokens.toLocaleString()}</p>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-muted-foreground mb-1">Prompt Tokens</p>
+              <p className="font-semibold">{summary.prompt_tokens.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">Completion Tokens</p>
+              <p className="font-semibold">{summary.completion_tokens.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1 flex items-center gap-1">
+                <Coins className="h-3 w-3" /> Total Cost
+              </p>
+              <p className="font-mono font-semibold text-lg">
+                {formatCost(summary.total_cost, { showNGN, exchangeRate, decimals: 4 })}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">Total Requests</p>
+              <p className="font-semibold text-lg">{summary.total_requests}</p>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Filters and Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Usage Breakdown</CardTitle>
-          <CardDescription>
+      {/* Breakdown */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Usage Breakdown</h2>
+          <p className="text-sm text-muted-foreground">
             View detailed token usage with various grouping options
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Filters */}
-          <div className="flex flex-wrap gap-4">
-            {/* Group By */}
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-4">
+          {/* Group By */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Group By</Label>
+            <Select
+              value={params.group_by || 'none'}
+              onValueChange={(value) => updateParams({ group_by: value as TokenUsageGroupBy })}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Grouping</SelectItem>
+                <SelectItem value="day">By Day</SelectItem>
+                <SelectItem value="week">By Week</SelectItem>
+                <SelectItem value="month">By Month</SelectItem>
+                <SelectItem value="agent">By Agent</SelectItem>
+                <SelectItem value="conversation">By Conversation</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Date Range */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Start Date</Label>
+            <Input
+              type="date"
+              value={params.start_date || ''}
+              onChange={(e) => updateParams({ start_date: e.target.value || undefined })}
+              className="w-[150px]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">End Date</Label>
+            <Input
+              type="date"
+              value={params.end_date || ''}
+              onChange={(e) => updateParams({ end_date: e.target.value || undefined })}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Sort By (only for ungrouped) */}
+          {params.group_by === 'none' && (
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Group By</Label>
+              <Label className="text-xs text-muted-foreground">Sort By</Label>
               <Select
-                value={params.group_by || 'none'}
-                onValueChange={(value) => updateParams({ group_by: value as TokenUsageGroupBy })}
+                value={params.sort_by || 'created_at'}
+                onValueChange={(value) => updateParams({ sort_by: value as 'created_at' | 'total_tokens' | 'estimated_cost' })}
               >
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No Grouping</SelectItem>
-                  <SelectItem value="day">By Day</SelectItem>
-                  <SelectItem value="week">By Week</SelectItem>
-                  <SelectItem value="month">By Month</SelectItem>
-                  <SelectItem value="agent">By Agent</SelectItem>
-                  <SelectItem value="conversation">By Conversation</SelectItem>
+                  <SelectItem value="created_at">Date</SelectItem>
+                  <SelectItem value="total_tokens">Tokens</SelectItem>
+                  <SelectItem value="estimated_cost">Cost</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Date Range */}
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Start Date</Label>
-              <Input
-                type="date"
-                value={params.start_date || ''}
-                onChange={(e) => updateParams({ start_date: e.target.value || undefined })}
-                className="w-[150px]"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">End Date</Label>
-              <Input
-                type="date"
-                value={params.end_date || ''}
-                onChange={(e) => updateParams({ end_date: e.target.value || undefined })}
-                className="w-[150px]"
-              />
-            </div>
-
-            {/* Sort By (only for ungrouped) */}
-            {params.group_by === 'none' && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Sort By</Label>
-                <Select
-                  value={params.sort_by || 'created_at'}
-                  onValueChange={(value) => updateParams({ sort_by: value as 'created_at' | 'total_tokens' | 'estimated_cost' })}
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="created_at">Date</SelectItem>
-                    <SelectItem value="total_tokens">Tokens</SelectItem>
-                    <SelectItem value="estimated_cost">Cost</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Per Page */}
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Per Page</Label>
-              <Select
-                value={String(params.per_page || 15)}
-                onValueChange={(value) => updateParams({ per_page: parseInt(value) })}
-              >
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="15">15</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Breakdown Table */}
-          <div className="rounded-lg border overflow-hidden">
-            {renderBreakdownTable}
-          </div>
-
-          {/* Pagination */}
-          {data?.pagination && (
-            <AdminPagination
-              pagination={data.pagination}
-              onPageChange={handlePageChange}
-              itemLabel="records"
-            />
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Breakdown Table */}
+        <div className="rounded-lg border overflow-hidden">
+          {renderBreakdownTable}
+        </div>
+
+        {/* Pagination */}
+        {data?.pagination && (
+          <AdminPagination
+            pagination={data.pagination}
+            onPageChange={handlePageChange}
+            perPage={params.per_page || 15}
+            onPerPageChange={(perPage) => updateParams({ per_page: perPage })}
+            itemLabel="records"
+          />
+        )}
+      </div>
     </div>
   );
 }

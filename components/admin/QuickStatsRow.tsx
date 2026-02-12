@@ -3,6 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCost } from '@/lib/utils/currency';
 import { MessageSquare, Hash, Coins, Zap } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { AdminUserUsageSummary } from '@/types/admin';
 
 interface QuickStatsRowProps {
@@ -60,9 +61,7 @@ export function QuickStatsRow({
               <span className="text-xs font-medium">{stat.label}</span>
             </div>
             <p
-              className={`text-2xl font-bold tabular-nums ${
-                stat.mono ? 'font-mono' : ''
-              }`}
+              className={cn('text-2xl font-bold tabular-nums', stat.mono && 'font-mono')}
             >
               {stat.value}
             </p>

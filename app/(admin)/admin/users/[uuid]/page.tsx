@@ -3,7 +3,6 @@
 import { use, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminUser, useAdminUserConversations } from '@/lib/hooks/useAdmin';
@@ -136,11 +135,9 @@ export default function AdminUserDetailPage({
             Back to Conversations
           </Button>
         </Link>
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            User not found
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border py-8 text-center text-muted-foreground">
+          User not found
+        </div>
       </div>
     );
   }
@@ -172,34 +169,31 @@ export default function AdminUserDetailPage({
             exchangeRate={exchangeRate}
           />
 
-          {/* Conversations Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Conversations</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <AdminUserConversationFilters
-                params={conversationParams}
-                onParamsChange={handleParamsChange}
-              />
+          {/* Conversations */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Conversations</h2>
+              <AdminUserConversationFilters />
+            </div>
 
-              <AdminConversationsTable
-                conversations={conversationsData?.data || []}
-                isLoading={conversationsLoading}
-                params={{ ...conversationParams, user_uuid: uuid }}
-                onSort={handleSort}
-                hideUserColumn
-              />
+            <AdminConversationsTable
+              conversations={conversationsData?.data || []}
+              isLoading={conversationsLoading}
+              params={{ ...conversationParams, user_uuid: uuid }}
+              onSort={handleSort}
+              hideUserColumn
+            />
 
-              {conversationsData?.pagination && (
-                <AdminPagination
-                  pagination={conversationsData.pagination}
-                  onPageChange={handlePageChange}
-                  itemLabel="conversations"
-                />
-              )}
-            </CardContent>
-          </Card>
+            {conversationsData?.pagination && (
+              <AdminPagination
+                pagination={conversationsData.pagination}
+                onPageChange={handlePageChange}
+                perPage={conversationParams.per_page || 15}
+                onPerPageChange={(perPage) => handleParamsChange({ per_page: perPage, page: 1 })}
+                itemLabel="conversations"
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
