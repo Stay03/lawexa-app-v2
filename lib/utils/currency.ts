@@ -21,7 +21,7 @@ export function formatCost(
   }
 
   // USD format with specified decimals
-  return `$${usdAmount.toFixed(decimals)}`;
+  return `$${Number(usdAmount).toFixed(decimals)}`;
 }
 
 /**

@@ -76,7 +76,7 @@ export function ModelUsageChart({ data }: ModelUsageChartProps) {
                   formatter={(value, name) => {
                     const item = data.find((d) => d.model_name === name);
                     return [
-                      `${Number(value).toLocaleString()} requests (${item?.percentage.toFixed(1)}%)`,
+                      `${Number(value).toLocaleString()} requests (${Number(item?.percentage ?? 0).toFixed(1)}%)`,
                       name,
                     ];
                   }}

@@ -55,7 +55,7 @@ function ChangePercentBadge({ value }: { value: number | null }) {
         <TrendingDown className="h-3 w-3" />
       )}
       {isPositive ? '+' : ''}
-      {value.toFixed(1)}%
+      {Number(value).toFixed(1)}%
     </Badge>
   );
 }
@@ -83,13 +83,13 @@ function AnalyticsStatCards({ statCards }: AnalyticsStatCardsProps) {
       key: 'avg_response_time' as const,
       label: 'Avg Response Time',
       icon: Clock,
-      format: (v: number) => `${v.toFixed(1)}s`,
+      format: (v: number) => `${Number(v).toFixed(1)}s`,
     },
     {
       key: 'error_rate' as const,
       label: 'Error Rate',
       icon: AlertTriangle,
-      format: (v: number) => `${v.toFixed(1)}%`,
+      format: (v: number) => `${Number(v).toFixed(1)}%`,
     },
     {
       key: 'total_cost' as const,
@@ -103,7 +103,7 @@ function AnalyticsStatCards({ statCards }: AnalyticsStatCardsProps) {
       key: 'avg_messages_per_conversation' as const,
       label: 'Avg Messages / Conv',
       icon: MessageCircle,
-      format: (v: number) => v.toFixed(1),
+      format: (v: number) => Number(v).toFixed(1),
     },
   ];
 
