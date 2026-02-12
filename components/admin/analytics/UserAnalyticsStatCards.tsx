@@ -1,14 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
-import {
-  UserPlus,
-  MessageSquare,
-  Bot,
-  Coins,
-  TrendingUp,
-  TrendingDown,
-} from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
@@ -18,9 +11,6 @@ interface UserAnalyticsStatCardsProps {
   statCards: StatCardsType;
 }
 
-/**
- * Change percentage badge component.
- */
 function ChangePercentBadge({ value }: { value: number | null }) {
   if (value === null) {
     return (
@@ -58,9 +48,6 @@ function ChangePercentBadge({ value }: { value: number | null }) {
   );
 }
 
-/**
- * Default component. Renders 4 user analytics stat cards in a responsive grid.
- */
 function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
   const { showNGN, exchangeRate } = useCurrencyStore();
 
@@ -68,25 +55,25 @@ function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
     {
       key: 'new_users' as const,
       label: 'New Users',
-      icon: UserPlus,
+      color: 'var(--chart-1)',
       format: (v: number) => v.toLocaleString(),
     },
     {
       key: 'total_conversations' as const,
-      label: 'Total Conversations',
-      icon: MessageSquare,
+      label: 'Conversations',
+      color: 'var(--chart-2)',
       format: (v: number) => v.toLocaleString(),
     },
     {
       key: 'total_ai_responses' as const,
       label: 'AI Responses',
-      icon: Bot,
+      color: 'var(--chart-3)',
       format: (v: number) => v.toLocaleString(),
     },
     {
       key: 'total_cost' as const,
       label: 'Total Cost',
-      icon: Coins,
+      color: 'var(--chart-4)',
       format: (v: number) =>
         formatCost(v, { showNGN, exchangeRate, decimals: 4 }),
       mono: true,
@@ -98,21 +85,38 @@ function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
       {cards.map((card) => {
         const stat = statCards[card.key];
         return (
-          <div key={card.key} className="rounded-lg bg-muted/50 p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <card.icon className="h-4 w-4" />
-              <span className="text-xs font-medium">{card.label}</span>
+          <div
+            key={card.key}
+            className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5 border-l-[3px]"
+            style={{ borderLeftColor: card.color }}
+          >
+            {/* Label with colored dot */}
+            <div className="flex items-center gap-2">
+              <span
+                className="h-2 w-2 rounded-full shrink-0"
+                style={{ backgroundColor: card.color }}
+              />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {card.label}
+              </span>
             </div>
-            <div className="flex items-baseline gap-2">
-              <p
-                className={cn(
-                  'text-2xl font-bold tabular-nums',
-                  card.mono && 'font-mono'
-                )}
-              >
-                {card.format(stat.value)}
-              </p>
+
+            {/* Value */}
+            <p
+              className={cn(
+                'mt-2 text-2xl font-bold tabular-nums',
+                card.mono && 'font-mono'
+              )}
+            >
+              {card.format(stat.value)}
+            </p>
+
+            {/* Change percentage with context */}
+            <div className="mt-3 flex items-center gap-1.5">
               <ChangePercentBadge value={stat.change_percent} />
+              <span className="text-xs text-muted-foreground">
+                vs prior period
+              </span>
             </div>
           </div>
         );
