@@ -521,19 +521,17 @@ export default function AdminConversationDetailPage({
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <Skeleton className="h-8 w-28 mb-3" />
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-80 mt-1" />
-        </div>
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-28" />
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="lg:w-56 lg:shrink-0 space-y-3">
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-6 w-32" />
             {[...Array(6)].map((_, i) => (
               <Skeleton key={i} className="h-16 rounded-lg" />
             ))}
           </div>
-          <Skeleton className="flex-1 h-[70vh] rounded-lg" />
+          <Skeleton className="flex-1 h-[80vh] rounded-lg" />
         </div>
       </div>
     );
@@ -587,25 +585,31 @@ export default function AdminConversationDetailPage({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div>
-        <Link href="/admin/conversations">
-          <Button variant="ghost" size="sm" className="mb-3 -ml-2 text-muted-foreground">
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Conversations
-          </Button>
-        </Link>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight truncate">
+    <div className="space-y-4">
+      {/* Back Button */}
+      <Link href="/admin/conversations">
+        <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Conversations
+        </Button>
+      </Link>
+
+      {/* Main Layout: Sidebar + Message History */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Sidebar - Title, Badges & Stats */}
+        <div className="lg:w-56 lg:shrink-0 space-y-3">
+          {/* Title & ID */}
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">
               {conversation.title || 'Untitled Conversation'}
             </h1>
-            <p className="text-sm text-muted-foreground font-mono mt-0.5">
+            <p className="text-xs text-muted-foreground font-mono break-all mt-1">
               {conversation.id}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0 mt-1">
+
+          {/* Badges */}
+          <div className="flex flex-wrap gap-2">
             <Badge
               variant={
                 conversation.status === 'active' ? 'default' : 'secondary'
@@ -626,13 +630,8 @@ export default function AdminConversationDetailPage({
               </Badge>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Main Layout: Sidebar + Content */}
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Sidebar - Stats */}
-        <div className="lg:w-56 lg:shrink-0 space-y-3">
+          {/* Stats */}
           <div className="rounded-lg border border-muted p-3">
             <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
               <User className="h-3.5 w-3.5" /> User UUID
@@ -685,19 +684,15 @@ export default function AdminConversationDetailPage({
           </div>
         </div>
 
-        {/* Right Content - Message History */}
+        {/* Right Content - Message History (full height) */}
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-semibold">Message History</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            {conversation.messages.length} messages in chronological order
-          </p>
           {conversation.messages.length === 0 ? (
             <div className="rounded-lg border py-8 text-center text-muted-foreground">
               No messages in this conversation
             </div>
           ) : (
             <div className="rounded-lg border overflow-hidden">
-              <ChatContainerRoot className="max-h-[70vh] overflow-y-auto">
+              <ChatContainerRoot className="max-h-[80vh] overflow-y-auto">
                 <ChatContainerContent>
                   {messageGroups.map((group, groupIndex) => {
                     if (group.type === 'handover-group') {
