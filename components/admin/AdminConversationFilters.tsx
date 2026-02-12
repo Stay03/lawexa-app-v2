@@ -8,18 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Search, X, Settings2 } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { CurrencySettings } from '@/components/admin/CurrencySettings';
 import type { AdminConversationsParams } from '@/types/admin';
 
 interface AdminConversationFiltersProps {
@@ -31,9 +22,6 @@ export function AdminConversationFilters({
   params,
   onParamsChange,
 }: AdminConversationFiltersProps) {
-  const { exchangeRate, showNGN, setExchangeRate, setShowNGN } =
-    useCurrencyStore();
-
   return (
     <div className="flex flex-col sm:flex-row gap-3">
       {/* User UUID Search */}
@@ -86,56 +74,7 @@ export function AdminConversationFilters({
       </Select>
 
       {/* Currency Settings */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="icon" className="shrink-0">
-            <Settings2 className="h-4 w-4" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-64">
-          <PopoverHeader>
-            <PopoverTitle>Currency Settings</PopoverTitle>
-          </PopoverHeader>
-
-          <div className="space-y-4">
-            {/* Show NGN Toggle */}
-            <div className="flex items-center justify-between">
-              <Label htmlFor="show-ngn" className="text-sm">
-                Show in NGN (₦)
-              </Label>
-              <Switch
-                id="show-ngn"
-                checked={showNGN}
-                onCheckedChange={setShowNGN}
-              />
-            </div>
-
-            {/* Exchange Rate Input */}
-            <div className="space-y-2">
-              <Label htmlFor="exchange-rate" className="text-sm">
-                USD to NGN Rate
-              </Label>
-              <Input
-                id="exchange-rate"
-                type="number"
-                min={1}
-                step={1}
-                value={exchangeRate}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value);
-                  if (!isNaN(value) && value > 0) {
-                    setExchangeRate(value);
-                  }
-                }}
-                className="h-9"
-              />
-              <p className="text-xs text-muted-foreground">
-                $1 = ₦{exchangeRate.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+      <CurrencySettings />
     </div>
   );
 }

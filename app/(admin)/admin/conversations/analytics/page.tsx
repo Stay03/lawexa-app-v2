@@ -9,6 +9,7 @@ import { AnalyticsStatCards } from '@/components/admin/analytics/AnalyticsStatCa
 import { AnalyticsCharts } from '@/components/admin/analytics/AnalyticsCharts';
 import { AnalyticsRecentConversations } from '@/components/admin/analytics/AnalyticsRecentConversations';
 import { AnalyticsTopUsers } from '@/components/admin/analytics/AnalyticsTopUsers';
+import { CurrencySettings } from '@/components/admin/CurrencySettings';
 import type { ConversationAnalyticsParams, AnalyticsPeriod } from '@/types/admin';
 
 function ConversationAnalyticsContent() {
@@ -80,13 +81,16 @@ function ConversationAnalyticsContent() {
           <h1 className="text-2xl font-semibold tracking-tight">
             Conversation Analytics
           </h1>
-          <AnalyticsPeriodSelector
-            period={(params.period as AnalyticsPeriod) || '30d'}
-            startDate={params.start_date}
-            endDate={params.end_date}
-            onPeriodChange={handlePeriodChange}
-            onCustomRangeChange={handleCustomRangeChange}
-          />
+          <div className="flex items-center gap-2">
+            <AnalyticsPeriodSelector
+              period={(params.period as AnalyticsPeriod) || '30d'}
+              startDate={params.start_date}
+              endDate={params.end_date}
+              onPeriodChange={handlePeriodChange}
+              onCustomRangeChange={handleCustomRangeChange}
+            />
+            <CurrencySettings />
+          </div>
         </div>
         <div className="rounded-lg border py-12 text-center text-muted-foreground">
           Failed to load analytics data. Please try again.
@@ -102,13 +106,16 @@ function ConversationAnalyticsContent() {
         <h1 className="text-2xl font-semibold tracking-tight">
           Conversation Analytics
         </h1>
-        <AnalyticsPeriodSelector
-          period={(params.period as AnalyticsPeriod) || '30d'}
-          startDate={params.start_date}
-          endDate={params.end_date}
-          onPeriodChange={handlePeriodChange}
-          onCustomRangeChange={handleCustomRangeChange}
-        />
+        <div className="flex items-center gap-2">
+          <AnalyticsPeriodSelector
+            period={(params.period as AnalyticsPeriod) || '30d'}
+            startDate={params.start_date}
+            endDate={params.end_date}
+            onPeriodChange={handlePeriodChange}
+            onCustomRangeChange={handleCustomRangeChange}
+          />
+          <CurrencySettings />
+        </div>
       </div>
 
       {/* Stat Cards */}

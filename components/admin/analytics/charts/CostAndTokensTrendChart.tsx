@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
@@ -16,26 +17,41 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import type { CostAndTokensTrendPoint } from '@/types/admin';
 
 interface CostAndTokensTrendChartProps {
   data: CostAndTokensTrendPoint[];
 }
 
-const chartConfig = {
-  total_cost: {
-    label: 'Cost (USD)',
-    color: 'var(--chart-1)',
-  },
-  total_tokens: {
-    label: 'Tokens',
-    color: 'var(--chart-3)',
-  },
-} satisfies ChartConfig;
-
 export function CostAndTokensTrendChart({
   data,
 }: CostAndTokensTrendChartProps) {
+  const { showNGN, exchangeRate } = useCurrencyStore();
+
+  const chartConfig = useMemo<ChartConfig>(
+    () => ({
+      total_cost: {
+        label: `Cost (${showNGN ? 'NGN' : 'USD'})`,
+        color: 'var(--chart-1)',
+      },
+      total_tokens: {
+        label: 'Tokens',
+        color: 'var(--chart-3)',
+      },
+    }),
+    [showNGN]
+  );
+
+  // Transform cost data when NGN is active
+  const chartData = useMemo(() => {
+    if (!showNGN) return data;
+    return data.map((point) => ({
+      ...point,
+      total_cost: Number(point.total_cost) * exchangeRate,
+    }));
+  }, [data, showNGN, exchangeRate]);
+
   if (!data.length) {
     return (
       <Card>
@@ -58,7 +74,7 @@ export function CostAndTokensTrendChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer margin={{ top: 10 }}>
+          <AreaChart data={chartData} accessibilityLayer margin={{ top: 20 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
@@ -75,8 +91,16 @@ export function CostAndTokensTrendChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) => `$${Number(v).toFixed(2)}`}
-              domain={[0, (max: number) => Math.ceil(max * 1.15)]}
+              tickFormatter={(v) => {
+                const n = Number(v);
+                if (showNGN) {
+                  return n >= 1000
+                    ? `₦${(n / 1000).toFixed(0)}k`
+                    : `₦${n.toFixed(0)}`;
+                }
+                return `$${n.toFixed(2)}`;
+              }}
+              domain={[0, (max: number) => Math.ceil(max * 1.25)]}
             />
             <YAxis
               yAxisId="tokens"
@@ -88,7 +112,7 @@ export function CostAndTokensTrendChart({
                 const n = Number(v);
                 return n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
               }}
-              domain={[0, (max: number) => Math.ceil(max * 1.15)]}
+              domain={[0, (max: number) => Math.ceil(max * 1.25)]}
             />
             <ChartTooltip
               content={
@@ -102,6 +126,12 @@ export function CostAndTokensTrendChart({
                   }}
                   formatter={(value, name) => {
                     if (name === 'total_cost') {
+                      if (showNGN) {
+                        return [
+                          `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                          'Cost',
+                        ];
+                      }
                       return [`$${Number(value).toFixed(4)}`, 'Cost'];
                     }
                     return [Number(value).toLocaleString(), 'Tokens'];
