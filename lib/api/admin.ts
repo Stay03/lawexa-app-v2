@@ -10,6 +10,8 @@ import type {
   AdminUserTokenUsageResponse,
   ConversationAnalyticsParams,
   ConversationAnalyticsResponse,
+  UserAnalyticsParams,
+  UserAnalyticsResponse,
 } from '@/types/admin';
 
 export const adminApi = {
@@ -119,6 +121,26 @@ export const adminApi = {
   ): Promise<ConversationAnalyticsResponse> => {
     const response = await apiClient.get<ConversationAnalyticsResponse>(
       '/admin/conversations/analytics',
+      {
+        params: {
+          period: params.period ?? '30d',
+          start_date: params.start_date,
+          end_date: params.end_date,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get user analytics with period comparison
+   * Requires admin role
+   */
+  getUserAnalytics: async (
+    params: UserAnalyticsParams = {}
+  ): Promise<UserAnalyticsResponse> => {
+    const response = await apiClient.get<UserAnalyticsResponse>(
+      '/admin/users/analytics',
       {
         params: {
           period: params.period ?? '30d',

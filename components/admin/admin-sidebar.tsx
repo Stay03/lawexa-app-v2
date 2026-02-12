@@ -2,14 +2,12 @@
 
 import * as React from 'react';
 import {
-  Users,
   ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 
-import { AdminNavMain, type AdminNavItem } from '@/components/admin/admin-nav-main';
 import { AdminNavConversationsSection } from '@/components/admin/admin-nav-conversations';
+import { AdminNavUsersSection } from '@/components/admin/admin-nav-users';
 import { AdminNavAiSection } from '@/components/admin/admin-nav-ai';
 import { NavUser } from '@/components/layout/nav-user';
 import {
@@ -22,14 +20,6 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
-
-const adminNavItems: AdminNavItem[] = [
-  {
-    title: 'Users',
-    url: '/admin/users',
-    icon: Users,
-  },
-];
 
 export function AdminSidebar({
   ...props
@@ -72,7 +62,7 @@ export function AdminSidebar({
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-0">
         <AdminNavConversationsSection />
-        <AdminNavMain items={adminNavItems} />
+        <AdminNavUsersSection />
         <AdminNavAiSection />
       </SidebarContent>
       <SidebarFooter>

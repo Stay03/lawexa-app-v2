@@ -7,6 +7,7 @@ import type {
   AdminUserConversationsParams,
   AdminUserTokenUsageParams,
   ConversationAnalyticsParams,
+  UserAnalyticsParams,
 } from '@/types/admin';
 
 // Query key factory for organized caching
@@ -25,6 +26,8 @@ export const adminKeys = {
     [...adminKeys.users(), uuid, 'token-usage', params] as const,
   conversationAnalytics: (params: ConversationAnalyticsParams) =>
     [...adminKeys.conversations(), 'analytics', params] as const,
+  userAnalytics: (params: UserAnalyticsParams) =>
+    [...adminKeys.users(), 'analytics', params] as const,
 };
 
 /**
@@ -101,6 +104,17 @@ export function useConversationAnalytics(
   return useQuery({
     queryKey: adminKeys.conversationAnalytics(params),
     queryFn: () => adminApi.getConversationAnalytics(params),
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching user analytics data
+ */
+export function useUserAnalytics(params: UserAnalyticsParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.userAnalytics(params),
+    queryFn: () => adminApi.getUserAnalytics(params),
     staleTime: 30 * 1000, // 30 seconds
   });
 }

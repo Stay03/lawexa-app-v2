@@ -439,3 +439,109 @@ export interface ConversationAnalyticsResponse {
   message: string;
   data: ConversationAnalyticsData;
 }
+
+// ============================================
+// User Analytics Types
+// Based on API documentation: /docs/apiDocs/user-analytics-api.md
+// ============================================
+
+export type UserAnalyticsParams = ConversationAnalyticsParams;
+
+export interface UserAnalyticsStatCards {
+  new_users: AnalyticsStatCard;
+  total_conversations: AnalyticsStatCard;
+  total_ai_responses: AnalyticsStatCard;
+  total_cost: AnalyticsStatCard;
+}
+
+export interface UserGrowthPoint {
+  date: string;
+  count: number;
+}
+
+export interface UserConversationsAndMessagesPoint {
+  date: string;
+  conversations: number;
+  messages: number;
+}
+
+export interface UserTokenUsagePoint {
+  date: string;
+  total_tokens: number;
+}
+
+export interface UserDailyCostPoint {
+  date: string;
+  cost: number;
+}
+
+export interface ProfessionDistributionPoint {
+  profession: string;
+  count: number;
+  percentage: number;
+}
+
+export interface AreaOfStudyDistributionPoint {
+  area_of_study: string;
+  count: number;
+  percentage: number;
+}
+
+export interface CountryDistributionPoint {
+  country: string;
+  count: number;
+  percentage: number;
+}
+
+export interface LawSchoolDistributionPoint {
+  law_school: string;
+  count: number;
+  percentage: number;
+}
+
+export interface UserAnalyticsCharts {
+  user_growth: UserGrowthPoint[];
+  conversations_and_messages: UserConversationsAndMessagesPoint[];
+  token_usage: UserTokenUsagePoint[];
+  daily_cost: UserDailyCostPoint[];
+  profession_distribution: ProfessionDistributionPoint[];
+  area_of_study_distribution: AreaOfStudyDistributionPoint[];
+  country_distribution: CountryDistributionPoint[];
+  law_school_distribution: LawSchoolDistributionPoint[];
+}
+
+export interface UserDailyBreakdownRow {
+  date: string;
+  new_users: number;
+  conversations: number;
+  messages: number;
+  ai_responses: number;
+  total_tokens: number;
+  cost: number;
+}
+
+export interface UserUniversityRow {
+  university: string;
+  count: number;
+  percentage: number;
+  country: string | null;
+}
+
+export interface UserAnalyticsTables {
+  daily_breakdown: UserDailyBreakdownRow[];
+  top_universities: UserUniversityRow[];
+  international_universities: UserUniversityRow[];
+}
+
+export interface UserAnalyticsData {
+  period: AnalyticsPeriodInfo;
+  stat_cards: UserAnalyticsStatCards;
+  charts: UserAnalyticsCharts;
+  tables: UserAnalyticsTables;
+}
+
+export interface UserAnalyticsResponse {
+  success: boolean;
+  message: string;
+  data: UserAnalyticsData;
+}
