@@ -5,7 +5,7 @@
 import type { PaginationMeta, PaginationLinks } from './case';
 
 // Content types that can be requested
-export type ContentRequestType = 'case' | 'statute' | 'provision';
+export type ContentRequestType = 'case' | 'note';
 
 // Status values for content requests
 export type ContentRequestStatus = 'pending' | 'in_progress' | 'fulfilled' | 'rejected';

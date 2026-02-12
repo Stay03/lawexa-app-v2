@@ -20,8 +20,7 @@ import type { ContentRequest } from '@/types/content-request';
 
 const TYPE_LABELS: Record<string, string> = {
   case: 'Case',
-  statute: 'Statute',
-  provision: 'Provision',
+  note: 'Note',
 };
 
 /******************************************************************************

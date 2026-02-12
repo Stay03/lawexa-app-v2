@@ -356,7 +356,9 @@ function NotesPageContent() {
       <ContentRequestDialog
         open={isRequestDialogOpen}
         onOpenChange={setIsRequestDialogOpen}
+        defaultType="note"
         defaultTitle={search || undefined}
+        lockType
       />
     </PageContainer>
   );

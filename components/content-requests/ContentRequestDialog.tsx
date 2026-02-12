@@ -47,6 +47,8 @@ interface ContentRequestDialogProps {
   onOpenChange: (open: boolean) => void;
   defaultType?: ContentRequestType;
   defaultTitle?: string;
+  /** When true, the type select is disabled (locked to defaultType). */
+  lockType?: boolean;
 }
 
 /******************************************************************************
@@ -54,7 +56,7 @@ interface ContentRequestDialogProps {
 ******************************************************************************/
 
 const contentRequestFormSchema = z.object({
-  type: z.enum(['case', 'statute', 'provision'], {
+  type: z.enum(['case', 'note'], {
     message: 'Please select a content type.',
   }),
   title: z
@@ -72,8 +74,7 @@ type ContentRequestFormValues = z.infer<typeof contentRequestFormSchema>;
 
 const CONTENT_TYPE_OPTIONS = [
   { value: 'case', label: 'Case' },
-  { value: 'statute', label: 'Statute' },
-  { value: 'provision', label: 'Provision' },
+  { value: 'note', label: 'Note' },
 ] as const;
 
 /******************************************************************************
@@ -88,6 +89,7 @@ function ContentRequestDialog({
   onOpenChange,
   defaultType,
   defaultTitle,
+  lockType,
 }: ContentRequestDialogProps) {
   const submitRequest = useSubmitContentRequest();
 
@@ -163,7 +165,7 @@ function ContentRequestDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Content Type</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={lockType}>
                     <FormControl>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a type..." />

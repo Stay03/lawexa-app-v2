@@ -314,6 +314,7 @@ function CasesPageContent() {
         onOpenChange={setIsRequestDialogOpen}
         defaultType="case"
         defaultTitle={search || undefined}
+        lockType
       />
     </PageContainer>
   );
