@@ -54,7 +54,7 @@ export function DailyCostChart({ data }: DailyCostChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <AreaChart data={data} accessibilityLayer margin={{ top: 20 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
