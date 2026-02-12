@@ -31,6 +31,8 @@ const chartConfig = {
 
 export function DailyCostChart({ data }: DailyCostChartProps) {
   const { showNGN, exchangeRate } = useCurrencyStore();
+  const maxCost = Math.max(...data.map((d) => d.cost), 0);
+  const domainMax = Math.ceil(maxCost * 1.25) || 1;
 
   if (!data.length) {
     return (
@@ -71,8 +73,7 @@ export function DailyCostChart({ data }: DailyCostChartProps) {
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v) => `$${Number(v).toFixed(2)}`}
-              domain={[0, (max: number) => Math.ceil(max * 1.25)]}
-              padding={{ top: 10 }}
+              domain={[0, domainMax]}
             />
             <ChartTooltip
               content={
