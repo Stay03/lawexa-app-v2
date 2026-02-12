@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import {
-  MessageSquare,
   Users,
   ShieldCheck,
 } from 'lucide-react';
@@ -10,6 +9,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 import { AdminNavMain, type AdminNavItem } from '@/components/admin/admin-nav-main';
+import { AdminNavConversationsSection } from '@/components/admin/admin-nav-conversations';
 import { AdminNavAiSection } from '@/components/admin/admin-nav-ai';
 import { NavUser } from '@/components/layout/nav-user';
 import {
@@ -24,11 +24,6 @@ import {
 } from '@/components/ui/sidebar';
 
 const adminNavItems: AdminNavItem[] = [
-  {
-    title: 'Conversations',
-    url: '/admin/conversations',
-    icon: MessageSquare,
-  },
   {
     title: 'Users',
     url: '/admin/users',
@@ -76,6 +71,7 @@ export function AdminSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-0">
+        <AdminNavConversationsSection />
         <AdminNavMain items={adminNavItems} />
         <AdminNavAiSection />
       </SidebarContent>

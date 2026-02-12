@@ -8,6 +8,8 @@ import type {
   AdminUserConversationsResponse,
   AdminUserTokenUsageParams,
   AdminUserTokenUsageResponse,
+  ConversationAnalyticsParams,
+  ConversationAnalyticsResponse,
 } from '@/types/admin';
 
 export const adminApi = {
@@ -102,6 +104,26 @@ export const adminApi = {
           group_by: params.group_by ?? 'none',
           sort_by: params.sort_by ?? 'created_at',
           sort_order: params.sort_order ?? 'desc',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get conversation analytics with period comparison
+   * Requires admin role
+   */
+  getConversationAnalytics: async (
+    params: ConversationAnalyticsParams = {}
+  ): Promise<ConversationAnalyticsResponse> => {
+    const response = await apiClient.get<ConversationAnalyticsResponse>(
+      '/admin/conversations/analytics',
+      {
+        params: {
+          period: params.period ?? '30d',
+          start_date: params.start_date,
+          end_date: params.end_date,
         },
       }
     );

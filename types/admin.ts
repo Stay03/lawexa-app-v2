@@ -306,3 +306,136 @@ export interface AdminUserTokenUsageResponse {
   };
   pagination: AdminConversationsPagination;
 }
+
+// ============================================
+// Conversation Analytics Types
+// Based on API documentation: /docs/apiDocs/conversation-analytics-api.md
+// ============================================
+
+export type AnalyticsPeriod = 'today' | '7d' | '30d' | '90d' | 'custom';
+
+export interface ConversationAnalyticsParams {
+  period?: AnalyticsPeriod;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface AnalyticsPeriodInfo {
+  start: string;
+  end: string;
+  comparison_start: string;
+  comparison_end: string;
+}
+
+export interface AnalyticsStatCard {
+  value: number;
+  change_percent: number | null;
+}
+
+export interface AnalyticsStatCards {
+  total_conversations: AnalyticsStatCard;
+  active_users: AnalyticsStatCard;
+  avg_response_time: AnalyticsStatCard;
+  error_rate: AnalyticsStatCard;
+  total_cost: AnalyticsStatCard;
+  avg_messages_per_conversation: AnalyticsStatCard;
+}
+
+export interface ConversationsOverTimePoint {
+  date: string;
+  conversations: number;
+  unique_users: number;
+}
+
+export interface CostAndTokensTrendPoint {
+  date: string;
+  total_cost: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+export interface LatencyDistributionBucket {
+  bucket: string;
+  count: number;
+}
+
+export interface AgentPerformanceRow {
+  agent_id: number;
+  agent_name: string;
+  agent_slug: string;
+  request_count: number;
+  avg_latency_ms: number;
+  total_cost: number;
+  avg_tokens: number;
+  error_count: number;
+}
+
+export interface ModelUsageRow {
+  model_name: string;
+  model_id: string;
+  request_count: number;
+  percentage: number;
+}
+
+export interface MessageRoleDistributionPoint {
+  date: string;
+  user_count: number;
+  assistant_count: number;
+  tool_count: number;
+}
+
+export interface ErrorBreakdownRow {
+  category: string;
+  count: number;
+}
+
+export interface AnalyticsCharts {
+  conversations_over_time: ConversationsOverTimePoint[];
+  cost_and_tokens_trend: CostAndTokensTrendPoint[];
+  latency_distribution: LatencyDistributionBucket[];
+  agent_performance: AgentPerformanceRow[];
+  model_usage: ModelUsageRow[];
+  message_role_distribution: MessageRoleDistributionPoint[];
+  error_breakdown: ErrorBreakdownRow[];
+}
+
+export interface AnalyticsRecentConversation {
+  uuid: string;
+  title: string | null;
+  user_name: string;
+  user_uuid: string;
+  agent_name: string | null;
+  messages_count: number;
+  total_cost: number;
+  avg_latency_ms: number;
+  created_at: string;
+}
+
+export interface AnalyticsTopUser {
+  uuid: string;
+  name: string;
+  role: string;
+  conversations_count: number;
+  total_messages: number;
+  total_cost: number;
+  last_active: string;
+}
+
+export interface AnalyticsTables {
+  recent_conversations: AnalyticsRecentConversation[];
+  top_users: AnalyticsTopUser[];
+}
+
+export interface ConversationAnalyticsData {
+  period: AnalyticsPeriodInfo;
+  stat_cards: AnalyticsStatCards;
+  charts: AnalyticsCharts;
+  tables: AnalyticsTables;
+}
+
+export interface ConversationAnalyticsResponse {
+  success: boolean;
+  message: string;
+  data: ConversationAnalyticsData;
+}
