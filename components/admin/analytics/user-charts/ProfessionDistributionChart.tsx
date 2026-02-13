@@ -1,12 +1,10 @@
 'use client';
 
-import { Pie, PieChart, Cell } from 'recharts';
+import { Pie, PieChart, Cell, Label } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
   type ChartConfig,
 } from '@/components/ui/chart';
 import {
@@ -23,12 +21,18 @@ interface ProfessionDistributionChartProps {
 }
 
 const CHART_COLORS = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
+  '#22c55e',
+  '#3b82f6',
+  '#a855f7',
+  '#f97316',
+  '#ef4444',
 ];
+
+function formatProfession(profession: string): string {
+  return profession
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export function ProfessionDistributionChart({
   data,
@@ -37,8 +41,8 @@ export function ProfessionDistributionChart({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Profession Distribution</CardTitle>
-          <CardDescription>Users by profession</CardDescription>
+          <CardTitle>Profession</CardTitle>
+          <CardDescription>User breakdown by role</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -47,10 +51,13 @@ export function ProfessionDistributionChart({
     );
   }
 
-  // Build chart config dynamically from data
+  const topProfession = data.reduce((max, item) =>
+    item.count > max.count ? item : max
+  , data[0]);
+
   const chartConfig = data.reduce<ChartConfig>((acc, item, index) => {
     acc[item.profession] = {
-      label: item.profession,
+      label: formatProfession(item.profession),
       color: CHART_COLORS[index % CHART_COLORS.length],
     };
     return acc;
@@ -64,41 +71,90 @@ export function ProfessionDistributionChart({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profession Distribution</CardTitle>
-        <CardDescription>Users by profession</CardDescription>
+        <CardTitle>Profession</CardTitle>
+        <CardDescription>User breakdown by role</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="mx-auto h-[300px] w-full">
-          <PieChart accessibilityLayer>
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  nameKey="profession"
-                  formatter={(value, name) => {
-                    const item = data.find((d) => d.profession === name);
-                    return [
-                      `${Number(value).toLocaleString()} users (${Number(item?.percentage ?? 0).toFixed(1)}%)`,
-                      name,
-                    ];
+        <div className="flex items-center gap-4">
+          {/* Donut chart */}
+          <ChartContainer config={chartConfig} className="h-[140px] w-[140px] shrink-0">
+            <PieChart accessibilityLayer>
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    nameKey="profession"
+                    formatter={(value, name) => {
+                      const item = data.find((d) => d.profession === name);
+                      return [
+                        `${Number(value).toLocaleString()} users (${Number(item?.percentage ?? 0).toFixed(1)}%)`,
+                        name,
+                      ];
+                    }}
+                  />
+                }
+              />
+              <Pie
+                data={chartData}
+                dataKey="count"
+                nameKey="profession"
+                innerRadius={38}
+                outerRadius={55}
+                strokeWidth={2}
+              >
+                {chartData.map((entry) => (
+                  <Cell key={entry.profession} fill={entry.fill} />
+                ))}
+                <Label
+                  content={({ viewBox }) => {
+                    if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                      return (
+                        <text
+                          x={viewBox.cx}
+                          y={viewBox.cy}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                        >
+                          <tspan
+                            x={viewBox.cx}
+                            y={(viewBox.cy || 0) - 8}
+                            className="fill-foreground text-lg font-bold"
+                          >
+                            {Math.round(topProfession.percentage)}%
+                          </tspan>
+                          <tspan
+                            x={viewBox.cx}
+                            y={(viewBox.cy || 0) + 10}
+                            className="fill-muted-foreground text-[10px]"
+                          >
+                            {formatProfession(topProfession.profession)}
+                          </tspan>
+                        </text>
+                      );
+                    }
                   }}
                 />
-              }
-            />
-            <Pie
-              data={chartData}
-              dataKey="count"
-              nameKey="profession"
-              innerRadius={60}
-              outerRadius={100}
-              strokeWidth={2}
-            >
-              {chartData.map((entry) => (
-                <Cell key={entry.profession} fill={entry.fill} />
-              ))}
-            </Pie>
-            <ChartLegend content={<ChartLegendContent nameKey="profession" />} />
-          </PieChart>
-        </ChartContainer>
+              </Pie>
+            </PieChart>
+          </ChartContainer>
+
+          {/* Legend */}
+          <div className="flex flex-1 flex-col gap-2.5">
+            {chartData.map((item) => (
+              <div key={item.profession} className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                  style={{ backgroundColor: item.fill }}
+                />
+                <span className="flex-1 text-sm text-foreground">
+                  {formatProfession(item.profession)}
+                </span>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {item.count.toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
