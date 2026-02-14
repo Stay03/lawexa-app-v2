@@ -66,7 +66,7 @@ function getRandomMessage(messages: string[]): string {
 
 /** Format a greeting with or without the user's name. */
 function formatGreeting(greeting: IGreeting, userName?: string | null): string {
-  if (userName) {
+  if (userName && Math.random() >= 0.4) {
     const message = getRandomMessage(greeting.withName);
     return `${message} ${userName}!`;
   }
@@ -105,11 +105,12 @@ function getSmartGreetingParts(userName?: string | null): {
   isSpecial: TSpecialGreeting | null;
 } {
   const firstName = userName?.split(' ')[0] || '';
+  const showName = firstName && Math.random() >= 0.4;
   // 1. Check for active holiday
   const holiday = getActiveHoliday();
   if (holiday) {
     const greetings = HOLIDAY_CONFIGS[holiday].greetings;
-    const message = firstName
+    const message = showName
       ? getRandomMessage(greetings.withName)
       : getRandomMessage(greetings.withoutName);
 
@@ -118,24 +119,24 @@ function getSmartGreetingParts(userName?: string | null): {
       return { greeting: '', name: firstName, isSpecial: '__PULSING_HEART__' };
     }
 
-    return { greeting: message.replace(/,$/, ''), name: firstName, isSpecial: null };
+    return { greeting: message.replace(/,$/, ''), name: showName ? firstName : '', isSpecial: null };
   }
   // 2. Weighted random: 75% time-based, 25% day-based
   const useTimeBased = Math.random() < 0.75;
   if (useTimeBased) {
     const period = getTimePeriod();
     const greetings = TIME_GREETINGS[period];
-    const message = firstName
+    const message = showName
       ? getRandomMessage(greetings.withName)
       : getRandomMessage(greetings.withoutName);
-    return { greeting: message.replace(/,$/, ''), name: firstName, isSpecial: null };
+    return { greeting: message.replace(/,$/, ''), name: showName ? firstName : '', isSpecial: null };
   }
   const day = getDayOfWeek();
   const greetings = DAY_GREETINGS[day];
-  const message = firstName
+  const message = showName
     ? getRandomMessage(greetings.withName)
     : getRandomMessage(greetings.withoutName);
-  return { greeting: message.replace(/,$/, ''), name: firstName, isSpecial: null };
+  return { greeting: message.replace(/,$/, ''), name: showName ? firstName : '', isSpecial: null };
 }
 
 /******************************************************************************
