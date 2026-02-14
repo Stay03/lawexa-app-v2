@@ -33,7 +33,7 @@ export function TokenUsageChart({ data }: TokenUsageChartProps) {
       <Card>
         <CardHeader>
           <CardTitle>Token Usage</CardTitle>
-          <CardDescription>Daily token consumption</CardDescription>
+          <CardDescription>Total tokens per day (millions)</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -46,7 +46,7 @@ export function TokenUsageChart({ data }: TokenUsageChartProps) {
     <Card>
       <CardHeader>
         <CardTitle>Token Usage</CardTitle>
-        <CardDescription>Daily token consumption</CardDescription>
+        <CardDescription>Total tokens per day (millions)</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -68,7 +68,9 @@ export function TokenUsageChart({ data }: TokenUsageChartProps) {
               tickMargin={8}
               tickFormatter={(v) => {
                 const n = Number(v);
-                return n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+                if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(0)}M`;
+                if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+                return String(n);
               }}
             />
             <ChartTooltip
