@@ -142,7 +142,7 @@ export default function HomePage() {
       )}
 
       {/* Greeting */}
-      <h1 className="mb-6 text-[36px] font-medium">
+      <h1 className="mb-6 text-center text-[36px] font-medium">
         {isSpecial === '__PULSING_HEART__' ? (
           <PulsingHeart />
         ) : (
