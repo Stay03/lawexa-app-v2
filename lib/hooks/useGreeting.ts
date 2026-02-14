@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { getSmartGreeting, getSmartGreetingParts } from '@/lib/constants/greetings';
+import type { TSpecialGreeting } from '@/lib/constants/greetings';
 
 /**
  * Hook that returns a full greeting string.
@@ -28,14 +29,19 @@ export function useGreeting() {
 
 /**
  * Hook that returns greeting parts separately for custom styling.
- * Returns { greeting: string, name: string }
+ * Returns { greeting: string, name: string, isSpecial: TSpecialGreeting | null }
  * Uses smart greeting system with holiday, time, and day-based priorities.
  */
 export function useGreetingParts() {
   const { user } = useAuthStore();
-  const [parts, setParts] = useState<{ greeting: string; name: string }>({
+  const [parts, setParts] = useState<{
+    greeting: string;
+    name: string;
+    isSpecial: TSpecialGreeting | null;
+  }>({
     greeting: 'Welcome',
     name: '',
+    isSpecial: null,
   });
   const [mounted, setMounted] = useState(false);
 
@@ -46,7 +52,7 @@ export function useGreetingParts() {
 
   // Return static values during SSR to avoid hydration mismatch
   if (!mounted) {
-    return { greeting: 'Welcome', name: '' };
+    return { greeting: 'Welcome', name: '', isSpecial: null };
   }
 
   return parts;

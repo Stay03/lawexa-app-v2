@@ -1,4 +1,4 @@
-import type { TTimePeriod, TDayOfWeek, THoliday, IGreeting } from './types';
+import type { TTimePeriod, TDayOfWeek, THoliday, IGreeting, TSpecialGreeting } from './types';
 import { TIME_GREETINGS } from './time-greetings';
 import { DAY_GREETINGS } from './day-greetings';
 import { HOLIDAY_CONFIGS } from './holiday-greetings';
@@ -97,9 +97,13 @@ function getSmartGreeting(userName?: string | null): string {
 
 /**
  * Get greeting parts separately for custom styling.
- * Returns the greeting text and the user's first name.
+ * Returns the greeting text, the user's first name, and a flag for special greetings.
  */
-function getSmartGreetingParts(userName?: string | null): { greeting: string; name: string } {
+function getSmartGreetingParts(userName?: string | null): {
+  greeting: string;
+  name: string;
+  isSpecial: TSpecialGreeting | null;
+} {
   const firstName = userName?.split(' ')[0] || '';
   // 1. Check for active holiday
   const holiday = getActiveHoliday();
@@ -108,7 +112,13 @@ function getSmartGreetingParts(userName?: string | null): { greeting: string; na
     const message = firstName
       ? getRandomMessage(greetings.withName)
       : getRandomMessage(greetings.withoutName);
-    return { greeting: message.replace(/,$/, ''), name: firstName };
+
+    // Check if it's a special greeting
+    if (message === '__PULSING_HEART__') {
+      return { greeting: '', name: firstName, isSpecial: '__PULSING_HEART__' };
+    }
+
+    return { greeting: message.replace(/,$/, ''), name: firstName, isSpecial: null };
   }
   // 2. Weighted random: 75% time-based, 25% day-based
   const useTimeBased = Math.random() < 0.75;
@@ -118,14 +128,14 @@ function getSmartGreetingParts(userName?: string | null): { greeting: string; na
     const message = firstName
       ? getRandomMessage(greetings.withName)
       : getRandomMessage(greetings.withoutName);
-    return { greeting: message.replace(/,$/, ''), name: firstName };
+    return { greeting: message.replace(/,$/, ''), name: firstName, isSpecial: null };
   }
   const day = getDayOfWeek();
   const greetings = DAY_GREETINGS[day];
   const message = firstName
     ? getRandomMessage(greetings.withName)
     : getRandomMessage(greetings.withoutName);
-  return { greeting: message.replace(/,$/, ''), name: firstName };
+  return { greeting: message.replace(/,$/, ''), name: firstName, isSpecial: null };
 }
 
 /******************************************************************************
@@ -144,4 +154,4 @@ export {
   FALLBACK_GREETINGS,
 };
 
-export type { TTimePeriod, TDayOfWeek, THoliday, IGreeting } from './types';
+export type { TTimePeriod, TDayOfWeek, THoliday, IGreeting, TSpecialGreeting } from './types';

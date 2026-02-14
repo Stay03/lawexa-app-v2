@@ -27,9 +27,11 @@ type THoliday =
   | 'easter'
   | 'independenceDay';
 
+type TSpecialGreeting = '__PULSING_HEART__';
+
 interface IGreeting {
   withName: string[];
-  withoutName: string[];
+  withoutName: (string | TSpecialGreeting)[];
 }
 
 interface IHolidayConfig {
@@ -44,4 +46,4 @@ interface IHolidayConfig {
                                   Exports
 ******************************************************************************/
 
-export type { TTimePeriod, TDayOfWeek, THoliday, IGreeting, IHolidayConfig };
+export type { TTimePeriod, TDayOfWeek, THoliday, IGreeting, IHolidayConfig, TSpecialGreeting };

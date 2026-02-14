@@ -17,6 +17,7 @@ import {
 import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { PulsingHeart } from '@/components/ui/pulsing-heart';
 import {
   Select,
   SelectContent,
@@ -38,7 +39,7 @@ export default function HomePage() {
   const [studyMode, setStudyMode] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const { greeting, name } = useGreetingParts();
+  const { greeting, name, isSpecial } = useGreetingParts();
   const router = useRouter();
   const [showLinks, setShowLinks] = useState(false);
   const user = useAuthStore((state) => state.user);
@@ -142,10 +143,16 @@ export default function HomePage() {
 
       {/* Greeting */}
       <h1 className="mb-6 text-[36px] font-medium">
-        {greeting}
-        {name && (
+        {isSpecial === '__PULSING_HEART__' ? (
+          <PulsingHeart />
+        ) : (
           <>
-            , <span className="text-primary">{name}!</span>
+            {greeting}
+            {name && (
+              <>
+                , <span className="text-primary">{name}!</span>
+              </>
+            )}
           </>
         )}
       </h1>
