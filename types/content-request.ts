@@ -83,3 +83,30 @@ export interface SubmitContentRequestData {
   title: string;
   additional_notes?: string;
 }
+
+// Admin-specific query params for content request list
+export interface AdminContentRequestsParams {
+  status?: ContentRequestStatus;
+  type?: ContentRequestType;
+  sort?: 'created_at' | 'updated_at';
+  direction?: 'asc' | 'desc';
+  per_page?: number;
+  page?: number;
+  search?: string;
+}
+
+// PUT /api/content-requests/{uuid}/status request payload
+export interface UpdateStatusData {
+  status: ContentRequestStatus;
+}
+
+// PUT /api/content-requests/{uuid}/fulfill request payload
+export interface FulfillData {
+  created_content_type: CreatedContentType;
+  created_content_id: number;
+}
+
+// PUT /api/content-requests/{uuid}/reject request payload
+export interface RejectData {
+  rejection_reason: string;
+}

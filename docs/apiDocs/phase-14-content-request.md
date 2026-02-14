@@ -8,7 +8,7 @@ Phase 14 implements a content request system that allows authenticated users to 
 - Content request submission with type classification (case, statute, provision)
 - Status workflow: pending → in_progress → fulfilled/rejected
 - Polymorphic content linking when fulfilled (cases, notes)
-- Role-based access: users see own requests, researcher+ manages all
+- Role-based access: users see own requests via `/api/content-requests`, researcher+ manages all via `/api/admin/content-requests`
 - Email notifications on fulfillment
 - Conflict prevention for completed requests (409)
 
@@ -31,12 +31,13 @@ All endpoints require `auth:sanctum` middleware.
 
 | Endpoint | Method | Auth Required | Role Required |
 |----------|--------|---------------|---------------|
-| `/api/content-requests` | GET | Yes | Any |
+| `/api/content-requests` | GET | Yes | Any (returns own requests only) |
 | `/api/content-requests` | POST | Yes | Any (except Guest) |
 | `/api/content-requests/{uuid}` | GET | Yes | Owner or Researcher+ |
 | `/api/content-requests/{uuid}/status` | PUT | Yes | Researcher+ |
 | `/api/content-requests/{uuid}/fulfill` | PUT | Yes | Researcher+ |
 | `/api/content-requests/{uuid}/reject` | PUT | Yes | Researcher+ |
+| `/api/admin/content-requests` | GET | Yes | Researcher+ (returns all requests) |
 
 ---
 
@@ -137,7 +138,7 @@ curl -X POST "http://localhost:8000/api/content-requests" \
 
 ### GET /api/content-requests
 
-List content requests. Regular users see only their own requests; researcher+ sees all.
+List the authenticated user's own content requests.
 
 **Query Parameters:**
 
@@ -207,10 +208,98 @@ curl "http://localhost:8000/api/content-requests?status=pending&type=case" \
 ```
 
 **Notes:**
-- Researcher+ sees all requests with user details eager-loaded
-- Regular users see only their own requests
+- Always returns only the authenticated user's own requests, regardless of role
+- To view all users' requests, use `GET /api/admin/content-requests` (researcher+ only)
 - `per_page` is clamped between 1 and 50
 - Default sort is `created_at` descending (newest first)
+
+---
+
+### GET /api/admin/content-requests
+
+List all content requests from all users. Requires researcher+ role.
+
+**Authorization:** Researcher+ role (enforced via `role:researcher` middleware).
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `status` | string | - | Filter by status (`pending`, `in_progress`, `fulfilled`, `rejected`) |
+| `type` | string | - | Filter by content type (`case`, `statute`, `provision`) |
+| `sort` | string | `created_at` | Sort field (`created_at`, `updated_at`) |
+| `direction` | string | `desc` | Sort direction (`asc`, `desc`) |
+| `per_page` | integer | `15` | Items per page (1-50) |
+| `page` | integer | `1` | Page number |
+
+**Example Request:**
+```bash
+curl "http://localhost:8000/api/admin/content-requests?status=pending" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Content requests retrieved successfully.",
+  "data": [
+    {
+      "id": 4,
+      "uuid": "38a46b8c-d35e-4c6d-9bbd-c268790f869d",
+      "user": {
+        "id": 68,
+        "name": "Regular User",
+        "email": "user@example.com",
+        "avatar_url": null
+      },
+      "type": "case",
+      "title": "Donoghue v Stevenson [1932] AC 562",
+      "additional_notes": "Need the full House of Lords judgment.",
+      "created_content_type": null,
+      "created_content_id": null,
+      "created_content": null,
+      "status": "pending",
+      "status_label": "Pending",
+      "fulfilled_by": null,
+      "fulfilled_at": null,
+      "rejected_by": null,
+      "rejected_at": null,
+      "rejection_reason": null,
+      "created_at": "2026-02-13T02:37:25+00:00",
+      "updated_at": "2026-02-13T02:37:25+00:00"
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "per_page": 15,
+    "total": 4,
+    "last_page": 1,
+    "from": 1,
+    "to": 4
+  },
+  "links": {
+    "first": "http://localhost:8000/api/admin/content-requests?page=1",
+    "last": "http://localhost:8000/api/admin/content-requests?page=1",
+    "prev": null,
+    "next": null
+  }
+}
+```
+
+**Insufficient Role (403 Forbidden):**
+```json
+{
+  "success": false,
+  "message": "Insufficient permissions. This action requires at least researcher role."
+}
+```
+
+**Notes:**
+- Returns all content requests from all users with user details eager-loaded
+- Use this endpoint for the admin/researcher dashboard to manage content requests
+- Same filtering, sorting, and pagination as `GET /api/content-requests`
 
 ---
 
@@ -738,7 +827,8 @@ pending → in_progress → fulfilled
 
 | Action | Owner | Researcher+ | Other Users |
 |--------|-------|-------------|-------------|
-| List (GET /content-requests) | Own only | All | Own only |
+| List own (GET /content-requests) | Own only | Own only | Own only |
+| List all (GET /admin/content-requests) | No (403) | All | No (403) |
 | Detail (GET /content-requests/{uuid}) | Yes | Yes | No (403) |
 
 ### Request Management
