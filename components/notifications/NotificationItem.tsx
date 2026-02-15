@@ -22,6 +22,8 @@ interface NotificationItemProps {
   onMarkAsRead: (id: string) => void;
   onDelete: (id: string) => void;
   isCompact?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 /******************************************************************************
@@ -36,6 +38,8 @@ function NotificationItem({
   onMarkAsRead,
   onDelete,
   isCompact = false,
+  className,
+  style,
 }: NotificationItemProps) {
   const router = useRouter();
   const isUnread = !notification.read_at;
@@ -63,11 +67,13 @@ function NotificationItem({
     <div
       onClick={handleClick}
       className={cn(
-        'group relative flex gap-3 px-4 py-3 transition-colors cursor-pointer',
-        'hover:bg-muted/50',
+        'group relative flex gap-3 transition-colors cursor-pointer',
+        isCompact ? 'px-4 py-3' : 'px-5 py-4',
+        'hover:bg-muted/40',
         isUnread && 'bg-primary/5',
-        !isCompact && 'rounded-lg border'
+        className
       )}
+      style={style}
     >
       {/* Unread indicator */}
       {isUnread && (

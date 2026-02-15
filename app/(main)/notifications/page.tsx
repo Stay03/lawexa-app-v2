@@ -1,18 +1,22 @@
 'use client';
 
-import { Suspense, useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Bell, CheckCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedTabs } from '@/components/ui/animated-tabs';
 import { AdminPagination } from '@/components/admin';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
-import { NotificationItem } from '@/components/notifications';
+import { PageContainer, PageHeader } from '@/components/layout';
+import {
+  NotificationItem,
+  NotificationListGroup,
+  NotificationListSkeleton,
+} from '@/components/notifications';
 import {
   useNotifications,
   useUnreadCount,
@@ -22,16 +26,6 @@ import {
 } from '@/lib/hooks/useNotifications';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { NotificationListParams } from '@/types/notification';
-
-/******************************************************************************
-                                Constants
-******************************************************************************/
-
-const FILTER_TABS = [
-  { value: 'all', label: 'All' },
-  { value: 'unread', label: 'Unread' },
-  { value: 'read', label: 'Read' },
-];
 
 /******************************************************************************
                                 Page Content
@@ -66,6 +60,28 @@ function NotificationsPageContent() {
 
   const unreadCount = unreadData?.data?.unread_count ?? 0;
   const notifications = data?.data ?? [];
+
+  // Build filter tabs with unread count badge
+  const filterTabs = useMemo(
+    () => [
+      { value: 'all', label: 'All' },
+      {
+        value: 'unread',
+        label: (
+          <span className="inline-flex items-center gap-1.5">
+            Unread
+            {unreadCount > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </span>
+        ),
+      },
+      { value: 'read', label: 'Read' },
+    ],
+    [unreadCount]
+  );
 
   // Update URL params
   const updateParams = useCallback(
@@ -140,111 +156,91 @@ function NotificationsPageContent() {
   // Error state
   if (isError) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <ErrorState
-            title="Failed to load notifications"
-            description="Something went wrong while loading your notifications."
-            retry={() => { refetch(); }}
-          />
-        </CardContent>
-      </Card>
+      <PageContainer variant="list">
+        <PageHeader title="Notifications" description="Stay up to date with your latest updates." />
+        <ErrorState
+          title="Failed to load notifications"
+          description="Something went wrong while loading your notifications."
+          retry={() => { refetch(); }}
+        />
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between space-y-0">
-          <CardTitle>Notifications</CardTitle>
-          {unreadCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleMarkAllAsRead}
-              disabled={markAllAsReadMutation.isPending}
-            >
-              <CheckCheck className="mr-1.5 h-4 w-4" />
-              Mark all as read
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Filter Tabs */}
+    <PageContainer variant="list">
+      <PageHeader title="Notifications" description="Stay up to date with your latest updates.">
+        {unreadCount > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleMarkAllAsRead}
+            disabled={markAllAsReadMutation.isPending}
+          >
+            <CheckCheck className="mr-1.5 h-4 w-4" />
+            Mark all as read
+          </Button>
+        )}
+      </PageHeader>
+
+      {/* Filter Tabs + Content */}
+      {isLoading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-9 w-56 rounded-full" />
+          <NotificationListSkeleton />
+        </div>
+      ) : (
+        <>
           <AnimatedTabs
-            tabs={FILTER_TABS}
+            tabs={filterTabs}
             value={activeFilter}
             onValueChange={handleFilterChange}
+            className="animate-in slide-in-from-top-2 duration-300"
           />
 
           {/* Notification List */}
-          {isLoading ? (
-            <NotificationsListSkeleton />
-          ) : notifications.length === 0 ? (
-            <EmptyState
-              icon={Bell}
-              title="No notifications"
-              description={
-                activeFilter === 'unread'
-                  ? "You're all caught up! No unread notifications."
-                  : activeFilter === 'read'
-                    ? 'No read notifications found.'
-                    : "You don't have any notifications yet."
-              }
-            />
-          ) : (
-            <div className="space-y-2">
-              {notifications.map((notification) => (
-                <NotificationItem
-                  key={notification.id}
-                  notification={notification}
-                  onMarkAsRead={handleMarkAsRead}
-                  onDelete={handleDelete}
+          <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+            {notifications.length === 0 ? (
+              <EmptyState
+                icon={Bell}
+                title="No notifications"
+                description={
+                  activeFilter === 'unread'
+                    ? "You're all caught up! No unread notifications."
+                    : activeFilter === 'read'
+                      ? 'No read notifications found.'
+                      : "You don't have any notifications yet."
+                }
+              />
+            ) : (
+              <NotificationListGroup>
+                {notifications.map((notification, index) => (
+                  <NotificationItem
+                    key={notification.id}
+                    notification={notification}
+                    onMarkAsRead={handleMarkAsRead}
+                    onDelete={handleDelete}
+                    className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
+                    style={{ animationDelay: `${Math.min(index, 14) * 30}ms` }}
+                  />
+                ))}
+              </NotificationListGroup>
+            )}
+
+            {/* Pagination */}
+            {data?.pagination && data.pagination.total > 0 && (
+              <div className="pt-4">
+                <AdminPagination
+                  pagination={data.pagination}
+                  onPageChange={handlePageChange}
+                  itemLabel="notification"
                 />
-              ))}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {data?.pagination && data.pagination.total > 0 && (
-            <AdminPagination
-              pagination={data.pagination}
-              onPageChange={handlePageChange}
-              itemLabel="notification"
-            />
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-/******************************************************************************
-                            Child Components
-******************************************************************************/
-
-/**
- * Loading skeleton for the notifications list
- */
-function NotificationsListSkeleton() {
-  const opacityValues = [1, 0.7, 0.4, 0.2, 0.1];
-
-  return (
-    <div className="space-y-2">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex gap-3 rounded-lg border px-4 py-3"
-          style={{ opacity: opacityValues[i] ?? 0.1 }}
-        >
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-20" />
+              </div>
+            )}
           </div>
-        </div>
-      ))}
-    </div>
+        </>
+      )}
+    </PageContainer>
   );
 }
 
@@ -257,7 +253,20 @@ function NotificationsListSkeleton() {
  */
 export default function NotificationsPage() {
   return (
-    <Suspense fallback={<Skeleton className="h-[600px] w-full" />}>
+    <Suspense
+      fallback={
+        <PageContainer variant="list">
+          <PageHeader
+            title="Notifications"
+            description="Stay up to date with your latest updates."
+          />
+          <div className="space-y-4">
+            <Skeleton className="h-9 w-56 rounded-full" />
+            <NotificationListSkeleton />
+          </div>
+        </PageContainer>
+      }
+    >
       <NotificationsPageContent />
     </Suspense>
   );
