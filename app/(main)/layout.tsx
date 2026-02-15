@@ -18,6 +18,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/common/ThemeToggle"
+import { NotificationBell } from "@/components/notifications"
 import { ShareButton } from "@/components/common/ShareButton"
 import { ReaderModeToggle } from "@/components/cases/ReaderModeToggle"
 import { ConversationShareHeaderButton } from "@/components/conversations"
@@ -146,6 +147,7 @@ export default function MainLayout({
             {pathname.startsWith('/c/') && (
               <ConversationShareHeaderButton />
             )}
+            <NotificationBell />
             <ThemeToggle />
           </div>
         </header>
