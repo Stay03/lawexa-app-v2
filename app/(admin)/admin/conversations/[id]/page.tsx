@@ -21,10 +21,12 @@ import {
   ChainOfThoughtContent,
 } from '@/components/prompt-kit';
 import { ToolCallDetails } from '@/components/chat/tool-call-details';
+import { SearchResultsList } from '@/components/chat/search-results-cards';
 import { useAdminConversation } from '@/lib/hooks/useAdmin';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { formatCost } from '@/lib/utils/currency';
+import { formatFileSize } from '@/lib/validations/admin-cases';
 import {
   ArrowLeft,
   Lock,
@@ -37,11 +39,12 @@ import {
   Hash,
   Eye,
   ChevronDown,
+  FileUp,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { AdminMessage } from '@/types/admin';
-import type { ConversationMessage, ToolMessage, HandoverMessage } from '@/types/chat';
+import type { ConversationMessage, ToolMessage, HandoverMessage, MessageAttachment, ChatMessage } from '@/types/chat';
 import { isHandoverMessage } from '@/types/chat';
 
 // Convert AdminMessage to ConversationMessage for chat components
@@ -69,6 +72,16 @@ function convertAdminMessages(
       content: msg.content,
       timestamp: new Date(msg.created_at),
     };
+
+    // Extract attachment from metadata if present
+    let attachment: MessageAttachment | undefined;
+    if (msg.metadata?.file_id && msg.metadata?.file_name && msg.metadata?.file_size) {
+      attachment = {
+        file_id: msg.metadata.file_id,
+        file_name: msg.metadata.file_name,
+        file_size: msg.metadata.file_size,
+      };
+    }
 
     // Handle handover messages - orchestrator delegating to sub-agent
     if (msg.role === 'assistant' && msg.metadata?.type === 'handover') {
@@ -107,43 +120,37 @@ function convertAdminMessages(
       continue;
     }
 
-    // Handle tool_result messages
-    if (msg.role === 'tool' && msg.metadata?.type === 'tool_result') {
+    // Handle tool messages (role: "tool")
+    if (msg.role === 'tool') {
+      // Parse tool result data from content JSON string
+      let resultData = null;
+      try {
+        resultData = JSON.parse(msg.content);
+      } catch {
+        // If parsing fails, keep as null
+      }
+
       messages.push({
         ...base,
         role: 'tool' as const,
-        toolName: msg.metadata.tool_name || 'unknown',
-        toolParameters: msg.metadata.tool_parameters || {},
+        toolName: msg.metadata?.tool_name || 'unknown',
+        toolParameters: {}, // Not provided in admin API
         toolResult: {
-          success: msg.metadata.success ?? true,
-          data: null,
-          error: null,
+          success: resultData?.success ?? true,
+          data: resultData,
+          error: resultData?.error || null,
         },
         toolStatus: 'complete' as const,
-        latencyMs: msg.metadata.latency_ms,
+        latencyMs: msg.metadata?.execution_time_ms || msg.metadata?.latency_ms,
       } as ToolMessage);
       continue;
     }
 
-    // Handle tool_call messages - these are assistant messages requesting tool use
-    if (msg.metadata?.type === 'tool_call') {
-      messages.push({
-        ...base,
-        role: 'tool' as const,
-        toolName: msg.metadata.tool_name || 'unknown',
-        toolParameters: msg.metadata.tool_parameters || {},
-        toolResult: {
-          success: true,
-          data: null,
-          error: null,
-        },
-        toolStatus: 'complete' as const,
-        latencyMs: msg.metadata.latency_ms,
-      } as ToolMessage);
-      continue;
-    }
-
-    messages.push(base as ConversationMessage);
+    // Regular message (user or assistant)
+    messages.push({
+      ...base,
+      ...(attachment && { attachment }),
+    } as ConversationMessage);
   }
 
   return messages;
@@ -357,6 +364,7 @@ function HandoverDisplay({
                       <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
                         <ChainOfThoughtContent>
                           <ToolCallDetails message={message} />
+                          <SearchResultsList message={message} />
                         </ChainOfThoughtContent>
                       </CollapsibleContent>
                     </Collapsible>
@@ -471,6 +479,7 @@ function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
                   <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
                     <ChainOfThoughtContent>
                       <ToolCallDetails message={message} />
+                      <SearchResultsList message={message} />
                     </ChainOfThoughtContent>
                   </CollapsibleContent>
                 </Collapsible>
@@ -576,9 +585,22 @@ export default function AdminConversationDetailPage({
             </MessageContent>
           )
         ) : (
-          <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
-            {displayContent}
-          </MessageContent>
+          <>
+            <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
+              {displayContent}
+            </MessageContent>
+
+            {/* Attachment badge */}
+            {(message as ChatMessage).attachment && (
+              <div className="mt-1 flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground w-fit">
+                <FileUp className="h-3 w-3" />
+                <span className="max-w-[150px] truncate">
+                  {(message as ChatMessage).attachment!.file_name}
+                </span>
+                <span>{formatFileSize((message as ChatMessage).attachment!.file_size)}</span>
+              </div>
+            )}
+          </>
         )}
       </Message>
     );

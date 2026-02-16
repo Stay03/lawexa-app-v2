@@ -49,12 +49,19 @@ export interface AdminMessageMetadata {
   tool_parameters?: Record<string, unknown>;
   success?: boolean;
   latency_ms?: number;
+  execution_time_ms?: number;
   iteration?: number;
   target_agent?: string;
   task?: string;
   agent_slug?: string;
   parent_agent?: number;
   context?: 'handover';
+  // Attachment fields
+  file_id?: number;
+  file_name?: string;
+  file_size?: number;
+  file_mime_type?: string;
+  extracted_text_length?: number;
 }
 
 export interface AdminMessage {
