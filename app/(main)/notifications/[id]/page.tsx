@@ -1,7 +1,6 @@
 'use client';
 
 import { use, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -13,7 +12,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -112,26 +110,18 @@ function NotificationDetailPage({ params }: NotificationDetailPageProps) {
   return (
     <PageContainer variant="detail">
       {/* Back link */}
-      <Link
-        href="/notifications"
+      <button
+        onClick={() => router.back()}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Notifications
-      </Link>
+        Back
+      </button>
 
       {/* Main content */}
       <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
         {/* Header */}
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{notification.type}</Badge>
-            {notification.read_at ? (
-              <Badge variant="secondary">Read</Badge>
-            ) : (
-              <Badge>Unread</Badge>
-            )}
-          </div>
+        <div>
           <h1 className="text-2xl font-bold tracking-tight">{notification.title}</h1>
         </div>
 
@@ -193,14 +183,8 @@ function NotificationDetailPage({ params }: NotificationDetailPageProps) {
 function NotificationDetailSkeleton() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-4 w-36" />
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          <Skeleton className="h-5 w-20 rounded-full" />
-          <Skeleton className="h-5 w-14 rounded-full" />
-        </div>
-        <Skeleton className="h-8 w-3/4" />
-      </div>
+      <Skeleton className="h-4 w-16" />
+      <Skeleton className="h-8 w-3/4" />
       <Skeleton className="h-24 w-full rounded-lg" />
       <Skeleton className="h-6 w-48" />
     </div>
