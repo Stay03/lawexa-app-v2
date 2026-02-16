@@ -33,7 +33,7 @@ import { adminAiKeys } from '@/lib/hooks/useAdminAi';
 import { extractApiError } from '@/lib/utils/api-error';
 import { formatFileSize } from '@/lib/validations/admin-cases';
 
-const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function HomePage() {
   const [input, setInput] = useState('');
@@ -130,11 +130,18 @@ export default function HomePage() {
     const pdfFile = newFiles[0];
     if (!pdfFile) return;
 
-    if (pdfFile.type !== 'application/pdf') {
-      setError('Only PDF files are supported.');
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/rtf',
+      'text/rtf'
+    ];
+    if (!allowedTypes.includes(pdfFile.type)) {
+      setError('Only PDF, DOC, DOCX, and RTF files are supported.');
       return;
     }
-    if (pdfFile.size > MAX_PDF_SIZE) {
+    if (pdfFile.size > MAX_DOCUMENT_SIZE) {
       setError('File size must be 10MB or less.');
       return;
     }
@@ -234,7 +241,7 @@ export default function HomePage() {
 
       {/* Prompt Input with FileUpload wrapper */}
       <div className="w-full max-w-2xl">
-        <FileUpload onFilesAdded={handleFilesAdded} accept="application/pdf" multiple={false}>
+        <FileUpload onFilesAdded={handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
           <PromptInput
             value={input}
             onValueChange={(value) => {
@@ -244,7 +251,7 @@ export default function HomePage() {
             onSubmit={handleSubmit}
             disabled={isSubmitting}
           >
-            {/* PDF File Preview inside input */}
+            {/* Document File Preview inside input */}
             {(isUploading || uploadedFile) && (
               <div className="flex flex-wrap gap-2 px-3 pt-3">
                 <div
