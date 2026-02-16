@@ -8,6 +8,7 @@ import type {
   AdminUserTokenUsageParams,
   ConversationAnalyticsParams,
   UserAnalyticsParams,
+  ViewAnalyticsParams,
 } from '@/types/admin';
 
 // Query key factory for organized caching
@@ -28,6 +29,8 @@ export const adminKeys = {
     [...adminKeys.conversations(), 'analytics', params] as const,
   userAnalytics: (params: UserAnalyticsParams) =>
     [...adminKeys.users(), 'analytics', params] as const,
+  viewAnalytics: (params: ViewAnalyticsParams) =>
+    [...adminKeys.all, 'views', 'analytics', params] as const,
 };
 
 /**
@@ -115,6 +118,17 @@ export function useUserAnalytics(params: UserAnalyticsParams = {}) {
   return useQuery({
     queryKey: adminKeys.userAnalytics(params),
     queryFn: () => adminApi.getUserAnalytics(params),
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching view analytics data
+ */
+export function useViewAnalytics(params: ViewAnalyticsParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.viewAnalytics(params),
+    queryFn: () => adminApi.getViewAnalytics(params),
     staleTime: 30 * 1000, // 30 seconds
   });
 }

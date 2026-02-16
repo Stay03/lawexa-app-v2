@@ -8,6 +8,7 @@ import {
   MessageSquareQuote,
   Scale,
   Bell,
+  Eye,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -30,13 +31,14 @@ const contentNavItems = [
   { title: 'Content Requests', url: '/admin/content-requests', icon: MessageSquareQuote },
   { title: 'Cases', url: '/admin/cases', icon: Scale },
   { title: 'Notifications', url: '/admin/notifications', icon: Bell },
+  { title: 'Views Analytics', url: '/admin/views/analytics', icon: Eye },
 ];
 
 export function AdminNavContentSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/notifications');
+  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views');
 
   return (
     <SidebarGroup>

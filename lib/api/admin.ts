@@ -12,6 +12,8 @@ import type {
   ConversationAnalyticsResponse,
   UserAnalyticsParams,
   UserAnalyticsResponse,
+  ViewAnalyticsParams,
+  ViewAnalyticsResponse,
 } from '@/types/admin';
 
 export const adminApi = {
@@ -144,6 +146,27 @@ export const adminApi = {
       {
         params: {
           period: params.period ?? '30d',
+          start_date: params.start_date,
+          end_date: params.end_date,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get view analytics with period comparison
+   * Requires admin role
+   */
+  getViewAnalytics: async (
+    params: ViewAnalyticsParams = {}
+  ): Promise<ViewAnalyticsResponse> => {
+    const response = await apiClient.get<ViewAnalyticsResponse>(
+      '/admin/views/analytics',
+      {
+        params: {
+          period: params.period ?? 'last_30_days',
+          date: params.date,
           start_date: params.start_date,
           end_date: params.end_date,
         },

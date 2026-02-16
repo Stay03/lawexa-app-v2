@@ -546,3 +546,196 @@ export interface UserAnalyticsResponse {
   message: string;
   data: UserAnalyticsData;
 }
+
+// ============================================
+// View Analytics Types
+// Based on API documentation: /docs/apiDocs/view-analytics-api.md
+// ============================================
+
+export type ViewAnalyticsPeriod =
+  | 'today'
+  | 'last_24_hours'
+  | 'date'
+  | 'this_week'
+  | 'last_7_days'
+  | 'this_month'
+  | 'last_30_days'
+  | 'date_range';
+
+export interface ViewAnalyticsParams {
+  period?: ViewAnalyticsPeriod;
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface ViewAnalyticsStatCards {
+  total_views: AnalyticsStatCard;
+  unique_visitors: AnalyticsStatCard;
+  human_views: AnalyticsStatCard;
+  bot_views: AnalyticsStatCard;
+  search_engine_crawls: AnalyticsStatCard;
+  social_media_crawls: AnalyticsStatCard;
+  internal_search_views: AnalyticsStatCard;
+  countries_reached: AnalyticsStatCard;
+}
+
+// Chart Data Interfaces
+
+export interface ViewsOverTimePoint {
+  date?: string;
+  hour?: string;
+  human_views: number;
+  bot_views: number;
+  total_views: number;
+}
+
+export interface ViewsByContentTypePoint {
+  type: string;
+  count: number;
+  percentage: number;
+}
+
+export interface DeviceBreakdownPoint {
+  device_type: string;
+  count: number;
+  percentage: number;
+}
+
+export interface BrowserUsagePoint {
+  browser: string;
+  count: number;
+  percentage: number;
+}
+
+export interface HumanVsBotPoint {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+export interface BotBreakdownPoint {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ViewsByCountryPoint {
+  country: string;
+  count: number;
+}
+
+export interface ViewsByContinentPoint {
+  continent: string;
+  count: number;
+}
+
+export interface ViewsByProfessionPoint {
+  profession: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ProfileCountryVsIpCountryData {
+  profile_countries: ViewsByCountryPoint[];
+  ip_countries: ViewsByCountryPoint[];
+}
+
+export interface ViewsByUniversityChartPoint {
+  university: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ViewAnalyticsCharts {
+  views_over_time: ViewsOverTimePoint[];
+  views_by_content_type: ViewsByContentTypePoint[];
+  device_breakdown: DeviceBreakdownPoint[];
+  browser_usage: BrowserUsagePoint[];
+  human_vs_bot: HumanVsBotPoint[];
+  bot_breakdown: BotBreakdownPoint[];
+  views_by_country: ViewsByCountryPoint[];
+  views_by_continent: ViewsByContinentPoint[];
+  views_by_profession: ViewsByProfessionPoint[];
+  profile_country_vs_ip_country: ProfileCountryVsIpCountryData;
+  views_by_university: ViewsByUniversityChartPoint[];
+}
+
+// Table Data Interfaces
+
+export interface TopViewedContentRow {
+  viewable_type: string;
+  viewable_id: number;
+  view_count: number;
+}
+
+export interface RecentViewRow {
+  viewer_name: string | null;
+  profession: string | null;
+  profile_country: string | null;
+  viewable_type: string;
+  device_type: string | null;
+  browser: string | null;
+  ip_country: string | null;
+  is_bot: boolean;
+  viewed_at: string;
+}
+
+export interface TopViewerRow {
+  uuid: string;
+  name: string;
+  email: string;
+  profession: string | null;
+  view_count: number;
+}
+
+export interface TopSearchQueryRow {
+  search_query: string;
+  count: number;
+}
+
+export interface BotActivityRow {
+  bot_name: string | null;
+  bot_type: string;
+  viewable_type: string;
+  viewed_at: string;
+}
+
+export interface ViewsByCityRow {
+  city: string;
+  region: string | null;
+  country: string | null;
+  count: number;
+}
+
+export interface TopUniversityViewRow {
+  university: string;
+  view_count: number;
+  unique_viewers: number;
+}
+
+export interface ViewAnalyticsTables {
+  top_viewed_content: TopViewedContentRow[];
+  recent_views: RecentViewRow[];
+  top_viewers: TopViewerRow[];
+  top_search_queries: TopSearchQueryRow[];
+  bot_activity: BotActivityRow[];
+  views_by_city: ViewsByCityRow[];
+  top_universities: TopUniversityViewRow[];
+}
+
+export type ViewAnalyticsGranularity = 'hour' | 'day';
+
+export interface ViewAnalyticsData {
+  period: AnalyticsPeriodInfo;
+  granularity: ViewAnalyticsGranularity;
+  stat_cards: ViewAnalyticsStatCards;
+  charts: ViewAnalyticsCharts;
+  tables: ViewAnalyticsTables;
+}
+
+export interface ViewAnalyticsResponse {
+  success: boolean;
+  message: string;
+  data: ViewAnalyticsData;
+}
