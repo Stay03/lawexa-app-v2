@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import type {
+  ShowNotificationResponse,
   NotificationListResponse,
   UnreadCountResponse,
   MarkReadResponse,
@@ -13,6 +14,14 @@ import type {
  * All endpoints require authentication
  */
 export const notificationsApi = {
+  /**
+   * Get a single notification by ID
+   */
+  getById: async (id: string): Promise<ShowNotificationResponse> => {
+    const response = await apiClient.get<ShowNotificationResponse>(`/notifications/${id}`);
+    return response.data;
+  },
+
   /**
    * Get paginated list of the authenticated user's notifications
    */

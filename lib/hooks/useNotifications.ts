@@ -18,6 +18,10 @@ export const notificationKeys = {
   list: (params: NotificationListParams) =>
     [...notificationKeys.lists(), params] as const,
 
+  // Notification Detail
+  details: () => [...notificationKeys.all, 'detail'] as const,
+  detail: (id: string) => [...notificationKeys.details(), id] as const,
+
   // Unread Count
   unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
 };
@@ -37,6 +41,21 @@ export function useNotifications(params: NotificationListParams = {}) {
     queryKey: notificationKeys.list(params),
     queryFn: () => notificationsApi.getList(params),
     enabled: isAuthenticated && !isGuest,
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * Get a single notification by ID
+ */
+export function useNotification(id: string) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isGuest = useAuthStore((s) => s.isGuest);
+
+  return useQuery({
+    queryKey: notificationKeys.detail(id),
+    queryFn: () => notificationsApi.getById(id),
+    enabled: !!id && isAuthenticated && !isGuest,
     staleTime: 60 * 1000,
   });
 }

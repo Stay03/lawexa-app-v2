@@ -49,11 +49,9 @@ function NotificationItem({
     if (isUnread) {
       onMarkAsRead(notification.id);
     }
-    // Navigate if action_url exists
-    if (notification.action_url) {
-      window.open(notification.action_url, '_blank', 'noopener,noreferrer');
-    }
-  }, [isUnread, notification.id, notification.action_url, onMarkAsRead]);
+    // Navigate to notification detail page
+    router.push(`/notifications/${notification.id}`);
+  }, [isUnread, notification.id, onMarkAsRead, router]);
 
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {

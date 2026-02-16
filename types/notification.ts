@@ -16,6 +16,12 @@ export interface Notification {
   created_at: string;
 }
 
+// GET /api/notifications/{id} response
+export interface ShowNotificationResponse {
+  data: Notification;
+  message: string;
+}
+
 // GET /api/notifications response
 export interface NotificationListResponse {
   success: boolean;
