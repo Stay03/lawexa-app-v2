@@ -71,8 +71,8 @@ function NotificationDetailPage({ params }: NotificationDetailPageProps) {
     });
   }, [id, deleteMutation, router]);
 
-  // Loading state
-  if (notificationQuery.isLoading) {
+  // Loading state (includes initial fetch and any pending state before data arrives)
+  if (notificationQuery.isLoading || (!notificationQuery.data && !notificationQuery.isError)) {
     return (
       <PageContainer variant="detail">
         <NotificationDetailSkeleton />
