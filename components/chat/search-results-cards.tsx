@@ -1,6 +1,12 @@
 'use client';
 
-import { Scale, BookOpen } from 'lucide-react';
+import { useState } from 'react';
+import { Scale, BookOpen, ChevronDown, ExternalLink } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@/components/ui/collapsible';
 import type { ToolMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +16,8 @@ interface CaseResult {
   slug: string;
   excerpt: string;
   topic?: string;
+  tags?: string[];
+  principles?: string;
   court?: { name: string; abbreviation?: string } | null;
   country?: { name: string } | null;
   judgment_date?: string | null;
@@ -60,34 +68,169 @@ export function extractSearchResults(message: ToolMessage): SearchResults | null
   }
 }
 
-function SearchResultRow({
-  title,
-  source,
-  href,
-  icon,
+function CaseResultRow({
+  item,
+  isExpanded,
+  onToggle,
 }: {
-  title: string;
-  source: string;
-  href: string;
-  icon: React.ReactNode;
+  item: CaseResult;
+  isExpanded: boolean;
+  onToggle: () => void;
 }) {
+  const source = item.court?.abbreviation || item.court?.name || 'Case';
+
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted/60"
-    >
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-xs text-foreground">
-        {title}
-      </span>
-      <span className="shrink-0 text-[10px] text-muted-foreground">
-        {source}
-      </span>
-    </a>
+    <Collapsible open={isExpanded} onOpenChange={onToggle}>
+      <CollapsibleTrigger asChild>
+        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/60">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <Scale className="h-2.5 w-2.5 text-primary" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+            {item.title}
+          </span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            {source}
+          </span>
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 shrink-0 text-muted-foreground transition-transform',
+              isExpanded && 'rotate-180'
+            )}
+          />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mx-3 mb-2 rounded-lg border border-border/30 bg-background/50 p-3">
+          <div className="max-h-[150px] overflow-y-auto space-y-2">
+            {/* Meta info */}
+            <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+              {item.topic && <span>{item.topic}</span>}
+              {item.citation && (
+                <>
+                  <span className="text-border">·</span>
+                  <span>{item.citation}</span>
+                </>
+              )}
+              {item.judgment_date && (
+                <>
+                  <span className="text-border">·</span>
+                  <span>{item.judgment_date}</span>
+                </>
+              )}
+            </div>
+
+            {/* Excerpt */}
+            {item.excerpt && (
+              <p className="text-[11px] leading-relaxed text-foreground/80">
+                {item.excerpt}
+              </p>
+            )}
+
+            {/* Principles */}
+            {item.principles && (
+              <div>
+                <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Key Principles
+                </p>
+                <p className="text-[11px] leading-relaxed text-foreground/70">
+                  {item.principles}
+                </p>
+              </div>
+            )}
+
+            {/* Tags */}
+            {item.tags && item.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {item.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] text-primary"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Open link */}
+          <a
+            href={`/cases/${item.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+          >
+            Open case <ExternalLink className="h-2.5 w-2.5" />
+          </a>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function NoteResultRow({
+  item,
+  isExpanded,
+  onToggle,
+}: {
+  item: NoteResult;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const source = item.course?.name || item.topic || 'Note';
+
+  return (
+    <Collapsible open={isExpanded} onOpenChange={onToggle}>
+      <CollapsibleTrigger asChild>
+        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/60">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <BookOpen className="h-2.5 w-2.5 text-primary" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+            {item.title}
+          </span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            {source}
+          </span>
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 shrink-0 text-muted-foreground transition-transform',
+              isExpanded && 'rotate-180'
+            )}
+          />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mx-3 mb-2 rounded-lg border border-border/30 bg-background/50 p-3">
+          <div className="max-h-[150px] overflow-y-auto space-y-2">
+            {/* Meta info */}
+            {item.topic && (
+              <span className="text-[10px] text-muted-foreground">
+                {item.topic}
+              </span>
+            )}
+
+            {/* Excerpt */}
+            {item.excerpt && (
+              <p className="text-[11px] leading-relaxed text-foreground/80">
+                {item.excerpt}
+              </p>
+            )}
+          </div>
+
+          {/* Open link */}
+          <a
+            href={`/notes/${item.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+          >
+            Open note <ExternalLink className="h-2.5 w-2.5" />
+          </a>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -99,9 +242,15 @@ export function SearchResultsList({
   className?: string;
 }) {
   const results = extractSearchResults(message);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
   if (!results) return null;
 
   const isCases = results.type === 'cases';
+
+  const toggleItem = (id: number) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
 
   return (
     <div className={cn('mt-3 rounded-xl border border-border/40 bg-muted/20', className)}>
@@ -116,28 +265,22 @@ export function SearchResultsList({
       </div>
 
       {/* Scrollable list */}
-      <div className="max-h-[200px] overflow-y-auto pb-1">
+      <div className="max-h-[300px] overflow-y-auto pb-1">
         {isCases
           ? (results.items as CaseResult[]).map((item) => (
-              <SearchResultRow
+              <CaseResultRow
                 key={item.id}
-                title={item.title}
-                source={
-                  item.court?.abbreviation ||
-                  item.court?.name ||
-                  'Case'
-                }
-                href={`/cases/${item.slug}`}
-                icon={<Scale className="h-2.5 w-2.5 text-primary" />}
+                item={item}
+                isExpanded={expandedId === item.id}
+                onToggle={() => toggleItem(item.id)}
               />
             ))
           : (results.items as NoteResult[]).map((item) => (
-              <SearchResultRow
+              <NoteResultRow
                 key={item.id}
-                title={item.title}
-                source={item.course?.name || item.topic || 'Note'}
-                href={`/notes/${item.slug}`}
-                icon={<BookOpen className="h-2.5 w-2.5 text-primary" />}
+                item={item}
+                isExpanded={expandedId === item.id}
+                onToggle={() => toggleItem(item.id)}
               />
             ))}
       </div>
