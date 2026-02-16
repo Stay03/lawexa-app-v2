@@ -14,6 +14,7 @@ import { useSidebar } from '@/components/ui/sidebar';
 import { chatApi } from '@/lib/api/chat';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
+import { SearchResultsList } from '@/components/chat/search-results-cards';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
@@ -122,6 +123,7 @@ function ToolMessageDisplay({ message }: { message: ToolMessage }) {
             {formatLatency(message.latencyMs)}
           </p>
         )}
+        {isComplete && <SearchResultsList message={message} />}
         {isError && (
           <p className="text-destructive mt-1 text-sm">
             Error: {message.toolResult?.error || 'Unknown error'}

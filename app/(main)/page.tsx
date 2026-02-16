@@ -160,7 +160,7 @@ export default function HomePage() {
       {/* Resource Links */}
       <div
         className={`mb-8 flex flex-wrap justify-center gap-4 overflow-hidden transition-all duration-700 ease-out ${
-          showLinks ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+          showLinks ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         <a

@@ -28,6 +28,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ToolCallDetails } from '@/components/chat/tool-call-details';
+import { SearchResultsList } from '@/components/chat/search-results-cards';
 import {
   ArrowUp,
   Paperclip,
@@ -216,6 +217,8 @@ function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
                     </ChainOfThoughtContent>
                   </CollapsibleContent>
                 </Collapsible>
+
+                {isComplete && <SearchResultsList message={message} />}
 
                 {isError && !isExpanded && (
                   <p className="text-destructive mt-1 text-sm">
