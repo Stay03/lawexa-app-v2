@@ -37,7 +37,8 @@ const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function HomePage() {
   const [input, setInput] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
+  const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
@@ -87,7 +88,7 @@ export default function HomePage() {
   }, []);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && !file) || isSubmitting) return;
+    if ((!input.trim() && !uploadedFile) || isSubmitting || isUploading) return;
 
     const message = input.trim();
     if (!message) return;
@@ -95,41 +96,28 @@ export default function HomePage() {
     setIsSubmitting(true);
 
     try {
-      // Upload PDF first if attached
-      let fileId: number | undefined;
-      if (file) {
-        setIsUploading(true);
-        const uploadRes = await chatApi.uploadDocument(file);
-        fileId = uploadRes.data.id;
-        setIsUploading(false);
-      }
-
       // Start chat to get conversation_id
       const response = await chatApi.start({
         message,
         stream: true,
         ...(studyMode && { study_mode: true }),
         ...(selectedWorkflowId && canSelectWorkflow && { workflow_id: Number(selectedWorkflowId) }),
-        ...(fileId && { file_id: fileId }),
+        ...(uploadedFile && { file_id: uploadedFile.file_id }),
       });
 
       if (response.success) {
-        // Navigate to conversation page with the message and execution_id
         const conversationId = response.data.conversation_id;
         const executionId = response.data.execution_id;
-
-        // Pass initial message and execution_id via URL params
         router.push(`/c/${conversationId}?msg=${encodeURIComponent(message)}&exec=${executionId}`);
       }
     } catch (err) {
-      setIsUploading(false);
       const apiError = extractApiError(err);
       setError(apiError.message);
       setIsSubmitting(false);
     }
   };
 
-  const handleFilesAdded = (newFiles: File[]) => {
+  const handleFilesAdded = async (newFiles: File[]) => {
     const pdfFile = newFiles[0];
     if (!pdfFile) return;
 
@@ -142,12 +130,30 @@ export default function HomePage() {
       return;
     }
 
-    setFile(pdfFile);
     if (error) setError(null);
+    setUploadingFileName(pdfFile.name);
+    setIsUploading(true);
+
+    try {
+      const uploadRes = await chatApi.uploadDocument(pdfFile);
+      setUploadedFile({
+        file_id: uploadRes.data.id,
+        file_name: uploadRes.data.original_name,
+        file_size: uploadRes.data.size,
+      });
+    } catch (err) {
+      const apiError = extractApiError(err);
+      setError(apiError.message);
+    } finally {
+      setIsUploading(false);
+      setUploadingFileName(null);
+    }
   };
 
   const removeFile = () => {
-    setFile(null);
+    setUploadedFile(null);
+    setUploadingFileName(null);
+    setIsUploading(false);
   };
 
   return (
@@ -230,7 +236,7 @@ export default function HomePage() {
             disabled={isSubmitting}
           >
             {/* PDF File Preview inside input */}
-            {file && (
+            {(isUploading || uploadedFile) && (
               <div className="flex flex-wrap gap-2 px-3 pt-3">
                 <div
                   className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
@@ -241,8 +247,12 @@ export default function HomePage() {
                   ) : (
                     <FileUp className="h-4 w-4" />
                   )}
-                  <span className="max-w-[120px] truncate">{file.name}</span>
-                  <span className="text-muted-foreground text-xs">{formatFileSize(file.size)}</span>
+                  <span className="max-w-[120px] truncate">
+                    {uploadedFile?.file_name || uploadingFileName}
+                  </span>
+                  {uploadedFile && (
+                    <span className="text-muted-foreground text-xs">{formatFileSize(uploadedFile.file_size)}</span>
+                  )}
                   <button
                     onClick={removeFile}
                     className="hover:bg-secondary/50 rounded-full p-1"
@@ -295,7 +305,7 @@ export default function HomePage() {
                   size="icon"
                   className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
                   onClick={handleSubmit}
-                  disabled={(!input.trim() && !file) || isSubmitting}
+                  disabled={(!input.trim() && !uploadedFile) || isSubmitting || isUploading}
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-5 w-5 animate-spin" />

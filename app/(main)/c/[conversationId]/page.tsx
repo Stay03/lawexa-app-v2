@@ -432,7 +432,8 @@ function ConversationPageContent() {
   const conversationId = params.conversationId as string;
 
   const [input, setInput] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
+  const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const initializedRef = useRef(false);
@@ -548,33 +549,23 @@ function ConversationPageContent() {
   }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, user?.id]);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && !file) || isStreaming || isSubmitting) return;
+    if ((!input.trim() && !uploadedFile) || isStreaming || isSubmitting || isUploading) return;
 
     const message = input.trim();
     if (!message) return;
 
-    const attachedFile = file;
+    const attachment = uploadedFile ? { ...uploadedFile } : undefined;
     setInput('');
-    setFile(null);
+    setUploadedFile(null);
     setIsSubmitting(true);
 
     try {
-      // Upload PDF first if attached
-      let fileId: number | undefined;
-      if (attachedFile) {
-        setIsUploading(true);
-        const uploadRes = await chatApi.uploadDocument(attachedFile);
-        fileId = uploadRes.data.id;
-        setIsUploading(false);
-      }
-
       // Add user message with attachment info
-      const attachment = fileId ? {
-        file_id: fileId,
-        file_name: attachedFile!.name,
-        file_size: attachedFile!.size,
-      } : undefined;
-      addUserMessage(message, attachment);
+      addUserMessage(message, attachment ? {
+        file_id: attachment.file_id,
+        file_name: attachment.file_name,
+        file_size: attachment.file_size,
+      } : undefined);
 
       // Scroll to bottom after sending
       setTimeout(() => {
@@ -591,15 +582,13 @@ function ConversationPageContent() {
         message,
         stream: true,
         conversation_id: conversationId,
-        ...(fileId && { file_id: fileId }),
+        ...(attachment && { file_id: attachment.file_id }),
       });
 
       if (response.success) {
-        // Connect to stream (don't pass message, already added above)
         connectToStream(response.data.execution_id);
       }
     } catch (err) {
-      setIsUploading(false);
       const apiError = extractApiError(err);
       setError(apiError.message);
     } finally {
@@ -607,7 +596,7 @@ function ConversationPageContent() {
     }
   };
 
-  const handleFilesAdded = (newFiles: File[]) => {
+  const handleFilesAdded = async (newFiles: File[]) => {
     const pdfFile = newFiles[0];
     if (!pdfFile) return;
 
@@ -620,12 +609,30 @@ function ConversationPageContent() {
       return;
     }
 
-    setFile(pdfFile);
     if (error) setError(null);
+    setUploadingFileName(pdfFile.name);
+    setIsUploading(true);
+
+    try {
+      const uploadRes = await chatApi.uploadDocument(pdfFile);
+      setUploadedFile({
+        file_id: uploadRes.data.id,
+        file_name: uploadRes.data.original_name,
+        file_size: uploadRes.data.size,
+      });
+    } catch (err) {
+      const apiError = extractApiError(err);
+      setError(apiError.message);
+    } finally {
+      setIsUploading(false);
+      setUploadingFileName(null);
+    }
   };
 
   const removeFile = () => {
-    setFile(null);
+    setUploadedFile(null);
+    setUploadingFileName(null);
+    setIsUploading(false);
   };
 
   const handleStop = () => {
@@ -821,8 +828,8 @@ function ConversationPageContent() {
                 disabled={isStreaming || isLoadingHistory}
                 maxHeight={36}
               >
-                {/* PDF File Preview - only shown when file exists */}
-                {file && (
+                {/* PDF File Preview - only shown when uploading or uploaded */}
+                {(isUploading || uploadedFile) && (
                   <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
                     <div
                       className="bg-secondary flex items-center gap-2 rounded-lg px-2 py-1 text-xs"
@@ -833,8 +840,12 @@ function ConversationPageContent() {
                       ) : (
                         <FileUp className="h-3 w-3" />
                       )}
-                      <span className="max-w-[100px] truncate">{file.name}</span>
-                      <span className="text-muted-foreground">{formatFileSize(file.size)}</span>
+                      <span className="max-w-[100px] truncate">
+                        {uploadedFile?.file_name || uploadingFileName}
+                      </span>
+                      {uploadedFile && (
+                        <span className="text-muted-foreground">{formatFileSize(uploadedFile.file_size)}</span>
+                      )}
                       <button
                         onClick={removeFile}
                         className="hover:bg-secondary/50 rounded-full p-0.5"
@@ -876,7 +887,7 @@ function ConversationPageContent() {
                       size="icon"
                       className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
                       onClick={handleSubmit}
-                      disabled={!input.trim() && !file}
+                      disabled={(!input.trim() && !uploadedFile) || isUploading}
                     >
                       <ArrowUp className="h-4 w-4" />
                     </Button>
