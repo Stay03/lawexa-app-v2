@@ -60,61 +60,33 @@ export function extractSearchResults(message: ToolMessage): SearchResults | null
   }
 }
 
-function CaseSearchResultCard({ item }: { item: CaseResult }) {
-  const courtLabel = item.court?.abbreviation || item.court?.name;
-  const sourceInfo = [courtLabel, item.citation].filter(Boolean).join(' · ');
-
+function SearchResultRow({
+  title,
+  source,
+  href,
+  icon,
+}: {
+  title: string;
+  source: string;
+  href: string;
+  icon: React.ReactNode;
+}) {
   return (
     <a
-      href={`/cases/${item.slug}`}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="group/card flex w-[180px] shrink-0 flex-col gap-2 rounded-xl border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-muted/50"
+      className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted/60"
     >
-      <div className="flex items-start gap-2">
-        <Scale className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
-        <h4 className="line-clamp-2 text-xs font-medium leading-tight text-foreground group-hover/card:text-primary">
-          {item.title}
-        </h4>
-      </div>
-      {sourceInfo && (
-        <p className="line-clamp-1 text-[10px] text-muted-foreground">
-          {sourceInfo}
-        </p>
-      )}
-      <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground/80">
-        {item.excerpt}
-      </p>
-    </a>
-  );
-}
-
-function NoteSearchResultCard({ item }: { item: NoteResult }) {
-  const sourceInfo = item.course?.name || item.topic;
-
-  return (
-    <a
-      href={`/notes/${item.slug}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group/card flex w-[180px] shrink-0 flex-col gap-2 rounded-xl border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-muted/50"
-    >
-      <div className="flex items-start gap-2">
-        <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
-        <h4 className="line-clamp-2 text-xs font-medium leading-tight text-foreground group-hover/card:text-primary">
-          {item.title}
-        </h4>
-      </div>
-      {sourceInfo && (
-        <p className="line-clamp-1 text-[10px] text-muted-foreground">
-          {sourceInfo}
-        </p>
-      )}
-      {item.excerpt && (
-        <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground/80">
-          {item.excerpt}
-        </p>
-      )}
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+        {title}
+      </span>
+      <span className="shrink-0 text-[10px] text-muted-foreground">
+        {source}
+      </span>
     </a>
   );
 }
@@ -129,22 +101,46 @@ export function SearchResultsList({
   const results = extractSearchResults(message);
   if (!results) return null;
 
+  const isCases = results.type === 'cases';
+
   return (
-    <div className={cn('mt-2', className)}>
-      <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-        {results.type === 'cases'
+    <div className={cn('mt-3 rounded-xl border border-border/40 bg-muted/20', className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          {isCases ? 'Cases' : 'Notes'}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          {results.total ?? results.items.length} results
+        </span>
+      </div>
+
+      {/* Scrollable list */}
+      <div className="max-h-[200px] overflow-y-auto pb-1">
+        {isCases
           ? (results.items as CaseResult[]).map((item) => (
-              <CaseSearchResultCard key={item.id} item={item} />
+              <SearchResultRow
+                key={item.id}
+                title={item.title}
+                source={
+                  item.court?.abbreviation ||
+                  item.court?.name ||
+                  'Case'
+                }
+                href={`/cases/${item.slug}`}
+                icon={<Scale className="h-2.5 w-2.5 text-primary" />}
+              />
             ))
           : (results.items as NoteResult[]).map((item) => (
-              <NoteSearchResultCard key={item.id} item={item} />
+              <SearchResultRow
+                key={item.id}
+                title={item.title}
+                source={item.course?.name || item.topic || 'Note'}
+                href={`/notes/${item.slug}`}
+                icon={<BookOpen className="h-2.5 w-2.5 text-primary" />}
+              />
             ))}
       </div>
-      {results.total && results.total > results.items.length && (
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          Showing {results.items.length} of {results.total} results
-        </p>
-      )}
     </div>
   );
 }

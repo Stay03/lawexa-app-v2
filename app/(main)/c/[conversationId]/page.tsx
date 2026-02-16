@@ -214,11 +214,10 @@ function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
                   <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
                     <ChainOfThoughtContent>
                       <ToolCallDetails message={message} />
+                      <SearchResultsList message={message} />
                     </ChainOfThoughtContent>
                   </CollapsibleContent>
                 </Collapsible>
-
-                {isComplete && <SearchResultsList message={message} />}
 
                 {isError && !isExpanded && (
                   <p className="text-destructive mt-1 text-sm">
