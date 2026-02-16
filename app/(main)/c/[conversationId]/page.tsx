@@ -58,7 +58,7 @@ import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { ChatProvider } from '@/lib/contexts/chat-context';
 import { formatFileSize } from '@/lib/validations/admin-cases';
 
-const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
 // Format tool name and parameters into user-friendly text
 function formatToolMessage(
@@ -608,11 +608,18 @@ function ConversationPageContent() {
     const pdfFile = newFiles[0];
     if (!pdfFile) return;
 
-    if (pdfFile.type !== 'application/pdf') {
-      setError('Only PDF files are supported.');
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/rtf',
+      'text/rtf'
+    ];
+    if (!allowedTypes.includes(pdfFile.type)) {
+      setError('Only PDF, DOC, DOCX, and RTF files are supported.');
       return;
     }
-    if (pdfFile.size > MAX_PDF_SIZE) {
+    if (pdfFile.size > MAX_DOCUMENT_SIZE) {
       setError('File size must be 10MB or less.');
       return;
     }
@@ -828,7 +835,7 @@ function ConversationPageContent() {
         <div className="mx-auto max-w-xs sm:max-w-md">
           {/* Show input for owners, view-only indicator for non-owners */}
           {isOwner ? (
-            <FileUpload onFilesAdded={handleFilesAdded} accept="application/pdf" multiple={false}>
+            <FileUpload onFilesAdded={handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
               <PromptInput
                 value={input}
                 onValueChange={setInput}
@@ -836,7 +843,7 @@ function ConversationPageContent() {
                 disabled={isStreaming || isLoadingHistory}
                 maxHeight={36}
               >
-                {/* PDF File Preview - only shown when uploading or uploaded */}
+                {/* Document File Preview - only shown when uploading or uploaded */}
                 {(isUploading || uploadedFile) && (
                   <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
                     <div
@@ -911,10 +918,10 @@ function ConversationPageContent() {
                       <FileUp className="text-muted-foreground h-8 w-8" />
                     </div>
                     <h3 className="mb-2 text-center text-base font-medium">
-                      Drop PDF to upload
+                      Drop document to upload
                     </h3>
                     <p className="text-muted-foreground text-center text-sm">
-                      Release to attach PDF to your message
+                      Release to attach document to your message
                     </p>
                   </div>
                 </div>
