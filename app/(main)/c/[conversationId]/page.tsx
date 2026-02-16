@@ -42,12 +42,13 @@ import {
   Eye,
   Bot,
   ChevronDown,
+  FileUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import { isToolMessage, isHandoverMessage, type ToolMessage, type HandoverMessage, type ConversationMessage } from '@/types/chat';
+import { isToolMessage, isHandoverMessage, type ToolMessage, type HandoverMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -55,6 +56,9 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { useRotatingText } from '@/lib/hooks/useRotatingText';
 import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { ChatProvider } from '@/lib/contexts/chat-context';
+import { formatFileSize } from '@/lib/validations/admin-cases';
+
+const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
 
 // Format tool name and parameters into user-friendly text
 function formatToolMessage(
@@ -428,7 +432,8 @@ function ConversationPageContent() {
   const conversationId = params.conversationId as string;
 
   const [input, setInput] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const initializedRef = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -543,18 +548,33 @@ function ConversationPageContent() {
   }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, user?.id]);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && files.length === 0) || isStreaming || isSubmitting) return;
+    if ((!input.trim() && !file) || isStreaming || isSubmitting) return;
 
     const message = input.trim();
     if (!message) return;
 
+    const attachedFile = file;
     setInput('');
-    setFiles([]);
+    setFile(null);
     setIsSubmitting(true);
 
     try {
-      // Add user message first
-      addUserMessage(message);
+      // Upload PDF first if attached
+      let fileId: number | undefined;
+      if (attachedFile) {
+        setIsUploading(true);
+        const uploadRes = await chatApi.uploadDocument(attachedFile);
+        fileId = uploadRes.data.id;
+        setIsUploading(false);
+      }
+
+      // Add user message with attachment info
+      const attachment = fileId ? {
+        file_id: fileId,
+        file_name: attachedFile!.name,
+        file_size: attachedFile!.size,
+      } : undefined;
+      addUserMessage(message, attachment);
 
       // Scroll to bottom after sending
       setTimeout(() => {
@@ -571,6 +591,7 @@ function ConversationPageContent() {
         message,
         stream: true,
         conversation_id: conversationId,
+        ...(fileId && { file_id: fileId }),
       });
 
       if (response.success) {
@@ -578,6 +599,7 @@ function ConversationPageContent() {
         connectToStream(response.data.execution_id);
       }
     } catch (err) {
+      setIsUploading(false);
       const apiError = extractApiError(err);
       setError(apiError.message);
     } finally {
@@ -586,11 +608,24 @@ function ConversationPageContent() {
   };
 
   const handleFilesAdded = (newFiles: File[]) => {
-    setFiles((prev) => [...prev, ...newFiles]);
+    const pdfFile = newFiles[0];
+    if (!pdfFile) return;
+
+    if (pdfFile.type !== 'application/pdf') {
+      setError('Only PDF files are supported.');
+      return;
+    }
+    if (pdfFile.size > MAX_PDF_SIZE) {
+      setError('File size must be 10MB or less.');
+      return;
+    }
+
+    setFile(pdfFile);
+    if (error) setError(null);
   };
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = () => {
+    setFile(null);
   };
 
   const handleStop = () => {
@@ -665,9 +700,19 @@ function ConversationPageContent() {
             )}
           </>
         ) : (
-          <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
-            {displayContent}
-          </MessageContent>
+          <>
+            <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
+              {displayContent}
+            </MessageContent>
+            {/* Attachment badge for PDF files */}
+            {(message as ChatMessage).attachment && (
+              <div className="mt-1 flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground w-fit">
+                <FileUp className="h-3 w-3" />
+                <span className="max-w-[150px] truncate">{(message as ChatMessage).attachment!.file_name}</span>
+                <span>{formatFileSize((message as ChatMessage).attachment!.file_size)}</span>
+              </div>
+            )}
+          </>
         )}
       </Message>
     );
@@ -768,7 +813,7 @@ function ConversationPageContent() {
         <div className="mx-auto max-w-xs sm:max-w-md">
           {/* Show input for owners, view-only indicator for non-owners */}
           {isOwner ? (
-            <FileUpload onFilesAdded={handleFilesAdded} multiple>
+            <FileUpload onFilesAdded={handleFilesAdded} accept="application/pdf" multiple={false}>
               <PromptInput
                 value={input}
                 onValueChange={setInput}
@@ -776,25 +821,27 @@ function ConversationPageContent() {
                 disabled={isStreaming || isLoadingHistory}
                 maxHeight={36}
               >
-                {/* File Previews - only shown when files exist */}
-                {files.length > 0 && (
+                {/* PDF File Preview - only shown when file exists */}
+                {file && (
                   <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
-                    {files.map((file, index) => (
-                      <div
-                        key={index}
-                        className="bg-secondary flex items-center gap-2 rounded-lg px-2 py-1 text-xs"
-                        onClick={(e) => e.stopPropagation()}
+                    <div
+                      className="bg-secondary flex items-center gap-2 rounded-lg px-2 py-1 text-xs"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <FileUp className="h-3 w-3" />
+                      )}
+                      <span className="max-w-[100px] truncate">{file.name}</span>
+                      <span className="text-muted-foreground">{formatFileSize(file.size)}</span>
+                      <button
+                        onClick={removeFile}
+                        className="hover:bg-secondary/50 rounded-full p-0.5"
                       >
-                        <Paperclip className="h-3 w-3" />
-                        <span className="max-w-[100px] truncate">{file.name}</span>
-                        <button
-                          onClick={() => removeFile(index)}
-                          className="hover:bg-secondary/50 rounded-full p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -829,7 +876,7 @@ function ConversationPageContent() {
                       size="icon"
                       className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
                       onClick={handleSubmit}
-                      disabled={!input.trim() && files.length === 0}
+                      disabled={!input.trim() && !file}
                     >
                       <ArrowUp className="h-4 w-4" />
                     </Button>
@@ -842,13 +889,13 @@ function ConversationPageContent() {
                 <div className="flex min-h-[200px] w-full items-center justify-center">
                   <div className="bg-background/90 m-4 w-full max-w-md rounded-lg border p-8 shadow-lg">
                     <div className="mb-4 flex justify-center">
-                      <Paperclip className="text-muted-foreground h-8 w-8" />
+                      <FileUp className="text-muted-foreground h-8 w-8" />
                     </div>
                     <h3 className="mb-2 text-center text-base font-medium">
-                      Drop files to upload
+                      Drop PDF to upload
                     </h3>
                     <p className="text-muted-foreground text-center text-sm">
-                      Release to add files to your message
+                      Release to attach PDF to your message
                     </p>
                   </div>
                 </div>

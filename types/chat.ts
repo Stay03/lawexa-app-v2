@@ -1,6 +1,13 @@
 // Message role types
 export type MessageRole = 'user' | 'assistant' | 'tool';
 
+// Attachment on a message (PDF file)
+export interface MessageAttachment {
+  file_id: number;
+  file_name: string;
+  file_size: number;
+}
+
 // Chat message interface
 export interface ChatMessage {
   id: string;
@@ -8,6 +15,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  attachment?: MessageAttachment;
 }
 
 // Tool message extends ChatMessage with tool-specific data
@@ -139,6 +147,7 @@ export interface ChatStartRequest {
   workflow_id?: number;
   agent_id?: number;
   study_mode?: boolean;
+  file_id?: number;
 }
 
 export interface ChatStartResponse {
@@ -192,7 +201,23 @@ export interface ApiMessage {
     task?: string;
     parent_agent?: number;
   } | null;
+  attachment?: MessageAttachment;
   created_at: string;
+}
+
+// Document upload response (POST /api/files/documents)
+export interface DocumentUploadResponse {
+  data: {
+    id: number;
+    original_name: string;
+    filename: string;
+    mime_type: string;
+    size: number;
+    category: string;
+    upload_status: string;
+    url: string;
+  };
+  message: string;
 }
 
 export interface ConversationData {

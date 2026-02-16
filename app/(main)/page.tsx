@@ -14,7 +14,7 @@ import {
   FileUploadTrigger,
   FileUploadContent,
 } from '@/components/ui/file-upload';
-import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle } from 'lucide-react';
+import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { PulsingHeart } from '@/components/ui/pulsing-heart';
@@ -31,10 +31,14 @@ import { useQuery } from '@tanstack/react-query';
 import { adminAiApi } from '@/lib/api/admin-ai';
 import { adminAiKeys } from '@/lib/hooks/useAdminAi';
 import { extractApiError } from '@/lib/utils/api-error';
+import { formatFileSize } from '@/lib/validations/admin-cases';
+
+const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function HomePage() {
   const [input, setInput] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
@@ -83,7 +87,7 @@ export default function HomePage() {
   }, []);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && files.length === 0) || isSubmitting) return;
+    if ((!input.trim() && !file) || isSubmitting) return;
 
     const message = input.trim();
     if (!message) return;
@@ -91,12 +95,22 @@ export default function HomePage() {
     setIsSubmitting(true);
 
     try {
+      // Upload PDF first if attached
+      let fileId: number | undefined;
+      if (file) {
+        setIsUploading(true);
+        const uploadRes = await chatApi.uploadDocument(file);
+        fileId = uploadRes.data.id;
+        setIsUploading(false);
+      }
+
       // Start chat to get conversation_id
       const response = await chatApi.start({
         message,
         stream: true,
         ...(studyMode && { study_mode: true }),
         ...(selectedWorkflowId && canSelectWorkflow && { workflow_id: Number(selectedWorkflowId) }),
+        ...(fileId && { file_id: fileId }),
       });
 
       if (response.success) {
@@ -108,6 +122,7 @@ export default function HomePage() {
         router.push(`/c/${conversationId}?msg=${encodeURIComponent(message)}&exec=${executionId}`);
       }
     } catch (err) {
+      setIsUploading(false);
       const apiError = extractApiError(err);
       setError(apiError.message);
       setIsSubmitting(false);
@@ -115,11 +130,24 @@ export default function HomePage() {
   };
 
   const handleFilesAdded = (newFiles: File[]) => {
-    setFiles((prev) => [...prev, ...newFiles]);
+    const pdfFile = newFiles[0];
+    if (!pdfFile) return;
+
+    if (pdfFile.type !== 'application/pdf') {
+      setError('Only PDF files are supported.');
+      return;
+    }
+    if (pdfFile.size > MAX_PDF_SIZE) {
+      setError('File size must be 10MB or less.');
+      return;
+    }
+
+    setFile(pdfFile);
+    if (error) setError(null);
   };
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = () => {
+    setFile(null);
   };
 
   return (
@@ -191,7 +219,7 @@ export default function HomePage() {
 
       {/* Prompt Input with FileUpload wrapper */}
       <div className="w-full max-w-2xl">
-        <FileUpload onFilesAdded={handleFilesAdded} multiple>
+        <FileUpload onFilesAdded={handleFilesAdded} accept="application/pdf" multiple={false}>
           <PromptInput
             value={input}
             onValueChange={(value) => {
@@ -201,25 +229,27 @@ export default function HomePage() {
             onSubmit={handleSubmit}
             disabled={isSubmitting}
           >
-            {/* File Previews inside input */}
-            {files.length > 0 && (
+            {/* PDF File Preview inside input */}
+            {file && (
               <div className="flex flex-wrap gap-2 px-3 pt-3">
-                {files.map((file, index) => (
-                  <div
-                    key={index}
-                    className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
-                    onClick={(e) => e.stopPropagation()}
+                <div
+                  className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileUp className="h-4 w-4" />
+                  )}
+                  <span className="max-w-[120px] truncate">{file.name}</span>
+                  <span className="text-muted-foreground text-xs">{formatFileSize(file.size)}</span>
+                  <button
+                    onClick={removeFile}
+                    className="hover:bg-secondary/50 rounded-full p-1"
                   >
-                    <Paperclip className="h-4 w-4" />
-                    <span className="max-w-[120px] truncate">{file.name}</span>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="hover:bg-secondary/50 rounded-full p-1"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -231,7 +261,7 @@ export default function HomePage() {
             <PromptInputActions className="flex items-center justify-between px-3 pb-3">
               {/* Left actions: Attach + Workflow selector */}
               <div className="flex items-center gap-1">
-                <PromptInputAction tooltip="Attach files">
+                <PromptInputAction tooltip="Attach PDF">
                   <FileUploadTrigger asChild>
                     <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
                       <Paperclip className="text-primary h-5 w-5" />
@@ -265,7 +295,7 @@ export default function HomePage() {
                   size="icon"
                   className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
                   onClick={handleSubmit}
-                  disabled={(!input.trim() && files.length === 0) || isSubmitting}
+                  disabled={(!input.trim() && !file) || isSubmitting}
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -301,13 +331,13 @@ export default function HomePage() {
             <div className="flex min-h-[200px] w-full items-center justify-center">
               <div className="bg-background/90 m-4 w-full max-w-md rounded-lg border p-8 shadow-lg">
                 <div className="mb-4 flex justify-center">
-                  <Paperclip className="text-muted-foreground h-8 w-8" />
+                  <FileUp className="text-muted-foreground h-8 w-8" />
                 </div>
                 <h3 className="mb-2 text-center text-base font-medium">
-                  Drop files to upload
+                  Drop PDF to upload
                 </h3>
                 <p className="text-muted-foreground text-center text-sm">
-                  Release to add files to your message
+                  Release to attach PDF to your message
                 </p>
               </div>
             </div>

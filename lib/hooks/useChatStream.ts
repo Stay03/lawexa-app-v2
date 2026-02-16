@@ -16,6 +16,7 @@ import type {
   HandoverMessage,
   ApiMessage,
   ConversationMessage,
+  MessageAttachment,
 } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 
@@ -49,12 +50,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const token = useAuthStore((state) => state.token);
 
   // Add user message to state
-  const addUserMessage = useCallback((content: string): ChatMessage => {
+  const addUserMessage = useCallback((content: string, attachment?: MessageAttachment): ChatMessage => {
     const message: ChatMessage = {
       id: generateId(),
       role: 'user',
       content,
       timestamp: new Date(),
+      ...(attachment && { attachment }),
     };
     setState((prev) => ({
       ...prev,
@@ -206,6 +208,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           role: 'user',
           content: apiMsg.content,
           timestamp: new Date(apiMsg.created_at),
+          ...(apiMsg.attachment && { attachment: apiMsg.attachment }),
         } as ChatMessage);
       }
       // Handover message - orchestrator delegating to sub-agent
