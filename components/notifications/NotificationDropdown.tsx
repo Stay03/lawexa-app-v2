@@ -109,6 +109,7 @@ function NotificationDropdown({ onClose }: NotificationDropdownProps) {
                 notification={notification}
                 onMarkAsRead={handleMarkAsRead}
                 onDelete={handleDelete}
+                onClose={onClose}
                 isCompact
               />
             ))}

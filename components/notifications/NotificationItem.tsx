@@ -21,6 +21,7 @@ interface NotificationItemProps {
   notification: Notification;
   onMarkAsRead: (id: string) => void;
   onDelete: (id: string) => void;
+  onClose?: () => void;
   isCompact?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -37,6 +38,7 @@ function NotificationItem({
   notification,
   onMarkAsRead,
   onDelete,
+  onClose,
   isCompact = false,
   className,
   style,
@@ -49,9 +51,11 @@ function NotificationItem({
     if (isUnread) {
       onMarkAsRead(notification.id);
     }
+    // Close dropdown/sheet if open
+    onClose?.();
     // Navigate to notification detail page
     router.push(`/notifications/${notification.id}`);
-  }, [isUnread, notification.id, onMarkAsRead, router]);
+  }, [isUnread, notification.id, onMarkAsRead, onClose, router]);
 
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
