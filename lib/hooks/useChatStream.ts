@@ -356,7 +356,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
   // Connect to existing SSE stream (for when navigating from home page)
   const connectToStream = useCallback(
-    (executionId: string, initialMessage?: string) => {
+    (executionId: string, initialMessage?: string, initialAttachment?: MessageAttachment) => {
       if (!token) {
         const error = 'Authentication required';
         setState((prev) => ({ ...prev, error }));
@@ -372,7 +372,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       // Add initial user message if provided
       if (initialMessage) {
-        addUserMessage(initialMessage);
+        addUserMessage(initialMessage, initialAttachment);
       }
 
       // Set streaming state (no assistant placeholder - we'll add it when completed)

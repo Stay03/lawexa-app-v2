@@ -108,7 +108,16 @@ export default function HomePage() {
       if (response.success) {
         const conversationId = response.data.conversation_id;
         const executionId = response.data.execution_id;
-        router.push(`/c/${conversationId}?msg=${encodeURIComponent(message)}&exec=${executionId}`);
+        const params = new URLSearchParams({
+          msg: message,
+          exec: executionId,
+        });
+        if (uploadedFile) {
+          params.set('file_id', String(uploadedFile.file_id));
+          params.set('file_name', uploadedFile.file_name);
+          params.set('file_size', String(uploadedFile.file_size));
+        }
+        router.push(`/c/${conversationId}?${params.toString()}`);
       }
     } catch (err) {
       const apiError = extractApiError(err);

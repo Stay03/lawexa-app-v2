@@ -517,13 +517,21 @@ function ConversationPageContent() {
     const initialMessage = searchParams.get('msg');
     const executionId = searchParams.get('exec');
 
+    // Read attachment info from URL params (passed from home page)
+    const fileId = searchParams.get('file_id');
+    const fileName = searchParams.get('file_name');
+    const fileSize = searchParams.get('file_size');
+    const initialAttachment = fileId && fileName && fileSize
+      ? { file_id: Number(fileId), file_name: fileName, file_size: Number(fileSize) }
+      : undefined;
+
     // Set conversation ID
     setConversationId(conversationId);
 
     // If we have an execution ID, connect to the stream (coming from home page)
     if (executionId && initialMessage) {
       initializedRef.current = true;
-      connectToStream(executionId, initialMessage);
+      connectToStream(executionId, initialMessage, initialAttachment);
 
       // Clean up URL params after connecting
       window.history.replaceState({}, '', `/c/${conversationId}`);
