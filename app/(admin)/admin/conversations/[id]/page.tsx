@@ -120,6 +120,11 @@ function convertAdminMessages(
       continue;
     }
 
+    // Skip tool_call assistant messages (raw JSON - not user-facing)
+    if (msg.role === 'assistant' && msg.metadata?.type === 'tool_call') {
+      continue;
+    }
+
     // Handle tool messages (role: "tool")
     if (msg.role === 'tool') {
       // Parse tool result data from content JSON string
