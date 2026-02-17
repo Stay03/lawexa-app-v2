@@ -101,7 +101,11 @@ export function CostAndTokensTrendChart({
                 }
                 return `$${n.toFixed(2)}`;
               }}
-              domain={[0, 'auto']}
+              domain={[0, (max: number) => {
+                if (max <= 0) return 10;
+                const power = Math.pow(10, Math.floor(Math.log10(max)));
+                return Math.ceil((max * 1.2) / power) * power;
+              }]}
             />
             <YAxis
               yAxisId="tokens"
