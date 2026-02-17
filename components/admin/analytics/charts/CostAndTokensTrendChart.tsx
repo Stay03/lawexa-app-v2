@@ -101,7 +101,7 @@ export function CostAndTokensTrendChart({
                 }
                 return `$${n.toFixed(2)}`;
               }}
-              domain={[0, (max: number) => Math.ceil(max * 1.25)]}
+              domain={[0, 'auto']}
             />
             <YAxis
               yAxisId="tokens"
