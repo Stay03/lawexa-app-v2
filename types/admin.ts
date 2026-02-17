@@ -83,6 +83,7 @@ export interface AdminConversationListItem {
   agent: AdminAgent | null;
   workflow: AdminWorkflow | null;
   messages_count: number;
+  attachments_count: number;
   usage: ConversationUsage;
   created_at: string;
   updated_at: string;

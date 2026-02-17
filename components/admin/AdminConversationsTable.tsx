@@ -17,7 +17,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ArrowUpDown, Lock, Globe, Coins, Hash } from 'lucide-react';
+import { ArrowUpDown, Lock, Globe, Coins, Hash, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCost, getCurrencySymbol } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
@@ -114,6 +114,11 @@ export function AdminConversationsTable({
             </TableHead>
             <TableHead className="w-[120px] font-semibold">Agent</TableHead>
             <TableHead className="w-[80px] text-right font-semibold">Messages</TableHead>
+            <TableHead className="w-[80px] text-right font-semibold">
+              <span className="flex items-center justify-end gap-1.5">
+                <Paperclip className="h-3.5 w-3.5" /> Files
+              </span>
+            </TableHead>
             <TableHead className="w-[100px] text-right font-semibold">
               <span className="flex items-center justify-end gap-1.5">
                 <Hash className="h-3.5 w-3.5" /> Tokens
@@ -184,6 +189,15 @@ export function AdminConversationsTable({
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {conversation.messages_count}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {conversation.attachments_count > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-sm">
+                    {conversation.attachments_count}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">0</span>
+                )}
               </TableCell>
               <TableCell className="text-right">
                 <Tooltip>
