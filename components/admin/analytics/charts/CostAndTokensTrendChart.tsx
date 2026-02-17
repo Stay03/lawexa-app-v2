@@ -52,6 +52,18 @@ export function CostAndTokensTrendChart({
     }));
   }, [data, showNGN, exchangeRate]);
 
+  const costDomain = useMemo(() => {
+    const max = Math.max(...chartData.map((d) => Number(d.total_cost)), 0);
+    if (max <= 0) return { max: 10, ticks: [0, 2.5, 5, 7.5, 10] };
+    const power = Math.pow(10, Math.floor(Math.log10(max)));
+    const niceMax = Math.ceil((max * 1.2) / power) * power;
+    const step = niceMax / 4;
+    return {
+      max: niceMax,
+      ticks: [0, step, step * 2, step * 3, niceMax],
+    };
+  }, [chartData]);
+
   if (!data.length) {
     return (
       <Card>
@@ -101,11 +113,8 @@ export function CostAndTokensTrendChart({
                 }
                 return `$${n.toFixed(2)}`;
               }}
-              domain={[0, (max: number) => {
-                if (max <= 0) return 10;
-                const power = Math.pow(10, Math.floor(Math.log10(max)));
-                return Math.ceil((max * 1.2) / power) * power;
-              }]}
+              domain={[0, costDomain.max]}
+              ticks={costDomain.ticks}
             />
             <YAxis
               yAxisId="tokens"
