@@ -8,6 +8,8 @@ import {
   MessageSquareQuote,
   Scale,
   Bell,
+  Send,
+  BarChart3,
   Eye,
 } from 'lucide-react';
 import {
@@ -30,7 +32,9 @@ import {
 const contentNavItems = [
   { title: 'Content Requests', url: '/admin/content-requests', icon: MessageSquareQuote },
   { title: 'Cases', url: '/admin/cases', icon: Scale },
-  { title: 'Notifications', url: '/admin/notifications', icon: Bell },
+  { title: 'All Broadcasts', url: '/admin/notifications', icon: Bell, excludePaths: ['/admin/notifications/broadcast', '/admin/notifications/analytics'] },
+  { title: 'Send Broadcast', url: '/admin/notifications/broadcast', icon: Send },
+  { title: 'Notif. Analytics', url: '/admin/notifications/analytics', icon: BarChart3 },
   { title: 'Views Analytics', url: '/admin/views/analytics', icon: Eye },
 ];
 
@@ -56,7 +60,9 @@ export function AdminNavContentSection() {
             <CollapsibleContent>
               <SidebarMenuSub>
                 {contentNavItems.map((item) => {
-                  const isActive = pathname === item.url || pathname.startsWith(item.url + '/');
+                  const baseActive = pathname === item.url || pathname.startsWith(item.url + '/');
+                  const isExcluded = item.excludePaths?.some((p: string) => pathname === p || pathname.startsWith(p + '/'));
+                  const isActive = baseActive && !isExcluded;
                   return (
                     <SidebarMenuSubItem key={item.title}>
                       <SidebarMenuSubButton asChild isActive={isActive}>
