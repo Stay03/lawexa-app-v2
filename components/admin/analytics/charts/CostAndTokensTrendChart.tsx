@@ -33,11 +33,11 @@ export function CostAndTokensTrendChart({
     () => ({
       total_cost: {
         label: `Cost (${showNGN ? 'NGN' : 'USD'})`,
-        color: 'var(--chart-1)',
+        color: 'oklch(0.75 0.15 55)',
       },
       total_tokens: {
         label: 'Tokens',
-        color: 'var(--chart-3)',
+        color: 'oklch(0.72 0.15 180)',
       },
     }),
     [showNGN]
@@ -170,6 +170,7 @@ export function CostAndTokensTrendChart({
               fill="url(#fillCost)"
               stroke="var(--color-total_cost)"
               strokeWidth={2}
+              dot={{ r: 3, fill: 'var(--color-total_cost)' }}
             />
             <Area
               yAxisId="tokens"
@@ -179,6 +180,7 @@ export function CostAndTokensTrendChart({
               stroke="var(--color-total_tokens)"
               strokeWidth={2}
               strokeDasharray="4 4"
+              dot={{ r: 3, fill: 'var(--color-total_tokens)' }}
             />
           </AreaChart>
         </ChartContainer>

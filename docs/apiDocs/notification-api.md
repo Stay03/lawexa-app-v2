@@ -6,10 +6,12 @@ The notification system enables admins to send targeted messages to users and al
 
 **Key Features:**
 - Admin broadcasts with flexible targeting (individual, multiple users, by role, or all users)
+- Broadcast management: list, view details, and track recipient read status
+- Notification analytics dashboard with stat cards, charts, and tables
 - System-triggered notifications (e.g., content request fulfillment)
 - Read/unread status tracking
 - Pagination and filtering
-- Queued notification delivery for performance
+- Bulk notification insertion for performance
 - Role-based access control
 
 ---
@@ -25,6 +27,10 @@ The notification system enables admins to send targeted messages to users and al
    - [Delete Notification](#delete-apinotificationsid)
 3. [Admin Notification Endpoints](#admin-notification-endpoints)
    - [Broadcast Notification](#post-apiadminnotificationsbroadcast)
+   - [List Broadcasts](#get-apiadminnotifications)
+   - [Show Broadcast](#get-apiadminnotificationsuuid)
+   - [List Broadcast Recipients](#get-apiadminnotificationsuuidrecipients)
+   - [Notification Analytics](#get-apiadminnotificationsanalytics)
 4. [Targeting Options](#targeting-options)
 5. [Validation & Error Responses](#validation--error-responses)
 6. [Data Models](#data-models)
@@ -41,6 +47,10 @@ The notification system enables admins to send targeted messages to users and al
 | `/api/notifications/read-all` | POST | Yes | Any |
 | `/api/notifications/{id}` | DELETE | Yes | Any (own notifications only) |
 | `/api/admin/notifications/broadcast` | POST | Yes | Admin+ |
+| `/api/admin/notifications` | GET | Yes | Admin+ |
+| `/api/admin/notifications/{uuid}` | GET | Yes | Admin+ |
+| `/api/admin/notifications/{uuid}/recipients` | GET | Yes | Admin+ |
+| `/api/admin/notifications/analytics` | GET | Yes | Admin+ |
 
 **Unauthenticated (401):**
 
@@ -438,6 +448,388 @@ curl -X POST "http://localhost:8000/api/admin/notifications/broadcast" \
 
 ---
 
+### GET /api/admin/notifications
+
+List all broadcasts with summary stats (read/unread counts). Requires admin role.
+
+**Authorization:** `auth:sanctum`, `role:admin`
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `sort` | string | `created_at` | Sort field: `created_at`, `recipients_count`, `title` |
+| `direction` | string | `desc` | Sort direction: `asc`, `desc` |
+| `per_page` | integer | `15` | Items per page (clamped 1-100) |
+| `page` | integer | `1` | Page number |
+
+**Example Requests:**
+
+```bash
+GET /api/admin/notifications
+GET /api/admin/notifications?per_page=10
+GET /api/admin/notifications?sort=recipients_count&direction=desc
+```
+
+**Response (Success - 200):**
+
+```json
+{
+  "success": true,
+  "message": "Broadcasts retrieved successfully.",
+  "data": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "title": "System Maintenance",
+      "message": "Platform will be unavailable on Saturday 10AM-12PM",
+      "action_url": null,
+      "icon": "warning",
+      "target_type": "all",
+      "target_criteria": null,
+      "recipients_count": 143,
+      "read_count": 98,
+      "unread_count": 45,
+      "admin": {
+        "uuid": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "name": "Admin User"
+      },
+      "created_at": "2026-02-17T10:30:00+00:00"
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "per_page": 15,
+    "total": 5,
+    "last_page": 1,
+    "from": 1,
+    "to": 5
+  },
+  "links": {
+    "first": "http://localhost:8000/api/admin/notifications?page=1",
+    "last": "http://localhost:8000/api/admin/notifications?page=1",
+    "prev": null,
+    "next": null
+  }
+}
+```
+
+**Notes:**
+- Default sort is newest first (`created_at desc`)
+- `read_count` and `unread_count` are computed from actual notification read status
+- Only broadcasts created via the broadcast endpoint appear (not system notifications)
+
+---
+
+### GET /api/admin/notifications/{uuid}
+
+Show details for a specific broadcast including read/unread counts. Requires admin role.
+
+**Authorization:** `auth:sanctum`, `role:admin`
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `uuid` | uuid | Broadcast UUID (the `id` field from list response) |
+
+**Example Request:**
+
+```bash
+GET /api/admin/notifications/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+```
+
+**Response (Success - 200):**
+
+```json
+{
+  "success": true,
+  "message": "Broadcast retrieved successfully.",
+  "data": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "title": "System Maintenance",
+    "message": "Platform will be unavailable on Saturday 10AM-12PM",
+    "action_url": "https://status.example.com",
+    "icon": "warning",
+    "target_type": "all",
+    "target_criteria": null,
+    "recipients_count": 143,
+    "read_count": 98,
+    "unread_count": 45,
+    "admin": {
+      "uuid": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Admin User"
+    },
+    "created_at": "2026-02-17T10:30:00+00:00"
+  }
+}
+```
+
+**Error - Not Found (404):**
+
+```json
+{
+  "success": false,
+  "message": "Broadcast not found.",
+  "errors": null
+}
+```
+
+---
+
+### GET /api/admin/notifications/{uuid}/recipients
+
+List paginated recipients for a specific broadcast with their read status. Requires admin role.
+
+**Authorization:** `auth:sanctum`, `role:admin`
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `uuid` | uuid | Broadcast UUID |
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `per_page` | integer | `15` | Items per page (clamped 1-100) |
+| `page` | integer | `1` | Page number |
+
+**Example Request:**
+
+```bash
+GET /api/admin/notifications/a1b2c3d4-e5f6-7890-abcd-ef1234567890/recipients?per_page=10
+```
+
+**Response (Success - 200):**
+
+```json
+{
+  "success": true,
+  "message": "Recipients retrieved successfully.",
+  "data": [
+    {
+      "notification_id": "36e69d4e-f888-4828-87f6-c620f0692b0d",
+      "user": {
+        "uuid": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        "name": "John Doe",
+        "email": "john@example.com",
+        "role": "user"
+      },
+      "read_at": "2026-02-17T11:15:00+00:00",
+      "created_at": "2026-02-17T10:30:00+00:00"
+    },
+    {
+      "notification_id": "47f7ae5f-g999-5939-98g7-d731g1793c1e",
+      "user": {
+        "uuid": "d4e5f6a7-b8c9-0123-defg-234567890123",
+        "name": "Jane Smith",
+        "email": "jane@example.com",
+        "role": "researcher"
+      },
+      "read_at": null,
+      "created_at": "2026-02-17T10:30:00+00:00"
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "per_page": 10,
+    "total": 143,
+    "last_page": 15,
+    "from": 1,
+    "to": 10
+  },
+  "links": {
+    "first": "...",
+    "last": "...",
+    "prev": null,
+    "next": "..."
+  }
+}
+```
+
+**Error - Not Found (404):**
+
+```json
+{
+  "success": false,
+  "message": "Broadcast not found.",
+  "errors": null
+}
+```
+
+**Notes:**
+- `read_at: null` means the recipient has not read the notification yet
+- Each recipient includes their user details (uuid, name, email, role)
+
+---
+
+### GET /api/admin/notifications/analytics
+
+Notification analytics dashboard with stat cards, charts, and tables. Requires admin role.
+
+**Authorization:** `auth:sanctum`, `role:admin`
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `period` | string | `30d` | Period: `today`, `7d`, `30d`, `90d`, `custom` |
+| `start_date` | date | - | Required when `period=custom` (format: `YYYY-MM-DD`) |
+| `end_date` | date | - | Required when `period=custom` (format: `YYYY-MM-DD`) |
+
+**Example Requests:**
+
+```bash
+GET /api/admin/notifications/analytics
+GET /api/admin/notifications/analytics?period=7d
+GET /api/admin/notifications/analytics?period=custom&start_date=2026-01-01&end_date=2026-02-01
+```
+
+**Response (Success - 200):**
+
+```json
+{
+  "success": true,
+  "message": "Notification analytics retrieved successfully.",
+  "data": {
+    "period": {
+      "start": "2026-01-18T00:00:00+00:00",
+      "end": "2026-02-17T12:00:00+00:00",
+      "comparison_start": "2025-12-19T00:00:00+00:00",
+      "comparison_end": "2026-01-17T23:59:59+00:00"
+    },
+    "stat_cards": {
+      "total_broadcasts": {
+        "value": 12,
+        "change_percent": 50.0
+      },
+      "total_notifications_sent": {
+        "value": 456,
+        "change_percent": 25.3
+      },
+      "read_rate": {
+        "value": 68.5,
+        "change_percent": 5.2
+      },
+      "avg_recipients_per_broadcast": {
+        "value": 38.0,
+        "change_percent": -10.0
+      }
+    },
+    "charts": {
+      "broadcasts_over_time": [
+        {
+          "date": "2026-02-15",
+          "broadcasts": 2,
+          "notifications_sent": 86
+        },
+        {
+          "date": "2026-02-17",
+          "broadcasts": 3,
+          "notifications_sent": 145
+        }
+      ],
+      "read_vs_unread": [
+        {
+          "date": "2026-02-15",
+          "read": 45,
+          "unread": 41
+        },
+        {
+          "date": "2026-02-17",
+          "read": 80,
+          "unread": 65
+        }
+      ],
+      "target_type_distribution": [
+        {
+          "target_type": "all",
+          "count": 5,
+          "percentage": 41.7
+        },
+        {
+          "target_type": "role",
+          "count": 4,
+          "percentage": 33.3
+        },
+        {
+          "target_type": "users",
+          "count": 2,
+          "percentage": 16.7
+        },
+        {
+          "target_type": "user",
+          "count": 1,
+          "percentage": 8.3
+        }
+      ]
+    },
+    "tables": {
+      "recent_broadcasts": [
+        {
+          "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          "title": "System Maintenance",
+          "target_type": "all",
+          "admin_name": "Admin User",
+          "recipients_count": 143,
+          "read_count": 98,
+          "unread_count": 45,
+          "created_at": "2026-02-17T10:30:00+00:00"
+        }
+      ],
+      "top_admins_by_broadcasts": [
+        {
+          "uuid": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+          "name": "Admin User",
+          "broadcasts_count": 8
+        }
+      ]
+    }
+  }
+}
+```
+
+**Stat Cards:**
+
+| Stat Card | Description |
+|-----------|-------------|
+| `total_broadcasts` | Number of broadcasts in the period |
+| `total_notifications_sent` | Total individual notifications delivered |
+| `read_rate` | Percentage of notifications that have been read (0-100) |
+| `avg_recipients_per_broadcast` | Average recipients per broadcast |
+
+Each stat card includes a `change_percent` comparing the current period to the previous period of equal length. `null` means no data in the previous period.
+
+**Charts:**
+
+| Chart | Description |
+|-------|-------------|
+| `broadcasts_over_time` | Daily broadcast count with total notifications sent |
+| `read_vs_unread` | Daily read vs unread notification counts |
+| `target_type_distribution` | Breakdown of broadcasts by target type with percentages |
+
+**Tables:**
+
+| Table | Description |
+|-------|-------------|
+| `recent_broadcasts` | Latest 10 broadcasts with stats |
+| `top_admins_by_broadcasts` | Top 10 admins ranked by broadcast count |
+
+**Validation Errors (422):**
+
+```json
+{
+  "success": false,
+  "message": "Period must be: today, 7d, 30d, 90d, or custom.",
+  "errors": {
+    "period": ["Period must be: today, 7d, 30d, 90d, or custom."]
+  }
+}
+```
+
+---
+
 ## Targeting Options
 
 ### Single User (`user_id`)
@@ -676,7 +1068,7 @@ You can combine `user_ids` and `role` to send to both groups:
 
 ## Data Models
 
-### Notification Resource
+### Notification Resource (User-facing)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -703,6 +1095,36 @@ You can combine `user_ids` and `role` to send to both groups:
   "created_at": "2026-02-14T05:47:33+00:00"
 }
 ```
+
+---
+
+### Broadcast Resource (Admin)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Broadcast UUID |
+| `title` | string | Broadcast title |
+| `message` | string | Broadcast message body |
+| `action_url` | string\|null | Optional URL for CTA button |
+| `icon` | string\|null | Optional icon identifier |
+| `target_type` | string | Target type: `user`, `users`, `role`, `all` |
+| `target_criteria` | object\|null | Targeting details (e.g., `{"role": "researcher"}`, `{"user_ids": [1,2]}`) |
+| `recipients_count` | integer | Total number of recipients |
+| `read_count` | integer | Number of recipients who have read |
+| `unread_count` | integer | Number of recipients who haven't read |
+| `admin` | object | Sender info: `{uuid, name}` |
+| `created_at` | datetime | ISO 8601 creation timestamp |
+
+---
+
+### Broadcast Recipient Resource (Admin)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `notification_id` | uuid | Individual notification UUID |
+| `user` | object | Recipient info: `{uuid, name, email, role}` |
+| `read_at` | datetime\|null | ISO 8601 timestamp when read (null = unread) |
+| `created_at` | datetime | ISO 8601 timestamp when notification was created |
 
 ---
 
@@ -742,18 +1164,20 @@ You can combine `user_ids` and `role` to send to both groups:
 
 ## Implementation Notes
 
-### Queuing
+### Broadcast Tracking
 
-All notifications are queued for async delivery:
-- Admin broadcasts implement `ShouldQueue` interface
-- Large recipient lists don't block HTTP response
-- Failed notifications automatically retry per queue configuration
+Each broadcast creates a `notification_broadcasts` record that links to individual notification rows via `broadcast_id`:
+- Tracks which admin sent the broadcast, targeting type, and recipient count
+- Enables read/unread stats per broadcast without scanning notification data JSON
+- Backward compatible: existing notifications (before this feature) have `broadcast_id = NULL` and won't appear in broadcast history
 
 ### Performance
 
-- **Pagination:** Hard limit of 50 items per page prevents performance issues
-- **Indexing:** Database indexes on `notifiable_id`, `read_at` for fast queries
+- **Bulk Insert:** Broadcasts use `DB::table('notifications')->insert()` in chunks of 500 for efficient delivery
+- **Pagination:** Hard limit of 100 items per page for admin endpoints, 50 for user endpoints
+- **Indexing:** Database indexes on `notifiable_id`, `read_at`, `broadcast_id` for fast queries
 - **Eager Loading:** Service layer pre-loads relationships to avoid N+1 queries
+- **Aggregation:** Read/unread counts use `withCount` with closures for efficient counting
 
 ### Security
 
@@ -845,10 +1269,43 @@ curl -X GET "http://localhost:8000/api/notifications/unread-count" \
 # Response: {"success": true, "data": {"unread_count": 0}}
 ```
 
+### Example 5: Admin Reviews Broadcast Performance
+
+```bash
+# 1. List recent broadcasts
+curl -X GET "http://localhost:8000/api/admin/notifications?per_page=5" \
+  -H "Authorization: Bearer {admin_token}"
+
+# 2. View details for a specific broadcast
+curl -X GET "http://localhost:8000/api/admin/notifications/{uuid}" \
+  -H "Authorization: Bearer {admin_token}"
+
+# 3. Check which recipients have read it
+curl -X GET "http://localhost:8000/api/admin/notifications/{uuid}/recipients" \
+  -H "Authorization: Bearer {admin_token}"
+```
+
+### Example 6: Admin Views Notification Analytics
+
+```bash
+# Default 30-day analytics
+curl -X GET "http://localhost:8000/api/admin/notifications/analytics" \
+  -H "Authorization: Bearer {admin_token}"
+
+# Last 7 days
+curl -X GET "http://localhost:8000/api/admin/notifications/analytics?period=7d" \
+  -H "Authorization: Bearer {admin_token}"
+
+# Custom date range
+curl -X GET "http://localhost:8000/api/admin/notifications/analytics?period=custom&start_date=2026-01-01&end_date=2026-01-31" \
+  -H "Authorization: Bearer {admin_token}"
+```
+
 ---
 
 ## Change Log
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-17 | 1.1 | Added admin broadcast management endpoints (list, show, recipients), notification analytics dashboard, broadcast tracking table |
 | 2026-02-14 | 1.0 | Initial release |
