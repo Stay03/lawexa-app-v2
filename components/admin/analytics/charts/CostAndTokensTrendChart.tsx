@@ -94,9 +94,10 @@ export function CostAndTokensTrendChart({
               tickFormatter={(v) => {
                 const n = Number(v);
                 if (showNGN) {
-                  return n >= 1000
-                    ? `₦${(n / 1000).toFixed(0)}k`
-                    : `₦${n.toFixed(0)}`;
+                  if (n >= 1_000_000_000) return `₦${(n / 1_000_000_000).toFixed(1)}B`;
+                  if (n >= 1_000_000) return `₦${(n / 1_000_000).toFixed(1)}M`;
+                  if (n >= 1_000) return `₦${(n / 1_000).toFixed(0)}k`;
+                  return `₦${n.toFixed(0)}`;
                 }
                 return `$${n.toFixed(2)}`;
               }}
@@ -110,7 +111,10 @@ export function CostAndTokensTrendChart({
               tickMargin={8}
               tickFormatter={(v) => {
                 const n = Number(v);
-                return n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+                if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+                if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+                if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+                return String(n);
               }}
               domain={[0, (max: number) => Math.ceil(max * 1.25)]}
             />
