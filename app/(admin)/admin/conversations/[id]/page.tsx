@@ -65,6 +65,18 @@ function convertAdminMessages(
     }
   });
 
+  // Build a map of tool_result messages by iteration for pairing with tool_calls
+  const toolResultsByIteration = new Map<number, AdminMessage>();
+  adminMessages.forEach((msg) => {
+    if (
+      msg.role === 'tool' &&
+      msg.metadata?.type === 'tool_result' &&
+      msg.metadata.iteration !== undefined
+    ) {
+      toolResultsByIteration.set(msg.metadata.iteration, msg);
+    }
+  });
+
   for (const msg of adminMessages) {
     const base = {
       id: String(msg.id),
@@ -120,34 +132,45 @@ function convertAdminMessages(
       continue;
     }
 
-    // Skip tool_call assistant messages (raw JSON - not user-facing)
+    // Handle tool_call messages - pair with tool_result to get both parameters AND result data
     if (msg.role === 'assistant' && msg.metadata?.type === 'tool_call') {
-      continue;
-    }
+      const toolResult = msg.metadata.iteration !== undefined
+        ? toolResultsByIteration.get(msg.metadata.iteration)
+        : undefined;
 
-    // Handle tool messages (role: "tool")
-    if (msg.role === 'tool') {
-      // Parse tool result data from content JSON string
-      let resultData = null;
-      try {
-        resultData = JSON.parse(msg.content);
-      } catch {
-        // If parsing fails, keep as null
+      // Parse tool result data from the paired tool_result message
+      let parsedToolResult = undefined;
+      if (toolResult) {
+        try {
+          const resultData = JSON.parse(toolResult.content);
+          parsedToolResult = {
+            success: toolResult.metadata?.success ?? resultData.success ?? true,
+            data: resultData.data ?? resultData,
+            error: null,
+          };
+        } catch {
+          parsedToolResult = {
+            success: toolResult.metadata?.success ?? true,
+            data: toolResult.content,
+            error: null,
+          };
+        }
       }
 
       messages.push({
         ...base,
         role: 'tool' as const,
-        toolName: msg.metadata?.tool_name || 'unknown',
-        toolParameters: {}, // Not provided in admin API
-        toolResult: {
-          success: resultData?.success ?? true,
-          data: resultData,
-          error: resultData?.error || null,
-        },
+        toolName: msg.metadata.tool_name || 'unknown',
+        toolParameters: msg.metadata.tool_parameters || {},
+        toolResult: parsedToolResult,
         toolStatus: 'complete' as const,
-        latencyMs: msg.metadata?.execution_time_ms || msg.metadata?.latency_ms,
+        latencyMs: toolResult?.metadata?.latency_ms || toolResult?.metadata?.execution_time_ms,
       } as ToolMessage);
+      continue;
+    }
+
+    // Skip tool_result messages (already captured via tool_call pairing above)
+    if (msg.role === 'tool' && msg.metadata?.type === 'tool_result') {
       continue;
     }
 
