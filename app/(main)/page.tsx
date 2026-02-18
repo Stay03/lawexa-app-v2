@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGreetingParts } from '@/lib/hooks/useGreeting';
 import {
@@ -14,7 +14,7 @@ import {
   FileUploadTrigger,
   FileUploadContent,
 } from '@/components/ui/file-upload';
-import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle, FileUp } from 'lucide-react';
+import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle, FileUp, Scale, NotebookPen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { PulsingHeart } from '@/components/ui/pulsing-heart';
@@ -172,75 +172,133 @@ export default function HomePage() {
     setIsUploading(false);
   };
 
+  const inputAreaRef = useRef<HTMLDivElement>(null);
+
+  const handlePromptClick = (prompt: string) => {
+    setInput(prompt);
+    inputAreaRef.current?.querySelector('textarea')?.focus();
+  };
+
+  const suggestedPrompts = [
+    'Explain this law',
+    'Find a case on',
+    'Do I have rights to',
+    'Connect me to a lawyer',
+  ];
+
   return (
-    <div className="flex min-h-[calc(100vh-120px)] flex-col items-center justify-center px-4" style={{ fontFamily: 'var(--font-comfortaa), sans-serif' }}>
-      {/* Study Mode Toggle - Only shown for students */}
-      {isStudent && (
-        <div className="mb-4 flex items-center gap-3">
-          <span className={`text-sm ${!studyMode ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-            Normal
-          </span>
-          <Switch
-            checked={studyMode}
-            onCheckedChange={setStudyMode}
-            size="default"
-          />
-          <span className={`text-sm ${studyMode ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-            Study Mode
-          </span>
-        </div>
-      )}
+    <div
+      className="flex flex-col h-full md:h-auto md:min-h-[calc(100vh-120px)] md:items-center md:justify-center px-4"
+      style={{ fontFamily: 'var(--font-comfortaa), sans-serif' }}
+    >
+      {/* ── UPPER CONTENT AREA ─────────────────────────────────── */}
+      {/* flex-1 on mobile pushes the input to the bottom; md:flex-none restores desktop flow */}
+      <div className="flex-1 md:flex-none flex flex-col items-center justify-center overflow-y-auto md:overflow-visible w-full max-w-2xl">
 
-      {/* Greeting */}
-      <h1 className="mb-6 text-center text-[36px] font-medium">
-        {isSpecial === '__PULSING_HEART__' ? (
-          <PulsingHeart />
-        ) : (
-          <>
-            {greeting}
-            {name && (
-              <>
-                , <span className="text-primary">{name}!</span>
-              </>
-            )}
-          </>
+        {/* Study Mode Toggle - Only shown for students */}
+        {isStudent && (
+          <div className="mb-4 flex items-center gap-3">
+            <span className={`text-sm ${!studyMode ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+              Normal
+            </span>
+            <Switch
+              checked={studyMode}
+              onCheckedChange={setStudyMode}
+              size="default"
+            />
+            <span className={`text-sm ${studyMode ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+              Study Mode
+            </span>
+          </div>
         )}
-      </h1>
 
-      {/* Resource Links */}
-      <div
-        className={`mb-8 flex flex-wrap justify-center gap-4 overflow-hidden transition-all duration-700 ease-out ${
-          showLinks ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
-        <a
-          href="/docs/Lawexa_State_of_Legal_Intelligence_Report.pdf"
-          download
-          className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+        {/* Greeting */}
+        <h1 className="mb-4 md:mb-6 text-center text-[26px] md:text-[36px] font-medium">
+          {isSpecial === '__PULSING_HEART__' ? (
+            <PulsingHeart />
+          ) : (
+            <>
+              {greeting}
+              {name && (
+                <>
+                  , <span className="text-primary">{name}!</span>
+                </>
+              )}
+            </>
+          )}
+        </h1>
+
+        {/* Resource Links */}
+        <div
+          className={`mb-2 md:mb-8 w-full flex flex-col md:flex-row md:flex-wrap md:justify-center gap-2 md:gap-4 overflow-hidden transition-all duration-700 ease-out ${
+            showLinks ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+          }`}
         >
-          <FileText className="h-4 w-4" />
-          State of Legal Intelligence Report
-        </a>
-        <a
-          href="https://chat.whatsapp.com/CNDMnd0eWYp4Qiy7k4oVlL"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500/5 px-4 py-2 text-sm text-green-600 transition-colors hover:bg-green-500/10 dark:text-green-400"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Join WhatsApp Community
-        </a>
+          <a
+            href="/docs/Lawexa_State_of_Legal_Intelligence_Report.pdf"
+            download
+            className="flex items-center gap-2 rounded-2xl md:rounded-full border border-primary/30 bg-primary/5 px-4 py-3 md:py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+          >
+            <FileText className="h-4 w-4" />
+            State of Legal Intelligence Report
+          </a>
+          <a
+            href="https://chat.whatsapp.com/CNDMnd0eWYp4Qiy7k4oVlL"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-2xl md:rounded-full border border-green-500/30 bg-green-500/5 px-4 py-3 md:py-2 text-sm text-green-600 transition-colors hover:bg-green-500/10 dark:text-green-400"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Join WhatsApp Community
+          </a>
+        </div>
+
+        {/* Error display */}
+        {error && (
+          <div className="mb-4 w-full rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {/* Suggested prompts — vertical list on mobile only */}
+        <div className="md:hidden w-full flex flex-col gap-2">
+          {suggestedPrompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              className="text-muted-foreground hover:bg-secondary rounded-2xl border px-4 py-3 text-sm transition-colors text-left"
+              onClick={() => handlePromptClick(prompt)}
+            >
+              {prompt}...
+            </button>
+          ))}
+        </div>
+
+        {/* Library shortcuts — mobile only, two side-by-side */}
+        <div className="md:hidden w-full grid grid-cols-2 gap-2 mt-2">
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm text-muted-foreground hover:bg-secondary transition-colors"
+            onClick={() => router.push('/cases')}
+          >
+            <Scale className="h-4 w-4 shrink-0 text-primary" />
+            Case Library
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm text-muted-foreground hover:bg-secondary transition-colors"
+            onClick={() => router.push('/notes')}
+          >
+            <NotebookPen className="h-4 w-4 shrink-0 text-primary" />
+            Notes Library
+          </button>
+        </div>
+
       </div>
 
-      {/* Error display */}
-      {error && (
-        <div className="mb-4 w-full max-w-2xl rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
-          {error}
-        </div>
-      )}
-
-      {/* Prompt Input with FileUpload wrapper */}
-      <div className="w-full max-w-2xl">
+      {/* ── BOTTOM INPUT AREA ──────────────────────────────────── */}
+      {/* shrink-0 keeps the input at its natural size on mobile; it always stays at the bottom */}
+      <div ref={inputAreaRef} className="shrink-0 w-full max-w-2xl pb-2 md:pb-0">
         <FileUpload onFilesAdded={handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
           <PromptInput
             value={input}
@@ -333,21 +391,16 @@ export default function HomePage() {
             </PromptInputActions>
           </PromptInput>
 
-          {/* Suggested prompts */}
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
-            {[
-              'Explain this law',
-              'Find a case on',
-              'Do I have rights to',
-              'Connect me to a lawyer',
-            ].map((prompt) => (
+          {/* Suggested prompts — horizontal row on desktop only */}
+          <div className="hidden md:flex mt-3 flex-wrap justify-center gap-2">
+            {suggestedPrompts.map((prompt) => (
               <button
                 key={prompt}
                 type="button"
                 className="text-muted-foreground hover:bg-secondary rounded-full border px-4 py-2 text-sm transition-colors"
-                onClick={() => setInput(prompt)}
+                onClick={() => handlePromptClick(prompt)}
               >
-                {prompt}
+                {prompt}...
               </button>
             ))}
           </div>
