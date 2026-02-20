@@ -263,6 +263,7 @@ function HandoverDisplay({
 
   const agentName = formatAgentName(handover.agentSlug);
   const isComplete = handover.handoverStatus === 'complete';
+  const isTransfer = handover.handoverType === 'transfer';
 
   return (
     <div className="px-4">
@@ -270,37 +271,46 @@ function HandoverDisplay({
         {/* Agent header */}
         <Collapsible open={isTaskExpanded} onOpenChange={setIsTaskExpanded}>
           <CollapsibleTrigger asChild>
-            <div className="hover:bg-muted/50 -mx-1 mb-1 flex cursor-pointer items-center gap-2 rounded-md px-1 py-1.5 transition-colors">
-              <div
-                className={cn(
-                  'flex h-5 w-5 items-center justify-center rounded-full',
-                  isComplete
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-muted text-muted-foreground'
+            <div className="hover:bg-muted/50 -mx-1 mb-1 cursor-pointer rounded-md px-1 py-1.5 transition-colors">
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    'flex h-5 w-5 items-center justify-center rounded-full',
+                    isComplete
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {isComplete ? (
+                    <Bot className="h-3 w-3" />
+                  ) : (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  )}
+                </div>
+                <span className="text-sm font-medium">{agentName}</span>
+                <div className="flex-1" />
+                {isComplete && handover.latencyMs && (
+                  <span className="text-muted-foreground text-xs">
+                    completed {(handover.latencyMs / 1000).toFixed(1)}s
+                  </span>
                 )}
-              >
-                {isComplete ? (
-                  <Bot className="h-3 w-3" />
-                ) : (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                {!isComplete && (
+                  <span className="text-muted-foreground text-xs">
+                    {isTransfer ? `handing over to ${agentName}...` : 'working...'}
+                  </span>
                 )}
+                <ChevronDown
+                  className={cn(
+                    'text-muted-foreground h-3.5 w-3.5 transition-transform duration-200',
+                    isTaskExpanded && 'rotate-180'
+                  )}
+                />
               </div>
-              <span className="text-sm font-medium">{agentName}</span>
-              <div className="flex-1" />
-              {isComplete && handover.latencyMs && (
-                <span className="text-muted-foreground text-xs">
-                  completed {(handover.latencyMs / 1000).toFixed(1)}s
-                </span>
+              {isComplete && (
+                <p className="text-muted-foreground ml-7 text-[11px]">
+                  {isTransfer ? 'Transferred' : 'Consulted'}
+                </p>
               )}
-              {!isComplete && (
-                <span className="text-muted-foreground text-xs">working...</span>
-              )}
-              <ChevronDown
-                className={cn(
-                  'text-muted-foreground h-3.5 w-3.5 transition-transform duration-200',
-                  isTaskExpanded && 'rotate-180'
-                )}
-              />
             </div>
           </CollapsibleTrigger>
 
@@ -389,8 +399,8 @@ function HandoverDisplay({
           </div>
         )}
 
-        {/* Agent response - expandable section */}
-        {handover.handoverResultContent && isComplete && (
+        {/* Agent response - expandable section (hidden for transfer to avoid duplicate content) */}
+        {handover.handoverResultContent && isComplete && !isTransfer && (
           <div className="ml-2 mt-1">
             <Collapsible open={isResultExpanded} onOpenChange={setIsResultExpanded}>
               <CollapsibleTrigger asChild>

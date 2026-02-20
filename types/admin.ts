@@ -56,6 +56,7 @@ export interface AdminMessageMetadata {
   agent_slug?: string;
   parent_agent?: number;
   context?: 'handover';
+  handover_type?: 'consult' | 'transfer';
   // Attachment fields
   file_id?: number;
   file_name?: string;

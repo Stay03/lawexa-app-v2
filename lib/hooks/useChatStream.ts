@@ -118,6 +118,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         agentSlug: event.agent_slug,
         task: event.query,
         handoverStatus: 'active',
+        handoverType: event.handover_type || 'consult',
       };
       setState((prev) => ({
         ...prev,
@@ -237,6 +238,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           agentSlug: apiMsg.metadata.target_agent || 'agent',
           task: apiMsg.metadata.task || '',
           handoverStatus: 'complete',
+          handoverType: handoverResult?.metadata?.handover_type || apiMsg.metadata.handover_type || 'consult',
           latencyMs: handoverResult?.metadata?.latency_ms,
           success: handoverResult?.metadata?.success ?? true,
           handoverResultContent,

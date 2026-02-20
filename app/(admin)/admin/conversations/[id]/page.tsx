@@ -120,6 +120,7 @@ function convertAdminMessages(
         agentSlug: msg.metadata.target_agent || 'agent',
         task: msg.metadata.task || '',
         handoverStatus: 'complete',
+        handoverType: handoverResult?.metadata?.handover_type || msg.metadata.handover_type || 'consult',
         latencyMs: handoverResult?.metadata?.latency_ms,
         success: handoverResult?.metadata?.success ?? true,
         handoverResultContent,
@@ -305,6 +306,7 @@ function HandoverDisplay({
   };
 
   const agentName = formatAgentName(handover.agentSlug);
+  const isTransfer = handover.handoverType === 'transfer';
 
   return (
     <div className="px-4">
@@ -312,23 +314,28 @@ function HandoverDisplay({
         {/* Agent header */}
         <Collapsible open={isTaskExpanded} onOpenChange={setIsTaskExpanded}>
           <CollapsibleTrigger asChild>
-            <div className="hover:bg-muted/50 -mx-1 mb-1 flex cursor-pointer items-center gap-2 rounded-md px-1 py-1.5 transition-colors">
-              <div className="bg-primary/10 text-primary flex h-5 w-5 items-center justify-center rounded-full">
-                <Bot className="h-3 w-3" />
-              </div>
-              <span className="text-sm font-medium">{agentName}</span>
-              <div className="flex-1" />
-              {handover.latencyMs && (
-                <span className="text-muted-foreground text-xs">
-                  completed {(handover.latencyMs / 1000).toFixed(1)}s
-                </span>
-              )}
-              <ChevronDown
-                className={cn(
-                  'text-muted-foreground h-3.5 w-3.5 transition-transform duration-200',
-                  isTaskExpanded && 'rotate-180'
+            <div className="hover:bg-muted/50 -mx-1 mb-1 cursor-pointer rounded-md px-1 py-1.5 transition-colors">
+              <div className="flex items-center gap-2">
+                <div className="bg-primary/10 text-primary flex h-5 w-5 items-center justify-center rounded-full">
+                  <Bot className="h-3 w-3" />
+                </div>
+                <span className="text-sm font-medium">{agentName}</span>
+                <div className="flex-1" />
+                {handover.latencyMs && (
+                  <span className="text-muted-foreground text-xs">
+                    completed {(handover.latencyMs / 1000).toFixed(1)}s
+                  </span>
                 )}
-              />
+                <ChevronDown
+                  className={cn(
+                    'text-muted-foreground h-3.5 w-3.5 transition-transform duration-200',
+                    isTaskExpanded && 'rotate-180'
+                  )}
+                />
+              </div>
+              <p className="text-muted-foreground ml-7 text-[11px]">
+                {isTransfer ? 'Transferred' : 'Consulted'}
+              </p>
             </div>
           </CollapsibleTrigger>
 
@@ -409,8 +416,8 @@ function HandoverDisplay({
           </div>
         )}
 
-        {/* Agent response - expandable section */}
-        {handover.handoverResultContent && (
+        {/* Agent response - expandable section (hidden for transfer to avoid duplicate content) */}
+        {handover.handoverResultContent && !isTransfer && (
           <div className="ml-2 mt-1">
             <Collapsible open={isResultExpanded} onOpenChange={setIsResultExpanded}>
               <CollapsibleTrigger asChild>

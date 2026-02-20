@@ -35,6 +35,7 @@ export interface HandoverMessage extends ChatMessage {
   agentSlug: string;
   task: string;
   handoverStatus: 'active' | 'complete';
+  handoverType?: 'consult' | 'transfer';
   latencyMs?: number;
   success?: boolean;
   handoverResultContent?: string;
@@ -118,6 +119,7 @@ export interface HandoverStartedEvent {
   status: 'handover_started';
   agent_slug: string;
   query: string;
+  handover_type?: 'consult' | 'transfer';
   timestamp: string;
 }
 
@@ -128,6 +130,7 @@ export interface HandoverCompleteEvent {
   success: boolean;
   response_preview?: string;
   latency_ms: number;
+  handover_type?: 'consult' | 'transfer';
   timestamp: string;
 }
 
@@ -200,6 +203,7 @@ export interface ApiMessage {
     agent_slug?: string;
     task?: string;
     parent_agent?: number;
+    handover_type?: 'consult' | 'transfer';
   } | null;
   attachment?: MessageAttachment;
   created_at: string;
