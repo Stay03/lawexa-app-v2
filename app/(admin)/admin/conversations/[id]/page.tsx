@@ -53,27 +53,31 @@ function convertAdminMessages(
 ): ConversationMessage[] {
   const messages: ConversationMessage[] = [];
 
-  // Build a map of handover_result messages by iteration
-  const handoverResultsByIteration = new Map<number, AdminMessage>();
+  // Build lists of handover_result messages by iteration (lists handle iteration resets across executions)
+  const handoverResultsByIteration = new Map<number, AdminMessage[]>();
   adminMessages.forEach((msg) => {
     if (
       msg.role === 'assistant' &&
       msg.metadata?.type === 'handover_result' &&
       msg.metadata.iteration !== undefined
     ) {
-      handoverResultsByIteration.set(msg.metadata.iteration, msg);
+      const list = handoverResultsByIteration.get(msg.metadata.iteration) || [];
+      list.push(msg);
+      handoverResultsByIteration.set(msg.metadata.iteration, list);
     }
   });
 
-  // Build a map of tool_result messages by iteration for pairing with tool_calls
-  const toolResultsByIteration = new Map<number, AdminMessage>();
+  // Build lists of tool_result messages by iteration for pairing with tool_calls
+  const toolResultsByIteration = new Map<number, AdminMessage[]>();
   adminMessages.forEach((msg) => {
     if (
       msg.role === 'tool' &&
       msg.metadata?.type === 'tool_result' &&
       msg.metadata.iteration !== undefined
     ) {
-      toolResultsByIteration.set(msg.metadata.iteration, msg);
+      const list = toolResultsByIteration.get(msg.metadata.iteration) || [];
+      list.push(msg);
+      toolResultsByIteration.set(msg.metadata.iteration, list);
     }
   });
 
@@ -100,7 +104,7 @@ function convertAdminMessages(
       const iteration = msg.metadata.iteration;
       const handoverResult =
         iteration !== undefined
-          ? handoverResultsByIteration.get(iteration)
+          ? handoverResultsByIteration.get(iteration)?.shift()
           : undefined;
 
       let handoverResultContent: string | undefined;
@@ -136,7 +140,7 @@ function convertAdminMessages(
     // Handle tool_call messages - pair with tool_result to get both parameters AND result data
     if (msg.role === 'assistant' && msg.metadata?.type === 'tool_call') {
       const toolResult = msg.metadata.iteration !== undefined
-        ? toolResultsByIteration.get(msg.metadata.iteration)
+        ? toolResultsByIteration.get(msg.metadata.iteration)?.shift()
         : undefined;
 
       // Parse tool result data from the paired tool_result message

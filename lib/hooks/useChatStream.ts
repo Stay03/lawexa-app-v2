@@ -185,19 +185,23 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const transformApiMessages = useCallback((apiMessages: ApiMessage[]): ConversationMessage[] => {
     const messages: ConversationMessage[] = [];
 
-    // Build a map of tool results by iteration for matching
-    const toolResultsByIteration = new Map<number, ApiMessage>();
+    // Build lists of tool results by iteration for matching (lists handle iteration resets across executions)
+    const toolResultsByIteration = new Map<number, ApiMessage[]>();
     apiMessages.forEach(msg => {
       if (msg.role === 'tool' && msg.metadata?.type === 'tool_result' && msg.metadata.iteration !== undefined) {
-        toolResultsByIteration.set(msg.metadata.iteration, msg);
+        const list = toolResultsByIteration.get(msg.metadata.iteration) || [];
+        list.push(msg);
+        toolResultsByIteration.set(msg.metadata.iteration, list);
       }
     });
 
-    // Build a map of handover results by iteration for matching
-    const handoverResultsByIteration = new Map<number, ApiMessage>();
+    // Build lists of handover results by iteration for matching
+    const handoverResultsByIteration = new Map<number, ApiMessage[]>();
     apiMessages.forEach(msg => {
       if (msg.role === 'assistant' && msg.metadata?.type === 'handover_result' && msg.metadata.iteration !== undefined) {
-        handoverResultsByIteration.set(msg.metadata.iteration, msg);
+        const list = handoverResultsByIteration.get(msg.metadata.iteration) || [];
+        list.push(msg);
+        handoverResultsByIteration.set(msg.metadata.iteration, list);
       }
     });
 
@@ -216,7 +220,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'handover') {
         const iteration = apiMsg.metadata.iteration;
         const handoverResult = iteration !== undefined
-          ? handoverResultsByIteration.get(iteration)
+          ? handoverResultsByIteration.get(iteration)?.shift()
           : undefined;
 
         // Extract handover result content if available
@@ -251,7 +255,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Assistant tool call - transform to ToolMessage with result
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'tool_call') {
         const toolResult = apiMsg.metadata.iteration !== undefined
-          ? toolResultsByIteration.get(apiMsg.metadata.iteration)
+          ? toolResultsByIteration.get(apiMsg.metadata.iteration)?.shift()
           : undefined;
 
         // Parse tool result if available
