@@ -93,14 +93,13 @@ export default function OnboardingStep7Page() {
     // Save expertise to store
     setAreasOfExpertise(selectedIds);
 
-    // Fire-and-forget save to server
-    saveStep({ step: 7, areas_of_expertise: selectedIds });
-
     if (shouldShowVerificationStep(userType)) {
+      // Fire-and-forget save to server (only when NOT completing — avoids race with POST /complete)
+      saveStep({ step: 7, areas_of_expertise: selectedIds });
       // Lawyers go to verification step
       router.push('/onboarding/step-8');
     } else {
-      // Law students complete onboarding
+      // Law students complete onboarding — POST /complete sends full payload, no need for saveStep
       submitOnboarding({
         userType: userType!,
         communicationStyle: communicationStyle!,

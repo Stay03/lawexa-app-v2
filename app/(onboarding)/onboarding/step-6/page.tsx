@@ -168,20 +168,20 @@ export default function OnboardingStep6Page() {
       areaOfStudy: isLawStudent ? 'law' : undefined,
     });
 
-    // Fire-and-forget save to server
-    const stepFields: Record<string, unknown> = {};
-    if (showUniversityForm && university) stepFields.university = university;
-    if (showUniversityForm && level) stepFields.level = level;
-    if (showLawSchoolForm && lawSchool) stepFields.law_school = lawSchool;
-    if (isLawStudent) stepFields.area_of_study = 'Law';
-    saveStep({ step: 6, ...stepFields });
-
     // Determine next step
     if (shouldShowExpertiseStep(userType)) {
+      // Fire-and-forget save to server (only when NOT completing — avoids race with POST /complete)
+      const stepFields: Record<string, unknown> = {};
+      if (showUniversityForm && university) stepFields.university = university;
+      if (showUniversityForm && level) stepFields.level = level;
+      if (showLawSchoolForm && lawSchool) stepFields.law_school = lawSchool;
+      if (isLawStudent) stepFields.area_of_study = 'Law';
+      saveStep({ step: 6, ...stepFields });
+
       // Lawyers and law students go to expertise step
       router.push('/onboarding/step-7');
     } else {
-      // This branch shouldn't be reached for non-law students anymore
+      // Fallback — POST /complete sends full payload, no need for saveStep
       submitOnboarding({
         userType: userType!,
         communicationStyle: communicationStyle!,
