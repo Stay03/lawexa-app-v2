@@ -27,6 +27,9 @@ export interface UserProfile {
   call_number?: string;
   other_certifications?: string;
   work_experience?: string;
+  // Onboarding tracking
+  onboarding_step?: number | null;
+  onboarding_completed_at?: string | null;
   // Social links
   linkedin_url?: string;
   website_url?: string;

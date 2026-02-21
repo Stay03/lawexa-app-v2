@@ -1,4 +1,4 @@
-import type { UserType, CommunicationStyle } from './auth';
+import type { UserType, CommunicationStyle, UserProfile, User, AreaOfExpertise } from './auth';
 
 export type StudentEducationLevel = 'university' | 'law_school';
 
@@ -111,4 +111,88 @@ export const LAW_SCHOOL_OPTIONS: Record<string, string[]> = {
 
 export function getLawSchoolOptions(country: string): string[] | null {
   return LAW_SCHOOL_OPTIONS[country] || null;
+}
+
+// --- Onboarding API Types ---
+
+/** GET /api/onboarding/progress response data */
+export interface OnboardingProgressResponse {
+  user_type: UserType | null;
+  onboarding_step: number | null;
+  is_completed: boolean;
+  communication_style: CommunicationStyle | null;
+  country: string | null;
+  country_code: string | null;
+  region: string | null;
+  city: string | null;
+  profession: string | null;
+  university: string | null;
+  level: string | null;
+  law_school: string | null;
+  area_of_study: string | null;
+  call_to_bar_year: number | null;
+  bio: string | null;
+  call_number: string | null;
+  areas_of_expertise: AreaOfExpertise[];
+}
+
+/** PUT /api/onboarding/step request payload */
+export interface OnboardingStepPayload {
+  step: number;
+  user_type?: UserType;
+  communication_style?: CommunicationStyle;
+  country?: string;
+  country_code?: string;
+  region?: string;
+  city?: string;
+  profession?: string;
+  area_of_study?: string;
+  university?: string;
+  level?: string;
+  law_school?: string;
+  call_to_bar_year?: number;
+  call_number?: string;
+  bio?: string;
+  areas_of_expertise?: number[];
+}
+
+/** PUT /api/onboarding/step response data */
+export interface OnboardingStepResponse {
+  profile: UserProfile & {
+    id: number;
+    onboarding_step: number | null;
+    onboarding_completed_at: string | null;
+  };
+  areas_of_expertise: AreaOfExpertise[];
+}
+
+/** POST /api/onboarding/complete request payload */
+export interface OnboardingCompletePayload {
+  user_type?: UserType;
+  communication_style?: CommunicationStyle;
+  country?: string;
+  country_code?: string;
+  region?: string;
+  city?: string;
+  profession?: string;
+  area_of_study?: string;
+  university?: string;
+  level?: string;
+  law_school?: string;
+  call_to_bar_year?: number;
+  call_number?: string;
+  bio?: string;
+  areas_of_expertise?: number[];
+}
+
+/** POST /api/onboarding/complete response data */
+export interface OnboardingCompleteResponse {
+  user: User;
+  location: {
+    country: string;
+    country_code: string;
+    continent: string;
+    region: string;
+    city: string;
+  };
 }

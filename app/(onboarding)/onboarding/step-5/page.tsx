@@ -12,6 +12,7 @@ import {
   shouldSkipProfileStep,
   shouldShowEducationLevelStep,
 } from '@/lib/utils/onboarding';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 
 const EDUCATION_LEVEL_OPTIONS = [
   {
@@ -39,6 +40,7 @@ export default function OnboardingStep5Page() {
     studentEducationLevel,
     setStudentEducationLevel,
   } = useOnboardingStore();
+  const { saveStep } = useOnboardingStepSave();
 
   const skipProfile = shouldSkipProfileStep(
     userType,
@@ -70,6 +72,7 @@ export default function OnboardingStep5Page() {
 
   const handleNext = () => {
     if (studentEducationLevel) {
+      saveStep({ step: 5 }); // Bookmark only — studentEducationLevel is frontend-only
       startTransition(() => {
         router.push('/onboarding/step-6');
       });

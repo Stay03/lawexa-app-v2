@@ -11,6 +11,7 @@ import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 import {
   getTotalSteps,
   shouldShowEducationStep,
@@ -29,6 +30,7 @@ export default function OnboardingStep4Page() {
     setProfileData,
   } = useOnboardingStore();
   const { submitOnboarding, isSubmitting } = useOnboarding();
+  const { saveStep } = useOnboardingStepSave();
 
   // Form state
   const [profession, setProfession] = useState(profileData.profession || '');
@@ -106,6 +108,13 @@ export default function OnboardingStep4Page() {
     setProfileData({
       profession: finalProfession,
     });
+
+    // Fire-and-forget save to server
+    const stepFields: Record<string, string> = {};
+    if (finalProfession) stepFields.profession = finalProfession;
+    if (region) stepFields.region = region;
+    if (city) stepFields.city = city;
+    saveStep({ step: 4, ...stepFields });
 
     // Determine next step based on user type and profession
     if (shouldShowEducationStep(userType, finalProfession)) {

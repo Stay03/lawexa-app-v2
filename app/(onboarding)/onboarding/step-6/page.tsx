@@ -17,6 +17,7 @@ import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 import {
   useUniversitiesByCountry,
   useGlobalUniversitySearch,
@@ -42,6 +43,7 @@ export default function OnboardingStep6Page() {
     setProfileData,
   } = useOnboardingStore();
   const { submitOnboarding, isSubmitting } = useOnboarding();
+  const { saveStep } = useOnboardingStepSave();
 
   // Prefetch expertise data so step-7 loads instantly
   useAllExpertise();
@@ -151,6 +153,9 @@ export default function OnboardingStep6Page() {
       setProfileData({
         university,
       });
+      const stepFields: Record<string, unknown> = {};
+      if (university) stepFields.university = university;
+      saveStep({ step: 6, ...stepFields });
       router.push('/onboarding/step-6b');
       return;
     }
@@ -162,6 +167,14 @@ export default function OnboardingStep6Page() {
       lawSchool: showLawSchoolForm ? lawSchool : undefined,
       areaOfStudy: isLawStudent ? 'law' : undefined,
     });
+
+    // Fire-and-forget save to server
+    const stepFields: Record<string, unknown> = {};
+    if (showUniversityForm && university) stepFields.university = university;
+    if (showUniversityForm && level) stepFields.level = level;
+    if (showLawSchoolForm && lawSchool) stepFields.law_school = lawSchool;
+    if (isLawStudent) stepFields.area_of_study = 'Law';
+    saveStep({ step: 6, ...stepFields });
 
     // Determine next step
     if (shouldShowExpertiseStep(userType)) {

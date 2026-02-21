@@ -6,6 +6,7 @@ import { CommunicationStyleStep } from '@/components/onboarding/CommunicationSty
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import type { CommunicationStyle } from '@/types/auth';
 
@@ -13,6 +14,7 @@ export default function OnboardingStep2Page() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { userType, communicationStyle, setCommunicationStyle } = useOnboardingStore();
+  const { saveStep } = useOnboardingStepSave();
 
   // Redirect to step 1 if no user type is selected
   useEffect(() => {
@@ -34,6 +36,7 @@ export default function OnboardingStep2Page() {
 
   const handleNext = () => {
     if (communicationStyle) {
+      saveStep({ step: 2, communication_style: communicationStyle });
       startTransition(() => {
         router.push('/onboarding/step-3');
       });

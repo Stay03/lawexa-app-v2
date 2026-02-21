@@ -10,6 +10,7 @@ import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { authApi } from '@/lib/api/auth';
 import { useCountries } from '@/lib/hooks/useCountries';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +23,7 @@ export default function OnboardingStep3Page() {
     locationData,
     setLocationData,
   } = useOnboardingStore();
+  const { saveStep } = useOnboardingStepSave();
 
   // Fetch user data to get detected location
   const { data: userData } = useQuery({
@@ -109,6 +111,15 @@ export default function OnboardingStep3Page() {
       city: matchesDetected ? detectedCity : undefined,
       selectedCountryMatchesDetected: matchesDetected,
     });
+
+    // Fire-and-forget save to server
+    const stepFields: Record<string, string> = {
+      country: selectedCountry,
+      country_code: selectedCountryCode,
+    };
+    if (matchesDetected && detectedRegion) stepFields.region = detectedRegion;
+    if (matchesDetected && detectedCity) stepFields.city = detectedCity;
+    saveStep({ step: 3, ...stepFields });
 
     // For lawyer/law_student who selected detected country, skip profile step
     const isLawyerOrLawStudent = userType === 'lawyer' || userType === 'law_student';

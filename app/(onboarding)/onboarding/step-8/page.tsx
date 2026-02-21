@@ -20,6 +20,7 @@ import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 import { getTotalSteps, shouldSkipProfileStep } from '@/lib/utils/onboarding';
 import { cn } from '@/lib/utils';
 import { lawyerVerificationApi, type LawyerProfileDocument } from '@/lib/api/lawyerVerification';
@@ -148,6 +149,7 @@ export default function OnboardingStep8Page() {
     setWantsClientReferrals,
   } = useOnboardingStore();
   const { submitOnboarding, isSubmitting } = useOnboarding();
+  const { saveStep } = useOnboardingStepSave();
 
   // Form state
   const [callNumber, setCallNumber] = useState(verificationData.callNumber || '');
@@ -293,6 +295,9 @@ export default function OnboardingStep8Page() {
       // Save call number
       setVerificationData({ callNumber });
       setWantsClientReferrals(true);
+
+      // Fire-and-forget save to server
+      saveStep({ step: 8, call_number: callNumber });
 
       // Complete onboarding
       submitOnboarding({

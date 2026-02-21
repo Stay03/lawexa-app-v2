@@ -17,6 +17,7 @@ import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import { getLevelOptions, AREA_OF_STUDY_OPTIONS } from '@/types/onboarding';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,7 @@ export default function OnboardingStep6bPage() {
     setProfileData,
   } = useOnboardingStore();
   const { submitOnboarding, isSubmitting } = useOnboarding();
+  const { saveStep } = useOnboardingStepSave();
 
   // Form state
   const [level, setLevel] = useState(profileData.level || '');
@@ -92,6 +94,9 @@ export default function OnboardingStep6bPage() {
       level,
       areaOfStudy,
     });
+
+    // Fire-and-forget save to server
+    saveStep({ step: 6, level, area_of_study: areaOfStudy });
 
     // Complete onboarding for non-law students
     submitOnboarding({

@@ -2,10 +2,10 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { authApi } from '@/lib/api/auth';
+import { onboardingApi } from '@/lib/api/onboarding';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
-import type { OnboardingFormData } from '@/types/onboarding';
+import type { OnboardingFormData, OnboardingCompletePayload } from '@/types/onboarding';
 
 export function useOnboarding() {
   const { updateUser, setOnboardingComplete } = useAuthStore();
@@ -24,13 +24,14 @@ export function useOnboarding() {
         }
       }
 
-      // Build the profile update payload
-      const payload: Record<string, unknown> = {
+      // Build the complete payload as a fallback — POST /complete accepts
+      // the same fields and will save them before validating, so even if
+      // some PUT /step calls failed, this ensures all data reaches the server.
+      const payload: OnboardingCompletePayload = {
         user_type: data.userType,
         communication_style: data.communicationStyle,
       };
 
-      // Add profession (derived or explicit)
       if (profession) {
         payload.profession = profession;
       }
@@ -71,17 +72,15 @@ export function useOnboarding() {
         payload.call_number = data.callNumber;
       }
 
-      return authApi.updateProfile(payload);
+      return onboardingApi.complete(payload);
     },
     onSuccess: (response) => {
       console.log('[onboarding] onSuccess fired, response:', { success: response.success, hasData: !!response.data });
 
       if (response.success && response.data) {
         console.log('[onboarding] Inside if block — updating user');
-        updateUser({
-          profile: response.data.profile,
-          areas_of_expertise: response.data.areas_of_expertise,
-        });
+        // POST /complete returns { user, location } — use the full user object
+        updateUser(response.data.user);
 
         // Mark onboarding as complete
         setOnboardingComplete(true);
@@ -98,8 +97,17 @@ export function useOnboarding() {
         console.log('[onboarding] Condition failed — response.success:', response.success, 'response.data:', response.data);
       }
     },
-    onError: (error: Error & { response?: { data?: { message?: string } } }) => {
-      const message = error.response?.data?.message || 'Failed to save profile. Please try again.';
+    onError: (error: Error & { response?: { status?: number; data?: { message?: string } } }) => {
+      // Handle 409 — onboarding already completed
+      if (error.response?.status === 409) {
+        toast.info('Your onboarding is already complete!');
+        setOnboardingComplete(true);
+        reset();
+        window.location.href = '/';
+        return;
+      }
+
+      const message = error.response?.data?.message || 'Failed to complete onboarding. Please try again.';
       toast.error(message);
     },
   });

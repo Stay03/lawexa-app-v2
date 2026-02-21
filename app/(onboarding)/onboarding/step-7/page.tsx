@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAllExpertise } from '@/lib/hooks/useExpertise';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 import { getTotalSteps, shouldShowVerificationStep, shouldSkipProfileStep } from '@/lib/utils/onboarding';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,7 @@ export default function OnboardingStep7Page() {
     setAreasOfExpertise,
   } = useOnboardingStore();
   const { submitOnboarding, isSubmitting } = useOnboarding();
+  const { saveStep } = useOnboardingStepSave();
 
   // Fetch all areas of expertise
   const {
@@ -90,6 +92,9 @@ export default function OnboardingStep7Page() {
   const handleNext = () => {
     // Save expertise to store
     setAreasOfExpertise(selectedIds);
+
+    // Fire-and-forget save to server
+    saveStep({ step: 7, areas_of_expertise: selectedIds });
 
     if (shouldShowVerificationStep(userType)) {
       // Lawyers go to verification step

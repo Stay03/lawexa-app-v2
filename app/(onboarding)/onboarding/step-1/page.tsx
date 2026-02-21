@@ -10,6 +10,7 @@ import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useCountries } from '@/lib/hooks/useCountries';
 import { authApi } from '@/lib/api/auth';
+import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
 import { getTotalSteps } from '@/lib/utils/onboarding';
 import type { UserType } from '@/types/auth';
 
@@ -38,6 +39,7 @@ export default function OnboardingStep1Page() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { userType, setUserType } = useOnboardingStore();
+  const { saveStep } = useOnboardingStepSave();
 
   // Prefetch countries data so step-3 loads instantly
   useCountries();
@@ -55,6 +57,7 @@ export default function OnboardingStep1Page() {
 
   const handleNext = () => {
     if (userType) {
+      saveStep({ step: 1, user_type: userType });
       startTransition(() => {
         router.push('/onboarding/step-2');
       });

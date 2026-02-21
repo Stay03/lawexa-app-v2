@@ -26,7 +26,7 @@ export const useAuthStore = create<AuthStore>()(
       // Let Zustand persist handle storage - no manual localStorage
       setAuth: (user, token) => {
         // If the user already has a profession, they completed onboarding before
-        const hasCompletedOnboarding = !!(user.profile?.profession);
+        const hasCompletedOnboarding = !!(user.profile?.onboarding_completed_at || user.profile?.profession);
         console.log('[authStore] setAuth called:', { hasCompletedOnboarding, profession: user.profile?.profession, role: user.role });
         set({
           user,
