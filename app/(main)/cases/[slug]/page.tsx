@@ -15,6 +15,7 @@ import {
   ReaderModeWrapper,
   ViewFullReportButton,
   RelatedCasesSection,
+  CaseViewThemeSwitcher,
 } from '@/components/cases';
 import { PageContainer } from '@/components/layout';
 import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
@@ -99,6 +100,10 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
   return (
     <>
       <PageContainer variant="detail" className="pb-24">
+        {/* Theme switcher - always visible outside wrapper for superadmin */}
+        <div className="flex justify-end mb-2">
+          <CaseViewThemeSwitcher />
+        </div>
         <ReaderModeWrapper
         caseData={caseDetail}
         slug={slug}

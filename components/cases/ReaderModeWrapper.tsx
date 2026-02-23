@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useReaderModeStore } from '@/lib/stores/readerModeStore';
+import { useCaseViewThemeStore } from '@/lib/stores/caseViewThemeStore';
 import { cn } from '@/lib/utils';
 import { CaseDocumentView } from './CaseDocumentView';
+import { CaseBlogView } from './CaseBlogView';
 import type { CaseDetail, RelatedCase } from '@/types/case';
 
 interface ReaderModeWrapperProps {
@@ -36,6 +38,7 @@ function ReaderModeWrapper({
 }: ReaderModeWrapperProps) {
   const [mounted, setMounted] = useState(false);
   const isReaderModeEnabled = useReaderModeStore((state) => state.isReaderModeEnabled);
+  const caseViewTheme = useCaseViewThemeStore((state) => state.caseViewTheme);
 
   // Handle hydration
   useEffect(() => {
@@ -44,6 +47,8 @@ function ReaderModeWrapper({
 
   // Don't apply reader mode styling until after hydration to avoid flash
   const shouldApplyReaderMode = mounted && isReaderModeEnabled;
+  // Blog theme only applies when reader mode is off
+  const shouldApplyBlogTheme = mounted && !isReaderModeEnabled && caseViewTheme === 'blog';
 
   return (
     <div
@@ -53,14 +58,24 @@ function ReaderModeWrapper({
         // Smooth transition for reader mode
         'reader-mode-transition',
         // Normal mode: preserve component spacing
-        !shouldApplyReaderMode && 'space-y-6',
+        !shouldApplyReaderMode && !shouldApplyBlogTheme && 'space-y-6',
         // Reader mode: full-bleed on mobile (negative margin to cancel parent p-4), normal padding on larger screens
         shouldApplyReaderMode && '-mx-4 px-4 py-6 sm:mx-0 sm:p-6 md:p-10 lg:p-12',
+        // Blog theme: minimal padding
+        shouldApplyBlogTheme && 'py-2',
         className
       )}
     >
       {shouldApplyReaderMode && caseData && slug ? (
         <CaseDocumentView
+          caseData={caseData}
+          slug={slug}
+          similarCases={similarCases}
+          citedCases={citedCases}
+          citedBy={citedBy}
+        />
+      ) : shouldApplyBlogTheme && caseData && slug ? (
+        <CaseBlogView
           caseData={caseData}
           slug={slug}
           similarCases={similarCases}

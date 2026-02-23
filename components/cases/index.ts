@@ -18,3 +18,5 @@ export { FullReportDocumentView } from './FullReportDocumentView';
 export { ViewFullReportButton } from './ViewFullReportButton';
 export { RelatedCaseCard } from './RelatedCaseCard';
 export { RelatedCasesSection } from './RelatedCasesSection';
+export { CaseBlogView } from './CaseBlogView';
+export { CaseViewThemeSwitcher } from './CaseViewThemeSwitcher';
