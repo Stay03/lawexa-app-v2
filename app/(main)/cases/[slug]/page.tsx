@@ -3,6 +3,7 @@
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Scale } from 'lucide-react';
+import { AxiosError } from 'axios';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
@@ -16,6 +17,8 @@ import {
   ViewFullReportButton,
   RelatedCasesSection,
   CaseViewThemeSwitcher,
+  CaseViewLimitBanner,
+  CaseViewHardLimit,
 } from '@/components/cases';
 import { PageContainer } from '@/components/layout';
 import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
@@ -23,6 +26,7 @@ import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { ShareButton } from '@/components/common/ShareButton';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 import { useCaseWithRelated } from '@/lib/hooks/useCases';
+import { extractViewLimitError } from '@/lib/utils/api-error';
 
 /******************************************************************************
                                Constants
@@ -57,7 +61,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
   const { slug } = use(params);
   const { q: searchQuery } = use(searchParams);
   const router = useRouter();
-  const { data, isLoading, isError, refetch } = useCaseWithRelated(slug, searchQuery);
+  const { data, isLoading, isError, error, refetch } = useCaseWithRelated(slug, searchQuery);
 
   // Loading state
   if (isLoading) {
@@ -70,6 +74,17 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
 
   // Error state
   if (isError) {
+    const limitError = extractViewLimitError(error);
+    if (limitError) {
+      return (
+        <PageContainer variant="detail">
+          <CaseViewHardLimit
+            limitError={limitError}
+            message={(error as AxiosError<{ message?: string }>)?.response?.data?.message}
+          />
+        </PageContainer>
+      );
+    }
     return (
       <PageContainer variant="detail">
         <ErrorState
@@ -96,6 +111,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
   }
 
   const caseDetail = data.data;
+  const isLimitExceeded = caseDetail.limit_exceeded === true;
 
   return (
     <>
@@ -147,7 +163,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
         </div>
 
         {/* View Full Report Button */}
-        {caseDetail.has_full_report && (
+        {caseDetail.has_full_report && !isLimitExceeded && (
           <div
             className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
             style={{ animationDelay: `${ANIMATION_DELAYS.viewReportButton}ms` }}
@@ -165,11 +181,18 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
         )}
 
         {/* Case Body/Summary */}
-        <CaseBodyCard
-          body={caseDetail.body}
-          excerpt={caseDetail.excerpt}
-          animationDelay={ANIMATION_DELAYS.body}
-        />
+        {isLimitExceeded ? (
+          <CaseViewLimitBanner
+            limitMessage={caseDetail.limit_message}
+            animationDelay={ANIMATION_DELAYS.body}
+          />
+        ) : (
+          <CaseBodyCard
+            body={caseDetail.body}
+            excerpt={caseDetail.excerpt}
+            animationDelay={ANIMATION_DELAYS.body}
+          />
+        )}
 
         {/* Metadata Grid */}
         <CaseMetadataGrid

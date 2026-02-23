@@ -9,7 +9,11 @@ import { Toaster } from "@/components/ui/sonner";
 const comfortaa = Comfortaa({ subsets: ["latin"], variable: "--font-comfortaa" });
 
 export const metadata: Metadata = {
-  title: "Lawexa - Nigerian Legal Resources",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://lawexa.com"),
+  title: {
+    default: "Lawexa - Nigerian Legal Resources",
+    template: "%s",
+  },
   description: "Access Nigerian law cases, notes, and legal research materials",
   manifest: "/site.webmanifest",
   icons: {
@@ -20,6 +24,15 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
   themeColor: "#C9A227",
+  openGraph: {
+    type: "website",
+    siteName: "Lawexa",
+    locale: "en_NG",
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@LawexaAi",
+  },
 };
 
 export default function RootLayout({

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { ViewFullReportButton } from './ViewFullReportButton';
+import { CaseViewLimitBanner } from './CaseViewLimitBanner';
 import type { CaseDetail, RelatedCase } from '@/types/case';
 
 interface CaseDocumentViewProps {
@@ -101,6 +102,8 @@ function CaseDocumentView({
     has_full_report,
   } = caseData;
 
+  const isLimitExceeded = caseData.limit_exceeded === true;
+
   const hasRelatedCases =
     (similarCases && similarCases.length > 0) ||
     (citedCases && citedCases.length > 0) ||
@@ -155,7 +158,7 @@ function CaseDocumentView({
         )}
 
         {/* View Full Report Button */}
-        {has_full_report && (
+        {has_full_report && !isLimitExceeded && (
           <div className="mt-4 flex justify-center">
             <ViewFullReportButton slug={slug} variant="outline" hasFullReport={has_full_report} />
           </div>
@@ -191,15 +194,17 @@ function CaseDocumentView({
       )}
 
       {/* Case Summary / Body */}
-      {formattedBody && (
-        <section className="document-section">
-          <h2 className="section-heading">Case Summary</h2>
+      <section className="document-section">
+        <h2 className="section-heading">Case Summary</h2>
+        {isLimitExceeded ? (
+          <CaseViewLimitBanner limitMessage={caseData.limit_message} />
+        ) : formattedBody ? (
           <div
             className="section-content body-content"
             dangerouslySetInnerHTML={{ __html: formattedBody }}
           />
-        </section>
-      )}
+        ) : null}
+      </section>
 
       {/* Additional Information */}
       {judicial_precedent && (

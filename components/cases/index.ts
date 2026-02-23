@@ -20,3 +20,5 @@ export { RelatedCaseCard } from './RelatedCaseCard';
 export { RelatedCasesSection } from './RelatedCasesSection';
 export { CaseBlogView } from './CaseBlogView';
 export { CaseViewThemeSwitcher } from './CaseViewThemeSwitcher';
+export { CaseViewLimitBanner } from './CaseViewLimitBanner';
+export { CaseViewHardLimit } from './CaseViewHardLimit';

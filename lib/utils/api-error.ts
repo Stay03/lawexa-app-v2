@@ -1,5 +1,6 @@
 import { AxiosError } from 'axios';
 import type { ApiResponse } from '@/types/api';
+import type { CaseViewLimitError } from '@/types/case';
 
 export interface ApiError {
   message: string;
@@ -24,6 +25,26 @@ export function extractApiError(error: unknown): ApiError {
     errors: null,
     status: 0,
   };
+}
+
+/**
+ * Extract structured view-limit error from a 429 response.
+ */
+export function extractViewLimitError(error: unknown): CaseViewLimitError | null {
+  if (error instanceof AxiosError && error.response?.status === 429) {
+    const errors = error.response.data?.errors;
+    if (errors?.limit_type) {
+      return {
+        limit_type: errors.limit_type,
+        plan_limit: errors.plan_limit,
+        hard_limit: errors.hard_limit,
+        used: errors.used,
+        remaining: errors.remaining,
+        resets_at: errors.resets_at,
+      };
+    }
+  }
+  return null;
 }
 
 /**

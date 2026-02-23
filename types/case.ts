@@ -76,9 +76,19 @@ export interface Case {
   meta: CaseMeta;
 }
 
+// View limit error from 429 response
+export interface CaseViewLimitError {
+  limit_type: string;
+  plan_limit: number;
+  hard_limit: number;
+  used: number;
+  remaining: number;
+  resets_at: string;
+}
+
 // Full case detail (from GET /api/cases/{slug})
 export interface CaseDetail extends Case {
-  body: string;
+  body: string | null;
   judges: Judge[];
   judicial_precedent: string | null;
   has_full_report?: boolean;
@@ -100,6 +110,8 @@ export interface CaseDetail extends Case {
   };
   created_at: string;
   updated_at: string;
+  limit_exceeded?: boolean;
+  limit_message?: string;
 }
 
 // Pagination metadata from API

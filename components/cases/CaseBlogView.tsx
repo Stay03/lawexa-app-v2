@@ -6,6 +6,7 @@ import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { ShareButton } from '@/components/common/ShareButton';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 import { ViewFullReportButton } from './ViewFullReportButton';
+import { CaseViewLimitBanner } from './CaseViewLimitBanner';
 import { cn } from '@/lib/utils';
 import type { CaseDetail, RelatedCase } from '@/types/case';
 
@@ -154,6 +155,7 @@ function CaseBlogView({
     : null;
 
   const hasBody = body && body.trim().length > 0;
+  const isLimitExceeded = caseData.limit_exceeded === true;
 
   // Filter valid judges
   const validJudges = (judges || []).filter(
@@ -283,7 +285,7 @@ function CaseBlogView({
           }}
           variant="full"
         />
-        {has_full_report && (
+        {has_full_report && !isLimitExceeded && (
           <div className="ml-auto">
             <ViewFullReportButton slug={slug} hasFullReport={has_full_report} />
           </div>
@@ -309,16 +311,20 @@ function CaseBlogView({
         <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">
           Case Summary
         </p>
-        <div className="prose dark:prose-invert max-w-none text-[18px] leading-relaxed">
-          {hasBody ? (
-            <div
-              dangerouslySetInnerHTML={{ __html: body }}
-              className="whitespace-pre-wrap"
-            />
-          ) : (
-            <p className="text-muted-foreground">{excerpt}</p>
-          )}
-        </div>
+        {isLimitExceeded ? (
+          <CaseViewLimitBanner limitMessage={caseData.limit_message} />
+        ) : (
+          <div className="prose dark:prose-invert max-w-none text-[18px] leading-relaxed">
+            {hasBody ? (
+              <div
+                dangerouslySetInnerHTML={{ __html: body }}
+                className="whitespace-pre-wrap"
+              />
+            ) : (
+              <p className="text-muted-foreground">{excerpt}</p>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ── Metadata ── */}

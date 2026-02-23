@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface CaseBodyCardProps {
-  body: string;
+  body: string | null;
   excerpt: string;
   className?: string;
   animationDelay?: number;
