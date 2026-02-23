@@ -22,6 +22,8 @@ export interface LawyerConnectionRequest {
   id: number;
   user: User;
   lawyer: User;
+  phone_number: string | null;
+  contact_email: string | null;
   message: string;
   status: 'pending' | 'accepted' | 'rejected';
   responded_at: string | null;
@@ -30,5 +32,7 @@ export interface LawyerConnectionRequest {
 
 export interface CreateConnectionRequestPayload {
   lawyer_uuid: string;
+  phone_number?: string;
+  contact_email?: string;
   message?: string;
 }

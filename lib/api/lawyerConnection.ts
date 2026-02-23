@@ -2,20 +2,37 @@ import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
 import type { LawyerConnectionRequest, CreateConnectionRequestPayload } from '@/types/connection';
 
+export interface SendConnectionParams {
+  lawyerId: string;
+  phone_number?: string;
+  contact_email?: string;
+  message?: string;
+}
+
 export const lawyerConnectionApi = {
   /**
    * Send a connection request to a lawyer
-   * @param lawyerId - The UUID of the lawyer to connect with
-   * @param message - Optional message to include with the connection request (max 1000 chars)
+   * @param params - Connection request parameters
    * @returns The created connection request
    */
-  sendConnectionRequest: async (lawyerId: string, message?: string) => {
+  sendConnectionRequest: async ({
+    lawyerId,
+    phone_number,
+    contact_email,
+    message,
+  }: SendConnectionParams) => {
     const payload: CreateConnectionRequestPayload = {
       lawyer_uuid: lawyerId,
     };
 
-    if (message) {
-      payload.message = message;
+    if (phone_number?.trim()) {
+      payload.phone_number = phone_number.trim();
+    }
+    if (contact_email?.trim()) {
+      payload.contact_email = contact_email.trim();
+    }
+    if (message?.trim()) {
+      payload.message = message.trim();
     }
 
     const response = await apiClient.post<ApiResponse<LawyerConnectionRequest>>(

@@ -6,13 +6,15 @@ import { lawyerConnectionApi } from '@/lib/api/lawyerConnection';
 
 interface SendConnectionRequestParams {
   lawyerId: string;
+  phone_number?: string;
+  contact_email?: string;
   message?: string;
 }
 
 export function useSendConnectionRequest() {
   return useMutation({
-    mutationFn: ({ lawyerId, message }: SendConnectionRequestParams) =>
-      lawyerConnectionApi.sendConnectionRequest(lawyerId, message),
+    mutationFn: (params: SendConnectionRequestParams) =>
+      lawyerConnectionApi.sendConnectionRequest(params),
     onSuccess: (response) => {
       if (response.success && response.data) {
         toast.success(
@@ -20,15 +22,6 @@ export function useSendConnectionRequest() {
           { duration: 5000 }
         );
       }
-    },
-    onError: (error: Error & { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }) => {
-      // Try to extract a meaningful error message
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.errors?.lawyer_uuid?.[0] ||
-        'Failed to send connection request';
-
-      toast.error(errorMessage);
     },
   });
 }
