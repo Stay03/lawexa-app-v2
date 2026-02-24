@@ -18,7 +18,12 @@
       "Bash(npm run build:*)",
       "Bash(dir:*)",
       "Bash(if exist \"src\\\\components\\\\ui\" dir \"src\\\\components\\\\ui\")",
-      "Bash(del nul)"
+      "Bash(del nul)",
+      "Read(//c/Users/stayn/OneDrive/Desktop/2023/lawexa-app-v2/lawexa-app/**)",
+      "Bash(npx next build)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\stayn\\OneDrive\\Desktop\\2023\\lawexa-app-v2\\lawexa-app\\app\\(admin)\\admin\\lawyer-verifications"
     ]
   },
   "enabledPlugins": {

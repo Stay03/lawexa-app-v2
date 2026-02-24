@@ -7,6 +7,7 @@ import {
   ChevronRight,
   List,
   BarChart3,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -28,13 +29,16 @@ import {
 const userNavItems = [
   { title: 'All Users', url: '/admin/users', icon: List },
   { title: 'Analytics', url: '/admin/users/analytics', icon: BarChart3 },
+  { title: 'Lawyer Verifications', url: '/admin/lawyer-verifications', icon: ShieldCheck },
 ];
 
 export function AdminNavUsersSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/users');
+  const isSectionActive =
+    pathname.startsWith('/admin/users') ||
+    pathname.startsWith('/admin/lawyer-verifications');
 
   return (
     <SidebarGroup>
@@ -52,7 +56,9 @@ export function AdminNavUsersSection() {
             <CollapsibleContent>
               <SidebarMenuSub>
                 {userNavItems.map((item) => {
-                  const isActive = pathname === item.url;
+                  const isActive =
+                    pathname === item.url ||
+                    pathname.startsWith(item.url + '/');
                   return (
                     <SidebarMenuSubItem key={item.title}>
                       <SidebarMenuSubButton asChild isActive={isActive}>
