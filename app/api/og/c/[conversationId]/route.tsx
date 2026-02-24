@@ -1,15 +1,14 @@
 import { ImageResponse } from 'next/og';
 import { fetchConversationForMetadata } from '@/lib/api/server';
 
-export const alt = 'Lawexa Conversation';
-export const size = { width: 1200, height: 630 };
-export const contentType = 'image/png';
+export const runtime = 'nodejs';
 
-export default async function OGImage({
-  params,
-}: {
-  params: Promise<{ conversationId: string }>;
-}) {
+const SIZE = { width: 1200, height: 630 };
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ conversationId: string }> }
+) {
   const { conversationId } = await params;
   const conversation = await fetchConversationForMetadata(conversationId);
 
@@ -18,7 +17,7 @@ export default async function OGImage({
   const agentName = conversation?.agent?.name || 'AI Assistant';
   const messageCount = conversation?.messages_count || 0;
 
-  // Generic branded fallback for missing/private conversations (API returns 404)
+  // Generic branded fallback for missing/private conversations
   if (!conversation) {
     return new ImageResponse(
       (
@@ -58,7 +57,7 @@ export default async function OGImage({
           </div>
         </div>
       ),
-      { ...size }
+      { ...SIZE }
     );
   }
 
@@ -98,13 +97,7 @@ export default async function OGImage({
         </div>
 
         {/* Title */}
-        <div
-          style={{
-            display: 'flex',
-            flex: 1,
-            alignItems: 'center',
-          }}
-        >
+        <div style={{ display: 'flex', flex: 1, alignItems: 'center' }}>
           <div
             style={{
               color: '#ffffff',
@@ -137,6 +130,6 @@ export default async function OGImage({
         </div>
       </div>
     ),
-    { ...size }
+    { ...SIZE }
   );
 }

@@ -21,18 +21,21 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
   }
 
   const { meta } = conversation;
-  const ogImageUrl = `${appUrl}/c/${conversationId}/opengraph-image`;
+  // Always construct URLs from the frontend app URL.
+  // Do NOT use meta.canonical from the backend — it points to the API server domain.
+  const canonicalUrl = `${appUrl}/c/${conversationId}`;
+  const ogImageUrl = `${appUrl}/api/og/c/${conversationId}`;
 
   return {
     title: meta.title,
     description: meta.description,
     alternates: {
-      canonical: meta.canonical,
+      canonical: canonicalUrl,
     },
     openGraph: {
       title: meta.title,
       description: meta.description,
-      url: meta.canonical,
+      url: canonicalUrl,
       siteName: SEO.siteName,
       type: 'article',
       locale: SEO.locale,
