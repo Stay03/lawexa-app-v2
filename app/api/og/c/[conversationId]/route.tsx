@@ -1,9 +1,15 @@
 import { ImageResponse } from 'next/og';
+import { readFileSync } from 'fs';
+import path from 'path';
 import { fetchConversationForMetadata } from '@/lib/api/server';
 
 export const runtime = 'nodejs';
 
 const SIZE = { width: 1200, height: 630 };
+
+// Load logo once at module level — cached across requests
+const logoData = readFileSync(path.join(process.cwd(), 'public/images/logo.png'));
+const logoSrc = `data:image/png;base64,${logoData.toString('base64')}`;
 
 export async function GET(
   _request: Request,
@@ -12,7 +18,8 @@ export async function GET(
   const { conversationId } = await params;
   const conversation = await fetchConversationForMetadata(conversationId);
 
-  const title = conversation?.title || 'Lawexa Conversation';
+  const rawTitle = conversation?.title || 'Legal Conversation';
+  const displayTitle = `Lawexa - ${rawTitle}`;
   const authorName = conversation?.author?.name || '';
   const agentName = conversation?.agent?.name || 'AI Assistant';
   const messageCount = conversation?.messages_count || 0;
@@ -32,26 +39,8 @@ export async function GET(
             background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
           }}
         >
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              backgroundColor: '#C9A227',
-              borderRadius: 14,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: 32,
-              fontWeight: 'bold',
-              marginBottom: 24,
-            }}
-          >
-            L
-          </div>
-          <div style={{ color: '#C9A227', fontSize: 48, fontWeight: 'bold' }}>
-            LAWEXA
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoSrc} style={{ height: 60, width: 'auto', marginBottom: 24 }} alt="Lawexa" />
           <div style={{ color: '#8b8fa3', fontSize: 22, marginTop: 12 }}>
             Nigerian Legal Resources
           </div>
@@ -73,42 +62,25 @@ export async function GET(
           padding: '60px',
         }}
       >
-        {/* Top bar with branding */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '40px' }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              backgroundColor: '#C9A227',
-              borderRadius: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: 24,
-              fontWeight: 'bold',
-            }}
-          >
-            L
-          </div>
-          <span style={{ color: '#C9A227', fontSize: 28, fontWeight: 'bold' }}>
-            LAWEXA
-          </span>
+        {/* Top bar with real logo */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '40px' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoSrc} style={{ height: 50, width: 'auto' }} alt="Lawexa" />
         </div>
 
-        {/* Title */}
+        {/* Title with "Lawexa - " prefix */}
         <div style={{ display: 'flex', flex: 1, alignItems: 'center' }}>
           <div
             style={{
               color: '#ffffff',
-              fontSize: title.length > 60 ? 36 : 48,
+              fontSize: displayTitle.length > 60 ? 36 : 48,
               fontWeight: 'bold',
               lineHeight: 1.3,
-              maxWidth: 900,
+              maxWidth: 1080,
               overflow: 'hidden',
             }}
           >
-            {title.length > 100 ? title.slice(0, 97) + '...' : title}
+            {displayTitle.length > 100 ? displayTitle.slice(0, 97) + '...' : displayTitle}
           </div>
         </div>
 
