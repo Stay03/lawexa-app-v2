@@ -11,6 +11,7 @@ import {
   Send,
   BarChart3,
   Eye,
+  Handshake,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -36,13 +37,15 @@ const contentNavItems = [
   { title: 'Send Broadcast', url: '/admin/notifications/broadcast', icon: Send },
   { title: 'Notif. Analytics', url: '/admin/notifications/analytics', icon: BarChart3 },
   { title: 'Views Analytics', url: '/admin/views/analytics', icon: Eye },
+  { title: 'Connections', url: '/admin/lawyer-connect', icon: Handshake, excludePaths: ['/admin/lawyer-connect/analytics'] },
+  { title: 'Connect Analytics', url: '/admin/lawyer-connect/analytics', icon: BarChart3 },
 ];
 
 export function AdminNavContentSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views');
+  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views') || pathname.startsWith('/admin/lawyer-connect');
 
   return (
     <SidebarGroup>
