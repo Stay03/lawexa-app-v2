@@ -19,7 +19,6 @@ export async function GET(
   const title = conversation?.title || 'Legal Conversation';
   const authorName = conversation?.author?.name || '';
   const agentName = conversation?.agent?.name || 'AI Assistant';
-  const messageCount = conversation?.messages_count || 0;
 
   // Generic branded fallback for missing/private conversations
   if (!conversation) {
@@ -91,11 +90,6 @@ export async function GET(
           <span style={{ color: '#8b8fa3', fontSize: 16 }}>
             with {agentName}
           </span>
-          {messageCount > 0 && (
-            <span style={{ color: '#8b8fa3', fontSize: 16 }}>
-              {messageCount} messages
-            </span>
-          )}
         </div>
       </div>
     ),
