@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
   const ogImageUrl = `${appUrl}/api/og/c/${conversationId}`;
 
   return {
-    title: meta.title,
+    title: `Lawexa - ${meta.title}`,
     description: meta.description,
     alternates: {
       canonical: canonicalUrl,

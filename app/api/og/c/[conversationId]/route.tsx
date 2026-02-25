@@ -1,15 +1,10 @@
 import { ImageResponse } from 'next/og';
-import { readFileSync } from 'fs';
-import path from 'path';
 import { fetchConversationForMetadata } from '@/lib/api/server';
+import { getAppUrl } from '@/lib/constants/seo';
 
 export const runtime = 'nodejs';
 
 const SIZE = { width: 1200, height: 630 };
-
-// Load logo once at module level — cached across requests
-const logoData = readFileSync(path.join(process.cwd(), 'public/images/logo.png'));
-const logoSrc = `data:image/png;base64,${logoData.toString('base64')}`;
 
 export async function GET(
   _request: Request,
@@ -18,8 +13,10 @@ export async function GET(
   const { conversationId } = await params;
   const conversation = await fetchConversationForMetadata(conversationId);
 
-  const rawTitle = conversation?.title || 'Legal Conversation';
-  const displayTitle = `Lawexa - ${rawTitle}`;
+  // Logo served from public directory — Satori fetches it by URL
+  const logoUrl = `${getAppUrl()}/images/logo.png`;
+
+  const title = conversation?.title || 'Legal Conversation';
   const authorName = conversation?.author?.name || '';
   const agentName = conversation?.agent?.name || 'AI Assistant';
   const messageCount = conversation?.messages_count || 0;
@@ -40,8 +37,8 @@ export async function GET(
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} style={{ height: 60, width: 'auto', marginBottom: 24 }} alt="Lawexa" />
-          <div style={{ color: '#8b8fa3', fontSize: 22, marginTop: 12 }}>
+          <img src={logoUrl} height={60} alt="Lawexa" />
+          <div style={{ color: '#8b8fa3', fontSize: 22, marginTop: 24 }}>
             Nigerian Legal Resources
           </div>
         </div>
@@ -62,25 +59,25 @@ export async function GET(
           padding: '60px',
         }}
       >
-        {/* Top bar with real logo */}
+        {/* Top bar with logo */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '40px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} style={{ height: 50, width: 'auto' }} alt="Lawexa" />
+          <img src={logoUrl} height={50} alt="Lawexa" />
         </div>
 
-        {/* Title with "Lawexa - " prefix */}
+        {/* Title — raw conversation title, no prefix */}
         <div style={{ display: 'flex', flex: 1, alignItems: 'center' }}>
           <div
             style={{
               color: '#ffffff',
-              fontSize: displayTitle.length > 60 ? 36 : 48,
+              fontSize: title.length > 60 ? 36 : 48,
               fontWeight: 'bold',
               lineHeight: 1.3,
               maxWidth: 1080,
               overflow: 'hidden',
             }}
           >
-            {displayTitle.length > 100 ? displayTitle.slice(0, 97) + '...' : displayTitle}
+            {title.length > 100 ? title.slice(0, 97) + '...' : title}
           </div>
         </div>
 
