@@ -10,6 +10,8 @@ export interface LawyerProfileDocument {
   created_at: string;
 }
 
+export type VerificationStatus = 'draft' | 'pending' | 'approved' | 'rejected';
+
 export interface LawyerProfile {
   id: number;
   user_id: number;
@@ -18,6 +20,8 @@ export interface LawyerProfile {
   verification_submitted_at: string | null;
   verification_notes?: string | null;
   rejection_reason?: string | null;
+  verification_status: VerificationStatus;
+  can_resubmit: boolean;
   documents: LawyerProfileDocument[];
   created_at: string;
   updated_at: string;

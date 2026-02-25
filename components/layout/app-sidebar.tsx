@@ -7,6 +7,7 @@ import {
   MessageSquarePlus,
   Library,
   Bookmark,
+  ShieldCheck,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/nav-main"
@@ -48,6 +49,22 @@ const navMain = [
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useAuthStore();
+  const isLawyer = user?.profile?.user_type === 'lawyer';
+
+  const navItems = [
+    ...navMain,
+    ...(isLawyer
+      ? [
+          {
+            title: 'Verification',
+            url: '/verification',
+            icon: ShieldCheck,
+          },
+        ]
+      : []),
+  ];
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -68,7 +85,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-0">
-        <NavMain items={navMain} />
+        <NavMain items={navItems} />
         <NavConversations />
       </SidebarContent>
       <SidebarFooter>
