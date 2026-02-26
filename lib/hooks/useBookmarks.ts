@@ -5,10 +5,12 @@ import { bookmarksApi } from '@/lib/api/bookmarks';
 import { caseKeys } from './useCases';
 import { noteKeys } from './useNotes';
 import { trendingKeys } from './useTrending';
+import { folderKeys } from './useFolders';
 import type { BookmarkListParams, BookmarkType } from '@/types/bookmark';
 import type { CaseDetailResponse, CaseListResponse } from '@/types/case';
 import type { NoteResponse, NoteListResponse } from '@/types/note';
 import type { TrendingCasesResponse, TrendingNotesResponse } from '@/types/trending';
+import type { FolderResponse, FolderListResponse, MyFolderListResponse } from '@/types/folder';
 
 // Query key factory
 export const bookmarkKeys = {
@@ -129,8 +131,7 @@ export function useToggleBookmark() {
             }
           }
         }
-      } else {
-        // type === 'note'
+      } else if (type === 'note') {
         await queryClient.cancelQueries({ queryKey: noteKeys.details() });
         await queryClient.cancelQueries({ queryKey: noteKeys.lists() });
         await queryClient.cancelQueries({ queryKey: trendingKeys.notes() });
@@ -191,6 +192,71 @@ export function useToggleBookmark() {
               updatedData[idx] = {
                 ...updatedData[idx],
                 is_bookmarked: !updatedData[idx].is_bookmarked,
+              };
+              queryClient.setQueryData(queryKey, { ...data, data: updatedData });
+            }
+          }
+        }
+      } else if (type === 'folder') {
+        await queryClient.cancelQueries({ queryKey: folderKeys.details() });
+        await queryClient.cancelQueries({ queryKey: folderKeys.lists() });
+        await queryClient.cancelQueries({ queryKey: folderKeys.myFolders() });
+
+        // Optimistically update folder detail caches
+        const folderDetailQueries = queryClient.getQueriesData<FolderResponse>({
+          queryKey: folderKeys.details(),
+        });
+        for (const [queryKey, data] of folderDetailQueries) {
+          if (data?.data && data.data.id === id) {
+            snapshots.push({ queryKey, data });
+            queryClient.setQueryData(queryKey, {
+              ...data,
+              data: {
+                ...data.data,
+                is_bookmarked: !data.data.is_bookmarked,
+                bookmarks_count: data.data.is_bookmarked
+                  ? Math.max(0, data.data.bookmarks_count - 1)
+                  : data.data.bookmarks_count + 1,
+              },
+            });
+          }
+        }
+
+        // Optimistically update public folder list caches
+        const folderListQueries = queryClient.getQueriesData<FolderListResponse>({
+          queryKey: folderKeys.lists(),
+        });
+        for (const [queryKey, data] of folderListQueries) {
+          if (data?.data) {
+            const folderIndex = data.data.findIndex((f) => f.id === id);
+            if (folderIndex !== -1) {
+              snapshots.push({ queryKey, data });
+              const updatedData = [...data.data];
+              updatedData[folderIndex] = {
+                ...updatedData[folderIndex],
+                is_bookmarked: !updatedData[folderIndex].is_bookmarked,
+              };
+              queryClient.setQueryData(queryKey, { ...data, data: updatedData });
+            }
+          }
+        }
+
+        // Optimistically update my-folders list caches
+        const myFolderQueries = queryClient.getQueriesData<MyFolderListResponse>({
+          queryKey: folderKeys.myFolders(),
+        });
+        for (const [queryKey, data] of myFolderQueries) {
+          if (data?.data) {
+            const folderIndex = data.data.findIndex((f) => f.id === id);
+            if (folderIndex !== -1) {
+              snapshots.push({ queryKey, data });
+              const updatedData = [...data.data];
+              updatedData[folderIndex] = {
+                ...updatedData[folderIndex],
+                is_bookmarked: !updatedData[folderIndex].is_bookmarked,
+                bookmarks_count: updatedData[folderIndex].is_bookmarked
+                  ? Math.max(0, updatedData[folderIndex].bookmarks_count - 1)
+                  : updatedData[folderIndex].bookmarks_count + 1,
               };
               queryClient.setQueryData(queryKey, { ...data, data: updatedData });
             }

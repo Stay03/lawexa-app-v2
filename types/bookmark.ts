@@ -5,7 +5,7 @@
 import type { PaginationMeta, PaginationLinks } from './case';
 
 // Bookmarkable content type
-export type BookmarkType = 'case' | 'note';
+export type BookmarkType = 'case' | 'note' | 'folder';
 
 // Case summary as returned inside a Bookmark object
 export interface BookmarkCaseContent {
@@ -35,11 +35,27 @@ export interface BookmarkNoteContent {
   created_at: string;
 }
 
+// Folder summary as returned inside a Bookmark object
+export interface BookmarkFolderContent {
+  id: number;
+  uuid: string;
+  name: string;
+  slug: string;
+  slug_path: string;
+  icon: string | null;
+  color: string | null;
+  is_private: boolean;
+  children_count: number;
+  items_count: number;
+  is_bookmarked: boolean;
+  created_at: string;
+}
+
 // Single bookmark item from list endpoint
 export interface Bookmark {
   id: number;
   type: BookmarkType;
-  content: BookmarkCaseContent | BookmarkNoteContent;
+  content: BookmarkCaseContent | BookmarkNoteContent | BookmarkFolderContent;
   created_at: string;
 }
 

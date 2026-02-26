@@ -41,6 +41,7 @@ const navMain = [
     items: [
       { title: "Cases", url: "/cases" },
       { title: "Notes", url: "/notes" },
+      { title: "Folders", url: "/folders" },
       { title: "My Requests", url: "/content-requests" },
       { title: "Community", url: "/shared" },
       { title: "Bookmarks", url: "/bookmarks" },

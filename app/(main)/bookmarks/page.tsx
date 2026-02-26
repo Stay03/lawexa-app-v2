@@ -3,7 +3,7 @@
 import { Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Bookmark, Scale, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bookmark, Scale, FileText, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AnimatedTabs } from '@/components/ui/animated-tabs';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -12,11 +12,13 @@ import { PageContainer, PageHeader } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useBookmarks } from '@/lib/hooks/useBookmarks';
+import { getFolderIcon } from '@/components/folders';
 import type {
   BookmarkType,
   Bookmark as BookmarkItem,
   BookmarkCaseContent,
   BookmarkNoteContent,
+  BookmarkFolderContent,
 } from '@/types/bookmark';
 
 /******************************************************************************
@@ -27,6 +29,7 @@ const BOOKMARK_TABS = [
   { value: 'all', label: 'All', icon: <Bookmark className="h-4 w-4" /> },
   { value: 'case', label: 'Cases', icon: <Scale className="h-4 w-4" /> },
   { value: 'note', label: 'Notes', icon: <FileText className="h-4 w-4" /> },
+  { value: 'folder', label: 'Folders', icon: <FolderOpen className="h-4 w-4" /> },
 ];
 
 /******************************************************************************
@@ -37,9 +40,40 @@ const BOOKMARK_TABS = [
  * Single bookmark item card (polymorphic — renders case or note content)
  */
 function BookmarkCard({ bookmark, index }: { bookmark: BookmarkItem; index: number }) {
-  const isCase = bookmark.type === 'case';
-  const content = bookmark.content;
-  const href = isCase ? `/cases/${content.slug}` : `/notes/${content.slug}`;
+  const { type, content } = bookmark;
+
+  // Resolve href based on content type
+  const href =
+    type === 'case'
+      ? `/cases/${content.slug}`
+      : type === 'note'
+        ? `/notes/${content.slug}`
+        : `/folders/${(content as BookmarkFolderContent).uuid}`;
+
+  // Resolve icon for bookmark card
+  const renderIcon = () => {
+    if (type === 'case') {
+      return <Scale className="h-3.5 w-3.5 text-muted-foreground" />;
+    }
+    if (type === 'note') {
+      return <FileText className="h-3.5 w-3.5 text-muted-foreground" />;
+    }
+    // Folder: use the folder's custom icon or default FolderOpen
+    const folderContent = content as BookmarkFolderContent;
+    const Icon = getFolderIcon(folderContent.icon ?? null);
+    return (
+      <Icon
+        className="h-3.5 w-3.5"
+        style={{ color: folderContent.color || undefined }}
+      />
+    );
+  };
+
+  // Resolve display title
+  const title =
+    type === 'folder'
+      ? (content as BookmarkFolderContent).name
+      : (content as BookmarkCaseContent | BookmarkNoteContent).title;
 
   return (
     <Link
@@ -49,25 +83,33 @@ function BookmarkCard({ bookmark, index }: { bookmark: BookmarkItem; index: numb
     >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted">
-            {isCase ? (
-              <Scale className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
+          <div
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted"
+            style={
+              type === 'folder' && (content as BookmarkFolderContent).color
+                ? { backgroundColor: `${(content as BookmarkFolderContent).color}18` }
+                : undefined
+            }
+          >
+            {renderIcon()}
           </div>
           <h3 className="min-w-0 truncate text-sm font-medium text-foreground group-hover:text-primary">
-            {content.title}
+            {title}
           </h3>
         </div>
-        {!isCase && 'content_preview' in content && (
+        {type === 'note' && 'content_preview' in content && (
           <p className="line-clamp-1 text-xs text-muted-foreground">
             {(content as BookmarkNoteContent).content_preview}
           </p>
         )}
-        {isCase && (content as BookmarkCaseContent).citation && (
+        {type === 'case' && (content as BookmarkCaseContent).citation && (
           <p className="text-xs text-muted-foreground">
             {(content as BookmarkCaseContent).citation}
+          </p>
+        )}
+        {type === 'folder' && (
+          <p className="text-xs text-muted-foreground">
+            {(content as BookmarkFolderContent).items_count} items · {(content as BookmarkFolderContent).children_count} subfolders
           </p>
         )}
       </div>
@@ -202,8 +244,8 @@ function BookmarksPageContent() {
           title="No bookmarks yet"
           description={
             tab !== 'all'
-              ? `You haven't bookmarked any ${tab === 'case' ? 'cases' : 'notes'} yet.`
-              : 'Start bookmarking cases and notes to save them for later.'
+              ? `You haven't bookmarked any ${tab === 'case' ? 'cases' : tab === 'note' ? 'notes' : 'folders'} yet.`
+              : 'Start bookmarking cases, notes, and folders to save them for later.'
           }
           action={
             tab !== 'all'
@@ -238,7 +280,7 @@ function BookmarksPageContent() {
     <PageContainer variant="list">
       <PageHeader
         title="Bookmarks"
-        description="Your saved cases and notes for quick access."
+        description="Your saved cases, notes, and folders for quick access."
       />
 
       {/* Tabs and content */}
@@ -286,7 +328,7 @@ function BookmarksPage() {
         <PageContainer variant="list">
           <PageHeader
             title="Bookmarks"
-            description="Your saved cases and notes for quick access."
+            description="Your saved cases, notes, and folders for quick access."
           />
           <Skeleton className="h-9 w-64 rounded-full" />
           <div className="divide-y divide-border overflow-hidden rounded-lg">
