@@ -44,6 +44,7 @@ import {
   ChevronDown,
   FileUp,
   AlertCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -475,6 +476,7 @@ function ConversationPageContent() {
     addUserMessage,
     disconnect,
     setError,
+    retryLastMessage,
   } = useChatStream({
     onError: (err) => console.error('Chat error:', err),
   });
@@ -703,12 +705,22 @@ function ConversationPageContent() {
           <div className="mx-auto max-w-2xl w-full">
             <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-              <div>
+              <div className="flex-1">
                 <p className="text-destructive font-medium">{errorMsg.content}</p>
                 {errorMsg.retryable && (
                   <p className="text-muted-foreground text-xs mt-0.5">You can try sending your message again.</p>
                 )}
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 shrink-0 gap-1.5 text-xs text-destructive hover:text-destructive"
+                onClick={retryLastMessage}
+                disabled={isStreaming}
+              >
+                <RotateCcw className="h-3 w-3" />
+                Retry
+              </Button>
             </div>
           </div>
         </div>
@@ -855,7 +867,17 @@ function ConversationPageContent() {
                 <div className="mx-auto max-w-2xl w-full">
                   <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                    <p className="text-destructive font-medium">{error}</p>
+                    <p className="text-destructive font-medium flex-1">{error}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0 gap-1.5 text-xs text-destructive hover:text-destructive"
+                      onClick={retryLastMessage}
+                      disabled={isStreaming}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Retry
+                    </Button>
                   </div>
                 </div>
               </div>

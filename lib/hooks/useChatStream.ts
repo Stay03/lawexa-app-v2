@@ -2,22 +2,23 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type {
-  ChatMessage,
-  ChatState,
-  UseChatStreamOptions,
-  CompletedEvent,
-  ToolCallingEvent,
-  ToolCompleteEvent,
-  IterationEvent,
-  HandoverStartedEvent,
-  HandoverCompleteEvent,
-  ToolMessage,
-  HandoverMessage,
-  ErrorMessage,
-  ApiMessage,
-  ConversationMessage,
-  MessageAttachment,
+import {
+  isErrorMessage,
+  type ChatMessage,
+  type ChatState,
+  type UseChatStreamOptions,
+  type CompletedEvent,
+  type ToolCallingEvent,
+  type ToolCompleteEvent,
+  type IterationEvent,
+  type HandoverStartedEvent,
+  type HandoverCompleteEvent,
+  type ToolMessage,
+  type HandoverMessage,
+  type ErrorMessage,
+  type ApiMessage,
+  type ConversationMessage,
+  type MessageAttachment,
 } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 
@@ -592,6 +593,38 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }));
   }, []);
 
+  // Retry the last user message after an error
+  const retryLastMessage = useCallback(async () => {
+    const lastUserMsg = [...state.messages].reverse().find((m) => m.role === 'user');
+    if (!lastUserMsg || !state.conversationId) return;
+
+    // Remove error messages, clear state.error, set streaming
+    setState((prev) => ({
+      ...prev,
+      messages: prev.messages.filter((m) => !isErrorMessage(m)),
+      error: null,
+      isStreaming: true,
+    }));
+
+    try {
+      const response = await chatApi.start({
+        message: lastUserMsg.content,
+        stream: true,
+        conversation_id: state.conversationId,
+      });
+
+      if (response.success) {
+        connectToStream(response.data.execution_id);
+      }
+    } catch {
+      setState((prev) => ({
+        ...prev,
+        error: 'Failed to retry. Please try again.',
+        isStreaming: false,
+      }));
+    }
+  }, [state.messages, state.conversationId, connectToStream]);
+
   return {
     // State
     messages: state.messages,
@@ -609,5 +642,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     disconnect,
     clearChat,
     setError,
+    retryLastMessage,
   };
 }
