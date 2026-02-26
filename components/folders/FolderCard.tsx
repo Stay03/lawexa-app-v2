@@ -108,20 +108,22 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
         </div>
 
         {/* Author */}
-        <div className="mt-1 flex items-center gap-1.5 text-[16px] text-muted-foreground">
-          {user.avatar_url ? (
-            <img
-              src={user.avatar_url}
-              alt=""
-              className="h-5 w-5 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-              {user.name.charAt(0).toUpperCase()}
-            </span>
-          )}
-          <span>{user.name}</span>
-        </div>
+        {user && (
+          <div className="mt-1 flex items-center gap-1.5 text-[16px] text-muted-foreground">
+            {user.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt=""
+                className="h-5 w-5 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                {user.name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span>{user.name}</span>
+          </div>
+        )}
       </div>
     </Link>
   );
