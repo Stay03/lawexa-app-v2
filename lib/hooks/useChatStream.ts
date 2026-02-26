@@ -84,6 +84,29 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     return id;
   }, []);
 
+  // Add error message inline (for API errors from SSE error event)
+  const addErrorMessage = useCallback(
+    (errorMsg: string, errorCode: string, retryable: boolean, retryAfterMs: number | null): void => {
+      const message: ErrorMessage = {
+        id: generateId(),
+        role: 'assistant',
+        content: errorMsg,
+        timestamp: new Date(),
+        messageType: 'error',
+        errorCode,
+        retryable,
+        retryAfterMs,
+      };
+      setState((prev) => ({
+        ...prev,
+        messages: [...prev.messages, message],
+        error: null,
+        isStreaming: false,
+      }));
+    },
+    []
+  );
+
   // Add tool call as a separate message in history
   const addToolMessage = useCallback(
     (toolCall: ToolCallingEvent): string => {
@@ -458,25 +481,21 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         onCompleted?.(event);
       });
 
-      // Handle error event
+      // Handle error event - add inline as ErrorMessage so it appears in message flow
       eventSource.addEventListener('error', (e) => {
         try {
           const event = JSON.parse((e as MessageEvent).data);
           // Backend sends error_message (new) or message (legacy)
-          const errorMsg = event.error_message || event.message || 'Stream error';
-          setState((prev) => ({
-            ...prev,
-            error: errorMsg,
-            isStreaming: false,
-          }));
+          const errorMsg = event.error_message || event.message || 'Something went wrong';
+          const errorCode = event.error_code || 'UNKNOWN';
+          const retryable = event.retryable ?? false;
+          const retryAfterMs = event.retry_after_ms ?? null;
+          addErrorMessage(errorMsg, errorCode, retryable, retryAfterMs);
           onError?.(errorMsg);
         } catch {
-          const errorMsg = 'Stream connection failed';
-          setState((prev) => ({
-            ...prev,
-            error: errorMsg,
-            isStreaming: false,
-          }));
+          // Fallback: unparseable error event, use state.error
+          const errorMsg = 'Stream error';
+          setState((prev) => ({ ...prev, error: errorMsg, isStreaming: false }));
           onError?.(errorMsg);
         }
         eventSource.close();
@@ -521,6 +540,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       token,
       addUserMessage,
       addAssistantMessage,
+      addErrorMessage,
       addHandoverMessage,
       updateHandoverMessage,
       addToolMessage,

@@ -849,10 +849,15 @@ function ConversationPageContent() {
               </Message>
             )}
 
-            {/* Error display */}
+            {/* Connection-level error display (network drops, not API errors) */}
             {error && (
-              <div className="text-destructive py-2 text-center text-sm">
-                {error}
+              <div className="flex justify-start px-4">
+                <div className="mx-auto max-w-2xl w-full">
+                  <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    <p className="text-destructive font-medium">{error}</p>
+                  </div>
+                </div>
               </div>
             )}
         </ChatContainerContent>
