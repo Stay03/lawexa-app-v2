@@ -43,12 +43,13 @@ import {
   Bot,
   ChevronDown,
   FileUp,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import { isToolMessage, isHandoverMessage, type ToolMessage, type HandoverMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
+import { isToolMessage, isHandoverMessage, isErrorMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -694,6 +695,26 @@ function ConversationPageContent() {
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
   const renderMessage = (message: ConversationMessage) => {
+    // Error messages from backend (e.g. AUTH_ERROR, RATE_LIMITED)
+    if (isErrorMessage(message)) {
+      const errorMsg = message as ErrorMessage;
+      return (
+        <div key={errorMsg.id} className="flex justify-start px-4">
+          <div className="mx-auto max-w-2xl w-full">
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <div>
+                <p className="text-destructive font-medium">{errorMsg.content}</p>
+                {errorMsg.retryable && (
+                  <p className="text-muted-foreground text-xs mt-0.5">You can try sending your message again.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // User or assistant message (role is guaranteed to be 'user' | 'assistant' here)
     const role = message.role as 'user' | 'assistant';
 

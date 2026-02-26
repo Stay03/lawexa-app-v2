@@ -41,8 +41,17 @@ export interface HandoverMessage extends ChatMessage {
   handoverResultContent?: string;
 }
 
+// Error message - when the backend reports a stream or API error
+export interface ErrorMessage extends ChatMessage {
+  role: 'assistant';
+  messageType: 'error';
+  errorCode: string;
+  retryable: boolean;
+  retryAfterMs: number | null;
+}
+
 // Union type for all message types
-export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage;
+export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage | ErrorMessage;
 
 // Type guard for tool messages
 export function isToolMessage(message: ConversationMessage): message is ToolMessage {
@@ -52,6 +61,11 @@ export function isToolMessage(message: ConversationMessage): message is ToolMess
 // Type guard for handover messages
 export function isHandoverMessage(message: ConversationMessage): message is HandoverMessage {
   return (message as HandoverMessage).messageType === 'handover';
+}
+
+// Type guard for error messages
+export function isErrorMessage(message: ConversationMessage): message is ErrorMessage {
+  return (message as ErrorMessage).messageType === 'error';
 }
 
 // Tool call types (from API spec)
@@ -139,7 +153,12 @@ export interface HeartbeatEvent {
 }
 
 export interface ErrorEvent {
-  message: string;
+  iteration?: number;
+  status?: string;
+  error_code?: string;
+  error_message?: string;
+  message?: string;
+  timestamp?: string;
 }
 
 // Chat API request/response types
@@ -192,7 +211,7 @@ export interface ApiMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   metadata: {
-    type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result';
+    type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result' | 'error';
     tool_name?: string;
     tool_parameters?: Record<string, unknown>;
     success?: boolean;
@@ -204,6 +223,11 @@ export interface ApiMessage {
     task?: string;
     parent_agent?: number;
     handover_type?: 'consult' | 'transfer';
+    // Error message fields
+    error_code?: string;
+    retryable?: boolean;
+    retry_after_ms?: number | null;
+    execution_id?: string;
   } | null;
   attachment?: MessageAttachment;
   created_at: string;

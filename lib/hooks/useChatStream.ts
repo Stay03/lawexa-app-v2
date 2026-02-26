@@ -14,6 +14,7 @@ import type {
   HandoverCompleteEvent,
   ToolMessage,
   HandoverMessage,
+  ErrorMessage,
   ApiMessage,
   ConversationMessage,
   MessageAttachment,
@@ -293,6 +294,19 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       else if (apiMsg.role === 'tool') {
         continue;
       }
+      // Error message saved by backend
+      else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'error') {
+        messages.push({
+          id: `msg_${apiMsg.id}`,
+          role: 'assistant',
+          content: apiMsg.content,
+          timestamp: new Date(apiMsg.created_at),
+          messageType: 'error',
+          errorCode: apiMsg.metadata.error_code || 'UNKNOWN',
+          retryable: apiMsg.metadata.retryable ?? false,
+          retryAfterMs: apiMsg.metadata.retry_after_ms ?? null,
+        } as ErrorMessage);
+      }
       // Regular assistant message (final response)
       else if (apiMsg.role === 'assistant' && !apiMsg.metadata?.type) {
         messages.push({
@@ -448,7 +462,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       eventSource.addEventListener('error', (e) => {
         try {
           const event = JSON.parse((e as MessageEvent).data);
-          const errorMsg = event.message || 'Stream error';
+          // Backend sends error_message (new) or message (legacy)
+          const errorMsg = event.error_message || event.message || 'Stream error';
           setState((prev) => ({
             ...prev,
             error: errorMsg,
