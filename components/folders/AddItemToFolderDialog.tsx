@@ -174,15 +174,15 @@ function AddItemToFolderDialog({
                         <FileText className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 overflow-hidden">
                       <p className="truncate text-sm font-medium">{item.title}</p>
                       {'content_preview' in item && (
-                        <p className="line-clamp-1 text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground">
                           {(item as { content_preview: string }).content_preview}
                         </p>
                       )}
                       {'citation' in item && (item as { citation: string | null }).citation && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground">
                           {(item as { citation: string | null }).citation}
                         </p>
                       )}

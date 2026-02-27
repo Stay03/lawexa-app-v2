@@ -21,7 +21,6 @@ import {
   FolderListGroup,
   FolderListSkeleton,
   FolderPagination,
-  FolderBreadcrumbs,
   FolderItemCard,
   CreateFolderDialog,
   EditFolderDialog,
@@ -161,9 +160,6 @@ function FolderDetailContent() {
 
   return (
     <PageContainer variant="list">
-      {/* Breadcrumbs */}
-      <FolderBreadcrumbs folder={folder} />
-
       {/* Folder header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -222,8 +218,6 @@ function FolderDetailContent() {
 
       {/* Stats */}
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <span>{folder.children_count} {folder.children_count === 1 ? 'subfolder' : 'subfolders'}</span>
-        <span className="text-border">|</span>
         <span>{folder.items_count} {folder.items_count === 1 ? 'item' : 'items'}</span>
         <span className="text-border">|</span>
         <span className="flex items-center gap-1">
@@ -249,7 +243,7 @@ function FolderDetailContent() {
               onClick={() => setIsCreateSubfolderOpen(true)}
             >
               <FolderPlus className="mr-1 h-4 w-4" />
-              New Subfolder
+              New Folder
             </Button>
             <Button
               variant="outline"
