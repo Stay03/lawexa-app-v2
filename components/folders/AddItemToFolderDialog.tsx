@@ -137,7 +137,7 @@ function AddItemToFolderDialog({
           </div>
 
           {/* Results list */}
-          <div className="max-h-[300px] overflow-y-auto rounded-lg border divide-y divide-border">
+          <div className="max-h-[300px] overflow-y-auto overflow-x-hidden rounded-lg border divide-y divide-border">
             {activeQuery.isFetching ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
