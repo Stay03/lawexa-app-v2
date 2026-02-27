@@ -8,5 +8,6 @@ export { CreateFolderDialog } from './CreateFolderDialog';
 export { EditFolderDialog } from './EditFolderDialog';
 export { DeleteFolderDialog } from './DeleteFolderDialog';
 export { AddItemToFolderDialog } from './AddItemToFolderDialog';
+export { AddToFolderDialog, AddToFolderButton } from './AddToFolderDialog';
 export { FolderIconPicker, getFolderIcon } from './FolderIconPicker';
 export { FolderColorPicker } from './FolderColorPicker';

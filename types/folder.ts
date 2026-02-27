@@ -148,7 +148,7 @@ export interface UpdateFolderData {
 // Add/remove item request body
 export interface FolderItemData {
   type: FolderItemType;
-  id: number;
+  id: number | string;
 }
 
 // Paginated folder list response (public)

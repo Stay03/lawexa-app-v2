@@ -59,6 +59,7 @@ import { useRotatingText } from '@/lib/hooks/useRotatingText';
 import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { ChatProvider } from '@/lib/contexts/chat-context';
 import { formatFileSize } from '@/lib/validations/admin-cases';
+import { AddToFolderButton } from '@/components/folders';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -809,16 +810,23 @@ function ConversationPageContent() {
       {/* Chat messages */}
       <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28">
           <ChatContainerContent>
-            {/* Context display - case/note slug */}
-            {contextSlug && contextType && (
+            {/* Context display and folder action */}
+            {(contextSlug || (isOwner && messages.length > 0)) && (
               <div className="px-4 pb-4">
-                <div className="mx-auto max-w-2xl">
-                  <p className="text-xs">
-                    <span className="text-yellow-600 dark:text-yellow-500">
-                      {contextType.toUpperCase()} CONTEXT:
-                    </span>{' '}
-                    <span className="font-medium text-foreground">{contextSlug}</span>
-                  </p>
+                <div className="mx-auto max-w-2xl flex items-center justify-between gap-2">
+                  {contextSlug && contextType ? (
+                    <p className="text-xs">
+                      <span className="text-yellow-600 dark:text-yellow-500">
+                        {contextType.toUpperCase()} CONTEXT:
+                      </span>{' '}
+                      <span className="font-medium text-foreground">{contextSlug}</span>
+                    </p>
+                  ) : (
+                    <div />
+                  )}
+                  {isOwner && messages.length > 0 && (
+                    <AddToFolderButton itemType="conversation" itemId={conversationId} variant="icon" />
+                  )}
                 </div>
               </div>
             )}

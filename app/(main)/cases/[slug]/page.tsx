@@ -25,6 +25,7 @@ import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { ShareButton } from '@/components/common/ShareButton';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
+import { AddToFolderButton } from '@/components/folders';
 import { useCaseWithRelated } from '@/lib/hooks/useCases';
 import { extractViewLimitError } from '@/lib/utils/api-error';
 
@@ -160,6 +161,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
             }}
             variant="full"
           />
+          <AddToFolderButton itemType="case" itemId={caseDetail.id} />
         </div>
 
         {/* View Full Report Button */}

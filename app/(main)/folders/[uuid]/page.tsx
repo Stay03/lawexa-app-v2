@@ -48,8 +48,9 @@ import type { FolderItemType } from '@/types/folder';
                                Constants
 ******************************************************************************/
 
-const ITEM_TYPE_TABS = [
+const CONTENT_TYPE_TABS = [
   { value: 'all', label: 'All' },
+  { value: 'subfolder', label: 'Subfolders' },
   { value: 'case', label: 'Cases' },
   { value: 'note', label: 'Notes' },
   { value: 'conversation', label: 'Conversations' },
@@ -76,13 +77,14 @@ function FolderDetailContent() {
 
   // URL state for items
   const itemPage = Number(searchParams.get('page')) || 1;
-  const typeFilter = (searchParams.get('type') || 'all') as FolderItemType | 'all';
+  const typeFilter = (searchParams.get('type') || 'all') as FolderItemType | 'all' | 'subfolder';
 
   // Fetch folder detail and items
   const folderQuery = useFolder(uuid);
+  const showItems = typeFilter !== 'subfolder';
   const itemsQuery = useFolderItems(uuid, {
     page: itemPage,
-    type: typeFilter === 'all' ? undefined : typeFilter,
+    type: typeFilter === 'all' || typeFilter === 'subfolder' ? undefined : typeFilter,
     per_page: 15,
   });
 
@@ -236,26 +238,74 @@ function FolderDetailContent() {
         )}
       </div>
 
-      {/* Subfolders section */}
-      {(folder.children.length > 0 || isOwner) && (
-        <>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Subfolders</h2>
-            {isOwner && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCreateSubfolderOpen(true)}
-              >
-                <FolderPlus className="mr-1 h-4 w-4" />
-                New Subfolder
-              </Button>
-            )}
+      {/* Contents heading */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Contents</h2>
+        {isOwner && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCreateSubfolderOpen(true)}
+            >
+              <FolderPlus className="mr-1 h-4 w-4" />
+              New Subfolder
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddItemOpen(true)}
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Add Item
+            </Button>
           </div>
+        )}
+      </div>
 
-          {folder.children.length > 0 ? (
+      {/* Content type filter */}
+      <AnimatedTabs
+        tabs={CONTENT_TYPE_TABS}
+        value={typeFilter}
+        onValueChange={handleTypeChange}
+      />
+
+      {/* Unified content list */}
+      {showItems && itemsQuery.isFetching ? (
+        <FolderListSkeleton count={3} />
+      ) : showItems && itemsQuery.isError ? (
+        <ErrorState
+          title="Failed to load items"
+          description="We couldn't load the folder contents. Please try again."
+          retry={() => itemsQuery.refetch()}
+        />
+      ) : (() => {
+        const subfolders = (typeFilter === 'all' || typeFilter === 'subfolder') ? folder.children : [];
+        const items = showItems ? (itemsQuery.data?.data || []) : [];
+        const hasContent = subfolders.length > 0 || items.length > 0;
+
+        if (!hasContent) {
+          return (
+            <EmptyState
+              icon={FolderOpen}
+              title={typeFilter === 'subfolder' ? 'No subfolders' : typeFilter === 'all' ? 'No contents' : `No ${typeFilter}s`}
+              description={
+                isOwner
+                  ? typeFilter === 'subfolder'
+                    ? 'Create a subfolder to organize content within this folder.'
+                    : 'Add cases, notes, or conversations to this folder.'
+                  : 'This folder is empty.'
+              }
+              className="py-6"
+            />
+          );
+        }
+
+        return (
+          <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
             <FolderListGroup>
-              {folder.children.map((child, index) => (
+              {/* Subfolders first (OS convention) */}
+              {subfolders.map((child, index) => (
                 <FolderCard
                   key={child.uuid}
                   folder={child}
@@ -263,86 +313,31 @@ function FolderDetailContent() {
                   style={{ animationDelay: `${index * 30}ms` }}
                 />
               ))}
+              {/* Items after subfolders */}
+              {items.map((item, index) => (
+                <FolderItemCard
+                  key={item.id}
+                  item={item}
+                  folderUuid={uuid}
+                  isOwner={isOwner}
+                  className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both duration-200"
+                  style={{ animationDelay: `${(subfolders.length + index) * 30}ms` }}
+                />
+              ))}
             </FolderListGroup>
-          ) : (
-            <EmptyState
-              icon={FolderOpen}
-              title="No subfolders"
-              description="Create a subfolder to organize content within this folder."
-              className="py-6"
-            />
-          )}
-        </>
-      )}
 
-      {/* Items section */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Items</h2>
-        {isOwner && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsAddItemOpen(true)}
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Add Item
-          </Button>
-        )}
-      </div>
-
-      {/* Item type filter */}
-      <AnimatedTabs
-        tabs={ITEM_TYPE_TABS}
-        value={typeFilter}
-        onValueChange={handleTypeChange}
-      />
-
-      {/* Items list */}
-      {itemsQuery.isFetching ? (
-        <FolderListSkeleton count={3} />
-      ) : itemsQuery.isError ? (
-        <ErrorState
-          title="Failed to load items"
-          description="We couldn't load the folder items. Please try again."
-          retry={() => itemsQuery.refetch()}
-        />
-      ) : !itemsQuery.data?.data || itemsQuery.data.data.length === 0 ? (
-        <EmptyState
-          icon={FolderOpen}
-          title="No items"
-          description={
-            isOwner
-              ? 'Add cases, notes, or conversations to this folder.'
-              : 'This folder is empty.'
-          }
-          className="py-6"
-        />
-      ) : (
-        <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-          <FolderListGroup>
-            {itemsQuery.data.data.map((item, index) => (
-              <FolderItemCard
-                key={item.id}
-                item={item}
-                folderUuid={uuid}
-                isOwner={isOwner}
-                className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both duration-200"
-                style={{ animationDelay: `${index * 30}ms` }}
+            {showItems && itemsQuery.data?.pagination && itemsQuery.data.pagination.last_page > 1 && (
+              <FolderPagination
+                currentPage={itemsQuery.data.pagination.current_page}
+                lastPage={itemsQuery.data.pagination.last_page}
+                total={itemsQuery.data.pagination.total}
+                onPageChange={handlePageChange}
+                className="mt-4"
               />
-            ))}
-          </FolderListGroup>
-
-          {itemsQuery.data.pagination.last_page > 1 && (
-            <FolderPagination
-              currentPage={itemsQuery.data.pagination.current_page}
-              lastPage={itemsQuery.data.pagination.last_page}
-              total={itemsQuery.data.pagination.total}
-              onPageChange={handlePageChange}
-              className="mt-4"
-            />
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
 
       {/* Owner dialogs */}
       {isOwner && (
