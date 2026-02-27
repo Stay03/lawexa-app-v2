@@ -52,7 +52,7 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
       href={`/folders/${uuid}`}
       className={cn(
         'group flex items-center gap-3',
-        'px-5 py-4',
+        'px-3 py-3 sm:px-5 sm:py-4',
         'transition-colors hover:bg-muted/40',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
         className
@@ -76,28 +76,23 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <h3 className="min-w-0 flex-1 text-base font-medium text-foreground group-hover:text-primary sm:truncate">
             {name}
+            {is_private && <Lock className="ml-1.5 inline h-3.5 w-3.5 text-muted-foreground sm:hidden" />}
           </h3>
 
-          <div className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground sm:gap-2.5">
-            {/* Counts – hidden on mobile */}
+          <div className="hidden shrink-0 items-center gap-2.5 text-sm text-muted-foreground sm:flex">
             {items_count > 0 && (
-              <span className="hidden sm:inline">{items_count} {items_count === 1 ? 'item' : 'items'}</span>
+              <span>{items_count} {items_count === 1 ? 'item' : 'items'}</span>
             )}
             {children_count > 0 && (
-              <span className="hidden sm:inline">{children_count} {children_count === 1 ? 'subfolder' : 'subfolders'}</span>
+              <span>{children_count} {children_count === 1 ? 'subfolder' : 'subfolders'}</span>
             )}
-
-            {/* Privacy indicator */}
             {is_private && (
               <span className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                 <Lock className="h-3 w-3" />
                 Private
               </span>
             )}
-
-            {/* Date – hidden on mobile */}
-            <span className="hidden tabular-nums sm:inline">{formattedDate}</span>
-
+            <span className="tabular-nums">{formattedDate}</span>
             <BookmarkButton
               type="folder"
               id={folder.id}
@@ -105,13 +100,12 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
               variant="icon"
               className="h-7 w-7"
             />
-            <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
           </div>
         </div>
 
         {/* Author */}
         {user && (
-          <div className="mt-1 flex items-center gap-1.5 text-[16px] text-muted-foreground">
+          <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
             {user.avatar_url ? (
               <img
                 src={user.avatar_url}
@@ -127,6 +121,9 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
           </div>
         )}
       </div>
+
+      {/* Chevron – always visible */}
+      <ChevronRight className="h-4 w-4 shrink-0 opacity-50 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
     </Link>
   );
 }

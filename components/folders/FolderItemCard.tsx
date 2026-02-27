@@ -98,7 +98,7 @@ function FolderItemCard({
       href={href}
       className={cn(
         'group flex items-center gap-3',
-        'px-5 py-4',
+        'px-3 py-3 sm:px-5 sm:py-4',
         'transition-colors hover:bg-muted/40',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
         className
@@ -112,17 +112,16 @@ function FolderItemCard({
 
       {/* Content */}
       <div className="min-w-0 flex-1">
-        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <h3 className="min-w-0 flex-1 text-base font-medium text-foreground group-hover:text-primary sm:truncate">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="min-w-0 flex-1 truncate text-base font-medium text-foreground group-hover:text-primary">
             {title}
           </h3>
 
-          <div className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground sm:gap-2.5">
-            <span className="hidden rounded bg-muted px-1.5 py-0.5 text-xs sm:inline">
+          <div className="hidden shrink-0 items-center gap-2.5 text-sm text-muted-foreground sm:flex">
+            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
               {typeLabel}
             </span>
-            <span className="hidden tabular-nums sm:inline">{addedDate}</span>
-
+            <span className="tabular-nums">{addedDate}</span>
             {isOwner && (
               <Button
                 variant="ghost"
@@ -135,10 +134,12 @@ function FolderItemCard({
                 <span className="sr-only">Remove from folder</span>
               </Button>
             )}
-            <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
           </div>
         </div>
       </div>
+
+      {/* Chevron – always visible */}
+      <ChevronRight className="h-4 w-4 shrink-0 opacity-50 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
     </Link>
   );
 }
