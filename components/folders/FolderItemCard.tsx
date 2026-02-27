@@ -66,9 +66,11 @@ function FolderItemCard({
   const typeLabel = TYPE_LABELS[item.type] || item.type;
   const title = _getItemTitle(item);
   const href = _getItemHref(item);
-  const addedDate = new Date(item.added_at).toLocaleDateString('en-US', {
+  const addedDateObj = new Date(item.added_at);
+  const addedDate = addedDateObj.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
+    ...(addedDateObj.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }),
   });
   // Handle remove
   const handleRemove = async (e: React.MouseEvent) => {
@@ -111,15 +113,15 @@ function FolderItemCard({
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <h3 className="min-w-0 flex-1 text-[20px] font-medium text-foreground group-hover:text-primary sm:truncate">
+          <h3 className="min-w-0 flex-1 text-base font-medium text-foreground group-hover:text-primary sm:truncate">
             {title}
           </h3>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-[16px] text-muted-foreground sm:flex-nowrap sm:gap-2.5">
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[12px]">
+          <div className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground sm:gap-2.5">
+            <span className="hidden rounded bg-muted px-1.5 py-0.5 text-xs sm:inline">
               {typeLabel}
             </span>
-            <span className="tabular-nums">{addedDate}</span>
+            <span className="hidden tabular-nums sm:inline">{addedDate}</span>
 
             {isOwner && (
               <Button

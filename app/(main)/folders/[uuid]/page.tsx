@@ -280,7 +280,7 @@ function FolderDetailContent() {
           retry={() => itemsQuery.refetch()}
         />
       ) : (() => {
-        const subfolders = (typeFilter === 'all' || typeFilter === 'subfolder') ? folder.children : [];
+        const subfolders = (typeFilter === 'all' || typeFilter === 'subfolder') ? (folder.children ?? []) : [];
         const items = showItems ? (itemsQuery.data?.data || []) : [];
         const hasContent = subfolders.length > 0 || items.length > 0;
 

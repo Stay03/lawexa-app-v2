@@ -40,9 +40,11 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
   // Resolve icon component
   const Icon = getFolderIcon(icon);
   // Format date
-  const formattedDate = new Date(created_at).toLocaleDateString('en-US', {
+  const createdDate = new Date(created_at);
+  const formattedDate = createdDate.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
+    ...(createdDate.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }),
   });
 
   return (
@@ -72,17 +74,17 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
       <div className="min-w-0 flex-1">
         {/* Title row */}
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <h3 className="min-w-0 flex-1 text-[20px] font-medium text-foreground group-hover:text-primary sm:truncate">
+          <h3 className="min-w-0 flex-1 text-base font-medium text-foreground group-hover:text-primary sm:truncate">
             {name}
           </h3>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-[16px] text-muted-foreground sm:flex-nowrap sm:gap-2.5">
-            {/* Counts */}
+          <div className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground sm:gap-2.5">
+            {/* Counts – hidden on mobile */}
             {items_count > 0 && (
-              <span>{items_count} {items_count === 1 ? 'item' : 'items'}</span>
+              <span className="hidden sm:inline">{items_count} {items_count === 1 ? 'item' : 'items'}</span>
             )}
             {children_count > 0 && (
-              <span>{children_count} {children_count === 1 ? 'subfolder' : 'subfolders'}</span>
+              <span className="hidden sm:inline">{children_count} {children_count === 1 ? 'subfolder' : 'subfolders'}</span>
             )}
 
             {/* Privacy indicator */}
@@ -93,8 +95,8 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
               </span>
             )}
 
-            {/* Date */}
-            <span className="tabular-nums">{formattedDate}</span>
+            {/* Date – hidden on mobile */}
+            <span className="hidden tabular-nums sm:inline">{formattedDate}</span>
 
             <BookmarkButton
               type="folder"

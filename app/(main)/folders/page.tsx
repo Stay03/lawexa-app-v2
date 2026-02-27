@@ -1,7 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Plus, FolderOpen, Globe } from 'lucide-react';
 
 import { EmptyState } from '@/components/common/EmptyState';
@@ -43,22 +44,8 @@ function FoldersPageContent() {
 
   // Read URL state
   const tab = searchParams.get('tab') || 'my-folders';
-  const search = searchParams.get('search') || '';
+  const urlSearch = searchParams.get('search') || '';
   const page = Number(searchParams.get('page')) || 1;
-
-  // Fetch folders based on active tab
-  const myFoldersQuery = useMyFolders({
-    page,
-    search: search || undefined,
-    per_page: 15,
-  });
-  const exploreFoldersQuery = useFolders({
-    page,
-    search: search || undefined,
-    per_page: 15,
-  });
-  const isMyFolders = tab === 'my-folders';
-  const activeQuery = isMyFolders ? myFoldersQuery : exploreFoldersQuery;
 
   // Update URL params
   const updateParams = useCallback(
@@ -77,17 +64,48 @@ function FoldersPageContent() {
     [router, searchParams]
   );
 
+  // Local search state to avoid cursor jumping
+  const [searchInput, setSearchInput] = useState(urlSearch);
+  const debouncedSearch = useDebounce(searchInput, 300);
+  const isInternalUpdate = useRef(false);
+
+  // Sync debounced local state → URL
+  useEffect(() => {
+    if (debouncedSearch !== urlSearch) {
+      isInternalUpdate.current = true;
+      updateParams({ search: debouncedSearch || null, page: null });
+    }
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync URL → local state (for external changes like tab switch)
+  useEffect(() => {
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
+    }
+    setSearchInput(urlSearch);
+  }, [urlSearch]);
+
+  // Fetch folders based on active tab
+  const search = debouncedSearch || undefined;
+  const myFoldersQuery = useMyFolders({
+    page,
+    search,
+    per_page: 15,
+  });
+  const exploreFoldersQuery = useFolders({
+    page,
+    search,
+    per_page: 15,
+  });
+  const isMyFolders = tab === 'my-folders';
+  const activeQuery = isMyFolders ? myFoldersQuery : exploreFoldersQuery;
+
   // Handlers
   const handleTabChange = useCallback(
     (value: string) => {
+      setSearchInput('');
       updateParams({ tab: value === 'my-folders' ? null : value, page: null, search: null });
-    },
-    [updateParams]
-  );
-
-  const handleSearchChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateParams({ search: e.target.value || null, page: null });
     },
     [updateParams]
   );
@@ -191,8 +209,8 @@ function FoldersPageContent() {
         <Input
           type="text"
           placeholder="Search folders..."
-          value={search}
-          onChange={handleSearchChange}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           className="w-full pl-10"
         />
         <svg

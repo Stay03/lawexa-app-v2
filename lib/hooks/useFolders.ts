@@ -98,7 +98,7 @@ export function useUpdateFolder() {
       foldersApi.update(uuid, data),
     onSuccess: (response) => {
       if (response.data?.uuid) {
-        queryClient.setQueryData(folderKeys.detail(response.data.uuid), response);
+        queryClient.invalidateQueries({ queryKey: folderKeys.detail(response.data.uuid) });
       }
       queryClient.invalidateQueries({ queryKey: folderKeys.lists() });
       queryClient.invalidateQueries({ queryKey: folderKeys.myFolders() });
