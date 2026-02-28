@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Eye } from 'lucide-react';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { ShareButton } from '@/components/common/ShareButton';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
@@ -109,13 +109,19 @@ function safeStringValue(value: unknown): string | null {
   return null;
 }
 
+function estimateReadTime(text: string | null | undefined): number {
+  if (!text) return 1;
+  const wordCount = text.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(wordCount / 200));
+}
+
 /******************************************************************************
                                Component
 ******************************************************************************/
 
 /**
- * Minimalist Modern Blog theme for the case view page.
- * Renders case data in a clean, card-free editorial layout.
+ * Medium-style blog theme for the case view page.
+ * Renders case data in a clean, editorial layout with action bar and tags at bottom.
  */
 function CaseBlogView({
   caseData,
@@ -156,13 +162,14 @@ function CaseBlogView({
 
   const hasBody = body && body.trim().length > 0;
   const isLimitExceeded = caseData.limit_exceeded === true;
+  const readTime = estimateReadTime(hasBody ? body : excerpt);
 
   // Filter valid judges
   const validJudges = (judges || []).filter(
     (j) => j && typeof j === 'object' && typeof j.name === 'string'
   );
 
-  // Build metadata items
+  // Build metadata items for the Case Details section
   const metadataItems: Array<{ key: string; label: string; value: React.ReactNode }> = [];
 
   if (court && typeof court === 'object' && court.name) {
@@ -220,76 +227,68 @@ function CaseBlogView({
     (citedCases && citedCases.length > 0) ||
     (citedBy && citedBy.length > 0);
 
+  // Build inline metadata items for header row
+  const headerMeta: string[] = [];
+  if (court?.name) headerMeta.push(court.name);
+  if (country?.name) headerMeta.push(country.name);
+  if (formattedDate) headerMeta.push(formattedDate);
+  if (safeCitation) headerMeta.push(safeCitation);
+  if (views_count > 0) headerMeta.push(`${views_count} ${views_count === 1 ? 'view' : 'views'}`);
+  headerMeta.push(`${readTime} min read`);
+
   return (
-    <article className="space-y-0">
+    <article>
       {/* ── Header ── */}
-      <header className="mb-8">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4">
+      <header className="mb-0">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-3">
           {title}
         </h1>
 
         {/* Inline metadata */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground mb-4">
-          {court && <span>{court.name}</span>}
-          {court && country && <span className="text-border">|</span>}
-          {country && <span>{country.name}</span>}
-          {(court || country) && formattedDate && <span className="text-border">|</span>}
-          {formattedDate && <span>{formattedDate}</span>}
-          {citation && (
-            <>
-              <span className="text-border">|</span>
-              <span className="font-medium text-foreground/70">{citation}</span>
-            </>
-          )}
-          {views_count > 0 && (
-            <>
-              <span className="text-border">|</span>
-              <span>{views_count} {views_count === 1 ? 'view' : 'views'}</span>
-            </>
-          )}
-        </div>
-
-        {/* Tags */}
-        {tags && tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {tags.map((tag) => (
-              <Link
-                key={tag}
-                href={`/cases?tags=${encodeURIComponent(tag)}`}
-                className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                {tag}
-              </Link>
+        {headerMeta.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground mb-6">
+            {headerMeta.map((item, i) => (
+              <span key={i} className="flex items-center gap-1.5">
+                {i > 0 && <span className="text-border select-none">·</span>}
+                {item}
+              </span>
             ))}
           </div>
         )}
-
-        <div className="border-b border-border" />
       </header>
 
-      {/* ── Actions ── */}
-      <div className="flex items-center gap-2 mb-8">
-        <BookmarkButton
-          type="case"
-          id={id}
-          isBookmarked={is_bookmarked}
-          bookmarksCount={bookmarks_count}
-          variant="full"
-        />
-        <ShareButton />
-        <FeedbackButton
-          context={{
-            contentType: 'case',
-            contentId: id,
-            contentTitle: title,
-          }}
-          variant="full"
-        />
-        {has_full_report && !isLimitExceeded && (
-          <div className="ml-auto">
-            <ViewFullReportButton slug={slug} hasFullReport={has_full_report} />
-          </div>
-        )}
+      {/* ── Action Bar (Medium-style) ── */}
+      <div className="flex items-center justify-between border-y border-border/60 py-3 mb-8">
+        {/* Left: views */}
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Eye className="h-4 w-4" />
+          <span className="tabular-nums">{views_count > 0 ? views_count : 0}</span>
+        </div>
+
+        {/* Right: action buttons */}
+        <div className="flex items-center gap-0.5">
+          <BookmarkButton
+            type="case"
+            id={id}
+            isBookmarked={is_bookmarked}
+            bookmarksCount={bookmarks_count}
+            variant="icon"
+          />
+          <ShareButton />
+          <FeedbackButton
+            context={{
+              contentType: 'case',
+              contentId: id,
+              contentTitle: title,
+            }}
+            variant="icon"
+          />
+          {has_full_report && !isLimitExceeded && (
+            <div className="ml-2 pl-2 border-l border-border/60">
+              <ViewFullReportButton slug={slug} hasFullReport={has_full_report} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Legal Principles ── */}
@@ -368,6 +367,26 @@ function CaseBlogView({
           {citedBy && citedBy.length > 0 && (
             <BlogRelatedGroup title="Cited By" cases={citedBy} />
           )}
+        </section>
+      )}
+
+      {/* ── Tags (bottom) ── */}
+      {tags && tags.length > 0 && (
+        <section className="mt-10 pt-8 border-t border-border/40">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
+            Tags
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <Link
+                key={tag}
+                href={`/cases?tags=${encodeURIComponent(tag)}`}
+                className="rounded-full border border-border/60 px-3 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground hover:border-border transition-colors"
+              >
+                {tag}
+              </Link>
+            ))}
+          </div>
         </section>
       )}
     </article>
