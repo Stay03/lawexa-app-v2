@@ -15,18 +15,34 @@ import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 
 interface AuthModalProps {
+  /** Element that triggers the dialog (used with internal state) */
   trigger?: React.ReactNode;
   defaultTab?: 'login' | 'register';
+  /** Externally controlled open state */
+  open?: boolean;
+  /** Callback when open state changes (for external control) */
+  onOpenChange?: (open: boolean) => void;
 }
 
-function AuthModal({ trigger, defaultTab = 'login' }: AuthModalProps) {
-  const [open, setOpen] = useState(false);
+/**
+ * Auth modal with tabbed Sign In / Sign Up forms.
+ * Supports both trigger-based (internal state) and externally controlled modes.
+ */
+function AuthModal({ trigger, defaultTab = 'login', open: controlledOpen, onOpenChange }: AuthModalProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  // Use external control when provided, otherwise fall back to internal state
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? (onOpenChange ?? (() => {})) : setInternalOpen;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || <Button>Sign In</Button>}
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          {trigger || <Button>Sign In</Button>}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-md p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Authentication</DialogTitle>

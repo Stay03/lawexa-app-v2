@@ -23,6 +23,8 @@ import {
 
 export function NavMain({
   items,
+  guestRestrictedUrls,
+  onGuestClick,
 }: {
   items: {
     title: string
@@ -34,9 +36,15 @@ export function NavMain({
       url: string
     }[]
   }[]
+  /** URLs that should open the auth modal instead of navigating (for guests) */
+  guestRestrictedUrls?: Set<string>
+  /** Called when a guest clicks a restricted nav item */
+  onGuestClick?: () => void
 }) {
   const pathname = usePathname()
   const { setOpenMobile } = useSidebar()
+
+  const isRestricted = (url: string) => guestRestrictedUrls?.has(url) ?? false
 
   return (
     <SidebarGroup>
@@ -45,8 +53,25 @@ export function NavMain({
         {items.map((item) => {
           const isActive = item.isActive || pathname.startsWith(item.url)
 
-          // If no sub-items, render as simple link
+          // If no sub-items, render as simple link or restricted button
           if (!item.items || item.items.length === 0) {
+            if (isRestricted(item.url)) {
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    onClick={() => {
+                      setOpenMobile(false)
+                      onGuestClick?.()
+                    }}
+                  >
+                    {item.icon && <item.icon />}
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )
+            }
+
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild tooltip={item.title} isActive={pathname === item.url}>
@@ -58,6 +83,9 @@ export function NavMain({
               </SidebarMenuItem>
             )
           }
+
+          // Check if all sub-items are restricted
+          const allSubItemsRestricted = item.items.every((sub) => isRestricted(sub.url))
 
           return (
             <Collapsible
@@ -75,11 +103,22 @@ export function NavMain({
                   <SidebarMenuSub>
                     {item.items?.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
-                          <Link href={subItem.url} onClick={() => setOpenMobile(false)}>
+                        {isRestricted(subItem.url) ? (
+                          <SidebarMenuSubButton
+                            onClick={() => {
+                              setOpenMobile(false)
+                              onGuestClick?.()
+                            }}
+                          >
                             <span>{subItem.title}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
+                          </SidebarMenuSubButton>
+                        ) : (
+                          <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
+                            <Link href={subItem.url} onClick={() => setOpenMobile(false)}>
+                              <span>{subItem.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        )}
                       </SidebarMenuSubItem>
                     ))}
                   </SidebarMenuSub>

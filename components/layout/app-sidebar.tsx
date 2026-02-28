@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useState } from "react"
 import {
   MessageSquarePlus,
   Library,
@@ -24,6 +25,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { useAuthStore } from "@/lib/stores/authStore"
+import { AuthModal } from "@/components/auth/AuthModal"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -49,30 +51,33 @@ const navMain = [
   { title: "Bookmarks",   url: "/bookmarks",        icon: Bookmark },
 ]
 
-// Minimal nav for guest users
-const navGuest = [
-  { title: "Community", url: "/shared", icon: Users },
-]
+// URLs that guests cannot access — clicking opens AuthModal instead
+const GUEST_RESTRICTED_URLS = new Set([
+  '/',
+  '/cases',
+  '/notes',
+  '/folders',
+  '/content-requests',
+  '/bookmarks',
+])
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, isGuest } = useAuthStore();
   const isLawyer = user?.profile?.user_type === 'lawyer';
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
-  // Guests see minimal navigation
-  const navItems = isGuest
-    ? navGuest
-    : [
-        ...navMain,
-        ...(isLawyer
-          ? [
-              {
-                title: 'Verification',
-                url: '/lawyer-verification',
-                icon: ShieldCheck,
-              },
-            ]
-          : []),
-      ];
+  const navItems = [
+    ...navMain,
+    ...(isLawyer
+      ? [
+          {
+            title: 'Verification',
+            url: '/lawyer-verification',
+            icon: ShieldCheck,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -94,13 +99,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-0">
-        <NavMain items={navItems} />
+        <NavMain
+          items={navItems}
+          guestRestrictedUrls={isGuest ? GUEST_RESTRICTED_URLS : undefined}
+          onGuestClick={isGuest ? () => setAuthModalOpen(true) : undefined}
+        />
         {!isGuest && <NavConversations />}
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
       </SidebarFooter>
       <SidebarRail />
+      {isGuest && (
+        <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+      )}
     </Sidebar>
   )
 }
