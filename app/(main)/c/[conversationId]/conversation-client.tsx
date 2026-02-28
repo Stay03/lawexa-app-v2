@@ -60,6 +60,9 @@ import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { ChatProvider } from '@/lib/contexts/chat-context';
 import { formatFileSize } from '@/lib/validations/admin-cases';
 import { AddToFolderButton } from '@/components/folders';
+import { useGuestAuth } from '@/lib/hooks/useGuestAuth';
+import { ConversationNotAvailable } from '@/components/conversations';
+import { ErrorState } from '@/components/common/ErrorState';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -444,6 +447,9 @@ function ConversationPageContent() {
   const searchParams = useSearchParams();
   const conversationId = params.conversationId as string;
 
+  // Guest auth — acquire token if user is unauthenticated
+  const { isReady: isGuestReady, isLoading: isGuestLoading, error: guestError } = useGuestAuth();
+
   const [input, setInput] = useState('');
   const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
@@ -527,6 +533,8 @@ function ConversationPageContent() {
   useEffect(() => {
     // Prevent double initialization in strict mode
     if (initializedRef.current) return;
+    // Wait for auth (guest token or real user) before making API calls
+    if (!isGuestReady) return;
 
     const initialMessage = searchParams.get('msg');
     const executionId = searchParams.get('exec');
@@ -568,7 +576,7 @@ function ConversationPageContent() {
         // Silently fail - the main loadConversationHistory will handle errors
       });
     }
-  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, user?.id]);
+  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, user?.id, isGuestReady]);
 
   const handleSubmit = async () => {
     if ((!input.trim() && !uploadedFile) || isStreaming || isSubmitting || isUploading) return;
@@ -804,6 +812,28 @@ function ConversationPageContent() {
   const contextType = contextMatch ? contextMatch[1].replace('_slug', '') : null;
   // Extract just the slug text, removing any XML-like formatting
   const contextSlug = contextMatch ? contextMatch[2].trim() : null;
+
+  // Guest auth loading state
+  if (isGuestLoading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  // Guest auth error
+  if (guestError) {
+    return (
+      <ErrorState
+        title="Unable to load conversation"
+        description="We couldn't establish a connection. Please try refreshing the page."
+      />
+    );
+  }
+  // Conversation not found (private, archived, or doesn't exist)
+  if (error === 'not_found') {
+    return <ConversationNotAvailable />;
+  }
 
   return (
     <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>

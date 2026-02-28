@@ -23,8 +23,10 @@ apiClient.interceptors.request.use((config) => {
 // Response interceptor - handle errors with smart redirect
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
+      const authState = useAuthStore.getState();
+
       // Check if we're already on an auth page to prevent redirect loops
       const isAuthPage =
         typeof window !== 'undefined' && (
@@ -37,8 +39,35 @@ apiClient.interceptors.response.use(
       // Check if this is a silent auth check (don't redirect)
       const isSilentCheck = error.config?.headers?.['X-Silent-Auth'];
 
-      if (!isAuthPage && !isSilentCheck) {
-        useAuthStore.getState().clearAuth();
+      // Check if this is a guest-accessible page
+      const isGuestPage =
+        typeof window !== 'undefined' && (
+          window.location.pathname.startsWith('/c/') ||
+          window.location.pathname.startsWith('/shared')
+        );
+
+      // Guest token refresh: re-acquire and retry the original request once
+      if (authState.isGuest && !error.config?._retried) {
+        try {
+          error.config._retried = true;
+          // Inline call to avoid circular import with auth.ts
+          const refreshResponse = await apiClient.post('/auth/guest', {}, {
+            headers: { 'X-Silent-Auth': 'true' },
+          });
+          const refreshData = refreshResponse.data;
+          if (refreshData.success && refreshData.data) {
+            authState.setAuth(refreshData.data.user, refreshData.data.token);
+            error.config.headers.Authorization = `Bearer ${refreshData.data.token}`;
+            return apiClient(error.config);
+          }
+        } catch {
+          // Guest token refresh failed — fall through
+        }
+      }
+
+      // For guest pages, don't redirect to /login — let components handle the error
+      if (!isAuthPage && !isSilentCheck && !isGuestPage) {
+        authState.clearAuth();
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }

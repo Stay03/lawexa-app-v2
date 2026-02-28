@@ -25,6 +25,7 @@ import { ConversationShareHeaderButton } from "@/components/conversations"
 import { usePathname } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useBreadcrumbStore } from "@/lib/stores/breadcrumbStore"
+import { useAuthStore } from "@/lib/stores/authStore"
 
 function getBreadcrumbs(pathname: string, getOverrideLabel: (segment: string) => string | undefined) {
   const segments = pathname.split('/').filter(Boolean)
@@ -87,6 +88,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname()
+  const isGuest = useAuthStore((state) => state.isGuest)
   // Subscribe to overrides array to trigger re-render when it changes
   const overrides = useBreadcrumbStore((state) => state.overrides)
   const getOverrideLabel = useBreadcrumbStore((state) => state.getLabel)
@@ -143,11 +145,11 @@ export default function MainLayout({
             {pathname.startsWith('/cases/') && pathname.split('/').length === 3 && (
               <ReaderModeToggle />
             )}
-            {/* Show conversation share button on conversation pages */}
-            {pathname.startsWith('/c/') && (
+            {/* Show conversation share button on conversation pages (not for guests) */}
+            {pathname.startsWith('/c/') && !isGuest && (
               <ConversationShareHeaderButton />
             )}
-            <NotificationBell />
+            {!isGuest && <NotificationBell />}
             <ThemeToggle />
           </div>
         </header>

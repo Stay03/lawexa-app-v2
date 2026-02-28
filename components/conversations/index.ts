@@ -5,3 +5,4 @@ export { TrendingConversationCard } from './TrendingConversationCard';
 export { ConversationListGroup } from './ConversationListGroup';
 export { ConversationListSkeleton } from './ConversationListSkeleton';
 export { ConversationEmptyState } from './ConversationEmptyState';
+export { ConversationNotAvailable } from './ConversationNotAvailable';

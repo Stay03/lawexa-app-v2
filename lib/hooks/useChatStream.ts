@@ -373,7 +373,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         }));
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to load conversation';
+      // Detect 404 specifically so conversation-client can show "not available" state
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const errorMsg = status === 404
+        ? 'not_found'
+        : err instanceof Error ? err.message : 'Failed to load conversation';
       setState((prev) => ({
         ...prev,
         error: errorMsg,

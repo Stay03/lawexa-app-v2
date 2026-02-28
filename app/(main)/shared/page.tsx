@@ -19,6 +19,7 @@ import {
   useInfiniteTrendingConversations,
 } from '@/lib/hooks/useConversationSharing';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
+import { useGuestAuth } from '@/lib/hooks/useGuestAuth';
 
 const recentTab = { value: 'recent', label: 'Recently Shared', icon: <Clock className="h-4 w-4" /> };
 const trendingTab = { value: 'trending', label: 'Trending', icon: <TrendingUp className="h-4 w-4" /> };
@@ -28,6 +29,9 @@ const tabs = [recentTab, trendingTab];
  * Shared conversations browse page content
  */
 function SharedConversationsPageContent() {
+  // Guest auth — acquire token if user is unauthenticated
+  const { isReady, isLoading: isGuestLoading, error: guestError } = useGuestAuth();
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -163,6 +167,34 @@ function SharedConversationsPageContent() {
       </>
     );
   };
+
+  // Wait for guest auth before rendering query-dependent content
+  if (!isReady) {
+    return (
+      <PageContainer variant="list">
+        <PageHeader
+          title="Shared Conversations"
+          description="Explore conversations shared by the community"
+        />
+        <ConversationListSkeleton />
+      </PageContainer>
+    );
+  }
+  // Guest auth error
+  if (guestError) {
+    return (
+      <PageContainer variant="list">
+        <PageHeader
+          title="Shared Conversations"
+          description="Explore conversations shared by the community"
+        />
+        <ErrorState
+          title="Unable to load"
+          description="We couldn't establish a connection. Please try refreshing the page."
+        />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer variant="list">

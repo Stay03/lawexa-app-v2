@@ -49,22 +49,30 @@ const navMain = [
   { title: "Bookmarks",   url: "/bookmarks",        icon: Bookmark },
 ]
 
+// Minimal nav for guest users
+const navGuest = [
+  { title: "Community", url: "/shared", icon: Users },
+]
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user } = useAuthStore();
+  const { user, isGuest } = useAuthStore();
   const isLawyer = user?.profile?.user_type === 'lawyer';
 
-  const navItems = [
-    ...navMain,
-    ...(isLawyer
-      ? [
-          {
-            title: 'Verification',
-            url: '/lawyer-verification',
-            icon: ShieldCheck,
-          },
-        ]
-      : []),
-  ];
+  // Guests see minimal navigation
+  const navItems = isGuest
+    ? navGuest
+    : [
+        ...navMain,
+        ...(isLawyer
+          ? [
+              {
+                title: 'Verification',
+                url: '/lawyer-verification',
+                icon: ShieldCheck,
+              },
+            ]
+          : []),
+      ];
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -87,7 +95,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-0">
         <NavMain items={navItems} />
-        <NavConversations />
+        {!isGuest && <NavConversations />}
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
