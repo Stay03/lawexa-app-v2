@@ -217,7 +217,7 @@ function EditFolderDialog({ open, onOpenChange, folder }: EditFolderDialogProps)
                       <p className="text-sm text-muted-foreground">
                         {field.value
                           ? 'Only you can see this folder'
-                          : 'Visible to all team members'}
+                          : 'Visible to everyone'}
                       </p>
                     </div>
                   </div>

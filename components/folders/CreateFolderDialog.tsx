@@ -216,7 +216,7 @@ function CreateFolderDialog({ open, onOpenChange, parentId }: CreateFolderDialog
                       <p className="text-sm text-muted-foreground">
                         {field.value
                           ? 'Only you can see this folder'
-                          : 'Visible to all team members'}
+                          : 'Visible to everyone'}
                       </p>
                     </div>
                   </div>

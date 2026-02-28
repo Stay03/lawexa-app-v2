@@ -95,7 +95,6 @@ function AddItemToFolderDialog({
         data: { type: searchType, id },
       });
       toast.success(result.message || `"${title}" added to folder.`);
-      handleOpenChange(false);
     } catch (error) {
       const apiError = extractApiError(error);
       toast.error('Failed to add item', {
