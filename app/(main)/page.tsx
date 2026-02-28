@@ -329,7 +329,7 @@ export default function HomePage() {
       {/* ── BOTTOM INPUT AREA ──────────────────────────────────── */}
       {/* shrink-0 keeps the input at its natural size on mobile; it always stays at the bottom */}
       <div ref={inputAreaRef} className="shrink-0 w-full max-w-2xl pb-2 md:pb-0">
-        <FileUpload onFilesAdded={isGuest ? undefined : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
+        <FileUpload onFilesAdded={isGuest ? () => {} : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
           <PromptInput
             value={input}
             onValueChange={(value) => {
