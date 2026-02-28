@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { AuthModal } from '@/components/auth/AuthModal';
 import { useQuery } from '@tanstack/react-query';
 import { adminAiApi } from '@/lib/api/admin-ai';
 import { adminAiKeys } from '@/lib/hooks/useAdminAi';
@@ -47,7 +48,9 @@ export default function HomePage() {
   const { greeting, name, isSpecial } = useGreetingParts();
   const router = useRouter();
   const [showLinks, setShowLinks] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
+  const isGuest = useAuthStore((state) => state.isGuest);
 
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
@@ -87,11 +90,31 @@ export default function HomePage() {
     };
   }, []);
 
+  // Restore saved prompt after guest logs in
+  useEffect(() => {
+    if (!isGuest && user) {
+      const saved = localStorage.getItem('guest_pending_prompt');
+      if (saved) {
+        setInput(saved);
+        localStorage.removeItem('guest_pending_prompt');
+        // Focus the textarea after restoring
+        setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 100);
+      }
+    }
+  }, [isGuest, user]);
+
   const handleSubmit = async () => {
     if ((!input.trim() && !uploadedFile) || isSubmitting || isUploading) return;
 
     const message = input.trim();
     if (!message) return;
+
+    // Guest: save prompt and show auth modal instead of sending
+    if (isGuest) {
+      localStorage.setItem('guest_pending_prompt', message);
+      setAuthModalOpen(true);
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -267,7 +290,14 @@ export default function HomePage() {
               key={prompt}
               type="button"
               className="text-muted-foreground hover:bg-secondary rounded-2xl border px-4 py-3 text-sm transition-colors text-left"
-              onClick={() => handlePromptClick(prompt)}
+              onClick={() => {
+                if (isGuest) {
+                  localStorage.setItem('guest_pending_prompt', prompt);
+                  setAuthModalOpen(true);
+                } else {
+                  handlePromptClick(prompt);
+                }
+              }}
             >
               {prompt}...
             </button>
@@ -299,7 +329,7 @@ export default function HomePage() {
       {/* ── BOTTOM INPUT AREA ──────────────────────────────────── */}
       {/* shrink-0 keeps the input at its natural size on mobile; it always stays at the bottom */}
       <div ref={inputAreaRef} className="shrink-0 w-full max-w-2xl pb-2 md:pb-0">
-        <FileUpload onFilesAdded={handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
+        <FileUpload onFilesAdded={isGuest ? undefined : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
           <PromptInput
             value={input}
             onValueChange={(value) => {
@@ -309,8 +339,8 @@ export default function HomePage() {
             onSubmit={handleSubmit}
             disabled={isSubmitting}
           >
-            {/* Document File Preview inside input */}
-            {(isUploading || uploadedFile) && (
+            {/* Document File Preview inside input — hidden for guests */}
+            {!isGuest && (isUploading || uploadedFile) && (
               <div className="flex flex-wrap gap-2 px-3 pt-3">
                 <div
                   className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
@@ -343,15 +373,17 @@ export default function HomePage() {
             />
 
             <PromptInputActions className="flex items-center justify-between px-3 pb-3">
-              {/* Left actions: Attach + Workflow selector */}
+              {/* Left actions: Attach + Workflow selector — hidden for guests */}
               <div className="flex items-center gap-1">
-                <PromptInputAction tooltip="Attach PDF">
-                  <FileUploadTrigger asChild>
-                    <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
-                      <Paperclip className="text-primary h-5 w-5" />
-                    </div>
-                  </FileUploadTrigger>
-                </PromptInputAction>
+                {!isGuest && (
+                  <PromptInputAction tooltip="Attach PDF">
+                    <FileUploadTrigger asChild>
+                      <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
+                        <Paperclip className="text-primary h-5 w-5" />
+                      </div>
+                    </FileUploadTrigger>
+                  </PromptInputAction>
+                )}
 
                 {/* Workflow selector - only for superadmin, admin, researcher */}
                 {canSelectWorkflow && workflows.length > 0 && (
@@ -398,31 +430,43 @@ export default function HomePage() {
                 key={prompt}
                 type="button"
                 className="text-muted-foreground hover:bg-secondary rounded-full border px-4 py-2 text-sm transition-colors"
-                onClick={() => handlePromptClick(prompt)}
+                onClick={() => {
+                  if (isGuest) {
+                    localStorage.setItem('guest_pending_prompt', prompt);
+                    setAuthModalOpen(true);
+                  } else {
+                    handlePromptClick(prompt);
+                  }
+                }}
               >
                 {prompt}...
               </button>
             ))}
           </div>
 
-          {/* Drag-and-drop overlay */}
-          <FileUploadContent>
-            <div className="flex min-h-[200px] w-full items-center justify-center">
-              <div className="bg-background/90 m-4 w-full max-w-md rounded-lg border p-8 shadow-lg">
-                <div className="mb-4 flex justify-center">
-                  <FileUp className="text-muted-foreground h-8 w-8" />
+          {/* Drag-and-drop overlay — only for authenticated users */}
+          {!isGuest && (
+            <FileUploadContent>
+              <div className="flex min-h-[200px] w-full items-center justify-center">
+                <div className="bg-background/90 m-4 w-full max-w-md rounded-lg border p-8 shadow-lg">
+                  <div className="mb-4 flex justify-center">
+                    <FileUp className="text-muted-foreground h-8 w-8" />
+                  </div>
+                  <h3 className="mb-2 text-center text-base font-medium">
+                    Drop PDF to upload
+                  </h3>
+                  <p className="text-muted-foreground text-center text-sm">
+                    Release to attach PDF to your message
+                  </p>
                 </div>
-                <h3 className="mb-2 text-center text-base font-medium">
-                  Drop PDF to upload
-                </h3>
-                <p className="text-muted-foreground text-center text-sm">
-                  Release to attach PDF to your message
-                </p>
               </div>
-            </div>
-          </FileUploadContent>
+            </FileUploadContent>
+          )}
         </FileUpload>
       </div>
+
+      {/* Auth modal for guests */}
+      {isGuest && <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />}
     </div>
   );
 }
