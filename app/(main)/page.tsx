@@ -92,16 +92,25 @@ export default function HomePage() {
 
   // Restore saved prompt after guest logs in
   useEffect(() => {
-    if (!isGuest && user) {
-      const saved = localStorage.getItem('guest_pending_prompt');
-      if (saved) {
-        setInput(saved);
-        localStorage.removeItem('guest_pending_prompt');
-        // Focus the textarea after restoring
-        setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 100);
+    const restorePrompt = () => {
+      const { isGuest: guest, user: u } = useAuthStore.getState();
+      if (!guest && u) {
+        const saved = localStorage.getItem('guest_pending_prompt');
+        if (saved) {
+          setInput(saved);
+          localStorage.removeItem('guest_pending_prompt');
+          setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 100);
+        }
       }
-    }
-  }, [isGuest, user]);
+    };
+
+    // Check immediately (store may already have correct values)
+    restorePrompt();
+
+    // Subscribe to store changes (handles async hydration and login within same session)
+    const unsub = useAuthStore.subscribe(restorePrompt);
+    return unsub;
+  }, []);
 
   const handleSubmit = async () => {
     if ((!input.trim() && !uploadedFile) || isSubmitting || isUploading) return;
