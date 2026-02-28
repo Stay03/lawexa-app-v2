@@ -6,6 +6,12 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -186,14 +192,24 @@ function AddToFolderButton({ itemType, itemId, variant = 'full' }: AddToFolderBu
   return (
     <>
       {variant === 'icon' ? (
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setIsOpen(true)}
-        >
-          <FolderPlus className="h-4 w-4" />
-          <span className="sr-only">Add to folder</span>
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setIsOpen(true)}
+              >
+                <FolderPlus className="h-4 w-4" />
+                <span className="sr-only">Add to folder</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Add to folder</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       ) : (
         <Button
           variant="outline"
