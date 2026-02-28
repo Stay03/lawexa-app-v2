@@ -37,7 +37,21 @@ import { formatFileSize } from '@/lib/validations/admin-cases';
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function HomePage() {
-  const [input, setInput] = useState('');
+  const pendingPromptRestoredRef = useRef(false);
+
+  const [input, setInput] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const state = useAuthStore.getState();
+      if (!state.isGuest && state.user) {
+        const saved = localStorage.getItem('guest_pending_prompt');
+        if (saved) {
+          pendingPromptRestoredRef.current = true;
+          return saved;
+        }
+      }
+    }
+    return '';
+  });
   const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -92,22 +106,30 @@ export default function HomePage() {
 
   // Restore saved prompt after guest logs in
   useEffect(() => {
+    // Lazy init already restored — just clean up localStorage and focus
+    if (pendingPromptRestoredRef.current) {
+      localStorage.removeItem('guest_pending_prompt');
+      setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 100);
+      return;
+    }
+
+    // Login-while-mounted case: subscribe to store changes
     const restorePrompt = () => {
+      if (pendingPromptRestoredRef.current) return;
       const { isGuest: guest, user: u } = useAuthStore.getState();
       if (!guest && u) {
         const saved = localStorage.getItem('guest_pending_prompt');
         if (saved) {
+          pendingPromptRestoredRef.current = true;
           setInput(saved);
-          localStorage.removeItem('guest_pending_prompt');
+          // Keep localStorage intact — a remount may follow (router.push('/'))
+          // The lazy initializer above will pick it up on remount
           setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 100);
         }
       }
     };
 
-    // Check immediately (store may already have correct values)
     restorePrompt();
-
-    // Subscribe to store changes (handles async hydration and login within same session)
     const unsub = useAuthStore.subscribe(restorePrompt);
     return unsub;
   }, []);
@@ -125,6 +147,7 @@ export default function HomePage() {
       return;
     }
 
+    localStorage.removeItem('guest_pending_prompt');
     setIsSubmitting(true);
 
     try {
