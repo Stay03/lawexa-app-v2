@@ -7,6 +7,7 @@ import { ShareButton } from '@/components/common/ShareButton';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 import { ViewFullReportButton } from './ViewFullReportButton';
 import { CaseViewLimitBanner } from './CaseViewLimitBanner';
+import { AddToFolderButton } from '@/components/folders';
 import { cn } from '@/lib/utils';
 import type { CaseDetail, RelatedCase } from '@/types/case';
 
@@ -274,6 +275,7 @@ function CaseBlogView({
             bookmarksCount={bookmarks_count}
             variant="icon"
           />
+          <AddToFolderButton itemType="case" itemId={id} variant="icon" />
           <ShareButton />
           <FeedbackButton
             context={{
