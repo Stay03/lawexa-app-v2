@@ -116,7 +116,7 @@ function AddItemToFolderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {/* Type selector */}
           <AnimatedTabs
             tabs={SEARCH_TYPE_TABS}
