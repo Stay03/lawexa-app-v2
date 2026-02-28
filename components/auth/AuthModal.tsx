@@ -37,7 +37,7 @@ const authTabs = [
  */
 function AuthModal({ trigger, defaultTab = 'login', open: controlledOpen, onOpenChange }: AuthModalProps) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   // Use external control when provided, otherwise fall back to internal state
   const isControlled = controlledOpen !== undefined;
