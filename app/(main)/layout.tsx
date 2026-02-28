@@ -26,6 +26,7 @@ import { usePathname } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useBreadcrumbStore } from "@/lib/stores/breadcrumbStore"
 import { useAuthStore } from "@/lib/stores/authStore"
+import { useGuestAuth } from "@/lib/hooks/useGuestAuth"
 
 function getBreadcrumbs(pathname: string, getOverrideLabel: (segment: string) => string | undefined) {
   const segments = pathname.split('/').filter(Boolean)
@@ -95,6 +96,7 @@ export default function MainLayout({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const breadcrumbs = React.useMemo(() => getBreadcrumbs(pathname, getOverrideLabel), [pathname, overrides])
   const [mounted, setMounted] = useState(false)
+  useGuestAuth()
 
   useEffect(() => {
     setMounted(true)
