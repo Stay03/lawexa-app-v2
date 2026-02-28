@@ -37,21 +37,7 @@ import { formatFileSize } from '@/lib/validations/admin-cases';
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function HomePage() {
-  const pendingPromptRestoredRef = useRef(false);
-
-  const [input, setInput] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const state = useAuthStore.getState();
-      if (!state.isGuest && state.user) {
-        const saved = localStorage.getItem('guest_pending_prompt');
-        if (saved) {
-          pendingPromptRestoredRef.current = true;
-          return saved;
-        }
-      }
-    }
-    return '';
-  });
+  const [input, setInput] = useState('');
   const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -104,35 +90,16 @@ export default function HomePage() {
     };
   }, []);
 
-  // Restore saved prompt after guest logs in
+  // Restore saved guest prompt after login — runs when auth state settles
   useEffect(() => {
-    // Lazy init already restored — just clean up localStorage and focus
-    if (pendingPromptRestoredRef.current) {
-      localStorage.removeItem('guest_pending_prompt');
-      setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 100);
-      return;
-    }
-
-    // Login-while-mounted case: subscribe to store changes
-    const restorePrompt = () => {
-      if (pendingPromptRestoredRef.current) return;
-      const { isGuest: guest, user: u } = useAuthStore.getState();
-      if (!guest && u) {
-        const saved = localStorage.getItem('guest_pending_prompt');
-        if (saved) {
-          pendingPromptRestoredRef.current = true;
-          setInput(saved);
-          // Keep localStorage intact — a remount may follow (router.push('/'))
-          // The lazy initializer above will pick it up on remount
-          setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 100);
-        }
+    if (!isGuest && user) {
+      const saved = localStorage.getItem('guest_pending_prompt');
+      if (saved) {
+        setInput(saved);
+        setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 100);
       }
-    };
-
-    restorePrompt();
-    const unsub = useAuthStore.subscribe(restorePrompt);
-    return unsub;
-  }, []);
+    }
+  }, [isGuest, user]);
 
   const handleSubmit = async () => {
     if ((!input.trim() && !uploadedFile) || isSubmitting || isUploading) return;
