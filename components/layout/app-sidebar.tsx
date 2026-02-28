@@ -2,12 +2,12 @@
 
 import * as React from "react"
 import {
-  Scale,
-  FileText,
   MessageSquarePlus,
   Library,
   Bookmark,
   ShieldCheck,
+  ClipboardList,
+  Users,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/nav-main"
@@ -42,11 +42,11 @@ const navMain = [
       { title: "Cases", url: "/cases" },
       { title: "Notes", url: "/notes" },
       { title: "Folders", url: "/folders" },
-      { title: "My Requests", url: "/content-requests" },
-      { title: "Community", url: "/shared" },
-      { title: "Bookmarks", url: "/bookmarks" },
     ],
   },
+  { title: "My Requests", url: "/content-requests", icon: ClipboardList },
+  { title: "Community",   url: "/shared",           icon: Users },
+  { title: "Bookmarks",   url: "/bookmarks",        icon: Bookmark },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
