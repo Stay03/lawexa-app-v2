@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MessageSquare, Eye, TrendingUp, ChevronRight } from 'lucide-react';
+import { Eye, TrendingUp, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import type { TrendingConversationItem } from '@/types/chat';
@@ -36,7 +36,6 @@ function TrendingConversationCard({
     id,
     title,
     author,
-    messages_count,
     views_count,
     trending_score,
     unique_viewers,
@@ -71,60 +70,42 @@ function TrendingConversationCard({
             </Badge>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-2 text-[16px] text-muted-foreground sm:flex-nowrap sm:gap-2.5">
-            {/* Messages count */}
-            <span className="flex items-center gap-1">
-              <MessageSquare className="h-3.5 w-3.5" />
-              {messages_count}
-            </span>
-
-            {/* Views count */}
-            <span className="flex items-center gap-1">
-              <Eye className="h-3.5 w-3.5" />
-              {views_count}
-            </span>
-
-            {/* Date */}
+          <div className="flex shrink-0 items-center gap-2.5 text-[16px] text-muted-foreground">
             <span className="tabular-nums">{formatRelativeTime(created_at)}</span>
-
             <ChevronRight className="h-4 w-4 opacity-50 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
           </div>
         </div>
 
-        {/* Author, Agent, and Unique Viewers */}
-        <div className="mt-1 flex items-center gap-3 text-[16px] text-muted-foreground">
-          {/* Author */}
-          <div className="flex items-center gap-1.5">
+        {/* Author, Agent, Views, and Unique Viewers */}
+        <div className="mt-1 flex min-w-0 items-center gap-3 text-[16px] text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-1.5">
             {author.avatar_url ? (
-              <img
-                src={author.avatar_url}
-                alt=""
-                className="h-5 w-5 shrink-0 rounded-full object-cover"
-              />
+              <img src={author.avatar_url} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
             ) : (
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
                 {author.name.charAt(0).toUpperCase()}
               </span>
             )}
-            <span>{author.name}</span>
+            <span className="truncate">{author.name}</span>
           </div>
-
-          {/* Agent */}
           {agent && (
-            <>
+            <span className="hidden shrink-0 items-center gap-3 sm:flex">
               <span className="text-muted-foreground/50">·</span>
               <span className="text-muted-foreground/80">{agent.name}</span>
-            </>
+            </span>
           )}
-
-          {/* Unique viewers */}
+          <span className="shrink-0 text-muted-foreground/50">·</span>
+          <span className="flex shrink-0 items-center gap-1">
+            <Eye className="h-3.5 w-3.5" />
+            {views_count}
+          </span>
           {unique_viewers > 0 && (
-            <>
+            <span className="hidden shrink-0 items-center gap-3 sm:flex">
               <span className="text-muted-foreground/50">·</span>
               <span className="text-muted-foreground/80">
                 {unique_viewers} unique {unique_viewers === 1 ? 'viewer' : 'viewers'}
               </span>
-            </>
+            </span>
           )}
         </div>
       </div>

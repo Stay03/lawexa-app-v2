@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { TrendingUp, Clock, Loader2, MessageSquare } from 'lucide-react';
+import { TrendingUp, Clock, Loader2 } from 'lucide-react';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
   ConversationCard,
