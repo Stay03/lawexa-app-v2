@@ -49,7 +49,7 @@ import type { FolderItemType } from '@/types/folder';
 
 const CONTENT_TYPE_TABS = [
   { value: 'all', label: 'All' },
-  { value: 'subfolder', label: 'Subfolders' },
+  { value: 'subfolder', label: 'Folders' },
   { value: 'case', label: 'Cases' },
   { value: 'note', label: 'Notes' },
   { value: 'conversation', label: 'Conversations' },

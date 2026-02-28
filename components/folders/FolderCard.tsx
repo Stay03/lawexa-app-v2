@@ -80,11 +80,8 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
           </h3>
 
           <div className="hidden shrink-0 items-center gap-2.5 text-sm text-muted-foreground sm:flex">
-            {items_count > 0 && (
-              <span>{items_count} {items_count === 1 ? 'item' : 'items'}</span>
-            )}
-            {children_count > 0 && (
-              <span>{children_count} {children_count === 1 ? 'subfolder' : 'subfolders'}</span>
+            {(items_count + children_count) > 0 && (
+              <span>{items_count + children_count} {(items_count + children_count) === 1 ? 'item' : 'items'}</span>
             )}
             {is_private && (
               <span className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">

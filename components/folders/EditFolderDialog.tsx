@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Globe, Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -198,17 +198,28 @@ function EditFolderDialog({ open, onOpenChange, folder }: EditFolderDialogProps)
               />
             </div>
 
-            {/* Private toggle */}
+            {/* Visibility toggle */}
             <FormField
               control={form.control}
               name="is_private"
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <FormLabel className="text-sm font-medium">Private folder</FormLabel>
-                    <p className="text-sm text-muted-foreground">
-                      Only you can see this folder
-                    </p>
+                  <div className="flex items-center gap-3">
+                    {field.value ? (
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Globe className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <div>
+                      <FormLabel className="text-sm font-medium">
+                        {field.value ? 'Private' : 'Shared'}
+                      </FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        {field.value
+                          ? 'Only you can see this folder'
+                          : 'Visible to all team members'}
+                      </p>
+                    </div>
                   </div>
                   <FormControl>
                     <Switch

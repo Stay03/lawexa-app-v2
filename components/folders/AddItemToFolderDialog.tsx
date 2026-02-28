@@ -137,7 +137,7 @@ function AddItemToFolderDialog({
           </div>
 
           {/* Results list */}
-          <div className="max-h-[300px] overflow-y-auto overflow-x-hidden rounded-lg border divide-y divide-border">
+          <div className="max-h-[300px] overflow-y-auto overflow-x-auto rounded-lg border divide-y divide-border">
             {activeQuery.isFetching ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -174,15 +174,15 @@ function AddItemToFolderDialog({
                         <FileText className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                      <p className="truncate text-sm font-medium">{item.title}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="whitespace-nowrap text-sm font-medium">{item.title}</p>
                       {'content_preview' in item && (
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="whitespace-nowrap text-xs text-muted-foreground">
                           {(item as { content_preview: string }).content_preview}
                         </p>
                       )}
                       {'citation' in item && (item as { citation: string | null }).citation && (
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="whitespace-nowrap text-xs text-muted-foreground">
                           {(item as { citation: string | null }).citation}
                         </p>
                       )}
