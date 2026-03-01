@@ -6,6 +6,7 @@ import {
   FileText,
   MessageSquare,
   Folder,
+  BookOpen,
   Trash2,
   ChevronRight,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const TYPE_ICONS: Record<FolderItemType, typeof Scale> = {
   note: FileText,
   conversation: MessageSquare,
   folder: Folder,
+  statute: BookOpen,
 };
 
 const TYPE_LABELS: Record<FolderItemType, string> = {
@@ -32,6 +34,7 @@ const TYPE_LABELS: Record<FolderItemType, string> = {
   note: 'Note',
   conversation: 'Conversation',
   folder: 'Folder',
+  statute: 'Statute',
 };
 
 /******************************************************************************
@@ -172,6 +175,8 @@ function _getItemHref(item: FolderItem): string {
       return `/c/${content.id}`;
     case 'folder':
       return `/folders/${content.uuid || content.id}`;
+    case 'statute':
+      return `/statutes/${content.slug || content.id}`;
     default:
       return '#';
   }

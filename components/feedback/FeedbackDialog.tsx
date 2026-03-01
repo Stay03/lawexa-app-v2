@@ -74,7 +74,7 @@ function FeedbackDialog({ open, onOpenChange, context }: FeedbackDialogProps) {
   const dragCounter = useRef(0);
 
   const categories = FEEDBACK_CATEGORIES[context.contentType];
-  const contentLabel = context.contentType === 'case' ? 'Case' : 'Note';
+  const contentLabel = context.contentType === 'case' ? 'Case' : context.contentType === 'statute' ? 'Statute' : 'Note';
 
   const form = useForm<FeedbackFormValues>({
     resolver: zodResolver(feedbackFormSchema),

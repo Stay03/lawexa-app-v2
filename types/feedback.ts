@@ -3,7 +3,7 @@
  */
 
 // Content types that can have feedback attached
-export type FeedbackContentType = 'case' | 'note';
+export type FeedbackContentType = 'case' | 'note' | 'statute';
 
 // A single feedback category option for the checkbox list
 export interface FeedbackCategory {

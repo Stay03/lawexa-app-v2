@@ -25,9 +25,20 @@ const NOTE_CATEGORIES: FeedbackCategory[] = [
   { id: 'others', label: 'Others (Kindly tell us in the text box below)' },
 ];
 
+const STATUTE_CATEGORIES: FeedbackCategory[] = [
+  { id: 'app_crashed', label: 'The app crashed' },
+  { id: 'unable_view_content', label: 'I am unable to view statute content' },
+  { id: 'missing_sections', label: 'Missing sections or provisions' },
+  { id: 'inaccurate_text', label: 'Inaccurate text provided' },
+  { id: 'formatting_issues', label: 'Formatting issues' },
+  { id: 'no_issues', label: 'No issues, Lawexa rocks!' },
+  { id: 'others', label: 'Others (Kindly tell us in the text box below)' },
+];
+
 const FEEDBACK_CATEGORIES: Record<FeedbackContentType, FeedbackCategory[]> = {
   case: CASE_CATEGORIES,
   note: NOTE_CATEGORIES,
+  statute: STATUTE_CATEGORIES,
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -87,6 +98,7 @@ export {
   FEEDBACK_CATEGORIES,
   CASE_CATEGORIES,
   NOTE_CATEGORIES,
+  STATUTE_CATEGORIES,
   MAX_FILE_SIZE,
   MAX_FILES,
   ACCEPTED_FILE_TYPES,

@@ -32,7 +32,7 @@ import type {
 interface FloatingPromptInputProps {
   className?: string;
   contextSlug?: string;
-  contextType?: 'case' | 'note';
+  contextType?: 'case' | 'note' | 'statute';
   contextTitle?: string;
 }
 
@@ -321,7 +321,8 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     // Prepend context slug for the first message only
     let messageToSend = message;
     if (!conversationId && contextSlug && contextType) {
-      const slugTag = contextType === 'case' ? 'case_slug' : 'note_slug';
+      const slugTagMap = { case: 'case_slug', note: 'note_slug', statute: 'statute_slug' } as const;
+      const slugTag = slugTagMap[contextType];
       messageToSend = `<${slugTag}>${contextSlug}</${slugTag}>\n\n${message}`;
     }
 

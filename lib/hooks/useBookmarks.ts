@@ -6,11 +6,13 @@ import { caseKeys } from './useCases';
 import { noteKeys } from './useNotes';
 import { trendingKeys } from './useTrending';
 import { folderKeys } from './useFolders';
+import { statuteKeys } from './useStatutes';
 import type { BookmarkListParams, BookmarkType } from '@/types/bookmark';
 import type { CaseDetailResponse, CaseListResponse } from '@/types/case';
 import type { NoteResponse, NoteListResponse } from '@/types/note';
 import type { TrendingCasesResponse, TrendingNotesResponse } from '@/types/trending';
 import type { FolderResponse, FolderListResponse, MyFolderListResponse } from '@/types/folder';
+import type { StatuteDetailResponse, StatuteListResponse } from '@/types/statute';
 
 // Query key factory
 export const bookmarkKeys = {
@@ -257,6 +259,52 @@ export function useToggleBookmark() {
                 bookmarks_count: updatedData[folderIndex].is_bookmarked
                   ? Math.max(0, updatedData[folderIndex].bookmarks_count - 1)
                   : updatedData[folderIndex].bookmarks_count + 1,
+              };
+              queryClient.setQueryData(queryKey, { ...data, data: updatedData });
+            }
+          }
+        }
+      } else if (type === 'statute') {
+        await queryClient.cancelQueries({ queryKey: statuteKeys.details() });
+        await queryClient.cancelQueries({ queryKey: statuteKeys.lists() });
+
+        // Optimistically update statute detail caches
+        const statuteDetailQueries = queryClient.getQueriesData<StatuteDetailResponse>({
+          queryKey: statuteKeys.details(),
+        });
+        for (const [queryKey, data] of statuteDetailQueries) {
+          if (data?.data && data.data.id === id) {
+            snapshots.push({ queryKey, data });
+            queryClient.setQueryData(queryKey, {
+              ...data,
+              data: {
+                ...data.data,
+                is_bookmarked: !data.data.is_bookmarked,
+                bookmarks_count: data.data.is_bookmarked
+                  ? Math.max(0, data.data.bookmarks_count - 1)
+                  : data.data.bookmarks_count + 1,
+              },
+            });
+          }
+        }
+
+        // Optimistically update statute list caches
+        const statuteListQueries = queryClient.getQueriesData<StatuteListResponse>({
+          queryKey: statuteKeys.lists(),
+        });
+        for (const [queryKey, data] of statuteListQueries) {
+          if (data?.data) {
+            const statuteIndex = data.data.findIndex((s) => s.id === id);
+            if (statuteIndex !== -1) {
+              snapshots.push({ queryKey, data });
+              const updatedData = [...data.data];
+              const item = updatedData[statuteIndex];
+              updatedData[statuteIndex] = {
+                ...item,
+                is_bookmarked: !item.is_bookmarked,
+                bookmarks_count: item.is_bookmarked
+                  ? Math.max(0, item.bookmarks_count - 1)
+                  : item.bookmarks_count + 1,
               };
               queryClient.setQueryData(queryKey, { ...data, data: updatedData });
             }

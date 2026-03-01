@@ -43,6 +43,7 @@ const navMain = [
     items: [
       { title: "Cases", url: "/cases" },
       { title: "Notes", url: "/notes" },
+      { title: "Statutes", url: "/statutes" },
       { title: "Folders", url: "/folders" },
     ],
   },
@@ -56,6 +57,7 @@ const GUEST_RESTRICTED_URLS = new Set([
   '/',
   '/cases',
   '/notes',
+  '/statutes',
   '/folders',
   '/content-requests',
   '/bookmarks',

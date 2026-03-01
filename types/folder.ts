@@ -29,7 +29,7 @@ export interface FolderUser {
 export type FolderSortField = 'created_at' | 'updated_at' | 'name';
 
 // Folder item content types
-export type FolderItemType = 'case' | 'note' | 'conversation' | 'folder';
+export type FolderItemType = 'case' | 'note' | 'conversation' | 'folder' | 'statute';
 
 // Folder summary (used in lists, children arrays, parent references)
 export interface FolderSummary {
