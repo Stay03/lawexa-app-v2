@@ -20,7 +20,7 @@ export interface AdminLawyerConnectListParams {
 }
 
 export interface AdminLawyerConnectAnalyticsParams {
-  period?: 'today' | '7d' | '30d' | '90d' | 'custom';
+  period?: 'today' | 'last_7_days' | 'last_30_days' | 'date_range';
   start_date?: string;
   end_date?: string;
 }

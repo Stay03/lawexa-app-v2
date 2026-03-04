@@ -18,7 +18,7 @@ function LawyerConnectAnalyticsContent() {
   // Read params from URL
   const params = useMemo<AdminLawyerConnectAnalyticsParams>(() => {
     const period =
-      (searchParams.get('period') as AnalyticsPeriod) || '30d';
+      (searchParams.get('period') as AnalyticsPeriod) || 'last_30_days';
     const start_date = searchParams.get('start_date') || undefined;
     const end_date = searchParams.get('end_date') || undefined;
     return { period, start_date, end_date };
@@ -49,7 +49,7 @@ function LawyerConnectAnalyticsContent() {
 
   const handlePeriodChange = useCallback(
     (period: AnalyticsPeriod) => {
-      if (period !== 'custom') {
+      if (period !== 'date_range') {
         updateParams({ period, start_date: undefined, end_date: undefined });
       } else {
         updateParams({ period });
@@ -60,14 +60,14 @@ function LawyerConnectAnalyticsContent() {
 
   const handleCustomRangeChange = useCallback(
     (startDate: string, endDate: string) => {
-      updateParams({ period: 'custom', start_date: startDate, end_date: endDate });
+      updateParams({ period: 'date_range', start_date: startDate, end_date: endDate });
     },
     [updateParams]
   );
 
   const PeriodSelector = (
     <AnalyticsPeriodSelector
-      period={(params.period as AnalyticsPeriod) || '30d'}
+      period={(params.period as AnalyticsPeriod) || 'last_30_days'}
       startDate={params.start_date}
       endDate={params.end_date}
       onPeriodChange={handlePeriodChange}

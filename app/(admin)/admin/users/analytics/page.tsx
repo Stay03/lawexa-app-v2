@@ -19,7 +19,7 @@ function UserAnalyticsContent() {
   // Read params from URL
   const params = useMemo<UserAnalyticsParams>(() => {
     const period =
-      (searchParams.get('period') as AnalyticsPeriod) || '30d';
+      (searchParams.get('period') as AnalyticsPeriod) || 'last_30_days';
     const start_date = searchParams.get('start_date') || undefined;
     const end_date = searchParams.get('end_date') || undefined;
     return { period, start_date, end_date };
@@ -50,7 +50,7 @@ function UserAnalyticsContent() {
 
   const handlePeriodChange = useCallback(
     (period: AnalyticsPeriod) => {
-      if (period !== 'custom') {
+      if (period !== 'date_range') {
         updateParams({
           period,
           start_date: undefined,
@@ -66,7 +66,7 @@ function UserAnalyticsContent() {
   const handleCustomRangeChange = useCallback(
     (startDate: string, endDate: string) => {
       updateParams({
-        period: 'custom',
+        period: 'date_range',
         start_date: startDate,
         end_date: endDate,
       });
@@ -83,7 +83,7 @@ function UserAnalyticsContent() {
           </h1>
           <div className="flex items-center gap-2">
             <AnalyticsPeriodSelector
-              period={(params.period as AnalyticsPeriod) || '30d'}
+              period={(params.period as AnalyticsPeriod) || 'last_30_days'}
               startDate={params.start_date}
               endDate={params.end_date}
               onPeriodChange={handlePeriodChange}
@@ -108,7 +108,7 @@ function UserAnalyticsContent() {
         </h1>
         <div className="flex items-center gap-2">
           <AnalyticsPeriodSelector
-            period={(params.period as AnalyticsPeriod) || '30d'}
+            period={(params.period as AnalyticsPeriod) || 'last_30_days'}
             startDate={params.start_date}
             endDate={params.end_date}
             onPeriodChange={handlePeriodChange}

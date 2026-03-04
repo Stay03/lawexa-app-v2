@@ -28,10 +28,9 @@ interface AnalyticsPeriodSelectorProps {
 
 const PERIOD_LABELS: Record<AnalyticsPeriod, string> = {
   today: 'Today',
-  '7d': 'Last 7 days',
-  '30d': 'Last 30 days',
-  '90d': 'Last 90 days',
-  custom: 'Custom Range',
+  last_7_days: 'Last 7 days',
+  last_30_days: 'Last 30 days',
+  date_range: 'Custom Range',
 };
 
 export function AnalyticsPeriodSelector({
@@ -50,7 +49,7 @@ export function AnalyticsPeriodSelector({
    */
   function handlePeriodChange(value: string) {
     const newPeriod = value as AnalyticsPeriod;
-    if (newPeriod === 'custom') {
+    if (newPeriod === 'date_range') {
       setIsPopoverOpen(true);
     } else {
       onPeriodChange(newPeriod);
@@ -82,7 +81,7 @@ export function AnalyticsPeriodSelector({
         </SelectContent>
       </Select>
 
-      {period === 'custom' && (
+      {period === 'date_range' && (
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1.5">

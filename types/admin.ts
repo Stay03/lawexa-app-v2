@@ -321,7 +321,7 @@ export interface AdminUserTokenUsageResponse {
 // Based on API documentation: /docs/apiDocs/conversation-analytics-api.md
 // ============================================
 
-export type AnalyticsPeriod = 'today' | '7d' | '30d' | '90d' | 'custom';
+export type AnalyticsPeriod = 'today' | 'last_7_days' | 'last_30_days' | 'date_range';
 
 export interface ConversationAnalyticsParams {
   period?: AnalyticsPeriod;

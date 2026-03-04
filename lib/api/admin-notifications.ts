@@ -85,7 +85,7 @@ export const adminNotificationsApi = {
       '/admin/notifications/analytics',
       {
         params: {
-          period: params.period ?? '30d',
+          period: params.period ?? 'last_30_days',
           start_date: params.start_date,
           end_date: params.end_date,
         },
