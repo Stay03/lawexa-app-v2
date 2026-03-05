@@ -87,9 +87,10 @@ export function ConversationsAndMessagesChart({
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(v) => {
-                    if (isHourly) return formatHour(v);
-                    return new Date(v).toLocaleDateString('en-US', {
+                  labelFormatter={(_v, payload) => {
+                    const pt = payload?.[0]?.payload;
+                    if (isHourly) return formatHour(String(pt?.hour ?? _v));
+                    return new Date(pt?.date ?? _v).toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',
                       year: 'numeric',
