@@ -20,12 +20,15 @@ function ConversationAnalyticsContent() {
   const params = useMemo<ConversationAnalyticsParams>(() => {
     const period =
       (searchParams.get('period') as AnalyticsPeriod) || 'last_30_days';
+    const date = searchParams.get('date') || undefined;
     const start_date = searchParams.get('start_date') || undefined;
     const end_date = searchParams.get('end_date') || undefined;
-    return { period, start_date, end_date };
+    return { period, date, start_date, end_date };
   }, [searchParams]);
 
   const { data, isLoading, error } = useConversationAnalytics(params);
+
+  const granularity = data?.data?.granularity ?? 'day';
 
   // Update URL params
   const updateParams = useCallback(
@@ -50,9 +53,10 @@ function ConversationAnalyticsContent() {
 
   const handlePeriodChange = useCallback(
     (period: AnalyticsPeriod) => {
-      if (period !== 'date_range') {
+      if (period !== 'date_range' && period !== 'date') {
         updateParams({
           period,
+          date: undefined,
           start_date: undefined,
           end_date: undefined,
         });
@@ -63,15 +67,40 @@ function ConversationAnalyticsContent() {
     [updateParams]
   );
 
+  const handleDateChange = useCallback(
+    (date: string) => {
+      updateParams({
+        period: 'date',
+        date,
+        start_date: undefined,
+        end_date: undefined,
+      });
+    },
+    [updateParams]
+  );
+
   const handleCustomRangeChange = useCallback(
     (startDate: string, endDate: string) => {
       updateParams({
         period: 'date_range',
+        date: undefined,
         start_date: startDate,
         end_date: endDate,
       });
     },
     [updateParams]
+  );
+
+  const periodSelector = (
+    <AnalyticsPeriodSelector
+      period={(params.period as AnalyticsPeriod) || 'last_30_days'}
+      date={params.date}
+      startDate={params.start_date}
+      endDate={params.end_date}
+      onPeriodChange={handlePeriodChange}
+      onDateChange={handleDateChange}
+      onCustomRangeChange={handleCustomRangeChange}
+    />
   );
 
   if (error) {
@@ -82,13 +111,7 @@ function ConversationAnalyticsContent() {
             Conversation Analytics
           </h1>
           <div className="flex items-center gap-2">
-            <AnalyticsPeriodSelector
-              period={(params.period as AnalyticsPeriod) || 'last_30_days'}
-              startDate={params.start_date}
-              endDate={params.end_date}
-              onPeriodChange={handlePeriodChange}
-              onCustomRangeChange={handleCustomRangeChange}
-            />
+            {periodSelector}
             <CurrencySettings />
           </div>
         </div>
@@ -107,13 +130,7 @@ function ConversationAnalyticsContent() {
           Conversation Analytics
         </h1>
         <div className="flex items-center gap-2">
-          <AnalyticsPeriodSelector
-            period={(params.period as AnalyticsPeriod) || 'last_30_days'}
-            startDate={params.start_date}
-            endDate={params.end_date}
-            onPeriodChange={handlePeriodChange}
-            onCustomRangeChange={handleCustomRangeChange}
-          />
+          {periodSelector}
           <CurrencySettings />
         </div>
       </div>
@@ -143,7 +160,7 @@ function ConversationAnalyticsContent() {
           </div>
         </div>
       ) : data?.data?.charts ? (
-        <AnalyticsCharts charts={data.data.charts} />
+        <AnalyticsCharts charts={data.data.charts} granularity={granularity} />
       ) : null}
 
       {/* Data Tables */}

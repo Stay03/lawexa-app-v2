@@ -22,12 +22,24 @@ import type { CostAndTokensTrendPoint } from '@/types/admin';
 
 interface CostAndTokensTrendChartProps {
   data: CostAndTokensTrendPoint[];
+  granularity: 'hour' | 'day';
+}
+
+function formatHourLabel(hour: string): string {
+  const h = parseInt(hour, 10);
+  if (h === 0) return '12 AM';
+  if (h < 12) return `${h} AM`;
+  if (h === 12) return '12 PM';
+  return `${h - 12} PM`;
 }
 
 export function CostAndTokensTrendChart({
   data,
+  granularity,
 }: CostAndTokensTrendChartProps) {
   const { showNGN, exchangeRate } = useCurrencyStore();
+  const isHourly = granularity === 'hour';
+  const xKey = isHourly ? 'hour' : 'date';
 
   const chartConfig = useMemo<ChartConfig>(
     () => ({
@@ -69,7 +81,7 @@ export function CostAndTokensTrendChart({
       <Card>
         <CardHeader>
           <CardTitle>Cost & Tokens Trend</CardTitle>
-          <CardDescription>Daily cost and token usage</CardDescription>
+          <CardDescription>{isHourly ? 'Hourly' : 'Daily'} cost and token usage</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -82,18 +94,19 @@ export function CostAndTokensTrendChart({
     <Card>
       <CardHeader>
         <CardTitle>Cost & Tokens Trend</CardTitle>
-        <CardDescription>Daily cost and token usage</CardDescription>
+        <CardDescription>{isHourly ? 'Hourly' : 'Daily'} cost and token usage</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <AreaChart data={chartData} accessibilityLayer margin={{ top: 20 }}>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="date"
+              dataKey={xKey}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v) => {
+                if (isHourly) return formatHourLabel(v);
                 const d = new Date(v);
                 return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
               }}
@@ -135,6 +148,7 @@ export function CostAndTokensTrendChart({
               content={
                 <ChartTooltipContent
                   labelFormatter={(v) => {
+                    if (isHourly) return formatHourLabel(v);
                     return new Date(v).toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',

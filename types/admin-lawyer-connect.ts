@@ -2,6 +2,7 @@
 // Based on API documentation: /docs/apiDocs/lawyer-connect.md
 
 import type { LawyerConnectionRequest } from './connection';
+import type { AnalyticsPeriod } from './admin';
 
 // ============================================
 // Query Parameters
@@ -20,7 +21,8 @@ export interface AdminLawyerConnectListParams {
 }
 
 export interface AdminLawyerConnectAnalyticsParams {
-  period?: 'today' | 'last_7_days' | 'last_30_days' | 'date_range';
+  period?: AnalyticsPeriod;
+  date?: string;
   start_date?: string;
   end_date?: string;
 }

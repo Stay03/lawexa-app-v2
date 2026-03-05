@@ -321,10 +321,19 @@ export interface AdminUserTokenUsageResponse {
 // Based on API documentation: /docs/apiDocs/conversation-analytics-api.md
 // ============================================
 
-export type AnalyticsPeriod = 'today' | 'last_7_days' | 'last_30_days' | 'date_range';
+export type AnalyticsPeriod =
+  | 'today'
+  | 'last_24_hours'
+  | 'date'
+  | 'this_week'
+  | 'last_7_days'
+  | 'this_month'
+  | 'last_30_days'
+  | 'date_range';
 
 export interface ConversationAnalyticsParams {
   period?: AnalyticsPeriod;
+  date?: string;
   start_date?: string;
   end_date?: string;
 }
@@ -351,13 +360,15 @@ export interface AnalyticsStatCards {
 }
 
 export interface ConversationsOverTimePoint {
-  date: string;
+  date?: string;
+  hour?: string;
   conversations: number;
   unique_users: number;
 }
 
 export interface CostAndTokensTrendPoint {
-  date: string;
+  date?: string;
+  hour?: string;
   total_cost: number;
   total_tokens: number;
   prompt_tokens: number;
@@ -388,7 +399,8 @@ export interface ModelUsageRow {
 }
 
 export interface MessageRoleDistributionPoint {
-  date: string;
+  date?: string;
+  hour?: string;
   user_count: number;
   assistant_count: number;
   tool_count: number;
@@ -438,6 +450,7 @@ export interface AnalyticsTables {
 
 export interface ConversationAnalyticsData {
   period: AnalyticsPeriodInfo;
+  granularity: 'hour' | 'day';
   stat_cards: AnalyticsStatCards;
   charts: AnalyticsCharts;
   tables: AnalyticsTables;

@@ -20,6 +20,7 @@ import type { ConversationsOverTimePoint } from '@/types/admin';
 
 interface ConversationsOverTimeChartProps {
   data: ConversationsOverTimePoint[];
+  granularity: 'hour' | 'day';
 }
 
 const chartConfig = {
@@ -33,15 +34,27 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+function formatHourLabel(hour: string): string {
+  const h = parseInt(hour, 10);
+  if (h === 0) return '12 AM';
+  if (h < 12) return `${h} AM`;
+  if (h === 12) return '12 PM';
+  return `${h - 12} PM`;
+}
+
 export function ConversationsOverTimeChart({
   data,
+  granularity,
 }: ConversationsOverTimeChartProps) {
+  const isHourly = granularity === 'hour';
+  const xKey = isHourly ? 'hour' : 'date';
+
   if (!data.length) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Conversations Over Time</CardTitle>
-          <CardDescription>Daily conversations and unique users</CardDescription>
+          <CardDescription>{isHourly ? 'Hourly' : 'Daily'} conversations and unique users</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -54,18 +67,19 @@ export function ConversationsOverTimeChart({
     <Card>
       <CardHeader>
         <CardTitle>Conversations Over Time</CardTitle>
-        <CardDescription>Daily conversations and unique users</CardDescription>
+        <CardDescription>{isHourly ? 'Hourly' : 'Daily'} conversations and unique users</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <AreaChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="date"
+              dataKey={xKey}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v) => {
+                if (isHourly) return formatHourLabel(v);
                 const d = new Date(v);
                 return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
               }}
@@ -75,6 +89,7 @@ export function ConversationsOverTimeChart({
               content={
                 <ChartTooltipContent
                   labelFormatter={(v) => {
+                    if (isHourly) return formatHourLabel(v);
                     return new Date(v).toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',

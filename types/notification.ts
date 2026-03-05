@@ -167,6 +167,7 @@ export interface BroadcastRecipientsResponse {
 // GET /api/admin/notifications/analytics query params
 export interface NotificationAnalyticsParams {
   period?: AnalyticsPeriod;
+  date?: string;
   start_date?: string;
   end_date?: string;
 }

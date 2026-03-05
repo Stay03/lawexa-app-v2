@@ -20,6 +20,7 @@ import type { MessageRoleDistributionPoint } from '@/types/admin';
 
 interface MessageRoleDistributionChartProps {
   data: MessageRoleDistributionPoint[];
+  granularity: 'hour' | 'day';
 }
 
 const chartConfig = {
@@ -37,9 +38,21 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+function formatHourLabel(hour: string): string {
+  const h = parseInt(hour, 10);
+  if (h === 0) return '12 AM';
+  if (h < 12) return `${h} AM`;
+  if (h === 12) return '12 PM';
+  return `${h - 12} PM`;
+}
+
 export function MessageRoleDistributionChart({
   data,
+  granularity,
 }: MessageRoleDistributionChartProps) {
+  const isHourly = granularity === 'hour';
+  const xKey = isHourly ? 'hour' : 'date';
+
   if (!data.length) {
     return (
       <Card>
@@ -65,11 +78,12 @@ export function MessageRoleDistributionChart({
           <AreaChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="date"
+              dataKey={xKey}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v) => {
+                if (isHourly) return formatHourLabel(v);
                 const d = new Date(v);
                 return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
               }}
@@ -79,6 +93,7 @@ export function MessageRoleDistributionChart({
               content={
                 <ChartTooltipContent
                   labelFormatter={(v) => {
+                    if (isHourly) return formatHourLabel(v);
                     return new Date(v).toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',
