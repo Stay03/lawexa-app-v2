@@ -8,28 +8,29 @@ import { ProfessionDistributionChart } from './user-charts/ProfessionDistributio
 import { CountryDistributionChart } from './user-charts/CountryDistributionChart';
 import { LawSchoolDistributionChart } from './user-charts/LawSchoolDistributionChart';
 import { AreaOfStudyDistributionChart } from './user-charts/AreaOfStudyDistributionChart';
-import type { UserAnalyticsCharts as UserAnalyticsChartsType } from '@/types/admin';
+import type { UserAnalyticsCharts as UserAnalyticsChartsType, ViewAnalyticsGranularity } from '@/types/admin';
 
 interface UserAnalyticsChartsProps {
   charts: UserAnalyticsChartsType;
+  granularity: ViewAnalyticsGranularity;
 }
 
 /**
  * Default component. Composes all user analytics charts in a responsive grid layout.
  */
-function UserAnalyticsCharts({ charts }: UserAnalyticsChartsProps) {
+function UserAnalyticsCharts({ charts, granularity }: UserAnalyticsChartsProps) {
   return (
     <div className="space-y-6">
       {/* Row 1: User Growth + Conversations & Messages */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UserGrowthChart data={charts.user_growth} />
-        <ConversationsAndMessagesChart data={charts.conversations_and_messages} />
+        <UserGrowthChart data={charts.user_growth} granularity={granularity} />
+        <ConversationsAndMessagesChart data={charts.conversations_and_messages} granularity={granularity} />
       </div>
 
       {/* Row 2: Token Usage + Daily Cost */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TokenUsageChart data={charts.token_usage} />
-        <DailyCostChart data={charts.daily_cost} />
+        <TokenUsageChart data={charts.token_usage} granularity={granularity} />
+        <DailyCostChart data={charts.daily_cost} granularity={granularity} />
       </div>
 
       {/* Row 3: Profession + Country Distribution */}

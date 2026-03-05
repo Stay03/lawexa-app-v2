@@ -14,10 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import type { UserTokenUsagePoint } from '@/types/admin';
+import type { UserTokenUsagePoint, ViewAnalyticsGranularity } from '@/types/admin';
 
 interface TokenUsageChartProps {
   data: UserTokenUsagePoint[];
+  granularity: ViewAnalyticsGranularity;
 }
 
 const chartConfig = {
@@ -27,13 +28,20 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function TokenUsageChart({ data }: TokenUsageChartProps) {
+function formatHour(hour: string): string {
+  const h = parseInt(hour, 10);
+  if (h === 0) return '12 AM';
+  if (h === 12) return '12 PM';
+  return h < 12 ? `${h} AM` : `${h - 12} PM`;
+}
+
+export function TokenUsageChart({ data, granularity }: TokenUsageChartProps) {
   if (!data.length) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Token Usage</CardTitle>
-          <CardDescription>Total tokens per day (millions)</CardDescription>
+          <CardDescription>Total tokens consumed</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -42,22 +50,26 @@ export function TokenUsageChart({ data }: TokenUsageChartProps) {
     );
   }
 
+  const isHourly = granularity === 'hour';
+  const dataKey = isHourly ? 'hour' : 'date';
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Token Usage</CardTitle>
-        <CardDescription>Total tokens per day (millions)</CardDescription>
+        <CardDescription>Total tokens consumed</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <BarChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="date"
+              dataKey={dataKey}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v) => {
+                if (isHourly) return formatHour(v);
                 const d = new Date(v);
                 return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
               }}
@@ -76,13 +88,14 @@ export function TokenUsageChart({ data }: TokenUsageChartProps) {
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(v) =>
-                    new Date(v).toLocaleDateString('en-US', {
+                  labelFormatter={(v) => {
+                    if (isHourly) return formatHour(v);
+                    return new Date(v).toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',
                       year: 'numeric',
-                    })
-                  }
+                    });
+                  }}
                   formatter={(value) => [
                     Number(value).toLocaleString(),
                     'Tokens',

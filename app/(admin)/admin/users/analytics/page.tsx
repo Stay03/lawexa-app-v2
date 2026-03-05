@@ -4,13 +4,13 @@ import { Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUserAnalytics } from '@/lib/hooks/useAdmin';
-import { AnalyticsPeriodSelector } from '@/components/admin/analytics/AnalyticsPeriodSelector';
+import { ViewAnalyticsPeriodSelector } from '@/components/admin/analytics/ViewAnalyticsPeriodSelector';
 import { UserAnalyticsStatCards } from '@/components/admin/analytics/UserAnalyticsStatCards';
 import { UserAnalyticsCharts } from '@/components/admin/analytics/UserAnalyticsCharts';
 import { DailyBreakdownTable } from '@/components/admin/analytics/user-tables/DailyBreakdownTable';
 import { UniversitiesTable } from '@/components/admin/analytics/user-tables/UniversitiesTable';
 import { CurrencySettings } from '@/components/admin/CurrencySettings';
-import type { UserAnalyticsParams, AnalyticsPeriod } from '@/types/admin';
+import type { UserAnalyticsParams, UserAnalyticsPeriod } from '@/types/admin';
 
 function UserAnalyticsContent() {
   const router = useRouter();
@@ -19,10 +19,11 @@ function UserAnalyticsContent() {
   // Read params from URL
   const params = useMemo<UserAnalyticsParams>(() => {
     const period =
-      (searchParams.get('period') as AnalyticsPeriod) || 'last_30_days';
+      (searchParams.get('period') as UserAnalyticsPeriod) || 'last_30_days';
+    const date = searchParams.get('date') || undefined;
     const start_date = searchParams.get('start_date') || undefined;
     const end_date = searchParams.get('end_date') || undefined;
-    return { period, start_date, end_date };
+    return { period, date, start_date, end_date };
   }, [searchParams]);
 
   const { data, isLoading, error } = useUserAnalytics(params);
@@ -49,16 +50,29 @@ function UserAnalyticsContent() {
   );
 
   const handlePeriodChange = useCallback(
-    (period: AnalyticsPeriod) => {
-      if (period !== 'date_range') {
+    (period: UserAnalyticsPeriod) => {
+      if (period === 'date' || period === 'date_range') {
+        updateParams({ period });
+      } else {
         updateParams({
           period,
+          date: undefined,
           start_date: undefined,
           end_date: undefined,
         });
-      } else {
-        updateParams({ period });
       }
+    },
+    [updateParams]
+  );
+
+  const handleDateChange = useCallback(
+    (date: string) => {
+      updateParams({
+        period: 'date',
+        date,
+        start_date: undefined,
+        end_date: undefined,
+      });
     },
     [updateParams]
   );
@@ -67,11 +81,28 @@ function UserAnalyticsContent() {
     (startDate: string, endDate: string) => {
       updateParams({
         period: 'date_range',
+        date: undefined,
         start_date: startDate,
         end_date: endDate,
       });
     },
     [updateParams]
+  );
+
+  // Period selector shared across error and success states
+  const periodSelector = (
+    <div className="flex items-center gap-2">
+      <ViewAnalyticsPeriodSelector
+        period={(params.period as UserAnalyticsPeriod) || 'last_30_days'}
+        date={params.date}
+        startDate={params.start_date}
+        endDate={params.end_date}
+        onPeriodChange={handlePeriodChange}
+        onDateChange={handleDateChange}
+        onDateRangeChange={handleCustomRangeChange}
+      />
+      <CurrencySettings />
+    </div>
   );
 
   if (error) {
@@ -81,16 +112,7 @@ function UserAnalyticsContent() {
           <h1 className="text-2xl font-semibold tracking-tight">
             User Analytics
           </h1>
-          <div className="flex items-center gap-2">
-            <AnalyticsPeriodSelector
-              period={(params.period as AnalyticsPeriod) || 'last_30_days'}
-              startDate={params.start_date}
-              endDate={params.end_date}
-              onPeriodChange={handlePeriodChange}
-              onCustomRangeChange={handleCustomRangeChange}
-            />
-            <CurrencySettings />
-          </div>
+          {periodSelector}
         </div>
         <div className="rounded-lg border py-12 text-center text-muted-foreground">
           Failed to load analytics data. Please try again.
@@ -106,16 +128,7 @@ function UserAnalyticsContent() {
         <h1 className="text-2xl font-semibold tracking-tight">
           User Analytics
         </h1>
-        <div className="flex items-center gap-2">
-          <AnalyticsPeriodSelector
-            period={(params.period as AnalyticsPeriod) || 'last_30_days'}
-            startDate={params.start_date}
-            endDate={params.end_date}
-            onPeriodChange={handlePeriodChange}
-            onCustomRangeChange={handleCustomRangeChange}
-          />
-          <CurrencySettings />
-        </div>
+        {periodSelector}
       </div>
 
       {/* Stat Cards */}
@@ -150,7 +163,10 @@ function UserAnalyticsContent() {
           </div>
         </div>
       ) : data?.data?.charts ? (
-        <UserAnalyticsCharts charts={data.data.charts} />
+        <UserAnalyticsCharts
+          charts={data.data.charts}
+          granularity={data.data.granularity}
+        />
       ) : null}
 
       {/* Tables Section */}
@@ -165,7 +181,10 @@ function UserAnalyticsContent() {
       ) : data?.data?.tables ? (
         <div className="space-y-6">
           {/* Daily Breakdown - full width */}
-          <DailyBreakdownTable data={data.data.tables.daily_breakdown} />
+          <DailyBreakdownTable
+            data={data.data.tables.daily_breakdown}
+            granularity={data.data.granularity}
+          />
 
           {/* Universities tables - side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

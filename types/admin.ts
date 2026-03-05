@@ -454,7 +454,14 @@ export interface ConversationAnalyticsResponse {
 // Based on API documentation: /docs/apiDocs/user-analytics-api.md
 // ============================================
 
-export type UserAnalyticsParams = ConversationAnalyticsParams;
+export type UserAnalyticsPeriod = ViewAnalyticsPeriod;
+
+export interface UserAnalyticsParams {
+  period?: UserAnalyticsPeriod;
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+}
 
 export interface UserAnalyticsStatCards {
   new_users: AnalyticsStatCard;
@@ -465,23 +472,27 @@ export interface UserAnalyticsStatCards {
 }
 
 export interface UserGrowthPoint {
-  date: string;
+  date?: string;
+  hour?: string;
   count: number;
 }
 
 export interface UserConversationsAndMessagesPoint {
-  date: string;
+  date?: string;
+  hour?: string;
   conversations: number;
   messages: number;
 }
 
 export interface UserTokenUsagePoint {
-  date: string;
+  date?: string;
+  hour?: string;
   total_tokens: number;
 }
 
 export interface UserDailyCostPoint {
-  date: string;
+  date?: string;
+  hour?: string;
   cost: number;
 }
 
@@ -521,7 +532,8 @@ export interface UserAnalyticsCharts {
 }
 
 export interface UserDailyBreakdownRow {
-  date: string;
+  date?: string;
+  hour?: string;
   new_users: number;
   conversations: number;
   messages: number;
@@ -545,6 +557,7 @@ export interface UserAnalyticsTables {
 
 export interface UserAnalyticsData {
   period: AnalyticsPeriodInfo;
+  granularity: ViewAnalyticsGranularity;
   stat_cards: UserAnalyticsStatCards;
   charts: UserAnalyticsCharts;
   tables: UserAnalyticsTables;

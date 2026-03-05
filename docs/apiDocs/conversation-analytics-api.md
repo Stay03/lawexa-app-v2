@@ -8,7 +8,8 @@ This endpoint provides a comprehensive analytics dashboard for conversations, po
 - 6 stat cards with period-over-period change percentages
 - 7 chart datasets (time series, distributions, breakdowns)
 - 2 data tables (recent conversations, top users)
-- Period filtering: today, 7d, 30d, 90d, or custom date range
+- Period filtering: today, last 24 hours, this week, last 7 days, this month, last 30 days, single date, or custom date range
+- Automatic granularity: hourly for single-day periods, daily for multi-day periods
 - Bot/system users excluded from active user counts
 
 ---
@@ -66,17 +67,23 @@ Retrieve aggregated analytics data for the conversation dashboard.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `period` | string | `30d` | Period preset: `today`, `7d`, `30d`, `90d`, `custom` |
-| `start_date` | date | - | Required when `period=custom`. Format: `Y-m-d` |
-| `end_date` | date | - | Required when `period=custom`. Format: `Y-m-d` |
+| `period` | string | `last_30_days` | Period preset (see [Period Presets](#period-presets) table) |
+| `date` | date | - | Required when `period=date`. Format: `Y-m-d` |
+| `start_date` | date | - | Required when `period=date_range`. Format: `Y-m-d` |
+| `end_date` | date | - | Required when `period=date_range`. Format: `Y-m-d` |
 
 **Example Requests:**
 
 ```
 GET /api/admin/conversations/analytics
-GET /api/admin/conversations/analytics?period=7d
 GET /api/admin/conversations/analytics?period=today
-GET /api/admin/conversations/analytics?period=custom&start_date=2026-01-01&end_date=2026-02-12
+GET /api/admin/conversations/analytics?period=last_24_hours
+GET /api/admin/conversations/analytics?period=last_7_days
+GET /api/admin/conversations/analytics?period=this_week
+GET /api/admin/conversations/analytics?period=this_month
+GET /api/admin/conversations/analytics?period=last_30_days
+GET /api/admin/conversations/analytics?period=date&date=2026-02-23
+GET /api/admin/conversations/analytics?period=date_range&start_date=2026-01-01&end_date=2026-02-12
 ```
 
 **Response (Success - 200):**
@@ -92,6 +99,7 @@ GET /api/admin/conversations/analytics?period=custom&start_date=2026-01-01&end_d
       "comparison_start": "2025-12-13T20:20:02+00:00",
       "comparison_end": "2026-01-12T23:59:59+00:00"
     },
+    "granularity": "day",
     "stat_cards": {
       "total_conversations": { "value": 69, "change_percent": 100 },
       "active_users": { "value": 8, "change_percent": 100 },
@@ -196,13 +204,23 @@ All dashboard components respect the global period selector. When a period chang
 
 ### Period Presets
 
-| Period | Current Range | Comparison Range |
-|--------|--------------|-----------------|
-| `today` | Start of today to now | Same duration yesterday |
-| `7d` | 7 days ago to now | 14 days ago to 7 days ago |
-| `30d` (default) | 30 days ago to now | 60 days ago to 30 days ago |
-| `90d` | 90 days ago to now | 180 days ago to 90 days ago |
-| `custom` | `start_date` to `end_date` | Equivalent duration immediately prior |
+| Preset | Param Value | Granularity | Current Range | Comparison Range |
+|--------|-------------|-------------|--------------|-----------------|
+| Today | `today` | Hour | Start of today to now | Same duration yesterday |
+| Last 24 Hours | `last_24_hours` | Hour | 24 hours ago to now | 48 hours ago to 24 hours ago |
+| Single Day | `date` | Hour | Start of day to end of day | Same duration the day before |
+| This Week | `this_week` | Day | Start of week to now | Same duration in previous week |
+| Last 7 Days | `last_7_days` | Day | 7 days ago to now | 14 days ago to 7 days ago |
+| This Month | `this_month` | Day | Start of month to now | Same duration in previous month |
+| Last 30 Days (default) | `last_30_days` | Day | 30 days ago to now | 60 days ago to 30 days ago |
+| Date Range | `date_range` | Day | `start_date` to `end_date` | Equivalent duration immediately prior |
+
+### Granularity
+
+The `granularity` field in the response indicates how time-series data is grouped:
+
+- **`hour`** — Single-day periods (`today`, `last_24_hours`, `date`). Time-series charts use `hour` as the key (values: `"00"` to `"23"`).
+- **`day`** — Multi-day periods (`this_week`, `last_7_days`, `this_month`, `last_30_days`, `date_range`). Time-series charts use `date` as the key (format: `YYYY-MM-DD`).
 
 ### Change Percent Calculation
 
@@ -227,6 +245,7 @@ Each stat card includes a `change_percent` comparing the current period to the p
       "comparison_start": "2026-02-11T20:19:52+00:00",
       "comparison_end": "2026-02-11T23:59:59+00:00"
     },
+    "granularity": "hour",
     "stat_cards": {
       "total_conversations": { "value": 0, "change_percent": null },
       "active_users": { "value": 0, "change_percent": null },
@@ -289,14 +308,14 @@ Each card returns:
 ### Charts
 
 #### conversations_over_time
-Daily conversation counts with unique user counts.
+Conversation counts with unique user counts. Key changes based on granularity (`date` or `hour`).
 
 ```json
 [{ "date": "2026-01-20", "conversations": 52, "unique_users": 4 }]
 ```
 
 #### cost_and_tokens_trend
-Daily cost and token usage breakdown.
+Cost and token usage breakdown. Key changes based on granularity (`date` or `hour`).
 
 ```json
 [{
@@ -349,7 +368,7 @@ AI model usage distribution with percentages.
 ```
 
 #### message_role_distribution
-Daily message counts by role (user, assistant, tool).
+Message counts by role (user, assistant, tool). Key changes based on granularity (`date` or `hour`).
 
 ```json
 [{ "date": "2026-01-20", "user_count": 65, "assistant_count": 58, "tool_count": 21 }]
@@ -431,26 +450,42 @@ GET /api/admin/conversations/analytics?period=invalid
 ```json
 {
   "success": false,
-  "message": "Period must be: today, 7d, 30d, 90d, or custom.",
+  "message": "Period must be: today, last_24_hours, date, this_week, last_7_days, this_month, last_30_days, or date_range.",
   "errors": {
-    "period": ["Period must be: today, 7d, 30d, 90d, or custom."]
+    "period": ["Period must be: today, last_24_hours, date, this_week, last_7_days, this_month, last_30_days, or date_range."]
   }
 }
 ```
 
-**Custom period without dates:**
+**Date period without date param:**
 
 ```
-GET /api/admin/conversations/analytics?period=custom
+GET /api/admin/conversations/analytics?period=date
 ```
 
 ```json
 {
   "success": false,
-  "message": "Start date is required when using custom period. (and 1 more error)",
+  "message": "Date is required when using the date period.",
   "errors": {
-    "start_date": ["Start date is required when using custom period."],
-    "end_date": ["End date is required when using custom period."]
+    "date": ["Date is required when using the date period."]
+  }
+}
+```
+
+**Date range without dates:**
+
+```
+GET /api/admin/conversations/analytics?period=date_range
+```
+
+```json
+{
+  "success": false,
+  "message": "Start date is required when using date_range period. (and 1 more error)",
+  "errors": {
+    "start_date": ["Start date is required when using date_range period."],
+    "end_date": ["End date is required when using date_range period."]
   }
 }
 ```
@@ -458,7 +493,7 @@ GET /api/admin/conversations/analytics?period=custom
 **Start date after end date:**
 
 ```
-GET /api/admin/conversations/analytics?period=custom&start_date=2026-02-10&end_date=2026-02-05
+GET /api/admin/conversations/analytics?period=date_range&start_date=2026-02-10&end_date=2026-02-05
 ```
 
 ```json
@@ -475,7 +510,7 @@ GET /api/admin/conversations/analytics?period=custom&start_date=2026-02-10&end_d
 **Invalid date format:**
 
 ```
-GET /api/admin/conversations/analytics?period=custom&start_date=not-a-date&end_date=also-not
+GET /api/admin/conversations/analytics?period=date_range&start_date=not-a-date&end_date=also-not
 ```
 
 ```json
@@ -513,7 +548,7 @@ GET /api/admin/conversations/analytics?period=custom&start_date=not-a-date&end_d
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `date` | string | Date (YYYY-MM-DD) |
+| `date` or `hour` | string | Date (YYYY-MM-DD) for daily granularity, or hour (`"00"`-`"23"`) for hourly |
 | `conversations` | integer | Number of conversations created |
 | `unique_users` | integer | Number of distinct users |
 
@@ -521,7 +556,7 @@ GET /api/admin/conversations/analytics?period=custom&start_date=not-a-date&end_d
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `date` | string | Date (YYYY-MM-DD) |
+| `date` or `hour` | string | Date (YYYY-MM-DD) for daily granularity, or hour (`"00"`-`"23"`) for hourly |
 | `total_cost` | float | Total estimated cost in USD |
 | `total_tokens` | integer | Total tokens used |
 | `prompt_tokens` | integer | Input/prompt tokens |
@@ -560,7 +595,7 @@ GET /api/admin/conversations/analytics?period=custom&start_date=not-a-date&end_d
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `date` | string | Date (YYYY-MM-DD) |
+| `date` or `hour` | string | Date (YYYY-MM-DD) for daily granularity, or hour (`"00"`-`"23"`) for hourly |
 | `user_count` | integer | User messages sent |
 | `assistant_count` | integer | Assistant messages generated |
 | `tool_count` | integer | Tool call/result messages |
@@ -617,21 +652,25 @@ All tests performed against local dev server on 2026-02-12.
 
 | Test | Status | Response |
 |------|--------|----------|
-| `?period=invalid` | 422 | `Period must be: today, 7d, 30d, 90d, or custom.` |
-| `?period=custom` (no dates) | 422 | `Start date is required when using custom period.` |
-| `?period=custom&start_date=2026-02-10&end_date=2026-02-05` | 422 | `Start date must be before or equal to end date.` |
-| `?period=custom&start_date=not-a-date&end_date=also-not` | 422 | `The start date field must be a valid date.` |
+| `?period=invalid` | 422 | `Period must be: today, last_24_hours, date, this_week, last_7_days, this_month, last_30_days, or date_range.` |
+| `?period=date` (no date param) | 422 | `Date is required when using the date period.` |
+| `?period=date_range` (no dates) | 422 | `Start date is required when using date_range period.` |
+| `?period=date_range&start_date=2026-02-10&end_date=2026-02-05` | 422 | `Start date must be before or equal to end date.` |
+| `?period=date_range&start_date=not-a-date&end_date=also-not` | 422 | `The start date field must be a valid date.` |
 
 ### Happy Path Periods
 
-| Test | Status | Notes |
-|------|--------|-------|
-| No params (defaults to 30d) | 200 | Returns full dashboard data |
-| `?period=today` | 200 | Empty state (no data today) - all values 0, arrays empty |
-| `?period=7d` | 200 | Returns data within 7-day window |
-| `?period=30d` | 200 | Returns data within 30-day window |
-| `?period=90d` | 200 | Returns data within 90-day window |
-| `?period=custom&start_date=2026-01-01&end_date=2026-02-12` | 200 | Returns data within custom range |
+| Test | Status | Granularity | Notes |
+|------|--------|-------------|-------|
+| No params (defaults to last_30_days) | 200 | day | Returns full dashboard data |
+| `?period=today` | 200 | hour | Hourly breakdown of today's data |
+| `?period=last_24_hours` | 200 | hour | Rolling 24-hour window |
+| `?period=date&date=2026-02-23` | 200 | hour | Specific day with hourly breakdown |
+| `?period=this_week` | 200 | day | Current week data |
+| `?period=last_7_days` | 200 | day | Rolling 7-day window |
+| `?period=this_month` | 200 | day | Current month data |
+| `?period=last_30_days` | 200 | day | Rolling 30-day window |
+| `?period=date_range&start_date=2026-01-01&end_date=2026-02-12` | 200 | day | Custom range with comparison period |
 
 ---
 

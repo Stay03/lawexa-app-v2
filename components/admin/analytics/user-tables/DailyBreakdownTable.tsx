@@ -17,21 +17,30 @@ import {
 } from '@/components/ui/table';
 import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import type { UserDailyBreakdownRow } from '@/types/admin';
+import type { UserDailyBreakdownRow, ViewAnalyticsGranularity } from '@/types/admin';
 
 interface DailyBreakdownTableProps {
   data: UserDailyBreakdownRow[];
+  granularity: ViewAnalyticsGranularity;
 }
 
-export function DailyBreakdownTable({ data }: DailyBreakdownTableProps) {
+function formatHour(hour: string): string {
+  const h = parseInt(hour, 10);
+  if (h === 0) return '12 AM';
+  if (h === 12) return '12 PM';
+  return h < 12 ? `${h} AM` : `${h - 12} PM`;
+}
+
+export function DailyBreakdownTable({ data, granularity }: DailyBreakdownTableProps) {
   const { showNGN, exchangeRate } = useCurrencyStore();
+  const isHourly = granularity === 'hour';
 
   if (!data.length) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Daily Breakdown</CardTitle>
-          <CardDescription>Comprehensive daily metrics</CardDescription>
+          <CardTitle>Breakdown</CardTitle>
+          <CardDescription>Comprehensive metrics</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -43,14 +52,14 @@ export function DailyBreakdownTable({ data }: DailyBreakdownTableProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Daily Breakdown</CardTitle>
-        <CardDescription>Comprehensive daily metrics</CardDescription>
+        <CardTitle>Breakdown</CardTitle>
+        <CardDescription>Comprehensive metrics</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
+              <TableHead>{isHourly ? 'Hour' : 'Date'}</TableHead>
               <TableHead className="text-right">New Users</TableHead>
               <TableHead className="text-right">Conversations</TableHead>
               <TableHead className="text-right">Messages</TableHead>
@@ -61,13 +70,15 @@ export function DailyBreakdownTable({ data }: DailyBreakdownTableProps) {
           </TableHeader>
           <TableBody>
             {data.map((row) => (
-              <TableRow key={row.date}>
+              <TableRow key={row.hour ?? row.date}>
                 <TableCell className="font-medium">
-                  {new Date(row.date).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
+                  {isHourly
+                    ? formatHour(row.hour!)
+                    : new Date(row.date!).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {row.new_users}

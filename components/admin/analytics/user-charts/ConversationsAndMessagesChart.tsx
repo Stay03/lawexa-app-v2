@@ -16,10 +16,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import type { UserConversationsAndMessagesPoint } from '@/types/admin';
+import type { UserConversationsAndMessagesPoint, ViewAnalyticsGranularity } from '@/types/admin';
 
 interface ConversationsAndMessagesChartProps {
   data: UserConversationsAndMessagesPoint[];
+  granularity: ViewAnalyticsGranularity;
 }
 
 const chartConfig = {
@@ -33,15 +34,23 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+function formatHour(hour: string): string {
+  const h = parseInt(hour, 10);
+  if (h === 0) return '12 AM';
+  if (h === 12) return '12 PM';
+  return h < 12 ? `${h} AM` : `${h - 12} PM`;
+}
+
 export function ConversationsAndMessagesChart({
   data,
+  granularity,
 }: ConversationsAndMessagesChartProps) {
   if (!data.length) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Conversations & Messages</CardTitle>
-          <CardDescription>Daily conversations and user messages</CardDescription>
+          <CardDescription>Conversations and user messages</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -50,22 +59,26 @@ export function ConversationsAndMessagesChart({
     );
   }
 
+  const isHourly = granularity === 'hour';
+  const dataKey = isHourly ? 'hour' : 'date';
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Conversations & Messages</CardTitle>
-        <CardDescription>Daily conversations and user messages</CardDescription>
+        <CardDescription>Conversations and user messages</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <AreaChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="date"
+              dataKey={dataKey}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v) => {
+                if (isHourly) return formatHour(v);
                 const d = new Date(v);
                 return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
               }}
@@ -74,13 +87,14 @@ export function ConversationsAndMessagesChart({
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(v) =>
-                    new Date(v).toLocaleDateString('en-US', {
+                  labelFormatter={(v) => {
+                    if (isHourly) return formatHour(v);
+                    return new Date(v).toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',
                       year: 'numeric',
-                    })
-                  }
+                    });
+                  }}
                 />
               }
             />
