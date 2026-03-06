@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Check, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -23,6 +23,7 @@ interface IPlanCardProps {
   plan: IPlan;
   currentData: ICurrentSubscriptionData | null;
   displayName?: string;
+  interval?: string;
   isLoading?: boolean;
   onSelect: (plan: IPlan, action: TPlanAction) => void;
 }
@@ -108,7 +109,7 @@ const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> =
  * Default component. Renders a single plan card for the pricing grid.
  */
 function PlanCard(props: IPlanCardProps) {
-  const { plan, currentData, displayName, isLoading = false, onSelect } = props;
+  const { plan, currentData, displayName, interval, isLoading = false, onSelect } = props;
   const action = getPlanAction(plan, currentData);
   const isCurrent = action === 'current';
   const isFeatured = plan.is_featured;
@@ -122,7 +123,7 @@ function PlanCard(props: IPlanCardProps) {
   return (
     <Card
       className={cn(
-        'relative flex flex-col transition-shadow hover:shadow-md',
+        'relative flex h-full flex-col transition-shadow hover:shadow-md',
         isFeatured && 'ring-2 ring-primary',
         isCurrent && 'bg-muted/30'
       )}
@@ -152,6 +153,14 @@ function PlanCard(props: IPlanCardProps) {
               <div className="text-3xl font-bold">Free</div>
               <div className="text-sm text-muted-foreground">forever</div>
             </>
+          ) : interval === 'annually' ? (
+            <>
+              <div className="text-3xl font-bold">
+                {formatNaira(formatMonthlyFromAnnual(plan.amount))}
+              </div>
+              <div className="text-sm text-muted-foreground">/ month</div>
+              <div className="text-xs text-muted-foreground">billed annually</div>
+            </>
           ) : (
             <>
               <div className="text-3xl font-bold">{formatNaira(plan.formatted_amount)}</div>
@@ -162,63 +171,68 @@ function PlanCard(props: IPlanCardProps) {
           )}
         </div>
 
-        {/* Features */}
+        {/* Highlighted features */}
         {highlightedFeatures.length > 0 && (
-          <FeaturesList highlighted={highlightedFeatures} more={moreFeatures} />
+          <HighlightedFeatures features={highlightedFeatures} />
         )}
-      </CardContent>
 
-      <CardFooter>
+        {/* CTA button */}
         <PlanButton
           action={action}
           isLoading={isLoading}
           onClick={() => onSelect(plan, action)}
         />
-      </CardFooter>
+
+        {/* Collapsible additional features */}
+        {moreFeatures.length > 0 && (
+          <CollapsibleFeatures features={moreFeatures} />
+        )}
+      </CardContent>
     </Card>
   );
 }
 
 /**
- * Features list with highlighted items always visible and remaining in a collapsible.
+ * Always-visible highlighted features list.
  */
-function FeaturesList({ highlighted, more }: { highlighted: string[]; more: string[] }) {
+function HighlightedFeatures({ features }: { features: string[] }) {
+  return (
+    <ul className="space-y-2.5">
+      {features.map((feature) => (
+        <li key={feature} className="flex items-start gap-2 text-sm">
+          <Check className="size-4 shrink-0 text-primary mt-0.5" />
+          <span>{feature}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Collapsible section for additional features.
+ */
+function CollapsibleFeatures({ features }: { features: string[] }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="space-y-2.5">
-      {/* Always-visible highlighted features */}
-      <ul className="space-y-2.5">
-        {highlighted.map((feature) => (
-          <li key={feature} className="flex items-start gap-2 text-sm">
-            <Check className="size-4 shrink-0 text-primary mt-0.5" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      {/* Collapsible remaining features */}
-      {more.length > 0 && (
-        <Collapsible open={open} onOpenChange={setOpen}>
-          <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            <ChevronDown
-              className={cn('size-4 shrink-0 transition-transform', open && 'rotate-180')}
-            />
-            {open ? 'Less' : 'More features'}
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <ul className="mt-2.5 space-y-2.5">
-              {more.map((feature) => (
-                <li key={feature} className="flex items-start gap-2 text-sm">
-                  <Check className="size-4 shrink-0 text-primary mt-0.5" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-    </div>
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+        <ChevronDown
+          className={cn('size-4 shrink-0 transition-transform', open && 'rotate-180')}
+        />
+        {open ? 'Less' : 'More features'}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <ul className="mt-2.5 space-y-2.5">
+          {features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2 text-sm">
+              <Check className="size-4 shrink-0 text-primary mt-0.5" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -259,6 +273,12 @@ function PlanButton(props: {
 /** Replace "NGN " prefix with "₦" for display. */
 function formatNaira(formatted: string): string {
   return formatted.replace(/^NGN\s*/, '₦');
+}
+
+/** Convert annual amount to a formatted monthly equivalent string. */
+function formatMonthlyFromAnnual(amount: string): string {
+  const monthly = parseFloat(amount) / 12;
+  return `NGN ${monthly.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /** Derive the tier key from a plan slug (e.g. "basic-monthly" → "basic"). */

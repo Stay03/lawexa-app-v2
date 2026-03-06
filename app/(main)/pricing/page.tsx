@@ -219,8 +219,8 @@ function PricingPage() {
 
       {/* Plan grid — one column per tier, centered */}
       <div className="flex flex-wrap justify-center gap-6">
-        {/* Free tier — always visible */}
-        {freeTierGroup?.freePlan && (
+        {/* Free tier — only visible for free-tier users or when not logged in */}
+        {freeTierGroup?.freePlan && (!currentData || currentData.is_free_tier) && (
           <div className="flex-1 min-w-[240px] max-w-[300px]">
             <PlanCard
               key={freeTierGroup.freePlan.id}
@@ -242,6 +242,7 @@ function PricingPage() {
               <PlanCard
                 plan={plan}
                 displayName={group.displayName}
+                interval={effectiveInterval}
                 currentData={currentData}
                 isLoading={activePlanId === plan.id}
                 onSelect={handleSelect}
