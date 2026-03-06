@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   User,
   Settings,
+  CreditCard,
   Paintbrush,
   Bell,
   Lock,
@@ -24,6 +25,12 @@ const navItems = [
     description: 'Basic account settings',
     href: '/settings/account',
     icon: Settings,
+  },
+  {
+    label: 'Billing',
+    description: 'Subscription and invoices',
+    href: '/settings/billing',
+    icon: CreditCard,
   },
   {
     label: 'Appearance',
