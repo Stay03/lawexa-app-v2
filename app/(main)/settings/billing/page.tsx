@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/common/ErrorState';
-import CurrentPlanCard from '@/components/subscriptions/CurrentPlanCard';
+import PlanSection from '@/components/subscriptions/PlanSection';
 import InvoiceTable from '@/components/subscriptions/InvoiceTable';
 import CancelDialog from '@/components/subscriptions/CancelDialog';
 import {
@@ -57,25 +59,27 @@ function BillingPage() {
     );
   }
 
+  const showCancellation =
+    !currentData.is_free_tier && currentData.subscription?.status === 'active';
+
   // Return
   return (
-    <div className="space-y-8">
-      {/* Current plan */}
-      <CurrentPlanCard
-        data={currentData}
-        onCancel={() => setIsCancelOpen(true)}
-      />
+    <div>
+      {/* Plan section */}
+      <PlanSection data={currentData} />
 
-      {/* Invoice history */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">Invoice History</h2>
-          <p className="text-sm text-muted-foreground">
-            View your past payments and billing history.
-          </p>
-        </div>
-        <InvoiceTable />
-      </div>
+      <Separator className="my-8" />
+
+      {/* Invoices section */}
+      <InvoiceSection />
+
+      {/* Cancellation section */}
+      {showCancellation && (
+        <>
+          <Separator className="my-8" />
+          <CancellationSection onCancel={() => setIsCancelOpen(true)} />
+        </>
+      )}
 
       {/* Cancel dialog */}
       <CancelDialog
@@ -90,33 +94,69 @@ function BillingPage() {
 }
 
 /**
+ * Invoices section with accent heading.
+ */
+function InvoiceSection() {
+  return (
+    <div className="space-y-5">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-primary">
+        Invoices
+      </h3>
+      <InvoiceTable />
+    </div>
+  );
+}
+
+/**
+ * Cancellation section with destructive action.
+ */
+function CancellationSection({ onCancel }: { onCancel: () => void }) {
+  return (
+    <div className="space-y-5">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-primary">
+        Cancellation
+      </h3>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm font-medium">Cancel plan</p>
+        <Button variant="destructive" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Skeleton for the billing page.
  */
 function BillingSkeleton() {
   return (
-    <div className="space-y-8">
-      <div className="rounded-2xl border p-6 space-y-4">
-        <Skeleton className="h-5 w-28" />
-        <Skeleton className="h-6 w-40" />
-        <Skeleton className="h-4 w-32" />
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-48" />
-          <Skeleton className="h-4 w-44" />
+    <div>
+      {/* Plan section skeleton */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          <Skeleton className="size-10 rounded-lg" />
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
         </div>
-        <div className="flex gap-3">
-          <Skeleton className="h-9 w-28 rounded-full" />
-          <Skeleton className="h-9 w-36 rounded-full" />
-        </div>
+        <Skeleton className="h-9 w-28 rounded-full" />
       </div>
-      <div className="space-y-4">
-        <Skeleton className="h-6 w-32" />
-        <Skeleton className="h-4 w-56" />
-        <div className="rounded-lg border p-4 space-y-4">
+
+      <Separator className="my-8" />
+
+      {/* Invoices section skeleton */}
+      <div className="space-y-5">
+        <Skeleton className="h-4 w-16" />
+        <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="flex gap-4">
+            <div key={i} className="flex items-center justify-between">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-4 w-14" />
+              <Skeleton className="h-4 w-10" />
             </div>
           ))}
         </div>

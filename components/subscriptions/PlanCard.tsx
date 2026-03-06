@@ -1,9 +1,15 @@
 'use client';
 
-import { Check, Sparkles, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Check, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import type { IPlan, ICurrentSubscriptionData } from '@/types/subscription';
 
@@ -16,9 +22,77 @@ type TPlanAction = 'current' | 'subscribe' | 'upgrade' | 'downgrade' | 'unavaila
 interface IPlanCardProps {
   plan: IPlan;
   currentData: ICurrentSubscriptionData | null;
+  displayName?: string;
   isLoading?: boolean;
   onSelect: (plan: IPlan, action: TPlanAction) => void;
 }
+
+/******************************************************************************
+                               Constants
+******************************************************************************/
+
+const LIMIT_TYPE_LABELS: Record<string, string> = {
+  ai_messages: 'AI messages',
+  bookmarks: 'bookmarks',
+  note_creations: 'notes',
+};
+
+const BUTTON_CONFIG: Record<
+  TPlanAction,
+  { label: string; variant: 'default' | 'outline' | 'secondary' | 'ghost'; disabled: boolean }
+> = {
+  current: { label: 'Current Plan', variant: 'outline', disabled: true },
+  subscribe: { label: 'Get Started', variant: 'default', disabled: false },
+  upgrade: { label: 'Upgrade', variant: 'default', disabled: false },
+  downgrade: { label: 'Downgrade', variant: 'secondary', disabled: true },
+  unavailable: { label: 'Not Available', variant: 'ghost', disabled: true },
+};
+
+const TIER_FEATURES: Record<string, string[]> = {
+  basic: [
+    'Access to Case, Statute & Notes Library',
+    'Foreign & Local Cases',
+    'Multi-Jurisdiction Access',
+    'Natural Language Search',
+    'AI Tutor for learning concepts and solving problem questions',
+    'Study Mode for focused learning',
+    'Flashcards to review key topics',
+    'Quizzes for practice and assessment',
+    'Connect to a Lawyer feature',
+    'Chat with Document (10MB limit)',
+    '50 AI Messages per month',
+  ],
+  pro: [
+    'Access to Case, Statute & Notes Library',
+    'Foreign & Local Cases',
+    'Multi-Jurisdiction Access',
+    'Natural Language Search',
+    'AI Tutor',
+    'Study Mode',
+    'Flashcards',
+    'Quizzes',
+    'Connect to a Lawyer',
+    'Chat with Document (25MB limit)',
+    '150 AI Messages per month',
+  ],
+  'ai-counsel': [
+    'Access to Case, Statute & Notes Library',
+    'Foreign & Local Cases',
+    'Multi-Jurisdiction Access',
+    'Natural Language Search',
+    'AI Tutor',
+    'Study Mode',
+    'Flashcards',
+    'Quizzes',
+    'Connect to a Lawyer',
+    'Chat with Document (No size limit)',
+    'Unlimited AI Messages',
+    'Legal Drafting',
+    'Deep Legal Research',
+    'Deep Contract Review',
+    'Twitter Bot for legal updates',
+  ],
+};
 
 /******************************************************************************
                                Components
@@ -28,10 +102,14 @@ interface IPlanCardProps {
  * Default component. Renders a single plan card for the pricing grid.
  */
 function PlanCard(props: IPlanCardProps) {
-  const { plan, currentData, isLoading = false, onSelect } = props;
+  const { plan, currentData, displayName, isLoading = false, onSelect } = props;
   const action = getPlanAction(plan, currentData);
   const isCurrent = action === 'current';
   const isFeatured = plan.is_featured;
+
+  // Resolve features: use explicit tier features if available, else fall back to API
+  const tierKey = getTierKeyFromSlug(plan);
+  const features = TIER_FEATURES[tierKey] ?? plan.features;
 
   return (
     <Card
@@ -52,7 +130,7 @@ function PlanCard(props: IPlanCardProps) {
       )}
 
       <CardHeader className={cn(isFeatured && 'pt-4')}>
-        <CardTitle className="text-lg">{plan.name}</CardTitle>
+        <CardTitle className="text-lg">{displayName ?? plan.name}</CardTitle>
         {plan.description && (
           <p className="text-sm text-muted-foreground">{plan.description}</p>
         )}
@@ -63,30 +141,21 @@ function PlanCard(props: IPlanCardProps) {
         <div>
           {plan.is_free ? (
             <>
-              <span className="text-3xl font-bold">Free</span>
-              <span className="text-sm text-muted-foreground ml-1">forever</span>
+              <div className="text-3xl font-bold">Free</div>
+              <div className="text-sm text-muted-foreground">forever</div>
             </>
           ) : (
             <>
-              <span className="text-3xl font-bold">{plan.formatted_amount}</span>
-              <span className="text-sm text-muted-foreground ml-1">
+              <div className="text-3xl font-bold">{formatNaira(plan.formatted_amount)}</div>
+              <div className="text-sm text-muted-foreground">
                 / {plan.interval_label.toLowerCase()}
-              </span>
+              </div>
             </>
           )}
         </div>
 
-        {/* Features */}
-        {plan.features.length > 0 && (
-          <ul className="space-y-2.5">
-            {plan.features.map((feature) => (
-              <li key={feature} className="flex items-start gap-2 text-sm">
-                <Check className="size-4 shrink-0 text-primary mt-0.5" />
-                <span>{feature}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        {/* Collapsible features */}
+        {features.length > 0 && <CollapsibleFeatures features={features} />}
 
         {/* Limits */}
         <LimitBadges plan={plan} />
@@ -100,6 +169,34 @@ function PlanCard(props: IPlanCardProps) {
         />
       </CardFooter>
     </Card>
+  );
+}
+
+/**
+ * Collapsible features list.
+ */
+function CollapsibleFeatures({ features }: { features: string[] }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+        <ChevronDown
+          className={cn('size-4 shrink-0 transition-transform', open && 'rotate-180')}
+        />
+        Features
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <ul className="mt-3 space-y-2.5">
+          {features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2 text-sm">
+              <Check className="size-4 shrink-0 text-primary mt-0.5" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -164,22 +261,17 @@ function PlanButton(props: {
                                Functions
 ******************************************************************************/
 
-const LIMIT_TYPE_LABELS: Record<string, string> = {
-  ai_messages: 'AI messages',
-  bookmarks: 'bookmarks',
-  note_creations: 'notes',
-};
+/** Replace "NGN " prefix with "₦" for display. */
+function formatNaira(formatted: string): string {
+  return formatted.replace(/^NGN\s*/, '₦');
+}
 
-const BUTTON_CONFIG: Record<
-  TPlanAction,
-  { label: string; variant: 'default' | 'outline' | 'secondary' | 'ghost'; disabled: boolean }
-> = {
-  current: { label: 'Current Plan', variant: 'outline', disabled: true },
-  subscribe: { label: 'Get Started', variant: 'default', disabled: false },
-  upgrade: { label: 'Upgrade', variant: 'default', disabled: false },
-  downgrade: { label: 'Downgrade', variant: 'secondary', disabled: true },
-  unavailable: { label: 'Not Available', variant: 'ghost', disabled: true },
-};
+/** Derive the tier key from a plan slug (e.g. "basic-monthly" → "basic"). */
+function getTierKeyFromSlug(plan: IPlan): string {
+  if (plan.is_free) return 'free';
+  const parts = plan.slug.split('-');
+  return parts.slice(0, -1).join('-');
+}
 
 /**
  * Determine what action the user can take on a plan.

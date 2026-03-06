@@ -215,17 +215,20 @@ function PricingPage() {
         </div>
       )}
 
-      {/* Plan grid — one column per tier */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Plan grid — one column per tier, centered */}
+      <div className="flex flex-wrap justify-center gap-6">
         {/* Free tier — always visible */}
         {freeTierGroup?.freePlan && (
-          <PlanCard
-            key={freeTierGroup.freePlan.id}
-            plan={freeTierGroup.freePlan}
-            currentData={currentData}
-            isLoading={activePlanId === freeTierGroup.freePlan.id}
-            onSelect={handleSelect}
-          />
+          <div className="w-full max-w-[300px]">
+            <PlanCard
+              key={freeTierGroup.freePlan.id}
+              plan={freeTierGroup.freePlan}
+              displayName="Free"
+              currentData={currentData}
+              isLoading={activePlanId === freeTierGroup.freePlan.id}
+              onSelect={handleSelect}
+            />
+          </div>
         )}
 
         {/* Paid tiers — filtered by selected interval */}
@@ -233,13 +236,15 @@ function PricingPage() {
           const plan = group.plansByInterval[effectiveInterval];
           if (!plan) return null;
           return (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              currentData={currentData}
-              isLoading={activePlanId === plan.id}
-              onSelect={handleSelect}
-            />
+            <div key={plan.id} className="w-full max-w-[300px]">
+              <PlanCard
+                plan={plan}
+                displayName={group.displayName}
+                currentData={currentData}
+                isLoading={activePlanId === plan.id}
+                onSelect={handleSelect}
+              />
+            </div>
           );
         })}
       </div>
@@ -266,9 +271,9 @@ function PricingHeader() {
  */
 function PricingGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="flex flex-wrap justify-center gap-6">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="space-y-4 rounded-2xl border p-6">
+        <div key={i} className="w-full max-w-[300px] space-y-4 rounded-2xl border p-6">
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-10 w-32" />
