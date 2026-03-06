@@ -219,7 +219,7 @@ function PricingPage() {
       <div className="flex flex-wrap justify-center gap-6">
         {/* Free tier — always visible */}
         {freeTierGroup?.freePlan && (
-          <div className="w-full max-w-[300px]">
+          <div className="flex-1 min-w-[240px] max-w-[300px]">
             <PlanCard
               key={freeTierGroup.freePlan.id}
               plan={freeTierGroup.freePlan}
@@ -236,7 +236,7 @@ function PricingPage() {
           const plan = group.plansByInterval[effectiveInterval];
           if (!plan) return null;
           return (
-            <div key={plan.id} className="w-full max-w-[300px]">
+            <div key={plan.id} className="flex-1 min-w-[240px] max-w-[300px]">
               <PlanCard
                 plan={plan}
                 displayName={group.displayName}
@@ -273,7 +273,7 @@ function PricingGridSkeleton() {
   return (
     <div className="flex flex-wrap justify-center gap-6">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="w-full max-w-[300px] space-y-4 rounded-2xl border p-6">
+        <div key={i} className="flex-1 min-w-[240px] max-w-[300px] space-y-4 rounded-2xl border p-6">
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-10 w-32" />
