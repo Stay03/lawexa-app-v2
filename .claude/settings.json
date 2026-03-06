@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git status:*)",
       "Bash(wc:*)",
-      "Read(//c/Users/stayn/AppData/Local/Temp/claude/c--Users-stayn-OneDrive-Desktop-2023-lawexa-app-v2-lawexa-app/tasks/**)"
+      "Read(//c/Users/stayn/AppData/Local/Temp/claude/c--Users-stayn-OneDrive-Desktop-2023-lawexa-app-v2-lawexa-app/tasks/**)",
+      "Bash(head -50 /c/Users/stayn/OneDrive/Desktop/2023/lawexa-app-v2/lawexa-app/app/\\\\\\(main\\\\\\)/layout.tsx)"
     ],
     "additionalDirectories": [
       "c:\\Users\\stayn\\OneDrive\\Desktop\\2023\\lawexa-app-v2\\lawexa-app\\app\\(main)\\statutes"

@@ -774,3 +774,121 @@ export interface ViewAnalyticsResponse {
   message: string;
   data: ViewAnalyticsData;
 }
+
+// ============================================
+// Subscription Analytics Types
+// Based on API documentation: /docs/apiDocs/subscription-analytics.md
+// ============================================
+
+export type SubscriptionAnalyticsPeriod = AnalyticsPeriod;
+
+export interface SubscriptionAnalyticsParams {
+  period?: SubscriptionAnalyticsPeriod;
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface SubscriptionAnalyticsStatCards {
+  total_subscriptions: AnalyticsStatCard;
+  active_subscriptions: AnalyticsStatCard;
+  new_subscriptions: AnalyticsStatCard;
+  churned_subscriptions: AnalyticsStatCard;
+  mrr: AnalyticsStatCard;
+  revenue: AnalyticsStatCard;
+  churn_rate: AnalyticsStatCard;
+  avg_revenue_per_user: AnalyticsStatCard;
+}
+
+export interface SubscriptionsOverTimePoint {
+  date: string;
+  count: number;
+}
+
+export interface RevenueOverTimePoint {
+  date: string;
+  revenue: number;
+}
+
+export interface MrrTrendPoint {
+  date: string;
+  mrr: number;
+}
+
+export interface PlanDistributionPoint {
+  plan_name: string;
+  count: number;
+  percentage: number;
+  total_amount: number;
+}
+
+export interface StatusDistributionPoint {
+  status: string;
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ChurnOverTimePoint {
+  date: string;
+  count: number;
+}
+
+export interface SubscriptionAnalyticsCharts {
+  subscriptions_over_time: SubscriptionsOverTimePoint[];
+  revenue_over_time: RevenueOverTimePoint[];
+  mrr_trend: MrrTrendPoint[];
+  plan_distribution: PlanDistributionPoint[];
+  status_distribution: StatusDistributionPoint[];
+  churn_over_time: ChurnOverTimePoint[];
+}
+
+export interface PlanBreakdownRow {
+  plan_name: string;
+  active_count: number;
+  new_in_period: number;
+  churned_in_period: number;
+  revenue_in_period: number;
+  mrr_contribution: number;
+}
+
+export interface RecentSubscriptionRow {
+  id: number;
+  user_name: string;
+  user_email: string;
+  user_uuid: string;
+  plan_name: string;
+  status: string;
+  status_label: string;
+  amount: number;
+  currency: string;
+  created_at: string;
+}
+
+export interface TopRevenueUserRow {
+  user_uuid: string;
+  user_name: string;
+  user_email: string;
+  total_revenue: number;
+  invoice_count: number;
+}
+
+export interface SubscriptionAnalyticsTables {
+  plan_breakdown: PlanBreakdownRow[];
+  recent_subscriptions: RecentSubscriptionRow[];
+  top_revenue_users: TopRevenueUserRow[];
+}
+
+export interface SubscriptionAnalyticsData {
+  period: AnalyticsPeriodInfo;
+  granularity: 'hour' | 'day';
+  stat_cards: SubscriptionAnalyticsStatCards;
+  charts: SubscriptionAnalyticsCharts;
+  tables: SubscriptionAnalyticsTables;
+}
+
+export interface SubscriptionAnalyticsResponse {
+  success: boolean;
+  message: string;
+  data: SubscriptionAnalyticsData;
+}

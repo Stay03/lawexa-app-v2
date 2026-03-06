@@ -37,3 +37,24 @@ export function getCurrencySymbol(showNGN: boolean): string {
 export function getCurrencyLabel(showNGN: boolean): string {
   return showNGN ? 'NGN' : 'USD';
 }
+
+/**
+ * Format a Naira amount for display.
+ * Values are already in NGN — no conversion needed.
+ */
+export function formatNaira(
+  amount: number,
+  options?: { decimals?: number; compact?: boolean }
+): string {
+  const { decimals = 0, compact = false } = options ?? {};
+  if (compact && amount >= 1_000_000) {
+    return `₦${(amount / 1_000_000).toFixed(1)}M`;
+  }
+  if (compact && amount >= 1_000) {
+    return `₦${(amount / 1_000).toFixed(1)}K`;
+  }
+  return `₦${amount.toLocaleString('en-NG', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })}`;
+}

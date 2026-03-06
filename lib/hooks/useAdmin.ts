@@ -9,6 +9,7 @@ import type {
   ConversationAnalyticsParams,
   UserAnalyticsParams,
   ViewAnalyticsParams,
+  SubscriptionAnalyticsParams,
 } from '@/types/admin';
 
 // Query key factory for organized caching
@@ -31,6 +32,8 @@ export const adminKeys = {
     [...adminKeys.users(), 'analytics', params] as const,
   viewAnalytics: (params: ViewAnalyticsParams) =>
     [...adminKeys.all, 'views', 'analytics', params] as const,
+  subscriptionAnalytics: (params: SubscriptionAnalyticsParams) =>
+    [...adminKeys.all, 'subscriptions', 'analytics', params] as const,
 };
 
 /**
@@ -129,6 +132,19 @@ export function useViewAnalytics(params: ViewAnalyticsParams = {}) {
   return useQuery({
     queryKey: adminKeys.viewAnalytics(params),
     queryFn: () => adminApi.getViewAnalytics(params),
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching subscription analytics data
+ */
+export function useSubscriptionAnalytics(
+  params: SubscriptionAnalyticsParams = {}
+) {
+  return useQuery({
+    queryKey: adminKeys.subscriptionAnalytics(params),
+    queryFn: () => adminApi.getSubscriptionAnalytics(params),
     staleTime: 30 * 1000, // 30 seconds
   });
 }

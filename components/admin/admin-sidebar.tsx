@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { AdminNavConversationsSection } from '@/components/admin/admin-nav-conversations';
 import { AdminNavUsersSection } from '@/components/admin/admin-nav-users';
 import { AdminNavContentSection } from '@/components/admin/admin-nav-content';
+import { AdminNavBillingSection } from '@/components/admin/admin-nav-billing';
 import { AdminNavAiSection } from '@/components/admin/admin-nav-ai';
 import { NavUser } from '@/components/layout/nav-user';
 import {
@@ -65,6 +66,7 @@ export function AdminSidebar({
         <AdminNavConversationsSection />
         <AdminNavUsersSection />
         <AdminNavContentSection />
+        <AdminNavBillingSection />
         <AdminNavAiSection />
       </SidebarContent>
       <SidebarFooter>
