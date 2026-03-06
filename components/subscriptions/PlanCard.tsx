@@ -42,50 +42,62 @@ const BUTTON_CONFIG: Record<
   unavailable: { label: 'Not Available', variant: 'ghost', disabled: true },
 };
 
-const TIER_FEATURES: Record<string, string[]> = {
-  basic: [
-    'Access to Case, Statute & Notes Library',
-    'Foreign & Local Cases',
-    'Multi-Jurisdiction Access',
-    'Natural Language Search',
-    'AI Tutor for learning concepts and solving problem questions',
-    'Study Mode for focused learning',
-    'Flashcards to review key topics',
-    'Quizzes for practice and assessment',
-    'Connect to a Lawyer feature',
-    'Chat with Document (10MB limit)',
-    '50 AI Messages per month',
-  ],
-  pro: [
-    'Access to Case, Statute & Notes Library',
-    'Foreign & Local Cases',
-    'Multi-Jurisdiction Access',
-    'Natural Language Search',
-    'AI Tutor',
-    'Study Mode',
-    'Flashcards',
-    'Quizzes',
-    'Connect to a Lawyer',
-    'Chat with Document (25MB limit)',
-    '150 AI Messages per month',
-  ],
-  'ai-counsel': [
-    'Access to Case, Statute & Notes Library',
-    'Foreign & Local Cases',
-    'Multi-Jurisdiction Access',
-    'Natural Language Search',
-    'AI Tutor',
-    'Study Mode',
-    'Flashcards',
-    'Quizzes',
-    'Connect to a Lawyer',
-    'Chat with Document (No size limit)',
-    'Unlimited AI Messages',
-    'Legal Drafting',
-    'Deep Legal Research',
-    'Deep Contract Review',
-    'Twitter Bot for legal updates',
-  ],
+const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> = {
+  basic: {
+    highlighted: [
+      'Chat with Document (10MB limit)',
+      '50 AI Messages per month',
+      'AI Tutor',
+      'Natural Language Search',
+    ],
+    more: [
+      'Access to Case, Statute & Notes Library',
+      'Foreign & Local Cases',
+      'Multi-Jurisdiction Access',
+      'Study Mode',
+      'Flashcards',
+      'Quizzes',
+      'Connect to a Lawyer',
+    ],
+  },
+  pro: {
+    highlighted: [
+      'Chat with Document (25MB limit)',
+      '150 AI Messages per month',
+      'AI Tutor',
+      'Natural Language Search',
+    ],
+    more: [
+      'Access to Case, Statute & Notes Library',
+      'Foreign & Local Cases',
+      'Multi-Jurisdiction Access',
+      'Study Mode',
+      'Flashcards',
+      'Quizzes',
+      'Connect to a Lawyer',
+    ],
+  },
+  'ai-counsel': {
+    highlighted: [
+      'Unlimited AI Messages',
+      'Chat with Document (No size limit)',
+      'Legal Drafting',
+      'Deep Legal Research',
+      'Deep Contract Review',
+    ],
+    more: [
+      'Access to Case, Statute & Notes Library',
+      'Foreign & Local Cases',
+      'Multi-Jurisdiction Access',
+      'Natural Language Search',
+      'AI Tutor',
+      'Study Mode',
+      'Flashcards',
+      'Quizzes',
+      'Connect to a Lawyer',
+      'Twitter Bot for legal updates',
+    ],
+  },
 };
 
 /******************************************************************************
@@ -103,7 +115,9 @@ function PlanCard(props: IPlanCardProps) {
 
   // Resolve features: use explicit tier features if available, else fall back to API
   const tierKey = getTierKeyFromSlug(plan);
-  const features = TIER_FEATURES[tierKey] ?? plan.features;
+  const tierFeatures = TIER_FEATURES[tierKey];
+  const highlightedFeatures = tierFeatures?.highlighted ?? plan.features;
+  const moreFeatures = tierFeatures?.more ?? [];
 
   return (
     <Card
@@ -148,8 +162,10 @@ function PlanCard(props: IPlanCardProps) {
           )}
         </div>
 
-        {/* Collapsible features */}
-        {features.length > 0 && <CollapsibleFeatures features={features} />}
+        {/* Features */}
+        {highlightedFeatures.length > 0 && (
+          <FeaturesList highlighted={highlightedFeatures} more={moreFeatures} />
+        )}
       </CardContent>
 
       <CardFooter>
@@ -164,30 +180,45 @@ function PlanCard(props: IPlanCardProps) {
 }
 
 /**
- * Collapsible features list.
+ * Features list with highlighted items always visible and remaining in a collapsible.
  */
-function CollapsibleFeatures({ features }: { features: string[] }) {
+function FeaturesList({ highlighted, more }: { highlighted: string[]; more: string[] }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-        <ChevronDown
-          className={cn('size-4 shrink-0 transition-transform', open && 'rotate-180')}
-        />
-        Features
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <ul className="mt-3 space-y-2.5">
-          {features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2 text-sm">
-              <Check className="size-4 shrink-0 text-primary mt-0.5" />
-              <span>{feature}</span>
-            </li>
-          ))}
-        </ul>
-      </CollapsibleContent>
-    </Collapsible>
+    <div className="space-y-2.5">
+      {/* Always-visible highlighted features */}
+      <ul className="space-y-2.5">
+        {highlighted.map((feature) => (
+          <li key={feature} className="flex items-start gap-2 text-sm">
+            <Check className="size-4 shrink-0 text-primary mt-0.5" />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+
+      {/* Collapsible remaining features */}
+      {more.length > 0 && (
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <ChevronDown
+              className={cn('size-4 shrink-0 transition-transform', open && 'rotate-180')}
+            />
+            {open ? 'Less' : 'More features'}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <ul className="mt-2.5 space-y-2.5">
+              {more.map((feature) => (
+                <li key={feature} className="flex items-start gap-2 text-sm">
+                  <Check className="size-4 shrink-0 text-primary mt-0.5" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
   );
 }
 
