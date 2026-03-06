@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
 
 import { PageContainer } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { ErrorState } from '@/components/common/ErrorState';
 import PlanCard from '@/components/subscriptions/PlanCard';
 import type { TPlanAction } from '@/components/subscriptions/PlanCard';
@@ -20,15 +21,49 @@ import {
 } from '@/lib/hooks/useSubscriptions';
 
 /******************************************************************************
+                               Types
+******************************************************************************/
+
+type TInterval = 'daily' | 'monthly' | 'annually';
+
+interface ITierGroup {
+  tierKey: string;
+  displayName: string;
+  plansByInterval: Partial<Record<TInterval, IPlan>>;
+  freePlan?: IPlan;
+}
+
+/******************************************************************************
+                               Constants
+******************************************************************************/
+
+const INTERVAL_ORDER: TInterval[] = ['daily', 'monthly', 'annually'];
+
+const INTERVAL_LABELS: Record<TInterval, string> = {
+  daily: 'Daily',
+  monthly: 'Monthly',
+  annually: 'Annually',
+};
+
+const TIER_DISPLAY_NAMES: Record<string, string> = {
+  free: 'Free',
+  basic: 'Basic',
+  pro: 'Pro',
+  'ai-counsel': 'AI Counsel',
+};
+
+/******************************************************************************
                                Components
 ******************************************************************************/
 
 /**
- * Default component. Pricing page with plan selection grid.
+ * Default component. Pricing page with interval toggle and tiered plan grid.
  */
 function PricingPage() {
   const router = useRouter();
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
+  const [selectedInterval, setSelectedInterval] = useState<TInterval>('monthly');
+
   // Data
   const plansQuery = usePlans();
   const currentQuery = useCurrentSubscription();
@@ -41,6 +76,27 @@ function PricingPage() {
   const isError = plansQuery.isError || currentQuery.isError;
   const plans = plansQuery.data?.data ?? [];
   const currentData = currentQuery.data?.data ?? null;
+
+  // Derived data
+  const availableIntervals = useMemo(() => getAvailableIntervals(plans), [plans]);
+  const tierGroups = useMemo(() => groupPlansByTier(plans), [plans]);
+  const freeTierGroup = tierGroups.find((g) => g.tierKey === 'free') ?? null;
+  const paidTierGroups = tierGroups.filter((g) => g.tierKey !== 'free');
+
+  // Fall back to first available interval if selected isn't available
+  const effectiveInterval: TInterval = availableIntervals.includes(selectedInterval)
+    ? selectedInterval
+    : availableIntervals[0] ?? 'monthly';
+
+  // Best savings % across all tiers (for the "Save X%" badge on annual tab)
+  const annualSavings = useMemo(
+    () =>
+      paidTierGroups.reduce((best, group) => {
+        const s = calcSavingsPercent(group.plansByInterval.monthly, group.plansByInterval.annually);
+        return Math.max(best, s);
+      }, 0),
+    [paidTierGroups]
+  );
 
   /** Handle plan selection based on the resolved action. */
   const handleSelect = useCallback(
@@ -93,8 +149,11 @@ function PricingPage() {
   // Loading state
   if (isLoading) {
     return (
-      <PageContainer className="max-w-5xl">
+      <PageContainer className="max-w-6xl">
         <PricingHeader />
+        <div className="flex justify-center">
+          <Skeleton className="h-10 w-72 rounded-lg" />
+        </div>
         <PricingGridSkeleton />
       </PageContainer>
     );
@@ -103,7 +162,7 @@ function PricingPage() {
   // Error state
   if (isError) {
     return (
-      <PageContainer className="max-w-5xl">
+      <PageContainer className="max-w-6xl">
         <PricingHeader />
         <ErrorState
           title="Failed to load plans"
@@ -117,10 +176,10 @@ function PricingPage() {
     );
   }
 
-  // Return
   return (
-    <PageContainer className="max-w-5xl">
+    <PageContainer className="max-w-6xl">
       <PricingHeader />
+
       {/* Cancelled subscription notice */}
       {currentData?.subscription?.status === 'cancelled' && currentData.subscription.has_access && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">
@@ -129,17 +188,60 @@ function PricingPage() {
           You can subscribe to a new plan after that date.
         </div>
       )}
-      {/* Plan grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {plans.map((plan) => (
+
+      {/* Billing interval toggle */}
+      {availableIntervals.length > 1 && (
+        <div className="flex justify-center">
+          <Tabs
+            value={effectiveInterval}
+            onValueChange={(v) => setSelectedInterval(v as TInterval)}
+          >
+            <TabsList>
+              {availableIntervals.map((interval) => (
+                <TabsTrigger key={interval} value={interval} className="gap-1.5">
+                  {INTERVAL_LABELS[interval]}
+                  {interval === 'annually' && annualSavings > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] px-1.5 py-0 font-semibold text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50"
+                    >
+                      Save {annualSavings}%
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+
+      {/* Plan grid — one column per tier */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Free tier — always visible */}
+        {freeTierGroup?.freePlan && (
           <PlanCard
-            key={plan.id}
-            plan={plan}
+            key={freeTierGroup.freePlan.id}
+            plan={freeTierGroup.freePlan}
             currentData={currentData}
-            isLoading={activePlanId === plan.id}
+            isLoading={activePlanId === freeTierGroup.freePlan.id}
             onSelect={handleSelect}
           />
-        ))}
+        )}
+
+        {/* Paid tiers — filtered by selected interval */}
+        {paidTierGroups.map((group) => {
+          const plan = group.plansByInterval[effectiveInterval];
+          if (!plan) return null;
+          return (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              currentData={currentData}
+              isLoading={activePlanId === plan.id}
+              onSelect={handleSelect}
+            />
+          );
+        })}
       </div>
     </PageContainer>
   );
@@ -164,8 +266,8 @@ function PricingHeader() {
  */
 function PricingGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {[...Array(3)].map((_, i) => (
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {[...Array(4)].map((_, i) => (
         <div key={i} className="space-y-4 rounded-2xl border p-6">
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-4 w-40" />
@@ -181,6 +283,77 @@ function PricingGridSkeleton() {
       ))}
     </div>
   );
+}
+
+/******************************************************************************
+                               Functions
+******************************************************************************/
+
+/** Derive the tier key from a plan slug. Free plans always return 'free'. */
+function getTierKey(plan: IPlan): string {
+  if (plan.is_free) return 'free';
+  // Slug pattern: "{tier}-{interval}" e.g. "basic-monthly", "ai-counsel-annually"
+  const parts = plan.slug.split('-');
+  // Last segment is the interval — everything before is the tier
+  return parts.slice(0, -1).join('-');
+}
+
+/** Convert a tier key to a display name. */
+function getTierDisplayName(tierKey: string): string {
+  if (TIER_DISPLAY_NAMES[tierKey]) return TIER_DISPLAY_NAMES[tierKey];
+  return tierKey
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/** Group plans into tiers, each with their interval variants. */
+function groupPlansByTier(plans: IPlan[]): ITierGroup[] {
+  const tierMap = new Map<string, ITierGroup>();
+
+  for (const plan of plans) {
+    const key = getTierKey(plan);
+    if (!tierMap.has(key)) {
+      tierMap.set(key, {
+        tierKey: key,
+        displayName: getTierDisplayName(key),
+        plansByInterval: {},
+      });
+    }
+    const group = tierMap.get(key)!;
+    if (plan.is_free) {
+      group.freePlan = plan;
+    } else {
+      group.plansByInterval[plan.interval as TInterval] = plan;
+    }
+  }
+
+  // Free first, then paid tiers in order of appearance
+  const groups = Array.from(tierMap.values());
+  const freeGroup = groups.find((g) => g.tierKey === 'free');
+  const paidGroups = groups.filter((g) => g.tierKey !== 'free');
+  return freeGroup ? [freeGroup, ...paidGroups] : paidGroups;
+}
+
+/** Get available billing intervals from paid plans, in preferred order. */
+function getAvailableIntervals(plans: IPlan[]): TInterval[] {
+  const seen = new Set<string>();
+  for (const plan of plans) {
+    if (!plan.is_free) seen.add(plan.interval);
+  }
+  return INTERVAL_ORDER.filter((i) => seen.has(i));
+}
+
+/** Calculate savings % for annual vs monthly billing. Returns 0 if not calculable. */
+function calcSavingsPercent(
+  monthlyPlan: IPlan | undefined,
+  annualPlan: IPlan | undefined
+): number {
+  if (!monthlyPlan || !annualPlan) return 0;
+  const monthlyYearly = parseFloat(monthlyPlan.amount) * 12;
+  const annual = parseFloat(annualPlan.amount);
+  if (monthlyYearly <= 0) return 0;
+  return Math.round(((monthlyYearly - annual) / monthlyYearly) * 100);
 }
 
 /******************************************************************************
