@@ -31,12 +31,6 @@ interface IPlanCardProps {
                                Constants
 ******************************************************************************/
 
-const LIMIT_TYPE_LABELS: Record<string, string> = {
-  ai_messages: 'AI messages',
-  bookmarks: 'bookmarks',
-  note_creations: 'notes',
-};
-
 const BUTTON_CONFIG: Record<
   TPlanAction,
   { label: string; variant: 'default' | 'outline' | 'secondary' | 'ghost'; disabled: boolean }
@@ -156,9 +150,6 @@ function PlanCard(props: IPlanCardProps) {
 
         {/* Collapsible features */}
         {features.length > 0 && <CollapsibleFeatures features={features} />}
-
-        {/* Limits */}
-        <LimitBadges plan={plan} />
       </CardContent>
 
       <CardFooter>
@@ -197,33 +188,6 @@ function CollapsibleFeatures({ features }: { features: string[] }) {
         </ul>
       </CollapsibleContent>
     </Collapsible>
-  );
-}
-
-/**
- * Displays plan limits as subtle badges.
- */
-function LimitBadges({ plan }: { plan: IPlan }) {
-  const limitLabels = plan.limits
-    .map((limit) => {
-      const label = LIMIT_TYPE_LABELS[limit.type] || limit.type;
-      if (limit.is_unlimited) return `Unlimited ${label}`;
-      if (limit.value === 0) return null;
-      const period = limit.period === 'lifetime' ? '' : '/mo';
-      return `${limit.value} ${label}${period}`;
-    })
-    .filter(Boolean);
-
-  if (limitLabels.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {limitLabels.map((label) => (
-        <Badge key={label} variant="secondary" className="text-xs font-normal">
-          {label}
-        </Badge>
-      ))}
-    </div>
   );
 }
 

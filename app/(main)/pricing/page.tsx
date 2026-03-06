@@ -39,6 +39,8 @@ interface ITierGroup {
 
 const INTERVAL_ORDER: TInterval[] = ['daily', 'monthly', 'annually'];
 
+const TIER_ORDER = ['basic', 'pro', 'ai-counsel'];
+
 const INTERVAL_LABELS: Record<TInterval, string> = {
   daily: 'Daily',
   monthly: 'Monthly',
@@ -333,10 +335,16 @@ function groupPlansByTier(plans: IPlan[]): ITierGroup[] {
     }
   }
 
-  // Free first, then paid tiers in order of appearance
+  // Free first, then paid tiers in explicit order
   const groups = Array.from(tierMap.values());
   const freeGroup = groups.find((g) => g.tierKey === 'free');
-  const paidGroups = groups.filter((g) => g.tierKey !== 'free');
+  const paidGroups = groups
+    .filter((g) => g.tierKey !== 'free')
+    .sort((a, b) => {
+      const ai = TIER_ORDER.indexOf(a.tierKey);
+      const bi = TIER_ORDER.indexOf(b.tierKey);
+      return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+    });
   return freeGroup ? [freeGroup, ...paidGroups] : paidGroups;
 }
 
