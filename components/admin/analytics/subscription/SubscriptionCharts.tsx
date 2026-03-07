@@ -8,46 +8,75 @@ import { StatusDistributionChart } from './charts/StatusDistributionChart';
 import { ChurnOverTimeChart } from './charts/ChurnOverTimeChart';
 import type { SubscriptionAnalyticsCharts as ChartsType } from '@/types/admin';
 
+/******************************************************************************
+                                 Types
+******************************************************************************/
+
 interface SubscriptionChartsProps {
   charts: ChartsType;
   granularity: 'hour' | 'day';
 }
 
+/******************************************************************************
+                                 Component
+******************************************************************************/
+
 /**
- * Default component. Composes all subscription analytics charts in a layout.
+ * Default component. Composes all subscription analytics charts in a layout
+ * grouped by category with section headers.
  */
 function SubscriptionCharts({ charts, granularity }: SubscriptionChartsProps) {
   return (
-    <div className="space-y-6">
-      {/* Subscriptions over time — full width */}
-      <SubscriptionsOverTimeChart
-        data={charts.subscriptions_over_time}
-        granularity={granularity}
-      />
-
-      {/* Revenue + MRR trend — side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RevenueOverTimeChart
-          data={charts.revenue_over_time}
+    <div className="space-y-8">
+      {/* Growth & Acquisition */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          Growth &amp; Acquisition
+        </h2>
+        <SubscriptionsOverTimeChart
+          data={charts.subscriptions_over_time}
           granularity={granularity}
         />
-        <MrrTrendChart
-          data={charts.mrr_trend}
+      </section>
+
+      {/* Revenue & MRR */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          Revenue &amp; MRR
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RevenueOverTimeChart
+            data={charts.revenue_over_time}
+            granularity={granularity}
+          />
+          <MrrTrendChart
+            data={charts.mrr_trend}
+            granularity={granularity}
+          />
+        </div>
+      </section>
+
+      {/* Distribution */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          Distribution
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PlanDistributionChart data={charts.plan_distribution} />
+          <StatusDistributionChart data={charts.status_distribution} />
+        </div>
+      </section>
+
+      {/* Churn & Retention */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          Churn &amp; Retention
+        </h2>
+        <ChurnOverTimeChart
+          data={charts.churn_over_time}
           granularity={granularity}
         />
-      </div>
-
-      {/* Plan + Status distribution — side by side donut charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PlanDistributionChart data={charts.plan_distribution} />
-        <StatusDistributionChart data={charts.status_distribution} />
-      </div>
-
-      {/* Churn over time — full width */}
-      <ChurnOverTimeChart
-        data={charts.churn_over_time}
-        granularity={granularity}
-      />
+      </section>
     </div>
   );
 }

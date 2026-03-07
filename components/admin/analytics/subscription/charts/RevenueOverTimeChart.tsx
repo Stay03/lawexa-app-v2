@@ -14,13 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Receipt } from 'lucide-react';
 import { formatNaira } from '@/lib/utils/currency';
+import { formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 import type { RevenueOverTimePoint } from '@/types/admin';
 
-interface RevenueOverTimeChartProps {
-  data: RevenueOverTimePoint[];
-  granularity: 'hour' | 'day';
-}
+/******************************************************************************
+                                 Constants
+******************************************************************************/
 
 const chartConfig = {
   revenue: {
@@ -29,16 +30,18 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function formatDateTick(value: string, granularity: 'hour' | 'day'): string {
-  if (granularity === 'hour' && value.includes(' ')) {
-    const h = parseInt(value.split(' ')[1], 10);
-    if (h === 0) return '12 AM';
-    if (h === 12) return '12 PM';
-    return h < 12 ? `${h} AM` : `${h - 12} PM`;
-  }
-  const d = new Date(value);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+/******************************************************************************
+                                 Types
+******************************************************************************/
+
+interface RevenueOverTimeChartProps {
+  data: RevenueOverTimePoint[];
+  granularity: 'hour' | 'day';
 }
+
+/******************************************************************************
+                                 Component
+******************************************************************************/
 
 export function RevenueOverTimeChart({
   data,
@@ -51,8 +54,9 @@ export function RevenueOverTimeChart({
           <CardTitle>Revenue Over Time</CardTitle>
           <CardDescription>{granularity === 'hour' ? 'Hourly' : 'Daily'} paid invoice revenue</CardDescription>
         </CardHeader>
-        <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
-          No data for this period
+        <CardContent className="flex h-[250px] flex-col items-center justify-center gap-2 text-muted-foreground">
+          <Receipt className="h-8 w-8 opacity-40" />
+          <p className="text-sm">No data for this period</p>
         </CardContent>
       </Card>
     );
@@ -84,16 +88,7 @@ export function RevenueOverTimeChart({
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(v) => {
-                    if (granularity === 'hour' && String(v).includes(' ')) {
-                      return formatDateTick(String(v), granularity);
-                    }
-                    return new Date(String(v)).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    });
-                  }}
+                  labelFormatter={(v) => formatDateTooltipLabel(String(v), granularity)}
                   formatter={(value) => [formatNaira(Number(value)), 'Revenue']}
                 />
               }
@@ -102,6 +97,7 @@ export function RevenueOverTimeChart({
               dataKey="revenue"
               fill="var(--color-revenue)"
               radius={[4, 4, 0, 0]}
+              cursor="pointer"
             />
           </BarChart>
         </ChartContainer>

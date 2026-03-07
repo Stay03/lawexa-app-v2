@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSubscriptionAnalytics } from '@/lib/hooks/useAdmin';
 import { AnalyticsPeriodSelector } from '@/components/admin/analytics/AnalyticsPeriodSelector';
@@ -105,22 +106,25 @@ function SubscriptionAnalyticsContent() {
 
   if (error) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">
             Subscription Analytics
           </h1>
           {periodSelector}
         </div>
-        <div className="rounded-lg border py-12 text-center text-muted-foreground">
-          Failed to load analytics data. Please try again.
+        <div className="rounded-lg border py-12">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <AlertCircle className="h-8 w-8 opacity-40" />
+            <p className="text-sm">Failed to load analytics data. Please try again.</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Page Header with Period Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">
@@ -131,10 +135,17 @@ function SubscriptionAnalyticsContent() {
 
       {/* Stat Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="h-[120px] rounded-2xl" />
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-[120px] rounded-2xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-[120px] rounded-2xl" />
+            ))}
+          </div>
         </div>
       ) : data?.data?.stat_cards ? (
         <SubscriptionStatCards statCards={data.data.stat_cards} />
@@ -142,17 +153,29 @@ function SubscriptionAnalyticsContent() {
 
       {/* Charts */}
       {isLoading ? (
-        <div className="space-y-6">
-          <Skeleton className="h-[350px] rounded-2xl" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[350px] rounded-2xl" />
-            <Skeleton className="h-[350px] rounded-2xl" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[350px] rounded-2xl" />
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <Skeleton className="h-4 w-40" />
             <Skeleton className="h-[350px] rounded-2xl" />
           </div>
-          <Skeleton className="h-[350px] rounded-2xl" />
+          <div className="space-y-4">
+            <Skeleton className="h-4 w-32" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Skeleton className="h-[350px] rounded-2xl" />
+              <Skeleton className="h-[350px] rounded-2xl" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-4 w-28" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Skeleton className="h-[350px] rounded-2xl" />
+              <Skeleton className="h-[350px] rounded-2xl" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-[350px] rounded-2xl" />
+          </div>
         </div>
       ) : data?.data?.charts ? (
         <SubscriptionCharts
@@ -164,6 +187,7 @@ function SubscriptionAnalyticsContent() {
       {/* Data Tables */}
       {isLoading ? (
         <div className="space-y-6">
+          <Skeleton className="h-4 w-36" />
           <Skeleton className="h-[400px] rounded-2xl" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Skeleton className="h-[300px] rounded-2xl" />
@@ -171,7 +195,10 @@ function SubscriptionAnalyticsContent() {
           </div>
         </div>
       ) : data?.data?.tables ? (
-        <div className="space-y-6">
+        <section className="space-y-6">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            Detailed Breakdown
+          </h2>
           <PlanBreakdownTable data={data.data.tables.plan_breakdown} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <RecentSubscriptionsTable
@@ -181,7 +208,7 @@ function SubscriptionAnalyticsContent() {
               data={data.data.tables.top_revenue_users}
             />
           </div>
-        </div>
+        </section>
       ) : null}
     </div>
   );
@@ -191,15 +218,22 @@ export default function SubscriptionAnalyticsPage() {
   return (
     <Suspense
       fallback={
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <Skeleton className="h-8 w-[260px]" />
             <Skeleton className="h-9 w-[180px]" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
-              <Skeleton key={i} className="h-[120px] rounded-2xl" />
-            ))}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-[120px] rounded-2xl" />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-[120px] rounded-2xl" />
+              ))}
+            </div>
           </div>
           <Skeleton className="h-[350px] rounded-2xl" />
         </div>

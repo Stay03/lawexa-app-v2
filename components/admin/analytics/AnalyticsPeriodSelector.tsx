@@ -18,15 +18,9 @@ import { Input } from '@/components/ui/input';
 import { Calendar } from 'lucide-react';
 import type { AnalyticsPeriod } from '@/types/admin';
 
-interface AnalyticsPeriodSelectorProps {
-  period: AnalyticsPeriod;
-  date?: string;
-  startDate?: string;
-  endDate?: string;
-  onPeriodChange: (period: AnalyticsPeriod) => void;
-  onDateChange?: (date: string) => void;
-  onCustomRangeChange: (startDate: string, endDate: string) => void;
-}
+/******************************************************************************
+                                 Constants
+******************************************************************************/
 
 const PERIOD_LABELS: Record<AnalyticsPeriod, string> = {
   today: 'Today',
@@ -38,6 +32,40 @@ const PERIOD_LABELS: Record<AnalyticsPeriod, string> = {
   last_30_days: 'Last 30 Days',
   date_range: 'Date Range',
 };
+
+/******************************************************************************
+                                 Functions
+******************************************************************************/
+
+/**
+ * Format an ISO date string (YYYY-MM-DD) to a human-readable display format.
+ */
+function formatDisplayDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/******************************************************************************
+                                 Types
+******************************************************************************/
+
+interface AnalyticsPeriodSelectorProps {
+  period: AnalyticsPeriod;
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  onPeriodChange: (period: AnalyticsPeriod) => void;
+  onDateChange?: (date: string) => void;
+  onCustomRangeChange: (startDate: string, endDate: string) => void;
+}
+
+/******************************************************************************
+                                 Component
+******************************************************************************/
 
 export function AnalyticsPeriodSelector({
   period,
@@ -52,6 +80,8 @@ export function AnalyticsPeriodSelector({
   const [customStart, setCustomStart] = useState(startDate || '');
   const [customEnd, setCustomEnd] = useState(endDate || '');
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
+  const isRangeInvalid = customStart && customEnd && customEnd < customStart;
 
   function handlePeriodChange(value: string) {
     const newPeriod = value as AnalyticsPeriod;
@@ -71,7 +101,7 @@ export function AnalyticsPeriodSelector({
   }
 
   function handleApplyDateRange() {
-    if (customStart && customEnd) {
+    if (customStart && customEnd && !isRangeInvalid) {
       onCustomRangeChange(customStart, customEnd);
       setIsPopoverOpen(false);
     }
@@ -79,9 +109,9 @@ export function AnalyticsPeriodSelector({
 
   const popoverLabel =
     period === 'date' && date
-      ? date
+      ? formatDisplayDate(date)
       : period === 'date_range' && startDate && endDate
-        ? `${startDate} - ${endDate}`
+        ? `${formatDisplayDate(startDate)} – ${formatDisplayDate(endDate)}`
         : period === 'date'
           ? 'Select date'
           : 'Select dates';
@@ -135,7 +165,12 @@ export function AnalyticsPeriodSelector({
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm font-medium">Custom Date Range</p>
+                <div>
+                  <p className="text-sm font-medium">Custom Date Range</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    End date must be after start date
+                  </p>
+                </div>
                 <div className="space-y-2">
                   <div>
                     <label className="text-xs text-muted-foreground">Start Date</label>
@@ -156,11 +191,16 @@ export function AnalyticsPeriodSelector({
                     />
                   </div>
                 </div>
+                {isRangeInvalid && (
+                  <p className="text-xs text-destructive">
+                    End date must be on or after start date
+                  </p>
+                )}
                 <Button
                   size="sm"
                   className="w-full"
                   onClick={handleApplyDateRange}
-                  disabled={!customStart || !customEnd}
+                  disabled={!customStart || !customEnd || !!isRangeInvalid}
                 >
                   Apply
                 </Button>

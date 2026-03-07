@@ -14,12 +14,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { BarChart3 } from 'lucide-react';
+import { formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 import type { SubscriptionsOverTimePoint } from '@/types/admin';
 
-interface SubscriptionsOverTimeChartProps {
-  data: SubscriptionsOverTimePoint[];
-  granularity: 'hour' | 'day';
-}
+/******************************************************************************
+                                 Constants
+******************************************************************************/
 
 const chartConfig = {
   count: {
@@ -28,16 +29,18 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function formatDateTick(value: string, granularity: 'hour' | 'day'): string {
-  if (granularity === 'hour' && value.includes(' ')) {
-    const h = parseInt(value.split(' ')[1], 10);
-    if (h === 0) return '12 AM';
-    if (h === 12) return '12 PM';
-    return h < 12 ? `${h} AM` : `${h - 12} PM`;
-  }
-  const d = new Date(value);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+/******************************************************************************
+                                 Types
+******************************************************************************/
+
+interface SubscriptionsOverTimeChartProps {
+  data: SubscriptionsOverTimePoint[];
+  granularity: 'hour' | 'day';
 }
+
+/******************************************************************************
+                                 Component
+******************************************************************************/
 
 export function SubscriptionsOverTimeChart({
   data,
@@ -50,8 +53,9 @@ export function SubscriptionsOverTimeChart({
           <CardTitle>Subscriptions Over Time</CardTitle>
           <CardDescription>{granularity === 'hour' ? 'Hourly' : 'Daily'} new subscription counts</CardDescription>
         </CardHeader>
-        <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
-          No data for this period
+        <CardContent className="flex h-[250px] flex-col items-center justify-center gap-2 text-muted-foreground">
+          <BarChart3 className="h-8 w-8 opacity-40" />
+          <p className="text-sm">No data for this period</p>
         </CardContent>
       </Card>
     );
@@ -78,16 +82,7 @@ export function SubscriptionsOverTimeChart({
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(v) => {
-                    if (granularity === 'hour' && String(v).includes(' ')) {
-                      return formatDateTick(String(v), granularity);
-                    }
-                    return new Date(String(v)).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    });
-                  }}
+                  labelFormatter={(v) => formatDateTooltipLabel(String(v), granularity)}
                 />
               }
             />
@@ -95,6 +90,7 @@ export function SubscriptionsOverTimeChart({
               dataKey="count"
               fill="var(--color-count)"
               radius={[4, 4, 0, 0]}
+              cursor="pointer"
             />
           </BarChart>
         </ChartContainer>
