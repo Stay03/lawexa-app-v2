@@ -10,6 +10,8 @@ import type {
   UserAnalyticsParams,
   ViewAnalyticsParams,
   SubscriptionAnalyticsParams,
+  AdminSubscriptionsParams,
+  AdminSubscribersParams,
 } from '@/types/admin';
 
 // Query key factory for organized caching
@@ -34,6 +36,14 @@ export const adminKeys = {
     [...adminKeys.all, 'views', 'analytics', params] as const,
   subscriptionAnalytics: (params: SubscriptionAnalyticsParams) =>
     [...adminKeys.all, 'subscriptions', 'analytics', params] as const,
+  subscriptions: () => [...adminKeys.all, 'subscriptions'] as const,
+  subscriptionsList: (params: AdminSubscriptionsParams) =>
+    [...adminKeys.subscriptions(), 'list', params] as const,
+  subscriptionDetail: (id: number) =>
+    [...adminKeys.subscriptions(), 'detail', id] as const,
+  subscribers: () => [...adminKeys.all, 'subscribers'] as const,
+  subscribersList: (params: AdminSubscribersParams) =>
+    [...adminKeys.subscribers(), 'list', params] as const,
 };
 
 /**
@@ -146,5 +156,39 @@ export function useSubscriptionAnalytics(
     queryKey: adminKeys.subscriptionAnalytics(params),
     queryFn: () => adminApi.getSubscriptionAnalytics(params),
     staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching admin subscriptions list with pagination, filtering, sorting
+ */
+export function useAdminSubscriptions(params: AdminSubscriptionsParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.subscriptionsList(params),
+    queryFn: () => adminApi.getAdminSubscriptions(params),
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook for fetching a single subscription with detail and invoices
+ */
+export function useAdminSubscription(id: number) {
+  return useQuery({
+    queryKey: adminKeys.subscriptionDetail(id),
+    queryFn: () => adminApi.getAdminSubscription(id),
+    enabled: id > 0,
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook for fetching admin subscribers list with pagination, filtering, sorting
+ */
+export function useAdminSubscribers(params: AdminSubscribersParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.subscribersList(params),
+    queryFn: () => adminApi.getAdminSubscribers(params),
+    staleTime: 30 * 1000,
   });
 }

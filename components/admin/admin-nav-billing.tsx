@@ -6,6 +6,8 @@ import {
   CreditCard,
   ChevronRight,
   BarChart3,
+  List,
+  Users,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -25,6 +27,8 @@ import {
 } from '@/components/ui/sidebar';
 
 const billingNavItems = [
+  { title: 'Subscriptions', url: '/admin/subscriptions', icon: List, exact: true },
+  { title: 'Subscribers', url: '/admin/subscribers', icon: Users },
   { title: 'Sub. Analytics', url: '/admin/subscriptions/analytics', icon: BarChart3 },
 ];
 
@@ -32,7 +36,7 @@ export function AdminNavBillingSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/subscriptions');
+  const isSectionActive = pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/subscribers');
 
   return (
     <SidebarGroup>
@@ -50,7 +54,9 @@ export function AdminNavBillingSection() {
             <CollapsibleContent>
               <SidebarMenuSub>
                 {billingNavItems.map((item) => {
-                  const isActive = pathname === item.url || pathname.startsWith(item.url + '/');
+                  const isActive = item.exact
+                    ? pathname === item.url || (pathname.startsWith(item.url + '/') && !pathname.startsWith(item.url + '/analytics'))
+                    : pathname === item.url || pathname.startsWith(item.url + '/');
                   return (
                     <SidebarMenuSubItem key={item.title}>
                       <SidebarMenuSubButton asChild isActive={isActive}>

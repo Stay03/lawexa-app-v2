@@ -892,3 +892,156 @@ export interface SubscriptionAnalyticsResponse {
   message: string;
   data: SubscriptionAnalyticsData;
 }
+
+// ============================================
+// Admin Subscription Management Types
+// Based on API documentation: /docs/apiDocs/admin-subscription-api.md
+// ============================================
+
+export interface AdminSubscriptionUser {
+  uuid: string;
+  name: string;
+  email: string;
+}
+
+export interface AdminSubscriptionDetailUser extends AdminSubscriptionUser {
+  role: string;
+  avatar_url: string | null;
+}
+
+export interface AdminSubscriptionPlan {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  amount: string;
+  formatted_amount: string;
+  currency: string;
+  interval: string;
+  interval_label: string;
+  interval_count: number;
+  is_free: boolean;
+  is_featured: boolean;
+  features: string[];
+  limits: { type: string; value: number; is_unlimited: boolean; period: string }[];
+}
+
+export type AdminSubscriptionStatus = 'active' | 'past_due' | 'cancelled' | 'expired' | 'trialing';
+
+export interface AdminSubscriptionListItem {
+  id: number;
+  subscription_code: string | null;
+  user: AdminSubscriptionUser;
+  plan: AdminSubscriptionPlan;
+  status: AdminSubscriptionStatus;
+  status_label: string;
+  amount: string;
+  currency: string;
+  start_date: string | null;
+  next_payment_date: string | null;
+  cancelled_at: string | null;
+  ends_at: string | null;
+  days_until_renewal: number | null;
+  is_in_grace_period: boolean;
+  has_access: boolean;
+  invoices_count: number;
+  created_at: string;
+}
+
+export interface AdminSubscriptionInvoice {
+  id: number;
+  invoice_code: string;
+  amount: string;
+  currency: string;
+  formatted_amount: string;
+  status: string;
+  paid: boolean;
+  paid_at: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  transaction_reference: string | null;
+  created_at: string;
+}
+
+export interface AdminSubscriptionDetail extends AdminSubscriptionListItem {
+  email_token: string | null;
+  authorization_code: string | null;
+  invoice_limit: number;
+  cron_expression: string | null;
+  quantity: number;
+  user: AdminSubscriptionDetailUser;
+  recent_invoices: AdminSubscriptionInvoice[];
+  updated_at: string;
+}
+
+export interface AdminSubscriber {
+  uuid: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar_url: string | null;
+  created_at: string;
+  subscription: {
+    id: number;
+    status: AdminSubscriptionStatus;
+    status_label: string;
+    amount: string;
+    currency: string;
+    start_date: string | null;
+    next_payment_date: string | null;
+    ends_at: string | null;
+    has_access: boolean;
+    plan: AdminSubscriptionPlan;
+  } | null;
+}
+
+// Query Parameters
+
+export interface AdminSubscriptionsParams {
+  status?: AdminSubscriptionStatus;
+  plan_id?: number;
+  search?: string;
+  start_date?: string;
+  end_date?: string;
+  min_amount?: number;
+  max_amount?: number;
+  sort_by?: 'created_at' | 'amount' | 'start_date' | 'next_payment_date';
+  sort_order?: 'asc' | 'desc';
+  per_page?: number;
+  page?: number;
+}
+
+export interface AdminSubscribersParams {
+  search?: string;
+  role?: 'user' | 'researcher' | 'admin' | 'superadmin' | 'guest';
+  plan_id?: number;
+  subscription_status?: AdminSubscriptionStatus;
+  sort_by?: 'name' | 'email' | 'created_at';
+  sort_order?: 'asc' | 'desc';
+  per_page?: number;
+  page?: number;
+}
+
+// API Responses
+
+export interface AdminSubscriptionsListResponse {
+  success: boolean;
+  message: string;
+  data: AdminSubscriptionListItem[];
+  pagination: AdminConversationsPagination;
+  links: AdminConversationsLinks;
+}
+
+export interface AdminSubscriptionDetailResponse {
+  success: boolean;
+  message: string;
+  data: AdminSubscriptionDetail;
+}
+
+export interface AdminSubscribersListResponse {
+  success: boolean;
+  message: string;
+  data: AdminSubscriber[];
+  pagination: AdminConversationsPagination;
+  links: AdminConversationsLinks;
+}

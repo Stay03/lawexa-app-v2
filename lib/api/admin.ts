@@ -16,6 +16,11 @@ import type {
   ViewAnalyticsResponse,
   SubscriptionAnalyticsParams,
   SubscriptionAnalyticsResponse,
+  AdminSubscriptionsParams,
+  AdminSubscriptionsListResponse,
+  AdminSubscriptionDetailResponse,
+  AdminSubscribersParams,
+  AdminSubscribersListResponse,
 } from '@/types/admin';
 
 export const adminApi = {
@@ -194,6 +199,72 @@ export const adminApi = {
           date: params.date,
           start_date: params.start_date,
           end_date: params.end_date,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * List all subscriptions with pagination, filtering, and sorting
+   * Requires admin role
+   */
+  getAdminSubscriptions: async (
+    params: AdminSubscriptionsParams = {}
+  ): Promise<AdminSubscriptionsListResponse> => {
+    const response = await apiClient.get<AdminSubscriptionsListResponse>(
+      '/admin/subscriptions',
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          status: params.status,
+          plan_id: params.plan_id,
+          search: params.search,
+          start_date: params.start_date,
+          end_date: params.end_date,
+          min_amount: params.min_amount,
+          max_amount: params.max_amount,
+          sort_by: params.sort_by ?? 'created_at',
+          sort_order: params.sort_order ?? 'desc',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get a single subscription with detail and recent invoices
+   * Requires admin role
+   */
+  getAdminSubscription: async (
+    id: number
+  ): Promise<AdminSubscriptionDetailResponse> => {
+    const response = await apiClient.get<AdminSubscriptionDetailResponse>(
+      `/admin/subscriptions/${id}`
+    );
+    return response.data;
+  },
+
+  /**
+   * List all subscribers with their most recent subscription
+   * Requires admin role
+   */
+  getAdminSubscribers: async (
+    params: AdminSubscribersParams = {}
+  ): Promise<AdminSubscribersListResponse> => {
+    const response = await apiClient.get<AdminSubscribersListResponse>(
+      '/admin/subscribers',
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          search: params.search,
+          role: params.role,
+          plan_id: params.plan_id,
+          subscription_status: params.subscription_status,
+          sort_by: params.sort_by ?? 'created_at',
+          sort_order: params.sort_order ?? 'desc',
         },
       }
     );
