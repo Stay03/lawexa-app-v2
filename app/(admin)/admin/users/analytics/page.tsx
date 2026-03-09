@@ -133,10 +133,17 @@ function UserAnalyticsContent() {
 
       {/* Stat Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-lg" />
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-[140px] rounded-2xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-2xl" />
+            ))}
+          </div>
         </div>
       ) : data?.data?.stat_cards ? (
         <UserAnalyticsStatCards statCards={data.data.stat_cards} />
@@ -145,22 +152,12 @@ function UserAnalyticsContent() {
       {/* Charts */}
       {isLoading ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[350px] rounded-2xl" />
-            <Skeleton className="h-[350px] rounded-2xl" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[350px] rounded-2xl" />
-            <Skeleton className="h-[350px] rounded-2xl" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[350px] rounded-2xl" />
-            <Skeleton className="h-[350px] rounded-2xl" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[350px] rounded-2xl" />
-            <Skeleton className="h-[350px] rounded-2xl" />
-          </div>
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Skeleton className="h-[350px] rounded-2xl" />
+              {i < 5 && <Skeleton className="h-[350px] rounded-2xl" />}
+            </div>
+          ))}
         </div>
       ) : data?.data?.charts ? (
         <UserAnalyticsCharts
@@ -214,9 +211,9 @@ export default function UserAnalyticsPage() {
             <Skeleton className="h-8 w-[200px]" />
             <Skeleton className="h-9 w-[180px]" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-lg" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-[140px] rounded-2xl" />
             ))}
           </div>
           <Skeleton className="h-[350px] rounded-2xl" />

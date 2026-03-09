@@ -476,8 +476,45 @@ export interface UserAnalyticsParams {
   end_date?: string;
 }
 
+export interface CurrentlyOnlineCard {
+  value: number;
+  registered: number;
+  guest: number;
+}
+
+export interface UserCountCard {
+  value: number;
+  registered: number;
+  guest: number;
+  change_percent: number | null;
+}
+
+export interface ActivationMetric {
+  value: number;
+  activated_count: number;
+  total_signups: number;
+  change_percent: number | null;
+}
+
+export interface ActivationRateCard {
+  ai_activation: ActivationMetric;
+  content_activation: ActivationMetric;
+}
+
+export interface ReturningUsersCard {
+  value: number;
+  registered: number;
+  guest: number;
+  returning_rate: number;
+  change_percent: number | null;
+}
+
 export interface UserAnalyticsStatCards {
-  new_users: AnalyticsStatCard;
+  currently_online: CurrentlyOnlineCard;
+  new_users: UserCountCard;
+  total_users: UserCountCard;
+  activation_rate: ActivationRateCard;
+  returning_users: ReturningUsersCard;
   total_conversations: AnalyticsStatCard;
   total_ai_responses: AnalyticsStatCard;
   total_tokens: AnalyticsStatCard;
@@ -487,7 +524,29 @@ export interface UserAnalyticsStatCards {
 export interface UserGrowthPoint {
   date?: string;
   hour?: string;
+  total: number;
+  registered: number;
+  guest: number;
+}
+
+export interface UserTypeDistributionPoint {
+  type: string;
   count: number;
+  percentage: number;
+}
+
+export interface ActiveUsersOverTimePoint {
+  date?: string;
+  hour?: string;
+  total: number;
+  registered: number;
+  guest: number;
+}
+
+export interface AuthProviderDistributionPoint {
+  provider: string;
+  count: number;
+  percentage: number;
 }
 
 export interface UserConversationsAndMessagesPoint {
@@ -535,6 +594,9 @@ export interface LawSchoolDistributionPoint {
 
 export interface UserAnalyticsCharts {
   user_growth: UserGrowthPoint[];
+  user_type_distribution: UserTypeDistributionPoint[];
+  active_users_over_time: ActiveUsersOverTimePoint[];
+  auth_provider_distribution: AuthProviderDistributionPoint[];
   conversations_and_messages: UserConversationsAndMessagesPoint[];
   token_usage: UserTokenUsagePoint[];
   daily_cost: UserDailyCostPoint[];
@@ -548,6 +610,7 @@ export interface UserDailyBreakdownRow {
   date?: string;
   hour?: string;
   new_users: number;
+  new_guests: number;
   conversations: number;
   messages: number;
   ai_responses: number;

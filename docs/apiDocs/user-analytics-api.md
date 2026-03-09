@@ -2,14 +2,15 @@
 
 ## Overview
 
-This endpoint provides a comprehensive user demographics and growth analytics dashboard for the admin panel. All data respects a global period selector, with automatic comparison to the equivalent previous period for change tracking.
+This endpoint provides a comprehensive user demographics, growth, and engagement analytics dashboard for the admin panel. All data respects a global period selector, with automatic comparison to the equivalent previous period for change tracking.
 
 **Key Features:**
-- 5 stat cards with period-over-period change percentages
-- 8 chart datasets (growth trends, usage metrics, demographic distributions)
+- 9 stat cards with period-over-period change percentages and registered/guest breakdowns
+- 11 chart datasets (growth trends, engagement metrics, demographic distributions)
 - 3 data tables (daily breakdown, top universities, international universities)
 - Period filtering: today, last 24 hours, this week, last 7 days, this month, last 30 days, single date, or custom date range
 - Automatic granularity: hourly for single-day periods, daily for multi-day periods
+- Guest vs registered user tracking across all metrics
 - Bot/system users excluded from all counts and distributions
 
 ---
@@ -61,7 +62,7 @@ This endpoint provides a comprehensive user demographics and growth analytics da
 
 ### GET /api/admin/users/analytics
 
-Retrieve aggregated user demographics and growth analytics for the admin dashboard.
+Retrieve aggregated user demographics, growth, and engagement analytics for the admin dashboard.
 
 **Query Parameters:**
 
@@ -83,7 +84,7 @@ GET /api/admin/users/analytics?period=this_week
 GET /api/admin/users/analytics?period=this_month
 GET /api/admin/users/analytics?period=last_30_days
 GET /api/admin/users/analytics?period=date&date=2026-02-23
-GET /api/admin/users/analytics?period=date_range&start_date=2026-01-01&end_date=2026-02-12
+GET /api/admin/users/analytics?period=date_range&start_date=2026-01-01&end_date=2026-03-09
 ```
 
 **Response (Success - 200):**
@@ -94,125 +95,151 @@ GET /api/admin/users/analytics?period=date_range&start_date=2026-01-01&end_date=
   "message": "User analytics retrieved successfully.",
   "data": {
     "period": {
-      "start": "2026-01-13T00:00:00+00:00",
-      "end": "2026-02-12T04:45:44+00:00",
-      "comparison_start": "2025-12-13T19:14:15+00:00",
-      "comparison_end": "2026-01-12T23:59:59+00:00"
+      "start": "2026-02-07T00:00:00+00:00",
+      "end": "2026-03-09T14:18:53+00:00",
+      "comparison_start": "2026-01-07T09:41:06+00:00",
+      "comparison_end": "2026-02-06T23:59:59+00:00"
     },
     "granularity": "day",
     "stat_cards": {
-      "new_users": { "value": 78, "change_percent": 100 },
-      "total_conversations": { "value": 69, "change_percent": 100 },
-      "total_ai_responses": { "value": 53, "change_percent": 100 },
-      "total_tokens": { "value": 302087, "change_percent": 100 },
-      "total_cost": { "value": 1.17, "change_percent": 100 }
+      "currently_online": {
+        "value": 1,
+        "registered": 1,
+        "guest": 0
+      },
+      "new_users": {
+        "value": 39,
+        "registered": 37,
+        "guest": 2,
+        "change_percent": -44.3
+      },
+      "total_users": {
+        "value": 117,
+        "registered": 115,
+        "guest": 2,
+        "change_percent": 50
+      },
+      "activation_rate": {
+        "ai_activation": {
+          "value": 0,
+          "activated_count": 0,
+          "total_signups": 37,
+          "change_percent": -100
+        },
+        "content_activation": {
+          "value": 5.4,
+          "activated_count": 2,
+          "total_signups": 37,
+          "change_percent": 25.6
+        }
+      },
+      "returning_users": {
+        "value": 0,
+        "registered": 0,
+        "guest": 0,
+        "returning_rate": 0,
+        "change_percent": null
+      },
+      "total_conversations": {
+        "value": 10,
+        "change_percent": -85.5
+      },
+      "total_ai_responses": {
+        "value": 0,
+        "change_percent": -100
+      },
+      "total_tokens": {
+        "value": 0,
+        "change_percent": -100
+      },
+      "total_cost": {
+        "value": 0,
+        "change_percent": -100
+      }
     },
     "charts": {
       "user_growth": [
-        { "date": "2026-01-16", "count": 3 },
-        { "date": "2026-01-17", "count": 41 },
-        { "date": "2026-01-21", "count": 15 },
-        { "date": "2026-01-26", "count": 3 },
-        { "date": "2026-01-31", "count": 4 },
-        { "date": "2026-02-01", "count": 4 },
-        { "date": "2026-02-09", "count": 4 },
-        { "date": "2026-02-12", "count": 4 }
+        { "date": "2026-02-09", "total": 4, "registered": 3, "guest": 1 },
+        { "date": "2026-02-23", "total": 7, "registered": 7, "guest": 0 }
+      ],
+      "user_type_distribution": [
+        { "type": "Registered", "count": 37, "percentage": 94.9 },
+        { "type": "Guest", "count": 2, "percentage": 5.1 }
+      ],
+      "active_users_over_time": [
+        { "date": "2026-03-08", "total": 1, "registered": 1, "guest": 0 },
+        { "date": "2026-03-09", "total": 2, "registered": 2, "guest": 0 }
+      ],
+      "auth_provider_distribution": [
+        { "provider": "Email", "count": 37, "percentage": 94.9 },
+        { "provider": "Guest", "count": 2, "percentage": 5.1 }
       ],
       "conversations_and_messages": [
-        { "date": "2026-01-19", "conversations": 6, "messages": 8 },
-        { "date": "2026-01-20", "conversations": 52, "messages": 65 },
-        { "date": "2026-01-21", "conversations": 10, "messages": 0 },
-        { "date": "2026-01-31", "conversations": 1, "messages": 0 }
+        { "date": "2026-02-16", "conversations": 10, "messages": 9 }
       ],
-      "token_usage": [
-        { "date": "2026-01-19", "total_tokens": 1060 },
-        { "date": "2026-01-20", "total_tokens": 301027 }
-      ],
-      "daily_cost": [
-        { "date": "2026-01-19", "cost": 0.0002094 },
-        { "date": "2026-01-20", "cost": 1.1684370000000002 }
-      ],
+      "token_usage": [],
+      "daily_cost": [],
       "profession_distribution": [
-        { "profession": "Lawyer", "count": 6, "percentage": 40 },
-        { "profession": "Corporate Lawyer", "count": 5, "percentage": 33.3 },
-        { "profession": "Law Student", "count": 3, "percentage": 20 },
-        { "profession": "Senior Lawyer", "count": 1, "percentage": 6.7 }
+        { "profession": "student", "count": 1, "percentage": 33.3 },
+        { "profession": "lawyer", "count": 1, "percentage": 33.3 }
       ],
-      "area_of_study_distribution": [],
+      "area_of_study_distribution": [
+        { "area_of_study": "Law", "count": 1, "percentage": 100 }
+      ],
       "country_distribution": [
-        { "country": "Nigeria", "count": 10, "percentage": 76.9 },
-        { "country": "United Kingdom", "count": 1, "percentage": 7.7 },
-        { "country": "Saint Lucia", "count": 1, "percentage": 7.7 },
-        { "country": "French Polynesia", "count": 1, "percentage": 7.7 }
+        { "country": "Nigeria", "count": 2, "percentage": 66.7 },
+        { "country": "Ghana", "count": 1, "percentage": 33.3 }
       ],
-      "law_school_distribution": [
-        { "law_school": "Harvard Law School", "count": 6, "percentage": 66.7 },
-        { "law_school": "Spencer, Marvin and Reilly Law School", "count": 1, "percentage": 11.1 },
-        { "law_school": "Sipes-Toy Law School", "count": 1, "percentage": 11.1 },
-        { "law_school": "Schaden Group Law School", "count": 1, "percentage": 11.1 }
-      ]
+      "law_school_distribution": []
     },
     "tables": {
       "daily_breakdown": [
         {
-          "date": "2026-01-16",
-          "new_users": 3,
-          "conversations": 0,
-          "messages": 0,
+          "date": "2026-02-16",
+          "new_users": 0,
+          "new_guests": 0,
+          "conversations": 10,
+          "messages": 10,
           "ai_responses": 0,
           "total_tokens": 0,
           "cost": 0
-        },
-        {
-          "date": "2026-01-17",
-          "new_users": 41,
-          "conversations": 0,
-          "messages": 0,
-          "ai_responses": 0,
-          "total_tokens": 0,
-          "cost": 0
-        },
-        {
-          "date": "2026-01-19",
-          "new_users": 0,
-          "conversations": 6,
-          "messages": 16,
-          "ai_responses": 7,
-          "total_tokens": 1060,
-          "cost": 0
-        },
-        {
-          "date": "2026-01-20",
-          "new_users": 0,
-          "conversations": 52,
-          "messages": 144,
-          "ai_responses": 46,
-          "total_tokens": 301027,
-          "cost": 1.17
         }
       ],
-      "top_universities": [
-        {
-          "university": "KNUST",
-          "count": 3,
-          "percentage": 75,
-          "country": "United Kingdom"
-        },
-        {
-          "university": "Queen Mary, U. of London",
-          "count": 1,
-          "percentage": 25,
-          "country": "Nigeria"
-        }
+      "top_universities": [],
+      "international_universities": []
+    }
+  }
+}
+```
+
+**Hourly Response Example (`period=today`):**
+
+```json
+{
+  "success": true,
+  "message": "User analytics retrieved successfully.",
+  "data": {
+    "period": {
+      "start": "2026-03-09T00:00:00+00:00",
+      "end": "2026-03-09T14:18:54+00:00",
+      "comparison_start": "2026-03-08T09:41:05+00:00",
+      "comparison_end": "2026-03-08T23:59:59+00:00"
+    },
+    "granularity": "hour",
+    "stat_cards": { "..." : "..." },
+    "charts": {
+      "user_growth": [],
+      "active_users_over_time": [
+        { "hour": "11", "total": 1, "registered": 1, "guest": 0 },
+        { "hour": "12", "total": 1, "registered": 1, "guest": 0 },
+        { "hour": "14", "total": 1, "registered": 1, "guest": 0 }
       ],
-      "international_universities": [
-        {
-          "university": "KNUST",
-          "count": 3,
-          "percentage": 100,
-          "country": "United Kingdom"
-        }
-      ]
+      "..." : "..."
+    },
+    "tables": {
+      "daily_breakdown": [],
+      "top_universities": [],
+      "international_universities": []
     }
   }
 }
@@ -261,15 +288,17 @@ Each stat card includes a `change_percent` comparing the current period to the p
   "success": true,
   "message": "User analytics retrieved successfully.",
   "data": {
-    "period": {
-      "start": "2026-02-12T00:00:00+00:00",
-      "end": "2026-02-12T04:45:34+00:00",
-      "comparison_start": "2026-02-11T19:14:25+00:00",
-      "comparison_end": "2026-02-11T23:59:59+00:00"
-    },
+    "period": { "..." : "..." },
     "granularity": "hour",
     "stat_cards": {
-      "new_users": { "value": 0, "change_percent": null },
+      "currently_online": { "value": 0, "registered": 0, "guest": 0 },
+      "new_users": { "value": 0, "registered": 0, "guest": 0, "change_percent": null },
+      "total_users": { "value": 117, "registered": 115, "guest": 2, "change_percent": 0 },
+      "activation_rate": {
+        "ai_activation": { "value": 0, "activated_count": 0, "total_signups": 0, "change_percent": null },
+        "content_activation": { "value": 0, "activated_count": 0, "total_signups": 0, "change_percent": null }
+      },
+      "returning_users": { "value": 0, "registered": 0, "guest": 0, "returning_rate": 0, "change_percent": null },
       "total_conversations": { "value": 0, "change_percent": null },
       "total_ai_responses": { "value": 0, "change_percent": null },
       "total_tokens": { "value": 0, "change_percent": null },
@@ -277,6 +306,12 @@ Each stat card includes a `change_percent` comparing the current period to the p
     },
     "charts": {
       "user_growth": [],
+      "user_type_distribution": [
+        { "type": "Registered", "count": 0, "percentage": 0 },
+        { "type": "Guest", "count": 0, "percentage": 0 }
+      ],
+      "active_users_over_time": [],
+      "auth_provider_distribution": [],
       "conversations_and_messages": [],
       "token_usage": [],
       "daily_cost": [],
@@ -296,6 +331,9 @@ Each stat card includes a `change_percent` comparing the current period to the p
 
 **Notes:**
 - All charts and tables return empty arrays when no data exists in the period
+- `user_type_distribution` always returns both entries (even with zero counts)
+- `total_users` reflects all-time count, not period-specific — so it's always populated
+- `currently_online` is real-time (not period-dependent) and has no `change_percent`
 - Demographic distributions only include non-null, non-empty values
 
 ---
@@ -304,49 +342,175 @@ Each stat card includes a `change_percent` comparing the current period to the p
 
 ### Stat Cards
 
+#### currently_online (real-time)
+Users with token activity in the last 5 minutes. Not period-dependent.
+
+```json
+{
+  "value": 1,
+  "registered": 1,
+  "guest": 0
+}
+```
+
+#### new_users
+New user registrations in the current period, split by registered vs guest.
+
+```json
+{
+  "value": 39,
+  "registered": 37,
+  "guest": 2,
+  "change_percent": -44.3
+}
+```
+
+#### total_users
+Cumulative user count (all time). Split by registered vs guest.
+
+```json
+{
+  "value": 117,
+  "registered": 115,
+  "guest": 2,
+  "change_percent": 50
+}
+```
+
+#### activation_rate
+Two sub-metrics tracking how many new registered signups in the period became active:
+
+- **ai_activation**: Users who triggered at least one AI response
+- **content_activation**: Users who created at least one conversation
+
+```json
+{
+  "ai_activation": {
+    "value": 0,
+    "activated_count": 0,
+    "total_signups": 37,
+    "change_percent": -100
+  },
+  "content_activation": {
+    "value": 5.4,
+    "activated_count": 2,
+    "total_signups": 37,
+    "change_percent": 25.6
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `value` | Activation rate as percentage |
+| `activated_count` | Number of users who activated |
+| `total_signups` | Total registered signups in period |
+| `change_percent` | Rate change vs previous period |
+
+#### returning_users
+Users active in both the current and previous period.
+
+```json
+{
+  "value": 0,
+  "registered": 0,
+  "guest": 0,
+  "returning_rate": 0,
+  "change_percent": null
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `value` | Total returning users |
+| `registered` | Returning registered users |
+| `guest` | Returning guest users |
+| `returning_rate` | Percentage of current active users who are returning |
+
+#### total_conversations, total_ai_responses, total_tokens, total_cost
+Simple stat cards with value and change_percent:
+
+```json
+{ "value": 10, "change_percent": -85.5 }
+```
+
 | Card | Source | Calculation | Unit |
 |------|--------|-------------|------|
-| `new_users` | `users` | `COUNT(*)` excluding bot/system | integer |
 | `total_conversations` | `conversations` | `COUNT(*)` | integer |
 | `total_ai_responses` | `ai_responses` | `COUNT(*)` | integer |
 | `total_tokens` | `ai_responses` | `SUM(total_tokens)` | integer |
 | `total_cost` | `ai_responses` | `SUM(estimated_cost)` | USD |
 
-Each card returns:
-```json
-{
-  "value": 78,
-  "change_percent": 100.0
-}
-```
+---
 
 ### Charts
 
 #### user_growth
-New user registration counts (bar chart). Key changes based on granularity.
+New user registration counts with registered/guest breakdown (stacked bar chart). Key changes based on granularity.
 
 **Daily granularity (multi-day periods):**
 ```json
 [
-  { "date": "2026-01-17", "count": 41 },
-  { "date": "2026-01-21", "count": 15 }
+  { "date": "2026-02-09", "total": 4, "registered": 3, "guest": 1 },
+  { "date": "2026-02-23", "total": 7, "registered": 7, "guest": 0 }
 ]
 ```
 
 **Hourly granularity (single-day periods):**
 ```json
 [
-  { "hour": "09", "count": 3 },
-  { "hour": "14", "count": 1 }
+  { "hour": "09", "total": 3, "registered": 2, "guest": 1 },
+  { "hour": "14", "total": 1, "registered": 1, "guest": 0 }
 ]
 ```
+
+#### user_type_distribution
+Breakdown of new users by type in the period (donut chart). Always returns both entries.
+
+```json
+[
+  { "type": "Registered", "count": 37, "percentage": 94.9 },
+  { "type": "Guest", "count": 2, "percentage": 5.1 }
+]
+```
+
+#### active_users_over_time (DAU)
+Daily/hourly active user counts based on token activity. Split by registered/guest.
+
+**Daily granularity:**
+```json
+[
+  { "date": "2026-03-08", "total": 1, "registered": 1, "guest": 0 },
+  { "date": "2026-03-09", "total": 2, "registered": 2, "guest": 0 }
+]
+```
+
+**Hourly granularity:**
+```json
+[
+  { "hour": "11", "total": 1, "registered": 1, "guest": 0 },
+  { "hour": "14", "total": 1, "registered": 1, "guest": 0 }
+]
+```
+
+#### auth_provider_distribution
+Breakdown of how users signed up (donut chart). Only includes providers with non-zero counts.
+
+```json
+[
+  { "provider": "Email", "count": 37, "percentage": 94.9 },
+  { "provider": "Guest", "count": 2, "percentage": 5.1 }
+]
+```
+
+Possible providers: `Email`, `Google`, `Guest`
 
 #### conversations_and_messages
 New conversations overlaid with user message counts (dual-line chart). Key changes based on granularity.
 
 **Daily granularity:**
 ```json
-[{ "date": "2026-01-20", "conversations": 52, "messages": 65 }]
+[{ "date": "2026-02-16", "conversations": 10, "messages": 9 }]
 ```
 
 **Hourly granularity:**
@@ -375,9 +539,8 @@ User breakdown by profession with percentages (donut chart).
 
 ```json
 [
-  { "profession": "Lawyer", "count": 6, "percentage": 40 },
-  { "profession": "Corporate Lawyer", "count": 5, "percentage": 33.3 },
-  { "profession": "Law Student", "count": 3, "percentage": 20 }
+  { "profession": "student", "count": 1, "percentage": 33.3 },
+  { "profession": "lawyer", "count": 1, "percentage": 33.3 }
 ]
 ```
 
@@ -386,8 +549,7 @@ User breakdown by area of study with percentages (donut chart).
 
 ```json
 [
-  { "area_of_study": "Law", "count": 248, "percentage": 99.2 },
-  { "area_of_study": "Accounting", "count": 1, "percentage": 0.4 }
+  { "area_of_study": "Law", "count": 1, "percentage": 100 }
 ]
 ```
 
@@ -396,8 +558,8 @@ Geographic distribution of users with percentages (horizontal bar chart).
 
 ```json
 [
-  { "country": "Nigeria", "count": 10, "percentage": 76.9 },
-  { "country": "United Kingdom", "count": 1, "percentage": 7.7 }
+  { "country": "Nigeria", "count": 2, "percentage": 66.7 },
+  { "country": "Ghana", "count": 1, "percentage": 33.3 }
 ]
 ```
 
@@ -411,6 +573,8 @@ Nigerian Law School campus breakdown with percentages (donut chart). Only includ
 ]
 ```
 
+---
+
 ### Tables
 
 #### daily_breakdown
@@ -420,17 +584,20 @@ Comprehensive metrics combining all data sources, grouped by granularity. Return
 **Daily granularity:**
 ```json
 {
-  "date": "2026-01-20",
+  "date": "2026-02-16",
   "new_users": 0,
-  "conversations": 52,
-  "messages": 144,
-  "ai_responses": 46,
-  "total_tokens": 301027,
-  "cost": 1.17
+  "new_guests": 0,
+  "conversations": 10,
+  "messages": 10,
+  "ai_responses": 0,
+  "total_tokens": 0,
+  "cost": 0
 }
 ```
 
-**Note:** `messages` in the daily breakdown table counts all messages (user, assistant, and tool), unlike the `conversations_and_messages` chart which only counts user messages.
+**Notes:**
+- `new_guests` tracks guest user signups separately from `new_users` (registered)
+- `messages` in the daily breakdown counts all messages (user, assistant, and tool), unlike the `conversations_and_messages` chart which only counts user messages
 
 #### top_universities (limit: 15)
 
@@ -562,25 +729,95 @@ GET /api/admin/users/analytics?period=date_range&start_date=not-a-date&end_date=
 | `comparison_start` | datetime | Previous period start (ISO 8601) |
 | `comparison_end` | datetime | Previous period end (ISO 8601) |
 
-### Stat Card Object
+### Currently Online Card
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `value` | integer | Total online users |
+| `registered` | integer | Online registered users |
+| `guest` | integer | Online guest users |
+
+### New Users / Total Users Card
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `value` | integer | Total count |
+| `registered` | integer | Registered user count |
+| `guest` | integer | Guest user count |
+| `change_percent` | number\|null | Percentage change from previous period |
+
+### Activation Rate Card
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ai_activation` | object | AI response activation metrics |
+| `content_activation` | object | Conversation creation activation metrics |
+
+Each sub-object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `value` | float | Activation rate as percentage |
+| `activated_count` | integer | Users who activated |
+| `total_signups` | integer | Total registered signups in period |
+| `change_percent` | number\|null | Rate change vs previous period |
+
+### Returning Users Card
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `value` | integer | Total returning users |
+| `registered` | integer | Returning registered users |
+| `guest` | integer | Returning guest users |
+| `returning_rate` | float | Percentage of current active users who are returning |
+| `change_percent` | number\|null | Change vs previous period |
+
+### Simple Stat Card (conversations, ai_responses, tokens, cost)
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `value` | number | The metric value for the current period |
-| `change_percent` | number\|null | Percentage change from previous period. `null` when no data in either period |
+| `change_percent` | number\|null | Percentage change from previous period |
 
 ### User Growth Entry
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `date` or `hour` | string | Date (YYYY-MM-DD) for daily granularity, or hour (`"00"`-`"23"`) for hourly |
-| `count` | integer | Number of new user registrations |
+| `date` or `hour` | string | Date (YYYY-MM-DD) or hour (`"00"`-`"23"`) |
+| `total` | integer | Total new users |
+| `registered` | integer | New registered users |
+| `guest` | integer | New guest users |
+
+### User Type Distribution Entry
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | `Registered` or `Guest` |
+| `count` | integer | Number of users of this type |
+| `percentage` | float | Percentage of total |
+
+### Active Users Over Time Entry
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` or `hour` | string | Date (YYYY-MM-DD) or hour (`"00"`-`"23"`) |
+| `total` | integer | Total active users |
+| `registered` | integer | Active registered users |
+| `guest` | integer | Active guest users |
+
+### Auth Provider Distribution Entry
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `provider` | string | Auth provider: `Email`, `Google`, `Guest` |
+| `count` | integer | Number of users |
+| `percentage` | float | Percentage of total |
 
 ### Conversations and Messages Entry
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `date` or `hour` | string | Date (YYYY-MM-DD) for daily granularity, or hour (`"00"`-`"23"`) for hourly |
+| `date` or `hour` | string | Date (YYYY-MM-DD) or hour (`"00"`-`"23"`) |
 | `conversations` | integer | Number of new conversations |
 | `messages` | integer | Number of user messages sent |
 
@@ -588,14 +825,14 @@ GET /api/admin/users/analytics?period=date_range&start_date=not-a-date&end_date=
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `date` or `hour` | string | Date (YYYY-MM-DD) for daily granularity, or hour (`"00"`-`"23"`) for hourly |
+| `date` or `hour` | string | Date (YYYY-MM-DD) or hour (`"00"`-`"23"`) |
 | `total_tokens` | integer | Total tokens consumed |
 
 ### Daily Cost Entry
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `date` or `hour` | string | Date (YYYY-MM-DD) for daily granularity, or hour (`"00"`-`"23"`) for hourly |
+| `date` or `hour` | string | Date (YYYY-MM-DD) or hour (`"00"`-`"23"`) |
 | `cost` | float | Estimated API cost in USD |
 
 ### Profession Distribution Entry
@@ -634,8 +871,9 @@ GET /api/admin/users/analytics?period=date_range&start_date=not-a-date&end_date=
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `date` or `hour` | string | Date (YYYY-MM-DD) for daily granularity, or hour (`"00"`-`"23"`) for hourly |
-| `new_users` | integer | New user registrations |
+| `date` or `hour` | string | Date (YYYY-MM-DD) or hour (`"00"`-`"23"`) |
+| `new_users` | integer | New registered user registrations |
+| `new_guests` | integer | New guest user signups |
 | `conversations` | integer | New conversations created |
 | `messages` | integer | Total messages (all roles) |
 | `ai_responses` | integer | AI responses generated |
@@ -653,45 +891,6 @@ GET /api/admin/users/analytics?period=date_range&start_date=not-a-date&end_date=
 
 ---
 
-## Curl Test Results
-
-All tests performed against local dev server on 2026-02-12.
-
-### Authentication & Authorization
-
-| Test | Status | Response |
-|------|--------|----------|
-| No auth token | 401 | `Unauthenticated.` |
-| Invalid/expired token | 401 | `Unauthenticated.` |
-| Regular user (non-admin) | 403 | `Insufficient permissions. This action requires at least admin role.` |
-| Admin user | 200 | Success |
-
-### Period Validation
-
-| Test | Status | Response |
-|------|--------|----------|
-| `?period=invalid` | 422 | `Period must be: today, last_24_hours, date, this_week, last_7_days, this_month, last_30_days, or date_range.` |
-| `?period=date` (no date param) | 422 | `Date is required when using the date period.` |
-| `?period=date_range` (no dates) | 422 | `Start date is required when using date_range period.` |
-| `?period=date_range&start_date=2026-02-10&end_date=2026-02-05` | 422 | `Start date must be before or equal to end date.` |
-| `?period=date_range&start_date=not-a-date&end_date=also-not` | 422 | `The start date field must be a valid date.` |
-
-### Happy Path Periods
-
-| Test | Status | Granularity | Notes |
-|------|--------|-------------|-------|
-| No params (defaults to last_30_days) | 200 | day | Full charts and tables |
-| `?period=today` | 200 | hour | Hourly breakdown of today's data |
-| `?period=last_24_hours` | 200 | hour | Rolling 24-hour window |
-| `?period=date&date=2026-02-23` | 200 | hour | Specific day with hourly breakdown |
-| `?period=this_week` | 200 | day | Current week data |
-| `?period=last_7_days` | 200 | day | Rolling 7-day window |
-| `?period=this_month` | 200 | day | Current month data |
-| `?period=last_30_days` | 200 | day | Rolling 30-day window |
-| `?period=date_range&start_date=2026-01-01&end_date=2026-02-12` | 200 | day | Custom range with comparison period |
-
----
-
 ## Implementation Files
 
 | File | Description |
@@ -700,4 +899,4 @@ All tests performed against local dev server on 2026-02-12.
 | `app/Http/Requests/Admin/UserAnalyticsRequest.php` | Form request validation |
 | `app/Services/UserAnalyticsService.php` | All query and aggregation logic |
 | `routes/api.php` | Route registration (before `{uuid}` catch-all) |
-| `tests/Feature/Admin/UserAnalyticsTest.php` | 32 Pest feature tests |
+| `tests/Feature/Admin/UserAnalyticsTest.php` | Pest feature tests |

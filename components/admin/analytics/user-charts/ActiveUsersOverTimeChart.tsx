@@ -1,6 +1,6 @@
 'use client';
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -16,10 +16,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import type { UserGrowthPoint, ViewAnalyticsGranularity } from '@/types/admin';
+import type { ActiveUsersOverTimePoint, ViewAnalyticsGranularity } from '@/types/admin';
 
-interface UserGrowthChartProps {
-  data: UserGrowthPoint[];
+interface ActiveUsersOverTimeChartProps {
+  data: ActiveUsersOverTimePoint[];
   granularity: ViewAnalyticsGranularity;
 }
 
@@ -41,13 +41,16 @@ function formatHour(hour: string): string {
   return h < 12 ? `${h} AM` : `${h - 12} PM`;
 }
 
-export function UserGrowthChart({ data, granularity }: UserGrowthChartProps) {
+export function ActiveUsersOverTimeChart({
+  data,
+  granularity,
+}: ActiveUsersOverTimeChartProps) {
   if (!data.length) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>User Growth</CardTitle>
-          <CardDescription>New registrations</CardDescription>
+          <CardTitle>Active Users</CardTitle>
+          <CardDescription>Daily/hourly active users</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -62,12 +65,12 @@ export function UserGrowthChart({ data, granularity }: UserGrowthChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>User Growth</CardTitle>
-        <CardDescription>New registrations</CardDescription>
+        <CardTitle>Active Users</CardTitle>
+        <CardDescription>Daily/hourly active users</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <BarChart data={data} accessibilityLayer>
+          <AreaChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey={dataKey}
@@ -97,19 +100,33 @@ export function UserGrowthChart({ data, granularity }: UserGrowthChartProps) {
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Bar
+            <defs>
+              <linearGradient id="fillActiveRegistered" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-registered)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--color-registered)" stopOpacity={0.05} />
+              </linearGradient>
+              <linearGradient id="fillActiveGuest" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-guest)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--color-guest)" stopOpacity={0.05} />
+              </linearGradient>
+            </defs>
+            <Area
               dataKey="registered"
-              fill="var(--color-registered)"
-              radius={[0, 0, 0, 0]}
-              stackId="growth"
+              type="monotone"
+              fill="url(#fillActiveRegistered)"
+              stroke="var(--color-registered)"
+              strokeWidth={2}
+              stackId="active"
             />
-            <Bar
+            <Area
               dataKey="guest"
-              fill="var(--color-guest)"
-              radius={[4, 4, 0, 0]}
-              stackId="growth"
+              type="monotone"
+              fill="url(#fillActiveGuest)"
+              stroke="var(--color-guest)"
+              strokeWidth={2}
+              stackId="active"
             />
-          </BarChart>
+          </AreaChart>
         </ChartContainer>
       </CardContent>
     </Card>

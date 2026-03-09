@@ -4,7 +4,9 @@
       "Bash(git status:*)",
       "Bash(wc:*)",
       "Read(//c/Users/stayn/AppData/Local/Temp/claude/c--Users-stayn-OneDrive-Desktop-2023-lawexa-app-v2-lawexa-app/tasks/**)",
-      "Bash(head -50 /c/Users/stayn/OneDrive/Desktop/2023/lawexa-app-v2/lawexa-app/app/\\\\\\(main\\\\\\)/layout.tsx)"
+      "Bash(head -50 /c/Users/stayn/OneDrive/Desktop/2023/lawexa-app-v2/lawexa-app/app/\\\\\\(main\\\\\\)/layout.tsx)",
+      "Bash(xargs grep -l \"user.*analytics\\\\|userAnalytics\\\\|user_analytics\")",
+      "Read(//c/Users/stayn/OneDrive/Desktop/2023/lawexa-app-v2//**)"
     ],
     "additionalDirectories": [
       "c:\\Users\\stayn\\OneDrive\\Desktop\\2023\\lawexa-app-v2\\lawexa-app\\app\\(main)\\statutes"
