@@ -6,6 +6,7 @@ import {
   User,
   Settings,
   CreditCard,
+  MessageSquarePlus,
   Paintbrush,
   Bell,
   Lock,
@@ -31,6 +32,12 @@ const navItems = [
     description: 'Subscription and invoices',
     href: '/settings/billing',
     icon: CreditCard,
+  },
+  {
+    label: 'Message Packs',
+    description: 'Buy additional AI messages',
+    href: '/settings/message-packs',
+    icon: MessageSquarePlus,
   },
   {
     label: 'Appearance',

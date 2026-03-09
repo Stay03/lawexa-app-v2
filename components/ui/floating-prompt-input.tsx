@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/lib/stores/authStore';
+import MessageCounter from '@/components/chat/MessageCounter';
 import {
   Message,
   MessageContent,
@@ -452,6 +453,9 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             </div>
           </div>
         </div>
+
+        {/* Message counter */}
+        <MessageCounter />
 
         {/* Prompt Input */}
         <div className={cn(

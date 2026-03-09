@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
+import { ArrowRight } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -70,6 +72,11 @@ function BillingPage() {
 
       <Separator className="my-8" />
 
+      {/* PAYG link */}
+      <PaygLinkSection />
+
+      <Separator className="my-8" />
+
       {/* Invoices section */}
       <InvoiceSection />
 
@@ -89,6 +96,28 @@ function BillingPage() {
         isPending={cancelMutation.isPending}
         onConfirm={handleCancel}
       />
+    </div>
+  );
+}
+
+/**
+ * PAYG message packs link section.
+ */
+function PaygLinkSection() {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium">Message Packs</p>
+        <p className="text-xs text-muted-foreground">
+          Need more AI messages? Buy pay-as-you-go message packs.
+        </p>
+      </div>
+      <Button variant="outline" size="sm" asChild>
+        <Link href="/settings/message-packs">
+          View packs
+          <ArrowRight className="size-4" />
+        </Link>
+      </Button>
     </div>
   );
 }

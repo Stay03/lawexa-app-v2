@@ -63,6 +63,7 @@ import { AddToFolderButton } from '@/components/folders';
 import { useGuestAuth } from '@/lib/hooks/useGuestAuth';
 import { ConversationNotAvailable } from '@/components/conversations';
 import { ErrorState } from '@/components/common/ErrorState';
+import MessageCounter from '@/components/chat/MessageCounter';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -929,6 +930,8 @@ function ConversationPageContent() {
         style={{ left: sidebarWidth }}
       >
         <div className="mx-auto max-w-xs sm:max-w-md">
+          {/* Message counter */}
+          {isOwner && <MessageCounter />}
           {/* Show input for owners, view-only indicator for non-owners */}
           {isOwner ? (
             <FileUpload onFilesAdded={handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
