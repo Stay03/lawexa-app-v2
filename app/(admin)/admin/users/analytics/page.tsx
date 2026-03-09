@@ -10,7 +10,23 @@ import { UserAnalyticsCharts } from '@/components/admin/analytics/UserAnalyticsC
 import { DailyBreakdownTable } from '@/components/admin/analytics/user-tables/DailyBreakdownTable';
 import { UniversitiesTable } from '@/components/admin/analytics/user-tables/UniversitiesTable';
 import { CurrencySettings } from '@/components/admin/CurrencySettings';
-import type { UserAnalyticsParams, UserAnalyticsPeriod } from '@/types/admin';
+import type {
+  UserAnalyticsParams,
+  UserAnalyticsPeriod,
+  CurrentlyOnlineCard,
+} from '@/types/admin';
+
+function OnlineIndicator({ online }: { online: CurrentlyOnlineCard }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-950/50 border border-green-200 dark:border-green-900/50 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-400">
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+      </span>
+      {online.value} online
+    </span>
+  );
+}
 
 function UserAnalyticsContent() {
   const router = useRouter();
@@ -109,9 +125,11 @@ function UserAnalyticsContent() {
     return (
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            User Analytics
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              User Analytics
+            </h1>
+          </div>
           {periodSelector}
         </div>
         <div className="rounded-lg border py-12 text-center text-muted-foreground">
@@ -125,25 +143,23 @@ function UserAnalyticsContent() {
     <div className="space-y-6">
       {/* Page Header with Period Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          User Analytics
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            User Analytics
+          </h1>
+          {data?.data?.stat_cards && (
+            <OnlineIndicator online={data.data.stat_cards.currently_online} />
+          )}
+        </div>
         {periodSelector}
       </div>
 
       {/* Stat Cards */}
       {isLoading ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-[140px] rounded-2xl" />
-            ))}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-2xl" />
-            ))}
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-[160px] rounded-2xl" />
+          ))}
         </div>
       ) : data?.data?.stat_cards ? (
         <UserAnalyticsStatCards statCards={data.data.stat_cards} />
@@ -208,12 +224,15 @@ export default function UserAnalyticsPage() {
       fallback={
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <Skeleton className="h-8 w-[200px]" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-[200px]" />
+              <Skeleton className="h-6 w-[80px] rounded-full" />
+            </div>
             <Skeleton className="h-9 w-[180px]" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-[140px] rounded-2xl" />
+              <Skeleton key={i} className="h-[160px] rounded-2xl" />
             ))}
           </div>
           <Skeleton className="h-[350px] rounded-2xl" />

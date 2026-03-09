@@ -1,54 +1,32 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Users, Activity } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { formatCost } from '@/lib/utils/currency';
+import { Users, MessageSquare, Activity, RotateCcw, Zap } from 'lucide-react';
+import { formatCost, formatCompact } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { ChangePercentBadge } from '@/components/admin/analytics/ChangePercentBadge';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@/components/ui/tabs';
 import type { UserAnalyticsStatCards as StatCardsType } from '@/types/admin';
 
 interface UserAnalyticsStatCardsProps {
   statCards: StatCardsType;
 }
 
-function ChangePercentBadge({ value }: { value: number | null }) {
-  if (value === null) {
-    return (
-      <Badge variant="outline" className="text-xs">
-        N/A
-      </Badge>
-    );
-  }
-  if (value === 0) {
-    return (
-      <Badge variant="outline" className="text-xs">
-        0%
-      </Badge>
-    );
-  }
-  const isPositive = value > 0;
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        'text-xs gap-0.5',
-        isPositive
-          ? 'text-green-600 border-green-200 bg-green-50 dark:text-green-400 dark:border-green-900/50 dark:bg-green-950/50'
-          : 'text-red-600 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:bg-red-950/50'
-      )}
-    >
-      {isPositive ? (
-        <TrendingUp className="h-3 w-3" />
-      ) : (
-        <TrendingDown className="h-3 w-3" />
-      )}
-      {isPositive ? '+' : ''}
-      {value.toFixed(1)}%
-    </Badge>
-  );
-}
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
 
-function SubCount({ registered, guest }: { registered: number; guest: number }) {
+function SubCount({
+  registered,
+  guest,
+}: {
+  registered: number;
+  guest: number;
+}) {
   return (
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
       <span>{registered.toLocaleString()} registered</span>
@@ -58,236 +36,271 @@ function SubCount({ registered, guest }: { registered: number; guest: number }) 
   );
 }
 
-function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
+function ProgressBar({ value, color }: { value: number; color: string }) {
+  return (
+    <div className="h-1.5 w-full rounded-full bg-muted">
+      <div
+        className="h-full rounded-full transition-all"
+        style={{
+          width: `${Math.min(value, 100)}%`,
+          backgroundColor: color,
+        }}
+      />
+    </div>
+  );
+}
+
+const CARD =
+  'rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5';
+
+/* ------------------------------------------------------------------ */
+/*  Card 1 — Users (merged New + Total)                                */
+/* ------------------------------------------------------------------ */
+
+function UsersCard({ statCards }: { statCards: StatCardsType }) {
+  return (
+    <div className={CARD}>
+      <div className="flex items-center gap-2">
+        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Users
+        </span>
+      </div>
+
+      <p className="mt-2 text-3xl font-bold tabular-nums">
+        {statCards.total_users.value.toLocaleString()}
+      </p>
+
+      <div className="mt-1 flex items-center gap-1.5">
+        <span className="text-sm text-muted-foreground">
+          +{statCards.new_users.value.toLocaleString()} new
+        </span>
+        <ChangePercentBadge value={statCards.new_users.change_percent} />
+      </div>
+
+      <div className="mt-1.5">
+        <SubCount
+          registered={statCards.total_users.registered}
+          guest={statCards.total_users.guest}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Card 2 — Engagement (merged Conversations + AI Responses)          */
+/* ------------------------------------------------------------------ */
+
+function EngagementCard({ statCards }: { statCards: StatCardsType }) {
+  return (
+    <div className={CARD}>
+      <div className="flex items-center gap-2">
+        <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Engagement
+        </span>
+      </div>
+
+      <p className="mt-2 text-3xl font-bold tabular-nums">
+        {statCards.total_conversations.value.toLocaleString()}
+      </p>
+
+      <div className="mt-1">
+        <span className="text-sm text-muted-foreground">
+          {statCards.total_ai_responses.value.toLocaleString()} AI responses
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+        <ChangePercentBadge
+          value={statCards.total_conversations.change_percent}
+        />
+        <ChangePercentBadge
+          value={statCards.total_ai_responses.change_percent}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Card 3 — Activation Rate (redesigned with progress bars)           */
+/* ------------------------------------------------------------------ */
+
+function ActivationRateCard({ statCards }: { statCards: StatCardsType }) {
+  const { ai_activation, content_activation } = statCards.activation_rate;
+
+  return (
+    <div className={CARD}>
+      <div className="flex items-center gap-2">
+        <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Activation Rate
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-3">
+        {/* AI Activation */}
+        <div className="space-y-1">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs font-medium text-muted-foreground">
+              AI
+            </span>
+            <span className="text-sm font-bold tabular-nums">
+              {ai_activation.value.toFixed(1)}%
+            </span>
+          </div>
+          <ProgressBar value={ai_activation.value} color="var(--chart-1)" />
+          <div className="flex items-center gap-1.5">
+            <ChangePercentBadge value={ai_activation.change_percent} />
+            <span className="text-[10px] text-muted-foreground">
+              {ai_activation.activated_count}/{ai_activation.total_signups}
+            </span>
+          </div>
+        </div>
+
+        {/* Content Activation */}
+        <div className="space-y-1">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs font-medium text-muted-foreground">
+              Content
+            </span>
+            <span className="text-sm font-bold tabular-nums">
+              {content_activation.value.toFixed(1)}%
+            </span>
+          </div>
+          <ProgressBar
+            value={content_activation.value}
+            color="var(--chart-3)"
+          />
+          <div className="flex items-center gap-1.5">
+            <ChangePercentBadge value={content_activation.change_percent} />
+            <span className="text-[10px] text-muted-foreground">
+              {content_activation.activated_count}/
+              {content_activation.total_signups}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Card 4 — Returning Users (return rate as hero)                     */
+/* ------------------------------------------------------------------ */
+
+function ReturningUsersCard({ statCards }: { statCards: StatCardsType }) {
+  const { returning_users } = statCards;
+
+  return (
+    <div className={CARD}>
+      <div className="flex items-center gap-2">
+        <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Returning Users
+        </span>
+      </div>
+
+      <p className="mt-2 text-3xl font-bold tabular-nums">
+        {returning_users.returning_rate.toFixed(1)}%
+      </p>
+
+      <div className="mt-1 flex items-center gap-1.5">
+        <span className="text-sm text-muted-foreground">
+          {returning_users.value.toLocaleString()} users returned
+        </span>
+        <ChangePercentBadge value={returning_users.change_percent} />
+      </div>
+
+      <div className="mt-1.5">
+        <SubCount
+          registered={returning_users.registered}
+          guest={returning_users.guest}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Card 5 — AI Usage (Tokens ↔ Cost toggle)                          */
+/* ------------------------------------------------------------------ */
+
+function AIUsageCard({ statCards }: { statCards: StatCardsType }) {
   const { showNGN, exchangeRate } = useCurrencyStore();
 
   return (
-    <div className="space-y-4">
-      {/* Row 1: Online, New Users, Total Users, Activation Rate, Returning Users */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {/* Currently Online */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
+    <div className={CARD}>
+      <Tabs defaultValue="tokens" className="gap-0">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-            </span>
+            <Zap className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Currently Online
+              AI Usage
             </span>
           </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums">
-            {statCards.currently_online.value.toLocaleString()}
-          </p>
-          <div className="mt-2">
-            <SubCount
-              registered={statCards.currently_online.registered}
-              guest={statCards.currently_online.guest}
-            />
-          </div>
+          <TabsList className="h-7">
+            <TabsTrigger
+              value="tokens"
+              className="text-[11px] px-2 py-0.5 h-6"
+            >
+              Tokens
+            </TabsTrigger>
+            <TabsTrigger
+              value="cost"
+              className="text-[11px] px-2 py-0.5 h-6"
+            >
+              Cost
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        {/* New Users */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
-          <div className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: 'var(--chart-1)' }}
-            />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              New Users
-            </span>
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums">
-            {statCards.new_users.value.toLocaleString()}
+        <TabsContent value="tokens" className="mt-2">
+          <p className="text-3xl font-bold tabular-nums">
+            {formatCompact(statCards.total_tokens.value)}
           </p>
-          <div className="mt-1">
-            <SubCount
-              registered={statCards.new_users.registered}
-              guest={statCards.new_users.guest}
-            />
-          </div>
           <div className="mt-2 flex items-center gap-1.5">
-            <ChangePercentBadge value={statCards.new_users.change_percent} />
-            <span className="text-xs text-muted-foreground">vs prior period</span>
-          </div>
-        </div>
-
-        {/* Total Users */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
-          <div className="flex items-center gap-2">
-            <Users className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Total Users
-            </span>
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums">
-            {statCards.total_users.value.toLocaleString()}
-          </p>
-          <div className="mt-1">
-            <SubCount
-              registered={statCards.total_users.registered}
-              guest={statCards.total_users.guest}
-            />
-          </div>
-          <div className="mt-2 flex items-center gap-1.5">
-            <ChangePercentBadge value={statCards.total_users.change_percent} />
-            <span className="text-xs text-muted-foreground">vs prior period</span>
-          </div>
-        </div>
-
-        {/* Activation Rate */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
-          <div className="flex items-center gap-2">
-            <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Activation Rate
-            </span>
-          </div>
-          <div className="mt-2 space-y-2">
-            <div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">AI</span>
-                <span className="text-lg font-bold tabular-nums">
-                  {statCards.activation_rate.ai_activation.value.toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <ChangePercentBadge value={statCards.activation_rate.ai_activation.change_percent} />
-                <span className="text-[10px] text-muted-foreground">
-                  {statCards.activation_rate.ai_activation.activated_count}/{statCards.activation_rate.ai_activation.total_signups}
-                </span>
-              </div>
-            </div>
-            <div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Content</span>
-                <span className="text-lg font-bold tabular-nums">
-                  {statCards.activation_rate.content_activation.value.toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <ChangePercentBadge value={statCards.activation_rate.content_activation.change_percent} />
-                <span className="text-[10px] text-muted-foreground">
-                  {statCards.activation_rate.content_activation.activated_count}/{statCards.activation_rate.content_activation.total_signups}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Returning Users */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
-          <div className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: 'var(--chart-5)' }}
-            />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Returning Users
-            </span>
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums">
-            {statCards.returning_users.value.toLocaleString()}
-          </p>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{statCards.returning_users.returning_rate.toFixed(1)}% return rate</span>
-          </div>
-          <div className="mt-1">
-            <SubCount
-              registered={statCards.returning_users.registered}
-              guest={statCards.returning_users.guest}
-            />
-          </div>
-          <div className="mt-2 flex items-center gap-1.5">
-            <ChangePercentBadge value={statCards.returning_users.change_percent} />
-            <span className="text-xs text-muted-foreground">vs prior period</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Row 2: Conversations, AI Responses, Cost/Tokens */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Conversations */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
-          <div className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: 'var(--chart-2)' }}
-            />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Conversations
-            </span>
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums">
-            {statCards.total_conversations.value.toLocaleString()}
-          </p>
-          <div className="mt-3 flex items-center gap-1.5">
-            <ChangePercentBadge value={statCards.total_conversations.change_percent} />
-            <span className="text-xs text-muted-foreground">vs prior period</span>
-          </div>
-        </div>
-
-        {/* AI Responses */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
-          <div className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: 'var(--chart-3)' }}
-            />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              AI Responses
-            </span>
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums">
-            {statCards.total_ai_responses.value.toLocaleString()}
-          </p>
-          <div className="mt-3 flex items-center gap-1.5">
-            <ChangePercentBadge value={statCards.total_ai_responses.change_percent} />
-            <span className="text-xs text-muted-foreground">vs prior period</span>
-          </div>
-        </div>
-
-        {/* Total Tokens */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
-          <div className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: 'var(--chart-4)' }}
-            />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Total Tokens
-            </span>
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums">
-            {statCards.total_tokens.value.toLocaleString()}
-          </p>
-          <div className="mt-3 flex items-center gap-1.5">
             <ChangePercentBadge value={statCards.total_tokens.change_percent} />
-            <span className="text-xs text-muted-foreground">vs prior period</span>
-          </div>
-        </div>
-
-        {/* Total Cost */}
-        <div className="rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
-          <div className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: 'var(--chart-4)' }}
-            />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Total Cost
+            <span className="text-xs text-muted-foreground">
+              vs prior period
             </span>
           </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums font-mono">
-            {formatCost(statCards.total_cost.value, { showNGN, exchangeRate, decimals: 4 })}
+        </TabsContent>
+
+        <TabsContent value="cost" className="mt-2">
+          <p className="text-3xl font-bold tabular-nums font-mono">
+            {formatCost(statCards.total_cost.value, {
+              showNGN,
+              exchangeRate,
+              decimals: 2,
+            })}
           </p>
-          <div className="mt-3 flex items-center gap-1.5">
+          <div className="mt-2 flex items-center gap-1.5">
             <ChangePercentBadge value={statCards.total_cost.change_percent} />
-            <span className="text-xs text-muted-foreground">vs prior period</span>
+            <span className="text-xs text-muted-foreground">
+              vs prior period
+            </span>
           </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Export                                                        */
+/* ------------------------------------------------------------------ */
+
+function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <UsersCard statCards={statCards} />
+      <EngagementCard statCards={statCards} />
+      <ActivationRateCard statCards={statCards} />
+      <ReturningUsersCard statCards={statCards} />
+      <AIUsageCard statCards={statCards} />
     </div>
   );
 }

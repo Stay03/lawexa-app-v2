@@ -58,3 +58,19 @@ export function formatNaira(
     maximumFractionDigits: decimals,
   })}`;
 }
+
+/**
+ * Format a large number compactly (e.g., 1234 → "1.2K", 1234567 → "1.2M").
+ */
+export function formatCompact(value: number): string {
+  if (value >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}K`;
+  }
+  return value.toLocaleString();
+}
