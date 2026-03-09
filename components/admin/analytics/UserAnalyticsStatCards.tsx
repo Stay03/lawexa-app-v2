@@ -60,13 +60,6 @@ function SubCount({ registered, guest }: { registered: number; guest: number }) 
 
 function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
   const { showNGN, exchangeRate } = useCurrencyStore();
-  const [showTokens, setShowTokens] = useState(false);
-
-  const costTokenStat = showTokens ? statCards.total_tokens : statCards.total_cost;
-  const costTokenLabel = showTokens ? 'Total Tokens' : 'Total Cost';
-  const costTokenValue = showTokens
-    ? costTokenStat.value.toLocaleString()
-    : formatCost(costTokenStat.value, { showNGN, exchangeRate, decimals: 4 });
 
   return (
     <div className="space-y-4">
