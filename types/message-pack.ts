@@ -7,7 +7,7 @@ export interface IMessagePack {
   quantity: number;
   messages_total: number;
   messages_remaining: number;
-  amount: string;
+  amount: number;
   formatted_amount: string;
   currency: string;
   status: TMessagePackStatus;
