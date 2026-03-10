@@ -7,7 +7,6 @@ import {
   ChevronRight,
   BarChart3,
   List,
-  Users,
   Package,
 } from 'lucide-react';
 import {
@@ -29,7 +28,6 @@ import {
 
 const billingNavItems = [
   { title: 'Subscriptions', url: '/admin/subscriptions', icon: List, exact: true },
-  { title: 'Subscribers', url: '/admin/subscribers', icon: Users },
   { title: 'Sub. Analytics', url: '/admin/subscriptions/analytics', icon: BarChart3 },
   { title: 'Message Packs', url: '/admin/message-packs', icon: Package, exact: true },
   { title: 'Pack Analytics', url: '/admin/message-packs/analytics', icon: BarChart3 },
@@ -39,7 +37,7 @@ export function AdminNavBillingSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/subscribers') || pathname.startsWith('/admin/message-packs');
+  const isSectionActive = pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/message-packs');
 
   return (
     <SidebarGroup>

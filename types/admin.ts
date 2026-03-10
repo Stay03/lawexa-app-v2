@@ -1098,27 +1098,6 @@ export interface AdminSubscriptionDetail extends AdminSubscriptionListItem {
   updated_at: string;
 }
 
-export interface AdminSubscriber {
-  uuid: string;
-  name: string;
-  email: string;
-  role: string;
-  avatar_url: string | null;
-  created_at: string;
-  subscription: {
-    id: number;
-    status: AdminSubscriptionStatus;
-    status_label: string;
-    amount: string;
-    currency: string;
-    start_date: string | null;
-    next_payment_date: string | null;
-    ends_at: string | null;
-    has_access: boolean;
-    plan: AdminSubscriptionPlan;
-  } | null;
-}
-
 // Query Parameters
 
 export interface AdminSubscriptionsParams {
@@ -1130,17 +1109,6 @@ export interface AdminSubscriptionsParams {
   min_amount?: number;
   max_amount?: number;
   sort_by?: 'created_at' | 'amount' | 'start_date' | 'next_payment_date';
-  sort_order?: 'asc' | 'desc';
-  per_page?: number;
-  page?: number;
-}
-
-export interface AdminSubscribersParams {
-  search?: string;
-  role?: 'user' | 'researcher' | 'admin' | 'superadmin' | 'guest';
-  plan_id?: number;
-  subscription_status?: AdminSubscriptionStatus;
-  sort_by?: 'name' | 'email' | 'created_at';
   sort_order?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
@@ -1160,14 +1128,6 @@ export interface AdminSubscriptionDetailResponse {
   success: boolean;
   message: string;
   data: AdminSubscriptionDetail;
-}
-
-export interface AdminSubscribersListResponse {
-  success: boolean;
-  message: string;
-  data: AdminSubscriber[];
-  pagination: AdminConversationsPagination;
-  links: AdminConversationsLinks;
 }
 
 // ============================================

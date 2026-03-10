@@ -121,13 +121,13 @@ function AdminSubscriptionDetailView({ subscription }: AdminSubscriptionDetailPr
               <DetailField label="Interval" value={sub.plan.interval_label} />
               <DetailField
                 label="Start Date"
-                value={sub.start_date ? format(new Date(sub.start_date), 'MMM d, yyyy') : '-'}
+                value={sub.start_date ? format(new Date(sub.start_date), 'MMM d, yyyy h:mm a') : '-'}
               />
               <DetailField
                 label="Next Payment"
                 value={
                   sub.next_payment_date
-                    ? format(new Date(sub.next_payment_date), 'MMM d, yyyy')
+                    ? format(new Date(sub.next_payment_date), 'MMM d, yyyy h:mm a')
                     : '-'
                 }
               />

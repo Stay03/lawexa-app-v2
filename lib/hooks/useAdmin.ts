@@ -12,7 +12,6 @@ import type {
   ViewAnalyticsParams,
   SubscriptionAnalyticsParams,
   AdminSubscriptionsParams,
-  AdminSubscribersParams,
   AdminMessagePacksParams,
   MessagePackAnalyticsParams,
 } from '@/types/admin';
@@ -46,9 +45,6 @@ export const adminKeys = {
     [...adminKeys.subscriptions(), 'list', params] as const,
   subscriptionDetail: (id: number) =>
     [...adminKeys.subscriptions(), 'detail', id] as const,
-  subscribers: () => [...adminKeys.all, 'subscribers'] as const,
-  subscribersList: (params: AdminSubscribersParams) =>
-    [...adminKeys.subscribers(), 'list', params] as const,
   messagePacks: () => [...adminKeys.all, 'message-packs'] as const,
   messagePacksList: (params: AdminMessagePacksParams) =>
     [...adminKeys.messagePacks(), 'list', params] as const,
@@ -206,17 +202,6 @@ export function useAdminSubscription(id: number) {
 }
 
 /**
- * Hook for fetching admin subscribers list with pagination, filtering, sorting
- */
-export function useAdminSubscribers(params: AdminSubscribersParams = {}) {
-  return useQuery({
-    queryKey: adminKeys.subscribersList(params),
-    queryFn: () => adminApi.getAdminSubscribers(params),
-    staleTime: 30 * 1000,
-  });
-}
-
-/**
  * Hook for fetching admin message packs list with pagination, filtering, sorting
  */
 export function useAdminMessagePacks(params: AdminMessagePacksParams = {}) {
@@ -252,7 +237,7 @@ export function useMessagePackAnalytics(params: MessagePackAnalyticsParams = {})
 
 /**
  * Hook for cancelling an admin subscription
- * Invalidates subscription and subscriber caches on success
+ * Invalidates subscription caches on success
  */
 export function useCancelAdminSubscription() {
   const queryClient = useQueryClient();
@@ -260,14 +245,13 @@ export function useCancelAdminSubscription() {
     mutationFn: (id: number) => adminApi.cancelAdminSubscription(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.subscriptions() });
-      queryClient.invalidateQueries({ queryKey: adminKeys.subscribers() });
     },
   });
 }
 
 /**
  * Hook for reactivating a cancelled admin subscription
- * Invalidates subscription and subscriber caches on success
+ * Invalidates subscription caches on success
  */
 export function useReactivateAdminSubscription() {
   const queryClient = useQueryClient();
@@ -275,7 +259,6 @@ export function useReactivateAdminSubscription() {
     mutationFn: (id: number) => adminApi.reactivateAdminSubscription(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.subscriptions() });
-      queryClient.invalidateQueries({ queryKey: adminKeys.subscribers() });
     },
   });
 }

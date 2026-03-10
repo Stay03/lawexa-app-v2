@@ -21,8 +21,6 @@ import type {
   AdminSubscriptionsParams,
   AdminSubscriptionsListResponse,
   AdminSubscriptionDetailResponse,
-  AdminSubscribersParams,
-  AdminSubscribersListResponse,
   AdminMessagePacksParams,
   AdminMessagePacksListResponse,
   AdminMessagePackDetailResponse,
@@ -308,31 +306,6 @@ export const adminApi = {
   ): Promise<AdminSubscriptionDetailResponse> => {
     const response = await apiClient.post<AdminSubscriptionDetailResponse>(
       `/admin/subscriptions/${id}/reactivate`
-    );
-    return response.data;
-  },
-
-  /**
-   * List all subscribers with their most recent subscription
-   * Requires admin role
-   */
-  getAdminSubscribers: async (
-    params: AdminSubscribersParams = {}
-  ): Promise<AdminSubscribersListResponse> => {
-    const response = await apiClient.get<AdminSubscribersListResponse>(
-      '/admin/subscribers',
-      {
-        params: {
-          page: params.page ?? 1,
-          per_page: params.per_page ?? 15,
-          search: params.search,
-          role: params.role,
-          plan_id: params.plan_id,
-          subscription_status: params.subscription_status,
-          sort_by: params.sort_by ?? 'created_at',
-          sort_order: params.sort_order ?? 'desc',
-        },
-      }
     );
     return response.data;
   },
