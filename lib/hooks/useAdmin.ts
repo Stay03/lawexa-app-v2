@@ -249,3 +249,33 @@ export function useMessagePackAnalytics(params: MessagePackAnalyticsParams = {})
     staleTime: 30 * 1000,
   });
 }
+
+/**
+ * Hook for cancelling an admin subscription
+ * Invalidates subscription and subscriber caches on success
+ */
+export function useCancelAdminSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => adminApi.cancelAdminSubscription(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.subscriptions() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.subscribers() });
+    },
+  });
+}
+
+/**
+ * Hook for reactivating a cancelled admin subscription
+ * Invalidates subscription and subscriber caches on success
+ */
+export function useReactivateAdminSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => adminApi.reactivateAdminSubscription(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.subscriptions() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.subscribers() });
+    },
+  });
+}

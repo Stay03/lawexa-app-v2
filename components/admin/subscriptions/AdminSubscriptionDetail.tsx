@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -8,6 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
@@ -15,15 +17,19 @@ import {
 } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import {
+  Ban,
   CheckCircle2,
   XCircle,
   Clock,
   User,
   CreditCard,
+  RefreshCw,
   Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatNaira } from '@/lib/utils/currency';
+import { AdminSubscriptionCancelDialog } from './AdminSubscriptionCancelDialog';
+import { AdminSubscriptionReactivateDialog } from './AdminSubscriptionReactivateDialog';
 import type { AdminSubscriptionDetail as TSubscriptionDetail } from '@/types/admin';
 
 /******************************************************************************
@@ -55,6 +61,12 @@ interface AdminSubscriptionDetailProps {
  */
 function AdminSubscriptionDetailView({ subscription }: AdminSubscriptionDetailProps) {
   const sub = subscription;
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [reactivateDialogOpen, setReactivateDialogOpen] = useState(false);
+
+  const canCancel =
+    ['active', 'past_due', 'trialing'].includes(sub.status) && !sub.plan.is_free;
+  const canReactivate = sub.status === 'cancelled';
 
   return (
     <div className="space-y-6">
@@ -73,12 +85,33 @@ function AdminSubscriptionDetailView({ subscription }: AdminSubscriptionDetailPr
                   </CardDescription>
                 </div>
               </div>
-              <Badge
-                variant="outline"
-                className={cn('text-sm capitalize', STATUS_STYLES[sub.status])}
-              >
-                {sub.status_label}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {canCancel && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setCancelDialogOpen(true)}
+                  >
+                    <Ban className="mr-1.5 h-3.5 w-3.5" />
+                    Cancel
+                  </Button>
+                )}
+                {canReactivate && (
+                  <Button
+                    size="sm"
+                    onClick={() => setReactivateDialogOpen(true)}
+                  >
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                    Reactivate
+                  </Button>
+                )}
+                <Badge
+                  variant="outline"
+                  className={cn('text-sm capitalize', STATUS_STYLES[sub.status])}
+                >
+                  {sub.status_label}
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -216,6 +249,18 @@ function AdminSubscriptionDetailView({ subscription }: AdminSubscriptionDetailPr
           </CardContent>
         </Card>
       </div>
+
+      {/* Action Dialogs */}
+      <AdminSubscriptionCancelDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        subscription={sub}
+      />
+      <AdminSubscriptionReactivateDialog
+        open={reactivateDialogOpen}
+        onOpenChange={setReactivateDialogOpen}
+        subscription={sub}
+      />
     </div>
   );
 }
