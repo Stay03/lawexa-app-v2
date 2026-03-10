@@ -26,3 +26,5 @@ export { AdminSubscriptionDetailView } from './subscriptions/AdminSubscriptionDe
 export { AdminSubscriptionInvoicesTable } from './subscriptions/AdminSubscriptionInvoicesTable';
 export { AdminSubscriberFilters } from './subscriptions/AdminSubscriberFilters';
 export { AdminSubscribersTable } from './subscriptions/AdminSubscribersTable';
+export { AdminUsersTable } from './AdminUsersTable';
+export { AdminUserFilters } from './AdminUserFilters';

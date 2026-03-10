@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
 import type {
   AdminConversationsParams,
+  IAdminUserListParams,
   AdminUserConversationsParams,
   AdminUserTokenUsageParams,
   ConversationAnalyticsParams,
@@ -23,6 +24,8 @@ export const adminKeys = {
   conversationDetail: (uuid: string) =>
     [...adminKeys.conversations(), 'detail', uuid] as const,
   users: () => [...adminKeys.all, 'users'] as const,
+  usersList: (params: IAdminUserListParams) =>
+    [...adminKeys.users(), 'list', params] as const,
   userDetail: (uuid: string) => [...adminKeys.users(), 'detail', uuid] as const,
   userConversations: (uuid: string, params: AdminUserConversationsParams) =>
     [...adminKeys.users(), uuid, 'conversations', params] as const,
@@ -66,6 +69,17 @@ export function useAdminConversation(uuid: string) {
     queryFn: () => adminApi.getConversation(uuid),
     enabled: !!uuid,
     staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching admin users list with pagination, filtering, sorting
+ */
+export function useAdminUsers(params: IAdminUserListParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.usersList(params),
+    queryFn: () => adminApi.getUsers(params),
+    staleTime: 30 * 1000,
   });
 }
 

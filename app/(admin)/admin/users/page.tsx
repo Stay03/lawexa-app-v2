@@ -1,104 +1,185 @@
 'use client';
 
-import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
-import { MessageSquare, ArrowRight } from 'lucide-react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AdminPagination } from '@/components/admin';
+import { AdminUsersTable } from '@/components/admin/AdminUsersTable';
+import { AdminUserFilters } from '@/components/admin/AdminUserFilters';
+import { useAdminUsers } from '@/lib/hooks/useAdmin';
+import { useDebounce } from '@/lib/hooks/useDebounce';
+import type { IAdminUserListParams, TAdminUserSortBy } from '@/types/admin';
+
+/******************************************************************************
+                                 Component
+******************************************************************************/
+
+/**
+ * Content component for the admin users page.
+ */
+function AdminUsersContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Local search state for debouncing
+  const [searchValue, setSearchValue] = useState(
+    searchParams.get('search') || ''
+  );
+  const debouncedSearch = useDebounce(searchValue, 300);
+
+  // Read params from URL
+  const params = useMemo<IAdminUserListParams>(() => {
+    const page = Number(searchParams.get('page')) || 1;
+    const per_page = Number(searchParams.get('per_page')) || 15;
+    const sort_by = (searchParams.get('sort_by') as TAdminUserSortBy) || 'created_at';
+    const sort_order = (searchParams.get('sort_order') as 'asc' | 'desc') || 'desc';
+    // Multi-select array params
+    const role = searchParams.getAll('role');
+    const auth_provider = searchParams.getAll('auth_provider');
+    const profession = searchParams.getAll('profession');
+    const country = searchParams.getAll('country');
+    const subscription_plan = searchParams.getAll('subscription_plan');
+    // Boolean filters
+    const is_online = searchParams.get('is_online');
+    const has_payg_balance = searchParams.get('has_payg_balance');
+    const is_creator = searchParams.get('is_creator');
+    const is_verified = searchParams.get('is_verified');
+    // Date range
+    const created_from = searchParams.get('created_from') || undefined;
+    const created_to = searchParams.get('created_to') || undefined;
+    return {
+      page,
+      per_page,
+      sort_by,
+      sort_order,
+      role: role.length > 0 ? role : undefined,
+      auth_provider: auth_provider.length > 0 ? auth_provider : undefined,
+      profession: profession.length > 0 ? profession : undefined,
+      country: country.length > 0 ? country : undefined,
+      subscription_plan: subscription_plan.length > 0 ? subscription_plan : undefined,
+      is_online: is_online === null ? undefined : is_online === 'true',
+      has_payg_balance: has_payg_balance === null ? undefined : has_payg_balance === 'true',
+      is_creator: is_creator === null ? undefined : is_creator === 'true',
+      is_verified: is_verified === null ? undefined : is_verified === 'true',
+      created_from,
+      created_to,
+      search: debouncedSearch || undefined,
+    };
+  }, [searchParams, debouncedSearch]);
+
+  const { data, isLoading } = useAdminUsers(params);
+
+  // Update URL params (supports scalar and array values)
+  const updateParams = useCallback(
+    (updates: Partial<IAdminUserListParams>) => {
+      const newParams = new URLSearchParams(searchParams.toString());
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') {
+          newParams.delete(key);
+        } else if (Array.isArray(value)) {
+          newParams.delete(key);
+          value.forEach((v) => newParams.append(key, String(v)));
+        } else if (typeof value === 'boolean') {
+          newParams.set(key, String(value));
+        } else {
+          newParams.set(key, String(value));
+        }
+      });
+      const queryString = newParams.toString();
+      router.push(queryString ? `/admin/users?${queryString}` : '/admin/users');
+    },
+    [router, searchParams]
+  );
+
+  // Sync debounced search to URL
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (debouncedSearch !== currentSearch) {
+      updateParams({ search: debouncedSearch || undefined, page: 1 });
+    }
+  }, [debouncedSearch, searchParams, updateParams]);
+
+  const handleParamsChange = useCallback(
+    (newParams: Partial<IAdminUserListParams>) => {
+      updateParams(newParams);
+    },
+    [updateParams]
+  );
+
+  const handleSort = useCallback(
+    (sortBy: TAdminUserSortBy) => {
+      updateParams({
+        sort_by: sortBy,
+        sort_order:
+          params.sort_by === sortBy && params.sort_order === 'desc' ? 'asc' : 'desc',
+      });
+    },
+    [updateParams, params.sort_by, params.sort_order]
+  );
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      updateParams({ page });
+    },
+    [updateParams]
+  );
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold tracking-tight">User Management</h1>
+
+      <AdminUserFilters
+        params={params}
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        onParamsChange={handleParamsChange}
+      />
+
+      <AdminUsersTable
+        users={data?.data || []}
+        isLoading={isLoading}
+        params={params}
+        onSort={handleSort}
+      />
+
+      {data?.pagination && (
+        <AdminPagination
+          pagination={data.pagination}
+          onPageChange={handlePageChange}
+          perPage={params.per_page || 15}
+          onPerPageChange={(perPage) => handleParamsChange({ per_page: perPage, page: 1 })}
+          itemLabel="users"
+        />
+      )}
+    </div>
+  );
+}
+
+/******************************************************************************
+                                 Export default
+******************************************************************************/
 
 export default function AdminUsersPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">User Management</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          View and manage user accounts, their conversations, and token usage
-        </p>
-      </div>
-
-      {/* Info Section */}
-      <div className="rounded-lg border bg-muted/50 p-4">
-        <h3 className="font-medium mb-2">How to Access User Details</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          To view a user&apos;s details, you can access them in the following ways:
-        </p>
-        <ul className="space-y-2 text-sm text-muted-foreground">
-          <li className="flex items-start gap-2">
-            <span className="font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs">1</span>
-            <span>
-              <strong>From Conversations:</strong> Go to the Conversations page and click on any
-              user UUID in the table. This will take you to that user&apos;s conversations.
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs">2</span>
-            <span>
-              <strong>Direct URL:</strong> If you know the user&apos;s UUID, you can navigate directly
-              to <code className="bg-muted px-1 py-0.5 rounded text-xs">/admin/users/[uuid]</code>
-            </span>
-          </li>
-        </ul>
-      </div>
-
-      {/* Quick Actions */}
-      <div>
-        <h3 className="font-medium mb-3">Quick Actions</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Link href="/admin/conversations">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-              <CardContent className="flex items-center gap-4 p-4">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium">View All Conversations</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Browse conversations and click on user UUIDs to view user details
-                  </p>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </div>
-
-      {/* User Details Info */}
-      <div className="rounded-lg border p-4">
-        <h3 className="font-medium mb-2">What You Can See</h3>
-        <div className="grid gap-4 md:grid-cols-3 text-sm">
-          <div>
-            <h4 className="font-medium text-primary mb-1">User Profile</h4>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>Name and email</li>
-              <li>Role and verification status</li>
-              <li>Professional information</li>
-              <li>Location details</li>
-              <li>Education and bar info</li>
-              <li>Areas of expertise</li>
-            </ul>
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <Skeleton className="h-8 w-[200px]" />
+          <div className="flex flex-wrap gap-3">
+            <Skeleton className="h-10 w-[260px]" />
+            <Skeleton className="h-10 w-[130px]" />
+            <Skeleton className="h-10 w-[130px]" />
+            <Skeleton className="h-10 w-[130px]" />
           </div>
-          <div>
-            <h4 className="font-medium text-primary mb-1">Conversations</h4>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>All user conversations</li>
-              <li>Filter by status</li>
-              <li>Sort by date or title</li>
-              <li>View conversation details</li>
-              <li>Message history</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-medium text-primary mb-1">Token Usage</h4>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>Usage summary</li>
-              <li>Group by day/week/month</li>
-              <li>Group by agent</li>
-              <li>Group by conversation</li>
-              <li>Date range filtering</li>
-              <li>Cost tracking</li>
-            </ul>
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
           </div>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <AdminUsersContent />
+    </Suspense>
   );
 }

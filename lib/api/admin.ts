@@ -4,6 +4,8 @@ import type {
   AdminConversationsListResponse,
   AdminConversationDetailResponse,
   AdminUserDetailResponse,
+  IAdminUserListParams,
+  IAdminUserListResponse,
   AdminUserConversationsParams,
   AdminUserConversationsResponse,
   AdminUserTokenUsageParams,
@@ -57,6 +59,39 @@ export const adminApi = {
   ): Promise<AdminConversationDetailResponse> => {
     const response = await apiClient.get<AdminConversationDetailResponse>(
       `/admin/conversations/${uuid}`
+    );
+    return response.data;
+  },
+
+  /**
+   * List all users with pagination, filtering, and sorting
+   * Requires admin role
+   */
+  getUsers: async (
+    params: IAdminUserListParams = {}
+  ): Promise<IAdminUserListResponse> => {
+    const response = await apiClient.get<IAdminUserListResponse>(
+      '/admin/users',
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          search: params.search,
+          'role[]': params.role,
+          'auth_provider[]': params.auth_provider,
+          'profession[]': params.profession,
+          'country[]': params.country,
+          'subscription_plan[]': params.subscription_plan,
+          is_online: params.is_online,
+          has_payg_balance: params.has_payg_balance,
+          is_creator: params.is_creator,
+          is_verified: params.is_verified,
+          created_from: params.created_from,
+          created_to: params.created_to,
+          sort_by: params.sort_by ?? 'created_at',
+          sort_order: params.sort_order ?? 'desc',
+        },
+      }
     );
     return response.data;
   },

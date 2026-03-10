@@ -205,6 +205,65 @@ export interface AdminUserDetailResponse {
   data: AdminUserDetail;
 }
 
+// ============================================
+// User List Types (GET /api/admin/users)
+// ============================================
+
+export type TAdminUserSortBy = 'name' | 'email' | 'role' | 'created_at' | 'last_seen_at';
+
+export interface IAdminUserListItem {
+  uuid: string;
+  name: string;
+  email: string | null;
+  avatar_url: string | null;
+  role: string;
+  auth_provider: string;
+  is_online: boolean;
+  last_seen_at: string | null;
+  profession: string | null;
+  university: string | null;
+  area_of_study: string | null;
+  subscription_plan: string | null;
+  remaining_messages: number | null;
+  has_payg_balance: boolean;
+  payg_balance: number;
+  country: string | null;
+  ip_address: string | null;
+  ip_country: string | null;
+  device_type: string | null;
+  platform: string | null;
+  is_creator: boolean;
+  is_verified: boolean;
+  created_at: string;
+}
+
+export interface IAdminUserListParams {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  role?: string[];
+  auth_provider?: string[];
+  profession?: string[];
+  country?: string[];
+  subscription_plan?: string[];
+  is_online?: boolean;
+  has_payg_balance?: boolean;
+  is_creator?: boolean;
+  is_verified?: boolean;
+  created_from?: string;
+  created_to?: string;
+  sort_by?: TAdminUserSortBy;
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface IAdminUserListResponse {
+  success: boolean;
+  message: string;
+  data: IAdminUserListItem[];
+  pagination: AdminConversationsPagination;
+  links: AdminConversationsLinks;
+}
+
 // User Conversations Query Parameters
 export interface AdminUserConversationsParams {
   status?: 'active' | 'archived';
