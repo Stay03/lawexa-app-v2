@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import {
   Popover,
   PopoverContent,
@@ -158,31 +159,20 @@ function AdminUserFilters({
         }
       />
 
-      {/* Online Status */}
-      <Select
-        value={
-          params.is_online === undefined
-            ? 'all'
-            : params.is_online
-              ? 'online'
-              : 'offline'
-        }
-        onValueChange={(value) =>
-          onParamsChange({
-            is_online: value === 'all' ? undefined : value === 'online',
-            page: 1,
-          })
-        }
-      >
-        <SelectTrigger className="w-[130px]">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="online">Online</SelectItem>
-          <SelectItem value="offline">Offline</SelectItem>
-        </SelectContent>
-      </Select>
+      {/* Online Only Toggle */}
+      <label className="flex items-center gap-2 px-3 h-9 rounded-md border border-input bg-background cursor-pointer select-none">
+        <Switch
+          checked={params.is_online === true}
+          onCheckedChange={(checked) =>
+            onParamsChange({
+              is_online: checked ? true : undefined,
+              page: 1,
+            })
+          }
+          className="scale-90"
+        />
+        <span className="text-sm whitespace-nowrap">Online only</span>
+      </label>
 
       {/* More Filters Sheet */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>

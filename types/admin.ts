@@ -230,6 +230,7 @@ export interface IAdminUserListItem {
   country: string | null;
   ip_address: string | null;
   ip_country: string | null;
+  ip_country_code: string | null;
   device_type: string | null;
   platform: string | null;
   is_creator: boolean;
