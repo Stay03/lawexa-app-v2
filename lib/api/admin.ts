@@ -23,6 +23,11 @@ import type {
   AdminSubscriptionDetailResponse,
   AdminSubscribersParams,
   AdminSubscribersListResponse,
+  AdminMessagePacksParams,
+  AdminMessagePacksListResponse,
+  AdminMessagePackDetailResponse,
+  MessagePackAnalyticsParams,
+  MessagePackAnalyticsResponse,
 } from '@/types/admin';
 
 export const adminApi = {
@@ -300,6 +305,67 @@ export const adminApi = {
           subscription_status: params.subscription_status,
           sort_by: params.sort_by ?? 'created_at',
           sort_order: params.sort_order ?? 'desc',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * List all message packs with pagination, filtering, and sorting
+   * Requires admin role
+   */
+  getAdminMessagePacks: async (
+    params: AdminMessagePacksParams = {}
+  ): Promise<AdminMessagePacksListResponse> => {
+    const response = await apiClient.get<AdminMessagePacksListResponse>(
+      '/admin/message-packs',
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          status: params.status,
+          search: params.search,
+          start_date: params.start_date,
+          end_date: params.end_date,
+          min_amount: params.min_amount,
+          max_amount: params.max_amount,
+          sort_by: params.sort_by ?? 'created_at',
+          sort_order: params.sort_order ?? 'desc',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get a single message pack with full details
+   * Requires admin role
+   */
+  getAdminMessagePack: async (
+    id: number
+  ): Promise<AdminMessagePackDetailResponse> => {
+    const response = await apiClient.get<AdminMessagePackDetailResponse>(
+      `/admin/message-packs/${id}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get message pack analytics with period comparison
+   * Requires admin role
+   */
+  getMessagePackAnalytics: async (
+    params: MessagePackAnalyticsParams = {}
+  ): Promise<MessagePackAnalyticsResponse> => {
+    const response = await apiClient.get<MessagePackAnalyticsResponse>(
+      '/admin/message-packs/analytics',
+      {
+        params: {
+          period: params.period ?? 'last_30_days',
+          date: params.date,
+          start_date: params.start_date,
+          end_date: params.end_date,
         },
       }
     );

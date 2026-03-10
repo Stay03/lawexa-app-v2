@@ -13,6 +13,8 @@ import type {
   SubscriptionAnalyticsParams,
   AdminSubscriptionsParams,
   AdminSubscribersParams,
+  AdminMessagePacksParams,
+  MessagePackAnalyticsParams,
 } from '@/types/admin';
 
 // Query key factory for organized caching
@@ -47,6 +49,13 @@ export const adminKeys = {
   subscribers: () => [...adminKeys.all, 'subscribers'] as const,
   subscribersList: (params: AdminSubscribersParams) =>
     [...adminKeys.subscribers(), 'list', params] as const,
+  messagePacks: () => [...adminKeys.all, 'message-packs'] as const,
+  messagePacksList: (params: AdminMessagePacksParams) =>
+    [...adminKeys.messagePacks(), 'list', params] as const,
+  messagePackDetail: (id: number) =>
+    [...adminKeys.messagePacks(), 'detail', id] as const,
+  messagePackAnalytics: (params: MessagePackAnalyticsParams) =>
+    [...adminKeys.messagePacks(), 'analytics', params] as const,
 };
 
 /**
@@ -203,6 +212,40 @@ export function useAdminSubscribers(params: AdminSubscribersParams = {}) {
   return useQuery({
     queryKey: adminKeys.subscribersList(params),
     queryFn: () => adminApi.getAdminSubscribers(params),
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook for fetching admin message packs list with pagination, filtering, sorting
+ */
+export function useAdminMessagePacks(params: AdminMessagePacksParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.messagePacksList(params),
+    queryFn: () => adminApi.getAdminMessagePacks(params),
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook for fetching a single message pack with full details
+ */
+export function useAdminMessagePack(id: number) {
+  return useQuery({
+    queryKey: adminKeys.messagePackDetail(id),
+    queryFn: () => adminApi.getAdminMessagePack(id),
+    enabled: id > 0,
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook for fetching message pack analytics data
+ */
+export function useMessagePackAnalytics(params: MessagePackAnalyticsParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.messagePackAnalytics(params),
+    queryFn: () => adminApi.getMessagePackAnalytics(params),
     staleTime: 30 * 1000,
   });
 }

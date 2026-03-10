@@ -1167,3 +1167,166 @@ export interface AdminSubscribersListResponse {
   pagination: AdminConversationsPagination;
   links: AdminConversationsLinks;
 }
+
+// ============================================
+// Admin Message Pack (PAYG) Types
+// Based on API documentation: /docs/apiDocs/admin-message-pack.md
+// ============================================
+
+export type MessagePackStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+
+export interface AdminMessagePackUser {
+  uuid: string;
+  name: string;
+  email: string;
+}
+
+export interface AdminMessagePackDetailUser extends AdminMessagePackUser {
+  role: string;
+  avatar_url: string | null;
+}
+
+export interface AdminMessagePackListItem {
+  id: number;
+  user: AdminMessagePackUser;
+  quantity: number;
+  messages_total: number;
+  messages_remaining: number;
+  messages_consumed: number;
+  amount: number;
+  formatted_amount: string;
+  currency: string;
+  status: MessagePackStatus;
+  status_label: string;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface AdminMessagePackDetail extends Omit<AdminMessagePackListItem, 'user'> {
+  user: AdminMessagePackDetailUser;
+  transaction_reference: string | null;
+  metadata: Record<string, unknown> | null;
+  updated_at: string;
+}
+
+// Query Parameters
+
+export interface AdminMessagePacksParams {
+  status?: MessagePackStatus;
+  search?: string;
+  start_date?: string;
+  end_date?: string;
+  min_amount?: number;
+  max_amount?: number;
+  sort_by?: 'created_at' | 'amount' | 'paid_at' | 'messages_total';
+  sort_order?: 'asc' | 'desc';
+  per_page?: number;
+  page?: number;
+}
+
+export interface MessagePackAnalyticsParams {
+  period?: AnalyticsPeriod;
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+// Analytics Stat Cards
+
+export interface MessagePackAnalyticsStatCards {
+  total_revenue: AnalyticsStatCard;
+  total_packs_sold: AnalyticsStatCard;
+  total_messages_purchased: AnalyticsStatCard;
+  total_messages_consumed: AnalyticsStatCard;
+  consumption_rate: AnalyticsStatCard;
+  avg_pack_size: AnalyticsStatCard;
+}
+
+// Analytics Chart Types
+
+export interface MessagePackRevenueOverTimePoint {
+  date?: string;
+  hour?: string;
+  revenue: number;
+}
+
+export interface MessagePackPurchasesOverTimePoint {
+  date?: string;
+  hour?: string;
+  count: number;
+}
+
+export interface MessagePackStatusDistributionPoint {
+  status: string;
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface MessagePackAnalyticsCharts {
+  revenue_over_time: MessagePackRevenueOverTimePoint[];
+  purchases_over_time: MessagePackPurchasesOverTimePoint[];
+  status_distribution: MessagePackStatusDistributionPoint[];
+}
+
+// Analytics Table Types
+
+export interface MessagePackTopBuyerRow {
+  user_uuid: string;
+  user_name: string | null;
+  user_email: string | null;
+  is_deleted: boolean;
+  total_spent: number;
+  total_messages: number;
+  pack_count: number;
+}
+
+export interface MessagePackRecentPurchaseRow {
+  id: number;
+  user_name: string | null;
+  user_email: string | null;
+  user_uuid: string | null;
+  is_deleted: boolean;
+  quantity: number;
+  messages_total: number;
+  amount: number;
+  currency: string;
+  paid_at: string;
+}
+
+export interface MessagePackAnalyticsTables {
+  top_buyers: MessagePackTopBuyerRow[];
+  recent_purchases: MessagePackRecentPurchaseRow[];
+}
+
+// Full Analytics Data
+
+export interface MessagePackAnalyticsData {
+  period: AnalyticsPeriodInfo;
+  granularity: 'hour' | 'day';
+  stat_cards: MessagePackAnalyticsStatCards;
+  charts: MessagePackAnalyticsCharts;
+  tables: MessagePackAnalyticsTables;
+}
+
+// API Responses
+
+export interface AdminMessagePacksListResponse {
+  success: boolean;
+  message: string;
+  data: AdminMessagePackListItem[];
+  pagination: AdminConversationsPagination;
+  links: AdminConversationsLinks;
+}
+
+export interface AdminMessagePackDetailResponse {
+  success: boolean;
+  message: string;
+  data: AdminMessagePackDetail;
+}
+
+export interface MessagePackAnalyticsResponse {
+  success: boolean;
+  message: string;
+  data: MessagePackAnalyticsData;
+}

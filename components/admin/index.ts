@@ -28,3 +28,6 @@ export { AdminSubscriberFilters } from './subscriptions/AdminSubscriberFilters';
 export { AdminSubscribersTable } from './subscriptions/AdminSubscribersTable';
 export { AdminUsersTable } from './AdminUsersTable';
 export { AdminUserFilters } from './AdminUserFilters';
+export { AdminMessagePackFilters } from './message-packs/AdminMessagePackFilters';
+export { AdminMessagePacksTable } from './message-packs/AdminMessagePacksTable';
+export { AdminMessagePackDetailView } from './message-packs/AdminMessagePackDetail';
