@@ -2,12 +2,14 @@
 
 ## Overview
 
-These endpoints provide admin-level access to subscription and subscriber data for the admin dashboard. All endpoints are read-only and support filtering, sorting, and pagination.
+These endpoints provide admin-level access to subscription and subscriber data for the admin dashboard. Endpoints support filtering, sorting, pagination, and subscription lifecycle management.
 
 **Key Features:**
 - List all subscriptions with advanced filtering (status, plan, user search, date range, amount range)
 - View detailed subscription information including recent invoices
 - List all subscribers with their most recent subscription
+- Cancel a user's subscription (disables in Paystack, sets access end date)
+- Reactivate a cancelled subscription (re-enables in Paystack, restores active status)
 - Computed fields: `days_until_renewal`, `is_in_grace_period`, `has_access`
 
 ---
@@ -17,10 +19,12 @@ These endpoints provide admin-level access to subscription and subscriber data f
 1. [Authentication & Authorization](#authentication--authorization)
 2. [List Subscriptions](#list-subscriptions)
 3. [Show Subscription](#show-subscription)
-4. [List Subscribers](#list-subscribers)
-5. [Data Models](#data-models)
-6. [Validation & Error Responses](#validation--error-responses)
-7. [Implementation Files](#implementation-files)
+4. [Cancel Subscription](#cancel-subscription)
+5. [Reactivate Subscription](#reactivate-subscription)
+6. [List Subscribers](#list-subscribers)
+7. [Data Models](#data-models)
+8. [Validation & Error Responses](#validation--error-responses)
+9. [Implementation Files](#implementation-files)
 
 ---
 
@@ -30,6 +34,8 @@ These endpoints provide admin-level access to subscription and subscriber data f
 |----------|--------|---------------|---------------|
 | `/api/admin/subscriptions` | GET | Yes | Admin |
 | `/api/admin/subscriptions/{id}` | GET | Yes | Admin |
+| `/api/admin/subscriptions/{id}/cancel` | POST | Yes | Admin |
+| `/api/admin/subscriptions/{id}/reactivate` | POST | Yes | Admin |
 | `/api/admin/subscribers` | GET | Yes | Admin |
 
 **Middleware:** `auth:sanctum`, `role:admin`
@@ -294,6 +300,201 @@ curl -X GET "http://localhost:8000/api/admin/subscriptions/1" \
 - Includes admin-specific fields not shown in the list endpoint: `email_token`, `authorization_code`, `invoice_limit`, `cron_expression`, `quantity`, `updated_at`.
 - User object includes `role` and `avatar_url` (not included in list endpoint).
 - Non-numeric IDs (e.g., `/subscriptions/abc`) return a route-not-found error.
+
+---
+
+## Cancel Subscription
+
+### POST /api/admin/subscriptions/{id}/cancel
+
+Cancel a user's subscription. This disables the subscription in Paystack and sets the local status to `cancelled`. The user retains access until the `ends_at` date (typically the next payment date).
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | integer | Subscription ID (numeric only) |
+
+**Example curl:**
+
+```bash
+curl -X POST "http://localhost:8000/api/admin/subscriptions/1/cancel" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Response — Success (200):**
+
+```json
+{
+  "success": true,
+  "message": "Subscription cancelled successfully. Access continues until 2026-04-15.",
+  "data": {
+    "id": 1,
+    "subscription_code": "SUB_test123",
+    "email_token": "token_abc",
+    "authorization_code": null,
+    "invoice_limit": 0,
+    "cron_expression": null,
+    "user": {
+      "uuid": "a5b3e808-a3ad-4c1f-b1e7-d3af87d11536",
+      "name": "Test User",
+      "email": "test@example.com",
+      "role": "user",
+      "avatar_url": null
+    },
+    "plan": { "..." : "full plan object" },
+    "status": "cancelled",
+    "status_label": "Cancelled",
+    "amount": "15000.00",
+    "currency": "NGN",
+    "quantity": 1,
+    "start_date": "2026-01-15T00:00:00+00:00",
+    "next_payment_date": "2026-04-15T00:00:00+00:00",
+    "cancelled_at": "2026-03-10T14:30:00+00:00",
+    "ends_at": "2026-04-15T00:00:00+00:00",
+    "days_until_renewal": null,
+    "is_in_grace_period": false,
+    "has_access": true,
+    "recent_invoices": [],
+    "created_at": "2026-01-15T00:00:00+00:00",
+    "updated_at": "2026-03-10T14:30:00+00:00"
+  }
+}
+```
+
+**Response — Not Found (404):**
+
+```json
+{
+  "success": false,
+  "message": "Subscription not found.",
+  "errors": null
+}
+```
+
+**Response — Free Plan (400):**
+
+```json
+{
+  "success": false,
+  "message": "Cannot cancel a free tier subscription.",
+  "errors": null
+}
+```
+
+**Response — Already Cancelled (400):**
+
+```json
+{
+  "success": false,
+  "message": "Subscription is already cancelled. Access continues until 2026-04-15.",
+  "errors": null
+}
+```
+
+**Response — Already Expired (400):**
+
+```json
+{
+  "success": false,
+  "message": "Subscription is already expired.",
+  "errors": null
+}
+```
+
+**Notes:**
+- Dispatches a `SubscriptionCancelled` event.
+- Calls Paystack's `POST /subscription/disable` endpoint if the subscription has a `subscription_code`. Paystack failures are logged but do not prevent local cancellation.
+- The user retains access until `ends_at`, which defaults to the `next_payment_date` or falls back to a grace period.
+- Can cancel subscriptions with status: `active`, `past_due`, `trialing`.
+
+---
+
+## Reactivate Subscription
+
+### POST /api/admin/subscriptions/{id}/reactivate
+
+Reactivate a cancelled subscription. This re-enables the subscription in Paystack and restores the local status to `active`.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | integer | Subscription ID (numeric only) |
+
+**Example curl:**
+
+```bash
+curl -X POST "http://localhost:8000/api/admin/subscriptions/1/reactivate" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Response — Success (200):**
+
+```json
+{
+  "success": true,
+  "message": "Subscription reactivated successfully.",
+  "data": {
+    "id": 1,
+    "subscription_code": "SUB_test123",
+    "email_token": "token_abc",
+    "authorization_code": null,
+    "invoice_limit": 0,
+    "cron_expression": null,
+    "user": {
+      "uuid": "a5b3e808-a3ad-4c1f-b1e7-d3af87d11536",
+      "name": "Test User",
+      "email": "test@example.com",
+      "role": "user",
+      "avatar_url": null
+    },
+    "plan": { "..." : "full plan object" },
+    "status": "active",
+    "status_label": "Active",
+    "amount": "15000.00",
+    "currency": "NGN",
+    "quantity": 1,
+    "start_date": "2026-01-15T00:00:00+00:00",
+    "next_payment_date": "2026-04-10T14:30:00+00:00",
+    "cancelled_at": null,
+    "ends_at": null,
+    "days_until_renewal": 31,
+    "is_in_grace_period": false,
+    "has_access": true,
+    "recent_invoices": [],
+    "created_at": "2026-01-15T00:00:00+00:00",
+    "updated_at": "2026-03-10T14:30:00+00:00"
+  }
+}
+```
+
+**Response — Not Found (404):**
+
+```json
+{
+  "success": false,
+  "message": "Subscription not found.",
+  "errors": null
+}
+```
+
+**Response — Not Cancelled (400):**
+
+```json
+{
+  "success": false,
+  "message": "Only cancelled subscriptions can be reactivated. Current status: Active.",
+  "errors": null
+}
+```
+
+**Notes:**
+- Only subscriptions with status `cancelled` can be reactivated. Expired subscriptions cannot be re-enabled in Paystack.
+- Calls Paystack's `POST /subscription/enable` endpoint if the subscription has a `subscription_code`. Paystack failures are logged but do not prevent local reactivation.
+- Clears `cancelled_at` and `ends_at`, sets a new `next_payment_date` based on the plan's interval.
 
 ---
 
@@ -627,13 +828,14 @@ All validation errors return **422** with the following structure:
 
 | File | Description |
 |------|-------------|
-| `app/Http/Controllers/Admin/SubscriptionController.php` | Controller with `index`, `show`, `subscribers` actions |
+| `app/Http/Controllers/Admin/SubscriptionController.php` | Controller with `index`, `show`, `cancel`, `reactivate`, `subscribers` actions |
 | `app/Http/Requests/Admin/ListSubscriptionsRequest.php` | Validation for list subscriptions |
 | `app/Http/Requests/Admin/ListSubscribersRequest.php` | Validation for list subscribers |
 | `app/Http/Resources/Admin/SubscriptionResource.php` | List item resource |
 | `app/Http/Resources/Admin/SubscriptionDetailResource.php` | Detail view resource |
 | `app/Http/Resources/Admin/SubscriberResource.php` | Subscriber resource |
 | `app/Http/Resources/Admin/SubscriptionInvoiceResource.php` | Invoice resource |
+| `app/Services/SubscriptionService.php` | Service with `cancel()`, `reactivate()` methods (handles Paystack + events) |
 | `app/Models/Subscription.php` | Model with `days_until_renewal`, `is_in_grace_period`, `hasAccess()` |
-| `routes/api.php` | Route definitions (lines 575-588) |
-| `tests/Feature/Admin/SubscriptionManagementTest.php` | Feature tests (47 tests) |
+| `routes/api.php` | Route definitions (lines 596-602) |
+| `tests/Feature/Admin/SubscriptionManagementTest.php` | Feature tests (72 tests) |

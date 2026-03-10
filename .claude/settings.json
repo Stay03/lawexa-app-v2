@@ -10,7 +10,9 @@
       "Bash(grep -l \"UserAnalytics\" /c/Users/stayn/OneDrive/Desktop/2023/lawexa-app-v2/lawexa-app/components/admin/analytics/*.tsx)",
       "Bash(xargs grep -l \"status\\\\|online\\\\|indicator\")",
       "Bash(xargs grep -l \"DailyBreakdownTable\")",
-      "Bash(head -100 \"app/\\(admin\\)/admin/subscribers/page.tsx\")"
+      "Bash(head -100 \"app/\\(admin\\)/admin/subscribers/page.tsx\")",
+      "Bash(xargs grep -l \"useAdminSubscription\\\\|getAdminSubscription\")",
+      "Bash(xargs grep -l \"z\\\\..*subscription\\\\|Zod\\\\|zod\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\stayn\\OneDrive\\Desktop\\2023\\lawexa-app-v2\\lawexa-app\\app\\(main)\\statutes",

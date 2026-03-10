@@ -223,6 +223,7 @@ export interface IAdminUserListItem {
   profession: string | null;
   university: string | null;
   area_of_study: string | null;
+  level: string | null;
   subscription_plan: string | null;
   remaining_messages: number | null;
   has_payg_balance: boolean;

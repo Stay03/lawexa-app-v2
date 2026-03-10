@@ -131,7 +131,8 @@ function AdminUsersTable({
             </TableHead>
             <TableHead className="w-[100px] font-semibold">Plan</TableHead>
             <TableHead className="w-[90px] text-right font-semibold">Messages</TableHead>
-            <TableHead className="w-[100px] font-semibold">Country</TableHead>
+            <TableHead className="w-[120px] font-semibold">University</TableHead>
+            <TableHead className="w-[80px] font-semibold">Level</TableHead>
             <TableHead className="w-[80px] font-semibold">Device</TableHead>
             <TableHead className="w-[90px] font-semibold">Platform</TableHead>
             <TableHead className="w-[120px] font-semibold">
@@ -184,6 +185,9 @@ function AdminUsersTable({
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
+                          <span className="block truncate font-medium text-sm">
+                            {user.name}
+                          </span>
                           {user.ip_country_code && (
                             <ReactCountryFlag
                               countryCode={user.ip_country_code}
@@ -192,9 +196,6 @@ function AdminUsersTable({
                               aria-label={user.ip_country_code}
                             />
                           )}
-                          <span className="block truncate font-medium text-sm">
-                            {user.name}
-                          </span>
                           {user.is_verified && (
                             <BadgeCheck className="h-3.5 w-3.5 text-primary shrink-0" />
                           )}
@@ -216,9 +217,9 @@ function AdminUsersTable({
                   <TooltipContent side="top" className="max-w-[280px]">
                     <div className="space-y-1 text-xs">
                       {user.profession && <p>Profession: {user.profession}</p>}
-                      {user.university && <p>University: {user.university}</p>}
                       {user.area_of_study && <p>Study: {user.area_of_study}</p>}
-                      {!user.profession && !user.university && !user.area_of_study && (
+                      {user.country && <p>Country: {user.country}</p>}
+                      {!user.profession && !user.area_of_study && !user.country && (
                         <p className="text-muted-foreground">No profile info</p>
                       )}
                     </div>
@@ -272,10 +273,17 @@ function AdminUsersTable({
                 </div>
               </TableCell>
 
-              {/* Country */}
+              {/* University */}
               <TableCell className="text-sm">
-                <span className="block truncate max-w-[100px]">
-                  {user.country || '—'}
+                <span className="block truncate max-w-[120px] text-muted-foreground">
+                  {user.university || '—'}
+                </span>
+              </TableCell>
+
+              {/* Level */}
+              <TableCell className="text-sm">
+                <span className="block truncate max-w-[80px] text-muted-foreground">
+                  {user.level || '—'}
                 </span>
               </TableCell>
 

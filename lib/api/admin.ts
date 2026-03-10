@@ -287,6 +287,32 @@ export const adminApi = {
   },
 
   /**
+   * Cancel a subscription (admin action)
+   * Sets status to cancelled, disables in Paystack
+   */
+  cancelAdminSubscription: async (
+    id: number
+  ): Promise<AdminSubscriptionDetailResponse> => {
+    const response = await apiClient.post<AdminSubscriptionDetailResponse>(
+      `/admin/subscriptions/${id}/cancel`
+    );
+    return response.data;
+  },
+
+  /**
+   * Reactivate a cancelled subscription (admin action)
+   * Restores status to active, re-enables in Paystack
+   */
+  reactivateAdminSubscription: async (
+    id: number
+  ): Promise<AdminSubscriptionDetailResponse> => {
+    const response = await apiClient.post<AdminSubscriptionDetailResponse>(
+      `/admin/subscriptions/${id}/reactivate`
+    );
+    return response.data;
+  },
+
+  /**
    * List all subscribers with their most recent subscription
    * Requires admin role
    */
