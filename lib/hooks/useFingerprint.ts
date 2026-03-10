@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import { setCachedFingerprint } from '@/lib/utils/device-id';
 
 export function useFingerprint() {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
@@ -13,6 +14,7 @@ export function useFingerprint() {
         const fp = await FingerprintJS.load();
         const result = await fp.get();
         setFingerprint(result.visitorId);
+        setCachedFingerprint(result.visitorId);
       } catch (error) {
         console.error('Failed to get fingerprint:', error);
       } finally {

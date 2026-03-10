@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { getDeviceId, getCachedFingerprint } from '@/lib/utils/device-id';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -11,12 +12,23 @@ export const apiClient = axios.create({
   },
 });
 
-// Request interceptor - add auth token from Zustand store
+// Request interceptor - add auth token and device identifiers
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Attach device identifiers on every request (for retroactive collection)
+  const deviceId = getDeviceId();
+  const fingerprint = getCachedFingerprint();
+  if (deviceId) {
+    config.headers['X-Device-Id'] = deviceId;
+  }
+  if (fingerprint) {
+    config.headers['X-Fingerprint'] = fingerprint;
+  }
+
   return config;
 });
 
@@ -51,7 +63,10 @@ apiClient.interceptors.response.use(
         try {
           error.config._retried = true;
           // Inline call to avoid circular import with auth.ts
-          const refreshResponse = await apiClient.post('/auth/guest', {}, {
+          const refreshResponse = await apiClient.post('/auth/guest', {
+            device_id: getDeviceId(),
+            fingerprint: getCachedFingerprint(),
+          }, {
             headers: { 'X-Silent-Auth': 'true' },
           });
           const refreshData = refreshResponse.data;

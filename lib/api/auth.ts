@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
 import type { AuthResponse, User, Session, UserProfile } from '@/types/auth';
+import { getDeviceIdentifiers } from '@/lib/utils/device-id';
 
 export const authApi = {
   // Public endpoints
@@ -12,7 +13,7 @@ export const authApi = {
   }) => {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/auth/register',
-      data
+      { ...data, ...getDeviceIdentifiers() }
     );
     return response.data;
   },
@@ -20,7 +21,7 @@ export const authApi = {
   login: async (data: { email: string; password: string }) => {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/auth/login',
-      data
+      { ...data, ...getDeviceIdentifiers() }
     );
     return response.data;
   },
@@ -35,15 +36,19 @@ export const authApi = {
   googleCallback: async (code: string) => {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/auth/google',
-      { code }
+      { code, ...getDeviceIdentifiers() }
     );
     return response.data;
   },
 
   guestToken: async (fingerprint?: string) => {
+    const identifiers = getDeviceIdentifiers();
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/auth/guest',
-      { fingerprint }
+      {
+        fingerprint: fingerprint ?? identifiers.fingerprint,
+        device_id: identifiers.device_id,
+      }
     );
     return response.data;
   },
