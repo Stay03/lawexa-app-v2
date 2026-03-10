@@ -21,6 +21,9 @@ const BAR_COLORS = [
   '#a855f7',
   '#f97316',
   '#ef4444',
+  '#06b6d4',
+  '#ec4899',
+  '#eab308',
 ];
 
 export function CountryDistributionChart({
@@ -49,6 +52,7 @@ export function CountryDistributionChart({
         <CardDescription>Geographic distribution</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="max-h-[400px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-track]:bg-transparent">
         <div className="space-y-4">
           {data.map((item, index) => {
             const countryCode = getCountryCode(item.country);
@@ -100,6 +104,7 @@ export function CountryDistributionChart({
               </div>
             );
           })}
+        </div>
         </div>
       </CardContent>
     </Card>

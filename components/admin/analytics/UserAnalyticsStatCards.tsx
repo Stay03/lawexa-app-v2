@@ -1,6 +1,6 @@
 'use client';
 
-import { Users, MessageSquare, Activity, RotateCcw, Zap } from 'lucide-react';
+import { UserPlus, MessageSquare, Activity, RotateCcw, Zap } from 'lucide-react';
 import { formatCost, formatCompact } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { ChangePercentBadge } from '@/components/admin/analytics/ChangePercentBadge';
@@ -54,34 +54,30 @@ const CARD =
   'rounded-2xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5';
 
 /* ------------------------------------------------------------------ */
-/*  Card 1 — Users (merged New + Total)                                */
+/*  Card 1 — New Users (acquisition this period)                       */
 /* ------------------------------------------------------------------ */
 
-function UsersCard({ statCards }: { statCards: StatCardsType }) {
+function NewUsersCard({ statCards }: { statCards: StatCardsType }) {
   return (
     <div className={CARD}>
       <div className="flex items-center gap-2">
-        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+        <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Users
+          New Users
         </span>
       </div>
 
-      <p className="mt-2 text-3xl font-bold tabular-nums">
-        {statCards.total_users.value.toLocaleString()}
-      </p>
-
-      <div className="mt-1 flex items-center gap-1.5">
-        <span className="text-sm text-muted-foreground">
-          +{statCards.new_users.value.toLocaleString()} new
-        </span>
+      <div className="mt-2 flex items-center gap-2">
+        <p className="text-3xl font-bold tabular-nums">
+          {statCards.new_users.value.toLocaleString()}
+        </p>
         <ChangePercentBadge value={statCards.new_users.change_percent} />
       </div>
 
       <div className="mt-1.5">
         <SubCount
-          registered={statCards.total_users.registered}
-          guest={statCards.total_users.guest}
+          registered={statCards.new_users.registered}
+          guest={statCards.new_users.guest}
         />
       </div>
     </div>
@@ -296,7 +292,7 @@ function AIUsageCard({ statCards }: { statCards: StatCardsType }) {
 function UserAnalyticsStatCards({ statCards }: UserAnalyticsStatCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-      <UsersCard statCards={statCards} />
+      <NewUsersCard statCards={statCards} />
       <EngagementCard statCards={statCards} />
       <ActivationRateCard statCards={statCards} />
       <ReturningUsersCard statCards={statCards} />

@@ -26,7 +26,13 @@ const CHART_COLORS = [
   '#a855f7',
   '#f97316',
   '#ef4444',
+  '#06b6d4',
+  '#ec4899',
+  '#eab308',
 ];
+
+const OTHER_COLOR = '#64748b';
+const TOP_N = 5;
 
 function formatProfession(profession: string): string {
   return profession
@@ -55,18 +61,32 @@ export function ProfessionDistributionChart({
     item.count > max.count ? item : max
   , data[0]);
 
-  const chartConfig = data.reduce<ChartConfig>((acc, item, index) => {
-    acc[item.profession] = {
-      label: formatProfession(item.profession),
-      color: CHART_COLORS[index % CHART_COLORS.length],
-    };
-    return acc;
-  }, {});
+  // Aggregate: top N + "Other"
+  const sorted = [...data].sort((a, b) => b.count - a.count);
+  const topItems = sorted.slice(0, TOP_N);
+  const restItems = sorted.slice(TOP_N);
 
-  const chartData = data.map((item, index) => ({
+  const displayData = topItems.map((item, index) => ({
     ...item,
     fill: CHART_COLORS[index % CHART_COLORS.length],
   }));
+
+  if (restItems.length > 0) {
+    displayData.push({
+      profession: 'other',
+      count: restItems.reduce((sum, d) => sum + d.count, 0),
+      percentage: restItems.reduce((sum, d) => sum + d.percentage, 0),
+      fill: OTHER_COLOR,
+    });
+  }
+
+  const chartConfig = displayData.reduce<ChartConfig>((acc, item) => {
+    acc[item.profession] = {
+      label: formatProfession(item.profession),
+      color: item.fill,
+    };
+    return acc;
+  }, {});
 
   return (
     <Card>
@@ -84,7 +104,7 @@ export function ProfessionDistributionChart({
                   <ChartTooltipContent
                     nameKey="profession"
                     formatter={(value, name) => {
-                      const item = data.find((d) => d.profession === name);
+                      const item = displayData.find((d) => d.profession === name);
                       return [
                         `${Number(value).toLocaleString()} users (${Number(item?.percentage ?? 0).toFixed(1)}%)`,
                         name,
@@ -94,14 +114,14 @@ export function ProfessionDistributionChart({
                 }
               />
               <Pie
-                data={chartData}
+                data={displayData}
                 dataKey="count"
                 nameKey="profession"
                 innerRadius={38}
                 outerRadius={55}
                 strokeWidth={2}
               >
-                {chartData.map((entry) => (
+                {displayData.map((entry) => (
                   <Cell key={entry.profession} fill={entry.fill} />
                 ))}
                 <Label
@@ -139,7 +159,7 @@ export function ProfessionDistributionChart({
 
           {/* Legend */}
           <div className="flex flex-1 flex-col gap-2.5">
-            {chartData.map((item) => (
+            {displayData.map((item) => (
               <div key={item.profession} className="flex items-center gap-2">
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-sm"
