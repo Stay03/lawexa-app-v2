@@ -60,7 +60,7 @@ export function DailyBreakdownTable({ data, granularity }: DailyBreakdownTablePr
           <TableHeader>
             <TableRow>
               <TableHead>{isHourly ? 'Hour' : 'Date'}</TableHead>
-              <TableHead className="text-right">New Users</TableHead>
+              <TableHead className="text-right">New Registered</TableHead>
               <TableHead className="text-right">New Guests</TableHead>
               <TableHead className="text-right">Conversations</TableHead>
               <TableHead className="text-right">Messages</TableHead>
@@ -82,7 +82,7 @@ export function DailyBreakdownTable({ data, granularity }: DailyBreakdownTablePr
                       })}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {row.new_users}
+                  {row.new_users - row.new_guests}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {row.new_guests}

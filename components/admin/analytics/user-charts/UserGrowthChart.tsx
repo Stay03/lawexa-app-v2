@@ -59,6 +59,12 @@ export function UserGrowthChart({ data, granularity }: UserGrowthChartProps) {
   const isHourly = granularity === 'hour';
   const dataKey = isHourly ? 'hour' : 'date';
 
+  // API returns `registered` as total (registered + guest), fix to registered-only
+  const chartData = data.map((point) => ({
+    ...point,
+    registered: point.registered - point.guest,
+  }));
+
   return (
     <Card>
       <CardHeader>
@@ -67,7 +73,7 @@ export function UserGrowthChart({ data, granularity }: UserGrowthChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <BarChart data={data} accessibilityLayer>
+          <BarChart data={chartData} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey={dataKey}
