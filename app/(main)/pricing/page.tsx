@@ -36,7 +36,7 @@ import {
 ******************************************************************************/
 
 type TInterval = 'daily' | 'monthly' | 'annually';
-type TTab = 'personal' | 'pack' | 'enterprise';
+type TTab = 'plans' | 'payg' | 'enterprise';
 
 interface ITierGroup {
   tierKey: string;
@@ -69,7 +69,7 @@ const TIER_DISPLAY_NAMES: Record<string, string> = {
  */
 function PricingPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TTab>('personal');
+  const [activeTab, setActiveTab] = useState<TTab>('plans');
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
 
   // Data
@@ -180,15 +180,15 @@ function PricingPage() {
           onValueChange={(v) => setActiveTab(v as TTab)}
         >
           <TabsList>
-            <TabsTrigger value="personal">Personal</TabsTrigger>
-            <TabsTrigger value="pack">Pack</TabsTrigger>
+            <TabsTrigger value="plans">Plans</TabsTrigger>
+            <TabsTrigger value="payg">Pay as you go</TabsTrigger>
             <TabsTrigger value="enterprise">Enterprise</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
       {/* Tab content */}
-      {activeTab === 'personal' && (
+      {activeTab === 'plans' && (
         <PersonalTabContent
           currentData={currentData}
           freeTierGroup={freeTierGroup}
@@ -199,7 +199,7 @@ function PricingPage() {
         />
       )}
 
-      {activeTab === 'pack' && <PackTabContent />}
+      {activeTab === 'payg' && <PackTabContent />}
 
       {activeTab === 'enterprise' && <EnterpriseTabContent />}
     </PageContainer>
@@ -234,7 +234,7 @@ function PersonalTabContent(props: {
       <div className="flex flex-wrap justify-center gap-6">
         {/* Free tier — only visible for free-tier users or when not logged in */}
         {freeTierGroup?.freePlan && (!currentData || currentData.is_free_tier) && (
-          <div className="flex-1 min-w-[240px] max-w-[300px]">
+          <div className="flex-1 min-w-[240px] max-w-[340px]">
             <PlanCard
               key={freeTierGroup.freePlan.id}
               plan={freeTierGroup.freePlan}
@@ -254,7 +254,7 @@ function PersonalTabContent(props: {
             ?? Object.values(group.plansByInterval)[0];
           if (!basePlan) return null;
           return (
-            <div key={group.tierKey} className="flex-1 min-w-[240px] max-w-[300px]">
+            <div key={group.tierKey} className="flex-1 min-w-[240px] max-w-[340px]">
               <PlanCard
                 plan={basePlan}
                 displayName={group.displayName}
@@ -303,7 +303,7 @@ function PackTabContent() {
 
   return (
     <div className="flex justify-center">
-      <div className="min-w-[240px] max-w-[300px]">
+      <div className="min-w-[240px] max-w-[340px]">
         <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle className="text-lg">Pay As You Go</CardTitle>
@@ -440,7 +440,7 @@ function PricingGridSkeleton() {
   return (
     <div className="flex flex-wrap justify-center gap-6">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="flex-1 min-w-[240px] max-w-[300px] space-y-4 rounded-2xl border p-6">
+        <div key={i} className="flex-1 min-w-[240px] max-w-[340px] space-y-4 rounded-2xl border p-6">
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-10 w-32" />

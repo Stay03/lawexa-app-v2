@@ -344,13 +344,13 @@ function PlanButton(props: {
 
 /** Replace "NGN " prefix with "₦" for display. */
 function formatNaira(formatted: string): string {
-  return formatted.replace(/^NGN\s*/, '₦');
+  return formatted.replace(/^NGN\s*/, '₦').replace(/\.00$/, '');
 }
 
 /** Convert annual amount to a formatted monthly equivalent string. */
 function formatMonthlyFromAnnual(amount: string): string {
   const monthly = parseFloat(amount) / 12;
-  return `NGN ${monthly.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `NGN ${monthly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 /** Derive the tier key from a plan slug (e.g. "basic-monthly" → "basic"). */
