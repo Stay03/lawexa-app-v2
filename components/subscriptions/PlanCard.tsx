@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Check, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,14 +17,19 @@ import type { IPlan, ICurrentSubscriptionData } from '@/types/subscription';
                                Types
 ******************************************************************************/
 
+type TInterval = 'daily' | 'monthly' | 'annually';
 type TPlanAction = 'current' | 'subscribe' | 'upgrade' | 'downgrade' | 'unavailable';
 
 interface IPlanCardProps {
   plan: IPlan;
   currentData: ICurrentSubscriptionData | null;
   displayName?: string;
-  interval?: string;
+  /** All interval variants for this tier (used for in-card interval toggle). */
+  allIntervalPlans?: Partial<Record<TInterval, IPlan>>;
+  /** Available intervals to show in the toggle. */
+  availableIntervals?: TInterval[];
   isLoading?: boolean;
+  loadingPlanId?: number | null;
   onSelect: (plan: IPlan, action: TPlanAction) => void;
 }
 
@@ -41,6 +46,12 @@ const BUTTON_CONFIG: Record<
   upgrade: { label: 'Upgrade', variant: 'default', disabled: false },
   downgrade: { label: 'Downgrade', variant: 'secondary', disabled: true },
   unavailable: { label: 'Not Available', variant: 'ghost', disabled: true },
+};
+
+const INTERVAL_LABELS: Record<TInterval, string> = {
+  daily: 'Daily',
+  monthly: 'Monthly',
+  annually: 'Annually',
 };
 
 const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> = {
@@ -109,16 +120,47 @@ const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> =
  * Default component. Renders a single plan card for the pricing grid.
  */
 function PlanCard(props: IPlanCardProps) {
-  const { plan, currentData, displayName, interval, isLoading = false, onSelect } = props;
-  const action = getPlanAction(plan, currentData);
-  const isCurrent = action === 'current';
-  const isFeatured = plan.is_featured;
+  const {
+    plan,
+    currentData,
+    displayName,
+    allIntervalPlans,
+    availableIntervals = [],
+    isLoading = false,
+    loadingPlanId,
+    onSelect,
+  } = props;
 
-  // Resolve features: use explicit tier features if available, else fall back to API
+  const isFeatured = plan.is_featured;
+  const isFree = plan.is_free;
+
+  // In-card interval state (default to monthly, fallback to first available)
+  const [selectedInterval, setSelectedInterval] = useState<TInterval>(
+    availableIntervals.includes('monthly') ? 'monthly' : availableIntervals[0] ?? 'monthly'
+  );
+
+  // Resolve which plan to display based on selected interval
+  const activePlan = isFree ? plan : (allIntervalPlans?.[selectedInterval] ?? plan);
+  const action = getPlanAction(activePlan, currentData);
+  const isCurrent = action === 'current';
+
+  // Calculate savings for the annually badge
+  const annualSavings = useMemo(() => {
+    if (!allIntervalPlans?.monthly || !allIntervalPlans?.annually) return 0;
+    const monthlyYearly = parseFloat(allIntervalPlans.monthly.amount) * 12;
+    const annual = parseFloat(allIntervalPlans.annually.amount);
+    if (monthlyYearly <= 0) return 0;
+    return Math.round(((monthlyYearly - annual) / monthlyYearly) * 100);
+  }, [allIntervalPlans]);
+
+  // Resolve features
   const tierKey = getTierKeyFromSlug(plan);
   const tierFeatures = TIER_FEATURES[tierKey];
   const highlightedFeatures = tierFeatures?.highlighted ?? plan.features;
   const moreFeatures = tierFeatures?.more ?? [];
+
+  // Show interval toggle only for paid plans with multiple intervals
+  const showIntervalToggle = !isFree && availableIntervals.length > 1;
 
   return (
     <Card
@@ -146,26 +188,56 @@ function PlanCard(props: IPlanCardProps) {
       </CardHeader>
 
       <CardContent className="flex-1 space-y-6">
+        {/* Interval toggle inside card */}
+        {showIntervalToggle && (
+          <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
+            {availableIntervals.map((interval) => (
+              <button
+                key={interval}
+                onClick={() => setSelectedInterval(interval)}
+                className={cn(
+                  'flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  selectedInterval === interval
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <span className="flex items-center justify-center gap-1">
+                  {INTERVAL_LABELS[interval]}
+                  {interval === 'annually' && annualSavings > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="text-[9px] px-1 py-0 font-semibold text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50"
+                    >
+                      Save {annualSavings}%
+                    </Badge>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Price */}
         <div>
-          {plan.is_free ? (
+          {activePlan.is_free ? (
             <>
               <div className="text-3xl font-bold">Free</div>
               <div className="text-sm text-muted-foreground">forever</div>
             </>
-          ) : interval === 'annually' ? (
+          ) : selectedInterval === 'annually' ? (
             <>
               <div className="text-3xl font-bold">
-                {formatNaira(formatMonthlyFromAnnual(plan.amount))}
+                {formatNaira(formatMonthlyFromAnnual(activePlan.amount))}
               </div>
               <div className="text-sm text-muted-foreground">/ month</div>
               <div className="text-xs text-muted-foreground">billed annually</div>
             </>
           ) : (
             <>
-              <div className="text-3xl font-bold">{formatNaira(plan.formatted_amount)}</div>
+              <div className="text-3xl font-bold">{formatNaira(activePlan.formatted_amount)}</div>
               <div className="text-sm text-muted-foreground">
-                / {plan.interval_label.toLowerCase()}
+                / {activePlan.interval_label.toLowerCase()}
               </div>
             </>
           )}
@@ -179,8 +251,8 @@ function PlanCard(props: IPlanCardProps) {
         {/* CTA button */}
         <PlanButton
           action={action}
-          isLoading={isLoading}
-          onClick={() => onSelect(plan, action)}
+          isLoading={loadingPlanId === activePlan.id}
+          onClick={() => onSelect(activePlan, action)}
         />
 
         {/* Collapsible additional features */}

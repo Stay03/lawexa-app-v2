@@ -3,15 +3,18 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { Building2, Mail } from 'lucide-react';
 
 import { PageContainer } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState } from '@/components/common/ErrorState';
 import PlanCard from '@/components/subscriptions/PlanCard';
 import type { TPlanAction } from '@/components/subscriptions/PlanCard';
-import type { IPlan, IUpgradeInitData } from '@/types/subscription';
+import PaygBalanceCard from '@/components/payg/PaygBalanceCard';
+import type { IPlan, IUpgradeInitData, ICurrentSubscriptionData } from '@/types/subscription';
 import {
   usePlans,
   useCurrentSubscription,
@@ -25,6 +28,7 @@ import {
 ******************************************************************************/
 
 type TInterval = 'daily' | 'monthly' | 'annually';
+type TTab = 'personal' | 'pack' | 'enterprise';
 
 interface ITierGroup {
   tierKey: string;
@@ -41,12 +45,6 @@ const INTERVAL_ORDER: TInterval[] = ['daily', 'monthly', 'annually'];
 
 const TIER_ORDER = ['basic', 'pro', 'ai-counsel'];
 
-const INTERVAL_LABELS: Record<TInterval, string> = {
-  daily: 'Daily',
-  monthly: 'Monthly',
-  annually: 'Annually',
-};
-
 const TIER_DISPLAY_NAMES: Record<string, string> = {
   free: 'Free',
   basic: 'Basic',
@@ -59,12 +57,12 @@ const TIER_DISPLAY_NAMES: Record<string, string> = {
 ******************************************************************************/
 
 /**
- * Default component. Pricing page with interval toggle and tiered plan grid.
+ * Default component. Pricing page with category tabs and tiered plan grid.
  */
 function PricingPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TTab>('personal');
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
-  const [selectedInterval, setSelectedInterval] = useState<TInterval>('monthly');
 
   // Data
   const plansQuery = usePlans();
@@ -84,21 +82,6 @@ function PricingPage() {
   const tierGroups = useMemo(() => groupPlansByTier(plans), [plans]);
   const freeTierGroup = tierGroups.find((g) => g.tierKey === 'free') ?? null;
   const paidTierGroups = tierGroups.filter((g) => g.tierKey !== 'free');
-
-  // Fall back to first available interval if selected isn't available
-  const effectiveInterval: TInterval = availableIntervals.includes(selectedInterval)
-    ? selectedInterval
-    : availableIntervals[0] ?? 'monthly';
-
-  // Best savings % across all tiers (for the "Save X%" badge on annual tab)
-  const annualSavings = useMemo(
-    () =>
-      paidTierGroups.reduce((best, group) => {
-        const s = calcSavingsPercent(group.plansByInterval.monthly, group.plansByInterval.annually);
-        return Math.max(best, s);
-      }, 0),
-    [paidTierGroups]
-  );
 
   /** Handle plan selection based on the resolved action. */
   const handleSelect = useCallback(
@@ -182,6 +165,54 @@ function PricingPage() {
     <PageContainer className="max-w-6xl">
       <PricingHeader />
 
+      {/* Main category tabs */}
+      <div className="flex justify-center">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as TTab)}
+        >
+          <TabsList>
+            <TabsTrigger value="personal">Personal</TabsTrigger>
+            <TabsTrigger value="pack">Pack</TabsTrigger>
+            <TabsTrigger value="enterprise">Enterprise</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'personal' && (
+        <PersonalTabContent
+          currentData={currentData}
+          freeTierGroup={freeTierGroup}
+          paidTierGroups={paidTierGroups}
+          availableIntervals={availableIntervals}
+          activePlanId={activePlanId}
+          onSelect={handleSelect}
+        />
+      )}
+
+      {activeTab === 'pack' && <PackTabContent />}
+
+      {activeTab === 'enterprise' && <EnterpriseTabContent />}
+    </PageContainer>
+  );
+}
+
+/**
+ * Personal tab — plan cards with in-card interval toggles.
+ */
+function PersonalTabContent(props: {
+  currentData: ICurrentSubscriptionData | null;
+  freeTierGroup: ITierGroup | null;
+  paidTierGroups: ITierGroup[];
+  availableIntervals: TInterval[];
+  activePlanId: number | null;
+  onSelect: (plan: IPlan, action: TPlanAction) => void;
+}) {
+  const { currentData, freeTierGroup, paidTierGroups, availableIntervals, activePlanId, onSelect } = props;
+
+  return (
+    <div className="space-y-6">
       {/* Cancelled subscription notice */}
       {currentData?.subscription?.status === 'cancelled' && currentData.subscription.has_access && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">
@@ -191,33 +222,7 @@ function PricingPage() {
         </div>
       )}
 
-      {/* Billing interval toggle */}
-      {availableIntervals.length > 1 && (
-        <div className="flex justify-center">
-          <Tabs
-            value={effectiveInterval}
-            onValueChange={(v) => setSelectedInterval(v as TInterval)}
-          >
-            <TabsList>
-              {availableIntervals.map((interval) => (
-                <TabsTrigger key={interval} value={interval} className="gap-1.5">
-                  {INTERVAL_LABELS[interval]}
-                  {interval === 'annually' && annualSavings > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] px-1.5 py-0 font-semibold text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50"
-                    >
-                      Save {annualSavings}%
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </div>
-      )}
-
-      {/* Plan grid — one column per tier, centered */}
+      {/* Plan grid */}
       <div className="flex flex-wrap justify-center gap-6">
         {/* Free tier — only visible for free-tier users or when not logged in */}
         {freeTierGroup?.freePlan && (!currentData || currentData.is_free_tier) && (
@@ -227,31 +232,99 @@ function PricingPage() {
               plan={freeTierGroup.freePlan}
               displayName="Free"
               currentData={currentData}
-              isLoading={activePlanId === freeTierGroup.freePlan.id}
-              onSelect={handleSelect}
+              loadingPlanId={activePlanId}
+              onSelect={onSelect}
             />
           </div>
         )}
 
-        {/* Paid tiers — filtered by selected interval */}
+        {/* Paid tiers — each card has its own interval toggle */}
         {paidTierGroups.map((group) => {
-          const plan = group.plansByInterval[effectiveInterval];
-          if (!plan) return null;
+          // Use the first available plan as the base plan for the card
+          const basePlan = group.plansByInterval.monthly
+            ?? group.plansByInterval[availableIntervals[0]]
+            ?? Object.values(group.plansByInterval)[0];
+          if (!basePlan) return null;
           return (
-            <div key={plan.id} className="flex-1 min-w-[240px] max-w-[300px]">
+            <div key={group.tierKey} className="flex-1 min-w-[240px] max-w-[300px]">
               <PlanCard
-                plan={plan}
+                plan={basePlan}
                 displayName={group.displayName}
-                interval={effectiveInterval}
+                allIntervalPlans={group.plansByInterval}
+                availableIntervals={availableIntervals}
                 currentData={currentData}
-                isLoading={activePlanId === plan.id}
-                onSelect={handleSelect}
+                loadingPlanId={activePlanId}
+                onSelect={onSelect}
               />
             </div>
           );
         })}
       </div>
-    </PageContainer>
+    </div>
+  );
+}
+
+/**
+ * Pack tab — PAYG message pack purchase.
+ */
+function PackTabContent() {
+  return (
+    <div className="mx-auto max-w-lg space-y-6">
+      <div className="text-center space-y-1">
+        <h2 className="text-xl font-semibold">Message Packs</h2>
+        <p className="text-sm text-muted-foreground">
+          Buy extra AI messages that never expire. Used after your plan messages run out.
+        </p>
+      </div>
+      <PaygBalanceCard />
+    </div>
+  );
+}
+
+/**
+ * Enterprise tab — contact for custom plans.
+ */
+function EnterpriseTabContent() {
+  return (
+    <div className="mx-auto max-w-lg">
+      <Card>
+        <CardHeader className="text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
+            <Building2 className="size-6 text-primary" />
+          </div>
+          <CardTitle className="text-xl">Enterprise</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Custom plans tailored to your organization&apos;s needs.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ul className="space-y-2 text-sm">
+            <li className="flex items-start gap-2">
+              <span className="text-primary font-bold">-</span>
+              <span>Custom user seats and message limits</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary font-bold">-</span>
+              <span>Dedicated support and onboarding</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary font-bold">-</span>
+              <span>Priority access to new features</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary font-bold">-</span>
+              <span>Custom integrations and API access</span>
+            </li>
+          </ul>
+          <Button className="w-full" asChild>
+            <a href="mailto:enterprise@lawexa.com">
+              <Mail className="size-4" />
+              Contact Sales
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -356,18 +429,6 @@ function getAvailableIntervals(plans: IPlan[]): TInterval[] {
     if (!plan.is_free) seen.add(plan.interval);
   }
   return INTERVAL_ORDER.filter((i) => seen.has(i));
-}
-
-/** Calculate savings % for annual vs monthly billing. Returns 0 if not calculable. */
-function calcSavingsPercent(
-  monthlyPlan: IPlan | undefined,
-  annualPlan: IPlan | undefined
-): number {
-  if (!monthlyPlan || !annualPlan) return 0;
-  const monthlyYearly = parseFloat(monthlyPlan.amount) * 12;
-  const annual = parseFloat(annualPlan.amount);
-  if (monthlyYearly <= 0) return 0;
-  return Math.round(((monthlyYearly - annual) / monthlyYearly) * 100);
 }
 
 /******************************************************************************

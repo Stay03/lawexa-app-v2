@@ -32,13 +32,16 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useCurrentSubscription } from "@/lib/hooks/useSubscriptions"
 import { Button } from "@/components/ui/button"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
   const { user, isAuthenticated, isGuest, logout, isLoggingOut } = useAuth()
+  const currentSubQuery = useCurrentSubscription()
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
+  const planName = currentSubQuery.data?.data?.plan?.name ?? 'Free'
 
   // Show login/register buttons for guests
   if (!isAuthenticated || isGuest) {
@@ -82,6 +85,7 @@ export function NavUser() {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user?.name}</span>
+                <span className="truncate text-xs text-muted-foreground">{planName}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
