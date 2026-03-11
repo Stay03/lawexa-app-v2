@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Building2, Mail } from 'lucide-react';
+import { Building2, Check, Loader2, Mail } from 'lucide-react';
 
 import { PageContainer } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +13,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState } from '@/components/common/ErrorState';
 import PlanCard from '@/components/subscriptions/PlanCard';
 import type { TPlanAction } from '@/components/subscriptions/PlanCard';
-import PaygBalanceCard from '@/components/payg/PaygBalanceCard';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { usePurchaseMessagePack } from '@/lib/hooks/useMessagePacks';
+import { extractApiError } from '@/lib/utils/api-error';
 import type { IPlan, IUpgradeInitData, ICurrentSubscriptionData } from '@/types/subscription';
 import {
   usePlans,
@@ -265,18 +273,101 @@ function PersonalTabContent(props: {
 }
 
 /**
- * Pack tab — PAYG message pack purchase.
+ * Pack tab — PAYG message pack purchase card.
  */
 function PackTabContent() {
+  const PRICE_PER_PACK = 2000;
+  const MESSAGES_PER_PACK = 10;
+  const MAX_QUANTITY = 10;
+
+  const [quantity, setQuantity] = useState(1);
+  const purchaseMutation = usePurchaseMessagePack();
+
+  const totalPrice = quantity * PRICE_PER_PACK;
+  const totalMessages = quantity * MESSAGES_PER_PACK;
+
+  const handlePurchase = () => {
+    purchaseMutation.mutate(quantity, {
+      onSuccess: (data) => {
+        if (data.success && data.data) {
+          sessionStorage.setItem('payg_reference', data.data.reference);
+          window.location.href = data.data.authorization_url;
+        }
+      },
+      onError: (err) => {
+        const apiError = extractApiError(err);
+        toast.error(apiError.message);
+      },
+    });
+  };
+
   return (
-    <div className="mx-auto max-w-lg space-y-6">
-      <div className="text-center space-y-1">
-        <h2 className="text-xl font-semibold">Message Packs</h2>
-        <p className="text-sm text-muted-foreground">
-          Buy extra AI messages that never expire. Used after your plan messages run out.
-        </p>
+    <div className="flex justify-center">
+      <div className="min-w-[240px] max-w-[300px]">
+        <Card className="flex h-full flex-col">
+          <CardHeader>
+            <CardTitle className="text-lg">Pay As You Go</CardTitle>
+            <p className="text-sm text-muted-foreground">One-time purchase</p>
+          </CardHeader>
+
+          <CardContent className="flex-1 space-y-6">
+            {/* Price */}
+            <div>
+              <div className="text-3xl font-bold">
+                from ₦{PRICE_PER_PACK.toLocaleString()}
+              </div>
+            </div>
+
+            {/* Features */}
+            <ul className="space-y-2.5">
+              {[
+                `${MESSAGES_PER_PACK} AI messages per pack`,
+                'Messages never expire',
+                'Used after plan messages run out',
+                'Buy more anytime',
+              ].map((feature) => (
+                <li key={feature} className="flex items-start gap-2 text-sm">
+                  <Check className="size-4 shrink-0 text-primary mt-0.5" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Quantity selector */}
+            <Select
+              value={String(quantity)}
+              onValueChange={(v) => setQuantity(Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: MAX_QUANTITY }, (_, i) => i + 1).map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} {n === 1 ? 'pack' : 'packs'} — {n * MESSAGES_PER_PACK} messages
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Buy button */}
+            <Button
+              className="w-full"
+              disabled={purchaseMutation.isPending}
+              onClick={handlePurchase}
+            >
+              {purchaseMutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Buy - ₦${totalPrice.toLocaleString()}`
+              )}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
-      <PaygBalanceCard />
     </div>
   );
 }
