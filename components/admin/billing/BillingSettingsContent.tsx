@@ -40,14 +40,31 @@ import type { AdminSetting, AdminSettingGroup } from '@/types/admin-settings';
 const GROUP_LABELS: Record<string, string> = {
   subscription: 'Subscription Settings',
   trial: 'Trial Settings',
-  limits: 'Limits & Quotas',
 };
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
   subscription: 'Configure subscription behavior and payment settings.',
   trial: 'Manage free trial duration, features, and enrollment.',
-  limits: 'Set message limits, storage quotas, and usage caps.',
 };
+
+/** Maps a boolean toggle key to the fields it controls. */
+const SETTING_DEPENDENCIES: Record<string, string[]> = {
+  trial_enabled: [
+    'trial_duration_days',
+    'trial_tokenization_amount',
+    'trial_reminder_enabled',
+    'trial_reminder_days_before',
+  ],
+  trial_reminder_enabled: ['trial_reminder_days_before'],
+};
+
+/** Invert: for each dependent field, list parent toggle keys. */
+const DISABLED_BY: Record<string, string[]> = {};
+for (const [toggle, deps] of Object.entries(SETTING_DEPENDENCIES)) {
+  for (const dep of deps) {
+    (DISABLED_BY[dep] ??= []).push(toggle);
+  }
+}
 
 function parseSettingValue(setting: AdminSetting): boolean | number | string {
   const v = setting.value;
@@ -76,9 +93,10 @@ interface SettingFieldProps {
   setting: AdminSetting;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control: any;
+  disabled?: boolean;
 }
 
-function SettingField({ setting, control }: SettingFieldProps) {
+function SettingField({ setting, control, disabled = false }: SettingFieldProps) {
   const label = formatLabel(setting.key);
 
   if (setting.type === 'boolean') {
@@ -87,7 +105,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
         control={control}
         name={setting.key}
         render={({ field }) => (
-          <FormItem className="flex items-center justify-between rounded-lg border p-3">
+          <FormItem className={`flex items-center justify-between rounded-lg border p-3 ${disabled ? 'opacity-50' : ''}`}>
             <div className="space-y-0.5">
               <FormLabel className="text-sm font-medium cursor-pointer">
                 {label}
@@ -102,6 +120,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
               <Switch
                 checked={field.value}
                 onCheckedChange={field.onChange}
+                disabled={disabled}
               />
             </FormControl>
           </FormItem>
@@ -116,7 +135,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
         control={control}
         name={setting.key}
         render={({ field }) => (
-          <FormItem className="flex items-center justify-between gap-x-6 py-3">
+          <FormItem className={`flex items-center justify-between gap-x-6 py-3 ${disabled ? 'opacity-50' : ''}`}>
             <div className="space-y-0.5">
               <FormLabel className="text-sm font-medium">{label}</FormLabel>
               {setting.description && (
@@ -130,6 +149,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
                 type="number"
                 min="0"
                 className="w-28 shrink-0"
+                disabled={disabled}
                 value={field.value ?? ''}
                 onChange={(e) =>
                   field.onChange(
@@ -150,7 +170,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
         control={control}
         name={setting.key}
         render={({ field }) => (
-          <FormItem className="py-3">
+          <FormItem className={`py-3 ${disabled ? 'opacity-50' : ''}`}>
             <FormLabel className="text-sm font-medium">{label}</FormLabel>
             {setting.description && (
               <FormDescription className="text-xs">
@@ -158,7 +178,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
               </FormDescription>
             )}
             <FormControl>
-              <Textarea className="font-mono text-sm max-h-40" rows={4} {...field} />
+              <Textarea className="font-mono text-sm max-h-40" disabled={disabled} rows={4} {...field} />
             </FormControl>
           </FormItem>
         )}
@@ -172,7 +192,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
       control={control}
       name={setting.key}
       render={({ field }) => (
-        <FormItem className="flex items-center justify-between gap-x-6 py-3">
+        <FormItem className={`flex items-center justify-between gap-x-6 py-3 ${disabled ? 'opacity-50' : ''}`}>
           <div className="space-y-0.5">
             <FormLabel className="text-sm font-medium">{label}</FormLabel>
             {setting.description && (
@@ -182,7 +202,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
             )}
           </div>
           <FormControl>
-            <Input className="w-48 shrink-0" {...field} />
+            <Input className="w-48 shrink-0" disabled={disabled} {...field} />
           </FormControl>
         </FormItem>
       )}
@@ -197,7 +217,7 @@ function SettingField({ setting, control }: SettingFieldProps) {
 function SettingsLoadingSkeleton() {
   return (
     <div className="max-w-3xl space-y-6">
-      {[...Array(3)].map((_, i) => (
+      {[...Array(2)].map((_, i) => (
         <div key={i} className="rounded-lg border p-6">
           <Skeleton className="h-6 w-[180px]" />
           <Skeleton className="h-4 w-[300px] mt-2" />
@@ -225,20 +245,16 @@ function SettingsLoadingSkeleton() {
 export function BillingSettingsContent() {
   const subscriptionQuery = useAdminSettings({ group: 'subscription' });
   const trialQuery = useAdminSettings({ group: 'trial' });
-  const limitsQuery = useAdminSettings({ group: 'limits' });
 
-  const isLoading =
-    subscriptionQuery.isLoading || trialQuery.isLoading || limitsQuery.isLoading;
-  const isError =
-    subscriptionQuery.isError || trialQuery.isError || limitsQuery.isError;
+  const isLoading = subscriptionQuery.isLoading || trialQuery.isLoading;
+  const isError = subscriptionQuery.isError || trialQuery.isError;
 
   const allSettings = useMemo(
     () => [
       ...(subscriptionQuery.data?.data || []),
       ...(trialQuery.data?.data || []),
-      ...(limitsQuery.data?.data || []),
     ],
-    [subscriptionQuery.data, trialQuery.data, limitsQuery.data]
+    [subscriptionQuery.data, trialQuery.data]
   );
 
   const settingsByGroup = useMemo(() => {
@@ -293,6 +309,26 @@ export function BillingSettingsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultValues]);
 
+  // Watch toggle keys to drive conditional disabling
+  const watchedToggles = form.watch(Object.keys(SETTING_DEPENDENCIES));
+  const toggleValues = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    const keys = Object.keys(SETTING_DEPENDENCIES);
+    keys.forEach((key, i) => {
+      map[key] = !!watchedToggles[i];
+    });
+    return map;
+  }, [watchedToggles]);
+
+  const isFieldDisabled = useCallback(
+    (key: string) => {
+      const parents = DISABLED_BY[key];
+      if (!parents) return false;
+      return parents.some((p) => !toggleValues[p]);
+    },
+    [toggleValues]
+  );
+
   const updateMutation = useUpdateAdminSettings();
 
   const onSubmit = useCallback(
@@ -335,7 +371,7 @@ export function BillingSettingsContent() {
           Billing Settings
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Manage subscription, trial, and limit configurations.
+          Manage subscription and trial configurations.
         </p>
       </div>
 
@@ -352,7 +388,6 @@ export function BillingSettingsContent() {
               onClick={() => {
                 subscriptionQuery.refetch();
                 trialQuery.refetch();
-                limitsQuery.refetch();
               }}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -396,6 +431,7 @@ export function BillingSettingsContent() {
                         key={setting.key}
                         setting={setting}
                         control={form.control}
+                        disabled={isFieldDisabled(setting.key)}
                       />
                     ))}
                   </CardContent>

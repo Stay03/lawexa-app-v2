@@ -13,7 +13,6 @@ export type AdminSettingGroup =
 export const BILLING_SETTING_GROUPS: AdminSettingGroup[] = [
   'subscription',
   'trial',
-  'limits',
 ];
 
 export interface AdminSetting {
