@@ -22,6 +22,7 @@ export interface AdminPlanListItem {
   is_active: boolean;
   is_featured: boolean;
   trial_eligible: boolean;
+  sort_order: number;
   features: string[];
   limits: IPlanLimit[];
   subscriptions_count: number;

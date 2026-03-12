@@ -4,7 +4,7 @@ import { useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Gauge } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -12,17 +12,14 @@ import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import {
@@ -84,10 +81,10 @@ const PERIOD_OPTIONS: { value: AdminLimitPeriod; label: string }[] = [
 function findLimit(
   limits: IPlanLimit[],
   type: string
-): { value: number; period: AdminLimitPeriod } {
+): { limit_value: number; period: AdminLimitPeriod } {
   const found = limits.find((l) => l.type === type);
   return {
-    value: found?.value ?? 0,
+    limit_value: found?.value ?? 0,
     period: (found?.period as AdminLimitPeriod) ?? 'month',
   };
 }
@@ -158,38 +155,49 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Plan Limits</CardTitle>
-        <CardDescription>
-          Set usage limits for this plan. Use -1 for unlimited, 0 for no access.
-          {plan.is_free && (
-            <span className="block mt-1 text-xs font-medium text-orange-600 dark:text-orange-400">
-              Free plan limits are shared defaults (plan_id = NULL).
-            </span>
-          )}
-        </CardDescription>
+        <div className="flex items-center gap-3">
+          <Gauge className="h-5 w-5 text-muted-foreground" />
+          <div>
+            <CardTitle className="text-base">Plan Limits</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              -1 = unlimited, 0 = no access
+              {plan.is_free && (
+                <span className="ml-2 font-medium text-orange-600 dark:text-orange-400">
+                  Free plan shared defaults
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            {LIMIT_TYPES.map((type) => (
-              <div
-                key={type}
-                className="rounded-lg border p-4 space-y-3"
-              >
-                <p className="text-sm font-medium">{LIMIT_LABELS[type]}</p>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+            {/* Header row — hidden on mobile */}
+            <div className="hidden sm:grid grid-cols-[1fr_100px_170px] gap-3 px-3">
+              <p className="text-xs font-medium text-muted-foreground">Limit</p>
+              <p className="text-xs font-medium text-muted-foreground">Value</p>
+              <p className="text-xs font-medium text-muted-foreground">Period</p>
+            </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Limit rows */}
+            <div className="space-y-2">
+              {LIMIT_TYPES.map((type) => (
+                <div
+                  key={type}
+                  className="grid grid-cols-1 sm:grid-cols-[1fr_100px_170px] gap-3 items-center rounded-lg border px-3 py-2.5"
+                >
+                  <p className="text-sm font-medium">{LIMIT_LABELS[type]}</p>
+
                   <FormField
                     control={form.control}
                     name={`${type}.limit_value`}
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs">Value</FormLabel>
+                      <FormItem className="space-y-0">
                         <FormControl>
                           <Input
                             type="number"
                             min="-1"
-                            className="w-full"
                             value={field.value ?? 0}
                             onChange={(e) =>
                               field.onChange(
@@ -200,9 +208,6 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
                             }
                           />
                         </FormControl>
-                        <FormDescription className="text-xs">
-                          -1 = unlimited, 0 = no access
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -212,8 +217,7 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
                     control={form.control}
                     name={`${type}.period`}
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs">Period</FormLabel>
+                      <FormItem className="space-y-0">
                         <Select
                           value={field.value}
                           onValueChange={field.onChange}
@@ -236,9 +240,10 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
                     )}
                   />
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
+            {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <Button
                 type="button"

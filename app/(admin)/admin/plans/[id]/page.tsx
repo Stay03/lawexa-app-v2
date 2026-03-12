@@ -54,11 +54,8 @@ function PlanDetailPage({
       <div className="space-y-6">
         {backLink}
         <Skeleton className="h-8 w-[260px]" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Skeleton className="h-[320px] rounded-2xl" />
-          <Skeleton className="h-[420px] rounded-2xl lg:col-span-2" />
-        </div>
-        <Skeleton className="h-[300px] rounded-2xl" />
+        <Skeleton className="h-[420px] rounded-2xl" />
+        <Skeleton className="h-[200px] rounded-2xl" />
         <Skeleton className="h-[200px] rounded-2xl" />
       </div>
     );
