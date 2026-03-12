@@ -33,8 +33,8 @@ interface IPlanCardProps {
   onSelect: (plan: IPlan, action: TPlanAction) => void;
   /** Whether this plan is eligible for a free trial. */
   trialEligible?: boolean;
-  /** Whether the trial start is in progress. */
-  isTrialLoading?: boolean;
+  /** Plan ID currently being processed for trial start (for loading state). */
+  trialLoadingPlanId?: number | null;
   /** Callback when user clicks "Start Free Trial". */
   onStartTrial?: (plan: IPlan) => void;
 }
@@ -136,7 +136,7 @@ function PlanCard(props: IPlanCardProps) {
     loadingPlanId,
     onSelect,
     trialEligible = false,
-    isTrialLoading = false,
+    trialLoadingPlanId,
     onStartTrial,
   } = props;
 
@@ -152,6 +152,10 @@ function PlanCard(props: IPlanCardProps) {
   const activePlan = isFree ? plan : (allIntervalPlans?.[selectedInterval] ?? plan);
   const action = getPlanAction(activePlan, currentData);
   const isCurrent = action === 'current';
+
+  // Trial mode — transforms the entire card when trial is available
+  const isTrialMode = trialEligible && action === 'subscribe' && !!onStartTrial;
+  const isTrialLoading = trialLoadingPlanId === activePlan.id;
 
   // Calculate savings for the annually badge
   const annualSavings = useMemo(() => {
@@ -175,24 +179,31 @@ function PlanCard(props: IPlanCardProps) {
     <Card
       className={cn(
         'relative flex h-full flex-col transition-shadow hover:shadow-md',
-        isFeatured && 'ring-2 ring-primary',
+        isTrialMode ? 'ring-2 ring-primary' : isFeatured && 'ring-2 ring-primary',
         isCurrent && 'bg-muted/30'
       )}
     >
-      {/* Featured badge */}
-      {isFeatured && (
+      {/* Badge — trial mode shows "FIRST TIME OFFER", otherwise "Popular" */}
+      {isTrialMode ? (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+          <Badge className="gap-1">
+            <Sparkles className="size-3" />
+            First Time Offer
+          </Badge>
+        </div>
+      ) : isFeatured ? (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
           <Badge className="gap-1">
             <Sparkles className="size-3" />
             Popular
           </Badge>
         </div>
-      )}
+      ) : null}
 
-      <CardHeader className={cn(isFeatured && 'pt-4')}>
+      <CardHeader className={cn((isFeatured || isTrialMode) && 'pt-4')}>
         <CardTitle className="text-lg">{displayName ?? plan.name}</CardTitle>
         {plan.description && (
-          <p className="text-sm text-muted-foreground">{plan.description}</p>
+          <p className="min-h-[40px] text-sm text-muted-foreground">{plan.description}</p>
         )}
       </CardHeader>
 
@@ -229,7 +240,25 @@ function PlanCard(props: IPlanCardProps) {
 
         {/* Price */}
         <div>
-          {activePlan.is_free ? (
+          {isTrialMode ? (
+            <>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold">₦0</span>
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 font-semibold text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50"
+                >
+                  Save {formatNaira(activePlan.formatted_amount)}
+                </Badge>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                / {activePlan.interval_label.toLowerCase()}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Then {formatNaira(activePlan.formatted_amount)}/{activePlan.interval_label.toLowerCase()} after trial
+              </div>
+            </>
+          ) : activePlan.is_free ? (
             <>
               <div className="text-3xl font-bold">Free</div>
               <div className="text-sm text-muted-foreground">forever</div>
@@ -257,20 +286,12 @@ function PlanCard(props: IPlanCardProps) {
           <HighlightedFeatures features={highlightedFeatures} />
         )}
 
-        {/* CTA button */}
-        <PlanButton
-          action={action}
-          isLoading={loadingPlanId === activePlan.id}
-          onClick={() => onSelect(activePlan, action)}
-        />
-
-        {/* Trial button */}
-        {trialEligible && action === 'subscribe' && onStartTrial && (
+        {/* CTA — trial mode shows single trial button, otherwise normal action */}
+        {isTrialMode ? (
           <Button
-            variant="outline"
             className="w-full"
             disabled={isTrialLoading}
-            onClick={() => onStartTrial(activePlan)}
+            onClick={() => onStartTrial!(activePlan)}
           >
             {isTrialLoading ? (
               <>
@@ -278,9 +299,15 @@ function PlanCard(props: IPlanCardProps) {
                 Starting trial...
               </>
             ) : (
-              'Start Free Trial'
+              `Start ${displayName ?? plan.name} Trial for Free`
             )}
           </Button>
+        ) : (
+          <PlanButton
+            action={action}
+            isLoading={loadingPlanId === activePlan.id}
+            onClick={() => onSelect(activePlan, action)}
+          />
         )}
 
         {/* Collapsible additional features */}

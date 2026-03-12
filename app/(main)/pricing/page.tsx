@@ -98,7 +98,6 @@ function PricingPage() {
   // Derived data
   const availableIntervals = useMemo(() => getAvailableIntervals(plans), [plans]);
   const tierGroups = useMemo(() => groupPlansByTier(plans), [plans]);
-  const freeTierGroup = tierGroups.find((g) => g.tierKey === 'free') ?? null;
   const paidTierGroups = tierGroups.filter((g) => g.tierKey !== 'free');
 
   /** Handle plan selection based on the resolved action. */
@@ -220,7 +219,6 @@ function PricingPage() {
       {activeTab === 'plans' && (
         <PersonalTabContent
           currentData={currentData}
-          freeTierGroup={freeTierGroup}
           paidTierGroups={paidTierGroups}
           availableIntervals={availableIntervals}
           activePlanId={activePlanId}
@@ -243,7 +241,6 @@ function PricingPage() {
  */
 function PersonalTabContent(props: {
   currentData: ICurrentSubscriptionData | null;
-  freeTierGroup: ITierGroup | null;
   paidTierGroups: ITierGroup[];
   availableIntervals: TInterval[];
   activePlanId: number | null;
@@ -253,7 +250,7 @@ function PersonalTabContent(props: {
   onStartTrial: (plan: IPlan) => void;
 }) {
   const {
-    currentData, freeTierGroup, paidTierGroups, availableIntervals,
+    currentData, paidTierGroups, availableIntervals,
     activePlanId, onSelect, trialAvailable, trialPlanId, onStartTrial,
   } = props;
 
@@ -270,21 +267,6 @@ function PersonalTabContent(props: {
 
       {/* Plan grid */}
       <div className="flex flex-wrap justify-center gap-6">
-        {/* Free tier — only visible for free-tier users or when not logged in */}
-        {freeTierGroup?.freePlan && (!currentData || currentData.is_free_tier) && (
-          <div className="flex-1 min-w-[240px] max-w-[340px]">
-            <PlanCard
-              key={freeTierGroup.freePlan.id}
-              plan={freeTierGroup.freePlan}
-              displayName="Free"
-              currentData={currentData}
-              loadingPlanId={activePlanId}
-              onSelect={onSelect}
-            />
-          </div>
-        )}
-
-        {/* Paid tiers — each card has its own interval toggle */}
         {paidTierGroups.map((group) => {
           // Use the first available plan as the base plan for the card
           const basePlan = group.plansByInterval.monthly
@@ -302,7 +284,7 @@ function PersonalTabContent(props: {
                 loadingPlanId={activePlanId}
                 onSelect={onSelect}
                 trialEligible={trialAvailable}
-                isTrialLoading={trialPlanId === basePlan.id}
+                trialLoadingPlanId={trialPlanId}
                 onStartTrial={onStartTrial}
               />
             </div>
@@ -480,7 +462,7 @@ function PricingHeader() {
 function PricingGridSkeleton() {
   return (
     <div className="flex flex-wrap justify-center gap-6">
-      {[...Array(4)].map((_, i) => (
+      {[...Array(3)].map((_, i) => (
         <div key={i} className="flex-1 min-w-[240px] max-w-[340px] space-y-4 rounded-2xl border p-6">
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-4 w-40" />
