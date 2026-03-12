@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useChatStream } from '@/lib/hooks/useChatStream';
 import {
   PromptInput,
@@ -709,27 +710,46 @@ function ConversationPageContent() {
     // Error messages from backend (e.g. AUTH_ERROR, RATE_LIMITED)
     if (isErrorMessage(message)) {
       const errorMsg = message as ErrorMessage;
+      const isExhausted = errorMsg.errorCode === 'MESSAGES_EXHAUSTED';
       return (
         <div key={errorMsg.id} className="flex justify-start px-4">
           <div className="mx-auto max-w-2xl w-full">
             <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
               <div className="flex-1">
-                <p className="text-destructive font-medium">{errorMsg.content}</p>
-                {errorMsg.retryable && (
-                  <p className="text-muted-foreground text-xs mt-0.5">You can try sending your message again.</p>
+                {isExhausted ? (
+                  <p className="text-destructive font-medium">
+                    You&apos;ve reached your AI message limit for this plan.{' '}
+                    <Link href="/pricing" className="underline hover:text-destructive/80">
+                      Upgrade to Pro
+                    </Link>{' '}
+                    for a higher monthly limit, or{' '}
+                    <Link href="/pricing?tab=payg" className="underline hover:text-destructive/80">
+                      Buy more messages
+                    </Link>{' '}
+                    to keep the conversation going right now.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-destructive font-medium">{errorMsg.content}</p>
+                    {errorMsg.retryable && (
+                      <p className="text-muted-foreground text-xs mt-0.5">You can try sending your message again.</p>
+                    )}
+                  </>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 shrink-0 gap-1.5 text-xs text-destructive hover:text-destructive"
-                onClick={retryLastMessage}
-                disabled={isStreaming}
-              >
-                <RotateCcw className="h-3 w-3" />
-                Retry
-              </Button>
+              {!isExhausted && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 gap-1.5 text-xs text-destructive hover:text-destructive"
+                  onClick={retryLastMessage}
+                  disabled={isStreaming}
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Retry
+                </Button>
+              )}
             </div>
           </div>
         </div>

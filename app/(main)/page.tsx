@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useGreetingParts } from '@/lib/hooks/useGreeting';
 import {
   PromptInput,
@@ -44,7 +45,7 @@ export default function HomePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; status: number } | null>(null);
   const { greeting, name, isSpecial } = useGreetingParts();
   const router = useRouter();
   const [showLinks, setShowLinks] = useState(false);
@@ -143,7 +144,7 @@ export default function HomePage() {
       }
     } catch (err) {
       const apiError = extractApiError(err);
-      setError(apiError.message);
+      setError({ message: apiError.message, status: apiError.status });
       setIsSubmitting(false);
     }
   };
@@ -160,11 +161,11 @@ export default function HomePage() {
       'text/rtf'
     ];
     if (!allowedTypes.includes(pdfFile.type)) {
-      setError('Only PDF, DOC, DOCX, and RTF files are supported.');
+      setError({ message: 'Only PDF, DOC, DOCX, and RTF files are supported.', status: 0 });
       return;
     }
     if (pdfFile.size > MAX_DOCUMENT_SIZE) {
-      setError('File size must be 10MB or less.');
+      setError({ message: 'File size must be 10MB or less.', status: 0 });
       return;
     }
 
@@ -181,7 +182,7 @@ export default function HomePage() {
       });
     } catch (err) {
       const apiError = extractApiError(err);
-      setError(apiError.message);
+      setError({ message: apiError.message, status: apiError.status });
     } finally {
       setIsUploading(false);
       setUploadingFileName(null);
@@ -278,7 +279,21 @@ export default function HomePage() {
         {/* Error display */}
         {error && (
           <div className="mb-4 w-full rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
-            {error}
+            {error.status === 403 && error.message.toLowerCase().includes('messages remaining') ? (
+              <>
+                You&apos;ve reached your AI message limit for this plan.{' '}
+                <Link href="/pricing" className="font-semibold underline hover:text-destructive/80">
+                  Upgrade to Pro
+                </Link>{' '}
+                for a higher monthly limit, or{' '}
+                <Link href="/pricing?tab=payg" className="font-semibold underline hover:text-destructive/80">
+                  Buy more messages
+                </Link>{' '}
+                to keep the conversation going right now.
+              </>
+            ) : (
+              error.message
+            )}
           </div>
         )}
 

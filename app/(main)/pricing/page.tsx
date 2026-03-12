@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Building2, Check, Loader2, Mail } from 'lucide-react';
 
@@ -71,7 +71,9 @@ const TIER_DISPLAY_NAMES: Record<string, string> = {
  */
 function PricingPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TTab>('plans');
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get('tab') as TTab) || 'plans';
+  const [activeTab, setActiveTab] = useState<TTab>(initialTab);
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
   const [trialPlanId, setTrialPlanId] = useState<number | null>(null);
   const userRole = useAuthStore((s) => s.user?.role);
@@ -555,4 +557,15 @@ function getAvailableIntervals(plans: IPlan[]): TInterval[] {
                                Export default
 ******************************************************************************/
 
-export default PricingPage;
+export default function PricingPageWrapper() {
+  return (
+    <Suspense fallback={
+      <PageContainer className="max-w-6xl">
+        <PricingHeader />
+        <PricingGridSkeleton />
+      </PageContainer>
+    }>
+      <PricingPage />
+    </Suspense>
+  );
+}
