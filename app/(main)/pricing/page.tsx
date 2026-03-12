@@ -31,6 +31,7 @@ import {
   useInitializeUpgrade,
 } from '@/lib/hooks/useSubscriptions';
 import { useTrialEligibility, useStartTrial } from '@/lib/hooks/useTrial';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 /******************************************************************************
                                Types
@@ -73,6 +74,7 @@ function PricingPage() {
   const [activeTab, setActiveTab] = useState<TTab>('plans');
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
   const [trialPlanId, setTrialPlanId] = useState<number | null>(null);
+  const userRole = useAuthStore((s) => s.user?.role);
 
   // Data
   const plansQuery = usePlans();
@@ -96,7 +98,11 @@ function PricingPage() {
   const currentData = currentQuery.data?.data ?? null;
 
   // Derived data
-  const availableIntervals = useMemo(() => getAvailableIntervals(plans), [plans]);
+  const availableIntervals = useMemo(() => {
+    const intervals = getAvailableIntervals(plans);
+    if (userRole !== 'superadmin') return intervals.filter((i) => i !== 'daily');
+    return intervals;
+  }, [plans, userRole]);
   const tierGroups = useMemo(() => groupPlansByTier(plans), [plans]);
   const paidTierGroups = tierGroups.filter((g) => g.tierKey !== 'free');
 
@@ -326,7 +332,7 @@ function PackTabContent() {
 
   return (
     <div className="flex justify-center">
-      <div className="min-w-[240px] max-w-[500px] w-full">
+      <div className="min-w-[240px] max-w-[380px]">
         <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle className="text-lg">Pay As You Go</CardTitle>
