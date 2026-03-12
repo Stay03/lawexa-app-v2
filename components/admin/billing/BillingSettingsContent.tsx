@@ -116,17 +116,20 @@ function SettingField({ setting, control }: SettingFieldProps) {
         control={control}
         name={setting.key}
         render={({ field }) => (
-          <FormItem>
-            <FormLabel>{label}</FormLabel>
-            {setting.description && (
-              <FormDescription className="text-xs">
-                {setting.description}
-              </FormDescription>
-            )}
+          <FormItem className="flex items-center justify-between gap-x-6 py-3">
+            <div className="space-y-0.5">
+              <FormLabel className="text-sm font-medium">{label}</FormLabel>
+              {setting.description && (
+                <FormDescription className="text-xs">
+                  {setting.description}
+                </FormDescription>
+              )}
+            </div>
             <FormControl>
               <Input
                 type="number"
                 min="0"
+                className="w-28 shrink-0"
                 value={field.value ?? ''}
                 onChange={(e) =>
                   field.onChange(
@@ -147,15 +150,15 @@ function SettingField({ setting, control }: SettingFieldProps) {
         control={control}
         name={setting.key}
         render={({ field }) => (
-          <FormItem>
-            <FormLabel>{label}</FormLabel>
+          <FormItem className="py-3">
+            <FormLabel className="text-sm font-medium">{label}</FormLabel>
             {setting.description && (
               <FormDescription className="text-xs">
                 {setting.description}
               </FormDescription>
             )}
             <FormControl>
-              <Textarea className="font-mono text-sm" rows={4} {...field} />
+              <Textarea className="font-mono text-sm max-h-40" rows={4} {...field} />
             </FormControl>
           </FormItem>
         )}
@@ -169,15 +172,17 @@ function SettingField({ setting, control }: SettingFieldProps) {
       control={control}
       name={setting.key}
       render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-          {setting.description && (
-            <FormDescription className="text-xs">
-              {setting.description}
-            </FormDescription>
-          )}
+        <FormItem className="flex items-center justify-between gap-x-6 py-3">
+          <div className="space-y-0.5">
+            <FormLabel className="text-sm font-medium">{label}</FormLabel>
+            {setting.description && (
+              <FormDescription className="text-xs">
+                {setting.description}
+              </FormDescription>
+            )}
+          </div>
           <FormControl>
-            <Input {...field} />
+            <Input className="w-48 shrink-0" {...field} />
           </FormControl>
         </FormItem>
       )}
@@ -191,17 +196,22 @@ function SettingField({ setting, control }: SettingFieldProps) {
 
 function SettingsLoadingSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl space-y-6">
       {[...Array(3)].map((_, i) => (
-        <div key={i} className="rounded-lg border p-6 space-y-4">
+        <div key={i} className="rounded-lg border p-6">
           <Skeleton className="h-6 w-[180px]" />
-          <Skeleton className="h-4 w-[300px]" />
-          {[...Array(3)].map((_, j) => (
-            <div key={j} className="flex items-center justify-between">
-              <Skeleton className="h-4 w-[200px]" />
-              <Skeleton className="h-6 w-[60px]" />
-            </div>
-          ))}
+          <Skeleton className="h-4 w-[300px] mt-2" />
+          <div className="divide-y mt-4">
+            {[...Array(3)].map((_, j) => (
+              <div key={j} className="flex items-center justify-between py-3">
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-[160px]" />
+                  <Skeleton className="h-3 w-[220px]" />
+                </div>
+                <Skeleton className="h-9 w-28 rounded-full" />
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
@@ -364,7 +374,7 @@ export function BillingSettingsContent() {
 
       {!isLoading && !isError && allSettings.length > 0 && (
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-3xl space-y-6">
             {BILLING_SETTING_GROUPS.map((groupKey) => {
               const settings = settingsByGroup.get(groupKey);
               if (!settings || settings.length === 0) return null;
@@ -380,7 +390,7 @@ export function BillingSettingsContent() {
                       </CardDescription>
                     )}
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="divide-y">
                     {settings.map((setting) => (
                       <SettingField
                         key={setting.key}
