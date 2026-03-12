@@ -8,6 +8,7 @@ import {
   BarChart3,
   List,
   Package,
+  Settings,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -31,13 +32,14 @@ const billingNavItems = [
   { title: 'Sub. Analytics', url: '/admin/subscriptions/analytics', icon: BarChart3 },
   { title: 'Message Packs', url: '/admin/message-packs', icon: Package, exact: true },
   { title: 'Pack Analytics', url: '/admin/message-packs/analytics', icon: BarChart3 },
+  { title: 'Settings', url: '/admin/billing/settings', icon: Settings },
 ];
 
 export function AdminNavBillingSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/message-packs');
+  const isSectionActive = pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/message-packs') || pathname.startsWith('/admin/billing');
 
   return (
     <SidebarGroup>

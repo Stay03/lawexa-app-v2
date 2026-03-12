@@ -15,6 +15,10 @@ import type {
   AdminMessagePacksParams,
   MessagePackAnalyticsParams,
 } from '@/types/admin';
+import type {
+  AdminSettingsParams,
+  AdminSettingsUpdatePayload,
+} from '@/types/admin-settings';
 
 // Query key factory for organized caching
 export const adminKeys = {
@@ -52,6 +56,9 @@ export const adminKeys = {
     [...adminKeys.messagePacks(), 'detail', id] as const,
   messagePackAnalytics: (params: MessagePackAnalyticsParams) =>
     [...adminKeys.messagePacks(), 'analytics', params] as const,
+  settings: () => [...adminKeys.all, 'settings'] as const,
+  settingsList: (params: AdminSettingsParams) =>
+    [...adminKeys.settings(), 'list', params] as const,
 };
 
 /**
@@ -259,6 +266,32 @@ export function useReactivateAdminSubscription() {
     mutationFn: (id: number) => adminApi.reactivateAdminSubscription(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.subscriptions() });
+    },
+  });
+}
+
+/**
+ * Hook for fetching admin settings, optionally filtered by group
+ */
+export function useAdminSettings(params: AdminSettingsParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.settingsList(params),
+    queryFn: () => adminApi.getSettings(params),
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * Hook for batch-updating admin settings
+ * Invalidates all settings queries on success
+ */
+export function useUpdateAdminSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: AdminSettingsUpdatePayload) =>
+      adminApi.updateSettings(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.settings() });
     },
   });
 }

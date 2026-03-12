@@ -27,6 +27,12 @@ import type {
   MessagePackAnalyticsParams,
   MessagePackAnalyticsResponse,
 } from '@/types/admin';
+import type {
+  AdminSettingsParams,
+  AdminSettingsListResponse,
+  AdminSettingsUpdatePayload,
+  AdminSettingsUpdateResponse,
+} from '@/types/admin-settings';
 
 export const adminApi = {
   /**
@@ -367,6 +373,34 @@ export const adminApi = {
           end_date: params.end_date,
         },
       }
+    );
+    return response.data;
+  },
+
+  /**
+   * Fetch settings, optionally filtered by group
+   * Requires admin role
+   */
+  getSettings: async (
+    params: AdminSettingsParams = {}
+  ): Promise<AdminSettingsListResponse> => {
+    const response = await apiClient.get<AdminSettingsListResponse>(
+      '/admin/settings',
+      { params: { group: params.group } }
+    );
+    return response.data;
+  },
+
+  /**
+   * Batch update settings by key
+   * Requires admin role
+   */
+  updateSettings: async (
+    payload: AdminSettingsUpdatePayload
+  ): Promise<AdminSettingsUpdateResponse> => {
+    const response = await apiClient.put<AdminSettingsUpdateResponse>(
+      '/admin/settings',
+      payload
     );
     return response.data;
   },
