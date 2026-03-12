@@ -19,6 +19,11 @@ import type {
   AdminSettingsParams,
   AdminSettingsUpdatePayload,
 } from '@/types/admin-settings';
+import type {
+  AdminPlansParams,
+  AdminPlanUpdatePayload,
+  AdminPlanLimitsPayload,
+} from '@/types/admin-plans';
 
 // Query key factory for organized caching
 export const adminKeys = {
@@ -59,6 +64,11 @@ export const adminKeys = {
   settings: () => [...adminKeys.all, 'settings'] as const,
   settingsList: (params: AdminSettingsParams) =>
     [...adminKeys.settings(), 'list', params] as const,
+  plans: () => [...adminKeys.all, 'plans'] as const,
+  plansList: (params: AdminPlansParams) =>
+    [...adminKeys.plans(), 'list', params] as const,
+  planDetail: (id: number) =>
+    [...adminKeys.plans(), 'detail', id] as const,
 };
 
 /**
@@ -292,6 +302,92 @@ export function useUpdateAdminSettings() {
       adminApi.updateSettings(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.settings() });
+    },
+  });
+}
+
+// ============================================
+// Admin Plans Hooks
+// ============================================
+
+/**
+ * Hook for fetching admin plans list with pagination and filtering
+ */
+export function useAdminPlans(params: AdminPlansParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.plansList(params),
+    queryFn: () => adminApi.getAdminPlans(params),
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook for fetching a single plan with limits and recent subscriptions
+ */
+export function useAdminPlan(id: number) {
+  return useQuery({
+    queryKey: adminKeys.planDetail(id),
+    queryFn: () => adminApi.getAdminPlan(id),
+    enabled: id > 0,
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook for updating plan metadata
+ * Invalidates plan caches on success
+ */
+export function useUpdateAdminPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: AdminPlanUpdatePayload }) =>
+      adminApi.updateAdminPlan(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.plans() });
+    },
+  });
+}
+
+/**
+ * Hook for updating plan limits
+ * Invalidates plan caches on success
+ */
+export function useUpdateAdminPlanLimits() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: AdminPlanLimitsPayload }) =>
+      adminApi.updateAdminPlanLimits(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.plans() });
+    },
+  });
+}
+
+/**
+ * Hook for updating free tier default limits
+ * Invalidates plan caches on success
+ */
+export function useUpdateFreePlanLimits() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: AdminPlanLimitsPayload) =>
+      adminApi.updateFreePlanLimits(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.plans() });
+    },
+  });
+}
+
+/**
+ * Hook for syncing plans from Paystack
+ * Invalidates plan caches on success
+ */
+export function useSyncPlans() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminApi.syncPlans(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.plans() });
     },
   });
 }

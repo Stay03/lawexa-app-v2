@@ -33,6 +33,16 @@ import type {
   AdminSettingsUpdatePayload,
   AdminSettingsUpdateResponse,
 } from '@/types/admin-settings';
+import type {
+  AdminPlansParams,
+  AdminPlansListResponse,
+  AdminPlanDetailResponse,
+  AdminPlanUpdatePayload,
+  AdminPlanUpdateResponse,
+  AdminPlanLimitsPayload,
+  AdminPlanLimitsResponse,
+  AdminPlanSyncResponse,
+} from '@/types/admin-plans';
 
 export const adminApi = {
   /**
@@ -401,6 +411,99 @@ export const adminApi = {
     const response = await apiClient.put<AdminSettingsUpdateResponse>(
       '/admin/settings',
       payload
+    );
+    return response.data;
+  },
+
+  // ============================================
+  // Admin Plans
+  // ============================================
+
+  /**
+   * List all plans with pagination and optional active filter
+   * Requires admin role
+   */
+  getAdminPlans: async (
+    params: AdminPlansParams = {}
+  ): Promise<AdminPlansListResponse> => {
+    const response = await apiClient.get<AdminPlansListResponse>(
+      '/admin/plans',
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          is_active: params.is_active,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get a single plan with limits and recent subscriptions
+   * Requires admin role
+   */
+  getAdminPlan: async (id: number): Promise<AdminPlanDetailResponse> => {
+    const response = await apiClient.get<AdminPlanDetailResponse>(
+      `/admin/plans/${id}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Update plan metadata (name, description, toggles, features)
+   * Does not allow changing amount, slug, plan_code, currency, or interval
+   * Requires admin role
+   */
+  updateAdminPlan: async (
+    id: number,
+    payload: AdminPlanUpdatePayload
+  ): Promise<AdminPlanUpdateResponse> => {
+    const response = await apiClient.put<AdminPlanUpdateResponse>(
+      `/admin/plans/${id}`,
+      payload
+    );
+    return response.data;
+  },
+
+  /**
+   * Update limits for a plan
+   * For free plans, saves to plan_id = NULL (shared free tier defaults)
+   * Requires admin role
+   */
+  updateAdminPlanLimits: async (
+    id: number,
+    payload: AdminPlanLimitsPayload
+  ): Promise<AdminPlanLimitsResponse> => {
+    const response = await apiClient.put<AdminPlanLimitsResponse>(
+      `/admin/plans/${id}/limits`,
+      payload
+    );
+    return response.data;
+  },
+
+  /**
+   * Update free tier default limits (plan_id = NULL)
+   * Requires admin role
+   */
+  updateFreePlanLimits: async (
+    payload: AdminPlanLimitsPayload
+  ): Promise<AdminPlanLimitsResponse> => {
+    const response = await apiClient.put<AdminPlanLimitsResponse>(
+      '/admin/plans/free/limits',
+      payload
+    );
+    return response.data;
+  },
+
+  /**
+   * Sync plans from Paystack
+   * Creates/updates local plans, deactivates removed plans, ensures free plan exists
+   * Requires admin role
+   */
+  syncPlans: async (): Promise<AdminPlanSyncResponse> => {
+    const response = await apiClient.post<AdminPlanSyncResponse>(
+      '/admin/plans/sync'
     );
     return response.data;
   },
