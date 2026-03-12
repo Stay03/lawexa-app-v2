@@ -30,6 +30,7 @@ import {
   useInitializePayment,
   useInitializeUpgrade,
 } from '@/lib/hooks/useSubscriptions';
+import { useTrialEligibility, useStartTrial } from '@/lib/hooks/useTrial';
 
 /******************************************************************************
                                Types
@@ -71,14 +72,23 @@ function PricingPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TTab>('plans');
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
+  const [trialPlanId, setTrialPlanId] = useState<number | null>(null);
 
   // Data
   const plansQuery = usePlans();
   const currentQuery = useCurrentSubscription();
+  const eligibilityQuery = useTrialEligibility();
   // Mutations
   const subscribeFree = useSubscribeFree();
   const initPayment = useInitializePayment();
   const initUpgrade = useInitializeUpgrade();
+  const startTrial = useStartTrial();
+
+  // Trial eligibility (graceful — does not block page render)
+  const isTrialAvailable = !!(
+    eligibilityQuery.data?.data?.trial_enabled &&
+    eligibilityQuery.data?.data?.user_eligible
+  );
 
   const isLoading = plansQuery.isLoading || currentQuery.isLoading;
   const isError = plansQuery.isError || currentQuery.isError;
@@ -139,6 +149,25 @@ function PricingPage() {
     [subscribeFree, initPayment, initUpgrade, router]
   );
 
+  /** Handle "Start Free Trial" click on a plan card. */
+  const handleStartTrial = useCallback(
+    async (plan: IPlan) => {
+      setTrialPlanId(plan.id);
+      try {
+        const result = await startTrial.mutateAsync(plan.id);
+        if (result.data?.authorization_url) {
+          window.location.href = result.data.authorization_url;
+        }
+      } catch (err) {
+        const apiError = extractApiError(err);
+        toast.error(apiError.message);
+      } finally {
+        setTrialPlanId(null);
+      }
+    },
+    [startTrial]
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -196,6 +225,9 @@ function PricingPage() {
           availableIntervals={availableIntervals}
           activePlanId={activePlanId}
           onSelect={handleSelect}
+          trialAvailable={isTrialAvailable}
+          trialPlanId={trialPlanId}
+          onStartTrial={handleStartTrial}
         />
       )}
 
@@ -216,8 +248,14 @@ function PersonalTabContent(props: {
   availableIntervals: TInterval[];
   activePlanId: number | null;
   onSelect: (plan: IPlan, action: TPlanAction) => void;
+  trialAvailable: boolean;
+  trialPlanId: number | null;
+  onStartTrial: (plan: IPlan) => void;
 }) {
-  const { currentData, freeTierGroup, paidTierGroups, availableIntervals, activePlanId, onSelect } = props;
+  const {
+    currentData, freeTierGroup, paidTierGroups, availableIntervals,
+    activePlanId, onSelect, trialAvailable, trialPlanId, onStartTrial,
+  } = props;
 
   return (
     <div className="space-y-6">
@@ -263,6 +301,9 @@ function PersonalTabContent(props: {
                 currentData={currentData}
                 loadingPlanId={activePlanId}
                 onSelect={onSelect}
+                trialEligible={trialAvailable}
+                isTrialLoading={trialPlanId === basePlan.id}
+                onStartTrial={onStartTrial}
               />
             </div>
           );

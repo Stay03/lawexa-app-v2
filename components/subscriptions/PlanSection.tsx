@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { ICurrentSubscriptionData } from '@/types/subscription';
+import type { ITrialData } from '@/types/trial';
 
 /******************************************************************************
                                Types
@@ -15,6 +16,7 @@ import type { ICurrentSubscriptionData } from '@/types/subscription';
 
 interface IPlanSectionProps {
   data: ICurrentSubscriptionData;
+  trialData?: ITrialData | null;
 }
 
 /******************************************************************************
@@ -37,7 +39,7 @@ const STATUS_STYLES: Record<string, { className: string; label: string }> = {
  * Default component. Shows the user's current subscription as a flat section.
  */
 function PlanSection(props: IPlanSectionProps) {
-  const { data } = props;
+  const { data, trialData } = props;
   const { subscription, plan, is_free_tier } = data;
 
   // Free tier — show upgrade prompt
@@ -99,6 +101,12 @@ function PlanSection(props: IPlanSectionProps) {
                   {format(new Date(subscription.next_payment_date), 'MMM d, yyyy')}.
                 </span>
               )}
+              {subscription?.next_payment_date && status === 'trialing' && (
+                <span>
+                  {' · '}First charge on{' '}
+                  {format(new Date(subscription.next_payment_date), 'MMM d, yyyy')}.
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -121,6 +129,21 @@ function PlanSection(props: IPlanSectionProps) {
       {status === 'past_due' && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200">
           Your payment is overdue. Please update your payment method to maintain access.
+        </div>
+      )}
+
+      {/* Trial notice */}
+      {status === 'trialing' && trialData?.trial_ends_at && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-800 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-200">
+          You&apos;re on a free trial. Your trial ends on{' '}
+          <span className="font-medium">
+            {format(new Date(trialData.trial_ends_at), 'MMM d, yyyy')}
+          </span>
+          {trialData.subscription?.days_until_renewal != null && (
+            <span> ({trialData.subscription.days_until_renewal} days remaining)</span>
+          )}
+          . After that, your card will be charged{' '}
+          <span className="font-medium">{trialData.plan.formatted_amount}</span>.
         </div>
       )}
     </div>

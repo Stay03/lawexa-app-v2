@@ -12,10 +12,12 @@ import { ErrorState } from '@/components/common/ErrorState';
 import PlanSection from '@/components/subscriptions/PlanSection';
 import InvoiceTable from '@/components/subscriptions/InvoiceTable';
 import CancelDialog from '@/components/subscriptions/CancelDialog';
+import TrialCancelDialog from '@/components/subscriptions/TrialCancelDialog';
 import {
   useCurrentSubscription,
   useCancelSubscription,
 } from '@/lib/hooks/useSubscriptions';
+import { useTrialStatus, useCancelTrial } from '@/lib/hooks/useTrial';
 
 /******************************************************************************
                                Components
@@ -26,9 +28,16 @@ import {
  */
 function BillingPage() {
   const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [isTrialCancelOpen, setIsTrialCancelOpen] = useState(false);
   const currentQuery = useCurrentSubscription();
   const cancelMutation = useCancelSubscription();
   const currentData = currentQuery.data?.data ?? null;
+
+  // Trial-specific hooks
+  const isTrialing = currentData?.subscription?.status === 'trialing';
+  const trialQuery = useTrialStatus(isTrialing);
+  const trialData = trialQuery.data?.data ?? null;
+  const cancelTrialMutation = useCancelTrial();
 
   /** Handle subscription cancellation. */
   const handleCancel = () => {
@@ -40,6 +49,21 @@ function BillingPage() {
       onError: (err) => {
         const message =
           err instanceof Error ? err.message : 'Failed to cancel subscription.';
+        toast.error(message);
+      },
+    });
+  };
+
+  /** Handle trial cancellation. */
+  const handleCancelTrial = () => {
+    cancelTrialMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        toast.success(data.message || 'Trial cancelled.');
+        setIsTrialCancelOpen(false);
+      },
+      onError: (err) => {
+        const message =
+          err instanceof Error ? err.message : 'Failed to cancel trial.';
         toast.error(message);
       },
     });
@@ -61,14 +85,15 @@ function BillingPage() {
     );
   }
 
-  const showCancellation =
+  const showSubscriptionCancellation =
     !currentData.is_free_tier && currentData.subscription?.status === 'active';
+  const showTrialCancellation = isTrialing;
 
   // Return
   return (
     <div>
       {/* Plan section */}
-      <PlanSection data={currentData} />
+      <PlanSection data={currentData} trialData={trialData} />
 
       <Separator className="my-8" />
 
@@ -80,21 +105,38 @@ function BillingPage() {
       {/* Invoices section */}
       <InvoiceSection />
 
-      {/* Cancellation section */}
-      {showCancellation && (
+      {/* Subscription cancellation section */}
+      {showSubscriptionCancellation && (
         <>
           <Separator className="my-8" />
           <CancellationSection onCancel={() => setIsCancelOpen(true)} />
         </>
       )}
 
-      {/* Cancel dialog */}
+      {/* Trial cancellation section */}
+      {showTrialCancellation && (
+        <>
+          <Separator className="my-8" />
+          <CancellationSection label="Cancel trial" onCancel={() => setIsTrialCancelOpen(true)} />
+        </>
+      )}
+
+      {/* Cancel subscription dialog */}
       <CancelDialog
         open={isCancelOpen}
         onOpenChange={setIsCancelOpen}
         subscription={currentData.subscription}
         isPending={cancelMutation.isPending}
         onConfirm={handleCancel}
+      />
+
+      {/* Cancel trial dialog */}
+      <TrialCancelDialog
+        open={isTrialCancelOpen}
+        onOpenChange={setIsTrialCancelOpen}
+        trial={trialData}
+        isPending={cancelTrialMutation.isPending}
+        onConfirm={handleCancelTrial}
       />
     </div>
   );
@@ -139,14 +181,14 @@ function InvoiceSection() {
 /**
  * Cancellation section with destructive action.
  */
-function CancellationSection({ onCancel }: { onCancel: () => void }) {
+function CancellationSection({ label = 'Cancel plan', onCancel }: { label?: string; onCancel: () => void }) {
   return (
     <div className="space-y-5">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-primary">
         Cancellation
       </h3>
       <div className="flex items-center justify-between gap-4">
-        <p className="text-sm font-medium">Cancel plan</p>
+        <p className="text-sm font-medium">{label}</p>
         <Button variant="destructive" onClick={onCancel}>
           Cancel
         </Button>

@@ -31,6 +31,12 @@ interface IPlanCardProps {
   isLoading?: boolean;
   loadingPlanId?: number | null;
   onSelect: (plan: IPlan, action: TPlanAction) => void;
+  /** Whether this plan is eligible for a free trial. */
+  trialEligible?: boolean;
+  /** Whether the trial start is in progress. */
+  isTrialLoading?: boolean;
+  /** Callback when user clicks "Start Free Trial". */
+  onStartTrial?: (plan: IPlan) => void;
 }
 
 /******************************************************************************
@@ -129,6 +135,9 @@ function PlanCard(props: IPlanCardProps) {
     isLoading = false,
     loadingPlanId,
     onSelect,
+    trialEligible = false,
+    isTrialLoading = false,
+    onStartTrial,
   } = props;
 
   const isFeatured = plan.is_featured;
@@ -254,6 +263,25 @@ function PlanCard(props: IPlanCardProps) {
           isLoading={loadingPlanId === activePlan.id}
           onClick={() => onSelect(activePlan, action)}
         />
+
+        {/* Trial button */}
+        {trialEligible && action === 'subscribe' && onStartTrial && (
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={isTrialLoading}
+            onClick={() => onStartTrial(activePlan)}
+          >
+            {isTrialLoading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Starting trial...
+              </>
+            ) : (
+              'Start Free Trial'
+            )}
+          </Button>
+        )}
 
         {/* Collapsible additional features */}
         {moreFeatures.length > 0 && (
