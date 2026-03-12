@@ -286,13 +286,13 @@ export function BillingSettingsContent() {
   const updateMutation = useUpdateAdminSettings();
 
   const onSubmit = useCallback(
-    (data: Record<string, boolean | number | string>) => {
+    (data: Record<string, unknown>) => {
       const dirtyFields = form.formState.dirtyFields;
       const changed: Record<string, string | number | boolean> = {};
 
       for (const key of Object.keys(dirtyFields)) {
         if (dirtyFields[key]) {
-          changed[key] = data[key];
+          changed[key] = data[key] as string | number | boolean;
         }
       }
 
