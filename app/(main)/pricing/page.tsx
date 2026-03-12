@@ -326,7 +326,7 @@ function PackTabContent() {
 
   return (
     <div className="flex justify-center">
-      <div className="min-w-[240px] max-w-[340px]">
+      <div className="min-w-[240px] max-w-[500px] w-full">
         <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle className="text-lg">Pay As You Go</CardTitle>

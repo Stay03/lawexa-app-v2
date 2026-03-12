@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import type { IPlan, ICurrentSubscriptionData } from '@/types/subscription';
+import TrialStartDialog from './TrialStartDialog';
 
 /******************************************************************************
                                Types
@@ -156,6 +157,7 @@ function PlanCard(props: IPlanCardProps) {
   // Trial mode — transforms the entire card when trial is available
   const isTrialMode = trialEligible && action === 'subscribe' && !!onStartTrial;
   const isTrialLoading = trialLoadingPlanId === activePlan.id;
+  const [isTrialDialogOpen, setIsTrialDialogOpen] = useState(false);
 
   // Calculate savings for the annually badge
   const annualSavings = useMemo(() => {
@@ -178,7 +180,7 @@ function PlanCard(props: IPlanCardProps) {
   return (
     <Card
       className={cn(
-        'relative flex h-full flex-col transition-shadow hover:shadow-md',
+        'relative flex h-full flex-col overflow-visible transition-shadow hover:shadow-md',
         isTrialMode ? 'ring-2 ring-primary' : isFeatured && 'ring-2 ring-primary',
         isCurrent && 'bg-muted/30'
       )}
@@ -251,9 +253,6 @@ function PlanCard(props: IPlanCardProps) {
                   Save {formatNaira(activePlan.formatted_amount)}
                 </Badge>
               </div>
-              <div className="text-sm text-muted-foreground">
-                / {activePlan.interval_label.toLowerCase()}
-              </div>
               <div className="text-xs text-muted-foreground">
                 Then {formatNaira(activePlan.formatted_amount)}/{activePlan.interval_label.toLowerCase()} after trial
               </div>
@@ -288,20 +287,22 @@ function PlanCard(props: IPlanCardProps) {
 
         {/* CTA — trial mode shows single trial button, otherwise normal action */}
         {isTrialMode ? (
-          <Button
-            className="w-full"
-            disabled={isTrialLoading}
-            onClick={() => onStartTrial!(activePlan)}
-          >
-            {isTrialLoading ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Starting trial...
-              </>
-            ) : (
-              `Start ${displayName ?? plan.name} Trial for Free`
-            )}
-          </Button>
+          <>
+            <Button
+              className="w-full"
+              disabled={isTrialLoading}
+              onClick={() => setIsTrialDialogOpen(true)}
+            >
+              {`Start ${displayName ?? plan.name} Trial for Free`}
+            </Button>
+            <TrialStartDialog
+              open={isTrialDialogOpen}
+              onOpenChange={setIsTrialDialogOpen}
+              plan={activePlan}
+              isPending={isTrialLoading}
+              onConfirm={() => onStartTrial!(activePlan)}
+            />
+          </>
         ) : (
           <PlanButton
             action={action}
