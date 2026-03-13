@@ -477,16 +477,18 @@ function ConversationPageContent() {
     isLoadingHistory,
     conversationTitle,
     error,
+    send,
     connectToStream,
     loadConversationHistory,
     fetchConversationTitle,
     setConversationId,
-    addUserMessage,
     disconnect,
     setError,
     retryLastMessage,
+    recoverPendingState,
   } = useChatStream({
     onError: (err) => console.error('Chat error:', err),
+    onHistoryLoaded: (data) => setConversationOwnerId(data.user_id),
   });
 
   const prevIsStreamingRef = useRef(isStreaming);
@@ -564,20 +566,39 @@ function ConversationPageContent() {
         setConversationOwnerId(user.id);
       }
     } else {
-      // Direct navigation - load conversation history
+      // Direct navigation — check for pending state (page reload during stream)
       initializedRef.current = true;
-      loadConversationHistory(conversationId);
 
-      // Fetch conversation metadata for ownership info
-      chatApi.getConversation(conversationId).then((response) => {
-        if (response.success && response.data) {
-          setConversationOwnerId(response.data.user_id);
+      // Check localStorage for pending chat from a previous session
+      let hasPending = false;
+      try {
+        const pending = localStorage.getItem('pending_chat');
+        if (pending) {
+          const parsed = JSON.parse(pending);
+          if (parsed.conversationId === conversationId && Date.now() - parsed.timestamp < 600_000) {
+            hasPending = true;
+            localStorage.removeItem('pending_chat');
+            // Check actual status before reconnecting
+            recoverPendingState(conversationId).then((result) => {
+              if (result !== 'reconnected') {
+                // Not pending anymore — load history normally
+                loadConversationHistory(conversationId);
+              }
+            });
+          } else {
+            localStorage.removeItem('pending_chat');
+          }
         }
-      }).catch(() => {
-        // Silently fail - the main loadConversationHistory will handle errors
-      });
+      } catch {
+        // localStorage unavailable
+      }
+
+      if (!hasPending) {
+        // Normal path: load conversation history (onHistoryLoaded sets ownership)
+        loadConversationHistory(conversationId);
+      }
     }
-  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, user?.id, isGuestReady]);
+  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, recoverPendingState, user?.id, isGuestReady]);
 
   const handleSubmit = async () => {
     if ((!input.trim() && !uploadedFile) || isStreaming || isSubmitting || isUploading) return;
@@ -590,41 +611,27 @@ function ConversationPageContent() {
     setUploadedFile(null);
     setIsSubmitting(true);
 
-    try {
-      // Add user message with attachment info
-      addUserMessage(message, attachment ? {
+    // Scroll to bottom after sending
+    setTimeout(() => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
+      }
+    }, 100);
+
+    await send(message, {
+      conversationId,
+      fileId: attachment?.file_id,
+      attachment: attachment ? {
         file_id: attachment.file_id,
         file_name: attachment.file_name,
         file_size: attachment.file_size,
-      } : undefined);
+      } : undefined,
+    });
 
-      // Scroll to bottom after sending
-      setTimeout(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTo({
-            top: chatContainerRef.current.scrollHeight,
-            behavior: 'smooth',
-          });
-        }
-      }, 100);
-
-      // Start new chat in same conversation
-      const response = await chatApi.start({
-        message,
-        stream: true,
-        conversation_id: conversationId,
-        ...(attachment && { file_id: attachment.file_id }),
-      });
-
-      if (response.success) {
-        connectToStream(response.data.execution_id);
-      }
-    } catch (err) {
-      const apiError = extractApiError(err);
-      setError(apiError.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    setIsSubmitting(false);
   };
 
   const handleFilesAdded = async (newFiles: File[]) => {
@@ -682,25 +689,8 @@ function ConversationPageContent() {
     if (!message.trim() || isStreaming || isSubmitting) return;
 
     setIsSubmitting(true);
-
-    try {
-      addUserMessage(message);
-
-      const response = await chatApi.start({
-        message,
-        stream: true,
-        conversation_id: conversationId,
-      });
-
-      if (response.success) {
-        connectToStream(response.data.execution_id);
-      }
-    } catch (err) {
-      const apiError = extractApiError(err);
-      setError(apiError.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    await send(message, { conversationId });
+    setIsSubmitting(false);
   };
 
   // Group consecutive tool messages for chain display
@@ -956,7 +946,7 @@ function ConversationPageContent() {
                 value={input}
                 onValueChange={setInput}
                 onSubmit={handleSubmit}
-                disabled={isStreaming || isLoadingHistory}
+                disabled={isStreaming || isLoadingHistory || isSubmitting}
                 maxHeight={36}
               >
                 {/* Document File Preview - only shown when uploading or uploaded */}
@@ -1018,7 +1008,7 @@ function ConversationPageContent() {
                       size="icon"
                       className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
                       onClick={handleSubmit}
-                      disabled={(!input.trim() && !uploadedFile) || isUploading}
+                      disabled={(!input.trim() && !uploadedFile) || isUploading || isSubmitting}
                     >
                       <ArrowUp className="h-4 w-4" />
                     </Button>

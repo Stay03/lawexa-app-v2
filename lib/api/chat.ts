@@ -4,6 +4,7 @@ import type {
   ChatStartResponse,
   ConversationResponse,
   ConversationsListResponse,
+  ConversationStatusResponse,
   ListConversationsParams,
   DocumentUploadResponse
 } from '@/types/chat';
@@ -39,6 +40,14 @@ export const chatApi = {
    */
   getConversation: async (id: string): Promise<ConversationResponse> => {
     const response = await apiClient.get<ConversationResponse>(`/conversations/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Get conversation status (for recovery from dropped SSE connections)
+   */
+  getStatus: async (id: string): Promise<ConversationStatusResponse> => {
+    const response = await apiClient.get<ConversationStatusResponse>(`/conversations/${id}/status`);
     return response.data;
   },
 

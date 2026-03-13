@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { AxiosError } from 'axios';
 import { ArrowUp, Loader2, Check, X, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -27,6 +28,7 @@ import type {
   ToolCallingEvent,
   ToolCompleteEvent,
   CompletedEvent,
+  PendingResponseData,
 } from '@/types/chat';
 
 interface FloatingPromptInputProps {
@@ -327,7 +329,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     }
 
     // Add user message to chat immediately (display original message without context)
-    addUserMessage(message);
+    const optimisticMsg = addUserMessage(message);
 
     try {
       const response = await chatApi.start({
@@ -347,8 +349,37 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
         // Connect to SSE stream to receive messages inline
         connectToStream(executionId);
+      } else {
+        // Backend returned success: false
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+        setError(response.message || 'Failed to send message');
+        setIsStreaming(false);
       }
     } catch (err) {
+      // Handle 409 PENDING_RESPONSE — reconnect instead of showing error
+      if (err instanceof AxiosError && err.response?.status === 409) {
+        const responseData = err.response.data as { code?: string; data?: PendingResponseData } | undefined;
+        if (responseData?.code === 'PENDING_RESPONSE') {
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+          if (responseData.data?.execution_id) {
+            connectToStream(responseData.data.execution_id);
+          } else {
+            setIsStreaming(false);
+            setError('A response is still being generated.');
+          }
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Handle 429 content duplicate
+      if (err instanceof AxiosError && err.response?.status === 429) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+        setError('This message was already sent. Please wait a moment.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const apiError = extractApiError(err);
       setError(apiError.message);
     } finally {

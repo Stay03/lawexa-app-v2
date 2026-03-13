@@ -161,6 +161,29 @@ export interface ErrorEvent {
   timestamp?: string;
 }
 
+// Pending response (409) from POST /api/chat
+export interface PendingResponseData {
+  conversation_id: string;
+  execution_id: string | null;
+  stream_url: string | null;
+  pending_since: string;
+}
+
+// Conversation status endpoint (GET /api/conversations/{uuid}/status)
+export interface ConversationStatusData {
+  status: 'idle' | 'pending' | 'completed' | 'failed' | 'expired';
+  messages: ApiMessage[];
+  execution_id: string | null;
+  stream_url: string | null;
+  pending_since: string | null;
+}
+
+export interface ConversationStatusResponse {
+  success: boolean;
+  message: string;
+  data: ConversationStatusData;
+}
+
 // Chat API request/response types
 export interface ChatStartRequest {
   message: string;
@@ -191,6 +214,16 @@ export interface UseChatStreamOptions {
   onToolComplete?: (event: ToolCompleteEvent) => void;
   onCompleted?: (event: CompletedEvent) => void;
   onError?: (error: string) => void;
+  onHistoryLoaded?: (data: ConversationData) => void;
+}
+
+// Options for the send() method
+export interface SendMessageOptions {
+  conversationId?: string;
+  fileId?: number;
+  attachment?: MessageAttachment;
+  studyMode?: boolean;
+  workflowId?: number;
 }
 
 // Chat state for hook

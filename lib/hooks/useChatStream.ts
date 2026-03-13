@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import { AxiosError } from 'axios';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
   isErrorMessage,
   type ChatMessage,
   type ChatState,
   type UseChatStreamOptions,
+  type SendMessageOptions,
   type CompletedEvent,
   type ToolCallingEvent,
   type ToolCompleteEvent,
@@ -19,6 +21,7 @@ import {
   type ApiMessage,
   type ConversationMessage,
   type MessageAttachment,
+  type PendingResponseData,
 } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 
@@ -29,6 +32,17 @@ const API_BASE_URL =
 const generateId = () =>
   `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
+// SSE watchdog: close stream if no events for this many ms
+const WATCHDOG_SILENCE_MS = 60_000;
+const WATCHDOG_CHECK_MS = 10_000;
+
+// Polling: check status every N ms, stop after max duration
+const POLL_INTERVAL_MS = 5_000;
+const POLL_MAX_DURATION_MS = 600_000; // 10 minutes
+
+// localStorage key for pending chat recovery
+const PENDING_CHAT_KEY = 'pending_chat';
+
 export function useChatStream(options: UseChatStreamOptions = {}) {
   const {
     onConnected,
@@ -37,6 +51,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     onToolComplete,
     onCompleted,
     onError,
+    onHistoryLoaded,
   } = options;
 
   const [state, setState] = useState<ChatState>({
@@ -49,7 +64,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   });
 
   const eventSourceRef = useRef<EventSource | null>(null);
+  const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastEventTimeRef = useRef<number>(0);
+  const conversationIdRef = useRef<string | null>(null);
   const token = useAuthStore((state) => state.token);
+
+  // ─── Internal helpers ──────────────────────────────────────
 
   // Add user message to state
   const addUserMessage = useCallback((content: string, attachment?: MessageAttachment): ChatMessage => {
@@ -66,6 +87,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       error: null,
     }));
     return message;
+  }, []);
+
+  // Remove a specific message by ID (used to roll back optimistic messages)
+  const removeMessage = useCallback((messageId: string) => {
+    setState((prev) => ({
+      ...prev,
+      messages: prev.messages.filter((m) => m.id !== messageId),
+    }));
   }, []);
 
   // Add assistant message (when completed)
@@ -345,7 +374,112 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     return messages;
   }, []);
 
-  // Load conversation history from API
+  // Merge missed messages from the status endpoint into state.
+  // Replaces any SSE-originated messages after the last user message with API messages.
+  const mergeMissedMessages = useCallback((apiMessages: ApiMessage[]) => {
+    if (apiMessages.length === 0) return;
+    const transformed = transformApiMessages(apiMessages);
+    setState((prev) => {
+      const lastUserIdx = [...prev.messages].reverse().findIndex((m) => m.role === 'user');
+      if (lastUserIdx === -1) {
+        return { ...prev, messages: [...prev.messages, ...transformed], isStreaming: false };
+      }
+      const cutIndex = prev.messages.length - lastUserIdx;
+      return {
+        ...prev,
+        messages: [...prev.messages.slice(0, cutIndex), ...transformed],
+        isStreaming: false,
+      };
+    });
+  }, [transformApiMessages]);
+
+  // ─── Polling ───────────────────────────────────────────────
+
+  // Stop any active poll
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  // Poll the status endpoint until the conversation is no longer pending
+  const pollForCompletion = useCallback((conversationId: string) => {
+    stopPolling();
+
+    const startTime = Date.now();
+
+    pollIntervalRef.current = setInterval(async () => {
+      // Safety: stop after max duration
+      if (Date.now() - startTime > POLL_MAX_DURATION_MS) {
+        stopPolling();
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          error: 'Response timed out. Please try again.',
+        }));
+        return;
+      }
+
+      try {
+        const response = await chatApi.getStatus(conversationId);
+        const status = response.data;
+
+        if (status.status !== 'pending') {
+          stopPolling();
+          if (status.messages.length > 0) {
+            mergeMissedMessages(status.messages);
+          } else {
+            setState((prev) => ({ ...prev, isStreaming: false }));
+          }
+          try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
+        }
+      } catch {
+        // Transient failure — keep polling
+      }
+    }, POLL_INTERVAL_MS);
+  }, [stopPolling, mergeMissedMessages]);
+
+  // ─── Watchdog ──────────────────────────────────────────────
+
+  const stopWatchdog = useCallback(() => {
+    if (watchdogRef.current) {
+      clearInterval(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+  }, []);
+
+  const startWatchdog = useCallback(() => {
+    stopWatchdog();
+    lastEventTimeRef.current = Date.now();
+
+    watchdogRef.current = setInterval(() => {
+      if (Date.now() - lastEventTimeRef.current > WATCHDOG_SILENCE_MS) {
+        stopWatchdog();
+
+        // Close the dead stream
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+
+        // Fall back to polling
+        const convId = conversationIdRef.current;
+        if (convId) {
+          pollForCompletion(convId);
+        } else {
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            error: 'Connection lost',
+          }));
+        }
+      }
+    }, WATCHDOG_CHECK_MS);
+  }, [stopWatchdog, pollForCompletion]);
+
+  // ─── Load conversation history ─────────────────────────────
+
   const loadConversationHistory = useCallback(async (conversationId: string) => {
     setState((prev) => ({
       ...prev,
@@ -353,6 +487,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       error: null,
       conversationId,
     }));
+    conversationIdRef.current = conversationId;
 
     try {
       const response = await chatApi.getConversation(conversationId);
@@ -365,6 +500,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           conversationTitle: response.data.title || null,
           isLoadingHistory: false,
         }));
+        onHistoryLoaded?.(response.data);
       } else {
         setState((prev) => ({
           ...prev,
@@ -385,7 +521,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       }));
       onError?.(errorMsg);
     }
-  }, [transformApiMessages, onError]);
+  }, [transformApiMessages, onError, onHistoryLoaded]);
 
   // Fetch only the conversation title (for after streaming completes)
   const fetchConversationTitle = useCallback(async (convId: string) => {
@@ -402,7 +538,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }
   }, []);
 
-  // Connect to existing SSE stream (for when navigating from home page)
+  // ─── SSE stream connection ─────────────────────────────────
+
+  // Connect to existing SSE stream (for when navigating from home page or reconnecting)
   const connectToStream = useCallback(
     (executionId: string, initialMessage?: string, initialAttachment?: MessageAttachment) => {
       if (!token) {
@@ -430,6 +568,18 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         error: null,
       }));
 
+      // Save pending state for page reload recovery
+      const convId = conversationIdRef.current;
+      if (convId) {
+        try {
+          localStorage.setItem(PENDING_CHAT_KEY, JSON.stringify({
+            conversationId: convId,
+            executionId,
+            timestamp: Date.now(),
+          }));
+        } catch {}
+      }
+
       // Connect to SSE stream
       const encodedToken = encodeURIComponent(token);
       const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}?token=${encodedToken}`;
@@ -437,31 +587,39 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const eventSource = new EventSource(streamUrl);
       eventSourceRef.current = eventSource;
 
+      // Start watchdog timer
+      startWatchdog();
+
       // Handle connected event
       eventSource.addEventListener('connected', () => {
+        lastEventTimeRef.current = Date.now();
         onConnected?.();
       });
 
       // Handle iteration event
       eventSource.addEventListener('iteration', (e) => {
+        lastEventTimeRef.current = Date.now();
         const event: IterationEvent = JSON.parse(e.data);
         onIteration?.(event);
       });
 
       // Handle handover_started event - sub-agent delegation
       eventSource.addEventListener('handover_started', (e) => {
+        lastEventTimeRef.current = Date.now();
         const event: HandoverStartedEvent = JSON.parse(e.data);
         addHandoverMessage(event);
       });
 
       // Handle handover_complete event - sub-agent finished
       eventSource.addEventListener('handover_complete', (e) => {
+        lastEventTimeRef.current = Date.now();
         const event: HandoverCompleteEvent = JSON.parse(e.data);
         updateHandoverMessage(event);
       });
 
       // Handle tool_calling event - add as separate history entry
       eventSource.addEventListener('tool_calling', (e) => {
+        lastEventTimeRef.current = Date.now();
         const event: ToolCallingEvent = JSON.parse(e.data);
         addToolMessage(event);
         onToolCalling?.(event);
@@ -469,18 +627,20 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       // Handle tool_complete event - update the tool message
       eventSource.addEventListener('tool_complete', (e) => {
+        lastEventTimeRef.current = Date.now();
         const event: ToolCompleteEvent = JSON.parse(e.data);
         updateToolMessage(event.tool_call.name, event);
         onToolComplete?.(event);
       });
 
-      // Handle heartbeat (keep-alive, no action needed)
+      // Handle heartbeat (keep-alive)
       eventSource.addEventListener('heartbeat', () => {
-        // No action needed
+        lastEventTimeRef.current = Date.now();
       });
 
       // Handle completed event - NOW add the assistant message
       eventSource.addEventListener('completed', (e) => {
+        lastEventTimeRef.current = Date.now();
         const event: CompletedEvent = JSON.parse(e.data);
         addAssistantMessage(event.message);
         onCompleted?.(event);
@@ -488,6 +648,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       // Handle error event - add inline as ErrorMessage so it appears in message flow
       eventSource.addEventListener('error', (e) => {
+        lastEventTimeRef.current = Date.now();
+        stopWatchdog();
         try {
           const event = JSON.parse((e as MessageEvent).data);
           // Backend sends error_message (new) or message (legacy)
@@ -504,20 +666,25 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           onError?.(errorMsg);
         }
         eventSource.close();
+        eventSourceRef.current = null;
+        try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
       });
 
       // Handle end event
       eventSource.addEventListener('end', () => {
+        stopWatchdog();
         eventSource.close();
         eventSourceRef.current = null;
         setState((prev) => ({
           ...prev,
           isStreaming: false,
         }));
+        try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
       });
 
       // Handle timeout event
       eventSource.addEventListener('timeout', () => {
+        stopWatchdog();
         const errorMsg = 'Stream timed out';
         setState((prev) => ({
           ...prev,
@@ -526,10 +693,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         }));
         onError?.(errorMsg);
         eventSource.close();
+        eventSourceRef.current = null;
+        try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
       });
 
       // Handle connection errors
       eventSource.onerror = () => {
+        stopWatchdog();
         const errorMsg = 'Connection error';
         setState((prev) => ({
           ...prev,
@@ -539,6 +709,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         onError?.(errorMsg);
         eventSource.close();
         eventSourceRef.current = null;
+        // Don't clear pending_chat here — the response may have been saved server-side.
+        // Recovery on reload will check status endpoint.
       };
     },
     [
@@ -550,6 +722,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       updateHandoverMessage,
       addToolMessage,
       updateToolMessage,
+      startWatchdog,
+      stopWatchdog,
       onConnected,
       onIteration,
       onToolCalling,
@@ -559,26 +733,33 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     ]
   );
 
-  // Set conversation ID
+  // ─── Set conversation ID ───────────────────────────────────
+
   const setConversationId = useCallback((id: string) => {
+    conversationIdRef.current = id;
     setState((prev) => ({
       ...prev,
       conversationId: id,
     }));
   }, []);
 
-  // Disconnect from SSE stream
+  // ─── Disconnect / cleanup ─────────────────────────────────
+
   const disconnect = useCallback(() => {
+    stopWatchdog();
+    stopPolling();
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
       setState((prev) => ({ ...prev, isStreaming: false }));
     }
-  }, []);
+    try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
+  }, [stopWatchdog, stopPolling]);
 
   // Clear messages and reset state
   const clearChat = useCallback(() => {
     disconnect();
+    conversationIdRef.current = null;
     setState({
       messages: [],
       isStreaming: false,
@@ -597,10 +778,103 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }));
   }, []);
 
-  // Retry the last user message after an error
+  // ─── Send (centralized send with 409/error handling) ───────
+
+  const send = useCallback(async (
+    message: string,
+    options: SendMessageOptions = {},
+  ) => {
+    // Guard: prevent concurrent sends
+    if (eventSourceRef.current) return;
+
+    const convId = options.conversationId || conversationIdRef.current;
+
+    // Add optimistic user message
+    const optimisticMsg = addUserMessage(message, options.attachment);
+
+    // Set streaming state
+    setState((prev) => ({ ...prev, isStreaming: true, error: null }));
+
+    try {
+      const response = await chatApi.start({
+        message,
+        stream: true,
+        ...(convId && { conversation_id: convId }),
+        ...(options.fileId && { file_id: options.fileId }),
+        ...(options.studyMode && { study_mode: true }),
+        ...(options.workflowId && { workflow_id: options.workflowId }),
+      });
+
+      if (response.success) {
+        connectToStream(response.data.execution_id);
+      } else {
+        // Backend returned success: false — reset state
+        removeMessage(optimisticMsg.id);
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          error: response.message || 'Failed to send message',
+        }));
+      }
+    } catch (err) {
+      // ── 409 PENDING_RESPONSE ──
+      if (err instanceof AxiosError && err.response?.status === 409) {
+        const responseData = err.response.data as { code?: string; data?: PendingResponseData } | undefined;
+        if (responseData?.code === 'PENDING_RESPONSE') {
+          // Remove the optimistic user message — the real one already exists on backend
+          removeMessage(optimisticMsg.id);
+
+          const pendingData = responseData.data;
+          if (pendingData?.execution_id) {
+            // Reconnect to the existing stream
+            connectToStream(pendingData.execution_id);
+          } else if (convId) {
+            // No execution yet — poll status until it completes
+            pollForCompletion(convId);
+          } else {
+            setState((prev) => ({
+              ...prev,
+              isStreaming: false,
+              error: 'A response is still being generated.',
+            }));
+          }
+          return;
+        }
+      }
+
+      // ── 429 content duplicate ──
+      if (err instanceof AxiosError && err.response?.status === 429) {
+        removeMessage(optimisticMsg.id);
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          error: 'This message was already sent. Please wait a moment.',
+        }));
+        return;
+      }
+
+      // ── Generic error ──
+      removeMessage(optimisticMsg.id);
+      const errorMsg = err instanceof AxiosError
+        ? (err.response?.data as { message?: string })?.message || 'Failed to send message'
+        : 'Network error. Please try again.';
+      setState((prev) => ({
+        ...prev,
+        isStreaming: false,
+        error: errorMsg,
+      }));
+    }
+  }, [addUserMessage, removeMessage, connectToStream, pollForCompletion]);
+
+  // ─── Retry (fetch-before-retry with status check) ─────────
+
   const retryLastMessage = useCallback(async () => {
+    // Guard: don't retry if already streaming
+    if (state.isStreaming || eventSourceRef.current) return;
+
     const lastUserMsg = [...state.messages].reverse().find((m) => m.role === 'user');
-    if (!lastUserMsg || !state.conversationId) return;
+    const convId = state.conversationId;
+    if (!lastUserMsg || !convId) return;
 
     // Remove error messages, clear state.error, set streaming
     setState((prev) => ({
@@ -611,23 +885,96 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }));
 
     try {
+      // Check status first — the AI may have already responded
+      const statusResponse = await chatApi.getStatus(convId);
+      const status = statusResponse.data;
+
+      if (status.status === 'completed' || status.status === 'failed') {
+        // Response already exists — merge missed messages
+        if (status.messages.length > 0) {
+          mergeMissedMessages(status.messages);
+        } else {
+          setState((prev) => ({ ...prev, isStreaming: false }));
+        }
+        return;
+      }
+
+      if (status.status === 'pending' && status.execution_id) {
+        // Still processing — reconnect to existing stream
+        connectToStream(status.execution_id);
+        return;
+      }
+
+      if (status.status === 'pending' && !status.execution_id) {
+        // Pending but no execution yet — poll
+        pollForCompletion(convId);
+        return;
+      }
+
+      // Status is expired or idle — truly retry
+      // Preserve file attachment from original message
+      const fileId = (lastUserMsg as ChatMessage)?.attachment?.file_id;
+
       const response = await chatApi.start({
         message: lastUserMsg.content,
         stream: true,
-        conversation_id: state.conversationId,
+        conversation_id: convId,
+        ...(fileId && { file_id: fileId }),
       });
 
       if (response.success) {
         connectToStream(response.data.execution_id);
+      } else {
+        setState((prev) => ({
+          ...prev,
+          error: response.message || 'Failed to retry',
+          isStreaming: false,
+        }));
       }
-    } catch {
+    } catch (err) {
+      // Handle 409 from the chatApi.start() call
+      if (err instanceof AxiosError && err.response?.status === 409) {
+        const responseData = err.response.data as { code?: string; data?: PendingResponseData } | undefined;
+        if (responseData?.code === 'PENDING_RESPONSE' && responseData.data?.execution_id) {
+          connectToStream(responseData.data.execution_id);
+          return;
+        }
+      }
+
       setState((prev) => ({
         ...prev,
         error: 'Failed to retry. Please try again.',
         isStreaming: false,
       }));
     }
-  }, [state.messages, state.conversationId, connectToStream]);
+  }, [state.messages, state.conversationId, state.isStreaming, connectToStream, mergeMissedMessages, pollForCompletion]);
+
+  // ─── Recovery (for page reload / direct navigation) ────────
+
+  const recoverPendingState = useCallback(async (conversationId: string): Promise<'reconnected' | 'completed' | 'failed' | 'expired' | 'idle' | 'load_history'> => {
+    try {
+      const response = await chatApi.getStatus(conversationId);
+      const status = response.data;
+
+      if (status.status === 'pending') {
+        setState((prev) => ({ ...prev, isStreaming: true, error: null }));
+        if (status.execution_id) {
+          connectToStream(status.execution_id);
+        } else {
+          pollForCompletion(conversationId);
+        }
+        return 'reconnected';
+      }
+
+      // For completed/failed/expired/idle, let the caller load history normally
+      return status.status === 'idle' ? 'idle' : status.status as 'completed' | 'failed' | 'expired';
+    } catch {
+      // Status endpoint failed — fall back to loading history
+      return 'load_history';
+    }
+  }, [connectToStream, pollForCompletion]);
+
+  // ─── Public API ────────────────────────────────────────────
 
   return {
     // State
@@ -638,6 +985,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     conversationTitle: state.conversationTitle,
     error: state.error,
     // Actions
+    send,
     connectToStream,
     loadConversationHistory,
     fetchConversationTitle,
@@ -647,5 +995,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     clearChat,
     setError,
     retryLastMessage,
+    recoverPendingState,
   };
 }

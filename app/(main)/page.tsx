@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { AxiosError } from 'axios';
 import Link from 'next/link';
 import { useGreetingParts } from '@/lib/hooks/useGreeting';
 import {
@@ -131,6 +132,16 @@ export default function HomePage() {
       if (response.success) {
         const conversationId = response.data.conversation_id;
         const executionId = response.data.execution_id;
+
+        // Save pending state for recovery on page reload
+        try {
+          localStorage.setItem('pending_chat', JSON.stringify({
+            conversationId,
+            executionId,
+            timestamp: Date.now(),
+          }));
+        } catch {}
+
         const params = new URLSearchParams({
           msg: message,
           exec: executionId,
@@ -141,8 +152,21 @@ export default function HomePage() {
           params.set('file_size', String(uploadedFile.file_size));
         }
         router.push(`/c/${conversationId}?${params.toString()}`);
+      } else {
+        // Backend returned success: false
+        setError({ message: response.message || 'Failed to start conversation', status: 0 });
+        setIsSubmitting(false);
       }
     } catch (err) {
+      // Handle 409 — user already has a pending conversation (e.g., navigated back and resent)
+      if (err instanceof AxiosError && err.response?.status === 409) {
+        const data = err.response.data?.data;
+        if (data?.conversation_id) {
+          router.push(`/c/${data.conversation_id}`);
+          return;
+        }
+      }
+
       const apiError = extractApiError(err);
       setError({ message: apiError.message, status: apiError.status });
       setIsSubmitting(false);
