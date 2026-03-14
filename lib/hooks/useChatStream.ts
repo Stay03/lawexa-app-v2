@@ -401,33 +401,40 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }
   }, []);
 
-  // Poll the status endpoint until the conversation is no longer pending
+  // Poll status until no longer pending, then reload full conversation history.
+  // This ensures all messages (tool calls, handovers, response) are present after recovery.
   const pollForCompletion = useCallback((conversationId: string) => {
     stopPolling();
-
     const startTime = Date.now();
 
     pollIntervalRef.current = setInterval(async () => {
-      // Safety: stop after max duration
       if (Date.now() - startTime > POLL_MAX_DURATION_MS) {
         stopPolling();
-        setState((prev) => ({
-          ...prev,
-          isStreaming: false,
-          error: 'Response timed out. Please try again.',
-        }));
+        setState((prev) => ({ ...prev, isStreaming: false, error: 'Response timed out. Please try again.' }));
         return;
       }
 
       try {
         const response = await chatApi.getStatus(conversationId);
-        const status = response.data;
-
-        if (status.status !== 'pending') {
+        if (response.data.status !== 'pending') {
           stopPolling();
-          if (status.messages.length > 0) {
-            mergeMissedMessages(status.messages);
-          } else {
+          // Reload full conversation to get all messages including tool calls
+          try {
+            const conv = await chatApi.getConversation(conversationId);
+            if (conv.success && conv.data.messages) {
+              const transformed = transformApiMessages(conv.data.messages);
+              setState((prev) => ({
+                ...prev,
+                messages: transformed,
+                conversationTitle: conv.data.title || prev.conversationTitle,
+                isStreaming: false,
+                error: null,
+              }));
+              onHistoryLoaded?.(conv.data);
+            } else {
+              setState((prev) => ({ ...prev, isStreaming: false, error: null }));
+            }
+          } catch {
             setState((prev) => ({ ...prev, isStreaming: false, error: null }));
           }
         }
@@ -435,7 +442,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         // Transient failure — keep polling
       }
     }, POLL_INTERVAL_MS);
-  }, [stopPolling, mergeMissedMessages]);
+  }, [stopPolling, transformApiMessages, onHistoryLoaded]);
 
   // ─── Watchdog ──────────────────────────────────────────────
 
@@ -951,12 +958,10 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const status = response.data;
 
       if (status.status === 'pending') {
+        // Always poll (not SSE reconnect) so that when execution completes,
+        // we reload full conversation history with all tool calls included.
         setState((prev) => ({ ...prev, isStreaming: true, error: null }));
-        if (status.execution_id) {
-          connectToStream(status.execution_id);
-        } else {
-          pollForCompletion(conversationId);
-        }
+        pollForCompletion(conversationId);
         return 'reconnected';
       }
 
@@ -966,7 +971,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Status endpoint failed — fall back to loading history
       return 'load_history';
     }
-  }, [connectToStream, pollForCompletion]);
+  }, [pollForCompletion]);
 
   // ─── Public API ────────────────────────────────────────────
 
