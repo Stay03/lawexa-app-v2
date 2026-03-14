@@ -133,15 +133,6 @@ export default function HomePage() {
         const conversationId = response.data.conversation_id;
         const executionId = response.data.execution_id;
 
-        // Save pending state for recovery on page reload
-        try {
-          localStorage.setItem('pending_chat', JSON.stringify({
-            conversationId,
-            executionId,
-            timestamp: Date.now(),
-          }));
-        } catch {}
-
         const params = new URLSearchParams({
           msg: message,
           exec: executionId,

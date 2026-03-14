@@ -566,37 +566,30 @@ function ConversationPageContent() {
         setConversationOwnerId(user.id);
       }
     } else {
-      // Direct navigation — check for pending state (page reload during stream)
+      // Direct navigation or page refresh during stream
       initializedRef.current = true;
 
-      // Check localStorage for pending chat from a previous session
-      let hasPending = false;
-      try {
-        const pending = localStorage.getItem('pending_chat');
-        if (pending) {
-          const parsed = JSON.parse(pending);
-          if (parsed.conversationId === conversationId && Date.now() - parsed.timestamp < 600_000) {
-            hasPending = true;
-            localStorage.removeItem('pending_chat');
-            // Check actual status before reconnecting
-            recoverPendingState(conversationId).then((result) => {
-              if (result !== 'reconnected') {
-                // Not pending anymore — load history normally
-                loadConversationHistory(conversationId);
-              }
-            });
-          } else {
-            localStorage.removeItem('pending_chat');
-          }
-        }
-      } catch {
-        // localStorage unavailable
-      }
+      // Always load history first, then check if there's a pending stream to reconnect to.
+      // This is more reliable than localStorage (which can be lost on hard refresh).
+      (async () => {
+        await loadConversationHistory(conversationId);
 
-      if (!hasPending) {
-        // Normal path: load conversation history (onHistoryLoaded sets ownership)
-        loadConversationHistory(conversationId);
-      }
+        // After history is loaded, check if the AI is still processing
+        const result = await recoverPendingState(conversationId);
+        // If 'reconnected', recoverPendingState already set isStreaming and connected.
+        // Otherwise, history is loaded — nothing else to do.
+        if (result === 'reconnected') {
+          // Scroll to bottom to show the streaming indicator
+          setTimeout(() => {
+            if (chatContainerRef.current) {
+              chatContainerRef.current.scrollTo({
+                top: chatContainerRef.current.scrollHeight,
+                behavior: 'smooth',
+              });
+            }
+          }, 100);
+        }
+      })();
     }
   }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, recoverPendingState, user?.id, isGuestReady]);
 

@@ -40,9 +40,6 @@ const WATCHDOG_CHECK_MS = 10_000;
 const POLL_INTERVAL_MS = 5_000;
 const POLL_MAX_DURATION_MS = 600_000; // 10 minutes
 
-// localStorage key for pending chat recovery
-const PENDING_CHAT_KEY = 'pending_chat';
-
 export function useChatStream(options: UseChatStreamOptions = {}) {
   const {
     onConnected,
@@ -432,7 +429,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           } else {
             setState((prev) => ({ ...prev, isStreaming: false }));
           }
-          try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
         }
       } catch {
         // Transient failure — keep polling
@@ -568,18 +564,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         error: null,
       }));
 
-      // Save pending state for page reload recovery
-      const convId = conversationIdRef.current;
-      if (convId) {
-        try {
-          localStorage.setItem(PENDING_CHAT_KEY, JSON.stringify({
-            conversationId: convId,
-            executionId,
-            timestamp: Date.now(),
-          }));
-        } catch {}
-      }
-
       // Connect to SSE stream
       const encodedToken = encodeURIComponent(token);
       const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}?token=${encodedToken}`;
@@ -667,7 +651,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         }
         eventSource.close();
         eventSourceRef.current = null;
-        try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
       });
 
       // Handle end event
@@ -679,7 +662,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           ...prev,
           isStreaming: false,
         }));
-        try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
       });
 
       // Handle timeout event
@@ -694,23 +676,29 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         onError?.(errorMsg);
         eventSource.close();
         eventSourceRef.current = null;
-        try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
       });
 
-      // Handle connection errors
+      // Handle connection errors — auto-recover via polling
       eventSource.onerror = () => {
         stopWatchdog();
-        const errorMsg = 'Connection error';
-        setState((prev) => ({
-          ...prev,
-          error: errorMsg,
-          isStreaming: false,
-        }));
-        onError?.(errorMsg);
         eventSource.close();
         eventSourceRef.current = null;
-        // Don't clear pending_chat here — the response may have been saved server-side.
-        // Recovery on reload will check status endpoint.
+
+        // Try to auto-recover: poll status endpoint until network is back
+        // and the response is ready. isStreaming stays true so the UI shows a loading indicator.
+        const convId = conversationIdRef.current;
+        if (convId) {
+          pollForCompletion(convId);
+        } else {
+          // No conversation context — can't recover, show error
+          const errorMsg = 'Connection error';
+          setState((prev) => ({
+            ...prev,
+            error: errorMsg,
+            isStreaming: false,
+          }));
+          onError?.(errorMsg);
+        }
       };
     },
     [
@@ -724,6 +712,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       updateToolMessage,
       startWatchdog,
       stopWatchdog,
+      pollForCompletion,
       onConnected,
       onIteration,
       onToolCalling,
@@ -753,7 +742,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       eventSourceRef.current = null;
       setState((prev) => ({ ...prev, isStreaming: false }));
     }
-    try { localStorage.removeItem(PENDING_CHAT_KEY); } catch {}
   }, [stopWatchdog, stopPolling]);
 
   // Clear messages and reset state
