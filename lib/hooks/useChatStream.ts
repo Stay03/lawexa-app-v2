@@ -379,13 +379,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     setState((prev) => {
       const lastUserIdx = [...prev.messages].reverse().findIndex((m) => m.role === 'user');
       if (lastUserIdx === -1) {
-        return { ...prev, messages: [...prev.messages, ...transformed], isStreaming: false };
+        return { ...prev, messages: [...prev.messages, ...transformed], isStreaming: false, error: null };
       }
       const cutIndex = prev.messages.length - lastUserIdx;
       return {
         ...prev,
         messages: [...prev.messages.slice(0, cutIndex), ...transformed],
         isStreaming: false,
+        error: null,
       };
     });
   }, [transformApiMessages]);
@@ -427,7 +428,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           if (status.messages.length > 0) {
             mergeMissedMessages(status.messages);
           } else {
-            setState((prev) => ({ ...prev, isStreaming: false }));
+            setState((prev) => ({ ...prev, isStreaming: false, error: null }));
           }
         }
       } catch {
@@ -631,11 +632,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       });
 
       // Handle error event - add inline as ErrorMessage so it appears in message flow
+      // NOTE: Browser connection errors also fire this listener (with no data).
+      // We only handle events WITH data here; connection errors are handled by onerror below.
       eventSource.addEventListener('error', (e) => {
+        const data = (e as MessageEvent).data;
+        if (!data) return; // Connection error — let onerror handle it
+
         lastEventTimeRef.current = Date.now();
         stopWatchdog();
         try {
-          const event = JSON.parse((e as MessageEvent).data);
+          const event = JSON.parse(data);
           // Backend sends error_message (new) or message (legacy)
           const errorMsg = event.error_message || event.message || 'Something went wrong';
           const errorCode = event.error_code || 'UNKNOWN';
@@ -644,7 +650,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           addErrorMessage(errorMsg, errorCode, retryable, retryAfterMs);
           onError?.(errorMsg);
         } catch {
-          // Fallback: unparseable error event, use state.error
+          // Unparseable data — show generic error
           const errorMsg = 'Stream error';
           setState((prev) => ({ ...prev, error: errorMsg, isStreaming: false }));
           onError?.(errorMsg);
