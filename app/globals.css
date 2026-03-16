@@ -1230,3 +1230,33 @@
   color: oklch(0.85 0 0);
 }
 
+/* Table styling (schedule fee tables, etc.) */
+.statute-document .statute-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.statute-document .statute-table th,
+.statute-document .statute-table td {
+  border: 1px solid oklch(0.8 0 0);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.statute-document .statute-table th {
+  font-weight: 700;
+  background-color: oklch(0.96 0 0);
+}
+
+.dark .statute-document .statute-table th,
+.dark .statute-document .statute-table td {
+  border-color: oklch(0.3 0 0);
+}
+
+.dark .statute-document .statute-table th {
+  background-color: oklch(0.2 0 0);
+}
+

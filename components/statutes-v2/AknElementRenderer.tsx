@@ -133,6 +133,24 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
     return null;
   }
 
+  // --- <table> — schedule fee tables, etc. ---
+  if (tag === 'table') {
+    return (
+      <table className="statute-table">
+        <tbody>{renderChildElements(element)}</tbody>
+      </table>
+    );
+  }
+  if (tag === 'tr') {
+    return <tr>{renderChildElements(element)}</tr>;
+  }
+  if (tag === 'th') {
+    return <th dangerouslySetInnerHTML={{ __html: element.innerHTML }} />;
+  }
+  if (tag === 'td') {
+    return <td dangerouslySetInnerHTML={{ __html: element.innerHTML }} />;
+  }
+
   // --- <ul> / <ol> — HTML lists (from fixed backend) ---
   if (tag === 'ul' || tag === 'ol') {
     return (
