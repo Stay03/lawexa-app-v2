@@ -12,6 +12,8 @@ import {
   BarChart3,
   Eye,
   Handshake,
+  BookOpen,
+  Upload,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -33,6 +35,8 @@ import {
 const contentNavItems = [
   { title: 'Content Requests', url: '/admin/content-requests', icon: MessageSquareQuote },
   { title: 'Cases', url: '/admin/cases', icon: Scale },
+  { title: 'Statutes', url: '/admin/statutes', icon: BookOpen, excludePaths: ['/admin/statutes/import'] },
+  { title: 'Import Statute', url: '/admin/statutes/import', icon: Upload },
   { title: 'All Broadcasts', url: '/admin/notifications', icon: Bell, excludePaths: ['/admin/notifications/broadcast', '/admin/notifications/analytics'] },
   { title: 'Send Broadcast', url: '/admin/notifications/broadcast', icon: Send },
   { title: 'Notif. Analytics', url: '/admin/notifications/analytics', icon: BarChart3 },
@@ -45,7 +49,7 @@ export function AdminNavContentSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views') || pathname.startsWith('/admin/lawyer-connect');
+  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/statutes') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views') || pathname.startsWith('/admin/lawyer-connect');
 
   return (
     <SidebarGroup>
