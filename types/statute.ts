@@ -48,7 +48,7 @@ export interface StatuteDetail extends Statute {
   nodes_count: number;
 }
 
-// Valid node types
+// Valid node types (AKN 3.0 standard)
 export type StatuteNodeType =
   | 'act'
   | 'chapter'
@@ -61,7 +61,19 @@ export type StatuteNodeType =
   | 'regulation'
   | 'clause'
   | 'paragraph'
-  | 'item';
+  | 'item'
+  | 'subpart'
+  | 'crossheading'
+  | 'hcontainer'
+  | 'subparagraph'
+  | 'subclause'
+  | 'subrule'
+  | 'division'
+  | 'subdivision'
+  | 'title'
+  | 'book'
+  | 'point'
+  | 'proviso';
 
 // Statute node (hierarchical structure element)
 export interface StatuteNode {
@@ -73,6 +85,8 @@ export interface StatuteNode {
   number: string | null;
   title: string | null;
   content: string | null;
+  intro: string | null;
+  wrap_up: string | null;
   slug: string;
   slug_path: string;
   order: number;
