@@ -187,15 +187,15 @@ export function StatuteImportUpload({ onImportStarted }: StatuteImportUploadProp
           <div className="space-y-2">
             <Label>Country</Label>
             <Select
-              value={countryId}
-              onValueChange={setCountryId}
+              value={countryId || 'none'}
+              onValueChange={(val) => setCountryId(val === 'none' ? '' : val)}
               disabled={importMutation.isPending}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select country" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {countries.map((country) => (
                   <SelectItem key={country.id} value={String(country.id)}>
                     {country.name}
