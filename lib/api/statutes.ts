@@ -62,4 +62,16 @@ export const statutesApi = {
     );
     return response.data;
   },
+
+  /**
+   * Export statute as AKN 3.0 XML string
+   */
+  exportAkn: async (slug: string): Promise<string> => {
+    const response = await apiClient.get<string>(`/statutes/${slug}/export-akn`, {
+      headers: { Accept: 'application/xml' },
+      responseType: 'text',
+      transformResponse: [(data: string) => data],
+    });
+    return response.data;
+  },
 };

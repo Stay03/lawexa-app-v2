@@ -2,28 +2,31 @@
 
 import { useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
-import { useStatuteNodes } from '@/lib/hooks/useStatutes';
-import { buildStatuteTree } from '@/lib/utils/statute-tree';
+import { useStatuteAkn } from '@/lib/hooks/useStatutes';
 import { ErrorState } from '@/components/common/ErrorState';
-import { StatuteNodeRenderer } from './StatuteNodeRenderer';
+import { AknElementRenderer } from './AknElementRenderer';
 
 interface StatuteDocumentRendererProps {
   slug: string;
-  nodesCount: number;
 }
 
 /**
- * Main document renderer that fetches nodes, builds the tree,
- * and renders the full statute as a legal document.
+ * Fetches AKN XML for a statute, parses it with DOMParser,
+ * and renders via the recursive AknElementRenderer.
  */
-function StatuteDocumentRenderer({ slug, nodesCount }: StatuteDocumentRendererProps) {
-  const { data, isLoading, isError, refetch } = useStatuteNodes(slug, nodesCount);
+function StatuteDocumentRenderer({ slug }: StatuteDocumentRendererProps) {
+  const { data: xmlString, isLoading, isError, refetch } = useStatuteAkn(slug);
 
-  const tree = useMemo(() => {
-    const nodes = data?.data?.nodes;
-    if (!nodes || nodes.length === 0) return [];
-    return buildStatuteTree(nodes);
-  }, [data]);
+  const bodyElement = useMemo(() => {
+    if (!xmlString) return null;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlString, 'application/xml');
+    // Check for parse errors
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) return null;
+    // Get the <body> element inside <act> or <bill>
+    return doc.querySelector('body');
+  }, [xmlString]);
 
   if (isLoading) {
     return (
@@ -37,27 +40,21 @@ function StatuteDocumentRenderer({ slug, nodesCount }: StatuteDocumentRendererPr
     return (
       <ErrorState
         title="Failed to load statute content"
-        description="We couldn't load the sections of this statute."
+        description="We couldn't load the content of this statute."
         retry={() => refetch()}
       />
     );
   }
 
-  if (tree.length === 0) {
+  if (!bodyElement) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
-        No content sections available for this statute.
+        No content available for this statute.
       </p>
     );
   }
 
-  return (
-    <>
-      {tree.map((rootNode) => (
-        <StatuteNodeRenderer key={rootNode.id} node={rootNode} />
-      ))}
-    </>
-  );
+  return <AknElementRenderer element={bodyElement} />;
 }
 
 export { StatuteDocumentRenderer };

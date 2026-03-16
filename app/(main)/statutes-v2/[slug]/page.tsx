@@ -104,9 +104,7 @@ function StatuteV2Page({ params, searchParams }: StatuteV2PageProps) {
           )}
 
           {/* Document Content */}
-          {statute.nodes_count > 0 && (
-            <StatuteDocumentRenderer slug={slug} nodesCount={statute.nodes_count} />
-          )}
+          <StatuteDocumentRenderer slug={slug} />
         </div>
       </PageContainer>
 

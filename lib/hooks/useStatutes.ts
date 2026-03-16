@@ -12,6 +12,7 @@ export const statuteKeys = {
   details: () => [...statuteKeys.all, 'detail'] as const,
   detail: (slug: string) => [...statuteKeys.details(), slug] as const,
   nodes: (slug: string) => [...statuteKeys.all, 'nodes', slug] as const,
+  akn: (slug: string) => [...statuteKeys.all, 'akn', slug] as const,
 };
 
 /**
@@ -51,6 +52,19 @@ export function useStatuteNodes(slug: string, totalCount: number) {
     queryKey: statuteKeys.nodes(slug),
     queryFn: () => statutesApi.getNodes(slug, 0, Math.max(totalCount - 1, 0)),
     enabled: !!slug && totalCount > 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Hook for fetching statute AKN XML export.
+ * Returns the raw XML string for client-side parsing and rendering.
+ */
+export function useStatuteAkn(slug: string) {
+  return useQuery({
+    queryKey: statuteKeys.akn(slug),
+    queryFn: () => statutesApi.exportAkn(slug),
+    enabled: !!slug,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
