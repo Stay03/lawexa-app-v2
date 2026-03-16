@@ -39,11 +39,16 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
     );
   }
 
+  // --- Attachment-related containers (schedules, appendices) ---
+  if (tag === 'attachments' || tag === 'attachment' || tag === 'doc' || tag === 'mainbody') {
+    return <>{renderChildElements(element)}</>;
+  }
+
   // --- Heading (inside structural elements) ---
   if (tag === 'heading') {
-    // Check if parent is a schedule
     const parentTag = element.parentElement?.localName;
-    const className = parentTag === 'schedule' ? 'schedule-heading' : 'order-heading';
+    const isScheduleHeading = parentTag === 'schedule' || parentTag === 'attachment';
+    const className = isScheduleHeading ? 'schedule-heading' : 'order-heading';
     return <h2 className={className}>{element.textContent}</h2>;
   }
 

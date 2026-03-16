@@ -24,8 +24,8 @@ function StatuteDocumentRenderer({ slug }: StatuteDocumentRendererProps) {
     // Check for parse errors
     const parseError = doc.querySelector('parsererror');
     if (parseError) return null;
-    // Get the <body> element inside <act> or <bill>
-    return doc.querySelector('body');
+    // Get the <act> element so we render both <body> and <attachments>
+    return doc.querySelector('act') ?? doc.querySelector('body');
   }, [xmlString]);
 
   if (isLoading) {
