@@ -19,7 +19,7 @@ interface AknElementRendererProps {
  * Recursively renders a single AKN XML DOM element into styled JSX.
  */
 function AknElementRenderer({ element }: AknElementRendererProps) {
-  const tag = element.localName;
+  const tag = element.localName.toLowerCase();
 
   // --- Structural containers (subpart, chapter, part, etc.) ---
   if (STRUCTURAL_TAGS.has(tag)) {
@@ -39,6 +39,23 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
     );
   }
 
+  // --- Section (numbered legal sections with headings) ---
+  if (tag === 'section') {
+    const num = element.querySelector(':scope > num');
+    const heading = element.querySelector(':scope > heading');
+    return (
+      <div className="section-block">
+        {(num || heading) && (
+          <h3 className="section-heading">
+            {num && <span>{num.textContent} </span>}
+            {heading?.textContent}
+          </h3>
+        )}
+        {renderChildElementsExcept(element, ['num', 'heading'])}
+      </div>
+    );
+  }
+
   // --- Attachment-related containers (schedules, appendices) ---
   if (tag === 'attachments' || tag === 'attachment' || tag === 'doc' || tag === 'mainbody') {
     return <>{renderChildElements(element)}</>;
@@ -46,7 +63,7 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
 
   // --- Heading (inside structural elements) ---
   if (tag === 'heading') {
-    const parentTag = element.parentElement?.localName;
+    const parentTag = element.parentElement?.localName?.toLowerCase();
     const isScheduleHeading = parentTag === 'schedule' || parentTag === 'attachment';
     const className = isScheduleHeading ? 'schedule-heading' : 'order-heading';
     return <h2 className={className}>{element.textContent}</h2>;
@@ -83,13 +100,21 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
   if (tag === 'subsection') {
     const num = element.querySelector(':scope > num');
     const contentEl = element.querySelector(':scope > content');
-    return (
-      <div>
-        <div className="subsection">
+    if (contentEl) {
+      // Simple: num + content
+      return (
+        <div><div className="subsection">
           {num && <span className="num">{num.textContent}</span>}
-          {contentEl && renderInlineContent(contentEl)}
-        </div>
-      </div>
+          {renderInlineContent(contentEl)}
+        </div></div>
+      );
+    }
+    // Complex: num + intro + paragraphs + wrapUp
+    return (
+      <div><div className="subsection">
+        {num && <span className="num">{num.textContent}</span>}
+        {renderChildElementsExcept(element, ['num'])}
+      </div></div>
     );
   }
 
@@ -97,13 +122,19 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
   if (tag === 'paragraph' || tag === 'item') {
     const num = element.querySelector(':scope > num');
     const contentEl = element.querySelector(':scope > content');
-    return (
-      <div>
-        <div className="paragraph-item">
+    if (contentEl) {
+      return (
+        <div><div className="paragraph-item">
           {num && <span className="num">{num.textContent}</span>}
-          {contentEl && renderInlineContent(contentEl)}
-        </div>
-      </div>
+          {renderInlineContent(contentEl)}
+        </div></div>
+      );
+    }
+    return (
+      <div><div className="paragraph-item">
+        {num && <span className="num">{num.textContent}</span>}
+        {renderChildElementsExcept(element, ['num'])}
+      </div></div>
     );
   }
 
@@ -193,6 +224,21 @@ function renderChildElements(parent: Element) {
   for (let i = 0; i < parent.children.length; i++) {
     const child = parent.children[i];
     children.push(<AknElementRenderer key={i} element={child} />);
+  }
+  return <>{children}</>;
+}
+
+/**
+ * Renders all child Element nodes except those with specified tag names.
+ */
+function renderChildElementsExcept(parent: Element, excludeTags: string[]) {
+  const exclude = new Set(excludeTags);
+  const children: React.ReactNode[] = [];
+  for (let i = 0; i < parent.children.length; i++) {
+    const child = parent.children[i];
+    if (!exclude.has(child.localName.toLowerCase())) {
+      children.push(<AknElementRenderer key={i} element={child} />);
+    }
   }
   return <>{children}</>;
 }
