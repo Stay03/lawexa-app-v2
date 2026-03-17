@@ -117,12 +117,7 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
       );
     }
     // Complex: num + intro + paragraphs + wrapUp
-    return (
-      <div><div className="subsection">
-        {num && <span className="num">{num.textContent}</span>}
-        {renderChildElementsExcept(element, ['num'])}
-      </div></div>
-    );
+    return renderComplexNumberedBlock(element, 'subsection');
   }
 
   // --- Paragraph / item (deeper indent) ---
@@ -137,12 +132,7 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
         </div></div>
       );
     }
-    return (
-      <div><div className="paragraph-item">
-        {num && <span className="num">{num.textContent}</span>}
-        {renderChildElementsExcept(element, ['num'])}
-      </div></div>
-    );
+    return renderComplexNumberedBlock(element, 'paragraph-item');
   }
 
   // --- Crossheading ---
@@ -229,13 +219,8 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
     );
   }
   if (fallbackNum) {
-    // Numbered block without direct content — recurse children except num
-    return (
-      <div><div className="paragraph-item">
-        <span className="num">{fallbackNum.textContent}</span>
-        {renderChildElementsExcept(element, ['num'])}
-      </div></div>
-    );
+    // Numbered block without direct content
+    return renderComplexNumberedBlock(element, 'paragraph-item');
   }
   // Plain container — just recurse
   return <>{renderChildElements(element)}</>;
@@ -270,6 +255,45 @@ function renderChildElementsExcept(parent: Element, excludeTags: string[]) {
     }
   }
   return <>{children}</>;
+}
+
+/**
+ * Renders a numbered block with <intro> text inline after the <num>.
+ * Used for the "complex" branch of subsection/paragraph/fallback where
+ * the element has <num> + <intro> + child elements (not just <content>).
+ */
+function renderComplexNumberedBlock(element: Element, className: string) {
+  const num = element.querySelector(':scope > num');
+  const intro = element.querySelector(':scope > intro');
+
+  // Get the first <p> from <intro> to render inline after the num
+  const firstP = intro ? intro.querySelector(':scope > p') : null;
+
+  // Remaining <p>s from intro (after the first)
+  const remainingIntroPs = intro
+    ? Array.from(intro.querySelectorAll(':scope > p')).slice(1)
+    : [];
+
+  // All other children except num and intro
+  const otherChildren: React.ReactNode[] = [];
+  for (let i = 0; i < element.children.length; i++) {
+    const child = element.children[i];
+    const childTag = child.localName.toLowerCase();
+    if (childTag !== 'num' && childTag !== 'intro') {
+      otherChildren.push(<AknElementRenderer key={`other-${i}`} element={child} />);
+    }
+  }
+
+  return (
+    <div><div className={className}>
+      {num && <span className="num">{num.textContent}</span>}
+      {firstP && <span dangerouslySetInnerHTML={{ __html: firstP.innerHTML }} />}
+      {remainingIntroPs.map((p, i) => (
+        <p key={`ip-${i}`} className="rule-block" dangerouslySetInnerHTML={{ __html: p.innerHTML }} />
+      ))}
+      {otherChildren}
+    </div></div>
+  );
 }
 
 /**
