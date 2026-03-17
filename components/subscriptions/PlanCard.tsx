@@ -64,8 +64,9 @@ const INTERVAL_LABELS: Record<TInterval, string> = {
 const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> = {
   basic: {
     highlighted: [
+      'Unlimited AI Messages',
+      'Unlimited Library Access',
       'Chat with Document (10MB limit)',
-      '50 AI Messages per month',
       'AI Tutor',
       'Natural Language Search',
     ],
@@ -81,8 +82,10 @@ const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> =
   },
   pro: {
     highlighted: [
+      'Unlimited AI Messages',
+      'Unlimited Library Access',
+      '50 Deep Legal Research',
       'Chat with Document (25MB limit)',
-      '150 AI Messages per month',
       'AI Tutor',
       'Natural Language Search',
     ],
@@ -99,6 +102,7 @@ const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> =
   'ai-counsel': {
     highlighted: [
       'Unlimited AI Messages',
+      'Unlimited Library Access',
       'Chat with Document (No size limit)',
       'Legal Drafting',
       'Deep Legal Research',
@@ -293,7 +297,7 @@ function PlanCard(props: IPlanCardProps) {
               disabled={isTrialLoading}
               onClick={() => setIsTrialDialogOpen(true)}
             >
-              {`Start ${displayName ?? plan.name} Trial for Free`}
+              Claim Bonus
             </Button>
             <TrialStartDialog
               open={isTrialDialogOpen}
