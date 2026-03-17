@@ -215,7 +215,29 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
     return <>{renderChildElements(element)}</>;
   }
 
-  // --- Default fallback: recurse children ---
+  // --- Default fallback: handle unknown tags gracefully ---
+  const fallbackNum = element.querySelector(':scope > num');
+  const fallbackContent = element.querySelector(':scope > content');
+
+  if (fallbackNum && fallbackContent) {
+    // Numbered block with content (like paragraph/subsection pattern)
+    return (
+      <div><div className="paragraph-item">
+        <span className="num">{fallbackNum.textContent}</span>
+        {renderInlineContent(fallbackContent)}
+      </div></div>
+    );
+  }
+  if (fallbackNum) {
+    // Numbered block without direct content — recurse children except num
+    return (
+      <div><div className="paragraph-item">
+        <span className="num">{fallbackNum.textContent}</span>
+        {renderChildElementsExcept(element, ['num'])}
+      </div></div>
+    );
+  }
+  // Plain container — just recurse
   return <>{renderChildElements(element)}</>;
 }
 
