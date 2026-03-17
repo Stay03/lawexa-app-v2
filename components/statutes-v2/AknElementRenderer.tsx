@@ -66,7 +66,14 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
     const parentTag = element.parentElement?.localName?.toLowerCase();
     const isScheduleHeading = parentTag === 'schedule' || parentTag === 'attachment';
     const className = isScheduleHeading ? 'schedule-heading' : 'order-heading';
-    return <h2 className={className}>{element.textContent}</h2>;
+    // Check for a sibling <num> in the parent (e.g. "Part 1" before "PRELIMINARY")
+    const siblingNum = element.parentElement?.querySelector(':scope > num');
+    return (
+      <h2 className={className}>
+        {siblingNum && <span>{siblingNum.textContent} — </span>}
+        {element.textContent}
+      </h2>
+    );
   }
 
   // --- Intro (text before children) ---
