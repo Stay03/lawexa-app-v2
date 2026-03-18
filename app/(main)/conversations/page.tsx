@@ -1,9 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useState, useEffect } from 'react';
+import { Suspense, useCallback, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { MessageSquare, Loader2, Inbox, Archive } from 'lucide-react';
-import { AnimatedTabs } from '@/components/ui/animated-tabs';
+import { MessageSquare, Loader2 } from 'lucide-react';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
@@ -23,9 +22,6 @@ import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 function ConversationsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState(
-    searchParams.get('status') || 'all'
-  );
 
   // Read URL state
   const search = searchParams.get('search') || '';
@@ -33,18 +29,9 @@ function ConversationsPageContent() {
   // Intersection observer for infinite scroll
   const { ref: loadMoreRef, isIntersecting } = useIntersectionObserver();
 
-  // Map tab to status param
-  const statusParam =
-    activeTab === 'active'
-      ? ('active' as const)
-      : activeTab === 'archived'
-        ? ('archived' as const)
-        : undefined;
-
   // Fetch conversations with infinite scroll
   const conversationsQuery = useInfiniteConversations({
     search: search || undefined,
-    status: statusParam,
     per_page: 15,
   });
 
@@ -95,15 +82,6 @@ function ConversationsPageContent() {
     [updateParams]
   );
 
-  // Handle tab change
-  const handleTabChange = useCallback(
-    (tab: string) => {
-      setActiveTab(tab);
-      updateParams({ status: tab === 'all' ? null : tab });
-    },
-    [updateParams]
-  );
-
   // Render list content
   const renderContent = () => {
     if (conversationsQuery.isError) {
@@ -120,26 +98,20 @@ function ConversationsPageContent() {
       !conversationsQuery.data?.pages[0]?.data ||
       items.length === 0
     ) {
-      const hasFilter = search || statusParam;
       return (
         <EmptyState
           icon={MessageSquare}
-          title={hasFilter ? 'No conversations found' : 'No conversations yet'}
+          title={search ? 'No conversations found' : 'No conversations yet'}
           description={
             search
               ? `No conversations match "${search}". Try a different search term.`
-              : statusParam === 'archived'
-                ? 'You have no archived conversations.'
-                : 'Start a new conversation to see it here.'
+              : 'Start a new conversation to see it here.'
           }
           action={
-            hasFilter
+            search
               ? {
-                  label: 'Clear filters',
-                  onClick: () => {
-                    setActiveTab('all');
-                    updateParams({ search: null, status: null });
-                  },
+                  label: 'Clear search',
+                  onClick: () => updateParams({ search: null }),
                 }
               : undefined
           }
@@ -193,42 +165,13 @@ function ConversationsPageContent() {
         className="max-w-md"
       />
 
-      {/* Loading state */}
+      {/* Content */}
       {conversationsQuery.isLoading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-9 w-64 rounded-full" />
-          <ConversationListSkeleton />
-        </div>
+        <ConversationListSkeleton />
       ) : (
-        <>
-          {/* Tabs */}
-          <AnimatedTabs
-            tabs={[
-              {
-                value: 'all',
-                label: 'All',
-                icon: <Inbox className="h-4 w-4" />,
-              },
-              {
-                value: 'active',
-                label: 'Active',
-                icon: <MessageSquare className="h-4 w-4" />,
-              },
-              {
-                value: 'archived',
-                label: 'Archived',
-                icon: <Archive className="h-4 w-4" />,
-              },
-            ]}
-            value={activeTab}
-            onValueChange={handleTabChange}
-            className="animate-in slide-in-from-top-2 duration-300"
-          />
-
-          <div className="mt-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            {renderContent()}
-          </div>
-        </>
+        <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+          {renderContent()}
+        </div>
       )}
     </PageContainer>
   );
@@ -247,10 +190,7 @@ function ConversationsPage() {
             description="Browse and search your AI conversations."
           />
           <Skeleton className="h-10 max-w-md" />
-          <div className="space-y-4">
-            <Skeleton className="h-9 w-64 rounded-full" />
-            <ConversationListSkeleton />
-          </div>
+          <ConversationListSkeleton />
         </PageContainer>
       }
     >

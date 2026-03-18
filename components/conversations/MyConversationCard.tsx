@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, MessageSquare, Bot } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import type { ConversationListItem } from '@/types/chat';
@@ -30,7 +30,7 @@ function MyConversationCard({
   className,
   style,
 }: MyConversationCardProps) {
-  const { id, title, agent, status, messages_count, updated_at } = conversation;
+  const { id, title, status, updated_at } = conversation;
 
   return (
     <Link
@@ -61,20 +61,6 @@ function MyConversationCard({
         </div>
       </div>
 
-      {/* Agent and message count */}
-      <div className="flex items-center gap-3 text-[16px] text-muted-foreground">
-        {agent && (
-          <span className="flex items-center gap-1.5">
-            <Bot className="h-3.5 w-3.5" />
-            <span className="truncate">{agent.name}</span>
-          </span>
-        )}
-        <span className="text-muted-foreground/50">·</span>
-        <span className="flex shrink-0 items-center gap-1">
-          <MessageSquare className="h-3.5 w-3.5" />
-          {messages_count} {messages_count === 1 ? 'message' : 'messages'}
-        </span>
-      </div>
     </Link>
   );
 }

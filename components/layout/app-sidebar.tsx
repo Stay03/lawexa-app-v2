@@ -4,6 +4,7 @@ import * as React from "react"
 import { useState } from "react"
 import {
   MessageSquarePlus,
+  MessageSquare,
   Library,
   Bookmark,
   ShieldCheck,
@@ -37,6 +38,11 @@ const navMain = [
     icon: MessageSquarePlus,
   },
   {
+    title: "Conversations",
+    url: "/conversations",
+    icon: MessageSquare,
+  },
+  {
     title: "Library",
     url: "#",
     icon: Library,
@@ -55,6 +61,7 @@ const navMain = [
 // URLs that guests cannot access — clicking opens AuthModal instead
 const GUEST_RESTRICTED_URLS = new Set([
   '/',
+  '/conversations',
   '/cases',
   '/notes',
   '/statutes',
