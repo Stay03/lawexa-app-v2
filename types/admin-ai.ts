@@ -175,6 +175,7 @@ export interface AdminAiAgent {
   system_prompt?: string | null;
   temperature: string;
   max_response_tokens: number;
+  max_iterations: number | null;
   is_active: boolean;
   model?: AdminAiModel;
   conversations_count?: number;
@@ -201,6 +202,7 @@ export interface AdminAiCreateAgentData {
   system_prompt: string;
   temperature?: number;
   max_response_tokens?: number;
+  max_iterations?: number | null;
   is_active?: boolean;
 }
 
@@ -212,6 +214,7 @@ export interface AdminAiUpdateAgentData {
   system_prompt?: string;
   temperature?: number;
   max_response_tokens?: number;
+  max_iterations?: number | null;
   is_active?: boolean;
 }
 

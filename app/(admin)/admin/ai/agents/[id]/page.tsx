@@ -31,6 +31,7 @@ import {
   Trash2,
   Thermometer,
   Hash,
+  Repeat,
   MessageSquare,
   Server,
   DollarSign,
@@ -177,6 +178,12 @@ export default function AiAgentDetailPage({
                 <Hash className="h-3 w-3" /> Max Response Tokens
               </p>
               <p className="tabular-nums">{agent.max_response_tokens.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1 flex items-center gap-1">
+                <Repeat className="h-3 w-3" /> Max Iterations
+              </p>
+              <p className="tabular-nums">{agent.max_iterations ?? 'Default'}</p>
             </div>
             <div>
               <p className="text-muted-foreground mb-1 flex items-center gap-1">

@@ -70,6 +70,13 @@ export const createAgentSchema = z.object({
     .min(100, 'Minimum is 100 tokens')
     .max(32000, 'Maximum is 32000 tokens')
     .optional(),
+  max_iterations: z
+    .number()
+    .int()
+    .min(1, 'Minimum is 1 iteration')
+    .max(50, 'Maximum is 50 iterations')
+    .nullable()
+    .optional(),
   is_active: z.boolean().optional(),
 });
 

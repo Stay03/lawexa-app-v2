@@ -73,6 +73,13 @@ const agentEditSchema = z.object({
     .min(100, 'Minimum is 100 tokens')
     .max(32000, 'Maximum is 32000 tokens')
     .optional(),
+  max_iterations: z
+    .number()
+    .int()
+    .min(1, 'Minimum is 1 iteration')
+    .max(50, 'Maximum is 50 iterations')
+    .nullable()
+    .optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -104,6 +111,7 @@ function AgentEditForm({ id, agent }: AgentEditFormProps) {
       system_prompt: agent.system_prompt || '',
       temperature: agent.temperature ? Number(agent.temperature) : 0.7,
       max_response_tokens: agent.max_response_tokens || 2048,
+      max_iterations: agent.max_iterations ?? null,
       is_active: agent.is_active,
     },
   });
@@ -314,6 +322,40 @@ function AgentEditForm({ id, agent }: AgentEditFormProps) {
                 )}
               />
             </div>
+
+            {/* Max Iterations */}
+            <FormField
+              control={form.control}
+              name="max_iterations"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Max Iterations
+                    <span className="ml-1 text-xs text-muted-foreground font-normal">
+                      (optional)
+                    </span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="50"
+                      placeholder="No limit"
+                      value={field.value ?? ''}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value === '' ? null : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Limits how many tool-calling rounds the agent can perform. Leave blank for default.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Active Switch */}
             <FormField
