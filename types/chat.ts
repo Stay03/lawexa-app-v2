@@ -310,6 +310,13 @@ export interface ConversationListItem {
   agent_id: number;
   title: string;
   status: 'active' | 'archived';
+  is_private: boolean;
+  agent: {
+    id: number;
+    name: string;
+    slug: string;
+    description: string | null;
+  };
   messages_count: number;
   created_at: string;
   updated_at: string;
@@ -320,17 +327,27 @@ export interface ConversationsListResponse {
   success: boolean;
   message: string;
   data: ConversationListItem[];
-  meta: {
+  pagination: {
     current_page: number;
-    last_page: number;
     per_page: number;
     total: number;
+    last_page: number;
+    from: number;
+    to: number;
+  };
+  links: {
+    first: string;
+    last: string;
+    prev: string | null;
+    next: string | null;
   };
 }
 
 // Query parameters for listing conversations
 export interface ListConversationsParams {
+  page?: number;
   per_page?: number;
+  search?: string;
   status?: 'active' | 'archived';
   sort_by?: 'created_at' | 'updated_at' | 'title';
   sort_order?: 'asc' | 'desc';
