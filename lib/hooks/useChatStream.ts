@@ -890,7 +890,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const statusResponse = await chatApi.getStatus(convId);
       const status = statusResponse.data;
 
-      if (status.status === 'completed' || status.status === 'failed') {
+      if (status.status === 'completed') {
         // Response already exists — merge missed messages
         if (status.messages.length > 0) {
           mergeMissedMessages(status.messages);
