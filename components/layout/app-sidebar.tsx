@@ -51,6 +51,7 @@ const navMain = [
       { title: "Notes", url: "/notes" },
       { title: "Statutes", url: "/statutes" },
       { title: "Folders", url: "/folders" },
+      { title: "Files", url: "/files" },
     ],
   },
   { title: "My Requests", url: "/content-requests", icon: ClipboardList },
@@ -66,6 +67,7 @@ const GUEST_RESTRICTED_URLS = new Set([
   '/notes',
   '/statutes',
   '/folders',
+  '/files',
   '/content-requests',
   '/bookmarks',
 ])
