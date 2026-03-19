@@ -93,7 +93,7 @@ export function FileUploadDialog({ open, onOpenChange }: FileUploadDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md overflow-hidden">
         <DialogHeader>
           <DialogTitle>Upload File</DialogTitle>
           <DialogDescription>

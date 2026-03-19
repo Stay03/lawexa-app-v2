@@ -77,8 +77,14 @@ function FilesPageContent() {
   // Flatten pages
   const items = filesQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
-  // Whether this is the very first load (no data yet)
-  const isInitialLoad = filesQuery.isLoading && !filesQuery.data;
+  // Only show full skeleton on the very first page visit (before any data loads)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  useEffect(() => {
+    if (!filesQuery.isLoading && filesQuery.data) {
+      setHasLoadedOnce(true);
+    }
+  }, [filesQuery.isLoading, filesQuery.data]);
+  const isInitialLoad = !hasLoadedOnce && filesQuery.isLoading;
 
   // Tab change — update URL
   const handleTabChange = (value: string) => {
