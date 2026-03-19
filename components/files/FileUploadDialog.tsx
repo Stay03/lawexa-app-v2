@@ -139,7 +139,7 @@ export function FileUploadDialog({ open, onOpenChange }: FileUploadDialogProps) 
 
           {/* Selected file preview */}
           {selectedFile && (
-            <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
+            <div className="flex items-center gap-3 overflow-hidden rounded-lg border bg-muted/30 p-3">
               <div className="rounded-lg bg-background p-2 shadow-sm">
                 {isImage ? (
                   <ImageIcon className="h-5 w-5 text-muted-foreground" />

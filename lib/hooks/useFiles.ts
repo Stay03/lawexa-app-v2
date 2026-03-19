@@ -27,7 +27,7 @@ export function useInfiniteFiles(params: Omit<FileListParams, 'page'> = {}) {
       return current_page < last_page ? current_page + 1 : undefined;
     },
     initialPageParam: 1,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 }
 
@@ -74,6 +74,8 @@ export function useDeleteFile() {
     mutationFn: (id: number) => filesApi.deleteFile(id),
     onSuccess: (data) => {
       toast.success(data.message || 'File deleted successfully.');
+      // Remove all cached list data to prevent stale items showing across tabs
+      queryClient.removeQueries({ queryKey: fileKeys.lists() });
       queryClient.invalidateQueries({ queryKey: fileKeys.lists() });
     },
     onError: (error) => {
