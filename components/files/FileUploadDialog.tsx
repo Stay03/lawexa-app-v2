@@ -93,7 +93,7 @@ export function FileUploadDialog({ open, onOpenChange }: FileUploadDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md overflow-hidden">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Upload File</DialogTitle>
           <DialogDescription>
@@ -110,7 +110,7 @@ export function FileUploadDialog({ open, onOpenChange }: FileUploadDialogProps) 
           }}
         />
 
-        <div className="mt-2 space-y-4">
+        <div className="mt-2 min-w-0 space-y-4">
           {/* Drop zone */}
           <FileUpload
             onFilesAdded={handleFilesAdded}
