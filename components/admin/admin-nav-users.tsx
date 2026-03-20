@@ -8,6 +8,7 @@ import {
   List,
   BarChart3,
   ShieldCheck,
+  Fingerprint,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -29,6 +30,7 @@ import {
 const userNavItems = [
   { title: 'All Users', url: '/admin/users', icon: List },
   { title: 'Analytics', url: '/admin/users/analytics', icon: BarChart3 },
+  { title: 'Device Intelligence', url: '/admin/device-intelligence', icon: Fingerprint },
   { title: 'Lawyer Verifications', url: '/admin/lawyer-verifications', icon: ShieldCheck },
 ];
 
@@ -38,6 +40,7 @@ export function AdminNavUsersSection() {
 
   const isSectionActive =
     pathname.startsWith('/admin/users') ||
+    pathname.startsWith('/admin/device-intelligence') ||
     pathname.startsWith('/admin/lawyer-verifications');
 
   return (

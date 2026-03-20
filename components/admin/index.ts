@@ -29,3 +29,8 @@ export { AdminUserFilters } from './AdminUserFilters';
 export { AdminMessagePackFilters } from './message-packs/AdminMessagePackFilters';
 export { AdminMessagePacksTable } from './message-packs/AdminMessagePacksTable';
 export { AdminMessagePackDetailView } from './message-packs/AdminMessagePackDetail';
+export { DeviceFilters } from './devices/DeviceFilters';
+export { DevicesTable } from './devices/DevicesTable';
+export { SharedDevicesTable } from './devices/SharedDevicesTable';
+export { IpClustersTable } from './devices/IpClustersTable';
+export { UserDeviceHistorySheet } from './devices/UserDeviceHistorySheet';
