@@ -182,8 +182,8 @@ function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
         <ChainOfThought>
           {messages.map((message, index) => {
             const isComplete = message.toolStatus === 'complete';
-            const isSuccess = isComplete && message.toolResult?.success;
-            const isError = isComplete && !message.toolResult?.success;
+            const isSuccess = isComplete && message.toolResult?.success !== false;
+            const isError = isComplete && message.toolResult?.success === false;
             const isLast = index === messages.length - 1;
             const isExpanded = expandedSteps.has(message.id);
 
@@ -338,8 +338,8 @@ function HandoverDisplay({
             <ChainOfThought>
               {toolMessages.map((message, index) => {
                 const isStepComplete = message.toolStatus === 'complete';
-                const isSuccess = isStepComplete && message.toolResult?.success;
-                const isError = isStepComplete && !message.toolResult?.success;
+                const isSuccess = isStepComplete && message.toolResult?.success !== false;
+                const isError = isStepComplete && message.toolResult?.success === false;
                 const isLast = index === toolMessages.length - 1;
                 const isExpanded = expandedSteps.has(message.id);
 

@@ -278,9 +278,18 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         let handoverResultContent: string | undefined;
         if (handoverResult) {
           const content = handoverResult.content;
-          // Only use content if it's not raw JSON (i.e., it's the agent's actual response)
-          if (content && !content.startsWith('{')) {
-            handoverResultContent = content;
+          if (content) {
+            // If content looks like JSON, try to extract the agent's text response
+            if (content.startsWith('{')) {
+              try {
+                const parsed = JSON.parse(content);
+                handoverResultContent = parsed.response || parsed.content || parsed.message || content;
+              } catch {
+                handoverResultContent = content;
+              }
+            } else {
+              handoverResultContent = content;
+            }
           }
         }
 
