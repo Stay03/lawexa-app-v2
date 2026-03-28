@@ -40,6 +40,10 @@ const WATCHDOG_CHECK_MS = 10_000;
 const POLL_INTERVAL_MS = 5_000;
 const POLL_MAX_DURATION_MS = 600_000; // 10 minutes
 
+// SSE reconnection: retry before falling back to polling
+const SSE_MAX_RECONNECTS = 3;
+const SSE_RECONNECT_DELAY_MS = 1_000;
+
 export function useChatStream(options: UseChatStreamOptions = {}) {
   const {
     onConnected,
@@ -65,6 +69,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastEventTimeRef = useRef<number>(0);
   const conversationIdRef = useRef<string | null>(null);
+  const executionIdRef = useRef<string | null>(null);
+  const reconnectCountRef = useRef<number>(0);
+  const reconnectStreamRef = useRef<(() => void) | null>(null);
   const token = useAuthStore((state) => state.token);
 
   // ─── Internal helpers ──────────────────────────────────────
@@ -476,20 +483,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           eventSourceRef.current = null;
         }
 
-        // Fall back to polling
-        const convId = conversationIdRef.current;
-        if (convId) {
-          pollForCompletion(convId);
-        } else {
-          setState((prev) => ({
-            ...prev,
-            isStreaming: false,
-            error: 'Connection lost',
-          }));
-        }
+        // Try SSE reconnection first, falls back to polling after max retries
+        reconnectStreamRef.current?.();
       }
     }, WATCHDOG_CHECK_MS);
-  }, [stopWatchdog, pollForCompletion]);
+  }, [stopWatchdog]);
 
   // ─── Load conversation history ─────────────────────────────
 
@@ -581,6 +579,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         error: null,
       }));
 
+      // Store execution ID for reconnection
+      executionIdRef.current = executionId;
+
       // Connect to SSE stream
       const encodedToken = encodeURIComponent(token);
       const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}?token=${encodedToken}`;
@@ -594,6 +595,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Handle connected event
       eventSource.addEventListener('connected', () => {
         lastEventTimeRef.current = Date.now();
+        reconnectCountRef.current = 0; // Reset on successful connection
         onConnected?.();
       });
 
@@ -700,27 +702,15 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         eventSourceRef.current = null;
       });
 
-      // Handle connection errors — auto-recover via polling
+      // Handle connection errors — auto-recover via SSE reconnection, then polling
       eventSource.onerror = () => {
         stopWatchdog();
         eventSource.close();
         eventSourceRef.current = null;
 
-        // Try to auto-recover: poll status endpoint until network is back
-        // and the response is ready. isStreaming stays true so the UI shows a loading indicator.
-        const convId = conversationIdRef.current;
-        if (convId) {
-          pollForCompletion(convId);
-        } else {
-          // No conversation context — can't recover, show error
-          const errorMsg = 'Connection error';
-          setState((prev) => ({
-            ...prev,
-            error: errorMsg,
-            isStreaming: false,
-          }));
-          onError?.(errorMsg);
-        }
+        // Try to reconnect SSE first (backend picks up from Redis/DB).
+        // Falls back to polling after SSE_MAX_RECONNECTS failures.
+        reconnectStreamRef.current?.();
       };
     },
     [
@@ -744,6 +734,49 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     ]
   );
 
+  // ─── SSE Reconnection ───────────────────────────────────────
+
+  // Attempt to reconnect SSE before falling back to polling.
+  // The backend picks up the live stream from Redis if still running,
+  // or returns the result from DB if already finished.
+  const reconnectStream = useCallback(() => {
+    const execId = executionIdRef.current;
+    const convId = conversationIdRef.current;
+
+    // No execution ID or max retries exceeded → fall back to polling
+    if (!execId || reconnectCountRef.current >= SSE_MAX_RECONNECTS) {
+      reconnectCountRef.current = 0;
+      if (convId) {
+        pollForCompletion(convId);
+      } else {
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          error: 'Connection lost',
+        }));
+      }
+      return;
+    }
+
+    reconnectCountRef.current += 1;
+
+    // Close existing connection if any
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    // Brief delay before reconnecting to avoid hammering the server
+    setTimeout(() => {
+      // Guard: stream may have been intentionally closed during the delay
+      if (!executionIdRef.current) return;
+      connectToStream(executionIdRef.current);
+    }, SSE_RECONNECT_DELAY_MS);
+  }, [pollForCompletion, connectToStream]);
+
+  // Keep ref in sync so onerror/watchdog callbacks can access latest reconnectStream
+  reconnectStreamRef.current = reconnectStream;
+
   // ─── Set conversation ID ───────────────────────────────────
 
   const setConversationId = useCallback((id: string) => {
@@ -759,6 +792,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const disconnect = useCallback(() => {
     stopWatchdog();
     stopPolling();
+    executionIdRef.current = null;
+    reconnectCountRef.current = 0;
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -967,10 +1002,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const status = response.data;
 
       if (status.status === 'pending') {
-        // Always poll (not SSE reconnect) so that when execution completes,
-        // we reload full conversation history with all tool calls included.
         setState((prev) => ({ ...prev, isStreaming: true, error: null }));
-        pollForCompletion(conversationId);
+        if (status.execution_id) {
+          // Reconnect to live SSE stream for real-time tool call updates
+          connectToStream(status.execution_id);
+        } else {
+          // No execution yet — poll until it completes
+          pollForCompletion(conversationId);
+        }
         return 'reconnected';
       }
 
@@ -980,7 +1019,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Status endpoint failed — fall back to loading history
       return 'load_history';
     }
-  }, [pollForCompletion]);
+  }, [pollForCompletion, connectToStream]);
 
   // ─── Public API ────────────────────────────────────────────
 

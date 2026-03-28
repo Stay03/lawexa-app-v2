@@ -148,6 +148,8 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const isMobile = useIsMobile();
   const token = useAuthStore((state) => state.token);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const executionIdRef = useRef<string | null>(null);
+  const hasReconnectedRef = useRef<boolean>(false);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Calculate left offset based on sidebar state
@@ -254,6 +256,8 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         return;
       }
 
+      // Store execution ID for reconnection
+      executionIdRef.current = executionId;
       setIsStreaming(true);
 
       const encodedToken = encodeURIComponent(token);
@@ -263,7 +267,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
       eventSourceRef.current = eventSource;
 
       eventSource.addEventListener('connected', () => {
-        console.log('Stream connected');
+        hasReconnectedRef.current = false; // Reset on successful connection
       });
 
       eventSource.addEventListener('tool_calling', (e) => {
@@ -284,6 +288,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
       eventSource.addEventListener('end', () => {
         eventSource.close();
         eventSourceRef.current = null;
+        executionIdRef.current = null;
         setIsStreaming(false);
       });
 
@@ -291,14 +296,26 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         console.error('Stream error');
         eventSource.close();
         eventSourceRef.current = null;
+        executionIdRef.current = null;
         setIsStreaming(false);
       });
 
       eventSource.onerror = () => {
-        console.error('Connection error');
         eventSource.close();
         eventSourceRef.current = null;
-        setIsStreaming(false);
+
+        // Try one SSE reconnect before giving up
+        const execId = executionIdRef.current;
+        if (execId && !hasReconnectedRef.current) {
+          hasReconnectedRef.current = true;
+          setTimeout(() => {
+            if (!executionIdRef.current) return;
+            connectToStream(executionIdRef.current);
+          }, 1_000);
+        } else {
+          executionIdRef.current = null;
+          setIsStreaming(false);
+        }
       };
     },
     [token, addToolMessage, updateToolMessage, addAssistantMessage]
