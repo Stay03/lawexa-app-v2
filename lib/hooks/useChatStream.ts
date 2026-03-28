@@ -196,7 +196,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               handoverStatus: 'complete',
               latencyMs: event.latency_ms,
               success: event.success,
-              handoverResultContent: event.response_preview || undefined,
+              handoverResultContent: event.content || event.response_preview || undefined,
             } as HandoverMessage;
           }
           return msg;

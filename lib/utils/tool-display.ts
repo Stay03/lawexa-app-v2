@@ -133,7 +133,7 @@ export function extractToolDisplayData(message: ToolMessage): ToolDisplayData {
     parameters: params,
     resultSummary,
     itemCount,
-    success: toolResult?.success ?? false,
+    success: toolResult?.success ?? true,
     error: toolResult?.error ?? null,
   };
 }

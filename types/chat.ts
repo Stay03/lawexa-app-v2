@@ -143,6 +143,7 @@ export interface HandoverCompleteEvent {
   agent_slug: string;
   success: boolean;
   response_preview?: string;
+  content?: string;
   latency_ms: number;
   handover_type?: 'consult' | 'transfer';
   timestamp: string;
