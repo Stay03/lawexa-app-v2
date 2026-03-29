@@ -2,26 +2,22 @@
 
 import React, { useRef, useEffect, forwardRef, useState, useCallback, useImperativeHandle } from 'react';
 import { cn } from '@/lib/utils';
-import { ArrowDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
-// ChatContainerRoot - scrollable container with scroll-to-bottom button
+// ChatContainerRoot - scrollable container with scroll state tracking
 export interface ChatContainerRootProps
   extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  sidebarOffset?: string;
-  bottomOffset?: number;
+  onScrollStateChange?: (needsScroll: boolean) => void;
 }
 
 export const ChatContainerRoot = forwardRef<
   HTMLDivElement,
   ChatContainerRootProps
->(({ children, className, sidebarOffset, bottomOffset, ...props }, ref) => {
+>(({ children, className, onScrollStateChange, ...props }, ref) => {
   const localRef = useRef<HTMLDivElement>(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const [hasNewMessage, setHasNewMessage] = useState(false);
   const prevChildrenRef = useRef(children);
   const isNearBottomRef = useRef(true);
+  const needsScrollRef = useRef(false);
 
   // Expose localRef as the forwarded ref so parent can also use it
   useImperativeHandle(ref, () => localRef.current as HTMLDivElement);
@@ -35,19 +31,19 @@ export const ChatContainerRoot = forwardRef<
       isNearBottomRef.current = distanceFromBottom <= 100;
 
       // Hide button when user scrolls to bottom
-      if (isNearBottomRef.current) {
-        setShowScrollButton(false);
-        setHasNewMessage(false);
+      if (isNearBottomRef.current && needsScrollRef.current) {
+        needsScrollRef.current = false;
+        onScrollStateChange?.(false);
       }
     }
-  }, []);
+  }, [onScrollStateChange]);
 
   // Listen to scroll events on the container + check position on mount
   useEffect(() => {
     const scrollEl = localRef.current;
     if (scrollEl) {
       scrollEl.addEventListener('scroll', checkScrollPosition);
-      checkScrollPosition(); // Set initial position immediately
+      checkScrollPosition();
       return () => scrollEl.removeEventListener('scroll', checkScrollPosition);
     }
   }, [checkScrollPosition]);
@@ -57,7 +53,7 @@ export const ChatContainerRoot = forwardRef<
     if (children !== prevChildrenRef.current) {
       prevChildrenRef.current = children;
 
-      // Re-check scroll position before deciding (ref may be stale)
+      // Re-check scroll position before deciding
       const scrollEl = localRef.current;
       if (scrollEl) {
         const { scrollTop, scrollHeight, clientHeight } = scrollEl;
@@ -65,53 +61,21 @@ export const ChatContainerRoot = forwardRef<
         isNearBottomRef.current = distanceFromBottom <= 100;
       }
 
-      if (!isNearBottomRef.current) {
-        setHasNewMessage(true);
-        setShowScrollButton(true);
+      if (!isNearBottomRef.current && !needsScrollRef.current) {
+        needsScrollRef.current = true;
+        onScrollStateChange?.(true);
       }
     }
-  }, [children]);
-
-  // Scroll to bottom handler
-  const scrollToBottom = useCallback(() => {
-    const scrollEl = localRef.current;
-    if (scrollEl) {
-      scrollEl.scrollTo({
-        top: scrollEl.scrollHeight,
-        behavior: 'smooth',
-      });
-      setShowScrollButton(false);
-      setHasNewMessage(false);
-    }
-  }, []);
+  }, [children, onScrollStateChange]);
 
   return (
-    <>
-      <div
-        ref={localRef}
-        className={cn('h-full', className)}
-        {...props}
-      >
-        {children}
-      </div>
-
-      {/* Scroll to bottom button - only shows when new content and not at bottom */}
-      {showScrollButton && hasNewMessage && (
-        <div
-          className="pointer-events-none fixed right-0 z-40 flex justify-center transition-[left] duration-200 ease-linear"
-          style={{ left: sidebarOffset || '0px', bottom: bottomOffset ? bottomOffset + 16 : 80 }}
-        >
-          <Button
-            size="icon"
-            variant="secondary"
-            className="pointer-events-auto h-10 w-10 rounded-full shadow-lg"
-            onClick={scrollToBottom}
-          >
-            <ArrowDown className="h-5 w-5" />
-          </Button>
-        </div>
-      )}
-    </>
+    <div
+      ref={localRef}
+      className={cn('h-full', className)}
+      {...props}
+    >
+      {children}
+    </div>
   );
 });
 ChatContainerRoot.displayName = 'ChatContainerRoot';

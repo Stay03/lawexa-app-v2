@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/collapsible';
 import { CompactToolChain } from '@/components/chat/compact-tool-chain';
 import {
+  ArrowDown,
   ArrowUp,
   Paperclip,
   X,
@@ -291,19 +292,7 @@ function ConversationPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const initializedRef = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const inputAreaRef = useRef<HTMLDivElement>(null);
-  const [inputAreaHeight, setInputAreaHeight] = useState(80);
-
-  // Track input area height for scroll button positioning
-  useEffect(() => {
-    const el = inputAreaRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      setInputAreaHeight(entry.contentRect.height + 16);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const [showScrollDown, setShowScrollDown] = useState(false);
 
   // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
@@ -704,7 +693,7 @@ function ConversationPageContent() {
   return (
     <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>
       {/* Chat messages */}
-      <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28" sidebarOffset={sidebarWidth} bottomOffset={inputAreaHeight}>
+      <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28" onScrollStateChange={setShowScrollDown}>
           <ChatContainerContent>
             {/* Context display and folder action */}
             {(contextSlug || (isOwner && messages.length > 0)) && (
@@ -812,10 +801,22 @@ function ConversationPageContent() {
 
       {/* Input area - fixed at bottom */}
       <div
-        ref={inputAreaRef}
         className="fixed bottom-4 right-0 z-50 px-4 transition-[left] duration-200 ease-linear"
         style={{ left: sidebarWidth }}
       >
+        {/* Scroll to bottom button - sits above the input */}
+        {showScrollDown && (
+          <div className="flex justify-center mb-2">
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-10 w-10 rounded-full shadow-lg"
+              onClick={() => chatContainerRef.current?.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' })}
+            >
+              <ArrowDown className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
         <div className="mx-auto max-w-xs sm:max-w-md">
           {/* Show input for owners, view-only indicator for non-owners */}
           {isOwner ? (
