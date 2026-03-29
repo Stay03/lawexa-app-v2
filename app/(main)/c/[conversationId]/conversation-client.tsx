@@ -786,7 +786,7 @@ function ConversationPageContent() {
                 onValueChange={setInput}
                 onSubmit={handleSubmit}
                 disabled={isStreaming || isLoadingHistory || isSubmitting}
-                maxHeight={36}
+                maxHeight={150}
               >
                 {/* Document File Preview - only shown when uploading or uploaded */}
                 {(isUploading || uploadedFile) && (
@@ -829,7 +829,6 @@ function ConversationPageContent() {
                   <PromptInputTextarea
                     placeholder="Ask me anything"
                     className="text-foreground min-h-[36px] py-2"
-                    disableAutosize
                   />
 
                   {/* Send/Stop button */}
