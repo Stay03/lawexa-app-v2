@@ -9,12 +9,13 @@ import { Button } from '@/components/ui/button';
 export interface ChatContainerRootProps
   extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
+  sidebarOffset?: string;
 }
 
 export const ChatContainerRoot = forwardRef<
   HTMLDivElement,
   ChatContainerRootProps
->(({ children, className, ...props }, ref) => {
+>(({ children, className, sidebarOffset, ...props }, ref) => {
   const localRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
@@ -95,14 +96,19 @@ export const ChatContainerRoot = forwardRef<
 
       {/* Scroll to bottom button - only shows when new content and not at bottom */}
       {showScrollButton && hasNewMessage && (
-        <Button
-          size="icon"
-          variant="secondary"
-          className="fixed bottom-20 left-1/2 z-40 h-10 w-10 -translate-x-1/2 rounded-full shadow-lg"
-          onClick={scrollToBottom}
+        <div
+          className="pointer-events-none fixed bottom-20 right-0 z-40 flex justify-center transition-[left] duration-200 ease-linear"
+          style={{ left: sidebarOffset || '0px' }}
         >
-          <ArrowDown className="h-5 w-5" />
-        </Button>
+          <Button
+            size="icon"
+            variant="secondary"
+            className="pointer-events-auto h-10 w-10 rounded-full shadow-lg"
+            onClick={scrollToBottom}
+          >
+            <ArrowDown className="h-5 w-5" />
+          </Button>
+        </div>
       )}
     </>
   );

@@ -666,7 +666,7 @@ function ConversationPageContent() {
   return (
     <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>
       {/* Chat messages */}
-      <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28">
+      <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28" sidebarOffset={sidebarWidth}>
           <ChatContainerContent>
             {/* Context display and folder action */}
             {(contextSlug || (isOwner && messages.length > 0)) && (
