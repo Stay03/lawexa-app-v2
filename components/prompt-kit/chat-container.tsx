@@ -40,11 +40,12 @@ export const ChatContainerRoot = forwardRef<
     }
   }, []);
 
-  // Listen to scroll events on the container
+  // Listen to scroll events on the container + check position on mount
   useEffect(() => {
     const scrollEl = localRef.current;
     if (scrollEl) {
       scrollEl.addEventListener('scroll', checkScrollPosition);
+      checkScrollPosition(); // Set initial position immediately
       return () => scrollEl.removeEventListener('scroll', checkScrollPosition);
     }
   }, [checkScrollPosition]);
@@ -53,6 +54,14 @@ export const ChatContainerRoot = forwardRef<
   useEffect(() => {
     if (children !== prevChildrenRef.current) {
       prevChildrenRef.current = children;
+
+      // Re-check scroll position before deciding (ref may be stale)
+      const scrollEl = localRef.current;
+      if (scrollEl) {
+        const { scrollTop, scrollHeight, clientHeight } = scrollEl;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        isNearBottomRef.current = distanceFromBottom <= 100;
+      }
 
       if (!isNearBottomRef.current) {
         setHasNewMessage(true);
