@@ -841,20 +841,19 @@ function ConversationPageContent() {
                   </div>
                 )}
 
-                {/* Inline input with buttons */}
-                <div className="flex items-center gap-2 px-1">
-                  {/* Attach button */}
+                {/* Textarea - full width */}
+                <PromptInputTextarea
+                  placeholder="Ask me anything"
+                  className="text-foreground min-h-[36px] py-2 px-3"
+                />
+
+                {/* Bottom bar: attach left, send right */}
+                <div className="flex items-center justify-between px-2 pb-1">
                   <FileUploadTrigger asChild>
                     <button className="hover:bg-secondary-foreground/10 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-2xl">
                       <Paperclip className="text-primary h-4 w-4" />
                     </button>
                   </FileUploadTrigger>
-
-                  {/* Textarea */}
-                  <PromptInputTextarea
-                    placeholder="Ask me anything"
-                    className="text-foreground min-h-[36px] py-2"
-                  />
 
                   {/* Send/Stop button */}
                   {isStreaming ? (
