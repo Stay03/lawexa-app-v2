@@ -44,6 +44,11 @@ const POLL_MAX_DURATION_MS = 600_000; // 10 minutes
 const SSE_MAX_RECONNECTS = 3;
 const SSE_RECONNECT_DELAY_MS = 1_000;
 
+// Heartbeat-only stale detection: if we receive this many consecutive
+// heartbeats with zero data events, check the conversation status via API.
+// At 5s heartbeat intervals, 12 heartbeats ≈ 60 seconds.
+const HEARTBEAT_ONLY_THRESHOLD = 12;
+
 export function useChatStream(options: UseChatStreamOptions = {}) {
   const {
     onConnected,
@@ -72,6 +77,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const executionIdRef = useRef<string | null>(null);
   const reconnectCountRef = useRef<number>(0);
   const reconnectStreamRef = useRef<(() => void) | null>(null);
+  const consecutiveHeartbeatsRef = useRef<number>(0);
+  const staleCheckInFlightRef = useRef<boolean>(false);
   const token = useAuthStore((state) => state.token);
 
   // ─── Internal helpers ──────────────────────────────────────
@@ -489,6 +496,58 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }, WATCHDOG_CHECK_MS);
   }, [stopWatchdog]);
 
+  // ─── Stale stream check ─────────────────────────────────────
+  // Detects when SSE is alive (heartbeats flowing) but no data events arrive,
+  // e.g. when another tab already consumed the completed/end events.
+
+  const checkStaleStream = useCallback(async () => {
+    const convId = conversationIdRef.current;
+    if (!convId || staleCheckInFlightRef.current) return;
+
+    staleCheckInFlightRef.current = true;
+    try {
+      const response = await chatApi.getStatus(convId);
+      const status = response.data.status;
+
+      if (status !== 'pending') {
+        // The AI finished but this tab never got the terminal event.
+        // Close the stale stream and load the final conversation.
+        stopWatchdog();
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+        executionIdRef.current = null;
+
+        try {
+          const conv = await chatApi.getConversation(convId);
+          if (conv.success && conv.data.messages) {
+            const transformed = transformApiMessages(conv.data.messages);
+            setState((prev) => ({
+              ...prev,
+              messages: transformed,
+              conversationTitle: conv.data.title || prev.conversationTitle,
+              isStreaming: false,
+              error: null,
+            }));
+            onHistoryLoaded?.(conv.data);
+          } else {
+            setState((prev) => ({ ...prev, isStreaming: false, error: null }));
+          }
+        } catch {
+          setState((prev) => ({ ...prev, isStreaming: false, error: null }));
+        }
+      }
+      // If still pending, reset counter and let the stream continue
+      consecutiveHeartbeatsRef.current = 0;
+    } catch {
+      // Status check failed — reset and try again later
+      consecutiveHeartbeatsRef.current = 0;
+    } finally {
+      staleCheckInFlightRef.current = false;
+    }
+  }, [stopWatchdog, transformApiMessages, onHistoryLoaded]);
+
   // ─── Load conversation history ─────────────────────────────
 
   const loadConversationHistory = useCallback(async (conversationId: string) => {
@@ -592,16 +651,23 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Start watchdog timer
       startWatchdog();
 
+      // Reset heartbeat-only counter on any real data event
+      const resetHeartbeatCounter = () => {
+        consecutiveHeartbeatsRef.current = 0;
+      };
+
       // Handle connected event
       eventSource.addEventListener('connected', () => {
         lastEventTimeRef.current = Date.now();
         reconnectCountRef.current = 0; // Reset on successful connection
+        resetHeartbeatCounter();
         onConnected?.();
       });
 
       // Handle iteration event
       eventSource.addEventListener('iteration', (e) => {
         lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
         const event: IterationEvent = JSON.parse(e.data);
         onIteration?.(event);
       });
@@ -609,6 +675,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Handle handover_started event - sub-agent delegation
       eventSource.addEventListener('handover_started', (e) => {
         lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
         const event: HandoverStartedEvent = JSON.parse(e.data);
         addHandoverMessage(event);
       });
@@ -616,6 +683,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Handle handover_complete event - sub-agent finished
       eventSource.addEventListener('handover_complete', (e) => {
         lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
         const event: HandoverCompleteEvent = JSON.parse(e.data);
         updateHandoverMessage(event);
       });
@@ -623,6 +691,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Handle tool_calling event - add as separate history entry
       eventSource.addEventListener('tool_calling', (e) => {
         lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
         const event: ToolCallingEvent = JSON.parse(e.data);
         addToolMessage(event);
         onToolCalling?.(event);
@@ -631,14 +700,21 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Handle tool_complete event - update the tool message
       eventSource.addEventListener('tool_complete', (e) => {
         lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
         const event: ToolCompleteEvent = JSON.parse(e.data);
         updateToolMessage(event.tool_call.name, event);
         onToolComplete?.(event);
       });
 
-      // Handle heartbeat (keep-alive)
+      // Handle heartbeat — track consecutive heartbeats without data events.
+      // If threshold exceeded, check if the AI actually finished (another tab
+      // may have consumed the completed/end events).
       eventSource.addEventListener('heartbeat', () => {
         lastEventTimeRef.current = Date.now();
+        consecutiveHeartbeatsRef.current += 1;
+        if (consecutiveHeartbeatsRef.current >= HEARTBEAT_ONLY_THRESHOLD) {
+          checkStaleStream();
+        }
       });
 
       // Handle completed event - NOW add the assistant message
@@ -725,6 +801,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       startWatchdog,
       stopWatchdog,
       pollForCompletion,
+      checkStaleStream,
       onConnected,
       onIteration,
       onToolCalling,
@@ -794,6 +871,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     stopPolling();
     executionIdRef.current = null;
     reconnectCountRef.current = 0;
+    consecutiveHeartbeatsRef.current = 0;
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
