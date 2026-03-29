@@ -124,22 +124,29 @@ function renderErrorState(): string {
 }
 
 function renderRichContent(caseData: CaseDetail): string {
-  // Get content: prefer principles, fallback to excerpt
-  const rawContent = caseData.principles
-    ? stripHtml(caseData.principles)
-    : caseData.excerpt || '';
-  const content = truncateText(rawContent, 200);
+  // Build full content: principles + body/excerpt
+  const parts: string[] = [];
+  if (caseData.principles) {
+    parts.push(stripHtml(caseData.principles));
+  }
+  if (caseData.body || caseData.excerpt) {
+    const bodyText = stripHtml(caseData.body || caseData.excerpt || '');
+    if (bodyText && bodyText !== parts[0]) {
+      parts.push(bodyText);
+    }
+  }
+  const content = parts.join('\n\n');
 
   // Build meta items
   const metaItems: string[] = [];
 
-  if (caseData.court?.abbreviation || caseData.court?.name) {
+  if (caseData.court?.name) {
     metaItems.push(`
       <span class="case-preview-tooltip__meta-item">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/>
         </svg>
-        ${escapeHtml(caseData.court.abbreviation || caseData.court.name)}
+        ${escapeHtml(caseData.court.name)}
       </span>
     `);
   }
@@ -159,7 +166,7 @@ function renderRichContent(caseData: CaseDetail): string {
     <div class="case-preview-tooltip">
       <div class="case-preview-tooltip__header">${escapeHtml(caseData.title)}</div>
       ${metaItems.length > 0 ? `<div class="case-preview-tooltip__meta">${metaItems.join('')}</div>` : ''}
-      ${content ? `<div class="case-preview-tooltip__content">${escapeHtml(content)}</div>` : ''}
+      ${content ? `<div class="case-preview-tooltip__content" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;">${escapeHtml(content)}</div>` : ''}
       <div class="case-preview-tooltip__footer">Click to view full case</div>
     </div>
   `;
