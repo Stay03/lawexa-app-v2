@@ -166,7 +166,7 @@ function renderRichContent(caseData: CaseDetail): string {
     <div class="case-preview-tooltip">
       <div class="case-preview-tooltip__header">${escapeHtml(caseData.title)}</div>
       ${metaItems.length > 0 ? `<div class="case-preview-tooltip__meta">${metaItems.join('')}</div>` : ''}
-      ${content ? `<div class="case-preview-tooltip__content" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;">${escapeHtml(content)}</div>` : ''}
+      ${content ? `<div class="case-preview-tooltip__content" style="max-height:400px;overflow-y:auto;white-space:pre-wrap;">${escapeHtml(content)}</div>` : ''}
       <div class="case-preview-tooltip__footer">Click to view full case</div>
     </div>
   `;
@@ -219,6 +219,7 @@ export function useCaseMentionTooltips({
           duration: [200, 150],
           arrow: true,
           theme: 'case-mention-tooltip',
+          maxWidth: 450,
           interactive: true,
           interactiveBorder: 10,
           appendTo: document.body,
