@@ -39,7 +39,10 @@ import { formatFileSize } from '@/lib/validations/admin-cases';
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function HomePage() {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('home_input_draft') ?? '';
+  });
   const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -53,6 +56,15 @@ export default function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
   const isGuest = useAuthStore((state) => state.isGuest);
+
+  // Sync input draft to localStorage
+  useEffect(() => {
+    if (input) {
+      localStorage.setItem('home_input_draft', input);
+    } else {
+      localStorage.removeItem('home_input_draft');
+    }
+  }, [input]);
 
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
@@ -117,6 +129,7 @@ export default function HomePage() {
     }
 
     localStorage.removeItem('guest_pending_prompt');
+    localStorage.removeItem('home_input_draft');
     setIsSubmitting(true);
 
     try {

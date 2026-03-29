@@ -62,6 +62,14 @@ import { ErrorState } from '@/components/common/ErrorState';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
+// Format elapsed seconds into human-readable time
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
+}
+
 // Format agent slug to readable name
 function formatAgentName(slug: string): string {
   return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -246,7 +254,10 @@ function ConversationPageContent() {
   // Guest auth — acquire token if user is unauthenticated
   const { isReady: isGuestReady, isLoading: isGuestLoading, error: guestError } = useGuestAuth();
 
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem(`conversation_draft_${conversationId}`) ?? '';
+  });
   const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -256,6 +267,15 @@ function ConversationPageContent() {
 
   // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
+
+  // Sync input draft to localStorage
+  useEffect(() => {
+    if (input) {
+      localStorage.setItem(`conversation_draft_${conversationId}`, input);
+    } else {
+      localStorage.removeItem(`conversation_draft_${conversationId}`);
+    }
+  }, [input, conversationId]);
 
   // Get current user for ownership check
   const user = useAuthStore((state) => state.user);
@@ -370,6 +390,7 @@ function ConversationPageContent() {
 
     const attachment = uploadedFile ? { ...uploadedFile } : undefined;
     setInput('');
+    localStorage.removeItem(`conversation_draft_${conversationId}`);
     setUploadedFile(null);
     setIsSubmitting(true);
 
@@ -681,10 +702,14 @@ function ConversationPageContent() {
               const isFirstToolGroup = isToolGroup && !messageGroups.slice(0, groupIndex).some(
                 g => g.type === 'tool-chain' || g.type === 'handover-group'
               );
-              const timerElement = isFirstToolGroup && isStreaming && streamStartTime && elapsed > 0 ? (
+              const timerElement = isFirstToolGroup && streamStartTime && elapsed > 0 ? (
                 <div key="elapsed-timer" className="px-4 mb-1">
                   <div className="mx-auto max-w-2xl flex justify-end">
-                    <span className="text-muted-foreground text-xs">Processing · {elapsed}s</span>
+                    <span className="text-muted-foreground text-xs">
+                      {isStreaming
+                        ? `Processing · ${formatElapsed(elapsed)}`
+                        : `Worked for ${formatElapsed(elapsed)}`}
+                    </span>
                   </div>
                 </div>
               ) : null;
