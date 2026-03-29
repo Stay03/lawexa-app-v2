@@ -166,8 +166,7 @@ function renderRichContent(caseData: CaseDetail): string {
     <div class="case-preview-tooltip">
       <div class="case-preview-tooltip__header">${escapeHtml(caseData.title)}</div>
       ${metaItems.length > 0 ? `<div class="case-preview-tooltip__meta">${metaItems.join('')}</div>` : ''}
-      ${content ? `<div class="case-preview-tooltip__content" style="max-height:400px;overflow-y:auto;white-space:pre-wrap;">${escapeHtml(content)}</div>` : ''}
-      <div class="case-preview-tooltip__footer">Click to view full case</div>
+      ${content ? `<div class="case-preview-tooltip__content" style="max-height:800px;overflow-y:auto;white-space:pre-wrap;">${escapeHtml(content)}</div>` : ''}
     </div>
   `;
 }
