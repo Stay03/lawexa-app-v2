@@ -18,18 +18,13 @@ import {
   ChatContainerContent,
   Message,
   MessageContent,
-  ChainOfThought,
-  ChainOfThoughtStep,
-  ChainOfThoughtTrigger,
-  ChainOfThoughtContent,
 } from '@/components/prompt-kit';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { ToolCallDetails } from '@/components/chat/tool-call-details';
-import { SearchResultsList } from '@/components/chat/search-results-cards';
+import { CompactToolChain } from '@/components/chat/compact-tool-chain';
 import {
   ArrowUp,
   Paperclip,
@@ -66,53 +61,6 @@ import { ConversationNotAvailable } from '@/components/conversations';
 import { ErrorState } from '@/components/common/ErrorState';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
-
-// Format tool name and parameters into user-friendly text
-function formatToolMessage(
-  toolName: string,
-  parameters: Record<string, unknown>,
-  isComplete: boolean
-): { action: string; detail?: string } {
-  const query = parameters.query as string | undefined;
-
-  switch (toolName) {
-    case 'search_cases':
-      return {
-        action: isComplete ? 'Searched cases' : 'Searching cases',
-        detail: query ? `for "${query}"` : undefined,
-      };
-    case 'search_notes':
-      return {
-        action: isComplete ? 'Searched notes' : 'Searching notes',
-        detail: query ? `for "${query}"` : undefined,
-      };
-    case 'get_case':
-    case 'get_case_details':
-      return {
-        action: isComplete ? 'Retrieved case details' : 'Retrieving case details',
-        detail: parameters.case_id ? `for case #${parameters.case_id}` : undefined,
-      };
-    case 'get_note':
-    case 'get_note_details':
-      return {
-        action: isComplete ? 'Retrieved note' : 'Retrieving note',
-        detail: parameters.note_id ? `#${parameters.note_id}` : undefined,
-      };
-    default:
-      // Fallback: convert snake_case to readable format
-      const readable = toolName
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      return {
-        action: isComplete ? readable : `${readable}...`,
-      };
-  }
-}
-
-// Format latency in seconds
-function formatLatency(ms: number): string {
-  return `found in ${(ms / 1000).toFixed(2)}s`;
-}
 
 // Format agent slug to readable name
 function formatAgentName(slug: string): string {
@@ -160,85 +108,12 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
   return groups;
 }
 
-// Tool chain display component - renders linked tool calls
+// Tool chain display component - compact animated view
 function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
-
-  const toggleStep = (messageId: string) => {
-    setExpandedSteps((prev) => {
-      const next = new Set(prev);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  };
-
   return (
     <div className="px-4">
       <div className="mx-auto max-w-2xl">
-        <ChainOfThought>
-          {messages.map((message, index) => {
-            const isComplete = message.toolStatus === 'complete';
-            const isSuccess = isComplete && message.toolResult?.success !== false;
-            const isError = isComplete && message.toolResult?.success === false;
-            const isLast = index === messages.length - 1;
-            const isExpanded = expandedSteps.has(message.id);
-
-            const status = !isComplete ? 'loading' : isSuccess ? 'success' : 'error';
-
-            const { action, detail } = formatToolMessage(
-              message.toolName,
-              message.toolParameters,
-              isComplete
-            );
-
-            return (
-              <ChainOfThoughtStep
-                key={message.id}
-                isLast={isLast}
-                status={status}
-              >
-                <Collapsible
-                  open={isExpanded}
-                  onOpenChange={() => isComplete && toggleStep(message.id)}
-                >
-                  <CollapsibleTrigger asChild disabled={!isComplete}>
-                    <ChainOfThoughtTrigger
-                      isClickable={isComplete}
-                      isExpanded={isExpanded}
-                      rightContent={
-                        isComplete && message.latencyMs
-                          ? formatLatency(message.latencyMs)
-                          : undefined
-                      }
-                    >
-                      <span className="font-medium">{action}</span>
-                      {detail && (
-                        <span className="text-muted-foreground font-normal"> {detail}</span>
-                      )}
-                    </ChainOfThoughtTrigger>
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
-                    <ChainOfThoughtContent>
-                      <ToolCallDetails message={message} />
-                      <SearchResultsList message={message} />
-                    </ChainOfThoughtContent>
-                  </CollapsibleContent>
-                </Collapsible>
-
-                {isError && !isExpanded && (
-                  <p className="text-destructive mt-1 text-sm">
-                    Error: {message.toolResult?.error || 'Unknown error'}
-                  </p>
-                )}
-              </ChainOfThoughtStep>
-            );
-          })}
-        </ChainOfThought>
+        <CompactToolChain messages={messages} />
       </div>
     </div>
   );
@@ -254,19 +129,6 @@ function HandoverDisplay({
 }) {
   const [isTaskExpanded, setIsTaskExpanded] = useState(false);
   const [isResultExpanded, setIsResultExpanded] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
-
-  const toggleStep = (messageId: string) => {
-    setExpandedSteps((prev) => {
-      const next = new Set(prev);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  };
 
   const agentName = formatAgentName(handover.agentSlug);
   const isComplete = handover.handoverStatus === 'complete';
@@ -335,74 +197,7 @@ function HandoverDisplay({
         {/* Nested tool chain */}
         {toolMessages.length > 0 && (
           <div className="ml-2">
-            <ChainOfThought>
-              {toolMessages.map((message, index) => {
-                const isStepComplete = message.toolStatus === 'complete';
-                const isSuccess = isStepComplete && message.toolResult?.success !== false;
-                const isError = isStepComplete && message.toolResult?.success === false;
-                const isLast = index === toolMessages.length - 1;
-                const isExpanded = expandedSteps.has(message.id);
-
-                const status = !isStepComplete
-                  ? 'loading'
-                  : isSuccess
-                    ? 'success'
-                    : 'error';
-
-                const { action, detail } = formatToolMessage(
-                  message.toolName,
-                  message.toolParameters,
-                  isStepComplete
-                );
-
-                return (
-                  <ChainOfThoughtStep
-                    key={message.id}
-                    isLast={isLast}
-                    status={status}
-                  >
-                    <Collapsible
-                      open={isExpanded}
-                      onOpenChange={() =>
-                        isStepComplete && toggleStep(message.id)
-                      }
-                    >
-                      <CollapsibleTrigger asChild disabled={!isStepComplete}>
-                        <ChainOfThoughtTrigger
-                          isClickable={isStepComplete}
-                          isExpanded={isExpanded}
-                          rightContent={
-                            isStepComplete && message.latencyMs
-                              ? formatLatency(message.latencyMs)
-                              : undefined
-                          }
-                        >
-                          <span className="font-medium">{action}</span>
-                          {detail && (
-                            <span className="text-muted-foreground font-normal">
-                              {' '}
-                              {detail}
-                            </span>
-                          )}
-                        </ChainOfThoughtTrigger>
-                      </CollapsibleTrigger>
-
-                      <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
-                        <ChainOfThoughtContent>
-                          <ToolCallDetails message={message} />
-                        </ChainOfThoughtContent>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    {isError && !isExpanded && (
-                      <p className="text-destructive mt-1 text-sm">
-                        Error: {message.toolResult?.error || 'Unknown error'}
-                      </p>
-                    )}
-                  </ChainOfThoughtStep>
-                );
-              })}
-            </ChainOfThought>
+            <CompactToolChain messages={toolMessages} showSearchResults={false} />
           </div>
         )}
 
