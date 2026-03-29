@@ -79,6 +79,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const reconnectStreamRef = useRef<(() => void) | null>(null);
   const consecutiveHeartbeatsRef = useRef<number>(0);
   const staleCheckInFlightRef = useRef<boolean>(false);
+  const dedupKeysRef = useRef<Set<string>>(new Set());
   const token = useAuthStore((state) => state.token);
 
   // ─── Internal helpers ──────────────────────────────────────
@@ -563,7 +564,35 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const response = await chatApi.getConversation(conversationId);
 
       if (response.success && response.data.messages) {
-        const transformedMessages = transformApiMessages(response.data.messages);
+        const apiMessages = response.data.messages;
+        const transformedMessages = transformApiMessages(apiMessages);
+
+        // Build dedup keys from raw API messages so SSE reconnect can skip
+        // events that are already rendered from history.
+        const dedup = new Set<string>();
+        for (const msg of apiMessages) {
+          const iter = msg.metadata?.iteration;
+          if (iter === undefined) continue;
+
+          if (msg.metadata?.type === 'tool_call') {
+            dedup.add(`${iter}:tool_calling`);
+            const hasResult = apiMessages.some(
+              (m) => m.role === 'tool' && m.metadata?.type === 'tool_result' && m.metadata?.iteration === iter
+            );
+            if (hasResult) dedup.add(`${iter}:tool_complete`);
+          } else if (msg.metadata?.type === 'handover') {
+            dedup.add(`${iter}:handover_started`);
+            const hasResult = apiMessages.some(
+              (m) => m.metadata?.type === 'handover_result' && m.metadata?.iteration === iter
+            );
+            if (hasResult) dedup.add(`${iter}:handover_complete`);
+          }
+        }
+        if (apiMessages.some((m) => m.role === 'assistant' && !m.metadata?.type)) {
+          dedup.add('completed');
+        }
+        dedupKeysRef.current = dedup;
+
         setState((prev) => ({
           ...prev,
           messages: transformedMessages,
@@ -651,6 +680,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Start watchdog timer
       startWatchdog();
 
+      // Snapshot dedup keys built from history — skip SSE events already rendered
+      const dedup = dedupKeysRef.current;
+
       // Reset heartbeat-only counter on any real data event
       const resetHeartbeatCounter = () => {
         consecutiveHeartbeatsRef.current = 0;
@@ -677,6 +709,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: HandoverStartedEvent = JSON.parse(e.data);
+        if (dedup.has(`${event.iteration}:handover_started`)) return;
         addHandoverMessage(event);
       });
 
@@ -685,6 +718,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: HandoverCompleteEvent = JSON.parse(e.data);
+        if (dedup.has(`${event.iteration}:handover_complete`)) return;
         updateHandoverMessage(event);
       });
 
@@ -693,6 +727,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: ToolCallingEvent = JSON.parse(e.data);
+        if (dedup.has(`${event.iteration}:tool_calling`)) return;
         addToolMessage(event);
         onToolCalling?.(event);
       });
@@ -702,6 +737,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: ToolCompleteEvent = JSON.parse(e.data);
+        if (dedup.has(`${event.iteration}:tool_complete`)) return;
         updateToolMessage(event.tool_call.name, event);
         onToolComplete?.(event);
       });
@@ -721,6 +757,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       eventSource.addEventListener('completed', (e) => {
         lastEventTimeRef.current = Date.now();
         const event: CompletedEvent = JSON.parse(e.data);
+        if (dedup.has('completed')) return;
         addAssistantMessage(event.message);
         onCompleted?.(event);
       });
@@ -872,6 +909,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     executionIdRef.current = null;
     reconnectCountRef.current = 0;
     consecutiveHeartbeatsRef.current = 0;
+    dedupKeysRef.current = new Set();
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -909,6 +947,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   ) => {
     // Guard: prevent concurrent sends
     if (eventSourceRef.current) return;
+
+    // Fresh send — no history to deduplicate against
+    dedupKeysRef.current = new Set();
 
     const convId = options.conversationId || conversationIdRef.current;
 
