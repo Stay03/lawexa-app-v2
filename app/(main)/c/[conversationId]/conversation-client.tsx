@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
+import { Fragment, Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useChatStream } from '@/lib/hooks/useChatStream';
@@ -701,34 +701,42 @@ function ConversationPageContent() {
               </div>
             )}
 
-            {/* Elapsed timer — shown above tool chain while streaming */}
-            {isStreaming && streamStartTime && elapsed > 0 && (
-              <div className="px-4">
-                <div className="mx-auto max-w-2xl">
-                  <div className="mb-2 flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span className="text-xs">Processing · {elapsed}s</span>
+            {messageGroups.map((group, groupIndex) => {
+              // Show elapsed timer right before the first tool-chain or handover group
+              const isToolGroup = group.type === 'tool-chain' || group.type === 'handover-group';
+              const isFirstToolGroup = isToolGroup && !messageGroups.slice(0, groupIndex).some(
+                g => g.type === 'tool-chain' || g.type === 'handover-group'
+              );
+              const timerElement = isFirstToolGroup && isStreaming && streamStartTime && elapsed > 0 ? (
+                <div key="elapsed-timer" className="px-4 mb-1">
+                  <div className="mx-auto max-w-2xl flex justify-end">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span className="text-xs">Processing · {elapsed}s</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              ) : null;
 
-            {messageGroups.map((group, groupIndex) => {
               if (group.type === 'handover-group') {
                 return (
-                  <HandoverDisplay
-                    key={`handover-${groupIndex}`}
-                    handover={group.handover}
-                    toolMessages={group.toolMessages}
-                  />
+                  <Fragment key={`handover-${groupIndex}`}>
+                    {timerElement}
+                    <HandoverDisplay
+                      handover={group.handover}
+                      toolMessages={group.toolMessages}
+                    />
+                  </Fragment>
                 );
               }
               if (group.type === 'tool-chain') {
                 return (
-                  <ToolChainDisplay
-                    key={`tool-chain-${groupIndex}`}
-                    messages={group.messages}
-                  />
+                  <Fragment key={`tool-chain-${groupIndex}`}>
+                    {timerElement}
+                    <ToolChainDisplay
+                      messages={group.messages}
+                    />
+                  </Fragment>
                 );
               }
               return renderMessage(group.message);
