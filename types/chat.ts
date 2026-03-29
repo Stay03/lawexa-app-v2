@@ -102,6 +102,7 @@ export interface IterationEvent {
 }
 
 export interface ToolCallingEvent {
+  seq?: number;
   iteration: number;
   status: 'tool_calling';
   tool_call: ToolCall;
@@ -109,6 +110,7 @@ export interface ToolCallingEvent {
 }
 
 export interface ToolCompleteEvent {
+  seq?: number;
   iteration: number;
   status: 'tool_complete';
   tool_call: ToolCall;
@@ -118,6 +120,7 @@ export interface ToolCompleteEvent {
 }
 
 export interface CompletedEvent {
+  seq?: number;
   iteration: number;
   status: 'completed';
   message: string;
@@ -129,6 +132,7 @@ export interface CompletedEvent {
 }
 
 export interface HandoverStartedEvent {
+  seq?: number;
   iteration: number;
   status: 'handover_started';
   agent_slug: string;
@@ -138,6 +142,7 @@ export interface HandoverStartedEvent {
 }
 
 export interface HandoverCompleteEvent {
+  seq?: number;
   iteration: number;
   status: 'handover_complete';
   agent_slug: string;
@@ -251,6 +256,7 @@ export interface ApiMessage {
     success?: boolean;
     latency_ms?: number;
     iteration?: number;
+    seq?: number;
     context?: 'handover';
     target_agent?: string;
     agent_slug?: string;

@@ -79,7 +79,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const reconnectStreamRef = useRef<(() => void) | null>(null);
   const consecutiveHeartbeatsRef = useRef<number>(0);
   const staleCheckInFlightRef = useRef<boolean>(false);
-  const dedupKeysRef = useRef<Set<string>>(new Set());
+  const dedupKeysRef = useRef<Set<number>>(new Set());
   const token = useAuthStore((state) => state.token);
 
   // ─── Internal helpers ──────────────────────────────────────
@@ -567,29 +567,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         const apiMessages = response.data.messages;
         const transformedMessages = transformApiMessages(apiMessages);
 
-        // Build dedup keys from raw API messages so SSE reconnect can skip
-        // events that are already rendered from history.
-        const dedup = new Set<string>();
+        // Build dedup set from seq numbers — collision-free dedup for SSE reconnect
+        const dedup = new Set<number>();
         for (const msg of apiMessages) {
-          const iter = msg.metadata?.iteration;
-          if (iter === undefined) continue;
-
-          if (msg.metadata?.type === 'tool_call') {
-            dedup.add(`${iter}:tool_calling`);
-            const hasResult = apiMessages.some(
-              (m) => m.role === 'tool' && m.metadata?.type === 'tool_result' && m.metadata?.iteration === iter
-            );
-            if (hasResult) dedup.add(`${iter}:tool_complete`);
-          } else if (msg.metadata?.type === 'handover') {
-            dedup.add(`${iter}:handover_started`);
-            const hasResult = apiMessages.some(
-              (m) => m.metadata?.type === 'handover_result' && m.metadata?.iteration === iter
-            );
-            if (hasResult) dedup.add(`${iter}:handover_complete`);
-          }
-        }
-        if (apiMessages.some((m) => m.role === 'assistant' && !m.metadata?.type)) {
-          dedup.add('completed');
+          const seq = msg.metadata?.seq;
+          if (seq !== undefined) dedup.add(seq);
         }
         dedupKeysRef.current = dedup;
 
@@ -709,7 +691,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: HandoverStartedEvent = JSON.parse(e.data);
-        if (dedup.has(`${event.iteration}:handover_started`)) return;
+        if (event.seq !== undefined && dedup.has(event.seq)) return;
         addHandoverMessage(event);
       });
 
@@ -718,7 +700,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: HandoverCompleteEvent = JSON.parse(e.data);
-        if (dedup.has(`${event.iteration}:handover_complete`)) return;
+        if (event.seq !== undefined && dedup.has(event.seq)) return;
         updateHandoverMessage(event);
       });
 
@@ -727,7 +709,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: ToolCallingEvent = JSON.parse(e.data);
-        if (dedup.has(`${event.iteration}:tool_calling`)) return;
+        if (event.seq !== undefined && dedup.has(event.seq)) return;
         addToolMessage(event);
         onToolCalling?.(event);
       });
@@ -737,7 +719,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: ToolCompleteEvent = JSON.parse(e.data);
-        if (dedup.has(`${event.iteration}:tool_complete`)) return;
+        if (event.seq !== undefined && dedup.has(event.seq)) return;
         updateToolMessage(event.tool_call.name, event);
         onToolComplete?.(event);
       });
@@ -757,7 +739,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       eventSource.addEventListener('completed', (e) => {
         lastEventTimeRef.current = Date.now();
         const event: CompletedEvent = JSON.parse(e.data);
-        if (dedup.has('completed')) return;
+        if (event.seq !== undefined && dedup.has(event.seq)) return;
         addAssistantMessage(event.message);
         onCompleted?.(event);
       });
