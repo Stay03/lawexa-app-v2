@@ -287,26 +287,10 @@ function ConversationPageContent() {
   });
 
   const prevIsStreamingRef = useRef(isStreaming);
-  const prevToolCountRef = useRef(0);
 
   const setOverride = useBreadcrumbStore((state) => state.setOverride);
   const clearOverride = useBreadcrumbStore((state) => state.clearOverride);
 
-  // Auto-scroll only when new tool messages appear (not for text messages)
-  useEffect(() => {
-    const toolMessages = messages.filter(isToolMessage);
-    const currentToolCount = toolMessages.length;
-
-    // Only scroll if we have more tool messages than before
-    if (currentToolCount > prevToolCountRef.current && chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
-
-    prevToolCountRef.current = currentToolCount;
-  }, [messages]);
 
   // Update breadcrumb when conversation title is loaded
   useEffect(() => {
@@ -373,17 +357,7 @@ function ConversationPageContent() {
         const result = await recoverPendingState(conversationId);
         // If 'reconnected', recoverPendingState already set isStreaming and connected.
         // Otherwise, history is loaded — nothing else to do.
-        if (result === 'reconnected') {
-          // Scroll to bottom to show the streaming indicator
-          setTimeout(() => {
-            if (chatContainerRef.current) {
-              chatContainerRef.current.scrollTo({
-                top: chatContainerRef.current.scrollHeight,
-                behavior: 'smooth',
-              });
-            }
-          }, 100);
-        }
+        // If reconnected, ChatContainerRoot's scroll-to-bottom button will handle it
       })();
     }
   }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, recoverPendingState, user?.id, isGuestReady]);
@@ -710,10 +684,7 @@ function ConversationPageContent() {
               const timerElement = isFirstToolGroup && isStreaming && streamStartTime && elapsed > 0 ? (
                 <div key="elapsed-timer" className="px-4 mb-1">
                   <div className="mx-auto max-w-2xl flex justify-end">
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      <span className="text-xs">Processing · {elapsed}s</span>
-                    </div>
+                    <span className="text-muted-foreground text-xs">Processing · {elapsed}s</span>
                   </div>
                 </div>
               ) : null;
