@@ -189,7 +189,7 @@ export function useCaseMentionTooltips({
       if (!containerRef.current) return;
 
       const mentions = containerRef.current.querySelectorAll<HTMLAnchorElement>(
-        'a[data-type="case-mention"], a.case-mention'
+        'a[data-type="case-mention"], a.case-mention, a[href*="/cases/"]'
       );
 
       // Destroy any existing instances first

@@ -4,6 +4,7 @@ import { Fragment, Suspense, useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useChatStream } from '@/lib/hooks/useChatStream';
+import { useCaseMentionTooltips } from '@/lib/hooks/useCaseMentionTooltips';
 import {
   PromptInput,
   PromptInputTextarea,
@@ -308,6 +309,7 @@ function ConversationPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const initializedRef = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatContentRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
   // Conversation owner for read-only mode check
@@ -375,6 +377,18 @@ function ConversationPageContent() {
       clearOverride(conversationId);
     };
   }, [conversationId, conversationTitle, setOverride, clearOverride]);
+
+  // Case hover previews — re-trigger when assistant messages change
+  const lastAssistantContent = useMemo(() => {
+    const assistantMsgs = messages.filter(m => m.role === 'assistant');
+    return assistantMsgs[assistantMsgs.length - 1]?.content || null;
+  }, [messages]);
+
+  useCaseMentionTooltips({
+    containerRef: chatContentRef,
+    enabled: true,
+    content: lastAssistantContent,
+  });
 
   // Fetch conversation title when streaming ends (for new conversations)
   useEffect(() => {
@@ -744,7 +758,7 @@ function ConversationPageContent() {
     <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>
       {/* Chat messages */}
       <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28" onScrollStateChange={setShowScrollDown}>
-          <ChatContainerContent>
+          <ChatContainerContent ref={chatContentRef}>
             {/* Context display and folder action */}
             {(contextSlug || (isOwner && messages.length > 0)) && (
               <div className="px-4 pb-4">
