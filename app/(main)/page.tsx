@@ -43,6 +43,10 @@ export default function HomePage() {
     if (typeof window === 'undefined') return '';
     return localStorage.getItem('home_input_draft') ?? '';
   });
+  const [pastedContent, setPastedContent] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('home_input_pasted') || null;
+  });
   const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -65,6 +69,15 @@ export default function HomePage() {
       localStorage.removeItem('home_input_draft');
     }
   }, [input]);
+
+  // Sync pasted content to localStorage
+  useEffect(() => {
+    if (pastedContent) {
+      localStorage.setItem('home_input_pasted', pastedContent);
+    } else {
+      localStorage.removeItem('home_input_pasted');
+    }
+  }, [pastedContent]);
 
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
@@ -116,26 +129,31 @@ export default function HomePage() {
   }, [isGuest, user]);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && !uploadedFile) || isSubmitting || isUploading) return;
+    if ((!input.trim() && !uploadedFile && !pastedContent) || isSubmitting || isUploading) return;
 
-    const message = input.trim();
-    if (!message) return;
+    const typedText = input.trim();
+    const fullMessage = pastedContent
+      ? `<pasted_content>${pastedContent}</pasted_content>${typedText ? '\n\n' + typedText : ''}`
+      : typedText;
+    if (!fullMessage) return;
 
     // Guest: save prompt and show auth modal instead of sending
     if (isGuest) {
-      localStorage.setItem('guest_pending_prompt', message);
+      localStorage.setItem('guest_pending_prompt', fullMessage);
       setAuthModalOpen(true);
       return;
     }
 
     localStorage.removeItem('guest_pending_prompt');
     localStorage.removeItem('home_input_draft');
+    localStorage.removeItem('home_input_pasted');
+    setPastedContent(null);
     setIsSubmitting(true);
 
     try {
       // Start chat to get conversation_id
       const response = await chatApi.start({
-        message,
+        message: fullMessage,
         stream: true,
         ...(studyMode && { study_mode: true }),
         ...(selectedWorkflowId && canSelectWorkflow && { workflow_id: Number(selectedWorkflowId) }),
@@ -147,7 +165,7 @@ export default function HomePage() {
         const executionId = response.data.execution_id;
 
         const params = new URLSearchParams({
-          msg: message,
+          msg: fullMessage,
           exec: executionId,
         });
         if (uploadedFile) {
@@ -409,9 +427,28 @@ export default function HomePage() {
               </div>
             )}
 
+            {/* Pasted content preview */}
+            {pastedContent && (
+              <div className="mx-3 mt-2 max-w-[160px] rounded-lg border bg-muted/50 p-2.5">
+                <p className="text-muted-foreground line-clamp-6 break-words text-[11px] leading-tight">
+                  {pastedContent.slice(0, 200)}...
+                </p>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="rounded border px-1.5 py-0.5 text-[10px] font-medium">PASTED</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPastedContent(null); }}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             <PromptInputTextarea
-              placeholder="Ask a legal question"
+              placeholder={pastedContent ? 'Add a message...' : 'Ask a legal question'}
               className="text-foreground"
+              onLargePaste={setPastedContent}
             />
 
             <PromptInputActions className="flex items-center justify-between px-3 pb-3">

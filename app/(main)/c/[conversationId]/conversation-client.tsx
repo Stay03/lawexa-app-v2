@@ -297,6 +297,10 @@ function ConversationPageContent() {
     if (typeof window === 'undefined') return '';
     return localStorage.getItem(`conversation_draft_${conversationId}`) ?? '';
   });
+  const [pastedContent, setPastedContent] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(`conversation_draft_pasted_${conversationId}`) || null;
+  });
   const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -316,6 +320,15 @@ function ConversationPageContent() {
       localStorage.removeItem(`conversation_draft_${conversationId}`);
     }
   }, [input, conversationId]);
+
+  // Sync pasted content to localStorage
+  useEffect(() => {
+    if (pastedContent) {
+      localStorage.setItem(`conversation_draft_pasted_${conversationId}`, pastedContent);
+    } else {
+      localStorage.removeItem(`conversation_draft_pasted_${conversationId}`);
+    }
+  }, [pastedContent, conversationId]);
 
   // Get current user for ownership check
   const user = useAuthStore((state) => state.user);
@@ -423,14 +436,19 @@ function ConversationPageContent() {
   }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, recoverPendingState, user?.id, isGuestReady]);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && !uploadedFile) || isStreaming || isSubmitting || isUploading) return;
+    if ((!input.trim() && !uploadedFile && !pastedContent) || isStreaming || isSubmitting || isUploading) return;
 
-    const message = input.trim();
-    if (!message) return;
+    const typedText = input.trim();
+    const fullMessage = pastedContent
+      ? `<pasted_content>${pastedContent}</pasted_content>${typedText ? '\n\n' + typedText : ''}`
+      : typedText;
+    if (!fullMessage) return;
 
     const attachment = uploadedFile ? { ...uploadedFile } : undefined;
     setInput('');
+    setPastedContent(null);
     localStorage.removeItem(`conversation_draft_${conversationId}`);
+    localStorage.removeItem(`conversation_draft_pasted_${conversationId}`);
     setUploadedFile(null);
     setIsSubmitting(true);
 
@@ -444,7 +462,7 @@ function ConversationPageContent() {
       }
     }, 100);
 
-    await send(message, {
+    await send(fullMessage, {
       conversationId,
       fileId: attachment?.file_id,
       attachment: attachment ? {
@@ -578,6 +596,15 @@ function ConversationPageContent() {
       displayContent = message.content.replace(/<(case_slug|note_slug)>[^<]+<\/\1>\n\n/g, '');
     }
 
+    // Parse pasted content from user messages
+    const pastedMatch = message.role === 'user'
+      ? displayContent.match(/<pasted_content>([\s\S]*?)<\/pasted_content>/)
+      : null;
+    const messagePastedText = pastedMatch ? pastedMatch[1].trim() : null;
+    const messageRemainingText = pastedMatch
+      ? displayContent.replace(/<pasted_content>[\s\S]*?<\/pasted_content>\s*/, '').trim()
+      : null;
+
     return (
       <Message key={message.id} role={role} className="group">
         {message.role === 'assistant' ? (
@@ -608,7 +635,23 @@ function ConversationPageContent() {
           </>
         ) : (
           <>
-            <UserMessageContent content={displayContent} />
+            {messagePastedText ? (
+              <>
+                <div className="max-w-[160px] rounded-lg border bg-muted/50 p-2.5">
+                  <p className="text-muted-foreground line-clamp-6 break-words text-[11px] leading-tight">
+                    {messagePastedText.slice(0, 200)}...
+                  </p>
+                  <span className="mt-1.5 inline-block rounded border px-1.5 py-0.5 text-[10px] font-medium">PASTED</span>
+                </div>
+                {messageRemainingText && (
+                  <MessageContent className="bg-muted rounded-3xl px-5 py-2.5 mt-1.5">
+                    {messageRemainingText}
+                  </MessageContent>
+                )}
+              </>
+            ) : (
+              <UserMessageContent content={displayContent} />
+            )}
             {/* Attachment badge for PDF files */}
             {(message as ChatMessage).attachment && (
               <div className="mt-1 flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground w-fit">
@@ -867,10 +910,29 @@ function ConversationPageContent() {
                   </div>
                 )}
 
+                {/* Pasted content preview */}
+                {pastedContent && (
+                  <div className="mx-3 mt-2 max-w-[160px] rounded-lg border bg-muted/50 p-2.5">
+                    <p className="text-muted-foreground line-clamp-6 break-words text-[11px] leading-tight">
+                      {pastedContent.slice(0, 200)}...
+                    </p>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className="rounded border px-1.5 py-0.5 text-[10px] font-medium">PASTED</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPastedContent(null); }}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Textarea - full width */}
                 <PromptInputTextarea
-                  placeholder="Ask me anything"
+                  placeholder={pastedContent ? 'Add a message...' : 'Ask me anything'}
                   className="text-foreground min-h-[36px] py-2 px-3"
+                  onLargePaste={setPastedContent}
                 />
 
                 {/* Bottom bar: attach left, send right */}

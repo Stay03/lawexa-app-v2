@@ -114,12 +114,14 @@ function PromptInput({
 
 export type PromptInputTextareaProps = {
   disableAutosize?: boolean
+  onLargePaste?: (text: string) => void
 } & React.ComponentProps<typeof Textarea>
 
 function PromptInputTextarea({
   className,
   onKeyDown,
   disableAutosize = false,
+  onLargePaste,
   ...props
 }: PromptInputTextareaProps) {
   const { value, setValue, maxHeight, onSubmit, disabled, textareaRef } =
@@ -171,12 +173,23 @@ function PromptInputTextarea({
     onKeyDown?.(e)
   }
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (onLargePaste) {
+      const text = e.clipboardData.getData("text/plain")
+      if (text.length > 4000) {
+        e.preventDefault()
+        onLargePaste(text)
+      }
+    }
+  }
+
   return (
     <Textarea
       ref={handleRef}
       value={value}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
       className={cn(
         "text-primary min-h-[44px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
         className
