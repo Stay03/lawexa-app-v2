@@ -291,6 +291,19 @@ function ConversationPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const initializedRef = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
+  const [inputAreaHeight, setInputAreaHeight] = useState(80);
+
+  // Track input area height for scroll button positioning
+  useEffect(() => {
+    const el = inputAreaRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setInputAreaHeight(entry.contentRect.height + 16);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
@@ -691,7 +704,7 @@ function ConversationPageContent() {
   return (
     <ChatProvider sendMessage={sendMessage} isStreaming={isStreaming}>
       {/* Chat messages */}
-      <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28" sidebarOffset={sidebarWidth}>
+      <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28" sidebarOffset={sidebarWidth} bottomOffset={inputAreaHeight}>
           <ChatContainerContent>
             {/* Context display and folder action */}
             {(contextSlug || (isOwner && messages.length > 0)) && (
@@ -799,6 +812,7 @@ function ConversationPageContent() {
 
       {/* Input area - fixed at bottom */}
       <div
+        ref={inputAreaRef}
         className="fixed bottom-4 right-0 z-50 px-4 transition-[left] duration-200 ease-linear"
         style={{ left: sidebarWidth }}
       >
