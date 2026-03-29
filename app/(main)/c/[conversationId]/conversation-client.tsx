@@ -25,6 +25,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { CompactToolChain } from '@/components/chat/compact-tool-chain';
+import { PastedContentCard } from '@/components/chat/pasted-content-card';
 import {
   ArrowDown,
   ArrowUp,
@@ -46,7 +47,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn } from '@/lib/utils';
+import { cn, stripPastedTags } from '@/lib/utils';
 import { isToolMessage, isHandoverMessage, isErrorMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
@@ -368,7 +369,7 @@ function ConversationPageContent() {
   // Update breadcrumb when conversation title is loaded
   useEffect(() => {
     if (conversationTitle) {
-      setOverride(conversationId, conversationTitle);
+      setOverride(conversationId, stripPastedTags(conversationTitle));
     }
     return () => {
       clearOverride(conversationId);
@@ -637,12 +638,7 @@ function ConversationPageContent() {
           <>
             {messagePastedText ? (
               <>
-                <div className="max-w-[160px] rounded-lg border bg-muted/50 p-2.5">
-                  <p className="text-muted-foreground line-clamp-6 break-words text-[11px] leading-tight">
-                    {messagePastedText.slice(0, 200)}...
-                  </p>
-                  <span className="mt-1.5 inline-block rounded border px-1.5 py-0.5 text-[10px] font-medium">PASTED</span>
-                </div>
+                <PastedContentCard content={messagePastedText} />
                 {messageRemainingText && (
                   <MessageContent className="bg-muted rounded-3xl px-5 py-2.5 mt-1.5">
                     {messageRemainingText}
@@ -912,19 +908,8 @@ function ConversationPageContent() {
 
                 {/* Pasted content preview */}
                 {pastedContent && (
-                  <div className="mx-3 mt-2 max-w-[160px] rounded-lg border bg-muted/50 p-2.5">
-                    <p className="text-muted-foreground line-clamp-6 break-words text-[11px] leading-tight">
-                      {pastedContent.slice(0, 200)}...
-                    </p>
-                    <div className="mt-1.5 flex items-center justify-between">
-                      <span className="rounded border px-1.5 py-0.5 text-[10px] font-medium">PASTED</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setPastedContent(null); }}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
+                  <div className="mx-3 mt-2">
+                    <PastedContentCard content={pastedContent} onRemove={() => setPastedContent(null)} />
                   </div>
                 )}
 

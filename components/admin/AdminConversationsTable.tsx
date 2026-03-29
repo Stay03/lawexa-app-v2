@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ArrowUpDown, Lock, Globe, Coins, Hash, Paperclip } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, stripPastedTags } from '@/lib/utils';
 import { formatCost, getCurrencySymbol } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import type {
@@ -146,7 +146,7 @@ export function AdminConversationsTable({
             >
               <TableCell className="font-medium max-w-[280px]">
                 <span className="block truncate">
-                  {conversation.title || 'Untitled'}
+                  {stripPastedTags(conversation.title || 'Untitled')}
                 </span>
               </TableCell>
               {!hideUserColumn && (

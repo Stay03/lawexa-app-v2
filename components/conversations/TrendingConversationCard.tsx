@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Eye, TrendingUp, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, stripPastedTags } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import type { TrendingConversationItem } from '@/types/chat';
 import { formatDistanceToNow } from 'date-fns';
@@ -61,7 +61,7 @@ function TrendingConversationCard({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h3 className="min-w-0 flex-1 text-[20px] font-medium text-foreground group-hover:text-primary sm:truncate">
-              {title}
+              {stripPastedTags(title)}
             </h3>
             {/* Trending badge */}
             <Badge variant="secondary" className="shrink-0 gap-1">

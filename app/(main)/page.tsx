@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
+import { PastedContentCard } from '@/components/chat/pasted-content-card';
 import Link from 'next/link';
 import { useGreetingParts } from '@/lib/hooks/useGreeting';
 import {
@@ -429,19 +430,8 @@ export default function HomePage() {
 
             {/* Pasted content preview */}
             {pastedContent && (
-              <div className="mx-3 mt-2 max-w-[160px] rounded-lg border bg-muted/50 p-2.5">
-                <p className="text-muted-foreground line-clamp-6 break-words text-[11px] leading-tight">
-                  {pastedContent.slice(0, 200)}...
-                </p>
-                <div className="mt-1.5 flex items-center justify-between">
-                  <span className="rounded border px-1.5 py-0.5 text-[10px] font-medium">PASTED</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setPastedContent(null); }}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
+              <div className="mx-3 mt-2">
+                <PastedContentCard content={pastedContent} onRemove={() => setPastedContent(null)} />
               </div>
             )}
 

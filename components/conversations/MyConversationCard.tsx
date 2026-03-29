@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, stripPastedTags } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import type { ConversationListItem } from '@/types/chat';
 import { formatDistanceToNow } from 'date-fns';
@@ -47,7 +47,7 @@ function MyConversationCard({
       {/* Header: Title and metadata */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <h3 className="min-w-0 flex-1 text-[20px] font-medium text-foreground group-hover:text-primary sm:truncate">
-          {title}
+          {stripPastedTags(title)}
         </h3>
 
         <div className="flex shrink-0 items-center gap-2.5 text-[16px] text-muted-foreground">

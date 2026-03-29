@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { stripPastedTags } from "@/lib/utils"
 import { MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -88,12 +89,12 @@ export function NavConversations() {
                 <SidebarMenuItem key={conversation.id}>
                   <SidebarMenuButton
                     asChild
-                    tooltip={conversation.title}
+                    tooltip={stripPastedTags(conversation.title)}
                     isActive={isActive}
                   >
                     <Link href={`/c/${conversation.id}`} onClick={() => setOpenMobile(false)}>
                       <MessageSquare className="h-4 w-4" />
-                      <span className="truncate">{conversation.title}</span>
+                      <span className="truncate">{stripPastedTags(conversation.title)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
