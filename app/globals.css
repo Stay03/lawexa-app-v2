@@ -898,10 +898,6 @@
   font-size: 0.8125rem;
   line-height: 1.5;
   color: hsl(var(--popover-foreground) / 0.9);
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 
