@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, forwardRef, useState, useCallback } from 'react';
+import React, { useRef, useEffect, forwardRef, useState, useCallback, useImperativeHandle } from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,16 +15,18 @@ export const ChatContainerRoot = forwardRef<
   HTMLDivElement,
   ChatContainerRootProps
 >(({ children, className, ...props }, ref) => {
-  const innerRef = useRef<HTMLDivElement>(null);
-  const containerRef = (ref as React.RefObject<HTMLDivElement>) || innerRef;
+  const localRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const prevChildrenRef = useRef(children);
   const isNearBottomRef = useRef(true);
 
+  // Expose localRef as the forwarded ref so parent can also use it
+  useImperativeHandle(ref, () => localRef.current as HTMLDivElement);
+
   // Check if user is near the bottom of the scroll container
   const checkScrollPosition = useCallback(() => {
-    const scrollEl = containerRef.current;
+    const scrollEl = localRef.current;
     if (scrollEl) {
       const { scrollTop, scrollHeight, clientHeight } = scrollEl;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
@@ -36,23 +38,22 @@ export const ChatContainerRoot = forwardRef<
         setHasNewMessage(false);
       }
     }
-  }, [containerRef]);
+  }, []);
 
-  // Listen to scroll events on the container itself
+  // Listen to scroll events on the container
   useEffect(() => {
-    const scrollEl = containerRef.current;
+    const scrollEl = localRef.current;
     if (scrollEl) {
       scrollEl.addEventListener('scroll', checkScrollPosition);
       return () => scrollEl.removeEventListener('scroll', checkScrollPosition);
     }
-  }, [containerRef, checkScrollPosition]);
+  }, [checkScrollPosition]);
 
-  // Detect new messages - only show button if user is not at bottom
+  // Detect new content - only show button if user is not at bottom
   useEffect(() => {
     if (children !== prevChildrenRef.current) {
       prevChildrenRef.current = children;
 
-      // Only show scroll button if not near bottom when new content arrives
       if (!isNearBottomRef.current) {
         setHasNewMessage(true);
         setShowScrollButton(true);
@@ -62,7 +63,7 @@ export const ChatContainerRoot = forwardRef<
 
   // Scroll to bottom handler
   const scrollToBottom = useCallback(() => {
-    const scrollEl = containerRef.current;
+    const scrollEl = localRef.current;
     if (scrollEl) {
       scrollEl.scrollTo({
         top: scrollEl.scrollHeight,
@@ -71,19 +72,19 @@ export const ChatContainerRoot = forwardRef<
       setShowScrollButton(false);
       setHasNewMessage(false);
     }
-  }, [containerRef]);
+  }, []);
 
   return (
     <>
       <div
-        ref={containerRef}
+        ref={localRef}
         className={cn('h-full', className)}
         {...props}
       >
         {children}
       </div>
 
-      {/* Scroll to bottom button - only shows when new message and not at bottom */}
+      {/* Scroll to bottom button - only shows when new content and not at bottom */}
       {showScrollButton && hasNewMessage && (
         <Button
           size="icon"
