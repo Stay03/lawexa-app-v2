@@ -253,24 +253,35 @@ function UserMessageContent({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false);
   const shouldTruncate = content.length > USER_MESSAGE_TRUNCATE_LENGTH;
 
-  const displayText = shouldTruncate && !expanded
-    ? content.slice(0, USER_MESSAGE_TRUNCATE_LENGTH) + '...'
-    : content;
-
   return (
-    <>
-      <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
-        {displayText}
-      </MessageContent>
-      {shouldTruncate && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-xs text-muted-foreground hover:text-foreground mt-1 ml-2"
-        >
-          {expanded ? 'Show less' : 'Show more'}
-        </button>
+    <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
+      {shouldTruncate && !expanded ? (
+        <div>
+          <div className="relative max-h-[200px] overflow-hidden">
+            {content.slice(0, USER_MESSAGE_TRUNCATE_LENGTH)}
+            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-muted to-transparent" />
+          </div>
+          <button
+            onClick={() => setExpanded(true)}
+            className="text-muted-foreground hover:text-foreground mt-1 text-xs"
+          >
+            Show more
+          </button>
+        </div>
+      ) : (
+        <div>
+          {content}
+          {shouldTruncate && (
+            <button
+              onClick={() => setExpanded(false)}
+              className="text-muted-foreground hover:text-foreground mt-1 block text-xs"
+            >
+              Show less
+            </button>
+          )}
+        </div>
       )}
-    </>
+    </MessageContent>
   );
 }
 
