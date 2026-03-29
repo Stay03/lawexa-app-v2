@@ -165,16 +165,17 @@ export default function HomePage() {
         const conversationId = response.data.conversation_id;
         const executionId = response.data.execution_id;
 
-        const params = new URLSearchParams({
+        // Store message in sessionStorage to avoid URL length limits
+        sessionStorage.setItem(`conv_init_${conversationId}`, JSON.stringify({
           msg: fullMessage,
           exec: executionId,
-        });
-        if (uploadedFile) {
-          params.set('file_id', String(uploadedFile.file_id));
-          params.set('file_name', uploadedFile.file_name);
-          params.set('file_size', String(uploadedFile.file_size));
-        }
-        router.push(`/c/${conversationId}?${params.toString()}`);
+          ...(uploadedFile && {
+            file_id: uploadedFile.file_id,
+            file_name: uploadedFile.file_name,
+            file_size: uploadedFile.file_size,
+          }),
+        }));
+        router.push(`/c/${conversationId}?init=1`);
       } else {
         // Backend returned success: false
         setError({ message: response.message || 'Failed to start conversation', status: 0 });

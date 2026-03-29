@@ -406,16 +406,32 @@ function ConversationPageContent() {
     // Wait for auth (guest token or real user) before making API calls
     if (!isGuestReady) return;
 
-    const initialMessage = searchParams.get('msg');
-    const executionId = searchParams.get('exec');
+    // Read init data from sessionStorage (set by home page) or fall back to URL params
+    const initKey = `conv_init_${conversationId}`;
+    const storedInit = sessionStorage.getItem(initKey);
+    let initialMessage: string | null = null;
+    let executionId: string | null = null;
+    let initialAttachment: { file_id: number; file_name: string; file_size: number } | undefined;
 
-    // Read attachment info from URL params (passed from home page)
-    const fileId = searchParams.get('file_id');
-    const fileName = searchParams.get('file_name');
-    const fileSize = searchParams.get('file_size');
-    const initialAttachment = fileId && fileName && fileSize
-      ? { file_id: Number(fileId), file_name: fileName, file_size: Number(fileSize) }
-      : undefined;
+    if (storedInit) {
+      const parsed = JSON.parse(storedInit);
+      initialMessage = parsed.msg;
+      executionId = parsed.exec;
+      if (parsed.file_id && parsed.file_name && parsed.file_size) {
+        initialAttachment = { file_id: parsed.file_id, file_name: parsed.file_name, file_size: parsed.file_size };
+      }
+      sessionStorage.removeItem(initKey);
+    } else {
+      // Legacy fallback for URL params
+      initialMessage = searchParams.get('msg');
+      executionId = searchParams.get('exec');
+      const fileId = searchParams.get('file_id');
+      const fileName = searchParams.get('file_name');
+      const fileSize = searchParams.get('file_size');
+      initialAttachment = fileId && fileName && fileSize
+        ? { file_id: Number(fileId), file_name: fileName, file_size: Number(fileSize) }
+        : undefined;
+    }
 
     // Set conversation ID
     setConversationId(conversationId);
