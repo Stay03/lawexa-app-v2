@@ -604,6 +604,41 @@ function ConversationPageContent() {
     enabled: showThinking,
   });
 
+  // Stream elapsed timer — derive start from first tool/handover message timestamp
+  const streamStartTime = useMemo(() => {
+    for (const msg of messages) {
+      if (isToolMessage(msg) || isHandoverMessage(msg)) {
+        return msg.timestamp.getTime();
+      }
+    }
+    return null;
+  }, [messages]);
+
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!streamStartTime) {
+      setElapsed(0);
+      return;
+    }
+
+    if (!isStreaming) {
+      // Streaming done — freeze at final elapsed
+      const last = messages[messages.length - 1];
+      if (last) {
+        setElapsed(Math.floor((last.timestamp.getTime() - streamStartTime) / 1000));
+      }
+      return;
+    }
+
+    // Live ticking — set initial immediately (handles refresh mid-stream)
+    setElapsed(Math.floor((Date.now() - streamStartTime) / 1000));
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - streamStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [streamStartTime, isStreaming, messages]);
+
   // Extract context from first user message if it contains XML tags
   const firstUserMessage = messages.find(m => m.role === 'user');
   const contextMatch = firstUserMessage?.content.match(/<(case_slug|note_slug)>([^<]+)<\/\1>/);
@@ -663,6 +698,18 @@ function ConversationPageContent() {
             {isLoadingHistory && (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+              </div>
+            )}
+
+            {/* Elapsed timer — shown above tool chain while streaming */}
+            {isStreaming && streamStartTime && elapsed > 0 && (
+              <div className="px-4">
+                <div className="mx-auto max-w-2xl">
+                  <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span className="text-xs">Processing · {elapsed}s</span>
+                  </div>
+                </div>
               </div>
             )}
 
