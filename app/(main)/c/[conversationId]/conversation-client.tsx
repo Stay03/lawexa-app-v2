@@ -246,6 +246,33 @@ function HandoverDisplay({
   );
 }
 
+const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
+
+function UserMessageContent({ content }: { content: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const shouldTruncate = content.length > USER_MESSAGE_TRUNCATE_LENGTH;
+
+  const displayText = shouldTruncate && !expanded
+    ? content.slice(0, USER_MESSAGE_TRUNCATE_LENGTH) + '...'
+    : content;
+
+  return (
+    <>
+      <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
+        {displayText}
+      </MessageContent>
+      {shouldTruncate && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-muted-foreground hover:text-foreground mt-1 ml-2"
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </>
+  );
+}
+
 function ConversationPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -568,9 +595,7 @@ function ConversationPageContent() {
           </>
         ) : (
           <>
-            <MessageContent className="bg-muted rounded-3xl px-5 py-2.5">
-              {displayContent}
-            </MessageContent>
+            <UserMessageContent content={displayContent} />
             {/* Attachment badge for PDF files */}
             {(message as ChatMessage).attachment && (
               <div className="mt-1 flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground w-fit">
