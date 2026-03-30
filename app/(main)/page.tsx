@@ -481,7 +481,7 @@ export default function HomePage() {
                   size="icon"
                   className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
                   onClick={handleSubmit}
-                  disabled={(!input.trim() && !uploadedFile) || isSubmitting || isUploading}
+                  disabled={(!input.trim() && !uploadedFile && !pastedContent) || isSubmitting || isUploading}
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-5 w-5 animate-spin" />

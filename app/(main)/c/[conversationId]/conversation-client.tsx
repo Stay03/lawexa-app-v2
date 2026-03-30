@@ -973,7 +973,7 @@ function ConversationPageContent() {
                       size="icon"
                       className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
                       onClick={handleSubmit}
-                      disabled={(!input.trim() && !uploadedFile) || isUploading || isSubmitting}
+                      disabled={(!input.trim() && !uploadedFile && !pastedContent) || isUploading || isSubmitting}
                     >
                       <ArrowUp className="h-4 w-4" />
                     </Button>

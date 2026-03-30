@@ -530,7 +530,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                   className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
                   onClick={handleSubmit}
                   onMouseDown={(e) => e.preventDefault()}
-                  disabled={!input.trim() || isSubmitting}
+                  disabled={(!input.trim() && !pastedContent) || isSubmitting}
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
