@@ -11,6 +11,7 @@ import { AiAgentFilters } from '@/components/admin/ai/AiAgentFilters';
 import { AiAgentsTable } from '@/components/admin/ai/AiAgentsTable';
 import { AiAgentFormSheet } from '@/components/admin/ai/AiAgentFormSheet';
 import { AiAgentDeleteDialog } from '@/components/admin/ai/AiAgentDeleteDialog';
+import { AiAgentCopyDialog } from '@/components/admin/ai/AiAgentCopyDialog';
 import { useAdminAiAgents } from '@/lib/hooks/useAdminAi';
 import type { AdminAiAgentsParams, AdminAiAgent } from '@/types/admin-ai';
 
@@ -24,6 +25,8 @@ function AiAgentsPageContent() {
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletingAgent, setDeletingAgent] = useState<AdminAiAgent | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyingAgent, setCopyingAgent] = useState<AdminAiAgent | null>(null);
 
   // Read params from URL
   const params = useMemo<AdminAiAgentsParams>(() => {
@@ -96,6 +99,11 @@ function AiAgentsPageContent() {
     [updateParams]
   );
 
+  const handleCopy = useCallback((agent: AdminAiAgent) => {
+    setCopyingAgent(agent);
+    setCopyOpen(true);
+  }, []);
+
   const handleDelete = useCallback((agent: AdminAiAgent) => {
     setDeletingAgent(agent);
     setDeleteOpen(true);
@@ -126,6 +134,7 @@ function AiAgentsPageContent() {
             isLoading={isLoading}
             params={params}
             onSort={handleSort}
+            onCopy={handleCopy}
             onDelete={handleDelete}
           />
 
@@ -148,6 +157,12 @@ function AiAgentsPageContent() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         agent={deletingAgent}
+      />
+
+      <AiAgentCopyDialog
+        open={copyOpen}
+        onOpenChange={setCopyOpen}
+        agent={copyingAgent}
       />
     </div>
   );

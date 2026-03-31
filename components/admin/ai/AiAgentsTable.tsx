@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
   ArrowUpDown,
+  Copy,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -41,6 +42,7 @@ interface AiAgentsTableProps {
   isLoading: boolean;
   params: AdminAiAgentsParams;
   onSort: (sortBy: AgentSortField) => void;
+  onCopy: (agent: AdminAiAgent) => void;
   onDelete: (agent: AdminAiAgent) => void;
 }
 
@@ -49,6 +51,7 @@ export function AiAgentsTable({
   isLoading,
   params,
   onSort,
+  onCopy,
   onDelete,
 }: AiAgentsTableProps) {
   const router = useRouter();
@@ -216,6 +219,15 @@ export function AiAgentsTable({
                     >
                       <Pencil className="mr-2 h-4 w-4" />
                       Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCopy(agent);
+                      }}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

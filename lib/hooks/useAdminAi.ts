@@ -12,12 +12,14 @@ import type {
   AdminAiAgentsParams,
   AdminAiCreateAgentData,
   AdminAiUpdateAgentData,
+  AdminAiCopyAgentData,
   AdminAiToolsParams,
   AdminAiCreateToolData,
   AdminAiUpdateToolData,
   AdminAiWorkflowsParams,
   AdminAiCreateWorkflowData,
   AdminAiUpdateWorkflowData,
+  AdminAiCopyWorkflowData,
 } from '@/types/admin-ai';
 
 // ============================================
@@ -285,6 +287,20 @@ export function useDeleteAiAgent() {
   });
 }
 
+/**
+ * Hook for copying an AI agent
+ */
+export function useCopyAiAgent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data?: AdminAiCopyAgentData }) =>
+      adminAiApi.copyAgent(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.agents() });
+    },
+  });
+}
+
 // ============================================
 // Tool Hooks
 // ============================================
@@ -461,6 +477,20 @@ export function useDeleteAiWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => adminAiApi.deleteWorkflow(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.workflows() });
+    },
+  });
+}
+
+/**
+ * Hook for copying an AI workflow
+ */
+export function useCopyAiWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data?: AdminAiCopyWorkflowData }) =>
+      adminAiApi.copyWorkflow(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminAiKeys.workflows() });
     },

@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
   ArrowUpDown,
+  Copy,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -43,6 +44,7 @@ interface AiWorkflowsTableProps {
   params: AdminAiWorkflowsParams;
   onSort: (sortBy: WorkflowSortField) => void;
   onEdit: (workflow: AdminAiWorkflow) => void;
+  onCopy: (workflow: AdminAiWorkflow) => void;
   onDelete: (workflow: AdminAiWorkflow) => void;
 }
 
@@ -52,6 +54,7 @@ export function AiWorkflowsTable({
   params,
   onSort,
   onEdit,
+  onCopy,
   onDelete,
 }: AiWorkflowsTableProps) {
   const router = useRouter();
@@ -253,6 +256,15 @@ export function AiWorkflowsTable({
                     >
                       <Pencil className="mr-2 h-4 w-4" />
                       Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCopy(workflow);
+                      }}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

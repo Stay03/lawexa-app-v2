@@ -11,6 +11,7 @@ import { AdminPagination } from '@/components/admin';
 import { AiWorkflowFilters } from '@/components/admin/ai/AiWorkflowFilters';
 import { AiWorkflowsTable } from '@/components/admin/ai/AiWorkflowsTable';
 import { AiWorkflowDeleteDialog } from '@/components/admin/ai/AiWorkflowDeleteDialog';
+import { AiWorkflowCopyDialog } from '@/components/admin/ai/AiWorkflowCopyDialog';
 import { useAdminAiWorkflows } from '@/lib/hooks/useAdminAi';
 import type { AdminAiWorkflowsParams, AdminAiWorkflow } from '@/types/admin-ai';
 
@@ -23,6 +24,8 @@ function AiWorkflowsPageContent() {
   // Dialog state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletingWorkflow, setDeletingWorkflow] = useState<AdminAiWorkflow | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyingWorkflow, setCopyingWorkflow] = useState<AdminAiWorkflow | null>(null);
 
   // Read params from URL
   const params = useMemo<AdminAiWorkflowsParams>(() => {
@@ -100,6 +103,11 @@ function AiWorkflowsPageContent() {
     [router]
   );
 
+  const handleCopy = useCallback((workflow: AdminAiWorkflow) => {
+    setCopyingWorkflow(workflow);
+    setCopyOpen(true);
+  }, []);
+
   const handleDelete = useCallback((workflow: AdminAiWorkflow) => {
     setDeletingWorkflow(workflow);
     setDeleteOpen(true);
@@ -129,6 +137,7 @@ function AiWorkflowsPageContent() {
             params={params}
             onSort={handleSort}
             onEdit={handleEdit}
+            onCopy={handleCopy}
             onDelete={handleDelete}
           />
 
@@ -146,6 +155,12 @@ function AiWorkflowsPageContent() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         workflow={deletingWorkflow}
+      />
+
+      <AiWorkflowCopyDialog
+        open={copyOpen}
+        onOpenChange={setCopyOpen}
+        workflow={copyingWorkflow}
       />
     </div>
   );

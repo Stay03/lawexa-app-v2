@@ -218,6 +218,11 @@ export interface AdminAiUpdateAgentData {
   is_active?: boolean;
 }
 
+export interface AdminAiCopyAgentData {
+  name?: string;
+  slug?: string;
+}
+
 export interface AdminAiAgentsListResponse {
   success: boolean;
   message: string;
@@ -379,6 +384,12 @@ export interface AdminAiUpdateWorkflowData {
   is_default?: boolean;
   is_active?: boolean;
   agents?: AdminAiWorkflowAgentInput[];
+}
+
+export interface AdminAiCopyWorkflowData {
+  deep?: boolean;
+  name?: string;
+  slug?: string;
 }
 
 export interface AdminAiWorkflowsListResponse {

@@ -20,6 +20,7 @@ import type {
   AdminAiAgentDetailResponse,
   AdminAiCreateAgentData,
   AdminAiUpdateAgentData,
+  AdminAiCopyAgentData,
   AdminAiAgent,
   AdminAiToolsParams,
   AdminAiToolsListResponse,
@@ -33,6 +34,7 @@ import type {
   AdminAiWorkflowDetailResponse,
   AdminAiCreateWorkflowData,
   AdminAiUpdateWorkflowData,
+  AdminAiCopyWorkflowData,
   AdminAiWorkflow,
 } from '@/types/admin-ai';
 
@@ -280,6 +282,20 @@ export const adminAiApi = {
     return response.data;
   },
 
+  /**
+   * Copy an agent with optional custom name/slug
+   */
+  copyAgent: async (
+    id: number,
+    data?: AdminAiCopyAgentData
+  ): Promise<AdminAiMutationResponse<AdminAiAgent>> => {
+    const response = await apiClient.post<AdminAiMutationResponse<AdminAiAgent>>(
+      `/admin/ai-agents/${id}/copy`,
+      data ?? {}
+    );
+    return response.data;
+  },
+
   // ============================================
   // Tools
   // ============================================
@@ -455,6 +471,20 @@ export const adminAiApi = {
   ): Promise<AdminAiMutationResponse<null>> => {
     const response = await apiClient.delete<AdminAiMutationResponse<null>>(
       `/admin/ai-workflows/${id}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Copy a workflow with optional deep copy, custom name/slug
+   */
+  copyWorkflow: async (
+    id: number,
+    data?: AdminAiCopyWorkflowData
+  ): Promise<AdminAiMutationResponse<AdminAiWorkflow>> => {
+    const response = await apiClient.post<AdminAiMutationResponse<AdminAiWorkflow>>(
+      `/admin/ai-workflows/${id}/copy`,
+      data ?? {}
     );
     return response.data;
   },
