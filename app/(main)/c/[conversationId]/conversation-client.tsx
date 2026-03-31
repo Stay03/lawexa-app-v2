@@ -138,12 +138,39 @@ function HandoverDisplay({
   handover: HandoverMessage;
   toolMessages: ToolMessage[];
 }) {
-  const [isTaskExpanded, setIsTaskExpanded] = useState(false);
+  const isComplete = handover.handoverStatus === 'complete';
+  const [isTaskExpanded, setIsTaskExpanded] = useState(!isComplete);
   const [isResultExpanded, setIsResultExpanded] = useState(false);
+  const hasAutoCollapsed = useRef(false);
 
   const agentName = formatAgentName(handover.agentSlug);
-  const isComplete = handover.handoverStatus === 'complete';
   const isTransfer = handover.handoverType === 'transfer';
+
+  // 3-stage status: consulting → working → consulted
+  const stage = isComplete
+    ? 'consulted'
+    : toolMessages.length > 0
+      ? 'working'
+      : 'consulting';
+
+  // Auto-collapse when handover completes
+  useEffect(() => {
+    if (isComplete && !hasAutoCollapsed.current) {
+      hasAutoCollapsed.current = true;
+      setIsTaskExpanded(false);
+    }
+  }, [isComplete]);
+
+  // Auto-collapse task after 5 seconds while active
+  useEffect(() => {
+    if (!isComplete && isTaskExpanded && !hasAutoCollapsed.current) {
+      const timer = setTimeout(() => {
+        hasAutoCollapsed.current = true;
+        setIsTaskExpanded(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, isTaskExpanded]);
 
   return (
     <div className="px-4">
@@ -167,16 +194,15 @@ function HandoverDisplay({
                     <Loader2 className="h-3 w-3 animate-spin" />
                   )}
                 </div>
-                <span className="text-sm font-medium">{agentName}</span>
+                <span className="text-sm font-medium">
+                  {stage === 'consulting' && (isTransfer ? `Transferring to ${agentName}...` : `Consulting ${agentName}...`)}
+                  {stage === 'working' && `${agentName} working...`}
+                  {stage === 'consulted' && (isTransfer ? `Transferred to ${agentName}` : `Consulted ${agentName}`)}
+                </span>
                 <div className="flex-1" />
                 {isComplete && handover.latencyMs && (
                   <span className="text-muted-foreground text-xs">
-                    completed {(handover.latencyMs / 1000).toFixed(1)}s
-                  </span>
-                )}
-                {!isComplete && (
-                  <span className="text-muted-foreground text-xs">
-                    {isTransfer ? `handing over to ${agentName}...` : 'working...'}
+                    {(handover.latencyMs / 1000).toFixed(1)}s
                   </span>
                 )}
                 <ChevronDown
@@ -186,18 +212,13 @@ function HandoverDisplay({
                   )}
                 />
               </div>
-              {isComplete && (
-                <p className="text-muted-foreground ml-7 text-[11px]">
-                  {isTransfer ? 'Transferred' : 'Consulted'}
-                </p>
-              )}
             </div>
           </CollapsibleTrigger>
 
           <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
             {handover.task && (
               <div className="mb-2 ml-7 rounded-md bg-muted/30 px-3 py-2">
-                <p className="text-muted-foreground text-xs italic">
+                <p className="text-muted-foreground text-sm italic leading-relaxed">
                   &ldquo;{handover.task}&rdquo;
                 </p>
               </div>
