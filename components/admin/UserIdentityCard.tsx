@@ -183,9 +183,14 @@ export function UserIdentityCard({ user, className }: UserIdentityCardProps) {
                     <Building2 className="h-3.5 w-3.5" />
                     University
                   </span>
-                  <span className="font-medium text-right max-w-[140px] truncate">
-                    {profile.university}
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="font-medium text-right max-w-[140px] truncate cursor-help">
+                        {profile.university}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="left"><p>{profile.university}</p></TooltipContent>
+                  </Tooltip>
                 </div>
               )}
               {profile?.law_school && (
@@ -194,9 +199,14 @@ export function UserIdentityCard({ user, className }: UserIdentityCardProps) {
                     <Scale className="h-3.5 w-3.5" />
                     Law School
                   </span>
-                  <span className="font-medium text-right max-w-[140px] truncate">
-                    {profile.law_school}
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="font-medium text-right max-w-[140px] truncate cursor-help">
+                        {profile.law_school}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="left"><p>{profile.law_school}</p></TooltipContent>
+                  </Tooltip>
                 </div>
               )}
               {profile?.area_of_study && (
