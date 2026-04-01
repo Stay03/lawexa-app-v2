@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/collapsible';
 import { ToolCallDetails } from '@/components/chat/tool-call-details';
 import { SearchResultsList } from '@/components/chat/search-results-cards';
+import { StatuteResultsDisplay } from '@/components/chat/statute-results-display';
 import type { ToolMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +47,33 @@ export function formatToolMessage(
         action: isComplete ? 'Retrieved note' : 'Retrieving note',
         detail: parameters.note_id ? `#${parameters.note_id}` : undefined,
       };
+    case 'search_statutes':
+      return {
+        action: isComplete ? 'Searched statutes' : 'Searching statutes',
+        detail: query ? `for "${query}"` : undefined,
+      };
+    case 'read_statute': {
+      const mode = parameters.mode as string | undefined;
+      const section = parameters.section as string | undefined;
+      const start = parameters.start as number | undefined;
+      if (mode === 'outline') {
+        return { action: isComplete ? 'Read statute outline' : 'Reading statute outline' };
+      }
+      if (section) {
+        return {
+          action: isComplete ? 'Read statute' : 'Reading statute',
+          detail: `section ${section}`,
+        };
+      }
+      if (start !== undefined) {
+        const end = parameters.end as number | undefined;
+        return {
+          action: isComplete ? 'Read statute' : 'Reading statute',
+          detail: end ? `nodes ${start}–${end}` : `from node ${start}`,
+        };
+      }
+      return { action: isComplete ? 'Read Statute' : 'Reading Statute' };
+    }
     default: {
       const readable = toolName
         .replace(/_/g, ' ')
@@ -114,6 +142,7 @@ export function ToolStepItem({
           <ChainOfThoughtContent>
             <ToolCallDetails message={message} />
             {showSearchResults && <SearchResultsList message={message} />}
+            <StatuteResultsDisplay message={message} />
           </ChainOfThoughtContent>
         </CollapsibleContent>
       </Collapsible>

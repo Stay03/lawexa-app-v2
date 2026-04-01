@@ -76,7 +76,7 @@ export function extractToolDisplayData(message: ToolMessage): ToolDisplayData {
       }
 
       // Check for array lengths and determine resource type
-      const arrayKeys = ['lawyers', 'cases', 'notes', 'results', 'items'];
+      const arrayKeys = ['lawyers', 'cases', 'notes', 'results', 'items', 'statutes'];
       for (const key of arrayKeys) {
         if (Array.isArray(innerData[key])) {
           const count = (innerData[key] as unknown[]).length;
@@ -92,7 +92,7 @@ export function extractToolDisplayData(message: ToolMessage): ToolDisplayData {
 
     // Also check for direct arrays at data level (some APIs return { data: [...] })
     if (itemCount === null) {
-      const arrayKeys = ['lawyers', 'cases', 'notes', 'results', 'items'];
+      const arrayKeys = ['lawyers', 'cases', 'notes', 'results', 'items', 'statutes'];
       for (const key of arrayKeys) {
         if (Array.isArray(data[key])) {
           itemCount = (data[key] as unknown[]).length;
@@ -116,6 +116,8 @@ export function extractToolDisplayData(message: ToolMessage): ToolDisplayData {
     resourceType = 'note';
   } else if (message.toolName.includes('lawyer')) {
     resourceType = 'lawyer';
+  } else if (message.toolName.includes('statute')) {
+    resourceType = 'statute';
   }
 
   // Generate result summary with count if we have one
