@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
+import { useAuthStore } from '@/lib/stores/authStore';
 import type { IInvoiceListParams } from '@/types/subscription';
 
 /******************************************************************************
@@ -35,10 +36,12 @@ export function usePlans() {
  * Fetch the current user's subscription status.
  */
 export function useCurrentSubscription() {
+  const { isAuthenticated, isGuest } = useAuthStore();
   return useQuery({
     queryKey: subscriptionKeys.current(),
     queryFn: () => subscriptionsApi.getCurrent(),
     staleTime: 1 * 60 * 1000,
+    enabled: isAuthenticated && !isGuest,
   });
 }
 
