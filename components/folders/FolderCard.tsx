@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Lock } from 'lucide-react';
+import { ChevronRight, Lock, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { getFolderIcon } from './FolderIconPicker';
@@ -15,6 +15,7 @@ interface FolderCardProps {
   folder: FolderSummary;
   className?: string;
   style?: React.CSSProperties;
+  onDelete?: (folder: FolderSummary) => void;
 }
 
 /******************************************************************************
@@ -24,7 +25,7 @@ interface FolderCardProps {
 /**
  * Default component. Compact folder list item for grouped display.
  */
-function FolderCard({ folder, className, style }: FolderCardProps) {
+function FolderCard({ folder, className, style, onDelete }: FolderCardProps) {
   const {
     uuid,
     name,
@@ -97,6 +98,18 @@ function FolderCard({ folder, className, style }: FolderCardProps) {
               variant="icon"
               className="h-7 w-7"
             />
+            {onDelete && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDelete(folder);
+                }}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
 

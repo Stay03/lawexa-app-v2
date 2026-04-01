@@ -21,10 +21,12 @@ import type { FolderDetail } from '@/types/folder';
                                Types
 ******************************************************************************/
 
+type DeleteableFolder = Pick<FolderDetail, 'uuid' | 'name' | 'children_count'>;
+
 interface DeleteFolderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  folder: FolderDetail;
+  folder: DeleteableFolder;
   onDeleted?: () => void;
 }
 

@@ -13,7 +13,10 @@ import {
   FolderListSkeleton,
   FolderPagination,
   CreateFolderDialog,
+  DeleteFolderDialog,
 } from '@/components/folders';
+import { useAuthStore } from '@/lib/stores/authStore';
+import type { FolderSummary } from '@/types/folder';
 import { PageContainer, PageHeader } from '@/components/layout';
 import { AnimatedTabs } from '@/components/ui/animated-tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,6 +44,8 @@ function FoldersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState<FolderSummary | null>(null);
+  const currentUser = useAuthStore((s) => s.user);
 
   // Read URL state
   const tab = searchParams.get('tab') || 'my-folders';
@@ -168,6 +173,11 @@ function FoldersPageContent() {
               folder={folder}
               className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both duration-200"
               style={{ animationDelay: `${index * 30}ms` }}
+              onDelete={
+                isMyFolders || folder.user?.id === currentUser?.id
+                  ? setFolderToDelete
+                  : undefined
+              }
             />
           ))}
         </FolderListGroup>
@@ -251,6 +261,16 @@ function FoldersPageContent() {
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
       />
+
+      {/* Delete dialog */}
+      {folderToDelete && (
+        <DeleteFolderDialog
+          open={!!folderToDelete}
+          onOpenChange={(open) => { if (!open) setFolderToDelete(null); }}
+          folder={folderToDelete}
+          onDeleted={() => setFolderToDelete(null)}
+        />
+      )}
     </PageContainer>
   );
 }
