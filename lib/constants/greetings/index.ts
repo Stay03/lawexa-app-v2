@@ -80,9 +80,9 @@ function formatGreeting(greeting: IGreeting, userName?: string | null): string {
  * 3. Fallback
  */
 function getSmartGreeting(userName?: string | null): string {
-  // 1. Check for active holiday (highest priority)
+  // 1. Check for active holiday (50% chance to show holiday greeting)
   const holiday = getActiveHoliday();
-  if (holiday) {
+  if (holiday && Math.random() < 0.5) {
     return formatGreeting(HOLIDAY_CONFIGS[holiday].greetings, userName);
   }
   // 2. Weighted random: 75% time-based, 25% day-based
@@ -106,9 +106,9 @@ function getSmartGreetingParts(userName?: string | null): {
 } {
   const firstName = userName?.split(' ')[0] || '';
   const showName = firstName && Math.random() >= 0.4;
-  // 1. Check for active holiday
+  // 1. Check for active holiday (50% chance to show holiday greeting)
   const holiday = getActiveHoliday();
-  if (holiday) {
+  if (holiday && Math.random() < 0.5) {
     const greetings = HOLIDAY_CONFIGS[holiday].greetings;
     const message = showName
       ? getRandomMessage(greetings.withName)
