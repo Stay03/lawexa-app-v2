@@ -17,7 +17,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ArrowUpDown, Lock, Globe, Coins, Hash, Paperclip } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowUpDown, Lock, Globe, Coins, Hash, Paperclip, FolderPlus } from 'lucide-react';
+import { AddToFolderDialog } from '@/components/folders';
 import { cn, stripPastedTags } from '@/lib/utils';
 import { formatCost, getCurrencySymbol } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
@@ -43,6 +45,7 @@ export function AdminConversationsTable({
 }: AdminConversationsTableProps) {
   const router = useRouter();
   const { exchangeRate, showNGN } = useCurrencyStore();
+  const [folderConvId, setFolderConvId] = useState<string | null>(null);
 
   const handleRowClick = (id: string) => {
     router.push(`/admin/conversations/${id}`);
@@ -132,6 +135,7 @@ export function AdminConversationsTable({
             <TableHead className="w-[140px] font-semibold">
               <SortButton field="created_at">Created</SortButton>
             </TableHead>
+            <TableHead className="w-[50px] font-semibold" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -234,10 +238,36 @@ export function AdminConversationsTable({
                   </TooltipContent>
                 </Tooltip>
               </TableCell>
+              <TableCell className="text-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFolderConvId(conversation.id);
+                      }}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                      <FolderPlus className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Add to folder</TooltipContent>
+                </Tooltip>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {folderConvId && (
+        <AddToFolderDialog
+          open={!!folderConvId}
+          onOpenChange={(open) => { if (!open) setFolderConvId(null); }}
+          itemType="conversation"
+          itemId={folderConvId}
+        />
+      )}
     </div>
   );
 }
