@@ -222,6 +222,7 @@ export interface IAdminUserListItem {
   last_seen_at: string | null;
   profession: string | null;
   university: string | null;
+  law_school: string | null;
   area_of_study: string | null;
   level: string | null;
   subscription_plan: string | null;

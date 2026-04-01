@@ -131,7 +131,7 @@ function AdminUsersTable({
             </TableHead>
             <TableHead className="w-[100px] font-semibold">Plan</TableHead>
             <TableHead className="w-[90px] text-right font-semibold">Messages</TableHead>
-            <TableHead className="w-[120px] font-semibold">University</TableHead>
+            <TableHead className="w-[160px] font-semibold">University / Law School</TableHead>
             <TableHead className="w-[80px] font-semibold">Level</TableHead>
             <TableHead className="w-[80px] font-semibold">Device</TableHead>
             <TableHead className="w-[90px] font-semibold">Platform</TableHead>
@@ -273,11 +273,23 @@ function AdminUsersTable({
                 </div>
               </TableCell>
 
-              {/* University */}
+              {/* University / Law School */}
               <TableCell className="text-sm">
-                <span className="block truncate max-w-[120px] text-muted-foreground">
-                  {user.university || '—'}
-                </span>
+                {user.university || user.law_school ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="block truncate max-w-[160px] text-muted-foreground cursor-help">
+                        {[user.university, user.law_school].filter(Boolean).join(' / ')}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[300px]">
+                      {user.university && <p>University: {user.university}</p>}
+                      {user.law_school && <p>Law School: {user.law_school}</p>}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </TableCell>
 
               {/* Level */}
