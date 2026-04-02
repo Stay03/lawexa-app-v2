@@ -15,13 +15,8 @@ import {
   ChatContainerContent,
   Message,
   MessageContent,
-  ChainOfThought,
-  ChainOfThoughtStep,
-  ChainOfThoughtTrigger,
-  ChainOfThoughtContent,
 } from '@/components/prompt-kit';
-import { ToolCallDetails } from '@/components/chat/tool-call-details';
-import { SearchResultsList } from '@/components/chat/search-results-cards';
+import { CompactToolChain } from '@/components/chat/compact-tool-chain';
 import { useAdminConversation } from '@/lib/hooks/useAdmin';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
@@ -235,51 +230,6 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
   return groups;
 }
 
-// Format tool name for display
-function formatToolMessage(
-  toolName: string,
-  parameters: Record<string, unknown>
-): { action: string; detail?: string } {
-  const query = parameters.query as string | undefined;
-
-  switch (toolName) {
-    case 'search_cases':
-      return {
-        action: 'Searched cases',
-        detail: query ? `for "${query}"` : undefined,
-      };
-    case 'search_notes':
-      return {
-        action: 'Searched notes',
-        detail: query ? `for "${query}"` : undefined,
-      };
-    case 'get_case':
-    case 'get_case_details':
-      return {
-        action: 'Retrieved case details',
-        detail: parameters.case_id
-          ? `for case #${parameters.case_id}`
-          : undefined,
-      };
-    case 'get_note':
-    case 'get_note_details':
-      return {
-        action: 'Retrieved note',
-        detail: parameters.note_id ? `#${parameters.note_id}` : undefined,
-      };
-    default:
-      const readable = toolName
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      return { action: readable };
-  }
-}
-
-// Format latency in seconds
-function formatLatency(ms: number): string {
-  return `${(ms / 1000).toFixed(2)}s`;
-}
-
 // Format agent slug to readable name
 function formatAgentName(slug: string): string {
   return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -295,19 +245,6 @@ function HandoverDisplay({
 }) {
   const [isTaskExpanded, setIsTaskExpanded] = useState(false);
   const [isResultExpanded, setIsResultExpanded] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
-
-  const toggleStep = (messageId: string) => {
-    setExpandedSteps((prev) => {
-      const next = new Set(prev);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  };
 
   const agentName = formatAgentName(handover.agentSlug);
   const isTransfer = handover.handoverType === 'transfer';
@@ -323,11 +260,13 @@ function HandoverDisplay({
                 <div className="bg-primary/10 text-primary flex h-5 w-5 items-center justify-center rounded-full">
                   <Bot className="h-3 w-3" />
                 </div>
-                <span className="text-sm font-medium">{agentName}</span>
+                <span className="text-sm font-medium">
+                  {isTransfer ? `Transferred to ${agentName}` : `Consulted ${agentName}`}
+                </span>
                 <div className="flex-1" />
                 {handover.latencyMs && (
                   <span className="text-muted-foreground text-xs">
-                    completed {(handover.latencyMs / 1000).toFixed(1)}s
+                    {(handover.latencyMs / 1000).toFixed(1)}s
                   </span>
                 )}
                 <ChevronDown
@@ -337,16 +276,13 @@ function HandoverDisplay({
                   )}
                 />
               </div>
-              <p className="text-muted-foreground ml-7 text-[11px]">
-                {isTransfer ? 'Transferred' : 'Consulted'}
-              </p>
             </div>
           </CollapsibleTrigger>
 
           <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
             {handover.task && (
               <div className="mb-2 ml-7 rounded-md bg-muted/30 px-3 py-2">
-                <p className="text-muted-foreground text-xs italic">
+                <p className="text-muted-foreground text-sm italic leading-relaxed">
                   &ldquo;{handover.task}&rdquo;
                 </p>
               </div>
@@ -357,66 +293,7 @@ function HandoverDisplay({
         {/* Nested tool chain */}
         {toolMessages.length > 0 && (
           <div className="ml-2">
-            <ChainOfThought>
-              {toolMessages.map((message, index) => {
-                const isSuccess = message.toolResult?.success;
-                const isLast = index === toolMessages.length - 1;
-                const isExpanded = expandedSteps.has(message.id);
-
-                const status = isSuccess ? 'success' : 'error';
-
-                const { action, detail } = formatToolMessage(
-                  message.toolName,
-                  message.toolParameters
-                );
-
-                return (
-                  <ChainOfThoughtStep
-                    key={message.id}
-                    isLast={isLast}
-                    status={status}
-                  >
-                    <Collapsible
-                      open={isExpanded}
-                      onOpenChange={() => toggleStep(message.id)}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <ChainOfThoughtTrigger
-                          isClickable={true}
-                          isExpanded={isExpanded}
-                          rightContent={
-                            message.latencyMs
-                              ? formatLatency(message.latencyMs)
-                              : undefined
-                          }
-                        >
-                          <span className="font-medium">{action}</span>
-                          {detail && (
-                            <span className="text-muted-foreground font-normal">
-                              {' '}
-                              {detail}
-                            </span>
-                          )}
-                        </ChainOfThoughtTrigger>
-                      </CollapsibleTrigger>
-
-                      <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
-                        <ChainOfThoughtContent>
-                          <ToolCallDetails message={message} />
-                          <SearchResultsList message={message} />
-                        </ChainOfThoughtContent>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    {!isSuccess && !isExpanded && (
-                      <p className="text-destructive mt-1 text-sm">
-                        Error: {message.toolResult?.error || 'Unknown error'}
-                      </p>
-                    )}
-                  </ChainOfThoughtStep>
-                );
-              })}
-            </ChainOfThought>
+            <CompactToolChain messages={toolMessages} showSearchResults={false} />
           </div>
         )}
 
@@ -459,79 +336,10 @@ function HandoverDisplay({
 
 // Tool chain display component
 function ToolChainDisplay({ messages }: { messages: ToolMessage[] }) {
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
-
-  const toggleStep = (messageId: string) => {
-    setExpandedSteps((prev) => {
-      const next = new Set(prev);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  };
-
   return (
     <div className="px-4">
       <div className="mx-auto max-w-2xl">
-        <ChainOfThought>
-          {messages.map((message, index) => {
-            const isSuccess = message.toolResult?.success;
-            const isLast = index === messages.length - 1;
-            const isExpanded = expandedSteps.has(message.id);
-
-            const status = isSuccess ? 'success' : 'error';
-
-            const { action, detail } = formatToolMessage(
-              message.toolName,
-              message.toolParameters
-            );
-
-            return (
-              <ChainOfThoughtStep key={message.id} isLast={isLast} status={status}>
-                <Collapsible
-                  open={isExpanded}
-                  onOpenChange={() => toggleStep(message.id)}
-                >
-                  <CollapsibleTrigger asChild>
-                    <ChainOfThoughtTrigger
-                      isClickable={true}
-                      isExpanded={isExpanded}
-                      rightContent={
-                        message.latencyMs
-                          ? formatLatency(message.latencyMs)
-                          : undefined
-                      }
-                    >
-                      <span className="font-medium">{action}</span>
-                      {detail && (
-                        <span className="text-muted-foreground font-normal">
-                          {' '}
-                          {detail}
-                        </span>
-                      )}
-                    </ChainOfThoughtTrigger>
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
-                    <ChainOfThoughtContent>
-                      <ToolCallDetails message={message} />
-                      <SearchResultsList message={message} />
-                    </ChainOfThoughtContent>
-                  </CollapsibleContent>
-                </Collapsible>
-
-                {!isSuccess && !isExpanded && (
-                  <p className="text-destructive mt-1 text-sm">
-                    Error: {message.toolResult?.error || 'Unknown error'}
-                  </p>
-                )}
-              </ChainOfThoughtStep>
-            );
-          })}
-        </ChainOfThought>
+        <CompactToolChain messages={messages} />
       </div>
     </div>
   );
