@@ -16,11 +16,21 @@ import { StatuteResultsDisplay } from '@/components/chat/statute-results-display
 import type { ToolMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
 
+// Extract statute title from tool result data
+function getStatuteTitle(toolResult?: { data?: unknown }): string | null {
+  if (!toolResult?.data || typeof toolResult.data !== 'object') return null;
+  const data = toolResult.data as Record<string, unknown>;
+  const inner = (data.data as Record<string, unknown>) ?? data;
+  const statute = inner.statute as { title?: string } | undefined;
+  return statute?.title ?? null;
+}
+
 // Format tool name and parameters into user-friendly text
 export function formatToolMessage(
   toolName: string,
   parameters: Record<string, unknown>,
-  isComplete: boolean
+  isComplete: boolean,
+  toolResult?: { success: boolean; data: unknown; error: string | null },
 ): { action: string; detail?: string } {
   const query = parameters.query as string | undefined;
 
@@ -56,23 +66,33 @@ export function formatToolMessage(
       const mode = parameters.mode as string | undefined;
       const section = parameters.section as string | undefined;
       const start = parameters.start as number | undefined;
+      const statuteName = getStatuteTitle(toolResult) || null;
+      const ofName = statuteName ? ` of ${statuteName}` : '';
+
       if (mode === 'outline') {
-        return { action: isComplete ? 'Read statute outline' : 'Reading statute outline' };
+        return {
+          action: isComplete ? 'Read outline' : 'Reading outline',
+          detail: statuteName ? `of ${statuteName}` : undefined,
+        };
       }
       if (section) {
         return {
-          action: isComplete ? 'Read statute' : 'Reading statute',
-          detail: `section ${section}`,
+          action: isComplete ? `Read section ${section}` : `Reading section ${section}`,
+          detail: statuteName ? `of ${statuteName}` : undefined,
         };
       }
       if (start !== undefined) {
         const end = parameters.end as number | undefined;
+        const range = end ? `${start}–${end}` : `${start}`;
         return {
-          action: isComplete ? 'Read statute' : 'Reading statute',
-          detail: end ? `nodes ${start}–${end}` : `from node ${start}`,
+          action: isComplete ? `Read lines ${range}` : `Reading lines ${range}`,
+          detail: statuteName ? `of ${statuteName}` : undefined,
         };
       }
-      return { action: isComplete ? 'Read Statute' : 'Reading Statute' };
+      return {
+        action: isComplete ? 'Read Statute' : 'Reading Statute',
+        detail: statuteName || undefined,
+      };
     }
     default: {
       const readable = toolName
@@ -112,10 +132,12 @@ export function ToolStepItem({
   const isError = isComplete && message.toolResult?.success === false;
   const status = !isComplete ? 'loading' : isSuccess ? 'success' : 'error';
 
+  const isStatuteTool = message.toolName === 'search_statutes' || message.toolName === 'read_statute';
   const { action, detail } = formatToolMessage(
     message.toolName,
     message.toolParameters,
-    isComplete
+    isComplete,
+    message.toolResult ?? undefined,
   );
 
   return (
@@ -140,7 +162,7 @@ export function ToolStepItem({
 
         <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
           <ChainOfThoughtContent>
-            <ToolCallDetails message={message} />
+            {!isStatuteTool && <ToolCallDetails message={message} />}
             {showSearchResults && <SearchResultsList message={message} />}
             <StatuteResultsDisplay message={message} />
           </ChainOfThoughtContent>
