@@ -86,9 +86,8 @@ export function CompactToolChain({
     );
   }
 
-  // Compact mode: badge + previous (condensed) + current (full)
-  const hiddenCount = messages.length - 2;
-  const previousMessage = messages[messages.length - 2];
+  // Compact mode: badge + current tool only
+  const hiddenCount = messages.length - 1;
   const currentMessage = messages[messages.length - 1];
 
   return (
@@ -124,18 +123,7 @@ export function CompactToolChain({
       </button>
 
       <ChainOfThought>
-        {/* Previous tool call - condensed */}
-        <div className="origin-top transition-all duration-300 ease-out scale-[0.92] opacity-60">
-          <ToolStepItem
-            message={previousMessage}
-            isLast={false}
-            isExpanded={false}
-            onToggle={() => {}}
-            showSearchResults={showSearchResults}
-          />
-        </div>
-
-        {/* Current tool call - full size with entrance animation */}
+        {/* Current tool call */}
         <div
           key={currentMessage.id}
           className="animate-in fade-in slide-in-from-bottom-4 duration-300 fill-mode-both"

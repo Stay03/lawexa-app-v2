@@ -147,11 +147,7 @@ export function ToolStepItem({
           <ChainOfThoughtTrigger
             isClickable={isComplete}
             isExpanded={isExpanded}
-            rightContent={
-              isComplete && message.latencyMs
-                ? formatLatency(message.latencyMs)
-                : undefined
-            }
+            rightContent={undefined}
           >
             <span className="font-medium">{action}</span>
             {detail && (
