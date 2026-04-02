@@ -45,7 +45,8 @@ apiClient.interceptors.response.use(
           window.location.pathname.startsWith('/login') ||
           window.location.pathname.startsWith('/register') ||
           window.location.pathname.startsWith('/forgot-password') ||
-          window.location.pathname.startsWith('/reset-password')
+          window.location.pathname.startsWith('/reset-password') ||
+          window.location.pathname.startsWith('/auth/grant')
         );
 
       // Check if this is a silent auth check (don't redirect)

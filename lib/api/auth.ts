@@ -74,6 +74,15 @@ export const authApi = {
     return response.data;
   },
 
+  // SSO grant token for third-party apps (e.g., Bench)
+  grantToken: async (clientId: string) => {
+    const response = await apiClient.post<ApiResponse<{ token: string; user: User }>>(
+      '/auth/grant-token',
+      { client_id: clientId }
+    );
+    return response.data;
+  },
+
   // Protected endpoints
   me: async () => {
     const response = await apiClient.get<ApiResponse<{ user: User }>>('/auth/me');
