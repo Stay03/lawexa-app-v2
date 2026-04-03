@@ -7,6 +7,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { LawyerCardList } from '@/components/chat/lawyer-card';
 import { QuizCardList } from '@/components/chat/quiz-card';
+import { DeepResearchPromptCard } from '@/components/chat/deep-research-prompt-card';
 import {
   parseContent,
   hasSpecialContent,
@@ -69,6 +70,14 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
                 return (
                   <div key={`quizzes-${index}`} className="not-prose">
                     <QuizCardList quizzes={segment.quizzes} />
+                  </div>
+                );
+              }
+
+              if (segment.type === 'deep_research_prompt') {
+                return (
+                  <div key={`deep-research-${index}`} className="not-prose">
+                    <DeepResearchPromptCard prompt={segment.prompt} />
                   </div>
                 );
               }

@@ -1,10 +1,19 @@
 import { LawyerInfo } from '@/components/chat/lawyer-card';
 import { QuizInfo } from './parse-quiz-xml';
 
+export interface DeepResearchPromptInfo {
+  title: string;
+  message: string;
+  querySummary: string;
+  estimatedSources: string[];
+  actions: Array<{ id: string; label: string }>;
+}
+
 export type ContentSegment =
   | { type: 'text'; content: string }
   | { type: 'lawyers'; lawyers: LawyerInfo[] }
-  | { type: 'quizzes'; quizzes: QuizInfo[] };
+  | { type: 'quizzes'; quizzes: QuizInfo[] }
+  | { type: 'deep_research_prompt'; prompt: DeepResearchPromptInfo };
 
 export interface ParsedContent {
   segments: ContentSegment[];
@@ -82,6 +91,34 @@ function extractQuizzesFromBlock(xml: string): QuizInfo[] {
   }
 
   return quizzes;
+}
+
+// Deep research prompt parsing helpers
+function extractActions(xml: string): Array<{ id: string; label: string }> {
+  const actionRegex = /<action\s+id="([^"]+)"\s+label="([^"]+)"\s*\/>/gi;
+  const actions: Array<{ id: string; label: string }> = [];
+  let match;
+
+  while ((match = actionRegex.exec(xml)) !== null) {
+    actions.push({ id: match[1], label: match[2] });
+  }
+
+  return actions;
+}
+
+function parseDeepResearchPrompt(xml: string): DeepResearchPromptInfo {
+  const actionsBlock = getTagContent(xml, 'actions');
+  const sourcesRaw = getTagContent(xml, 'estimated_sources');
+
+  return {
+    title: getTagContent(xml, 'title'),
+    message: getTagContent(xml, 'message'),
+    querySummary: getTagContent(xml, 'query_summary'),
+    estimatedSources: sourcesRaw
+      ? sourcesRaw.split(',').map((s) => s.trim()).filter(Boolean)
+      : [],
+    actions: extractActions(actionsBlock),
+  };
 }
 
 interface MatchInfo {
@@ -173,6 +210,20 @@ export function parseContent(content: string): ParsedContent {
     }
   }
 
+  // ---- Find deep research prompt blocks ----
+  const deepResearchRegex = /<deep_research_prompt>([\s\S]*?)<\/deep_research_prompt>/gi;
+
+  while ((match = deepResearchRegex.exec(content)) !== null) {
+    const prompt = parseDeepResearchPrompt(match[0]);
+    if (prompt.title) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        segment: { type: 'deep_research_prompt', prompt },
+      });
+    }
+  }
+
   // Sort all matches by position
   matches.sort((a, b) => a.start - b.start);
 
@@ -214,6 +265,7 @@ export function hasSpecialContent(content: string): boolean {
     /<lawyer/i.test(content) ||
     /<lawyers/i.test(content) ||
     /<quiz(?:\s|>)/i.test(content) ||
-    /<quizzes(?:\s|>)/i.test(content)
+    /<quizzes(?:\s|>)/i.test(content) ||
+    /<deep_research_prompt/i.test(content)
   );
 }
