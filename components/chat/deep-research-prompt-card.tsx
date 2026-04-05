@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search } from 'lucide-react';
+import { Brain } from 'lucide-react';
 
 import {
   Card,
@@ -32,7 +32,7 @@ export function DeepResearchPromptCard({ prompt }: DeepResearchPromptCardProps) 
     <Card size="sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base font-medium">
-          <Search className="size-4 text-primary" />
+          <Brain className="size-4 text-primary" />
           {prompt.title}
         </CardTitle>
       </CardHeader>
