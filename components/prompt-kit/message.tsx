@@ -8,6 +8,8 @@ import remarkGfm from 'remark-gfm';
 import { LawyerCardList } from '@/components/chat/lawyer-card';
 import { QuizCardList } from '@/components/chat/quiz-card';
 import { DeepResearchPromptCard } from '@/components/chat/deep-research-prompt-card';
+import { MultiQuestionPromptCard } from '@/components/chat/multi-question-prompt-card';
+import { NextQuestionPromptCard } from '@/components/chat/next-question-prompt-card';
 import {
   parseContent,
   hasSpecialContent,
@@ -78,6 +80,22 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
                 return (
                   <div key={`deep-research-${index}`} className="not-prose">
                     <DeepResearchPromptCard prompt={segment.prompt} />
+                  </div>
+                );
+              }
+
+              if (segment.type === 'multi_question_prompt') {
+                return (
+                  <div key={`multi-question-${index}`} className="not-prose">
+                    <MultiQuestionPromptCard prompt={segment.prompt} />
+                  </div>
+                );
+              }
+
+              if (segment.type === 'next_question_prompt') {
+                return (
+                  <div key={`next-question-${index}`} className="not-prose">
+                    <NextQuestionPromptCard prompt={segment.prompt} />
                   </div>
                 );
               }

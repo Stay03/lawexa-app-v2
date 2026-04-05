@@ -9,11 +9,28 @@ export interface DeepResearchPromptInfo {
   actions: Array<{ id: string; label: string }>;
 }
 
+export interface MultiQuestionPromptInfo {
+  title: string;
+  description: string;
+  questionCount: number;
+  questions: Array<{ index: number; summary: string }>;
+  actions: Array<{ id: string; label: string }>;
+}
+
+export interface NextQuestionPromptInfo {
+  current: number;
+  total: number;
+  nextSummary: string;
+  actions: Array<{ id: string; label: string }>;
+}
+
 export type ContentSegment =
   | { type: 'text'; content: string }
   | { type: 'lawyers'; lawyers: LawyerInfo[] }
   | { type: 'quizzes'; quizzes: QuizInfo[] }
-  | { type: 'deep_research_prompt'; prompt: DeepResearchPromptInfo };
+  | { type: 'deep_research_prompt'; prompt: DeepResearchPromptInfo }
+  | { type: 'multi_question_prompt'; prompt: MultiQuestionPromptInfo }
+  | { type: 'next_question_prompt'; prompt: NextQuestionPromptInfo };
 
 export interface ParsedContent {
   segments: ContentSegment[];
@@ -121,6 +138,37 @@ function parseDeepResearchPrompt(xml: string): DeepResearchPromptInfo {
   };
 }
 
+function parseMultiQuestionPrompt(xml: string): MultiQuestionPromptInfo {
+  const actionsBlock = getTagContent(xml, 'actions');
+  const questionsBlock = getTagContent(xml, 'questions');
+  const questionRegex = /<question\s+index="(\d+)">([\s\S]*?)<\/question>/gi;
+  const questions: Array<{ index: number; summary: string }> = [];
+  let match;
+
+  while ((match = questionRegex.exec(questionsBlock)) !== null) {
+    questions.push({ index: parseInt(match[1], 10), summary: match[2].trim() });
+  }
+
+  return {
+    title: getTagContent(xml, 'title'),
+    description: getTagContent(xml, 'description'),
+    questionCount: parseInt(getTagContent(xml, 'question_count'), 10) || questions.length,
+    questions,
+    actions: extractActions(actionsBlock),
+  };
+}
+
+function parseNextQuestionPrompt(xml: string): NextQuestionPromptInfo {
+  const actionsBlock = getTagContent(xml, 'actions');
+
+  return {
+    current: parseInt(getTagContent(xml, 'current'), 10) || 0,
+    total: parseInt(getTagContent(xml, 'total'), 10) || 0,
+    nextSummary: getTagContent(xml, 'next_summary'),
+    actions: extractActions(actionsBlock),
+  };
+}
+
 interface MatchInfo {
   start: number;
   end: number;
@@ -224,6 +272,34 @@ export function parseContent(content: string): ParsedContent {
     }
   }
 
+  // ---- Find multi question prompt blocks ----
+  const multiQuestionRegex = /<multi_question_prompt>([\s\S]*?)<\/multi_question_prompt>/gi;
+
+  while ((match = multiQuestionRegex.exec(content)) !== null) {
+    const prompt = parseMultiQuestionPrompt(match[0]);
+    if (prompt.title) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        segment: { type: 'multi_question_prompt', prompt },
+      });
+    }
+  }
+
+  // ---- Find next question prompt blocks ----
+  const nextQuestionRegex = /<next_question_prompt>([\s\S]*?)<\/next_question_prompt>/gi;
+
+  while ((match = nextQuestionRegex.exec(content)) !== null) {
+    const prompt = parseNextQuestionPrompt(match[0]);
+    if (prompt.total > 0) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        segment: { type: 'next_question_prompt', prompt },
+      });
+    }
+  }
+
   // Sort all matches by position
   matches.sort((a, b) => a.start - b.start);
 
@@ -266,6 +342,8 @@ export function hasSpecialContent(content: string): boolean {
     /<lawyers/i.test(content) ||
     /<quiz(?:\s|>)/i.test(content) ||
     /<quizzes(?:\s|>)/i.test(content) ||
-    /<deep_research_prompt/i.test(content)
+    /<deep_research_prompt/i.test(content) ||
+    /<multi_question_prompt/i.test(content) ||
+    /<next_question_prompt/i.test(content)
   );
 }
