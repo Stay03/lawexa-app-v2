@@ -62,6 +62,8 @@ import { AddToFolderButton } from '@/components/folders';
 import { useGuestAuth } from '@/lib/hooks/useGuestAuth';
 import { ConversationNotAvailable } from '@/components/conversations';
 import { ErrorState } from '@/components/common/ErrorState';
+import { browserNotify } from '@/lib/utils/browser-notify';
+import { hasPromptContent } from '@/lib/utils/parse-content-xml';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -381,6 +383,11 @@ function ConversationPageContent() {
   } = useChatStream({
     onError: (err) => console.error('Chat error:', err),
     onHistoryLoaded: (data) => setConversationOwnerId(data.user_id),
+    onCompleted: (event) => {
+      if (hasPromptContent(event.message)) {
+        browserNotify('Action Required', 'Lawexa needs your input to continue.');
+      }
+    },
   });
 
   const prevIsStreamingRef = useRef(isStreaming);
@@ -413,9 +420,13 @@ function ConversationPageContent() {
 
   // Fetch conversation title when streaming ends (for new conversations)
   useEffect(() => {
-    // When streaming ends and we don't have a title yet, fetch it
-    if (prevIsStreamingRef.current && !isStreaming && !conversationTitle) {
-      fetchConversationTitle(conversationId);
+    if (prevIsStreamingRef.current && !isStreaming) {
+      // Fetch title if we don't have one yet
+      if (!conversationTitle) {
+        fetchConversationTitle(conversationId);
+      }
+      // Notify user that execution is complete
+      browserNotify('Research Complete', 'Lawexa has finished processing your request.');
     }
     prevIsStreamingRef.current = isStreaming;
   }, [isStreaming, conversationTitle, conversationId, fetchConversationTitle]);

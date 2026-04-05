@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useChatContext } from '@/lib/contexts/chat-context';
+import { NotificationNudge } from '@/components/chat/notification-nudge';
 import type { MultiQuestionPromptInfo } from '@/lib/utils/parse-content-xml';
 
 interface MultiQuestionPromptCardProps {
@@ -55,18 +56,21 @@ export function MultiQuestionPromptCard({ prompt }: MultiQuestionPromptCardProps
         </div>
       </CardContent>
 
-      <CardFooter className="flex gap-2">
-        {prompt.actions.map((action) => (
-          <Button
-            key={action.id}
-            variant={action.id === 'begin' ? 'default' : 'outline'}
-            size="sm"
-            disabled={clicked || chatContext?.isStreaming}
-            onClick={() => handleAction(action.label)}
-          >
-            {action.label}
-          </Button>
-        ))}
+      <CardFooter className="flex flex-col gap-2">
+        <div className="flex gap-2 w-full">
+          {prompt.actions.map((action) => (
+            <Button
+              key={action.id}
+              variant={action.id === 'begin' ? 'default' : 'outline'}
+              size="sm"
+              disabled={clicked || chatContext?.isStreaming}
+              onClick={() => handleAction(action.label)}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </div>
+        <NotificationNudge />
       </CardFooter>
     </Card>
   );

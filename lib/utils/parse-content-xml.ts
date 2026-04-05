@@ -336,6 +336,14 @@ export function parseContent(content: string): ParsedContent {
   return { segments };
 }
 
+export function hasPromptContent(content: string): boolean {
+  return (
+    /<deep_research_prompt/i.test(content) ||
+    /<multi_question_prompt/i.test(content) ||
+    /<next_question_prompt/i.test(content)
+  );
+}
+
 export function hasSpecialContent(content: string): boolean {
   return (
     /<lawyer/i.test(content) ||
