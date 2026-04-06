@@ -204,55 +204,63 @@ export function AdminConversationsTable({
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="tabular-nums cursor-help">
-                      {conversation.usage.total_tokens.toLocaleString()}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p className="text-xs">
-                      {conversation.usage.prompt_tokens.toLocaleString()} in / {conversation.usage.completion_tokens.toLocaleString()} out
-                    </p>
-                    {conversation.usage.orchestrator && conversation.usage.specialist && (
-                      <div className="mt-1.5 border-t border-border/40 pt-1.5 space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Orchestrator: {conversation.usage.orchestrator.total_tokens.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Specialist: {conversation.usage.specialist.total_tokens.toLocaleString()}
-                        </p>
-                      </div>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
+                {conversation.usage ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="tabular-nums cursor-help">
+                        {conversation.usage.total_tokens.toLocaleString()}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs">
+                        {conversation.usage.prompt_tokens.toLocaleString()} in / {conversation.usage.completion_tokens.toLocaleString()} out
+                      </p>
+                      {conversation.usage.orchestrator && conversation.usage.specialist && (
+                        <div className="mt-1.5 border-t border-border/40 pt-1.5 space-y-0.5">
+                          <p className="text-xs text-muted-foreground">
+                            Orchestrator: {conversation.usage.orchestrator.total_tokens.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Specialist: {conversation.usage.specialist.total_tokens.toLocaleString()}
+                          </p>
+                        </div>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <span className="text-muted-foreground">0</span>
+                )}
               </TableCell>
               <TableCell className="text-right font-mono text-xs tabular-nums">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="cursor-help">
-                      {formatCost(conversation.usage.total_cost, {
-                        showNGN,
-                        exchangeRate,
-                        decimals: 4,
-                      })}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {conversation.usage.orchestrator && conversation.usage.specialist ? (
-                      <div className="space-y-0.5">
-                        <p className="text-xs">
-                          Orchestrator: {formatCost(conversation.usage.orchestrator.cost, { showNGN, exchangeRate, decimals: 4 })}
-                        </p>
-                        <p className="text-xs">
-                          Specialist: {formatCost(conversation.usage.specialist.cost, { showNGN, exchangeRate, decimals: 4 })}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-xs">No breakdown available</p>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
+                {conversation.usage ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help">
+                        {formatCost(conversation.usage.total_cost, {
+                          showNGN,
+                          exchangeRate,
+                          decimals: 4,
+                        })}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {conversation.usage.orchestrator && conversation.usage.specialist ? (
+                        <div className="space-y-0.5">
+                          <p className="text-xs">
+                            Orchestrator: {formatCost(conversation.usage.orchestrator.cost, { showNGN, exchangeRate, decimals: 4 })}
+                          </p>
+                          <p className="text-xs">
+                            Specialist: {formatCost(conversation.usage.specialist.cost, { showNGN, exchangeRate, decimals: 4 })}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs">No breakdown available</p>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <span className="text-muted-foreground">{formatCost(0, { showNGN, exchangeRate, decimals: 4 })}</span>
+                )}
               </TableCell>
               <TableCell>
                 <Tooltip>

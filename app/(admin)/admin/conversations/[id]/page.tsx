@@ -526,12 +526,12 @@ export default function AdminConversationDetailPage({
               <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
                 <Hash className="h-3.5 w-3.5" /> Tokens
               </p>
-              <p className="text-sm font-medium">{conversation.usage.total_tokens.toLocaleString()}</p>
+              <p className="text-sm font-medium">{(conversation.usage?.total_tokens ?? 0).toLocaleString()}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {conversation.usage.prompt_tokens.toLocaleString()} in /{' '}
-                {conversation.usage.completion_tokens.toLocaleString()} out
+                {(conversation.usage?.prompt_tokens ?? 0).toLocaleString()} in /{' '}
+                {(conversation.usage?.completion_tokens ?? 0).toLocaleString()} out
               </p>
-              {conversation.usage.orchestrator && conversation.usage.specialist && (
+              {conversation.usage?.orchestrator && conversation.usage?.specialist && (
                 <div className="mt-2 border-t border-border/40 pt-2 space-y-0.5">
                   <p className="text-xs text-muted-foreground">
                     Orchestrator: {conversation.usage.orchestrator.total_tokens.toLocaleString()}
@@ -547,13 +547,13 @@ export default function AdminConversationDetailPage({
                 <Coins className="h-3.5 w-3.5" /> Cost
               </p>
               <p className="text-sm font-mono font-medium">
-                {formatCost(conversation.usage.total_cost, {
+                {formatCost(conversation.usage?.total_cost ?? 0, {
                   showNGN,
                   exchangeRate,
                   decimals: 6,
                 })}
               </p>
-              {conversation.usage.orchestrator && conversation.usage.specialist && (
+              {conversation.usage?.orchestrator && conversation.usage?.specialist && (
                 <div className="mt-2 border-t border-border/40 pt-2 space-y-0.5">
                   <p className="text-xs text-muted-foreground font-mono">
                     Orchestrator: {formatCost(conversation.usage.orchestrator.cost, { showNGN, exchangeRate, decimals: 4 })}

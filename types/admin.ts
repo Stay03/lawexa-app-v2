@@ -94,7 +94,7 @@ export interface AdminConversationListItem {
   workflow: AdminWorkflow | null;
   messages_count: number;
   attachments_count: number;
-  usage: ConversationUsage;
+  usage?: ConversationUsage;
   created_at: string;
   updated_at: string;
 }
