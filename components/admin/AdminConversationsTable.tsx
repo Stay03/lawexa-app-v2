@@ -214,15 +214,45 @@ export function AdminConversationsTable({
                     <p className="text-xs">
                       {conversation.usage.prompt_tokens.toLocaleString()} in / {conversation.usage.completion_tokens.toLocaleString()} out
                     </p>
+                    {conversation.usage.orchestrator && conversation.usage.specialist && (
+                      <div className="mt-1.5 border-t border-border/40 pt-1.5 space-y-0.5">
+                        <p className="text-xs text-muted-foreground">
+                          Orchestrator: {conversation.usage.orchestrator.total_tokens.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Specialist: {conversation.usage.specialist.total_tokens.toLocaleString()}
+                        </p>
+                      </div>
+                    )}
                   </TooltipContent>
                 </Tooltip>
               </TableCell>
               <TableCell className="text-right font-mono text-xs tabular-nums">
-                {formatCost(conversation.usage.total_cost, {
-                  showNGN,
-                  exchangeRate,
-                  decimals: 4,
-                })}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help">
+                      {formatCost(conversation.usage.total_cost, {
+                        showNGN,
+                        exchangeRate,
+                        decimals: 4,
+                      })}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {conversation.usage.orchestrator && conversation.usage.specialist ? (
+                      <div className="space-y-0.5">
+                        <p className="text-xs">
+                          Orchestrator: {formatCost(conversation.usage.orchestrator.cost, { showNGN, exchangeRate, decimals: 4 })}
+                        </p>
+                        <p className="text-xs">
+                          Specialist: {formatCost(conversation.usage.specialist.cost, { showNGN, exchangeRate, decimals: 4 })}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs">No breakdown available</p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
               </TableCell>
               <TableCell>
                 <Tooltip>

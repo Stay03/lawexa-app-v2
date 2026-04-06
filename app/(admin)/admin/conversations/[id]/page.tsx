@@ -531,6 +531,16 @@ export default function AdminConversationDetailPage({
                 {conversation.usage.prompt_tokens.toLocaleString()} in /{' '}
                 {conversation.usage.completion_tokens.toLocaleString()} out
               </p>
+              {conversation.usage.orchestrator && conversation.usage.specialist && (
+                <div className="mt-2 border-t border-border/40 pt-2 space-y-0.5">
+                  <p className="text-xs text-muted-foreground">
+                    Orchestrator: {conversation.usage.orchestrator.total_tokens.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Specialist: {conversation.usage.specialist.total_tokens.toLocaleString()}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="rounded-lg border border-muted p-3">
               <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
@@ -543,6 +553,16 @@ export default function AdminConversationDetailPage({
                   decimals: 6,
                 })}
               </p>
+              {conversation.usage.orchestrator && conversation.usage.specialist && (
+                <div className="mt-2 border-t border-border/40 pt-2 space-y-0.5">
+                  <p className="text-xs text-muted-foreground font-mono">
+                    Orchestrator: {formatCost(conversation.usage.orchestrator.cost, { showNGN, exchangeRate, decimals: 4 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    Specialist: {formatCost(conversation.usage.specialist.cost, { showNGN, exchangeRate, decimals: 4 })}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="rounded-lg border border-muted p-3">
               <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">

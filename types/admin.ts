@@ -1,11 +1,20 @@
 // Admin Conversation Management Types
 // Based on API documentation: /docs/apiDocs/admin-conversation-api-documentation.md
 
+export interface UsageBreakdown {
+  cost: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
 export interface ConversationUsage {
   total_cost: number;
   total_tokens: number;
   prompt_tokens: number;
   completion_tokens: number;
+  orchestrator?: UsageBreakdown;
+  specialist?: UsageBreakdown;
 }
 
 export interface MessageUsage {
