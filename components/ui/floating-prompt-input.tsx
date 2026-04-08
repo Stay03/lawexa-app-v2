@@ -2,12 +2,11 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { AxiosError } from 'axios';
-import { ArrowUp, Loader2, Check, X, ExternalLink } from 'lucide-react';
+import { ArrowUp, Loader2, Check, X, ExternalLink, ChevronDown, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   PromptInput,
   PromptInputTextarea,
-  PromptInputActions,
   PromptInputAction,
 } from '@/components/ui/prompt-input';
 import { Button } from '@/components/ui/button';
@@ -137,7 +136,7 @@ function ToolMessageDisplay({ message }: { message: ToolMessage }) {
 export function FloatingPromptInput({ className, contextSlug, contextType, contextTitle }: FloatingPromptInputProps) {
   const [input, setInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -323,11 +322,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
   const handleSuggestionClick = (suggestion: string) => {
     setInput(suggestion);
-    // Keep the input focused after clicking suggestion
-    setTimeout(() => {
-      const textarea = document.querySelector('textarea[placeholder="Ask a question..."]') as HTMLTextAreaElement;
-      textarea?.focus();
-    }, 0);
   };
 
   const handleSubmit = async () => {
@@ -404,6 +398,29 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     }
   };
 
+  // Collapsed state — just show a floating button
+  if (!isOpen) {
+    return (
+      <div
+        className={cn(
+          'fixed bottom-4 z-50 right-0 px-4 transition-[left] duration-200 ease-linear',
+          className
+        )}
+        style={{ left: sidebarWidth }}
+      >
+        <div className="mx-auto flex max-w-xs justify-end sm:max-w-md">
+          <Button
+            onClick={() => setIsOpen(true)}
+            size="icon"
+            className="h-12 w-12 rounded-full shadow-lg"
+          >
+            <MessageSquare className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -412,61 +429,66 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
       )}
       style={{ left: sidebarWidth }}
     >
-      <div className={cn(
-        "mx-auto transition-all duration-300 ease-out",
-        isFocused ? "max-w-sm sm:max-w-lg" : "max-w-xs sm:max-w-md"
-      )}>
-        {/* Expandable Chat/Suggestions Area */}
-        <div
-          className={cn(
-            "transition-all duration-300 ease-out overflow-hidden mb-2",
-            isFocused ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"
-          )}
-          onMouseDown={(e) => e.preventDefault()} // Prevent blur when clicking inside
-        >
-          <div className="bg-background rounded-t-3xl shadow-xs border border-border">
-            {/* Header - Chat about... */}
-            {contextTitle && (
-              <div className="px-4 py-2.5 flex items-center justify-between gap-2">
-                <p className="text-xs truncate">
-                  <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span> <span className="font-medium text-foreground">{contextTitle}</span>
-                </p>
-                {conversationId && (
-                  <button
-                    onClick={() => router.push(`/c/${conversationId}`)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    className="shrink-0 p-1.5 rounded-md hover:bg-muted transition-colors"
-                    aria-label="Open conversation in full page"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                  </button>
-                )}
-              </div>
-            )}
+      <div className="mx-auto max-w-sm sm:max-w-lg">
+        {/* Chat Panel */}
+        <div className="bg-background mb-2 overflow-hidden rounded-2xl border border-border shadow-lg">
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
+            <p className="min-w-0 truncate text-xs">
+              {contextTitle ? (
+                <>
+                  <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span>{' '}
+                  <span className="font-medium text-foreground">{contextTitle}</span>
+                </>
+              ) : (
+                <span className="font-medium text-foreground">Chat</span>
+              )}
+            </p>
+            <div className="flex shrink-0 items-center gap-1">
+              {conversationId && (
+                <button
+                  onClick={() => router.push(`/c/${conversationId}`)}
+                  className="rounded-md p-1.5 hover:bg-muted transition-colors"
+                  aria-label="Open conversation in full page"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              )}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="rounded-md p-1.5 hover:bg-muted transition-colors"
+                aria-label="Close chat"
+              >
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
 
-            {/* Chat Content */}
-            <div
-              ref={chatContainerRef}
-              className="p-4 h-[350px] overflow-y-auto"
-            >
+          {/* Chat Content */}
+          <div
+            ref={chatContainerRef}
+            className="h-[350px] overflow-y-auto p-4"
+          >
             {messages.length === 0 ? (
               /* Prompt Suggestions - shown when no messages */
-              <div className="flex flex-col gap-2">
-                {promptSuggestions.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    className="text-left px-4 py-3 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 text-sm"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+              <div className="flex h-full flex-col items-center justify-center gap-3">
+                <p className="text-xs text-muted-foreground">Suggested prompts</p>
+                <div className="flex w-full flex-col gap-2">
+                  {promptSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="rounded-xl border border-border px-4 py-3 text-left text-sm transition-all duration-200 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
-              /* Message History - shown when conversation exists */
+              /* Message History */
               <div className="flex flex-col gap-4">
                 {messages.map((message) => {
-                  // Handle tool messages separately
                   if (message.role === 'tool') {
                     return (
                       <ToolMessageDisplay
@@ -476,7 +498,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                     );
                   }
 
-                  // Handle user and assistant messages
                   return (
                     <Message key={message.id} role={message.role as 'user' | 'assistant'}>
                       <MessageContent markdown={message.role === 'assistant'}>
@@ -497,51 +518,42 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                 )}
               </div>
             )}
-            </div>
           </div>
         </div>
 
-        {/* Prompt Input */}
-        <div className={cn(
-          "transition-all duration-300 ease-out",
-          !isFocused && "hover:scale-105"
-        )}>
-          <PromptInput
-            value={input}
-            onValueChange={(value) => {
-              setInput(value);
-              if (error) setError(null);
-            }}
-            onSubmit={handleSubmit}
-            disabled={isSubmitting}
-            maxHeight={isMobile ? 120 : 36}
-          >
-            <div className="flex items-center gap-2 px-1">
-              <PromptInputTextarea
-                placeholder="Ask a question..."
-                className="text-foreground min-h-[36px] py-2"
-                disableAutosize={!isMobile}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-              />
-              <PromptInputAction tooltip="Send message">
-                <Button
-                  size="icon"
-                  className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
-                  onClick={handleSubmit}
-                  onMouseDown={(e) => e.preventDefault()}
-                  disabled={!input.trim() || isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowUp className="h-4 w-4" />
-                  )}
-                </Button>
-              </PromptInputAction>
-            </div>
-          </PromptInput>
-        </div>
+        {/* Input — same style as conversation page */}
+        <PromptInput
+          value={input}
+          onValueChange={(value) => {
+            setInput(value);
+            if (error) setError(null);
+          }}
+          onSubmit={handleSubmit}
+          disabled={isSubmitting}
+          maxHeight={150}
+        >
+          <PromptInputTextarea
+            placeholder="Ask me anything"
+            className="text-foreground min-h-[36px] py-2 px-3"
+          />
+          <div className="flex items-center justify-end px-2 pb-1">
+            <PromptInputAction tooltip="Send message">
+              <Button
+                size="icon"
+                className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
+                onClick={handleSubmit}
+                onMouseDown={(e) => e.preventDefault()}
+                disabled={!input.trim() || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
+              </Button>
+            </PromptInputAction>
+          </div>
+        </PromptInput>
       </div>
     </div>
   );

@@ -18,9 +18,10 @@ import type { MultiQuestionPromptInfo } from '@/lib/utils/parse-content-xml';
 
 interface MultiQuestionPromptCardProps {
   prompt: MultiQuestionPromptInfo;
+  isInteracted?: boolean;
 }
 
-export function MultiQuestionPromptCard({ prompt }: MultiQuestionPromptCardProps) {
+export function MultiQuestionPromptCard({ prompt, isInteracted = false }: MultiQuestionPromptCardProps) {
   const [clicked, setClicked] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -94,7 +95,7 @@ export function MultiQuestionPromptCard({ prompt }: MultiQuestionPromptCardProps
               key={action.id}
               variant={action.id === 'begin' ? 'default' : 'outline'}
               size="sm"
-              disabled={clicked || chatContext?.isStreaming}
+              disabled={clicked || isInteracted || chatContext?.isStreaming}
               onClick={() => handleAction(action.label)}
             >
               {action.label}

@@ -600,7 +600,7 @@ function ConversationPageContent() {
   // Group consecutive tool messages for chain display
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
-  const renderMessage = (message: ConversationMessage) => {
+  const renderMessage = (message: ConversationMessage, { isInteracted = false }: { isInteracted?: boolean } = {}) => {
     // Error messages from backend (e.g. AUTH_ERROR, RATE_LIMITED)
     if (isErrorMessage(message)) {
       const errorMsg = message as ErrorMessage;
@@ -677,6 +677,7 @@ function ConversationPageContent() {
               <MessageContent
                 className="prose prose-sm dark:prose-invert"
                 markdown
+                isInteracted={isInteracted}
               >
                 {displayContent}
               </MessageContent>
@@ -874,7 +875,12 @@ function ConversationPageContent() {
                   </Fragment>
                 );
               }
-              return renderMessage(group.message);
+              // Check if this assistant message has been interacted with
+              // (i.e., a user message follows it in the conversation)
+              const isInteracted = group.message.role === 'assistant' && messageGroups.slice(groupIndex + 1).some(
+                g => g.type === 'single' && g.message.role === 'user'
+              );
+              return renderMessage(group.message, { isInteracted });
             })}
 
             {/* Thinking indicator - shown when streaming but no tool calls yet */}

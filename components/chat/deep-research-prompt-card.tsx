@@ -18,9 +18,10 @@ import type { DeepResearchPromptInfo } from '@/lib/utils/parse-content-xml';
 
 interface DeepResearchPromptCardProps {
   prompt: DeepResearchPromptInfo;
+  isInteracted?: boolean;
 }
 
-export function DeepResearchPromptCard({ prompt }: DeepResearchPromptCardProps) {
+export function DeepResearchPromptCard({ prompt, isInteracted = false }: DeepResearchPromptCardProps) {
   const [clicked, setClicked] = useState(false);
   const chatContext = useChatContext();
 
@@ -66,7 +67,7 @@ export function DeepResearchPromptCard({ prompt }: DeepResearchPromptCardProps) 
               key={action.id}
               variant={action.id === 'confirm' ? 'default' : 'outline'}
               size="sm"
-              disabled={clicked || chatContext?.isStreaming}
+              disabled={clicked || isInteracted || chatContext?.isStreaming}
               onClick={() => handleAction(action.label)}
             >
               {action.label}

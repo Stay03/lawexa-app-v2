@@ -48,10 +48,12 @@ export interface MessageContentProps
   extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   markdown?: boolean;
+  /** When true, interactive prompt cards (buttons) inside this message will be disabled */
+  isInteracted?: boolean;
 }
 
 export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
-  ({ children, className, markdown = false, ...props }, ref) => {
+  ({ children, className, markdown = false, isInteracted = false, ...props }, ref) => {
     if (markdown && typeof children === 'string') {
       // Check if content has special XML tags (lawyers or quizzes)
       if (hasSpecialContent(children)) {
@@ -79,7 +81,7 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
               if (segment.type === 'deep_research_prompt') {
                 return (
                   <div key={`deep-research-${index}`} className="not-prose">
-                    <DeepResearchPromptCard prompt={segment.prompt} />
+                    <DeepResearchPromptCard prompt={segment.prompt} isInteracted={isInteracted} />
                   </div>
                 );
               }
@@ -87,7 +89,7 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
               if (segment.type === 'multi_question_prompt') {
                 return (
                   <div key={`multi-question-${index}`} className="not-prose">
-                    <MultiQuestionPromptCard prompt={segment.prompt} />
+                    <MultiQuestionPromptCard prompt={segment.prompt} isInteracted={isInteracted} />
                   </div>
                 );
               }
@@ -95,7 +97,7 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
               if (segment.type === 'next_question_prompt') {
                 return (
                   <div key={`next-question-${index}`} className="not-prose">
-                    <NextQuestionPromptCard prompt={segment.prompt} />
+                    <NextQuestionPromptCard prompt={segment.prompt} isInteracted={isInteracted} />
                   </div>
                 );
               }

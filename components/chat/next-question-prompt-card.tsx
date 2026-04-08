@@ -17,9 +17,10 @@ import type { NextQuestionPromptInfo } from '@/lib/utils/parse-content-xml';
 
 interface NextQuestionPromptCardProps {
   prompt: NextQuestionPromptInfo;
+  isInteracted?: boolean;
 }
 
-export function NextQuestionPromptCard({ prompt }: NextQuestionPromptCardProps) {
+export function NextQuestionPromptCard({ prompt, isInteracted = false }: NextQuestionPromptCardProps) {
   const [clicked, setClicked] = useState(false);
   const chatContext = useChatContext();
 
@@ -68,7 +69,7 @@ export function NextQuestionPromptCard({ prompt }: NextQuestionPromptCardProps) 
               key={action.id}
               variant={action.id === 'next' ? 'default' : 'outline'}
               size="sm"
-              disabled={clicked || chatContext?.isStreaming}
+              disabled={clicked || isInteracted || chatContext?.isStreaming}
               onClick={() => handleAction(action.label)}
             >
               {action.label}
