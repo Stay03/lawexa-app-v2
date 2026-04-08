@@ -32,8 +32,8 @@ export function PastedContentCard({ content, onRemove }: PastedContentCardProps)
         className="max-w-[160px] cursor-pointer rounded-lg border bg-muted/50 p-2.5 transition-colors hover:bg-muted/80"
         onClick={() => setOpen(true)}
       >
-        <p className="text-muted-foreground line-clamp-6 break-words text-[11px] leading-tight">
-          {content.slice(0, 200)}...
+        <p className="text-muted-foreground line-clamp-3 break-words text-[11px] leading-tight">
+          {content.slice(0, 100)}...
         </p>
         <div className="mt-1.5 flex items-center justify-between">
           <span className="rounded border px-1.5 py-0.5 text-[10px] font-medium">PASTED</span>

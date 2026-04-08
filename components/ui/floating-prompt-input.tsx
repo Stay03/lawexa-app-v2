@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { AxiosError } from 'axios';
-import { ArrowUp, Loader2, Check, X, ExternalLink } from 'lucide-react';
+import { ArrowUp, Loader2, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   PromptInput,
@@ -28,6 +28,7 @@ import {
   MessageContent,
 } from '@/components/prompt-kit/message';
 import { CompactToolChain } from '@/components/chat/compact-tool-chain';
+import { PastedContentCard } from '@/components/chat/pasted-content-card';
 import { isToolMessage } from '@/types/chat';
 import type {
   ChatMessage,
@@ -51,7 +52,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const generateId = () =>
   `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-// Group consecutive tool messages together (same logic as conversation page)
+// Group consecutive tool messages (same logic as conversation page)
 type MessageGroup =
   | { type: 'single'; message: ConversationMessage }
   | { type: 'tool-chain'; messages: ToolMessage[] };
@@ -62,7 +63,6 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
 
   while (i < messages.length) {
     const msg = messages[i];
-
     if (isToolMessage(msg)) {
       const toolMessages: ToolMessage[] = [msg];
       i++;
@@ -82,6 +82,7 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
 
 export function FloatingPromptInput({ className, contextSlug, contextType, contextTitle }: FloatingPromptInputProps) {
   const [input, setInput] = useState('');
+  const [pastedContent, setPastedContent] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
@@ -106,7 +107,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     'Quiz me 5 questions',
   ];
 
-  // Group messages for proper tool chain rendering
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
   // Auto-scroll to bottom when new messages arrive
@@ -273,20 +273,27 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   };
 
   const handleSubmit = async () => {
-    if (!input.trim() || isSubmitting || isStreaming) return;
+    // Build full message with pasted content (same as conversation page)
+    const typedText = input.trim();
+    const fullMessage = pastedContent
+      ? `<pasted_content>${pastedContent}</pasted_content>${typedText ? '\n\n' + typedText : ''}`
+      : typedText;
+    if (!fullMessage || isSubmitting || isStreaming) return;
 
-    const message = input.trim();
     setInput('');
+    setPastedContent(null);
     setIsSubmitting(true);
 
-    let messageToSend = message;
+    // Prepend context slug for the first message only
+    let messageToSend = fullMessage;
     if (!conversationId && contextSlug && contextType) {
       const slugTagMap = { case: 'case_slug', note: 'note_slug', statute: 'statute_slug' } as const;
       const slugTag = slugTagMap[contextType];
-      messageToSend = `<${slugTag}>${contextSlug}</${slugTag}>\n\n${message}`;
+      messageToSend = `<${slugTag}>${contextSlug}</${slugTag}>\n\n${fullMessage}`;
     }
 
-    const optimisticMsg = addUserMessage(message);
+    // Display the typed text (without pasted content XML) in chat
+    const optimisticMsg = addUserMessage(typedText || '(pasted content)');
 
     try {
       const response = await chatApi.start({
@@ -296,14 +303,10 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
       });
 
       if (response.success) {
-        const newConversationId = response.data.conversation_id;
-        const executionId = response.data.execution_id;
-
         if (!conversationId) {
-          setConversationId(newConversationId);
+          setConversationId(response.data.conversation_id);
         }
-
-        connectToStream(executionId);
+        connectToStream(response.data.execution_id);
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
         setError(response.message || 'Failed to send message');
@@ -339,9 +342,11 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     }
   };
 
+  const canSend = !!(input.trim() || pastedContent);
+
   return (
     <>
-      {/* Sheet — bottom on mobile, right on desktop */}
+      {/* Sheet — bottom on mobile, right sidebar on desktop */}
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent
           ref={sheetRef}
@@ -349,12 +354,13 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
           showCloseButton
           showOverlay={false}
           className={cn(
-            'flex flex-col p-0 shadow-2xl',
-            // Mobile bottom sheet — 70% height, rounded top
-            isMobile && 'h-[70vh] rounded-t-2xl border-t',
-            // Desktop right panel
-            !isMobile && 'sm:max-w-md border-l'
+            'flex flex-col overflow-hidden p-0',
+            // Desktop: right sidebar
+            !isMobile && 'sm:max-w-[420px] border-l shadow-xl',
+            // Mobile: bottom sheet with rounded top
+            isMobile && 'rounded-t-2xl border-t shadow-2xl'
           )}
+          style={isMobile ? { height: '70vh' } : undefined}
         >
           {/* Header */}
           <SheetHeader className="shrink-0 border-b border-border px-4 py-3">
@@ -387,10 +393,10 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             </SheetDescription>
           </SheetHeader>
 
-          {/* Chat messages — scrollable area */}
+          {/* Chat messages — scrollable */}
           <div
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto p-4"
+            className="min-h-0 flex-1 overflow-y-auto p-4"
           >
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-3">
@@ -410,7 +416,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             ) : (
               <div className="flex flex-col gap-4">
                 {messageGroups.map((group, groupIndex) => {
-                  // Tool chain — use CompactToolChain (same as conversation page)
                   if (group.type === 'tool-chain') {
                     return (
                       <CompactToolChain
@@ -420,12 +425,9 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                     );
                   }
 
-                  // User / assistant messages
                   const message = group.message;
-                  const role = message.role as 'user' | 'assistant';
-
                   return (
-                    <Message key={message.id} role={role}>
+                    <Message key={message.id} role={message.role as 'user' | 'assistant'}>
                       <MessageContent markdown={message.role === 'assistant'}>
                         {message.content}
                       </MessageContent>
@@ -446,7 +448,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             )}
           </div>
 
-          {/* Input at bottom of sheet — matches conversation page layout */}
+          {/* Input at bottom of sheet — matches conversation page */}
           <div className="shrink-0 border-t border-border p-3">
             <PromptInput
               value={input}
@@ -458,12 +460,21 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               disabled={isSubmitting}
               maxHeight={150}
             >
+              {/* Pasted content preview */}
+              {pastedContent && (
+                <div className="mx-3 mt-2">
+                  <PastedContentCard content={pastedContent} onRemove={() => setPastedContent(null)} />
+                </div>
+              )}
+
               {/* Textarea */}
               <PromptInputTextarea
-                placeholder="Ask me anything"
+                placeholder={pastedContent ? 'Add a message...' : 'Ask me anything'}
                 className="text-foreground min-h-[36px] py-2 px-3"
+                onLargePaste={setPastedContent}
               />
-              {/* Send button — bottom right, same as conversation page */}
+
+              {/* Send button — bottom right */}
               <div className="flex items-center justify-end px-2 pb-1">
                 <PromptInputAction tooltip="Send message">
                   <Button
@@ -471,7 +482,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                     className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
                     onClick={handleSubmit}
                     onMouseDown={(e) => e.preventDefault()}
-                    disabled={!input.trim() || isSubmitting}
+                    disabled={!canSend || isSubmitting}
                   >
                     {isSubmitting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -503,13 +514,16 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               disabled={isSubmitting}
               maxHeight={isMobile ? 120 : 36}
             >
-              <div className="flex items-center gap-2 px-1">
-                <PromptInputTextarea
-                  placeholder="Ask a question..."
-                  className="text-foreground min-h-[36px] py-2"
-                  disableAutosize={!isMobile}
-                  onFocus={() => setIsOpen(true)}
-                />
+              {/* Textarea */}
+              <PromptInputTextarea
+                placeholder="Ask a question..."
+                className="text-foreground min-h-[36px] py-2 px-3"
+                disableAutosize={!isMobile}
+                onFocus={() => setIsOpen(true)}
+              />
+
+              {/* Send button — bottom right */}
+              <div className="flex items-center justify-end px-2 pb-1">
                 <PromptInputAction tooltip="Send message">
                   <Button
                     size="icon"
