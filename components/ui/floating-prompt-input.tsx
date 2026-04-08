@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { AxiosError } from 'axios';
-import { ArrowUp, Loader2, ExternalLink } from 'lucide-react';
+import { ArrowUp, ArrowDown, Loader2, ExternalLink, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   PromptInput,
@@ -12,6 +12,7 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetClose,
   SheetHeader,
   SheetTitle,
   SheetDescription,
@@ -29,6 +30,8 @@ import {
 } from '@/components/prompt-kit/message';
 import { CompactToolChain } from '@/components/chat/compact-tool-chain';
 import { PastedContentCard } from '@/components/chat/pasted-content-card';
+import { useRotatingText } from '@/lib/hooks/useRotatingText';
+import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { isToolMessage } from '@/types/chat';
 import type {
   ChatMessage,
@@ -89,6 +92,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showScrollDown, setShowScrollDown] = useState(false);
 
   const router = useRouter();
   const { state } = useSidebar();
@@ -99,6 +103,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const hasReconnectedRef = useRef<boolean>(false);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const sheetRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef(true);
 
   const sidebarWidth = isMobile ? '0px' : state === 'expanded' ? '16rem' : '3rem';
 
@@ -109,12 +114,52 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Determine if we should show thinking indicator (same logic as conversation page)
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const showThinking = !!(isStreaming && lastMessage && lastMessage.role !== 'assistant');
+
+  const { currentText: currentThinkingText } = useRotatingText({
+    phrases: THINKING_PHRASES,
+    intervalMs: 5000,
+    mode: 'random',
+    enabled: showThinking,
+  });
+
+  // Track scroll position — show scroll-to-bottom button when not at bottom
+  const checkScrollPosition = useCallback(() => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distanceFromBottom <= 100;
+    if (isNearBottomRef.current && showScrollDown) {
+      setShowScrollDown(false);
+    }
+  }, [showScrollDown]);
+
+  // Listen to scroll events
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    const el = chatContainerRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkScrollPosition);
+    return () => el.removeEventListener('scroll', checkScrollPosition);
+  }, [checkScrollPosition]);
+
+  // When new messages arrive, show scroll button if not near bottom
+  useEffect(() => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom > 100) {
+      setShowScrollDown(true);
     }
   }, [messages]);
+
+  const scrollToBottom = () => {
+    chatContainerRef.current?.scrollTo({
+      top: chatContainerRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+  };
 
   // Focus textarea inside sheet when it opens
   useEffect(() => {
@@ -273,7 +318,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   };
 
   const handleSubmit = async () => {
-    // Build full message with pasted content (same as conversation page)
     const typedText = input.trim();
     const fullMessage = pastedContent
       ? `<pasted_content>${pastedContent}</pasted_content>${typedText ? '\n\n' + typedText : ''}`
@@ -284,7 +328,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     setPastedContent(null);
     setIsSubmitting(true);
 
-    // Prepend context slug for the first message only
     let messageToSend = fullMessage;
     if (!conversationId && contextSlug && contextType) {
       const slugTagMap = { case: 'case_slug', note: 'note_slug', statute: 'statute_slug' } as const;
@@ -292,7 +335,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
       messageToSend = `<${slugTag}>${contextSlug}</${slugTag}>\n\n${fullMessage}`;
     }
 
-    // Display the typed text (without pasted content XML) in chat
     const optimisticMsg = addUserMessage(typedText || '(pasted content)');
 
     try {
@@ -347,24 +389,23 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   return (
     <>
       {/* Sheet — bottom on mobile, right sidebar on desktop */}
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      {/* modal={false} allows page scroll while chat is open */}
+      <Sheet open={isOpen} onOpenChange={setIsOpen} modal={false}>
         <SheetContent
           ref={sheetRef}
           side={isMobile ? 'bottom' : 'right'}
-          showCloseButton
+          showCloseButton={false}
           showOverlay={false}
           className={cn(
             'flex flex-col overflow-hidden p-0',
-            // Desktop: right sidebar
             !isMobile && 'sm:max-w-[420px] border-l shadow-xl',
-            // Mobile: bottom sheet with rounded top
             isMobile && 'rounded-t-2xl border-t shadow-2xl'
           )}
           style={isMobile ? { height: '70vh' } : undefined}
         >
-          {/* Header */}
+          {/* Header — custom close + external link buttons */}
           <SheetHeader className="shrink-0 border-b border-border px-4 py-3">
-            <div className="flex items-center justify-between pr-8">
+            <div className="flex items-center justify-between">
               <SheetTitle className="text-sm font-medium">
                 {contextTitle ? (
                   <span>
@@ -375,18 +416,28 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                   'Assistant'
                 )}
               </SheetTitle>
-              {conversationId && (
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    router.push(`/c/${conversationId}`);
-                  }}
-                  className="rounded-md p-1.5 hover:bg-muted transition-colors"
-                  aria-label="Open conversation in full page"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-              )}
+              <div className="flex items-center gap-1">
+                {conversationId && (
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      router.push(`/c/${conversationId}`);
+                    }}
+                    className="rounded-md p-1.5 hover:bg-muted transition-colors"
+                    aria-label="Open conversation in full page"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                )}
+                <SheetClose asChild>
+                  <button
+                    className="rounded-md p-1.5 hover:bg-muted transition-colors"
+                    aria-label="Close chat"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </SheetClose>
+              </div>
             </div>
             <SheetDescription className="sr-only">
               Chat assistant for this {contextType || 'page'}
@@ -434,11 +485,17 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                     </Message>
                   );
                 })}
-                {isStreaming && (
-                  <div className="text-sm text-muted-foreground italic">
-                    Thinking...
-                  </div>
+
+                {/* Thinking indicator — rotating verbs like conversation page */}
+                {showThinking && (
+                  <Message role="assistant">
+                    <div className="text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">{currentThinkingText}</span>
+                    </div>
+                  </Message>
                 )}
+
                 {error && (
                   <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {error}
@@ -447,6 +504,20 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               </div>
             )}
           </div>
+
+          {/* Scroll to bottom button */}
+          {showScrollDown && (
+            <div className="flex justify-center pb-2">
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8 rounded-full shadow-md"
+                onClick={scrollToBottom}
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
 
           {/* Input at bottom of sheet — matches conversation page */}
           <div className="shrink-0 border-t border-border p-3">
@@ -512,13 +583,13 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               onValueChange={setInput}
               onSubmit={handleSubmit}
               disabled={isSubmitting}
-              maxHeight={isMobile ? 120 : 36}
+              maxHeight={36}
             >
-              {/* Textarea */}
+              {/* Textarea — single line tap target */}
               <PromptInputTextarea
                 placeholder="Ask a question..."
                 className="text-foreground min-h-[36px] py-2 px-3"
-                disableAutosize={!isMobile}
+                disableAutosize
                 onFocus={() => setIsOpen(true)}
               />
 
