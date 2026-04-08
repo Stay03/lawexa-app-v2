@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ListChecks } from 'lucide-react';
 
 import {
@@ -22,6 +22,8 @@ interface MultiQuestionPromptCardProps {
 
 export function MultiQuestionPromptCard({ prompt }: MultiQuestionPromptCardProps) {
   const [clicked, setClicked] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const chatContext = useChatContext();
 
   const handleAction = (label: string) => {
@@ -29,30 +31,59 @@ export function MultiQuestionPromptCard({ prompt }: MultiQuestionPromptCardProps
     chatContext?.sendMessage(label);
   };
 
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setIsAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 8);
+  }, []);
+
+  const showFade = prompt.questions.length > 8;
+
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base font-medium">
           <ListChecks className="size-4 text-primary" />
           {prompt.title}
+          <Badge variant="secondary" className="ml-auto text-xs font-normal">
+            {prompt.questions.length} questions
+          </Badge>
         </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">{prompt.description}</p>
+        <div className="rounded-lg bg-muted/50 p-3">
+          <p className="text-sm text-muted-foreground">{prompt.description}</p>
+        </div>
 
-        <div className="space-y-2">
-          {prompt.questions.map((q) => (
-            <div key={q.index} className="flex items-start gap-3">
-              <Badge
-                variant="outline"
-                className="mt-0.5 shrink-0 tabular-nums"
+        <div className="relative">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="max-h-[240px] space-y-1 overflow-y-auto pr-1"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'hsl(var(--border)) transparent',
+            }}
+          >
+            {prompt.questions.map((q) => (
+              <div
+                key={q.index}
+                className="flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40"
               >
-                {q.index}
-              </Badge>
-              <p className="text-sm">{q.summary}</p>
-            </div>
-          ))}
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-input/30 text-[11px] font-medium tabular-nums">
+                  {q.index}
+                </span>
+                <p className="text-sm leading-snug">{q.summary}</p>
+              </div>
+            ))}
+          </div>
+          {showFade && !isAtBottom && (
+            <div
+              className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 rounded-b-md bg-gradient-to-t from-card to-transparent"
+              aria-hidden="true"
+            />
+          )}
         </div>
       </CardContent>
 
