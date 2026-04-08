@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { AxiosError } from 'axios';
 import { ArrowUp, Loader2, Check, X, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -27,6 +27,8 @@ import {
   Message,
   MessageContent,
 } from '@/components/prompt-kit/message';
+import { CompactToolChain } from '@/components/chat/compact-tool-chain';
+import { isToolMessage } from '@/types/chat';
 import type {
   ChatMessage,
   ToolMessage,
@@ -49,85 +51,33 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const generateId = () =>
   `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-function formatToolMessage(
-  toolName: string,
-  parameters: Record<string, unknown>,
-  isComplete: boolean
-): { action: string; detail?: string } {
-  const query = parameters.query as string | undefined;
+// Group consecutive tool messages together (same logic as conversation page)
+type MessageGroup =
+  | { type: 'single'; message: ConversationMessage }
+  | { type: 'tool-chain'; messages: ToolMessage[] };
 
-  switch (toolName) {
-    case 'search_cases':
-      return {
-        action: isComplete ? 'Searched cases' : 'Searching cases',
-        detail: query ? `for "${query}"` : undefined,
-      };
-    case 'search_notes':
-      return {
-        action: isComplete ? 'Searched notes' : 'Searching notes',
-        detail: query ? `for "${query}"` : undefined,
-      };
-    case 'get_case':
-    case 'get_case_details':
-      return { action: isComplete ? 'Retrieved case' : 'Retrieving case' };
-    case 'get_note':
-    case 'get_note_details':
-      return { action: isComplete ? 'Retrieved note' : 'Retrieving note' };
-    default:
-      return {
-        action: isComplete ? `Completed ${toolName}` : `Running ${toolName}`,
-      };
+function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+  let i = 0;
+
+  while (i < messages.length) {
+    const msg = messages[i];
+
+    if (isToolMessage(msg)) {
+      const toolMessages: ToolMessage[] = [msg];
+      i++;
+      while (i < messages.length && isToolMessage(messages[i])) {
+        toolMessages.push(messages[i] as ToolMessage);
+        i++;
+      }
+      groups.push({ type: 'tool-chain', messages: toolMessages });
+    } else {
+      groups.push({ type: 'single', message: msg });
+      i++;
+    }
   }
-}
 
-function formatLatency(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
-}
-
-function ToolMessageDisplay({ message }: { message: ToolMessage }) {
-  const isComplete = message.toolStatus === 'complete';
-  const isSuccess = isComplete && message.toolResult?.success;
-  const isError = isComplete && !message.toolResult?.success;
-
-  const { action, detail } = formatToolMessage(
-    message.toolName,
-    message.toolParameters,
-    isComplete
-  );
-
-  return (
-    <div className="flex items-start gap-3 py-2">
-      <div
-        className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-          isSuccess && 'bg-green-500/10 text-green-600',
-          isError && 'bg-destructive/10 text-destructive',
-          !isComplete && 'bg-muted text-muted-foreground'
-        )}
-      >
-        {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
-        {isSuccess && <Check className="h-4 w-4" />}
-        {isError && <X className="h-4 w-4" />}
-      </div>
-      <div className="min-w-0 flex-1">
-        <span className="text-sm font-medium">
-          {action}
-          {detail && <span className="font-normal"> {detail}</span>}
-        </span>
-        {isComplete && message.latencyMs && (
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {formatLatency(message.latencyMs)}
-          </p>
-        )}
-        {isError && (
-          <p className="text-destructive mt-1 text-sm">
-            Error: {message.toolResult?.error || 'Unknown error'}
-          </p>
-        )}
-      </div>
-    </div>
-  );
+  return groups;
 }
 
 export function FloatingPromptInput({ className, contextSlug, contextType, contextTitle }: FloatingPromptInputProps) {
@@ -155,6 +105,9 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     'Explain this',
     'Quiz me 5 questions',
   ];
+
+  // Group messages for proper tool chain rendering
+  const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -386,100 +339,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     }
   };
 
-  // Shared chat content (used inside the sheet)
-  const chatContent = (
-    <div
-      ref={chatContainerRef}
-      className="flex-1 overflow-y-auto p-4"
-    >
-      {messages.length === 0 ? (
-        <div className="flex h-full flex-col items-center justify-center gap-3">
-          <p className="text-xs text-muted-foreground">Suggested prompts</p>
-          <div className="flex w-full max-w-sm flex-col gap-2">
-            {promptSuggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => handleSuggestionClick(suggestion)}
-                className="rounded-xl border border-border px-4 py-3 text-left text-sm transition-all duration-200 hover:border-primary/50 hover:bg-primary/5"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {messages.map((message) => {
-            if (message.role === 'tool') {
-              return (
-                <ToolMessageDisplay
-                  key={message.id}
-                  message={message as ToolMessage}
-                />
-              );
-            }
-
-            return (
-              <Message key={message.id} role={message.role as 'user' | 'assistant'}>
-                <MessageContent markdown={message.role === 'assistant'}>
-                  {message.content}
-                </MessageContent>
-              </Message>
-            );
-          })}
-          {isStreaming && (
-            <div className="text-sm text-muted-foreground italic">
-              Thinking...
-            </div>
-          )}
-          {error && (
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  // Shared input (used inside the sheet footer)
-  const chatInput = (
-    <div className="border-t border-border p-3">
-      <PromptInput
-        value={input}
-        onValueChange={(value) => {
-          setInput(value);
-          if (error) setError(null);
-        }}
-        onSubmit={handleSubmit}
-        disabled={isSubmitting}
-        maxHeight={150}
-      >
-        <PromptInputTextarea
-          placeholder="Ask me anything"
-          className="text-foreground min-h-[36px] py-2 px-3"
-        />
-        <div className="flex items-center justify-end px-2 pb-1">
-          <PromptInputAction tooltip="Send message">
-            <Button
-              size="icon"
-              className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
-              onClick={handleSubmit}
-              onMouseDown={(e) => e.preventDefault()}
-              disabled={!input.trim() || isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowUp className="h-4 w-4" />
-              )}
-            </Button>
-          </PromptInputAction>
-        </div>
-      </PromptInput>
-    </div>
-  );
-
   return (
     <>
       {/* Sheet — bottom on mobile, right on desktop */}
@@ -488,16 +347,17 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
           ref={sheetRef}
           side={isMobile ? 'bottom' : 'right'}
           showCloseButton
+          showOverlay={false}
           className={cn(
-            'flex flex-col p-0',
-            // Mobile bottom sheet
-            isMobile && 'h-[85vh] rounded-t-2xl',
+            'flex flex-col p-0 shadow-2xl',
+            // Mobile bottom sheet — 70% height, rounded top
+            isMobile && 'h-[70vh] rounded-t-2xl border-t',
             // Desktop right panel
-            !isMobile && 'sm:max-w-md'
+            !isMobile && 'sm:max-w-md border-l'
           )}
         >
           {/* Header */}
-          <SheetHeader className="border-b border-border px-4 py-3">
+          <SheetHeader className="shrink-0 border-b border-border px-4 py-3">
             <div className="flex items-center justify-between pr-8">
               <SheetTitle className="text-sm font-medium">
                 {contextTitle ? (
@@ -527,11 +387,102 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             </SheetDescription>
           </SheetHeader>
 
-          {/* Chat messages */}
-          {chatContent}
+          {/* Chat messages — scrollable area */}
+          <div
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto p-4"
+          >
+            {messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3">
+                <p className="text-xs text-muted-foreground">Suggested prompts</p>
+                <div className="flex w-full max-w-sm flex-col gap-2">
+                  {promptSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="rounded-xl border border-border px-4 py-3 text-left text-sm transition-all duration-200 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {messageGroups.map((group, groupIndex) => {
+                  // Tool chain — use CompactToolChain (same as conversation page)
+                  if (group.type === 'tool-chain') {
+                    return (
+                      <CompactToolChain
+                        key={`tool-chain-${groupIndex}`}
+                        messages={group.messages}
+                      />
+                    );
+                  }
 
-          {/* Input at bottom of sheet */}
-          {chatInput}
+                  // User / assistant messages
+                  const message = group.message;
+                  const role = message.role as 'user' | 'assistant';
+
+                  return (
+                    <Message key={message.id} role={role}>
+                      <MessageContent markdown={message.role === 'assistant'}>
+                        {message.content}
+                      </MessageContent>
+                    </Message>
+                  );
+                })}
+                {isStreaming && (
+                  <div className="text-sm text-muted-foreground italic">
+                    Thinking...
+                  </div>
+                )}
+                {error && (
+                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Input at bottom of sheet — matches conversation page layout */}
+          <div className="shrink-0 border-t border-border p-3">
+            <PromptInput
+              value={input}
+              onValueChange={(value) => {
+                setInput(value);
+                if (error) setError(null);
+              }}
+              onSubmit={handleSubmit}
+              disabled={isSubmitting}
+              maxHeight={150}
+            >
+              {/* Textarea */}
+              <PromptInputTextarea
+                placeholder="Ask me anything"
+                className="text-foreground min-h-[36px] py-2 px-3"
+              />
+              {/* Send button — bottom right, same as conversation page */}
+              <div className="flex items-center justify-end px-2 pb-1">
+                <PromptInputAction tooltip="Send message">
+                  <Button
+                    size="icon"
+                    className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
+                    onClick={handleSubmit}
+                    onMouseDown={(e) => e.preventDefault()}
+                    disabled={!input.trim() || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ArrowUp className="h-4 w-4" />
+                    )}
+                  </Button>
+                </PromptInputAction>
+              </div>
+            </PromptInput>
+          </div>
         </SheetContent>
       </Sheet>
 
