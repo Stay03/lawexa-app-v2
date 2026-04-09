@@ -842,58 +842,77 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         onCompleted?.(event);
       });
 
-      // Handle cancelled event — authoritative terminal for a user-initiated
-      // cancel (POST /api/chat/stream/{id}/cancel). If a v2_stream placeholder
-      // is mid-render, finalize it with whatever text accumulated so far.
-      eventSource.addEventListener('cancelled', () => {
-        stopWatchdog();
-        eventSource.close();
-        eventSourceRef.current = null;
-
-        const placeholderId = streamingMessageIdRef.current;
-        if (placeholderId) {
-          setState((prev) => ({
-            ...prev,
-            messages: prev.messages.map((m) =>
-              m.id === placeholderId ? { ...m, isStreaming: false } : m
-            ),
-            isStreaming: false,
-            isCancelling: false,
-          }));
-          streamingMessageIdRef.current = null;
-          currentIterationRef.current = null;
-          textByIterationRef.current.clear();
-        } else {
-          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
-        }
-      });
-
-      // Handle error event - add inline as ErrorMessage so it appears in message flow
+      // Handle error event. Covers two distinct cases:
+      //  1. `error_code === 'CANCELLED'` — user-initiated cancel confirmation.
+      //     NOT a real error. Don't render an ErrorMessage; just finalize any
+      //     v2_stream placeholder with its partial text and clear streaming state.
+      //  2. Everything else — real backend error, render inline as before.
+      //
       // NOTE: Browser connection errors also fire this listener (with no data).
-      // We only handle events WITH data here; connection errors are handled by onerror below.
+      // We only handle events WITH data here; connection errors go to onerror.
       eventSource.addEventListener('error', (e) => {
         const data = (e as MessageEvent).data;
         if (!data) return; // Connection error — let onerror handle it
 
         lastEventTimeRef.current = Date.now();
         stopWatchdog();
+
+        let parsed: {
+          error_code?: string;
+          error_message?: string;
+          message?: string;
+          retryable?: boolean;
+          retry_after_ms?: number | null;
+        } | null = null;
         try {
-          const event = JSON.parse(data);
-          // Backend sends error_message (new) or message (legacy)
-          const errorMsg = event.error_message || event.message || 'Something went wrong';
-          const errorCode = event.error_code || 'UNKNOWN';
-          const retryable = event.retryable ?? false;
-          const retryAfterMs = event.retry_after_ms ?? null;
+          parsed = JSON.parse(data);
+        } catch {
+          parsed = null;
+        }
+
+        // Close the stream BEFORE branching so onerror's identity guard trips
+        // regardless of which branch we take. Clear executionIdRef as
+        // defense-in-depth against any orphan reconnect attempt.
+        eventSource.close();
+        eventSourceRef.current = null;
+        executionIdRef.current = null;
+
+        // CANCELLED: user-initiated stop. Do NOT render as an error. Keep any
+        // v2_stream placeholder's accumulated partial text visible (matches
+        // ChatGPT/Claude cancel behavior).
+        if (parsed?.error_code === 'CANCELLED') {
+          const placeholderId = streamingMessageIdRef.current;
+          if (placeholderId) {
+            setState((prev) => ({
+              ...prev,
+              messages: prev.messages.map((m) =>
+                m.id === placeholderId ? { ...m, isStreaming: false } : m
+              ),
+              isStreaming: false,
+              isCancelling: false,
+            }));
+            streamingMessageIdRef.current = null;
+            currentIterationRef.current = null;
+            textByIterationRef.current.clear();
+          } else {
+            setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+          }
+          return;
+        }
+
+        // Real error — render inline as before.
+        if (parsed) {
+          const errorMsg = parsed.error_message || parsed.message || 'Something went wrong';
+          const errorCode = parsed.error_code || 'UNKNOWN';
+          const retryable = parsed.retryable ?? false;
+          const retryAfterMs = parsed.retry_after_ms ?? null;
           addErrorMessage(errorMsg, errorCode, retryable, retryAfterMs);
           onError?.(errorMsg);
-        } catch {
-          // Unparseable data — show generic error
+        } else {
           const errorMsg = 'Stream error';
           setState((prev) => ({ ...prev, error: errorMsg, isStreaming: false, isCancelling: false }));
           onError?.(errorMsg);
         }
-        eventSource.close();
-        eventSourceRef.current = null;
       });
 
       // Handle end event
@@ -921,8 +940,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         eventSourceRef.current = null;
       });
 
-      // Handle connection errors — auto-recover via SSE reconnection, then polling
+      // Handle connection errors — auto-recover via SSE reconnection, then polling.
+      // IMPORTANT: If another terminal handler (error/end/timeout) already nulled
+      // eventSourceRef, the close was intentional. Do NOT reconnect — that's how
+      // we used to get the "Something went wrong" duplicate loop after CANCELLED.
       eventSource.onerror = () => {
+        if (eventSourceRef.current !== eventSource) return;
+
         stopWatchdog();
         eventSource.close();
         eventSourceRef.current = null;

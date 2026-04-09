@@ -296,16 +296,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         setIsCancelling(false);
       });
 
-      // Authoritative terminal for a user-initiated cancel. Fires after POST
-      // /api/chat/stream/{id}/cancel. See chatApi.cancelStream for the contract.
-      eventSource.addEventListener('cancelled', () => {
-        eventSource.close();
-        eventSourceRef.current = null;
-        executionIdRef.current = null;
-        setIsStreaming(false);
-        setIsCancelling(false);
-      });
-
       eventSource.onerror = () => {
         eventSource.close();
         eventSourceRef.current = null;
