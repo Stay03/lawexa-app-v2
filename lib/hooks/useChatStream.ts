@@ -15,6 +15,8 @@ import {
   type IterationEvent,
   type HandoverStartedEvent,
   type HandoverCompleteEvent,
+  type TextDeltaEvent,
+  type TextResetEvent,
   type ToolMessage,
   type HandoverMessage,
   type ErrorMessage,
@@ -80,6 +82,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const consecutiveHeartbeatsRef = useRef<number>(0);
   const staleCheckInFlightRef = useRef<boolean>(false);
   const dedupKeysRef = useRef<Set<number>>(new Set());
+  // v2_stream token-streaming state:
+  // - textByIterationRef: per-iteration accumulator so text_reset only clears the affected iteration
+  // - streamingMessageIdRef: ID of the placeholder ChatMessage currently being mutated
+  // - currentIterationRef: iteration the placeholder belongs to
+  const textByIterationRef = useRef<Map<number, string>>(new Map());
+  const streamingMessageIdRef = useRef<string | null>(null);
+  const currentIterationRef = useRef<number | null>(null);
   const token = useAuthStore((state) => state.token);
 
   // ─── Internal helpers ──────────────────────────────────────
@@ -124,6 +133,28 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       messages: [...prev.messages, message],
     }));
     return id;
+  }, []);
+
+  // v2_stream: ensure a streaming assistant placeholder exists for the given iteration.
+  // A new iteration creates a fresh placeholder message so iteration transitions
+  // are visible in history (e.g., text from iteration 1 is kept above tool calls in iteration 2).
+  const ensureStreamingPlaceholder = useCallback((iteration: number): string => {
+    if (currentIterationRef.current !== iteration) {
+      currentIterationRef.current = iteration;
+      textByIterationRef.current.set(iteration, '');
+      const id = generateId();
+      streamingMessageIdRef.current = id;
+      const placeholder: ChatMessage = {
+        id,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isStreaming: true,
+      };
+      setState((prev) => ({ ...prev, messages: [...prev.messages, placeholder] }));
+      return id;
+    }
+    return streamingMessageIdRef.current!;
   }, []);
 
   // Add error message inline (for API errors from SSE error event)
@@ -724,6 +755,50 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         onToolComplete?.(event);
       });
 
+      // v2_stream: token-level text delta. Append to per-iteration buffer and
+      // mutate the streaming placeholder. NEVER dedup on seq — text deltas are
+      // ephemeral and seq is a shared monotonic counter (per backend contract).
+      eventSource.addEventListener('text_delta', (e) => {
+        lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
+        const event: TextDeltaEvent = JSON.parse(e.data);
+        const msgId = ensureStreamingPlaceholder(event.iteration);
+        const current = textByIterationRef.current.get(event.iteration) ?? '';
+        const updated = current + event.delta;
+        textByIterationRef.current.set(event.iteration, updated);
+        setState((prev) => ({
+          ...prev,
+          messages: prev.messages.map((m) =>
+            m.id === msgId ? { ...m, content: updated } : m
+          ),
+        }));
+      });
+
+      // v2_stream: text stream finished for this iteration. Do NOT replace
+      // content — wait for `completed` which carries authoritative text.
+      eventSource.addEventListener('text_done', () => {
+        lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
+      });
+
+      // v2_stream: model retried this iteration's text — clear the accumulator
+      // for this specific iteration only. Other iterations and tool state are untouched.
+      eventSource.addEventListener('text_reset', (e) => {
+        lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
+        const event: TextResetEvent = JSON.parse(e.data);
+        textByIterationRef.current.set(event.iteration, '');
+        const msgId = streamingMessageIdRef.current;
+        if (msgId && currentIterationRef.current === event.iteration) {
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === msgId ? { ...m, content: '' } : m
+            ),
+          }));
+        }
+      });
+
       // Handle heartbeat — track consecutive heartbeats without data events.
       // If threshold exceeded, check if the AI actually finished (another tab
       // may have consumed the completed/end events).
@@ -735,12 +810,35 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         }
       });
 
-      // Handle completed event - NOW add the assistant message
+      // Handle completed event. For v2_stream, replace the streaming placeholder
+      // with authoritative content. For legacy, append a new assistant message.
+      // `completed.content` is canonical; `completed.message` is a legacy alias.
       eventSource.addEventListener('completed', (e) => {
         lastEventTimeRef.current = Date.now();
         const event: CompletedEvent = JSON.parse(e.data);
         if (event.seq !== undefined && dedup.has(event.seq)) return;
-        addAssistantMessage(event.message);
+
+        const finalText = event.content ?? event.message ?? '';
+        const placeholderId = streamingMessageIdRef.current;
+
+        if (placeholderId) {
+          // v2_stream path — replace placeholder with authoritative text
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === placeholderId
+                ? { ...m, content: finalText, isStreaming: false }
+                : m
+            ),
+          }));
+          streamingMessageIdRef.current = null;
+          currentIterationRef.current = null;
+          textByIterationRef.current.clear();
+        } else {
+          // Legacy path — append a new assistant message
+          addAssistantMessage(finalText);
+        }
+
         onCompleted?.(event);
       });
 
@@ -817,6 +915,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       updateHandoverMessage,
       addToolMessage,
       updateToolMessage,
+      ensureStreamingPlaceholder,
       startWatchdog,
       stopWatchdog,
       pollForCompletion,
@@ -892,6 +991,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     reconnectCountRef.current = 0;
     consecutiveHeartbeatsRef.current = 0;
     dedupKeysRef.current = new Set();
+    // v2_stream: clear text accumulators on full disconnect (but NOT on
+    // SSE reconnect — the placeholder must persist so `completed` can replace it).
+    textByIterationRef.current.clear();
+    streamingMessageIdRef.current = null;
+    currentIterationRef.current = null;
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -949,6 +1053,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         ...(options.fileId && { file_id: options.fileId }),
         ...(options.studyMode && { study_mode: true }),
         ...(options.workflowId && { workflow_id: options.workflowId }),
+        ...(options.streamMode && { stream_mode: options.streamMode }),
       });
 
       if (response.success) {

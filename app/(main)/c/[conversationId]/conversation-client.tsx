@@ -334,6 +334,9 @@ function ConversationPageContent() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  // Per-conversation opt-in for token-level streaming. Seeded from the home
+  // page init blob; resets on hard refresh (follow-ups fall back to legacy).
+  const streamModeRef = useRef<'v2_stream' | undefined>(undefined);
 
   // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
@@ -384,7 +387,9 @@ function ConversationPageContent() {
     onError: (err) => console.error('Chat error:', err),
     onHistoryLoaded: (data) => setConversationOwnerId(data.user_id),
     onCompleted: (event) => {
-      if (hasPromptContent(event.message)) {
+      // Prefer canonical `content` (v2_stream), fall back to legacy `message`
+      const finalText = event.content ?? event.message ?? '';
+      if (hasPromptContent(finalText)) {
         browserNotify('Action Required', 'Lawexa needs your input to continue.');
       }
     },
@@ -451,6 +456,10 @@ function ConversationPageContent() {
       executionId = parsed.exec;
       if (parsed.file_id && parsed.file_name && parsed.file_size) {
         initialAttachment = { file_id: parsed.file_id, file_name: parsed.file_name, file_size: parsed.file_size };
+      }
+      // Seed per-conversation stream mode so follow-up sends keep using v2
+      if (parsed.stream_mode === 'v2_stream') {
+        streamModeRef.current = 'v2_stream';
       }
       sessionStorage.removeItem(initKey);
     } else {
@@ -533,6 +542,7 @@ function ConversationPageContent() {
         file_name: attachment.file_name,
         file_size: attachment.file_size,
       } : undefined,
+      streamMode: streamModeRef.current,
     });
 
     setIsSubmitting(false);
@@ -593,7 +603,7 @@ function ConversationPageContent() {
     if (!message.trim() || isStreaming || isSubmitting) return;
 
     setIsSubmitting(true);
-    await send(message, { conversationId });
+    await send(message, { conversationId, streamMode: streamModeRef.current });
     setIsSubmitting(false);
   };
 

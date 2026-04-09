@@ -274,7 +274,9 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
       eventSource.addEventListener('completed', (e) => {
         const event: CompletedEvent = JSON.parse(e.data);
-        addAssistantMessage(event.message);
+        // Floating chat stays on legacy mode; `message` is the legacy alias
+        // and `content` is the v2 canonical field. Prefer content, fall back.
+        addAssistantMessage(event.content ?? event.message ?? '');
       });
 
       eventSource.addEventListener('end', () => {

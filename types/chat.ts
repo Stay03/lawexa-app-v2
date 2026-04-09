@@ -119,16 +119,60 @@ export interface ToolCompleteEvent {
   timestamp: string;
 }
 
+// Canonical summary shape emitted by v2_stream completed events
+export interface CompletedSummary {
+  total_tokens: {
+    prompt: number;
+    completion: number;
+    total: number;
+  };
+  total_cost: number;
+  total_latency_ms: number;
+  // Present only when handovers occurred
+  orchestrator_tokens?: {
+    prompt: number;
+    completion: number;
+    total: number;
+  };
+  orchestrator_cost?: number;
+}
+
 export interface CompletedEvent {
   seq?: number;
   iteration: number;
   status: 'completed';
-  message: string;
-  tokens: {
+  // Canonical in v2_stream — read this
+  content?: string;
+  // Legacy alias (still sent by backend for backward compat)
+  message?: string;
+  // Canonical token/cost summary in v2_stream
+  summary?: CompletedSummary;
+  // Legacy alias
+  tokens?: {
     prompt: number;
     completion: number;
   };
   timestamp: string;
+}
+
+// v2_stream token-level streaming events
+export interface TextDeltaEvent {
+  delta: string;
+  iteration: number;
+  timestamp: string;
+  seq?: number; // ordering hint only — never use for dedup
+}
+
+export interface TextDoneEvent {
+  iteration: number;
+  timestamp: string;
+  seq?: number;
+}
+
+export interface TextResetEvent {
+  iteration: number;
+  timestamp: string;
+  seq?: number;
 }
 
 export interface HandoverStartedEvent {
@@ -194,6 +238,8 @@ export interface ConversationStatusResponse {
 export interface ChatStartRequest {
   message: string;
   stream: boolean;
+  // Opt-in token-level streaming. When set, backend emits text_delta events.
+  stream_mode?: 'v2_stream';
   conversation_id?: string;
   workflow_id?: number;
   agent_id?: number;
@@ -209,6 +255,8 @@ export interface ChatStartResponse {
     workflow_id: number;
     execution_id: string;
     stream_url: string;
+    // Echoed back by backend to confirm what's active
+    stream_mode?: 'v2_stream' | null;
   };
 }
 
@@ -230,6 +278,8 @@ export interface SendMessageOptions {
   attachment?: MessageAttachment;
   studyMode?: boolean;
   workflowId?: number;
+  // Opt-in token streaming; forwarded into ChatStartRequest.stream_mode
+  streamMode?: 'v2_stream';
 }
 
 // Chat state for hook

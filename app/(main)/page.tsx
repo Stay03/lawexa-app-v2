@@ -83,6 +83,16 @@ export default function HomePage() {
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
 
+  // Super admin gate for opt-in token-level streaming (v2_stream)
+  const isSuperAdmin = user?.role === 'superadmin';
+  const [streamMode, setStreamMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('stream_mode_v2') === '1';
+  });
+  useEffect(() => {
+    localStorage.setItem('stream_mode_v2', streamMode ? '1' : '0');
+  }, [streamMode]);
+
   // Workflow selector - only for superadmin, admin, researcher
   const canSelectWorkflow = !!user?.role && ['superadmin', 'admin', 'researcher'].includes(user.role);
   const workflowParams = { active_only: true, per_page: 50 };
@@ -156,6 +166,9 @@ export default function HomePage() {
       const response = await chatApi.start({
         message: fullMessage,
         stream: true,
+        // Opt-in token streaming — gated on superadmin role at the payload site
+        // so a stale localStorage flag can never leak stream_mode for other roles.
+        ...(streamMode && isSuperAdmin && { stream_mode: 'v2_stream' as const }),
         ...(studyMode && { study_mode: true }),
         ...(selectedWorkflowId && canSelectWorkflow && { workflow_id: Number(selectedWorkflowId) }),
         ...(uploadedFile && { file_id: uploadedFile.file_id }),
@@ -169,6 +182,8 @@ export default function HomePage() {
         sessionStorage.setItem(`conv_init_${conversationId}`, JSON.stringify({
           msg: fullMessage,
           exec: executionId,
+          // Forward stream_mode so the conversation page applies it to follow-ups
+          ...(streamMode && isSuperAdmin && { stream_mode: 'v2_stream' }),
           ...(uploadedFile && {
             file_id: uploadedFile.file_id,
             file_name: uploadedFile.file_name,
@@ -472,6 +487,18 @@ export default function HomePage() {
                       ))}
                     </SelectContent>
                   </Select>
+                )}
+
+                {/* Token-level streaming toggle — superadmin only */}
+                {isSuperAdmin && (
+                  <div className="flex items-center gap-1.5 px-2">
+                    <Switch
+                      checked={streamMode}
+                      onCheckedChange={setStreamMode}
+                      size="sm"
+                    />
+                    <span className="text-xs text-muted-foreground">Token stream</span>
+                  </div>
                 )}
               </div>
 
