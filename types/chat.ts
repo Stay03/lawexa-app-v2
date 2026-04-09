@@ -155,6 +155,16 @@ export interface CompletedEvent {
   timestamp: string;
 }
 
+// Terminal event emitted by backend when a streaming execution is cancelled
+// via POST /api/chat/stream/{executionId}/cancel. This is authoritative — the
+// UI must wait for this (or another terminal event) before closing the stream.
+export interface CancelledEvent {
+  seq?: number;
+  iteration?: number;
+  status?: 'cancelled';
+  timestamp?: string;
+}
+
 // v2_stream token-level streaming events
 export interface TextDeltaEvent {
   delta: string;
@@ -286,6 +296,9 @@ export interface SendMessageOptions {
 export interface ChatState {
   messages: ConversationMessage[];
   isStreaming: boolean;
+  // Optimistic flag between clicking Stop (cancel POST fired) and the
+  // authoritative terminal SSE event (`cancelled`/`completed`/`error`/`timeout`).
+  isCancelling: boolean;
   isLoadingHistory: boolean;
   conversationId: string | null;
   conversationTitle: string | null;

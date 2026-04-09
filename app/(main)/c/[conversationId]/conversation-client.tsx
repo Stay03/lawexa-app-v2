@@ -371,6 +371,7 @@ function ConversationPageContent() {
   const {
     messages,
     isStreaming,
+    isCancelling,
     isLoadingHistory,
     conversationTitle,
     error,
@@ -380,6 +381,7 @@ function ConversationPageContent() {
     fetchConversationTitle,
     setConversationId,
     disconnect,
+    cancelStream,
     setError,
     retryLastMessage,
     recoverPendingState,
@@ -595,7 +597,10 @@ function ConversationPageContent() {
   };
 
   const handleStop = () => {
-    disconnect();
+    // POST cancel + optimistic "Cancelling…". The stream stays open until
+    // the backend confirms via a terminal SSE event (`cancelled`/`completed`
+    // /`error`/`timeout`). Do NOT call disconnect() here.
+    cancelStream();
   };
 
   // Function to send a message programmatically (used by quiz components)
@@ -1011,10 +1016,16 @@ function ConversationPageContent() {
                     <Button
                       size="icon"
                       variant="destructive"
-                      className="h-7 w-7 shrink-0 rounded-full"
+                      className="h-7 w-7 shrink-0 rounded-full disabled:opacity-70"
                       onClick={handleStop}
+                      disabled={isCancelling}
+                      aria-label={isCancelling ? 'Cancelling' : 'Stop generating'}
                     >
-                      <Square className="h-4 w-4" />
+                      {isCancelling ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
                     </Button>
                   ) : (
                     <Button

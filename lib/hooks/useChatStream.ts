@@ -64,7 +64,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
   const [state, setState] = useState<ChatState>({
     messages: [],
-    isStreaming: false,
+    isStreaming: false, isCancelling: false,
     isLoadingHistory: false,
     conversationId: null,
     conversationTitle: null,
@@ -174,7 +174,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         ...prev,
         messages: [...prev.messages, message],
         error: null,
-        isStreaming: false,
+        isStreaming: false, isCancelling: false,
       }));
     },
     []
@@ -434,13 +434,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     setState((prev) => {
       const lastUserIdx = [...prev.messages].reverse().findIndex((m) => m.role === 'user');
       if (lastUserIdx === -1) {
-        return { ...prev, messages: [...prev.messages, ...transformed], isStreaming: false, error: null };
+        return { ...prev, messages: [...prev.messages, ...transformed], isStreaming: false, isCancelling: false, error: null };
       }
       const cutIndex = prev.messages.length - lastUserIdx;
       return {
         ...prev,
         messages: [...prev.messages.slice(0, cutIndex), ...transformed],
-        isStreaming: false,
+        isStreaming: false, isCancelling: false,
         error: null,
       };
     });
@@ -465,7 +465,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     pollIntervalRef.current = setInterval(async () => {
       if (Date.now() - startTime > POLL_MAX_DURATION_MS) {
         stopPolling();
-        setState((prev) => ({ ...prev, isStreaming: false, error: 'Response timed out. Please try again.' }));
+        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: 'Response timed out. Please try again.' }));
         return;
       }
 
@@ -482,15 +482,15 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                 ...prev,
                 messages: transformed,
                 conversationTitle: conv.data.title || prev.conversationTitle,
-                isStreaming: false,
+                isStreaming: false, isCancelling: false,
                 error: null,
               }));
               onHistoryLoaded?.(conv.data);
             } else {
-              setState((prev) => ({ ...prev, isStreaming: false, error: null }));
+              setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: null }));
             }
           } catch {
-            setState((prev) => ({ ...prev, isStreaming: false, error: null }));
+            setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: null }));
           }
         }
       } catch {
@@ -559,15 +559,15 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               ...prev,
               messages: transformed,
               conversationTitle: conv.data.title || prev.conversationTitle,
-              isStreaming: false,
+              isStreaming: false, isCancelling: false,
               error: null,
             }));
             onHistoryLoaded?.(conv.data);
           } else {
-            setState((prev) => ({ ...prev, isStreaming: false, error: null }));
+            setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: null }));
           }
         } catch {
-          setState((prev) => ({ ...prev, isStreaming: false, error: null }));
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: null }));
         }
       }
       // If still pending, reset counter and let the stream continue
@@ -676,7 +676,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Set streaming state (no assistant placeholder - we'll add it when completed)
       setState((prev) => ({
         ...prev,
-        isStreaming: true,
+        isStreaming: true, isCancelling: false,
         error: null,
       }));
 
@@ -842,6 +842,32 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         onCompleted?.(event);
       });
 
+      // Handle cancelled event — authoritative terminal for a user-initiated
+      // cancel (POST /api/chat/stream/{id}/cancel). If a v2_stream placeholder
+      // is mid-render, finalize it with whatever text accumulated so far.
+      eventSource.addEventListener('cancelled', () => {
+        stopWatchdog();
+        eventSource.close();
+        eventSourceRef.current = null;
+
+        const placeholderId = streamingMessageIdRef.current;
+        if (placeholderId) {
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === placeholderId ? { ...m, isStreaming: false } : m
+            ),
+            isStreaming: false,
+            isCancelling: false,
+          }));
+          streamingMessageIdRef.current = null;
+          currentIterationRef.current = null;
+          textByIterationRef.current.clear();
+        } else {
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+        }
+      });
+
       // Handle error event - add inline as ErrorMessage so it appears in message flow
       // NOTE: Browser connection errors also fire this listener (with no data).
       // We only handle events WITH data here; connection errors are handled by onerror below.
@@ -863,7 +889,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         } catch {
           // Unparseable data — show generic error
           const errorMsg = 'Stream error';
-          setState((prev) => ({ ...prev, error: errorMsg, isStreaming: false }));
+          setState((prev) => ({ ...prev, error: errorMsg, isStreaming: false, isCancelling: false }));
           onError?.(errorMsg);
         }
         eventSource.close();
@@ -877,7 +903,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         eventSourceRef.current = null;
         setState((prev) => ({
           ...prev,
-          isStreaming: false,
+          isStreaming: false, isCancelling: false,
         }));
       });
 
@@ -888,7 +914,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         setState((prev) => ({
           ...prev,
           error: errorMsg,
-          isStreaming: false,
+          isStreaming: false, isCancelling: false,
         }));
         onError?.(errorMsg);
         eventSource.close();
@@ -946,7 +972,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       } else {
         setState((prev) => ({
           ...prev,
-          isStreaming: false,
+          isStreaming: false, isCancelling: false,
           error: 'Connection lost',
         }));
       }
@@ -999,9 +1025,26 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
-      setState((prev) => ({ ...prev, isStreaming: false }));
+      setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
     }
   }, [stopWatchdog, stopPolling]);
+
+  // Graceful cancel — POSTs to the cancel endpoint and waits for a terminal
+  // SSE event (`cancelled`/`completed`/`error`/`timeout`) to finalize state.
+  // Does NOT close the EventSource locally. See chatApi.cancelStream for why.
+  const cancelStream = useCallback(() => {
+    const execId = executionIdRef.current;
+    if (!execId || !token) return;
+    // Guard double-click
+    if (state.isCancelling) return;
+
+    // Optimistic: show "Cancelling…" immediately
+    setState((prev) => ({ ...prev, isCancelling: true }));
+
+    // Fire-and-forget. The listener for `cancelled` (or a racing `completed`/
+    // `error`/`timeout`) will close the stream and clear `isCancelling`.
+    chatApi.cancelStream(execId, token);
+  }, [token, state.isCancelling]);
 
   // Clear messages and reset state
   const clearChat = useCallback(() => {
@@ -1009,7 +1052,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     conversationIdRef.current = null;
     setState({
       messages: [],
-      isStreaming: false,
+      isStreaming: false, isCancelling: false,
       isLoadingHistory: false,
       conversationId: null,
       conversationTitle: null,
@@ -1043,7 +1086,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     const optimisticMsg = addUserMessage(message, options.attachment);
 
     // Set streaming state
-    setState((prev) => ({ ...prev, isStreaming: true, error: null }));
+    setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
 
     try {
       const response = await chatApi.start({
@@ -1063,7 +1106,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         removeMessage(optimisticMsg.id);
         setState((prev) => ({
           ...prev,
-          isStreaming: false,
+          isStreaming: false, isCancelling: false,
           error: response.message || 'Failed to send message',
         }));
       }
@@ -1085,7 +1128,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           } else {
             setState((prev) => ({
               ...prev,
-              isStreaming: false,
+              isStreaming: false, isCancelling: false,
               error: 'A response is still being generated.',
             }));
           }
@@ -1098,7 +1141,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         removeMessage(optimisticMsg.id);
         setState((prev) => ({
           ...prev,
-          isStreaming: false,
+          isStreaming: false, isCancelling: false,
           error: 'This message was already sent. Please wait a moment.',
         }));
         return;
@@ -1111,7 +1154,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         : 'Network error. Please try again.';
       setState((prev) => ({
         ...prev,
-        isStreaming: false,
+        isStreaming: false, isCancelling: false,
         error: errorMsg,
       }));
     }
@@ -1132,7 +1175,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       ...prev,
       messages: prev.messages.filter((m) => !isErrorMessage(m)),
       error: null,
-      isStreaming: true,
+      isStreaming: true, isCancelling: false,
     }));
 
     try {
@@ -1145,7 +1188,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         if (status.messages.length > 0) {
           mergeMissedMessages(status.messages);
         } else {
-          setState((prev) => ({ ...prev, isStreaming: false }));
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
         }
         return;
       }
@@ -1179,7 +1222,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         setState((prev) => ({
           ...prev,
           error: response.message || 'Failed to retry',
-          isStreaming: false,
+          isStreaming: false, isCancelling: false,
         }));
       }
     } catch (err) {
@@ -1195,7 +1238,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       setState((prev) => ({
         ...prev,
         error: 'Failed to retry. Please try again.',
-        isStreaming: false,
+        isStreaming: false, isCancelling: false,
       }));
     }
   }, [state.messages, state.conversationId, state.isStreaming, connectToStream, mergeMissedMessages, pollForCompletion]);
@@ -1208,7 +1251,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const status = response.data;
 
       if (status.status === 'pending') {
-        setState((prev) => ({ ...prev, isStreaming: true, error: null }));
+        setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
         if (status.execution_id) {
           // Reconnect to live SSE stream for real-time tool call updates
           connectToStream(status.execution_id);
@@ -1233,6 +1276,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     // State
     messages: state.messages,
     isStreaming: state.isStreaming,
+    isCancelling: state.isCancelling,
     isLoadingHistory: state.isLoadingHistory,
     conversationId: state.conversationId,
     conversationTitle: state.conversationTitle,
@@ -1245,6 +1289,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     setConversationId,
     addUserMessage,
     disconnect,
+    cancelStream,
     clearChat,
     setError,
     retryLastMessage,

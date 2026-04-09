@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { AxiosError } from 'axios';
-import { ArrowUp, ArrowDown, Loader2, ExternalLink, X } from 'lucide-react';
+import { ArrowUp, ArrowDown, Loader2, ExternalLink, X, Square } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   PromptInput,
@@ -91,6 +91,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
@@ -284,6 +285,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         eventSourceRef.current = null;
         executionIdRef.current = null;
         setIsStreaming(false);
+        setIsCancelling(false);
       });
 
       eventSource.addEventListener('error', () => {
@@ -291,6 +293,17 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         eventSourceRef.current = null;
         executionIdRef.current = null;
         setIsStreaming(false);
+        setIsCancelling(false);
+      });
+
+      // Authoritative terminal for a user-initiated cancel. Fires after POST
+      // /api/chat/stream/{id}/cancel. See chatApi.cancelStream for the contract.
+      eventSource.addEventListener('cancelled', () => {
+        eventSource.close();
+        eventSourceRef.current = null;
+        executionIdRef.current = null;
+        setIsStreaming(false);
+        setIsCancelling(false);
       });
 
       eventSource.onerror = () => {
@@ -317,6 +330,15 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     setInput(suggestion);
     const textarea = sheetRef.current?.querySelector('textarea');
     textarea?.focus();
+  };
+
+  // Graceful cancel — POSTs cancel and waits for a terminal SSE event
+  // (`cancelled`/`end`/`error`). Does NOT close the EventSource locally.
+  const handleCancel = () => {
+    const execId = executionIdRef.current;
+    if (!execId || !token || isCancelling) return;
+    setIsCancelling(true);
+    chatApi.cancelStream(execId, token);
   };
 
   const handleSubmit = async () => {
@@ -547,23 +569,45 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                 onLargePaste={setPastedContent}
               />
 
-              {/* Send button — bottom right */}
+              {/* Send / Stop button — bottom right */}
               <div className="flex items-center justify-end px-2 pb-1">
-                <PromptInputAction tooltip="Send message">
-                  <Button
-                    size="icon"
-                    className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
-                    onClick={handleSubmit}
-                    onMouseDown={(e) => e.preventDefault()}
-                    disabled={!canSend || isSubmitting}
+                {isStreaming ? (
+                  <PromptInputAction
+                    tooltip={isCancelling ? 'Cancelling…' : 'Stop generating'}
                   >
-                    {isSubmitting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <ArrowUp className="h-4 w-4" />
-                    )}
-                  </Button>
-                </PromptInputAction>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="h-7 w-7 shrink-0 rounded-full disabled:opacity-70"
+                      onClick={handleCancel}
+                      onMouseDown={(e) => e.preventDefault()}
+                      disabled={isCancelling}
+                      aria-label={isCancelling ? 'Cancelling' : 'Stop generating'}
+                    >
+                      {isCancelling ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </PromptInputAction>
+                ) : (
+                  <PromptInputAction tooltip="Send message">
+                    <Button
+                      size="icon"
+                      className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
+                      onClick={handleSubmit}
+                      onMouseDown={(e) => e.preventDefault()}
+                      disabled={!canSend || isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ArrowUp className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </PromptInputAction>
+                )}
               </div>
             </PromptInput>
           </div>
