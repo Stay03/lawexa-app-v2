@@ -476,7 +476,7 @@ export default function HomePage() {
                     value={selectedWorkflowId}
                     onValueChange={setSelectedWorkflowId}
                   >
-                    <SelectTrigger size="sm" className="h-7 text-xs border-none bg-transparent hover:bg-secondary-foreground/10 px-2 gap-1">
+                    <SelectTrigger size="sm" className="h-7 text-xs border-none bg-transparent hover:bg-secondary-foreground/10 px-2 gap-1 min-w-0 max-w-[120px] sm:max-w-none [&>span]:truncate">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -491,13 +491,15 @@ export default function HomePage() {
 
                 {/* Token-level streaming toggle — superadmin only */}
                 {isSuperAdmin && (
-                  <div className="flex items-center gap-1.5 px-2">
+                  <div className="flex items-center gap-1.5 px-1 shrink-0">
                     <Switch
                       checked={streamMode}
                       onCheckedChange={setStreamMode}
                       size="sm"
                     />
-                    <span className="text-xs text-muted-foreground">Token stream</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      Token stream
+                    </span>
                   </div>
                 )}
               </div>
