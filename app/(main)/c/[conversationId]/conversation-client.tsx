@@ -647,7 +647,7 @@ function ConversationPageContent() {
                   </>
                 )}
               </div>
-              {!isExhausted && (
+              {!isExhausted && errorMsg.retryable && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -696,6 +696,28 @@ function ConversationPageContent() {
               >
                 {displayContent}
               </MessageContent>
+            )}
+            {/* Cut-off indicator for partial messages (cancelled or errored mid-stream) */}
+            {(message as ChatMessage).partial && (
+              <div
+                className={`mt-1 flex items-center gap-1.5 text-xs ${
+                  (message as ChatMessage).partial!.reason === 'cancelled'
+                    ? 'text-muted-foreground'
+                    : 'text-destructive'
+                }`}
+              >
+                {(message as ChatMessage).partial!.reason === 'cancelled' ? (
+                  <>
+                    <Square className="h-3 w-3" />
+                    <span>Stopped</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-3 w-3" />
+                    <span>Interrupted</span>
+                  </>
+                )}
+              </div>
             )}
             {/* Message actions (visible on hover) */}
             {displayContent && (

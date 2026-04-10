@@ -399,6 +399,23 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       else if (apiMsg.role === 'tool') {
         continue;
       }
+      // Partial assistant message — the stream was cancelled or errored
+      // mid-response and the backend rescued whatever text had been generated.
+      // Render as a normal ChatMessage (with markdown etc.) but tagged so the
+      // UI can show a "Stopped" / "Interrupted" badge beneath the content.
+      // IMPORTANT: this branch MUST come before the `type === 'error'` branch
+      // below, so partial precedence wins if both flags ever co-occur.
+      else if (apiMsg.role === 'assistant' && apiMsg.metadata?.partial === true) {
+        messages.push({
+          id: `msg_${apiMsg.id}`,
+          role: 'assistant',
+          content: apiMsg.content,
+          timestamp: new Date(apiMsg.created_at),
+          partial: {
+            reason: apiMsg.metadata.reason ?? 'cancelled',
+          },
+        } as ChatMessage);
+      }
       // Error message saved by backend
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'error') {
         messages.push({

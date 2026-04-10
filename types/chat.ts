@@ -16,6 +16,11 @@ export interface ChatMessage {
   timestamp: Date;
   isStreaming?: boolean;
   attachment?: MessageAttachment;
+  // Marks a message that was cut short mid-stream (cancelled or errored).
+  // content holds the partial text the user saw before the stream ended.
+  partial?: {
+    reason: 'cancelled' | 'error' | 'timeout';
+  };
 }
 
 // Tool message extends ChatMessage with tool-specific data
@@ -331,6 +336,11 @@ export interface ApiMessage {
     retryable?: boolean;
     retry_after_ms?: number | null;
     execution_id?: string;
+    // Partial message fields (streaming cancel/error with rescued text buffer).
+    // When partial === true, content holds the actual partial assistant text
+    // the user saw stream in. reason describes why it was cut short.
+    partial?: boolean;
+    reason?: 'cancelled' | 'error' | 'timeout';
   } | null;
   attachment?: MessageAttachment;
   created_at: string;
