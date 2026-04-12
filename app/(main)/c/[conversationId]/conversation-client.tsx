@@ -206,9 +206,19 @@ function HandoverDisplay({
                   )}
                 </div>
                 <span className="text-sm font-medium">
-                  {stage === 'consulting' && (isTransfer ? `Transferring to ${agentName}...` : `Consulting ${agentName}...`)}
-                  {stage === 'working' && `${agentName} working...`}
-                  {stage === 'consulted' && (isTransfer ? `Transferred to ${agentName}` : `Consulted ${agentName}`)}
+                  {handover.agentSlug === 'issue-spotter' ? (
+                    <>
+                      {stage === 'consulting' && 'Extracting Issues...'}
+                      {stage === 'working' && 'Extracting Issues...'}
+                      {stage === 'consulted' && 'Issues Extracted'}
+                    </>
+                  ) : (
+                    <>
+                      {stage === 'consulting' && (isTransfer ? `Transferring to ${agentName}...` : `Consulting ${agentName}...`)}
+                      {stage === 'working' && `${agentName} working...`}
+                      {stage === 'consulted' && (isTransfer ? `Transferred to ${agentName}` : `Consulted ${agentName}`)}
+                    </>
+                  )}
                 </span>
                 <div className="flex-1" />
                 {isComplete && handover.latencyMs && (
@@ -362,7 +372,8 @@ function ConversationPageContent() {
   const chatContentRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
   // Per-conversation opt-in for token-level streaming. Seeded from the home
-  // page init blob; resets on hard refresh (follow-ups fall back to legacy).
+  // page init blob on first load, or restored from localStorage on refresh
+  // so superadmin follow-ups keep streaming after a hard refresh.
   const streamModeRef = useRef<'v2_stream' | undefined>(undefined);
 
   // Conversation owner for read-only mode check
@@ -389,6 +400,17 @@ function ConversationPageContent() {
   // Get current user for ownership check
   const user = useAuthStore((state) => state.user);
   const isOwner = user?.id != null && conversationOwnerId != null && user.id === conversationOwnerId;
+
+  // Restore stream mode from localStorage on refresh so superadmin follow-ups
+  // keep using v2_stream even after the sessionStorage init blob is consumed.
+  if (
+    streamModeRef.current === undefined &&
+    user?.role === 'superadmin' &&
+    typeof window !== 'undefined' &&
+    localStorage.getItem('stream_mode_v2') === '1'
+  ) {
+    streamModeRef.current = 'v2_stream';
+  }
 
   // Sidebar state for input positioning
   const { state } = useSidebar();
