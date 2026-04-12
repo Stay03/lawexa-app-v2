@@ -89,6 +89,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const textByIterationRef = useRef<Map<number, string>>(new Map());
   const streamingMessageIdRef = useRef<string | null>(null);
   const currentIterationRef = useRef<number | null>(null);
+  // Sub-agent streaming: per-agent_slug text accumulator (separate from orchestrator)
+  const agentTextRef = useRef<Map<string, string>>(new Map());
   const token = useAuthStore((state) => state.token);
 
   // ─── Internal helpers ──────────────────────────────────────
@@ -229,6 +231,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   // Update handover message when sub-agent completes
   const updateHandoverMessage = useCallback(
     (event: HandoverCompleteEvent) => {
+      // Clear the specialist's streaming buffer
+      agentTextRef.current.delete(event.agent_slug);
+
       setState((prev) => ({
         ...prev,
         messages: prev.messages.map((msg) => {
@@ -243,7 +248,28 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               latencyMs: event.latency_ms,
               success: event.success,
               handoverResultContent: event.content || event.response_preview || undefined,
+              streamingContent: undefined,
             } as HandoverMessage;
+          }
+          return msg;
+        }),
+      }));
+    },
+    []
+  );
+
+  // Update streaming content on active handover for a given specialist
+  const updateHandoverStreamingContent = useCallback(
+    (agentSlug: string, content: string) => {
+      setState((prev) => ({
+        ...prev,
+        messages: prev.messages.map((msg) => {
+          if (
+            (msg as HandoverMessage).messageType === 'handover' &&
+            (msg as HandoverMessage).agentSlug === agentSlug &&
+            (msg as HandoverMessage).handoverStatus === 'active'
+          ) {
+            return { ...msg, streamingContent: content } as HandoverMessage;
           }
           return msg;
         }),
@@ -775,20 +801,33 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // v2_stream: token-level text delta. Append to per-iteration buffer and
       // mutate the streaming placeholder. NEVER dedup on seq — text deltas are
       // ephemeral and seq is a shared monotonic counter (per backend contract).
+      // When agent_slug is present, the text is from a specialist sub-agent —
+      // accumulate separately and push into the HandoverMessage's streamingContent.
       eventSource.addEventListener('text_delta', (e) => {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: TextDeltaEvent = JSON.parse(e.data);
-        const msgId = ensureStreamingPlaceholder(event.iteration);
-        const current = textByIterationRef.current.get(event.iteration) ?? '';
-        const updated = current + event.delta;
-        textByIterationRef.current.set(event.iteration, updated);
-        setState((prev) => ({
-          ...prev,
-          messages: prev.messages.map((m) =>
-            m.id === msgId ? { ...m, content: updated } : m
-          ),
-        }));
+
+        if (event.agent_slug) {
+          // Sub-agent text: accumulate separately, update HandoverMessage
+          const slug = event.agent_slug;
+          const current = agentTextRef.current.get(slug) ?? '';
+          const updated = current + event.delta;
+          agentTextRef.current.set(slug, updated);
+          updateHandoverStreamingContent(slug, updated);
+        } else {
+          // Orchestrator text: existing behavior
+          const msgId = ensureStreamingPlaceholder(event.iteration);
+          const current = textByIterationRef.current.get(event.iteration) ?? '';
+          const updated = current + event.delta;
+          textByIterationRef.current.set(event.iteration, updated);
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === msgId ? { ...m, content: updated } : m
+            ),
+          }));
+        }
       });
 
       // v2_stream: text stream finished for this iteration. Do NOT replace
@@ -798,12 +837,20 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         resetHeartbeatCounter();
       });
 
-      // v2_stream: model retried this iteration's text — clear the accumulator
-      // for this specific iteration only. Other iterations and tool state are untouched.
+      // v2_stream: model retried this iteration's text — clear the accumulator.
+      // When agent_slug is present, clear only that specialist's buffer.
       eventSource.addEventListener('text_reset', (e) => {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
         const event: TextResetEvent = JSON.parse(e.data);
+
+        if (event.agent_slug) {
+          agentTextRef.current.set(event.agent_slug, '');
+          updateHandoverStreamingContent(event.agent_slug, '');
+          return;
+        }
+
+        // Orchestrator reset: existing behavior
         textByIterationRef.current.set(event.iteration, '');
         const msgId = streamingMessageIdRef.current;
         if (msgId && currentIterationRef.current === event.iteration) {
@@ -851,6 +898,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           streamingMessageIdRef.current = null;
           currentIterationRef.current = null;
           textByIterationRef.current.clear();
+          agentTextRef.current.clear();
         } else {
           // Legacy path — append a new assistant message
           addAssistantMessage(finalText);
@@ -911,9 +959,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             streamingMessageIdRef.current = null;
             currentIterationRef.current = null;
             textByIterationRef.current.clear();
+            agentTextRef.current.clear();
           } else {
             setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
           }
+          agentTextRef.current.clear();
           return;
         }
 
@@ -980,6 +1030,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       addErrorMessage,
       addHandoverMessage,
       updateHandoverMessage,
+      updateHandoverStreamingContent,
       addToolMessage,
       updateToolMessage,
       ensureStreamingPlaceholder,

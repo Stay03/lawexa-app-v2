@@ -44,6 +44,8 @@ export interface HandoverMessage extends ChatMessage {
   latencyMs?: number;
   success?: boolean;
   handoverResultContent?: string;
+  // Ephemeral: holds in-progress streaming text from the specialist while handover is active
+  streamingContent?: string;
 }
 
 // Error message - when the backend reports a stream or API error
@@ -176,18 +178,21 @@ export interface TextDeltaEvent {
   iteration: number;
   timestamp: string;
   seq?: number; // ordering hint only — never use for dedup
+  agent_slug?: string; // present when text is from a specialist sub-agent
 }
 
 export interface TextDoneEvent {
   iteration: number;
   timestamp: string;
   seq?: number;
+  agent_slug?: string;
 }
 
 export interface TextResetEvent {
   iteration: number;
   timestamp: string;
   seq?: number;
+  agent_slug?: string;
 }
 
 export interface HandoverStartedEvent {

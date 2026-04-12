@@ -141,8 +141,10 @@ function HandoverDisplay({
   toolMessages: ToolMessage[];
 }) {
   const isComplete = handover.handoverStatus === 'complete';
+  const isAgentStreaming = !isComplete && !!handover.streamingContent;
   const [isTaskExpanded, setIsTaskExpanded] = useState(!isComplete);
   const [isResultExpanded, setIsResultExpanded] = useState(false);
+  const streamingRef = useRef<HTMLDivElement>(null);
   const hasAutoCollapsed = useRef(false);
 
   const agentName = formatAgentName(handover.agentSlug);
@@ -173,6 +175,13 @@ function HandoverDisplay({
       return () => clearTimeout(timer);
     }
   }, [isComplete, isTaskExpanded]);
+
+  // Auto-scroll streaming content to bottom as new text arrives
+  useEffect(() => {
+    if (streamingRef.current && handover.streamingContent) {
+      streamingRef.current.scrollTop = streamingRef.current.scrollHeight;
+    }
+  }, [handover.streamingContent]);
 
   return (
     <div className="px-4">
@@ -232,6 +241,24 @@ function HandoverDisplay({
         {toolMessages.length > 0 && (
           <div className="ml-2">
             <CompactToolChain messages={toolMessages} showSearchResults={false} />
+          </div>
+        )}
+
+        {/* Streaming agent response — auto-shown during active handover */}
+        {isAgentStreaming && (
+          <div className="ml-2 mt-1">
+            <div
+              ref={streamingRef}
+              className="mt-2 max-h-60 overflow-y-auto rounded-lg border bg-muted/20 p-4"
+            >
+              <MessageContent
+                className="prose prose-sm dark:prose-invert"
+                markdown
+              >
+                {handover.streamingContent}
+              </MessageContent>
+              <span className="inline-block h-4 w-0.5 animate-pulse bg-foreground/50 ml-0.5" />
+            </div>
           </div>
         )}
 
