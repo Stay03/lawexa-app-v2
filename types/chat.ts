@@ -114,6 +114,8 @@ export interface ToolCallingEvent {
   status: 'tool_calling';
   tool_call: ToolCall;
   timestamp: string;
+  context?: 'handover';
+  agent_slug?: string;
 }
 
 export interface ToolCompleteEvent {
@@ -124,6 +126,8 @@ export interface ToolCompleteEvent {
   tool_result: ToolResult;
   latency_ms: number;
   timestamp: string;
+  context?: 'handover';
+  agent_slug?: string;
 }
 
 // Canonical summary shape emitted by v2_stream completed events
@@ -193,6 +197,7 @@ export interface TextResetEvent {
   timestamp: string;
   seq?: number;
   agent_slug?: string;
+  reason?: string;
 }
 
 export interface HandoverStartedEvent {
@@ -216,6 +221,12 @@ export interface HandoverCompleteEvent {
   latency_ms: number;
   handover_type?: 'consult' | 'transfer';
   timestamp: string;
+}
+
+export interface ThinkingEvent {
+  iteration: number;
+  timestamp: string;
+  seq?: number;
 }
 
 export interface HeartbeatEvent {
@@ -323,7 +334,7 @@ export interface ApiMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   metadata: {
-    type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result' | 'error';
+    type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result' | 'error' | 'narration';
     tool_name?: string;
     tool_parameters?: Record<string, unknown>;
     success?: boolean;

@@ -24,13 +24,30 @@ export interface NextQuestionPromptInfo {
   actions: Array<{ id: string; label: string }>;
 }
 
+export interface MultiQuestionPlanInfo {
+  title: string;
+  description: string;
+  questionCount: number;
+  questions: Array<{ index: number; summary: string }>;
+  currentQuestionIndex: number;
+  actions: Array<{ id: string; label: string }>;
+}
+
+export interface MultiQuestionProgressInfo {
+  completedIndex: number;
+  nextIndex: number;
+  remaining: number;
+}
+
 export type ContentSegment =
   | { type: 'text'; content: string }
   | { type: 'lawyers'; lawyers: LawyerInfo[] }
   | { type: 'quizzes'; quizzes: QuizInfo[] }
   | { type: 'deep_research_prompt'; prompt: DeepResearchPromptInfo }
   | { type: 'multi_question_prompt'; prompt: MultiQuestionPromptInfo }
-  | { type: 'next_question_prompt'; prompt: NextQuestionPromptInfo };
+  | { type: 'next_question_prompt'; prompt: NextQuestionPromptInfo }
+  | { type: 'multi_question_plan'; plan: MultiQuestionPlanInfo }
+  | { type: 'multi_question_progress'; progress: MultiQuestionProgressInfo };
 
 export interface ParsedContent {
   segments: ContentSegment[];
@@ -169,6 +186,42 @@ function parseNextQuestionPrompt(xml: string): NextQuestionPromptInfo {
   };
 }
 
+function parseMultiQuestionPlan(xml: string): MultiQuestionPlanInfo {
+  const actionsBlock = getTagContent(xml, 'actions');
+  const questionsBlock = getTagContent(xml, 'questions');
+  const questionRegex = /<question\s+index="(\d+)">([\s\S]*?)<\/question>/gi;
+  const questions: Array<{ index: number; summary: string }> = [];
+  let match;
+
+  while ((match = questionRegex.exec(questionsBlock)) !== null) {
+    questions.push({ index: parseInt(match[1], 10), summary: match[2].trim() });
+  }
+
+  // Extract current_question index from self-closing tag
+  const currentQuestionMatch = xml.match(/<current_question\s+index="(\d+)"\s*\/>/i);
+  const currentQuestionIndex = currentQuestionMatch ? parseInt(currentQuestionMatch[1], 10) : 1;
+
+  return {
+    title: getTagContent(xml, 'title'),
+    description: getTagContent(xml, 'description'),
+    questionCount: parseInt(getTagContent(xml, 'question_count'), 10) || questions.length,
+    questions,
+    currentQuestionIndex,
+    actions: extractActions(actionsBlock),
+  };
+}
+
+function parseMultiQuestionProgress(xml: string): MultiQuestionProgressInfo {
+  const completedMatch = xml.match(/<completed\s+index="(\d+)"\s*\/>/i);
+  const nextMatch = xml.match(/<next\s+index="(\d+)"\s*\/>/i);
+
+  return {
+    completedIndex: completedMatch ? parseInt(completedMatch[1], 10) : 0,
+    nextIndex: nextMatch ? parseInt(nextMatch[1], 10) : 0,
+    remaining: parseInt(getTagContent(xml, 'remaining'), 10) || 0,
+  };
+}
+
 interface MatchInfo {
   start: number;
   end: number;
@@ -300,6 +353,34 @@ export function parseContent(content: string): ParsedContent {
     }
   }
 
+  // ---- Find multi question plan blocks ----
+  const multiQuestionPlanRegex = /<multi_question_plan>([\s\S]*?)<\/multi_question_plan>/gi;
+
+  while ((match = multiQuestionPlanRegex.exec(content)) !== null) {
+    const plan = parseMultiQuestionPlan(match[0]);
+    if (plan.title) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        segment: { type: 'multi_question_plan', plan },
+      });
+    }
+  }
+
+  // ---- Find multi question progress blocks ----
+  const multiQuestionProgressRegex = /<multi_question_progress>([\s\S]*?)<\/multi_question_progress>/gi;
+
+  while ((match = multiQuestionProgressRegex.exec(content)) !== null) {
+    const progress = parseMultiQuestionProgress(match[0]);
+    if (progress.completedIndex > 0 || progress.nextIndex > 0) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        segment: { type: 'multi_question_progress', progress },
+      });
+    }
+  }
+
   // Sort all matches by position
   matches.sort((a, b) => a.start - b.start);
 
@@ -340,7 +421,9 @@ export function hasPromptContent(content: string): boolean {
   return (
     /<deep_research_prompt/i.test(content) ||
     /<multi_question_prompt/i.test(content) ||
-    /<next_question_prompt/i.test(content)
+    /<next_question_prompt/i.test(content) ||
+    /<multi_question_plan/i.test(content) ||
+    /<multi_question_progress/i.test(content)
   );
 }
 
@@ -352,6 +435,8 @@ export function hasSpecialContent(content: string): boolean {
     /<quizzes(?:\s|>)/i.test(content) ||
     /<deep_research_prompt/i.test(content) ||
     /<multi_question_prompt/i.test(content) ||
-    /<next_question_prompt/i.test(content)
+    /<next_question_prompt/i.test(content) ||
+    /<multi_question_plan/i.test(content) ||
+    /<multi_question_progress/i.test(content)
   );
 }

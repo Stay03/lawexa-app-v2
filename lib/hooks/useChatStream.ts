@@ -91,6 +91,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const currentIterationRef = useRef<number | null>(null);
   // Sub-agent streaming: per-agent_slug text accumulator (separate from orchestrator)
   const agentTextRef = useRef<Map<string, string>>(new Map());
+  // Stream mode for the current/last execution — persisted so retry can forward it
+  const streamModeRef = useRef<'v2_stream' | undefined>(undefined);
   const token = useAuthStore((state) => state.token);
 
   // ─── Internal helpers ──────────────────────────────────────
@@ -382,6 +384,10 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       }
       // Skip handover result messages (already captured above)
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'handover_result') {
+        continue;
+      }
+      // Skip narration messages — internal orchestrator commentary not shown to users
+      else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'narration') {
         continue;
       }
       // Assistant tool call - transform to ToolMessage with result
@@ -784,6 +790,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         resetHeartbeatCounter();
         const event: ToolCallingEvent = JSON.parse(e.data);
         if (event.seq !== undefined && dedup.has(event.seq)) return;
+        // Skip internal handover tool calls — not user-visible
+        if (event.tool_call.name === '_handover') return;
         addToolMessage(event);
         onToolCalling?.(event);
       });
@@ -794,6 +802,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         resetHeartbeatCounter();
         const event: ToolCompleteEvent = JSON.parse(e.data);
         if (event.seq !== undefined && dedup.has(event.seq)) return;
+        // Skip internal handover tool calls — not user-visible
+        if (event.tool_call.name === '_handover') return;
         updateToolMessage(event.tool_call.name, event);
         onToolComplete?.(event);
       });
@@ -872,6 +882,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         if (consecutiveHeartbeatsRef.current >= HEARTBEAT_ONLY_THRESHOLD) {
           checkStaleStream();
         }
+      });
+
+      // Handle thinking event — model is actively reasoning. Reset counters
+      // so watchdog/heartbeat stale detection don't falsely trigger.
+      eventSource.addEventListener('thinking', () => {
+        lastEventTimeRef.current = Date.now();
+        resetHeartbeatCounter();
       });
 
       // Handle completed event. For v2_stream, replace the streaming placeholder
@@ -982,44 +999,115 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         }
       });
 
+      // Handle cancelled event — user-initiated stop confirmed by backend.
+      // Keep any v2_stream placeholder's accumulated partial text visible.
+      eventSource.addEventListener('cancelled', () => {
+        stopWatchdog();
+        eventSource.close();
+        eventSourceRef.current = null;
+        executionIdRef.current = null;
+
+        const placeholderId = streamingMessageIdRef.current;
+        if (placeholderId) {
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === placeholderId ? { ...m, isStreaming: false } : m
+            ),
+            isStreaming: false,
+            isCancelling: false,
+          }));
+          streamingMessageIdRef.current = null;
+          currentIterationRef.current = null;
+          textByIterationRef.current.clear();
+          agentTextRef.current.clear();
+        } else {
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+        }
+      });
+
       // Handle end event
       eventSource.addEventListener('end', () => {
         stopWatchdog();
         eventSource.close();
         eventSourceRef.current = null;
-        setState((prev) => ({
-          ...prev,
-          isStreaming: false, isCancelling: false,
-        }));
+
+        // Finalize any v2_stream placeholder left open
+        const placeholderId = streamingMessageIdRef.current;
+        if (placeholderId) {
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === placeholderId ? { ...m, isStreaming: false } : m
+            ),
+            isStreaming: false, isCancelling: false,
+          }));
+          streamingMessageIdRef.current = null;
+          currentIterationRef.current = null;
+          textByIterationRef.current.clear();
+          agentTextRef.current.clear();
+        } else {
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false, isCancelling: false,
+          }));
+        }
       });
 
       // Handle timeout event
       eventSource.addEventListener('timeout', () => {
         stopWatchdog();
         const errorMsg = 'Stream timed out';
-        setState((prev) => ({
-          ...prev,
-          error: errorMsg,
-          isStreaming: false, isCancelling: false,
-        }));
+
+        // Finalize any v2_stream placeholder, tag as partial timeout
+        const placeholderId = streamingMessageIdRef.current;
+        if (placeholderId) {
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === placeholderId
+                ? {
+                    ...m,
+                    isStreaming: false,
+                    ...(m.content ? { partial: { reason: 'timeout' as const } } : {}),
+                  }
+                : m
+            ),
+            error: errorMsg,
+            isStreaming: false, isCancelling: false,
+          }));
+          streamingMessageIdRef.current = null;
+          currentIterationRef.current = null;
+          textByIterationRef.current.clear();
+          agentTextRef.current.clear();
+        } else {
+          setState((prev) => ({
+            ...prev,
+            error: errorMsg,
+            isStreaming: false, isCancelling: false,
+          }));
+        }
+
         onError?.(errorMsg);
         eventSource.close();
         eventSourceRef.current = null;
       });
 
-      // Handle connection errors — auto-recover via SSE reconnection, then polling.
-      // IMPORTANT: If another terminal handler (error/end/timeout) already nulled
-      // eventSourceRef, the close was intentional. Do NOT reconnect — that's how
-      // we used to get the "Something went wrong" duplicate loop after CANCELLED.
+      // Handle connection errors. Let the browser auto-reconnect when possible
+      // — it sends Last-Event-ID so the backend can replay missed events.
+      // Only intervene when EventSource is permanently CLOSED (readyState === 2).
       eventSource.onerror = () => {
         if (eventSourceRef.current !== eventSource) return;
 
+        // readyState 0 = CONNECTING — browser is auto-reconnecting.
+        // Let it proceed; the watchdog (60s silence) is the safety net.
+        if (eventSource.readyState === 0) return;
+
+        // readyState 2 = CLOSED — connection permanently dead.
+        // Fall back to manual reconnect → polling.
         stopWatchdog();
         eventSource.close();
         eventSourceRef.current = null;
-
-        // Try to reconnect SSE first (backend picks up from Redis/DB).
-        // Falls back to polling after SSE_MAX_RECONNECTS failures.
         reconnectStreamRef.current?.();
       };
     },
@@ -1181,6 +1269,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
 
     try {
+      // Persist stream mode so retry can forward it
+      streamModeRef.current = options.streamMode;
+
       const response = await chatApi.start({
         message,
         stream: true,
@@ -1306,6 +1397,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         stream: true,
         conversation_id: convId,
         ...(fileId && { file_id: fileId }),
+        ...(streamModeRef.current && { stream_mode: streamModeRef.current }),
       });
 
       if (response.success) {

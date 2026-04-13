@@ -10,6 +10,8 @@ import { QuizCardList } from '@/components/chat/quiz-card';
 import { DeepResearchPromptCard } from '@/components/chat/deep-research-prompt-card';
 import { MultiQuestionPromptCard } from '@/components/chat/multi-question-prompt-card';
 import { NextQuestionPromptCard } from '@/components/chat/next-question-prompt-card';
+import { MultiQuestionPlanCard } from '@/components/chat/multi-question-plan-card';
+import { MultiQuestionProgressCard } from '@/components/chat/multi-question-progress-card';
 import {
   parseContent,
   hasSpecialContent,
@@ -98,6 +100,22 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
                 return (
                   <div key={`next-question-${index}`} className="not-prose">
                     <NextQuestionPromptCard prompt={segment.prompt} isInteracted={isInteracted} />
+                  </div>
+                );
+              }
+
+              if (segment.type === 'multi_question_plan') {
+                return (
+                  <div key={`multi-question-plan-${index}`} className="not-prose">
+                    <MultiQuestionPlanCard plan={segment.plan} isInteracted={isInteracted} />
+                  </div>
+                );
+              }
+
+              if (segment.type === 'multi_question_progress') {
+                return (
+                  <div key={`multi-question-progress-${index}`} className="not-prose">
+                    <MultiQuestionProgressCard progress={segment.progress} />
                   </div>
                 );
               }
