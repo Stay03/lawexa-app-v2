@@ -825,10 +825,17 @@ function ConversationPageContent() {
     enabled: showThinking,
   });
 
-  // Stream elapsed timer — derive start from first tool/handover message timestamp
+  // Stream elapsed timer — derive start from first tool/handover message,
+  // or fall back to first streaming assistant placeholder (text-only responses).
   const streamStartTime = useMemo(() => {
     for (const msg of messages) {
       if (isToolMessage(msg) || isHandoverMessage(msg)) {
+        return msg.timestamp.getTime();
+      }
+    }
+    // Fallback: use first streaming assistant message (v2_stream placeholder)
+    for (const msg of messages) {
+      if (msg.role === 'assistant' && (msg as ChatMessage).isStreaming) {
         return msg.timestamp.getTime();
       }
     }

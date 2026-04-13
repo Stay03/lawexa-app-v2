@@ -16,6 +16,7 @@ import {
   type HandoverStartedEvent,
   type HandoverCompleteEvent,
   type TextDeltaEvent,
+  type TextDoneEvent,
   type TextResetEvent,
   type ToolMessage,
   type HandoverMessage,
@@ -93,6 +94,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const agentTextRef = useRef<Map<string, string>>(new Map());
   // Stream mode for the current/last execution — persisted so retry can forward it
   const streamModeRef = useRef<'v2_stream' | undefined>(undefined);
+  // Tool call queue: maps tool name → ordered list of message IDs for pending calls.
+  // Ensures tool_complete updates the correct message when duplicate tool names exist.
+  const toolCallQueueRef = useRef<Map<string, string[]>>(new Map());
+  // Cancel guard ref — more reliable than state for preventing double-click
+  const isCancellingRef = useRef<boolean>(false);
   const token = useAuthStore((state) => state.token);
 
   // ─── Internal helpers ──────────────────────────────────────
@@ -196,6 +202,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         toolName: toolCall.tool_call.name,
         toolParameters: toolCall.tool_call.parameters,
         toolStatus: 'calling',
+        agentSlug: toolCall.agent_slug,
       };
       setState((prev) => ({
         ...prev,
@@ -280,20 +287,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     []
   );
 
-  // Update tool message when complete
+  // Update tool message when complete — matched by message ID (not name)
   const updateToolMessage = useCallback(
-    (toolName: string, event: ToolCompleteEvent) => {
+    (msgId: string, event: ToolCompleteEvent) => {
       setState((prev) => ({
         ...prev,
         messages: prev.messages.map((msg) => {
-          if (
-            msg.role === 'tool' &&
-            (msg as ToolMessage).toolName === toolName &&
-            (msg as ToolMessage).toolStatus === 'calling'
-          ) {
+          if (msg.id === msgId) {
             return {
               ...msg,
-              content: `${toolName} completed`,
+              content: `${event.tool_call.name} completed`,
               toolResult: event.tool_result,
               toolStatus: 'complete',
               latencyMs: event.latency_ms,
@@ -784,7 +787,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         updateHandoverMessage(event);
       });
 
-      // Handle tool_calling event - add as separate history entry
+      // Handle tool_calling event - add as separate history entry.
+      // Queue the message ID by tool name so tool_complete can match correctly
+      // even when the same tool is called multiple times.
       eventSource.addEventListener('tool_calling', (e) => {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
@@ -792,11 +797,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         if (event.seq !== undefined && dedup.has(event.seq)) return;
         // Skip internal handover tool calls — not user-visible
         if (event.tool_call.name === '_handover') return;
-        addToolMessage(event);
+        const msgId = addToolMessage(event);
+        const name = event.tool_call.name;
+        const queue = toolCallQueueRef.current.get(name) || [];
+        queue.push(msgId);
+        toolCallQueueRef.current.set(name, queue);
         onToolCalling?.(event);
       });
 
-      // Handle tool_complete event - update the tool message
+      // Handle tool_complete event - consume the first pending message ID
+      // for this tool name from the queue, ensuring correct FIFO matching.
       eventSource.addEventListener('tool_complete', (e) => {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
@@ -804,7 +814,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         if (event.seq !== undefined && dedup.has(event.seq)) return;
         // Skip internal handover tool calls — not user-visible
         if (event.tool_call.name === '_handover') return;
-        updateToolMessage(event.tool_call.name, event);
+        const name = event.tool_call.name;
+        const queue = toolCallQueueRef.current.get(name) || [];
+        const msgId = queue.shift();
+        if (msgId) {
+          toolCallQueueRef.current.set(name, queue);
+          updateToolMessage(msgId, event);
+        }
         onToolComplete?.(event);
       });
 
@@ -840,11 +856,26 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         }
       });
 
-      // v2_stream: text stream finished for this iteration. Do NOT replace
-      // content — wait for `completed` which carries authoritative text.
-      eventSource.addEventListener('text_done', () => {
+      // v2_stream: text stream finished for this iteration. Stop the
+      // streaming cursor but keep content visible — `completed` will
+      // replace it with authoritative text.
+      eventSource.addEventListener('text_done', (e) => {
         lastEventTimeRef.current = Date.now();
         resetHeartbeatCounter();
+        const event: TextDoneEvent = JSON.parse(e.data);
+
+        // Only stop cursor for orchestrator text, not sub-agent text
+        if (!event.agent_slug) {
+          const msgId = streamingMessageIdRef.current;
+          if (msgId) {
+            setState((prev) => ({
+              ...prev,
+              messages: prev.messages.map((m) =>
+                m.id === msgId ? { ...m, isStreaming: false } : m
+              ),
+            }));
+          }
+        }
       });
 
       // v2_stream: model retried this iteration's text — clear the accumulator.
@@ -958,6 +989,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         eventSource.close();
         eventSourceRef.current = null;
         executionIdRef.current = null;
+        isCancellingRef.current = false;
+        toolCallQueueRef.current.clear();
 
         // CANCELLED: user-initiated stop. Do NOT render as an error. Keep any
         // v2_stream placeholder's accumulated partial text visible (matches
@@ -1006,6 +1039,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         eventSource.close();
         eventSourceRef.current = null;
         executionIdRef.current = null;
+        isCancellingRef.current = false;
+        toolCallQueueRef.current.clear();
 
         const placeholderId = streamingMessageIdRef.current;
         if (placeholderId) {
@@ -1031,6 +1066,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         stopWatchdog();
         eventSource.close();
         eventSourceRef.current = null;
+        isCancellingRef.current = false;
+        toolCallQueueRef.current.clear();
 
         // Finalize any v2_stream placeholder left open
         const placeholderId = streamingMessageIdRef.current;
@@ -1057,6 +1094,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Handle timeout event
       eventSource.addEventListener('timeout', () => {
         stopWatchdog();
+        isCancellingRef.current = false;
+        toolCallQueueRef.current.clear();
         const errorMsg = 'Stream timed out';
 
         // Finalize any v2_stream placeholder, tag as partial timeout
@@ -1202,6 +1241,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     textByIterationRef.current.clear();
     streamingMessageIdRef.current = null;
     currentIterationRef.current = null;
+    toolCallQueueRef.current.clear();
+    isCancellingRef.current = false;
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -1215,8 +1256,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const cancelStream = useCallback(() => {
     const execId = executionIdRef.current;
     if (!execId || !token) return;
-    // Guard double-click
-    if (state.isCancelling) return;
+    // Ref-based guard — immune to React batching / stale closure issues
+    if (isCancellingRef.current) return;
+    isCancellingRef.current = true;
 
     // Optimistic: show "Cancelling…" immediately
     setState((prev) => ({ ...prev, isCancelling: true }));
@@ -1224,7 +1266,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     // Fire-and-forget. The listener for `cancelled` (or a racing `completed`/
     // `error`/`timeout`) will close the stream and clear `isCancelling`.
     chatApi.cancelStream(execId, token);
-  }, [token, state.isCancelling]);
+  }, [token]);
 
   // Clear messages and reset state
   const clearChat = useCallback(() => {

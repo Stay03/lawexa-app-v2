@@ -31,6 +31,7 @@ export interface ToolMessage extends ChatMessage {
   toolResult?: ToolResult;
   toolStatus: 'calling' | 'complete';
   latencyMs?: number;
+  agentSlug?: string;
 }
 
 // Handover message - when orchestrator delegates to a sub-agent
