@@ -21,7 +21,6 @@ import {
   type ToolMessage,
   type HandoverMessage,
   type ErrorMessage,
-  type NarrationMessage,
   type ApiMessage,
   type ConversationMessage,
   type MessageAttachment,
@@ -62,6 +61,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     onCompleted,
     onError,
     onHistoryLoaded,
+    onNarration,
   } = options;
 
   const [state, setState] = useState<ChatState>({
@@ -390,16 +390,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'handover_result') {
         continue;
       }
-      // Narration message — orchestrator commentary between phases
+      // Skip narration messages — shown transiently during streaming via onNarration callback
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'narration') {
-        messages.push({
-          id: `msg_${apiMsg.id}`,
-          role: 'assistant',
-          content: apiMsg.content,
-          timestamp: new Date(apiMsg.created_at),
-          messageType: 'narration',
-          agentSlug: apiMsg.metadata.agent_slug ?? undefined,
-        } as NarrationMessage);
+        continue;
       }
       // Assistant tool call - transform to ToolMessage with result
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'tool_call') {
@@ -894,12 +887,23 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         const event: TextResetEvent = JSON.parse(e.data);
 
         if (event.agent_slug) {
+          // Capture sub-agent narration before clearing
+          const currentText = agentTextRef.current.get(event.agent_slug) ?? '';
+          if (currentText.trim()) {
+            onNarration?.(currentText.trim(), event.agent_slug);
+          }
           agentTextRef.current.set(event.agent_slug, '');
           updateHandoverStreamingContent(event.agent_slug, '');
           return;
         }
 
-        // Orchestrator reset: existing behavior
+        // Capture orchestrator narration before clearing
+        const currentText = textByIterationRef.current.get(event.iteration) ?? '';
+        if (currentText.trim()) {
+          onNarration?.(currentText.trim());
+        }
+
+        // Orchestrator reset: clear accumulator and placeholder
         textByIterationRef.current.set(event.iteration, '');
         const msgId = streamingMessageIdRef.current;
         if (msgId && currentIterationRef.current === event.iteration) {
@@ -1179,6 +1183,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       onToolComplete,
       onCompleted,
       onError,
+      onNarration,
     ]
   );
 

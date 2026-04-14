@@ -66,7 +66,7 @@ export interface NarrationMessage extends ChatMessage {
 }
 
 // Union type for all message types
-export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage | ErrorMessage | NarrationMessage;
+export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage | ErrorMessage;
 
 // Type guard for tool messages
 export function isToolMessage(message: ConversationMessage): message is ToolMessage {
@@ -313,6 +313,7 @@ export interface UseChatStreamOptions {
   onCompleted?: (event: CompletedEvent) => void;
   onError?: (error: string) => void;
   onHistoryLoaded?: (data: ConversationData) => void;
+  onNarration?: (text: string, agentSlug?: string) => void;
 }
 
 // Options for the send() method

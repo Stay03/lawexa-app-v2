@@ -49,11 +49,11 @@ import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn, stripPastedTags } from '@/lib/utils';
-import { isToolMessage, isHandoverMessage, isErrorMessage, isNarrationMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type NarrationMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
-import { NarrationDisplay } from '@/components/chat/narration-display';
+import { isToolMessage, isHandoverMessage, isErrorMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useNarrationPrefsStore } from '@/lib/stores/narrationPrefsStore';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useRotatingText } from '@/lib/hooks/useRotatingText';
 import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
@@ -418,6 +418,10 @@ function ConversationPageContent() {
   const isMobile = useIsMobile();
   const sidebarWidth = isMobile ? '0px' : state === 'expanded' ? '16rem' : '3rem';
 
+  // Narration text displayed transiently as the loading indicator
+  const [narrationText, setNarrationText] = useState<string | null>(null);
+  const narrationMode = useNarrationPrefsStore((s) => s.narrationMode);
+
   const {
     messages,
     isStreaming,
@@ -445,7 +449,29 @@ function ConversationPageContent() {
         browserNotify('Action Required', 'Lawexa needs your input to continue.');
       }
     },
+    onNarration: (text, agentSlug) => {
+      // Mode 'orchestrator': only show orchestrator narrations (no agentSlug)
+      // Mode 'all': show both orchestrator and sub-agent narrations
+      if (narrationMode === 'orchestrator' && agentSlug) return;
+      // Truncate to first sentence or 120 chars for loading verb display
+      const truncated = text.length > 120
+        ? text.slice(0, (text.indexOf('.', 60) + 1) || 120).trim() + '...'
+        : text.trim();
+      if (truncated) setNarrationText(truncated);
+    },
   });
+
+  // Clear narration text when streaming ends
+  useEffect(() => {
+    if (!isStreaming) setNarrationText(null);
+  }, [isStreaming]);
+
+  // Auto-expire narration text after 8s so rotating verbs resume
+  useEffect(() => {
+    if (!narrationText) return;
+    const timer = setTimeout(() => setNarrationText(null), 8000);
+    return () => clearTimeout(timer);
+  }, [narrationText]);
 
   const prevIsStreamingRef = useRef(isStreaming);
 
@@ -667,10 +693,6 @@ function ConversationPageContent() {
 
   const renderMessage = (message: ConversationMessage, { isInteracted = false }: { isInteracted?: boolean } = {}) => {
     // Narration messages — orchestrator commentary between phases
-    if (isNarrationMessage(message)) {
-      return <NarrationDisplay key={message.id} message={message as NarrationMessage} />;
-    }
-
     // Error messages from backend (e.g. AUTH_ERROR, RATE_LIMITED)
     if (isErrorMessage(message)) {
       const errorMsg = message as ErrorMessage;
@@ -817,18 +839,19 @@ function ConversationPageContent() {
     );
   };
 
-  // Check if we need to show "Thinking..." indicator
-  // Show it when streaming and the last message is NOT an assistant response
-  // (i.e., still waiting for final response even if tool calls are happening)
+  // Check if we need to show the loading indicator
+  // Show when streaming and either: waiting for assistant response, or narration text available
   const lastMessage = messages[messages.length - 1];
   const showThinking = isStreaming && lastMessage && lastMessage.role !== 'assistant';
+  const showNarration = isStreaming && !!narrationText;
+  const showLoadingIndicator = showThinking || showNarration;
 
   // Dynamic rotating thinking text
   const { currentText: currentThinkingText } = useRotatingText({
     phrases: THINKING_PHRASES,
     intervalMs: 5000,
     mode: 'random',
-    enabled: showThinking,
+    enabled: showLoadingIndicator,
   });
 
   // Stream elapsed timer — derive start from first tool/handover message,
@@ -982,12 +1005,14 @@ function ConversationPageContent() {
               return renderMessage(group.message, { isInteracted });
             })}
 
-            {/* Thinking indicator - shown when streaming but no tool calls yet */}
-            {showThinking && (
+            {/* Loading indicator — shows narration text or rotating verbs */}
+            {showLoadingIndicator && (
               <Message role="assistant" className="group">
-                <div className="text-muted-foreground flex items-center gap-2">
+                <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{currentThinkingText}</span>
+                  <span className="transition-opacity duration-300">
+                    {narrationText || currentThinkingText}
+                  </span>
                 </div>
               </Message>
             )}
