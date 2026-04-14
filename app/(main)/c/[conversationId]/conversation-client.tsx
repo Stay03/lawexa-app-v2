@@ -65,6 +65,8 @@ import { ConversationNotAvailable } from '@/components/conversations';
 import { ErrorState } from '@/components/common/ErrorState';
 import { browserNotify } from '@/lib/utils/browser-notify';
 import { hasPromptContent } from '@/lib/utils/parse-content-xml';
+import { useUserLimits } from '@/lib/hooks/useUserLimits';
+import { NoFreeMessagesBanner } from '@/components/chat/no-free-messages-banner';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -401,6 +403,15 @@ function ConversationPageContent() {
   // Get current user for ownership check
   const user = useAuthStore((state) => state.user);
   const isOwner = user?.id != null && conversationOwnerId != null && user.id === conversationOwnerId;
+  const isGuest = useAuthStore((state) => state.isGuest);
+
+  // Check if user has no free AI messages (device abuse or zero-limit plan)
+  const { data: limitsData } = useUserLimits();
+  const hasNoFreeMessages = !isGuest &&
+    limitsData?.data?.ai_messages != null &&
+    limitsData.data.ai_messages.plan_limit === 0 &&
+    limitsData.data.ai_messages.total_remaining === 0 &&
+    limitsData.data.ai_messages.payg_remaining === 0;
 
   // Restore stream mode from localStorage on refresh so superadmin follow-ups
   // keep using v2_stream even after the sessionStorage init blob is consumed.
@@ -1061,13 +1072,14 @@ function ConversationPageContent() {
         )}
         <div className="mx-auto max-w-xs sm:max-w-md">
           {/* Show input for owners, view-only indicator for non-owners */}
+          {isOwner && hasNoFreeMessages && <NoFreeMessagesBanner className="mb-3" />}
           {isOwner ? (
             <FileUpload onFilesAdded={handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
               <PromptInput
                 value={input}
                 onValueChange={setInput}
                 onSubmit={handleSubmit}
-                disabled={isStreaming || isLoadingHistory || isSubmitting}
+                disabled={isStreaming || isLoadingHistory || isSubmitting || hasNoFreeMessages}
                 maxHeight={150}
               >
                 {/* Document File Preview - only shown when uploading or uploaded */}

@@ -36,6 +36,8 @@ import { adminAiApi } from '@/lib/api/admin-ai';
 import { adminAiKeys } from '@/lib/hooks/useAdminAi';
 import { extractApiError } from '@/lib/utils/api-error';
 import { formatFileSize } from '@/lib/validations/admin-cases';
+import { useUserLimits } from '@/lib/hooks/useUserLimits';
+import { NoFreeMessagesBanner } from '@/components/chat/no-free-messages-banner';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -61,6 +63,14 @@ export default function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
   const isGuest = useAuthStore((state) => state.isGuest);
+
+  // Check if user has no free AI messages (device abuse or zero-limit plan)
+  const { data: limitsData } = useUserLimits();
+  const hasNoFreeMessages = !isGuest &&
+    limitsData?.data?.ai_messages != null &&
+    limitsData.data.ai_messages.plan_limit === 0 &&
+    limitsData.data.ai_messages.total_remaining === 0 &&
+    limitsData.data.ai_messages.payg_remaining === 0;
 
   // Sync input draft to localStorage
   useEffect(() => {
@@ -406,6 +416,7 @@ export default function HomePage() {
       {/* ── BOTTOM INPUT AREA ──────────────────────────────────── */}
       {/* shrink-0 keeps the input at its natural size on mobile; it always stays at the bottom */}
       <div ref={inputAreaRef} className="shrink-0 w-full max-w-2xl pb-2 md:pb-0">
+        {hasNoFreeMessages && <NoFreeMessagesBanner className="mb-3" />}
         <FileUpload onFilesAdded={isGuest ? () => {} : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
           <PromptInput
             value={input}
@@ -414,7 +425,7 @@ export default function HomePage() {
               if (error) setError(null);
             }}
             onSubmit={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || hasNoFreeMessages}
           >
             {/* Document File Preview inside input — hidden for guests */}
             {!isGuest && (isUploading || uploadedFile) && (

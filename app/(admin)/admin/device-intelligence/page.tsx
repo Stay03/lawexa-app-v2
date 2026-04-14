@@ -16,11 +16,14 @@ import { DeviceFilters } from '@/components/admin/devices/DeviceFilters';
 import { DevicesTable } from '@/components/admin/devices/DevicesTable';
 import { SharedDevicesTable } from '@/components/admin/devices/SharedDevicesTable';
 import { IpClustersTable } from '@/components/admin/devices/IpClustersTable';
+import { AbuseLogFilters } from '@/components/admin/devices/AbuseLogFilters';
+import { AbuseLogsTable } from '@/components/admin/devices/AbuseLogsTable';
 import { UserDeviceHistorySheet } from '@/components/admin/devices/UserDeviceHistorySheet';
 import {
   useAdminDevices,
   useAdminSharedDevices,
   useAdminIpClusters,
+  useAdminDeviceAbuseLogs,
 } from '@/lib/hooks/useAdminDevices';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { cn } from '@/lib/utils';
@@ -28,6 +31,7 @@ import {
   Monitor,
   Fingerprint,
   Globe,
+  ShieldAlert,
 } from 'lucide-react';
 import type {
   DeviceTab,
@@ -36,12 +40,14 @@ import type {
   SharedDeviceGroupBy,
   SharedDeviceParams,
   IpClusterParams,
+  DeviceAbuseLogParams,
 } from '@/types/admin-devices';
 
 const TABS: { id: DeviceTab; label: string; icon: React.ReactNode }[] = [
   { id: 'devices', label: 'All Devices', icon: <Monitor className="h-4 w-4" /> },
   { id: 'shared', label: 'Shared Devices', icon: <Fingerprint className="h-4 w-4" /> },
   { id: 'ip-clusters', label: 'IP Clusters', icon: <Globe className="h-4 w-4" /> },
+  { id: 'abuse-logs', label: 'Abuse Logs', icon: <ShieldAlert className="h-4 w-4" /> },
 ];
 
 function DeviceIntelligenceContent() {
@@ -57,6 +63,12 @@ function DeviceIntelligenceContent() {
   // Debounced search for devices tab
   const [searchValue, setSearchValue] = useState(searchParams.get('search') || '');
   const debouncedSearch = useDebounce(searchValue, 300);
+
+  // Debounced filters for abuse logs tab
+  const [abuseSearchValue, setAbuseSearchValue] = useState(searchParams.get('search') || '');
+  const [abuseDeviceId, setAbuseDeviceId] = useState(searchParams.get('device_id') || '');
+  const debouncedAbuseSearch = useDebounce(abuseSearchValue, 300);
+  const debouncedAbuseDeviceId = useDebounce(abuseDeviceId, 300);
 
   // ── URL param helpers ──────────────────────────────────────
 
@@ -84,6 +96,8 @@ function DeviceIntelligenceContent() {
       // Reset all tab-specific params, keep only tab
       router.push(`/admin/device-intelligence?tab=${tab}`);
       setSearchValue('');
+      setAbuseSearchValue('');
+      setAbuseDeviceId('');
     },
     [router]
   );
@@ -126,11 +140,26 @@ function DeviceIntelligenceContent() {
     };
   }, [searchParams]);
 
+  // ── Abuse logs tab params ─────────────────────────────────
+
+  const abuseLogParams = useMemo<DeviceAbuseLogParams>(() => {
+    if (activeTab !== 'abuse-logs') return {};
+    return {
+      page: Number(searchParams.get('page')) || 1,
+      per_page: Number(searchParams.get('per_page')) || 15,
+      search: debouncedAbuseSearch || undefined,
+      device_id: debouncedAbuseDeviceId || undefined,
+      date_from: searchParams.get('date_from') || undefined,
+      date_to: searchParams.get('date_to') || undefined,
+    };
+  }, [searchParams, debouncedAbuseSearch, debouncedAbuseDeviceId, activeTab]);
+
   // ── Data fetching (only active tab fires) ───────────────
 
   const devicesQuery = useAdminDevices(deviceParams, activeTab === 'devices');
   const sharedQuery = useAdminSharedDevices(sharedParams, activeTab === 'shared');
   const ipClustersQuery = useAdminIpClusters(ipClusterParams, activeTab === 'ip-clusters');
+  const abuseLogsQuery = useAdminDeviceAbuseLogs(abuseLogParams, activeTab === 'abuse-logs');
 
   // ── Debounced search sync ──────────────────────────────────
 
@@ -141,6 +170,23 @@ function DeviceIntelligenceContent() {
       updateParams({ search: debouncedSearch || undefined, page: 1 });
     }
   }, [debouncedSearch, searchParams, updateParams, activeTab]);
+
+  // ── Debounced abuse logs sync ─────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'abuse-logs') return;
+    const currentSearch = searchParams.get('search') || '';
+    const currentDeviceId = searchParams.get('device_id') || '';
+    const updates: Record<string, string | undefined> = {};
+    if (debouncedAbuseSearch !== currentSearch) {
+      updates.search = debouncedAbuseSearch || undefined;
+    }
+    if (debouncedAbuseDeviceId !== currentDeviceId) {
+      updates.device_id = debouncedAbuseDeviceId || undefined;
+    }
+    if (Object.keys(updates).length > 0) {
+      updateParams({ ...updates, page: 1 });
+    }
+  }, [debouncedAbuseSearch, debouncedAbuseDeviceId, searchParams, updateParams, activeTab]);
 
   // ── Handlers ───────────────────────────────────────────────
 
@@ -188,7 +234,9 @@ function DeviceIntelligenceContent() {
       ? devicesQuery.data?.pagination
       : activeTab === 'shared'
         ? sharedQuery.data?.pagination
-        : ipClustersQuery.data?.pagination;
+        : activeTab === 'abuse-logs'
+          ? abuseLogsQuery.data?.pagination
+          : ipClustersQuery.data?.pagination;
 
   const activePerPage =
     Number(searchParams.get('per_page')) || 15;
@@ -280,6 +328,31 @@ function DeviceIntelligenceContent() {
         />
       )}
 
+      {/* Abuse Logs Tab */}
+      {activeTab === 'abuse-logs' && (
+        <>
+          <AbuseLogFilters
+            searchValue={abuseSearchValue}
+            deviceIdValue={abuseDeviceId}
+            dateFrom={searchParams.get('date_from') || ''}
+            dateTo={searchParams.get('date_to') || ''}
+            onSearchChange={setAbuseSearchValue}
+            onDeviceIdChange={setAbuseDeviceId}
+            onDateFromChange={(v) => updateParams({ date_from: v || undefined, page: 1 })}
+            onDateToChange={(v) => updateParams({ date_to: v || undefined, page: 1 })}
+            onClear={() => {
+              setAbuseSearchValue('');
+              setAbuseDeviceId('');
+              updateParams({ date_from: undefined, date_to: undefined, search: undefined, device_id: undefined, page: 1 });
+            }}
+          />
+          <AbuseLogsTable
+            logs={abuseLogsQuery.data?.data || []}
+            isLoading={abuseLogsQuery.isLoading ?? true}
+          />
+        </>
+      )}
+
       {/* Pagination (shared across all tabs) */}
       {activePagination && (
         <AdminPagination
@@ -292,7 +365,9 @@ function DeviceIntelligenceContent() {
               ? 'devices'
               : activeTab === 'shared'
                 ? 'groups'
-                : 'clusters'
+                : activeTab === 'abuse-logs'
+                  ? 'logs'
+                  : 'clusters'
           }
         />
       )}
@@ -320,6 +395,7 @@ export default function DeviceIntelligencePage() {
           <div className="flex gap-1">
             <Skeleton className="h-9 w-[130px] rounded-lg" />
             <Skeleton className="h-9 w-[150px] rounded-lg" />
+            <Skeleton className="h-9 w-[120px] rounded-lg" />
             <Skeleton className="h-9 w-[120px] rounded-lg" />
           </div>
           <div className="flex flex-wrap gap-3">

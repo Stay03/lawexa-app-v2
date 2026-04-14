@@ -14,7 +14,7 @@ export type DeviceType = 'desktop' | 'mobile' | 'tablet' | 'bot';
 
 export type SharedDeviceGroupBy = 'fingerprint' | 'device_id';
 
-export type DeviceTab = 'devices' | 'shared' | 'ip-clusters';
+export type DeviceTab = 'devices' | 'shared' | 'ip-clusters' | 'abuse-logs';
 
 /** User object returned inside device list items */
 export interface DeviceUserBasic {
@@ -174,4 +174,44 @@ export interface UserDeviceHistoryResponse {
   data: UserDeviceHistoryItem[];
   pagination: PaginationMeta;
   links: PaginationLinks;
+}
+
+// ============================================
+// Device Abuse Logs
+// ============================================
+
+export interface DeviceAbuseLogUser {
+  uuid: string;
+  name: string;
+  email: string;
+  role: string;
+  created_at: string;
+}
+
+export interface DeviceAbuseLog {
+  id: number;
+  device_id: string;
+  blocked_user: DeviceAbuseLogUser;
+  existing_users: DeviceAbuseLogUser[];
+  metadata: {
+    auth_provider: string;
+    registered_at: string;
+  };
+  created_at: string;
+}
+
+export interface DeviceAbuseLogParams {
+  device_id?: string;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+  per_page?: number;
+  page?: number;
+}
+
+export interface DeviceAbuseLogResponse {
+  success: boolean;
+  message: string;
+  data: DeviceAbuseLog[];
+  pagination: PaginationMeta;
 }

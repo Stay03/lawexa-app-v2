@@ -7,6 +7,7 @@ import type {
   SharedDeviceParams,
   IpClusterParams,
   UserDeviceHistoryParams,
+  DeviceAbuseLogParams,
 } from '@/types/admin-devices';
 
 // Query key factory
@@ -25,6 +26,9 @@ export const adminDeviceKeys = {
     [...adminDeviceKeys.all, 'user', uuid] as const,
   userDevicesList: (uuid: string, params: UserDeviceHistoryParams) =>
     [...adminDeviceKeys.userDevices(uuid), params] as const,
+  abuseLogs: () => [...adminDeviceKeys.all, 'abuse-logs'] as const,
+  abuseLogsList: (params: DeviceAbuseLogParams) =>
+    [...adminDeviceKeys.abuseLogs(), params] as const,
 };
 
 /**
@@ -67,6 +71,21 @@ export function useAdminIpClusters(
   return useQuery({
     queryKey: adminDeviceKeys.ipClustersList(params),
     queryFn: () => adminDevicesApi.getIpClusters(params),
+    staleTime: 30_000,
+    enabled,
+  });
+}
+
+/**
+ * Hook for fetching device abuse logs (blocked registrations on shared devices)
+ */
+export function useAdminDeviceAbuseLogs(
+  params: DeviceAbuseLogParams = {},
+  enabled = true
+) {
+  return useQuery({
+    queryKey: adminDeviceKeys.abuseLogsList(params),
+    queryFn: () => adminDevicesApi.getAbuseLogs(params),
     staleTime: 30_000,
     enabled,
   });

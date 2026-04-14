@@ -8,6 +8,8 @@ import type {
   IpClusterResponse,
   UserDeviceHistoryParams,
   UserDeviceHistoryResponse,
+  DeviceAbuseLogParams,
+  DeviceAbuseLogResponse,
 } from '@/types/admin-devices';
 
 /**
@@ -73,6 +75,28 @@ export const adminDevicesApi = {
         params: {
           per_page: params.per_page ?? 15,
           page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get device abuse logs (blocked registrations on shared devices)
+   */
+  getAbuseLogs: async (
+    params: DeviceAbuseLogParams = {}
+  ): Promise<DeviceAbuseLogResponse> => {
+    const response = await apiClient.get<DeviceAbuseLogResponse>(
+      '/admin/devices/abuse-logs',
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          device_id: params.device_id || undefined,
+          search: params.search || undefined,
+          date_from: params.date_from || undefined,
+          date_to: params.date_to || undefined,
         },
       }
     );
