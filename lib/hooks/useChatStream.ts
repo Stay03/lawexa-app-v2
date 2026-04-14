@@ -754,11 +754,31 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         consecutiveHeartbeatsRef.current = 0;
       };
 
-      // Handle connected event
-      eventSource.addEventListener('connected', () => {
+      // Handle connected event. On reconnect, the backend may send
+      // accumulated_text with the in-progress response buffer so the
+      // user doesn't see a gap after page refresh.
+      eventSource.addEventListener('connected', (e) => {
         lastEventTimeRef.current = Date.now();
         reconnectCountRef.current = 0; // Reset on successful connection
         resetHeartbeatCounter();
+
+        try {
+          const data = JSON.parse((e as MessageEvent).data);
+          if (data.accumulated_text) {
+            const iteration = currentIterationRef.current ?? 0;
+            const msgId = ensureStreamingPlaceholder(iteration);
+            textByIterationRef.current.set(iteration, data.accumulated_text);
+            setState((prev) => ({
+              ...prev,
+              messages: prev.messages.map((m) =>
+                m.id === msgId ? { ...m, content: data.accumulated_text } : m
+              ),
+            }));
+          }
+        } catch {
+          // First connection or no data — ignore
+        }
+
         onConnected?.();
       });
 
@@ -897,9 +917,12 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           return;
         }
 
-        // Capture orchestrator narration before clearing
+        // Capture narration before clearing. Only fire onNarration for
+        // narration-type text (specialist commentary). Response-type text
+        // (orchestrator answers) is saved as metadata:null by the backend
+        // and will render on page refresh — no need to show transiently.
         const currentText = textByIterationRef.current.get(event.iteration) ?? '';
-        if (currentText.trim()) {
+        if (currentText.trim() && event.text_type !== 'response') {
           onNarration?.(currentText.trim());
         }
 

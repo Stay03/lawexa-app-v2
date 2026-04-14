@@ -113,6 +113,7 @@ export interface ToolCallEvent {
 export interface ConnectedEvent {
   execution_id: string;
   message: string;
+  accumulated_text?: string;
 }
 
 export interface IterationEvent {
@@ -211,6 +212,8 @@ export interface TextResetEvent {
   seq?: number;
   agent_slug?: string;
   reason?: string;
+  text_type?: 'response' | 'narration';
+  accumulated_text?: string;
 }
 
 export interface HandoverStartedEvent {
