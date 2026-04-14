@@ -1,6 +1,6 @@
 'use client';
 
-import { Monitor, BookOpen } from 'lucide-react';
+import { Monitor, BookOpen, MessageSquareText } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -11,9 +11,12 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useReaderMode } from '@/lib/hooks/useReaderMode';
+import { useNarrationPrefsStore } from '@/lib/stores/narrationPrefsStore';
 
 export default function AppearanceSettingsPage() {
   const { isReaderModeEnabled, toggleReaderMode } = useReaderMode();
+  const narrationMode = useNarrationPrefsStore((s) => s.narrationMode);
+  const setNarrationMode = useNarrationPrefsStore((s) => s.setNarrationMode);
 
   return (
     <Card>
@@ -42,6 +45,26 @@ export default function AppearanceSettingsPage() {
             id="reader-mode"
             checked={isReaderModeEnabled}
             onCheckedChange={toggleReaderMode}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="narration-mode" className="flex items-center gap-2">
+              <MessageSquareText className="h-4 w-4" />
+              Show All Agent Activity
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Show sub-agent commentary in the loading indicator during
+              research. When off, only the main orchestrator&apos;s narration is shown.
+            </p>
+          </div>
+          <Switch
+            id="narration-mode"
+            checked={narrationMode === 'all'}
+            onCheckedChange={(checked) =>
+              setNarrationMode(checked ? 'all' : 'orchestrator')
+            }
           />
         </div>
       </CardContent>
