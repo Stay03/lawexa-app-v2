@@ -49,7 +49,8 @@ import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn, stripPastedTags } from '@/lib/utils';
-import { isToolMessage, isHandoverMessage, isErrorMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
+import { isToolMessage, isHandoverMessage, isErrorMessage, isNarrationMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type NarrationMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
+import { NarrationDisplay } from '@/components/chat/narration-display';
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -665,6 +666,11 @@ function ConversationPageContent() {
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
   const renderMessage = (message: ConversationMessage, { isInteracted = false }: { isInteracted?: boolean } = {}) => {
+    // Narration messages — orchestrator commentary between phases
+    if (isNarrationMessage(message)) {
+      return <NarrationDisplay key={message.id} message={message as NarrationMessage} />;
+    }
+
     // Error messages from backend (e.g. AUTH_ERROR, RATE_LIMITED)
     if (isErrorMessage(message)) {
       const errorMsg = message as ErrorMessage;

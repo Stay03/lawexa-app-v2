@@ -21,6 +21,7 @@ import {
   type ToolMessage,
   type HandoverMessage,
   type ErrorMessage,
+  type NarrationMessage,
   type ApiMessage,
   type ConversationMessage,
   type MessageAttachment,
@@ -389,9 +390,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'handover_result') {
         continue;
       }
-      // Skip narration messages — internal orchestrator commentary not shown to users
+      // Narration message — orchestrator commentary between phases
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'narration') {
-        continue;
+        messages.push({
+          id: `msg_${apiMsg.id}`,
+          role: 'assistant',
+          content: apiMsg.content,
+          timestamp: new Date(apiMsg.created_at),
+          messageType: 'narration',
+          agentSlug: apiMsg.metadata.agent_slug ?? undefined,
+        } as NarrationMessage);
       }
       // Assistant tool call - transform to ToolMessage with result
       else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'tool_call') {

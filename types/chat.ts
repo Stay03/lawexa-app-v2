@@ -58,8 +58,15 @@ export interface ErrorMessage extends ChatMessage {
   retryAfterMs: number | null;
 }
 
+// Narration message - orchestrator commentary saved between phases
+export interface NarrationMessage extends ChatMessage {
+  role: 'assistant';
+  messageType: 'narration';
+  agentSlug?: string;
+}
+
 // Union type for all message types
-export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage | ErrorMessage;
+export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage | ErrorMessage | NarrationMessage;
 
 // Type guard for tool messages
 export function isToolMessage(message: ConversationMessage): message is ToolMessage {
@@ -74,6 +81,11 @@ export function isHandoverMessage(message: ConversationMessage): message is Hand
 // Type guard for error messages
 export function isErrorMessage(message: ConversationMessage): message is ErrorMessage {
   return (message as ErrorMessage).messageType === 'error';
+}
+
+// Type guard for narration messages
+export function isNarrationMessage(message: ConversationMessage): message is NarrationMessage {
+  return (message as NarrationMessage).messageType === 'narration';
 }
 
 // Tool call types (from API spec)
