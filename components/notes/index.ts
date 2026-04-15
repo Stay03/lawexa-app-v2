@@ -13,6 +13,7 @@ export { NoteDetailHeader } from './NoteDetailHeader';
 export { NoteContent } from './NoteContent';
 export { NotePriceCard } from './NotePriceCard';
 export { NoteActions } from './NoteActions';
+export { ExportDocxButton } from './ExportDocxButton';
 export { NoteDetailSkeleton } from './NoteDetailSkeleton';
 export { NoteAuthorCard } from './NoteAuthorCard';
 export { WriterModeToggle } from './WriterModeToggle';

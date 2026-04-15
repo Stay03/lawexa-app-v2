@@ -18,6 +18,7 @@ import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 import { AddToFolderButton } from '@/components/folders';
+import { ExportDocxButton } from '@/components/notes/ExportDocxButton';
 import { useNote } from '@/lib/hooks/useNotes';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { canEditNote, isNoteOwner } from '@/lib/utils/note-utils';
@@ -127,6 +128,7 @@ function NoteViewPage({ params, searchParams }: NoteViewPageProps) {
           variant="full"
         />
         <AddToFolderButton itemType="note" itemId={note.id} />
+        {hasFullContent && <ExportDocxButton slug={slug} />}
         <NoteActions
           note={note}
           canEdit={canEdit}
