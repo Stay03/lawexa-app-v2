@@ -94,6 +94,24 @@ export function formatToolMessage(
         detail: statuteName || undefined,
       };
     }
+    case 'view_note':
+      return {
+        action: isComplete ? 'Read note' : 'Reading note',
+        detail: parameters.id ? `#${parameters.id}` : undefined,
+      };
+    case 'web_search':
+      return {
+        action: isComplete ? 'Searched the web' : 'Searching the web',
+        detail: query ? `for "${query}"` : undefined,
+      };
+    case 'get_page_content': {
+      const urls = parameters.urls as string[] | undefined;
+      const urlCount = urls?.length;
+      return {
+        action: isComplete ? 'Read page content' : 'Reading page content',
+        detail: urlCount ? `from ${urlCount} page${urlCount > 1 ? 's' : ''}` : undefined,
+      };
+    }
     default: {
       const readable = toolName
         .replace(/_/g, ' ')

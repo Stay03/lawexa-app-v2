@@ -138,6 +138,16 @@ export const notesApi = {
   },
 
   /**
+   * Export note as DOCX file
+   */
+  exportDocx: async (slug: string): Promise<Blob> => {
+    const response = await apiClient.get(`/notes/${slug}/export-docx`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  /**
    * Upload a content image (for embedding in note content)
    */
   uploadContentImage: async (file: File): Promise<FileUploadResponse> => {
