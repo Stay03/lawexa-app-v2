@@ -418,7 +418,7 @@ export default function AdminConversationDetailPage({
     let displayContent = message.content;
     if (message.role === 'user') {
       displayContent = message.content.replace(
-        /<(case_slug|note_slug)>[^<]+<\/\1>\n\n/g,
+        /<(case_slug|note_slug|statute_slug)>[^<]+<\/\1>\n\n/g,
         ''
       );
     }

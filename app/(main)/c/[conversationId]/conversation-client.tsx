@@ -743,7 +743,7 @@ function ConversationPageContent() {
     // Strip XML tags from user message content if present
     let displayContent = message.content;
     if (message.role === 'user') {
-      displayContent = message.content.replace(/<(case_slug|note_slug)>[^<]+<\/\1>\n\n/g, '');
+      displayContent = message.content.replace(/<(case_slug|note_slug|statute_slug)>[^<]+<\/\1>\n\n/g, '');
     }
 
     // Parse pasted content from user messages
@@ -893,7 +893,7 @@ function ConversationPageContent() {
 
   // Extract context from first user message if it contains XML tags
   const firstUserMessage = messages.find(m => m.role === 'user');
-  const contextMatch = firstUserMessage?.content.match(/<(case_slug|note_slug)>([^<]+)<\/\1>/);
+  const contextMatch = firstUserMessage?.content.match(/<(case_slug|note_slug|statute_slug)>([^<]+)<\/\1>/);
   const contextType = contextMatch ? contextMatch[1].replace('_slug', '') : null;
   // Extract just the slug text, removing any XML-like formatting
   const contextSlug = contextMatch ? contextMatch[2].trim() : null;
