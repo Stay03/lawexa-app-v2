@@ -912,10 +912,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           if (currentText.trim()) {
             onNarration?.(currentText.trim(), event.agent_slug);
           }
-          // Clear the ref accumulator so new deltas start fresh, but keep the
-          // visible streamingContent intact — avoids text disappearing between
-          // reset and the first new delta arriving.
           agentTextRef.current.set(event.agent_slug, '');
+          updateHandoverStreamingContent(event.agent_slug, '');
           return;
         }
 
@@ -928,10 +926,19 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           onNarration?.(currentText.trim());
         }
 
-        // Clear the ref accumulator so new deltas start fresh, but keep the
-        // visible placeholder content intact — prevents text from vanishing
-        // between the reset and the arrival of the first new delta.
+        // Orchestrator reset: clear accumulator and remove the placeholder
+        // message entirely (instead of setting to empty string) to avoid a
+        // brief flash of an empty bubble before the next iteration's content.
         textByIterationRef.current.set(event.iteration, '');
+        const msgId = streamingMessageIdRef.current;
+        if (msgId && currentIterationRef.current === event.iteration) {
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.filter((m) => m.id !== msgId),
+          }));
+          streamingMessageIdRef.current = null;
+          currentIterationRef.current = null;
+        }
       });
 
       // Handle heartbeat — track consecutive heartbeats without data events.
@@ -973,14 +980,21 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               if (m.id === placeholderId) {
                 return { ...m, content: finalText, isStreaming: false };
               }
+              // Clear handoverResultContent when the final response duplicates
+              // it — common with Writer agents whose output becomes the final text.
               const ho = m as HandoverMessage;
               if (
                 ho.messageType === 'handover' &&
                 ho.handoverResultContent &&
-                ho.handoverResultContent.length > 50 &&
-                finalText.includes(ho.handoverResultContent)
+                ho.handoverResultContent.length > 50
               ) {
-                return { ...m, handoverResultContent: undefined } as HandoverMessage;
+                const hoContent = ho.handoverResultContent;
+                if (
+                  finalText.includes(hoContent) ||
+                  hoContent.includes(finalText)
+                ) {
+                  return { ...m, handoverResultContent: undefined } as HandoverMessage;
+                }
               }
               return m;
             }),
