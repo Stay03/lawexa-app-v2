@@ -917,20 +917,36 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           return;
         }
 
-        // Capture narration before clearing. Only fire onNarration for
-        // narration-type text (specialist commentary). Response-type text
-        // (orchestrator answers) is saved as metadata:null by the backend
-        // and will render on page refresh — no need to show transiently.
         const currentText = textByIterationRef.current.get(event.iteration) ?? '';
-        if (currentText.trim() && event.text_type !== 'response') {
+        const msgId = streamingMessageIdRef.current;
+        const isResponse = event.text_type === 'response';
+
+        if (isResponse && currentText.trim() && msgId && currentIterationRef.current === event.iteration) {
+          // Response-type text is the orchestrator's real answer. The backend
+          // persists it as metadata:null, so it survives refresh. Keep the
+          // already-rendered text visible by finalizing the placeholder in
+          // place — detach refs so the next iteration creates a fresh one.
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === msgId ? { ...m, content: currentText, isStreaming: false } : m
+            ),
+          }));
+          textByIterationRef.current.set(event.iteration, '');
+          streamingMessageIdRef.current = null;
+          currentIterationRef.current = null;
+          return;
+        }
+
+        // Narration-type text: show transiently via onNarration.
+        if (currentText.trim() && !isResponse) {
           onNarration?.(currentText.trim());
         }
 
-        // Orchestrator reset: clear accumulator and remove the placeholder
-        // message entirely (instead of setting to empty string) to avoid a
-        // brief flash of an empty bubble before the next iteration's content.
+        // Narration reset (or empty response): clear accumulator and remove
+        // the placeholder so we don't flash an empty bubble before the next
+        // iteration's content arrives.
         textByIterationRef.current.set(event.iteration, '');
-        const msgId = streamingMessageIdRef.current;
         if (msgId && currentIterationRef.current === event.iteration) {
           setState((prev) => ({
             ...prev,
