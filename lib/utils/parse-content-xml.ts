@@ -39,6 +39,38 @@ export interface MultiQuestionProgressInfo {
   remaining: number;
 }
 
+export interface ExecutionPlanInfo {
+  /** Multi-question plan variant */
+  totalQuestions?: number;
+  questions?: Array<{
+    index: number;
+    summary: string;
+    classification: string;
+    pipeline: string;
+  }>;
+  /** Single-question agent routing variant */
+  querySummary?: string;
+  classification?: string;
+  pipeline?: string;
+  agents?: Array<{
+    order: number;
+    name: string;
+    reason: string;
+  }>;
+  writerNeeded?: boolean;
+}
+
+export interface MultiQuestionCompleteInfo {
+  totalAnswered: number;
+  summary: string;
+}
+
+export interface NoteLinkInfo {
+  title: string;
+  url: string;
+  downloadUrl?: string;
+}
+
 export type ContentSegment =
   | { type: 'text'; content: string }
   | { type: 'lawyers'; lawyers: LawyerInfo[] }
@@ -47,7 +79,10 @@ export type ContentSegment =
   | { type: 'multi_question_prompt'; prompt: MultiQuestionPromptInfo }
   | { type: 'next_question_prompt'; prompt: NextQuestionPromptInfo }
   | { type: 'multi_question_plan'; plan: MultiQuestionPlanInfo }
-  | { type: 'multi_question_progress'; progress: MultiQuestionProgressInfo };
+  | { type: 'multi_question_progress'; progress: MultiQuestionProgressInfo }
+  | { type: 'execution_plan'; plan: ExecutionPlanInfo }
+  | { type: 'multi_question_complete'; info: MultiQuestionCompleteInfo }
+  | { type: 'note_link'; note: NoteLinkInfo };
 
 export interface ParsedContent {
   segments: ContentSegment[];
@@ -222,6 +257,63 @@ function parseMultiQuestionProgress(xml: string): MultiQuestionProgressInfo {
   };
 }
 
+function parseExecutionPlan(xml: string): ExecutionPlanInfo {
+  const totalQuestions = parseInt(getTagContent(xml, 'total_questions'), 10) || 0;
+
+  if (totalQuestions > 0) {
+    // Multi-question variant
+    const questionsBlock = getTagContent(xml, 'questions');
+    const questionRegex = /<question\s+index="(\d+)">([\s\S]*?)<\/question>/gi;
+    const questions: ExecutionPlanInfo['questions'] = [];
+    let m;
+    while ((m = questionRegex.exec(questionsBlock)) !== null) {
+      questions.push({
+        index: parseInt(m[1], 10),
+        summary: getTagContent(m[2], 'summary') || m[2].trim(),
+        classification: getTagContent(m[2], 'classification') || '',
+        pipeline: getTagContent(m[2], 'pipeline') || '',
+      });
+    }
+    return { totalQuestions, questions };
+  }
+
+  // Single-question agent routing variant
+  const agentsBlock = getTagContent(xml, 'agents');
+  const agentRegex = /<agent\s+order="(\d+)">([\s\S]*?)<\/agent>/gi;
+  const agents: ExecutionPlanInfo['agents'] = [];
+  let m;
+  while ((m = agentRegex.exec(agentsBlock)) !== null) {
+    agents.push({
+      order: parseInt(m[1], 10),
+      name: getTagContent(m[2], 'name') || m[2].trim(),
+      reason: getTagContent(m[2], 'reason') || '',
+    });
+  }
+
+  return {
+    querySummary: getTagContent(xml, 'query_summary'),
+    classification: getTagContent(xml, 'classification'),
+    pipeline: getTagContent(xml, 'pipeline'),
+    agents: agents.length > 0 ? agents : undefined,
+    writerNeeded: getTagContent(xml, 'writer_needed').toLowerCase() === 'yes',
+  };
+}
+
+function parseMultiQuestionComplete(xml: string): MultiQuestionCompleteInfo {
+  return {
+    totalAnswered: parseInt(getTagContent(xml, 'total_answered'), 10) || 0,
+    summary: getTagContent(xml, 'summary'),
+  };
+}
+
+function parseNoteLink(xml: string): NoteLinkInfo {
+  return {
+    title: getTagContent(xml, 'title'),
+    url: getTagContent(xml, 'url'),
+    downloadUrl: getTagContent(xml, 'download') || undefined,
+  };
+}
+
 interface MatchInfo {
   start: number;
   end: number;
@@ -381,6 +473,48 @@ export function parseContent(content: string): ParsedContent {
     }
   }
 
+  // ---- Find execution plan blocks ----
+  const executionPlanRegex = /<execution_plan>([\s\S]*?)<\/execution_plan>/gi;
+
+  while ((match = executionPlanRegex.exec(content)) !== null) {
+    const plan = parseExecutionPlan(match[0]);
+    if (plan.totalQuestions || plan.querySummary) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        segment: { type: 'execution_plan', plan },
+      });
+    }
+  }
+
+  // ---- Find multi question complete blocks ----
+  const multiQuestionCompleteRegex = /<multi_question_complete>([\s\S]*?)<\/multi_question_complete>/gi;
+
+  while ((match = multiQuestionCompleteRegex.exec(content)) !== null) {
+    const info = parseMultiQuestionComplete(match[0]);
+    if (info.totalAnswered > 0) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        segment: { type: 'multi_question_complete', info },
+      });
+    }
+  }
+
+  // ---- Find note link blocks ----
+  const noteLinkRegex = /<note_link>([\s\S]*?)<\/note_link>/gi;
+
+  while ((match = noteLinkRegex.exec(content)) !== null) {
+    const note = parseNoteLink(match[0]);
+    if (note.title && note.url) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        segment: { type: 'note_link', note },
+      });
+    }
+  }
+
   // Sort all matches by position
   matches.sort((a, b) => a.start - b.start);
 
@@ -437,6 +571,9 @@ export function hasSpecialContent(content: string): boolean {
     /<multi_question_prompt/i.test(content) ||
     /<next_question_prompt/i.test(content) ||
     /<multi_question_plan/i.test(content) ||
-    /<multi_question_progress/i.test(content)
+    /<multi_question_progress/i.test(content) ||
+    /<execution_plan/i.test(content) ||
+    /<multi_question_complete/i.test(content) ||
+    /<note_link/i.test(content)
   );
 }

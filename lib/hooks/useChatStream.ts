@@ -912,8 +912,10 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           if (currentText.trim()) {
             onNarration?.(currentText.trim(), event.agent_slug);
           }
+          // Clear the ref accumulator so new deltas start fresh, but keep the
+          // visible streamingContent intact — avoids text disappearing between
+          // reset and the first new delta arriving.
           agentTextRef.current.set(event.agent_slug, '');
-          updateHandoverStreamingContent(event.agent_slug, '');
           return;
         }
 
@@ -926,17 +928,10 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           onNarration?.(currentText.trim());
         }
 
-        // Orchestrator reset: clear accumulator and placeholder
+        // Clear the ref accumulator so new deltas start fresh, but keep the
+        // visible placeholder content intact — prevents text from vanishing
+        // between the reset and the arrival of the first new delta.
         textByIterationRef.current.set(event.iteration, '');
-        const msgId = streamingMessageIdRef.current;
-        if (msgId && currentIterationRef.current === event.iteration) {
-          setState((prev) => ({
-            ...prev,
-            messages: prev.messages.map((m) =>
-              m.id === msgId ? { ...m, content: '' } : m
-            ),
-          }));
-        }
       });
 
       // Handle heartbeat — track consecutive heartbeats without data events.
@@ -969,14 +964,26 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         const placeholderId = streamingMessageIdRef.current;
 
         if (placeholderId) {
-          // v2_stream path — replace placeholder with authoritative text
+          // v2_stream path — replace placeholder with authoritative text.
+          // Also clear handoverResultContent from any handover whose result
+          // duplicates the final response to avoid showing the same text twice.
           setState((prev) => ({
             ...prev,
-            messages: prev.messages.map((m) =>
-              m.id === placeholderId
-                ? { ...m, content: finalText, isStreaming: false }
-                : m
-            ),
+            messages: prev.messages.map((m) => {
+              if (m.id === placeholderId) {
+                return { ...m, content: finalText, isStreaming: false };
+              }
+              const ho = m as HandoverMessage;
+              if (
+                ho.messageType === 'handover' &&
+                ho.handoverResultContent &&
+                ho.handoverResultContent.length > 50 &&
+                finalText.includes(ho.handoverResultContent)
+              ) {
+                return { ...m, handoverResultContent: undefined } as HandoverMessage;
+              }
+              return m;
+            }),
           }));
           streamingMessageIdRef.current = null;
           currentIterationRef.current = null;

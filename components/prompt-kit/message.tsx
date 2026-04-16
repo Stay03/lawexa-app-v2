@@ -12,6 +12,9 @@ import { MultiQuestionPromptCard } from '@/components/chat/multi-question-prompt
 import { NextQuestionPromptCard } from '@/components/chat/next-question-prompt-card';
 import { MultiQuestionPlanCard } from '@/components/chat/multi-question-plan-card';
 import { MultiQuestionProgressCard } from '@/components/chat/multi-question-progress-card';
+import { ExecutionPlanCard } from '@/components/chat/execution-plan-card';
+import { MultiQuestionCompleteCard } from '@/components/chat/multi-question-complete-card';
+import { NoteLinkCard } from '@/components/chat/note-link-card';
 import {
   parseContent,
   hasSpecialContent,
@@ -116,6 +119,30 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
                 return (
                   <div key={`multi-question-progress-${index}`} className="not-prose">
                     <MultiQuestionProgressCard progress={segment.progress} />
+                  </div>
+                );
+              }
+
+              if (segment.type === 'execution_plan') {
+                return (
+                  <div key={`execution-plan-${index}`} className="not-prose">
+                    <ExecutionPlanCard plan={segment.plan} />
+                  </div>
+                );
+              }
+
+              if (segment.type === 'multi_question_complete') {
+                return (
+                  <div key={`multi-question-complete-${index}`} className="not-prose">
+                    <MultiQuestionCompleteCard info={segment.info} />
+                  </div>
+                );
+              }
+
+              if (segment.type === 'note_link') {
+                return (
+                  <div key={`note-link-${index}`} className="not-prose">
+                    <NoteLinkCard note={segment.note} />
                   </div>
                 );
               }
