@@ -17,7 +17,7 @@ import {
   FileUploadTrigger,
   FileUploadContent,
 } from '@/components/ui/file-upload';
-import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle, FileUp, Scale, NotebookPen } from 'lucide-react';
+import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle, FileUp, Scale, NotebookPen, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { PulsingHeart } from '@/components/ui/pulsing-heart';
@@ -28,6 +28,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -40,6 +45,13 @@ import { useUserLimits } from '@/lib/hooks/useUserLimits';
 import { NoFreeMessagesBanner } from '@/components/chat/no-free-messages-banner';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
+
+// Curated workflow options shown to regular users (non-admin/researcher).
+// Hardcoded to avoid hitting the admin-only /ai-workflows endpoint.
+const REGULAR_USER_WORKFLOWS = [
+  { id: 5, name: 'Lawexa Lite' },
+  { id: 12, name: 'Lawexa Expert' },
+] as const;
 
 export default function HomePage() {
   const [input, setInput] = useState(() => {
@@ -93,18 +105,10 @@ export default function HomePage() {
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
 
-  // Super admin gate for opt-in token-level streaming (v2_stream)
-  const isSuperAdmin = user?.role === 'superadmin';
-  const [streamMode, setStreamMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('stream_mode_v2') === '1';
-  });
-  useEffect(() => {
-    localStorage.setItem('stream_mode_v2', streamMode ? '1' : '0');
-  }, [streamMode]);
-
-  // Workflow selector - only for superadmin, admin, researcher
+  // Workflow selector - admin/researcher get the full list from the API;
+  // everyone else (including guests) gets the curated Lite/Expert pair.
   const canSelectWorkflow = !!user?.role && ['superadmin', 'admin', 'researcher'].includes(user.role);
+  const showRegularUserWorkflows = !canSelectWorkflow;
   const workflowParams = { active_only: true, per_page: 50 };
   const { data: workflowsData } = useQuery({
     queryKey: adminAiKeys.workflowsList(workflowParams),
@@ -116,15 +120,17 @@ export default function HomePage() {
 
   // Pre-select the default workflow when data loads
   useEffect(() => {
-    if (workflows.length > 0 && !selectedWorkflowId) {
-      const defaultWorkflow = workflows.find((w) => w.is_default);
-      if (defaultWorkflow) {
-        setSelectedWorkflowId(String(defaultWorkflow.id));
-      } else {
-        setSelectedWorkflowId(String(workflows[0].id));
-      }
+    if (selectedWorkflowId) return;
+    if (showRegularUserWorkflows) {
+      // Default to Lawexa Lite for regular users / guests
+      setSelectedWorkflowId(String(REGULAR_USER_WORKFLOWS[0].id));
+      return;
     }
-  }, [workflows, selectedWorkflowId]);
+    if (workflows.length > 0) {
+      const defaultWorkflow = workflows.find((w) => w.is_default);
+      setSelectedWorkflowId(String((defaultWorkflow ?? workflows[0]).id));
+    }
+  }, [workflows, selectedWorkflowId, showRegularUserWorkflows]);
 
   useEffect(() => {
     // Slide in after a short delay
@@ -176,11 +182,10 @@ export default function HomePage() {
       const response = await chatApi.start({
         message: fullMessage,
         stream: true,
-        // Opt-in token streaming — gated on superadmin role at the payload site
-        // so a stale localStorage flag can never leak stream_mode for other roles.
-        ...(streamMode && isSuperAdmin && { stream_mode: 'v2_stream' as const }),
+        // Token-level streaming is on by default for everyone.
+        stream_mode: 'v2_stream' as const,
         ...(studyMode && { study_mode: true }),
-        ...(selectedWorkflowId && canSelectWorkflow && { workflow_id: Number(selectedWorkflowId) }),
+        ...(selectedWorkflowId && { workflow_id: Number(selectedWorkflowId) }),
         ...(uploadedFile && { file_id: uploadedFile.file_id }),
       });
 
@@ -192,8 +197,7 @@ export default function HomePage() {
         sessionStorage.setItem(`conv_init_${conversationId}`, JSON.stringify({
           msg: fullMessage,
           exec: executionId,
-          // Forward stream_mode so the conversation page applies it to follow-ups
-          ...(streamMode && isSuperAdmin && { stream_mode: 'v2_stream' }),
+          stream_mode: 'v2_stream',
           ...(uploadedFile && {
             file_id: uploadedFile.file_id,
             file_name: uploadedFile.file_name,
@@ -481,7 +485,7 @@ export default function HomePage() {
                   </PromptInputAction>
                 )}
 
-                {/* Workflow selector - only for superadmin, admin, researcher */}
+                {/* Workflow selector - admin/researcher get the full list from the API */}
                 {canSelectWorkflow && workflows.length > 0 && (
                   <Select
                     value={selectedWorkflowId}
@@ -500,17 +504,40 @@ export default function HomePage() {
                   </Select>
                 )}
 
-                {/* Token-level streaming toggle — superadmin only */}
-                {isSuperAdmin && (
-                  <div className="flex items-center gap-1.5 px-1 shrink-0">
-                    <Switch
-                      checked={streamMode}
-                      onCheckedChange={setStreamMode}
-                      size="sm"
-                    />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      Token stream
-                    </span>
+                {/* Curated Lite/Expert selector - everyone else (incl. guests) */}
+                {showRegularUserWorkflows && (
+                  <div className="flex items-center gap-0.5">
+                    <Select
+                      value={selectedWorkflowId}
+                      onValueChange={setSelectedWorkflowId}
+                    >
+                      <SelectTrigger size="sm" className="h-7 text-xs border-none bg-transparent hover:bg-secondary-foreground/10 px-2 gap-1 min-w-0 max-w-[140px] sm:max-w-none [&>span]:truncate">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REGULAR_USER_WORKFLOWS.map((wf) => (
+                          <SelectItem key={wf.id} value={String(wf.id)}>
+                            {wf.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="About Lawexa Lite vs Expert"
+                          className="text-muted-foreground hover:text-foreground rounded-full p-1"
+                        >
+                          <Info className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        Lawexa Expert uses multiple Lawexa agents working together to research,
+                        cross-check, and ground answers — slower but deeper. Lawexa Lite is a
+                        single agent: faster, suitable for quick questions.
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 )}
               </div>

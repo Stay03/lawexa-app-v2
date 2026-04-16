@@ -374,10 +374,9 @@ function ConversationPageContent() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
-  // Per-conversation opt-in for token-level streaming. Seeded from the home
-  // page init blob on first load, or restored from localStorage on refresh
-  // so superadmin follow-ups keep streaming after a hard refresh.
-  const streamModeRef = useRef<'v2_stream' | undefined>(undefined);
+  // Token-level streaming is on by default for everyone — every send below
+  // forwards this ref to the backend.
+  const streamModeRef = useRef<'v2_stream' | undefined>('v2_stream');
 
   // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
@@ -412,17 +411,6 @@ function ConversationPageContent() {
     limitsData.data.ai_messages.plan_limit === 0 &&
     limitsData.data.ai_messages.total_remaining === 0 &&
     limitsData.data.ai_messages.payg_remaining === 0;
-
-  // Restore stream mode from localStorage on refresh so superadmin follow-ups
-  // keep using v2_stream even after the sessionStorage init blob is consumed.
-  if (
-    streamModeRef.current === undefined &&
-    user?.role === 'superadmin' &&
-    typeof window !== 'undefined' &&
-    localStorage.getItem('stream_mode_v2') === '1'
-  ) {
-    streamModeRef.current = 'v2_stream';
-  }
 
   // Sidebar state for input positioning
   const { state } = useSidebar();
@@ -545,10 +533,6 @@ function ConversationPageContent() {
       executionId = parsed.exec;
       if (parsed.file_id && parsed.file_name && parsed.file_size) {
         initialAttachment = { file_id: parsed.file_id, file_name: parsed.file_name, file_size: parsed.file_size };
-      }
-      // Seed per-conversation stream mode so follow-up sends keep using v2
-      if (parsed.stream_mode === 'v2_stream') {
-        streamModeRef.current = 'v2_stream';
       }
       sessionStorage.removeItem(initKey);
     } else {
