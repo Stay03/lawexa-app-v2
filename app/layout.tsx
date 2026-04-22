@@ -5,6 +5,7 @@ import "./globals.css";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { AttributionBootstrap } from "@/components/AttributionBootstrap";
 
 const comfortaa = Comfortaa({ subsets: ["latin"], variable: "--font-comfortaa" });
 
@@ -45,6 +46,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-background font-sans antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <QueryProvider>
+            <AttributionBootstrap />
             {children}
             <Toaster position="top-right" />
           </QueryProvider>

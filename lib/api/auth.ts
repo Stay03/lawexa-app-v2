@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
 import type { AuthResponse, User, Session, UserProfile } from '@/types/auth';
 import { getDeviceIdentifiers } from '@/lib/utils/device-id';
+import { getStoredAttribution } from '@/lib/utils/attribution';
 
 export const authApi = {
   // Public endpoints
@@ -13,7 +14,7 @@ export const authApi = {
   }) => {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/auth/register',
-      { ...data, ...getDeviceIdentifiers() }
+      { ...data, ...getStoredAttribution(), ...getDeviceIdentifiers() }
     );
     return response.data;
   },
@@ -36,7 +37,7 @@ export const authApi = {
   googleCallback: async (code: string) => {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/auth/google',
-      { code, ...getDeviceIdentifiers() }
+      { code, ...getStoredAttribution(), ...getDeviceIdentifiers() }
     );
     return response.data;
   },
@@ -46,6 +47,7 @@ export const authApi = {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/auth/guest',
       {
+        ...getStoredAttribution(),
         fingerprint: fingerprint ?? identifiers.fingerprint,
         device_id: identifiers.device_id,
       }

@@ -101,3 +101,14 @@ export interface ResetPasswordFormData {
   password: string;
   password_confirmation: string;
 }
+
+export interface AttributionPayload {
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+  referrer_url?: string;
+  landing_url?: string;
+  referral_code?: string;
+}

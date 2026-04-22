@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError, type ApiError } from '@/lib/utils/api-error';
+import { clearAttribution } from '@/lib/utils/attribution';
 import type { LoginFormData, RegisterFormData } from '@/types/auth';
 
 export function useAuth() {
@@ -47,6 +48,7 @@ export function useAuth() {
     onSuccess: (response, variables) => {
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
+        clearAttribution();
 
         // For email signups, redirect to check-email page to verify
         if (response.data.user.auth_provider === 'email' && !response.data.user.is_verified) {
