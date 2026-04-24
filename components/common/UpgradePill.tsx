@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useCurrentSubscription } from '@/lib/hooks/useSubscriptions';
 import { cn } from '@/lib/utils';
 
-const DISMISSED_KEY = 'lawexa-get-plus-dismissed';
+const DISMISSED_KEY = 'lawexa-upgrade-pill-dismissed';
 
-interface GetPlusPillProps {
+interface UpgradePillProps {
   className?: string;
 }
 
-export function GetPlusPill({ className }: GetPlusPillProps) {
+export function UpgradePill({ className }: UpgradePillProps) {
   const { isAuthenticated, isGuest } = useAuth();
   const { data } = useCurrentSubscription();
   const [dismissed, setDismissed] = useState(true);
@@ -25,10 +25,10 @@ export function GetPlusPill({ className }: GetPlusPillProps) {
     );
   }, []);
 
-  const planName = data?.data?.plan?.name ?? 'Free';
-  const isFreePlan = planName === 'Free';
+  // Treat missing subscription data as free-tier (non-subscribed).
+  const isFreeTier = data?.data ? data.data.is_free_tier : true;
 
-  if (!isAuthenticated || isGuest || !isFreePlan || dismissed) {
+  if (!isAuthenticated || isGuest || !isFreeTier || dismissed) {
     return null;
   }
 
@@ -47,13 +47,12 @@ export function GetPlusPill({ className }: GetPlusPillProps) {
         className
       )}
     >
-      <Sparkles className="h-3.5 w-3.5" />
-      <span>Get Plus</span>
+      <span>Upgrade</span>
       <button
         type="button"
         onClick={handleDismiss}
         aria-label="Dismiss"
-        className="ml-0.5 -mr-1 rounded-full p-0.5 text-primary/70 transition-colors hover:bg-primary/20 hover:text-primary"
+        className="-mr-1 rounded-full p-0.5 text-primary/70 transition-colors hover:bg-primary/20 hover:text-primary"
       >
         <X className="h-3 w-3" />
       </button>

@@ -2,7 +2,6 @@
 
 import {
   BadgeCheck,
-  ChevronsUpDown,
   CreditCard,
   LogOut,
   Settings,
@@ -41,8 +40,10 @@ export function NavUser() {
   const currentSubQuery = useCurrentSubscription()
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
-  const planName = currentSubQuery.data?.data?.plan?.name ?? 'Free'
-  const isFreePlan = planName === 'Free'
+  const subData = currentSubQuery.data?.data
+  const planName = subData?.plan?.name ?? 'Free'
+  // Treat missing subscription data as free-tier (non-subscribed).
+  const isFreeTier = subData ? subData.is_free_tier : true
   const isCollapsed = state === 'collapsed'
 
   // Show login/register buttons for guests
@@ -90,7 +91,6 @@ export function NavUser() {
                 <span className="truncate font-medium">{user?.name}</span>
                 <span className="truncate text-xs text-muted-foreground">{planName}</span>
               </div>
-              <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -159,7 +159,7 @@ export function NavUser() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {isFreePlan && !isCollapsed && (
+        {isFreeTier && !isCollapsed && (
           <Button
             asChild
             size="sm"
