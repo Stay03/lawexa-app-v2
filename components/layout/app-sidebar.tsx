@@ -59,13 +59,10 @@ const navMain = [
   { title: "Bookmarks",   url: "/bookmarks",        icon: Bookmark },
 ]
 
-// URLs that guests cannot access — clicking opens AuthModal instead
+// URLs that guests cannot access — clicking opens AuthModal instead.
+// Content pages (/cases, /notes, /statutes, /conversations) are guest-readable;
+// the API client handles 401s if a specific request requires auth.
 const GUEST_RESTRICTED_URLS = new Set([
-  '/',
-  '/conversations',
-  '/cases',
-  '/notes',
-  '/statutes',
   '/folders',
   '/files',
   '/content-requests',
