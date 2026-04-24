@@ -241,8 +241,6 @@ export type TAdminUserSortBy =
   | 'last_seen_at'
   | 'first_touched_at';
 
-export type TSourceType = 'paid' | 'organic' | 'referral' | 'direct' | 'other' | 'unknown';
-
 export interface IAdminUserListAttribution {
   source: string;
   utm_source: string | null;
@@ -302,8 +300,6 @@ export interface IAdminUserListParams {
   utm_source?: string[];
   utm_medium?: string[];
   utm_campaign?: string[];
-  source_type?: TSourceType;
-  has_referral_code?: boolean;
   referred_by?: string;
   sort_by?: TAdminUserSortBy;
   sort_order?: 'asc' | 'desc';

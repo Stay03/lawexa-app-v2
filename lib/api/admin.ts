@@ -110,8 +110,6 @@ export const adminApi = {
           'utm_source[]': params.utm_source,
           'utm_medium[]': params.utm_medium,
           'utm_campaign[]': params.utm_campaign,
-          source_type: params.source_type,
-          has_referral_code: params.has_referral_code,
           referred_by: params.referred_by,
           sort_by: params.sort_by ?? 'created_at',
           sort_order: params.sort_order ?? 'desc',

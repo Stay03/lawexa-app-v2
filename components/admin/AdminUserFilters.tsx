@@ -27,8 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
-import type { IAdminUserListParams, TSourceType } from '@/types/admin';
-import { SOURCE_TYPE_OPTIONS } from '@/lib/utils/attributionSource';
+import type { IAdminUserListParams } from '@/types/admin';
 
 /******************************************************************************
                                  Constants
@@ -108,8 +107,6 @@ function AdminUserFilters({
       searchValue ||
       params.role?.length ||
       params.is_online !== undefined ||
-      params.source_type ||
-      params.has_referral_code !== undefined ||
       params.referred_by ||
       advancedFilterCount > 0
     );
@@ -117,8 +114,6 @@ function AdminUserFilters({
     searchValue,
     params.role,
     params.is_online,
-    params.source_type,
-    params.has_referral_code,
     params.referred_by,
     advancedFilterCount,
   ]);
@@ -141,8 +136,6 @@ function AdminUserFilters({
       utm_source: undefined,
       utm_medium: undefined,
       utm_campaign: undefined,
-      source_type: undefined,
-      has_referral_code: undefined,
       referred_by: undefined,
       search: undefined,
       page: 1,
@@ -196,44 +189,6 @@ function AdminUserFilters({
           className="scale-90"
         />
         <span className="text-sm whitespace-nowrap">Online only</span>
-      </label>
-
-      {/* Source Type Select */}
-      <Select
-        value={params.source_type ?? 'all'}
-        onValueChange={(v) =>
-          onParamsChange({
-            source_type: v === 'all' ? undefined : (v as TSourceType),
-            page: 1,
-          })
-        }
-      >
-        <SelectTrigger className="w-[150px] h-9">
-          <SelectValue placeholder="Source" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All sources</SelectItem>
-          {SOURCE_TYPE_OPTIONS.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value}>
-              {opt.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Has Referral Code Toggle */}
-      <label className="flex items-center gap-2 px-3 h-9 rounded-md border border-input bg-background cursor-pointer select-none">
-        <Switch
-          checked={params.has_referral_code === true}
-          onCheckedChange={(checked) =>
-            onParamsChange({
-              has_referral_code: checked ? true : undefined,
-              page: 1,
-            })
-          }
-          className="scale-90"
-        />
-        <span className="text-sm whitespace-nowrap">Has referral code</span>
       </label>
 
       {/* More Filters Sheet */}

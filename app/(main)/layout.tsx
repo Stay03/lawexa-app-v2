@@ -18,6 +18,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/common/ThemeToggle"
+import { GetPlusPill } from "@/components/common/GetPlusPill"
 import { NotificationBell } from "@/components/notifications"
 import { ShareButton } from "@/components/common/ShareButton"
 import { ReaderModeToggle } from "@/components/cases/ReaderModeToggle"
@@ -112,7 +113,12 @@ export default function MainLayout({
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="max-h-svh overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <header className="relative flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="pointer-events-auto">
+              <GetPlusPill />
+            </div>
+          </div>
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator

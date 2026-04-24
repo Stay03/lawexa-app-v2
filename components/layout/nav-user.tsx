@@ -36,12 +36,14 @@ import { useCurrentSubscription } from "@/lib/hooks/useSubscriptions"
 import { Button } from "@/components/ui/button"
 
 export function NavUser() {
-  const { isMobile } = useSidebar()
+  const { isMobile, state } = useSidebar()
   const { user, isAuthenticated, isGuest, logout, isLoggingOut } = useAuth()
   const currentSubQuery = useCurrentSubscription()
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
   const planName = currentSubQuery.data?.data?.plan?.name ?? 'Free'
+  const isFreePlan = planName === 'Free'
+  const isCollapsed = state === 'collapsed'
 
   // Show login/register buttons for guests
   if (!isAuthenticated || isGuest) {
@@ -73,11 +75,12 @@ export function NavUser() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
+        <div className="flex items-center gap-1.5">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="flex-1 min-w-0 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage src={user?.avatar_url || undefined} alt={user?.name} />
@@ -156,6 +159,17 @@ export function NavUser() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {isFreePlan && !isCollapsed && (
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0 rounded-full px-3 text-xs font-medium"
+          >
+            <Link href="/pricing">Upgrade</Link>
+          </Button>
+        )}
+        </div>
       </SidebarMenuItem>
     </SidebarMenu>
   )
