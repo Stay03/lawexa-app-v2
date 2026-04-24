@@ -8,7 +8,7 @@ import { AdminUsersTable } from '@/components/admin/AdminUsersTable';
 import { AdminUserFilters } from '@/components/admin/AdminUserFilters';
 import { useAdminUsers } from '@/lib/hooks/useAdmin';
 import { useDebounce } from '@/lib/hooks/useDebounce';
-import type { IAdminUserListParams, TAdminUserSortBy } from '@/types/admin';
+import type { IAdminUserListParams, TAdminUserSortBy, TSourceType } from '@/types/admin';
 
 /******************************************************************************
                                  Component
@@ -47,6 +47,13 @@ function AdminUsersContent() {
     // Date range
     const created_from = searchParams.get('created_from') || undefined;
     const created_to = searchParams.get('created_to') || undefined;
+    // Attribution filters
+    const utm_source = searchParams.getAll('utm_source');
+    const utm_medium = searchParams.getAll('utm_medium');
+    const utm_campaign = searchParams.getAll('utm_campaign');
+    const source_type = searchParams.get('source_type') as TSourceType | null;
+    const has_referral_code = searchParams.get('has_referral_code');
+    const referred_by = searchParams.get('referred_by') || undefined;
     return {
       page,
       per_page,
@@ -63,6 +70,13 @@ function AdminUsersContent() {
       is_verified: is_verified === null ? undefined : is_verified === 'true',
       created_from,
       created_to,
+      utm_source: utm_source.length > 0 ? utm_source : undefined,
+      utm_medium: utm_medium.length > 0 ? utm_medium : undefined,
+      utm_campaign: utm_campaign.length > 0 ? utm_campaign : undefined,
+      source_type: source_type || undefined,
+      has_referral_code:
+        has_referral_code === null ? undefined : has_referral_code === 'true',
+      referred_by,
       search: debouncedSearch || undefined,
     };
   }, [searchParams, debouncedSearch]);

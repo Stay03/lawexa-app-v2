@@ -10,6 +10,7 @@ import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { ArrowLeft } from 'lucide-react';
 import {
   UserIdentityCard,
+  UserAttributionCard,
   QuickStatsRow,
   AdminConversationsTable,
   AdminPagination,
@@ -177,6 +178,12 @@ export default function AdminUserDetailPage({
             usageSummary={user.usage_summary}
             showNGN={showNGN}
             exchangeRate={exchangeRate}
+          />
+
+          {/* Attribution */}
+          <UserAttributionCard
+            userUuid={user.uuid}
+            attribution={user.attribution}
           />
 
           {/* Conversations */}

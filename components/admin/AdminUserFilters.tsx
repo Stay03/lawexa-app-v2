@@ -27,7 +27,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
-import type { IAdminUserListParams } from '@/types/admin';
+import type { IAdminUserListParams, TSourceType } from '@/types/admin';
+import { SOURCE_TYPE_OPTIONS } from '@/lib/utils/attributionSource';
 
 /******************************************************************************
                                  Constants
@@ -63,6 +64,9 @@ interface ISheetFilterState {
   country: string[];
   created_from: string;
   created_to: string;
+  utm_source: string[];
+  utm_medium: string[];
+  utm_campaign: string[];
 }
 
 /******************************************************************************
@@ -92,6 +96,9 @@ function AdminUserFilters({
     if (params.country?.length) count++;
     if (params.created_from) count++;
     if (params.created_to) count++;
+    if (params.utm_source?.length) count++;
+    if (params.utm_medium?.length) count++;
+    if (params.utm_campaign?.length) count++;
     return count;
   }, [params]);
 
@@ -101,9 +108,20 @@ function AdminUserFilters({
       searchValue ||
       params.role?.length ||
       params.is_online !== undefined ||
+      params.source_type ||
+      params.has_referral_code !== undefined ||
+      params.referred_by ||
       advancedFilterCount > 0
     );
-  }, [searchValue, params.role, params.is_online, advancedFilterCount]);
+  }, [
+    searchValue,
+    params.role,
+    params.is_online,
+    params.source_type,
+    params.has_referral_code,
+    params.referred_by,
+    advancedFilterCount,
+  ]);
 
   // Clear all filters
   const handleClearAll = () => {
@@ -120,6 +138,12 @@ function AdminUserFilters({
       is_verified: undefined,
       created_from: undefined,
       created_to: undefined,
+      utm_source: undefined,
+      utm_medium: undefined,
+      utm_campaign: undefined,
+      source_type: undefined,
+      has_referral_code: undefined,
+      referred_by: undefined,
       search: undefined,
       page: 1,
     });
@@ -174,6 +198,44 @@ function AdminUserFilters({
         <span className="text-sm whitespace-nowrap">Online only</span>
       </label>
 
+      {/* Source Type Select */}
+      <Select
+        value={params.source_type ?? 'all'}
+        onValueChange={(v) =>
+          onParamsChange({
+            source_type: v === 'all' ? undefined : (v as TSourceType),
+            page: 1,
+          })
+        }
+      >
+        <SelectTrigger className="w-[150px] h-9">
+          <SelectValue placeholder="Source" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All sources</SelectItem>
+          {SOURCE_TYPE_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Has Referral Code Toggle */}
+      <label className="flex items-center gap-2 px-3 h-9 rounded-md border border-input bg-background cursor-pointer select-none">
+        <Switch
+          checked={params.has_referral_code === true}
+          onCheckedChange={(checked) =>
+            onParamsChange({
+              has_referral_code: checked ? true : undefined,
+              page: 1,
+            })
+          }
+          className="scale-90"
+        />
+        <span className="text-sm whitespace-nowrap">Has referral code</span>
+      </label>
+
       {/* More Filters Sheet */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetTrigger asChild>
@@ -208,6 +270,9 @@ function AdminUserFilters({
                 country: undefined,
                 created_from: undefined,
                 created_to: undefined,
+                utm_source: undefined,
+                utm_medium: undefined,
+                utm_campaign: undefined,
                 page: 1,
               });
               setIsSheetOpen(false);
@@ -313,6 +378,9 @@ function MoreFiltersContent({
     country: params.country || [],
     created_from: params.created_from || '',
     created_to: params.created_to || '',
+    utm_source: params.utm_source || [],
+    utm_medium: params.utm_medium || [],
+    utm_campaign: params.utm_campaign || [],
   });
 
   const handleApply = () => {
@@ -326,6 +394,9 @@ function MoreFiltersContent({
       country: local.country.length > 0 ? local.country : undefined,
       created_from: local.created_from || undefined,
       created_to: local.created_to || undefined,
+      utm_source: local.utm_source.length > 0 ? local.utm_source : undefined,
+      utm_medium: local.utm_medium.length > 0 ? local.utm_medium : undefined,
+      utm_campaign: local.utm_campaign.length > 0 ? local.utm_campaign : undefined,
     });
   };
 
@@ -441,6 +512,46 @@ function MoreFiltersContent({
         </div>
       </div>
 
+      {/* UTM Filters (comma-separated) */}
+      <div className="space-y-4 pt-2 border-t">
+        <div>
+          <p className="text-sm font-medium">Attribution (UTM)</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Comma-separate multiple values (e.g. <span className="font-mono">google, caseapp</span>)
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label>UTM Source</Label>
+          <Input
+            placeholder="e.g. google, caseapp"
+            value={local.utm_source.join(', ')}
+            onChange={(e) =>
+              setLocal((s) => ({ ...s, utm_source: _splitCsv(e.target.value) }))
+            }
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>UTM Medium</Label>
+          <Input
+            placeholder="e.g. cpc, email"
+            value={local.utm_medium.join(', ')}
+            onChange={(e) =>
+              setLocal((s) => ({ ...s, utm_medium: _splitCsv(e.target.value) }))
+            }
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>UTM Campaign</Label>
+          <Input
+            placeholder="e.g. q2-launch"
+            value={local.utm_campaign.join(', ')}
+            onChange={(e) =>
+              setLocal((s) => ({ ...s, utm_campaign: _splitCsv(e.target.value) }))
+            }
+          />
+        </div>
+      </div>
+
       {/* Actions */}
       <div className="flex gap-2 pt-2 border-t">
         <Button variant="outline" className="flex-1" onClick={onClear}>
@@ -486,6 +597,20 @@ function BooleanFilter({
       </Select>
     </div>
   );
+}
+
+/******************************************************************************
+                                 Functions
+******************************************************************************/
+
+/**
+ * Parse a comma-separated string into a trimmed, non-empty string array.
+ */
+function _splitCsv(value: string): string[] {
+  return value
+    .split(',')
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
 }
 
 /******************************************************************************

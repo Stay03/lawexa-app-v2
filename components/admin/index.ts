@@ -8,6 +8,7 @@ export { AdminPagination } from './AdminPagination';
 export { AdminMessageList } from './AdminMessageList';
 export { AdminUserTokenUsage } from './AdminUserTokenUsage';
 export { UserIdentityCard } from './UserIdentityCard';
+export { UserAttributionCard } from './UserAttributionCard';
 export { QuickStatsRow } from './QuickStatsRow';
 export { AiProviderFilters } from './ai/AiProviderFilters';
 export { AiProvidersTable } from './ai/AiProvidersTable';

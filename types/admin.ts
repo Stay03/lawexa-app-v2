@@ -190,6 +190,20 @@ export interface AdminUserUsageSummary {
   total_requests: number;
 }
 
+export interface AdminUserAttributionDetail {
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
+  referrer_url: string | null;
+  landing_url: string | null;
+  referral_code: string | null;
+  referrer_user: { uuid: string; name: string } | null;
+  origin_guest_user_id: number | null;
+  first_touched_at: string | null;
+}
+
 export interface AdminUserDetail {
   id: number;
   uuid: string;
@@ -204,6 +218,7 @@ export interface AdminUserDetail {
   areas_of_expertise: AdminAreaOfExpertise[];
   conversations_count: number;
   usage_summary: AdminUserUsageSummary;
+  attribution: AdminUserAttributionDetail | null;
   created_at: string;
   updated_at: string;
 }
@@ -218,7 +233,25 @@ export interface AdminUserDetailResponse {
 // User List Types (GET /api/admin/users)
 // ============================================
 
-export type TAdminUserSortBy = 'name' | 'email' | 'role' | 'created_at' | 'last_seen_at';
+export type TAdminUserSortBy =
+  | 'name'
+  | 'email'
+  | 'role'
+  | 'created_at'
+  | 'last_seen_at'
+  | 'first_touched_at';
+
+export type TSourceType = 'paid' | 'organic' | 'referral' | 'direct' | 'other' | 'unknown';
+
+export interface IAdminUserListAttribution {
+  source: string;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  referrer_domain: string | null;
+  has_referrer_user: boolean;
+  first_touched_at: string | null;
+}
 
 export interface IAdminUserListItem {
   uuid: string;
@@ -246,6 +279,8 @@ export interface IAdminUserListItem {
   platform: string | null;
   is_creator: boolean;
   is_verified: boolean;
+  source: string;
+  attribution: IAdminUserListAttribution | null;
   created_at: string;
 }
 
@@ -264,6 +299,12 @@ export interface IAdminUserListParams {
   is_verified?: boolean;
   created_from?: string;
   created_to?: string;
+  utm_source?: string[];
+  utm_medium?: string[];
+  utm_campaign?: string[];
+  source_type?: TSourceType;
+  has_referral_code?: boolean;
+  referred_by?: string;
   sort_by?: TAdminUserSortBy;
   sort_order?: 'asc' | 'desc';
 }

@@ -31,6 +31,7 @@ import {
   Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatSourceLabel } from '@/lib/utils/attributionSource';
 import type {
   IAdminUserListItem,
   IAdminUserListParams,
@@ -98,6 +99,7 @@ function AdminUsersTable({
               <Skeleton className="h-4 w-[80px]" />
               <Skeleton className="h-4 w-[60px]" />
               <Skeleton className="h-4 w-[60px]" />
+              <Skeleton className="h-4 w-[60px]" />
               <Skeleton className="h-4 w-[70px]" />
               <Skeleton className="h-4 w-[70px]" />
             </div>
@@ -135,6 +137,11 @@ function AdminUsersTable({
             <TableHead className="w-[80px] font-semibold">Level</TableHead>
             <TableHead className="w-[80px] font-semibold">Device</TableHead>
             <TableHead className="w-[90px] font-semibold">Platform</TableHead>
+            <TableHead className="w-[110px] font-semibold">
+              <SortButton field="first_touched_at" params={params} onSort={onSort}>
+                Source
+              </SortButton>
+            </TableHead>
             <TableHead className="w-[120px] font-semibold">
               <SortButton field="last_seen_at" params={params} onSort={onSort}>
                 Last Seen
@@ -315,6 +322,11 @@ function AdminUsersTable({
                 </span>
               </TableCell>
 
+              {/* Source */}
+              <TableCell>
+                <SourceCell source={user.source} attribution={user.attribution} />
+              </TableCell>
+
               {/* Last Seen */}
               <TableCell>
                 {user.is_online ? (
@@ -415,6 +427,62 @@ function GoogleIcon({ className }: { className?: string }) {
         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
       />
     </svg>
+  );
+}
+
+/**
+ * Source cell — renders `user.source` with a detail tooltip when attribution is present.
+ */
+function SourceCell({
+  source,
+  attribution,
+}: {
+  source: string;
+  attribution: IAdminUserListItem['attribution'];
+}) {
+  const label = formatSourceLabel(source);
+  const isUnknown = source === 'unknown';
+
+  const tooltipContent = attribution ? (
+    <div className="space-y-1 text-xs">
+      {attribution.utm_source && <p>utm_source: {attribution.utm_source}</p>}
+      {attribution.utm_medium && <p>utm_medium: {attribution.utm_medium}</p>}
+      {attribution.utm_campaign && <p>utm_campaign: {attribution.utm_campaign}</p>}
+      {attribution.referrer_domain && <p>Referrer: {attribution.referrer_domain}</p>}
+      {attribution.has_referrer_user && <p>Referred by another user</p>}
+      {attribution.first_touched_at && (
+        <p className="text-muted-foreground">
+          First touched {format(new Date(attribution.first_touched_at), 'PPp')}
+        </p>
+      )}
+      {!attribution.utm_source &&
+        !attribution.utm_medium &&
+        !attribution.utm_campaign &&
+        !attribution.referrer_domain &&
+        !attribution.has_referrer_user && (
+          <p className="text-muted-foreground">No UTM or referrer signals</p>
+        )}
+    </div>
+  ) : (
+    <p className="text-xs text-muted-foreground">No attribution data</p>
+  );
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            'text-sm truncate block max-w-[110px] cursor-help',
+            isUnknown ? 'text-muted-foreground' : 'text-foreground'
+          )}
+        >
+          {label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[280px]">
+        {tooltipContent}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
