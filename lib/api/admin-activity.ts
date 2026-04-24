@@ -3,6 +3,8 @@
 
 import { apiClient } from './client';
 import type {
+  ActivityFacetsParams,
+  ActivityFacetsResponse,
   ActivityFeedParams,
   ActivityFeedResponse,
   ActivityStatsParams,
@@ -30,7 +32,30 @@ async function getActivityFeedStats(
   return response.data;
 }
 
+async function getActivityFeedFacets(
+  params: ActivityFacetsParams = {}
+): Promise<ActivityFacetsResponse> {
+  const response = await apiClient.get<ActivityFacetsResponse>(
+    '/admin/activity-feed/facets',
+    { params }
+  );
+  return response.data;
+}
+
+async function getUserActivityFeed(
+  userUuid: string,
+  params: Omit<ActivityFeedParams, 'user_id'> = {}
+): Promise<ActivityFeedResponse> {
+  const response = await apiClient.get<ActivityFeedResponse>(
+    `/admin/users/${userUuid}/activity-feed`,
+    { params }
+  );
+  return response.data;
+}
+
 export const adminActivityApi = {
   getActivityFeed,
   getActivityFeedStats,
+  getActivityFeedFacets,
+  getUserActivityFeed,
 };

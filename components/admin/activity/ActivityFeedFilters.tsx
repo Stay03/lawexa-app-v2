@@ -20,7 +20,9 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronDown, X } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { ACTION_GROUPS } from './action-meta';
+import { FacetSelect } from './FacetSelect';
 import type {
+  ActivityFacets,
   ActivityFeedParams,
   ActivityStatus,
 } from '@/types/admin-activity';
@@ -30,9 +32,16 @@ export type FilterState = Omit<ActivityFeedParams, 'cursor' | 'per_page'>;
 interface ActivityFeedFiltersProps {
   value: FilterState;
   onChange: (next: FilterState) => void;
+  facets?: ActivityFacets;
+  facetsLoading?: boolean;
 }
 
-export function ActivityFeedFilters({ value, onChange }: ActivityFeedFiltersProps) {
+export function ActivityFeedFilters({
+  value,
+  onChange,
+  facets,
+  facetsLoading,
+}: ActivityFeedFiltersProps) {
   const [searchInput, setSearchInput] = useState(value.search ?? '');
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -65,6 +74,9 @@ export function ActivityFeedFilters({ value, onChange }: ActivityFeedFiltersProp
     value.status,
     value.is_bot !== undefined,
     value.country,
+    value.university,
+    value.law_school,
+    value.profession,
     value.user_id,
     value.subject_type,
     value.ip_address,
@@ -72,6 +84,21 @@ export function ActivityFeedFilters({ value, onChange }: ActivityFeedFiltersProp
     value.date_from,
     value.date_to,
   ].filter(Boolean).length;
+
+  const countryOptions =
+    facets?.countries.map((c) => ({
+      value: c.code || c.value,
+      label: c.value,
+      hint: c.code ?? undefined,
+      count: c.count,
+    })) ?? [];
+
+  const universityOptions =
+    facets?.universities.map((u) => ({ value: u.value, count: u.count })) ?? [];
+  const lawSchoolOptions =
+    facets?.law_schools.map((s) => ({ value: s.value, count: s.count })) ?? [];
+  const professionOptions =
+    facets?.professions.map((p) => ({ value: p.value, count: p.count })) ?? [];
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -185,6 +212,43 @@ export function ActivityFeedFilters({ value, onChange }: ActivityFeedFiltersProp
         />
       </div>
 
+      <FacetSelect
+        placeholder="Country"
+        value={value.country ?? null}
+        options={countryOptions}
+        onChange={(v) => patch({ country: v ?? undefined })}
+        isLoading={facetsLoading}
+        allowFreeText={false}
+        width="w-[150px]"
+      />
+
+      <FacetSelect
+        placeholder="University"
+        value={value.university ?? null}
+        options={universityOptions}
+        onChange={(v) => patch({ university: v ?? undefined })}
+        isLoading={facetsLoading}
+        width="w-[180px]"
+      />
+
+      <FacetSelect
+        placeholder="Law school"
+        value={value.law_school ?? null}
+        options={lawSchoolOptions}
+        onChange={(v) => patch({ law_school: v ?? undefined })}
+        isLoading={facetsLoading}
+        width="w-[170px]"
+      />
+
+      <FacetSelect
+        placeholder="Profession"
+        value={value.profession ?? null}
+        options={professionOptions}
+        onChange={(v) => patch({ profession: v ?? undefined })}
+        isLoading={facetsLoading}
+        width="w-[150px]"
+      />
+
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1">
@@ -193,17 +257,6 @@ export function ActivityFeedFilters({ value, onChange }: ActivityFeedFiltersProp
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[320px] space-y-3" align="end">
-          <div className="space-y-1">
-            <label className="text-xs font-medium">Country code</label>
-            <Input
-              placeholder="NG"
-              maxLength={2}
-              value={value.country ?? ''}
-              onChange={(e) =>
-                patch({ country: e.target.value.toUpperCase() || undefined })
-              }
-            />
-          </div>
           <div className="space-y-1">
             <label className="text-xs font-medium">IP address</label>
             <Input

@@ -24,10 +24,27 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-function subjectLabel(subject: ActivityFeedRowType['subject']): string | null {
+function subjectType(raw: string): string {
+  const tail = raw.split('\\').pop() ?? raw;
+  return tail.toLowerCase();
+}
+
+interface SubjectView {
+  type: string;
+  label: string | null;
+  fallback: string;
+  deleted: boolean;
+}
+
+function viewSubject(subject: ActivityFeedRowType['subject']): SubjectView | null {
   if (!subject) return null;
-  const type = subject.type.split('\\').pop() ?? subject.type;
-  return `${type} #${subject.id}`;
+  const type = subjectType(subject.type);
+  return {
+    type,
+    label: subject.label,
+    fallback: `${type} #${subject.id}`,
+    deleted: subject.label === null,
+  };
 }
 
 function propertyHint(action: string, properties: Record<string, unknown>): string | null {
@@ -58,7 +75,7 @@ function propertyHint(action: string, properties: Record<string, unknown>): stri
 export function ActivityFeedRow({ row }: ActivityFeedRowProps) {
   const meta = getActionMeta(row.action);
   const Icon = meta.icon;
-  const subject = subjectLabel(row.subject);
+  const subject = viewSubject(row.subject);
   const hint = propertyHint(row.action, row.properties);
   const failed = row.status === 'failed';
 
@@ -88,8 +105,31 @@ export function ActivityFeedRow({ row }: ActivityFeedRowProps) {
           )}
           <span className="text-muted-foreground">{meta.label}</span>
           {subject && (
-            <span className="text-muted-foreground">
-              — <span className="font-mono text-xs">{subject}</span>
+            <span className="text-muted-foreground inline-flex items-baseline gap-1 min-w-0">
+              —
+              {subject.label ? (
+                <>
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                    {subject.type}
+                  </span>
+                  <span
+                    className="truncate max-w-[320px] font-medium text-foreground"
+                    title={subject.label}
+                  >
+                    {subject.label}
+                  </span>
+                </>
+              ) : (
+                <span
+                  className="font-mono text-xs"
+                  title={subject.deleted ? 'subject deleted' : undefined}
+                >
+                  {subject.fallback}
+                  {subject.deleted && (
+                    <span className="ml-1 text-muted-foreground/60">(deleted)</span>
+                  )}
+                </span>
+              )}
             </span>
           )}
           {failed && (

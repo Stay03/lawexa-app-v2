@@ -15,6 +15,7 @@ import { ActivityFeedLiveToggle } from '@/components/admin/activity/ActivityFeed
 import { ActivityStatsChart } from '@/components/admin/activity/ActivityStatsChart';
 import {
   useActivityFeed,
+  useActivityFeedFacets,
   useActivityFeedStats,
 } from '@/lib/hooks/useAdminActivity';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
@@ -36,6 +37,9 @@ function parseFilters(search: URLSearchParams): FilterState {
       ? (actions as ActivityAction[])
       : undefined,
     country: search.get('country') ?? undefined,
+    university: search.get('university') ?? undefined,
+    law_school: search.get('law_school') ?? undefined,
+    profession: search.get('profession') ?? undefined,
     ip_address: search.get('ip_address') ?? undefined,
     device_id: search.get('device_id') ?? undefined,
     user_id: search.get('user_id')
@@ -57,6 +61,9 @@ function toSearchParams(filters: FilterState): URLSearchParams {
   if (filters.is_bot !== undefined) p.set('is_bot', String(filters.is_bot));
   if (filters.action) filters.action.forEach((a) => p.append('action', a));
   if (filters.country) p.set('country', filters.country);
+  if (filters.university) p.set('university', filters.university);
+  if (filters.law_school) p.set('law_school', filters.law_school);
+  if (filters.profession) p.set('profession', filters.profession);
   if (filters.ip_address) p.set('ip_address', filters.ip_address);
   if (filters.device_id) p.set('device_id', filters.device_id);
   if (filters.user_id) p.set('user_id', String(filters.user_id));
@@ -92,6 +99,7 @@ function ActivityFeedContent() {
 
   const feed = useActivityFeed(filters, { live });
   const stats = useActivityFeedStats(filters);
+  const facets = useActivityFeedFacets(filters);
 
   const lastUpdated = feed.dataUpdatedAt || null;
 
@@ -113,7 +121,12 @@ function ActivityFeedContent() {
         />
       </div>
 
-      <ActivityFeedFilters value={filters} onChange={updateFilters} />
+      <ActivityFeedFilters
+        value={filters}
+        onChange={updateFilters}
+        facets={facets.data?.data}
+        facetsLoading={facets.isLoading}
+      />
 
       <ActivityStatsChart
         data={stats.data?.data}

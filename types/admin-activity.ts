@@ -14,12 +14,34 @@ export const ACTIVITY_ACTIONS = {
   ],
   ai: [
     'conversation_created',
+    'conversation_viewed',
     'conversation_published',
     'conversation_deleted',
     'ai_message_sent',
   ],
-  contentView: ['case_viewed', 'statute_viewed', 'note_viewed'],
-  contentCreate: ['note_created', 'folder_created', 'content_requested'],
+  contentView: [
+    'case_viewed',
+    'statute_viewed',
+    'note_viewed',
+    'folder_viewed',
+  ],
+  contentCreate: [
+    'note_created',
+    'note_published',
+    'note_unpublished',
+    'note_deleted',
+    'note_restored',
+    'folder_created',
+    'folder_updated',
+    'folder_deleted',
+    'folder_restored',
+    'folder_item_added',
+    'folder_item_removed',
+    'content_requested',
+    'case_deleted',
+    'case_restored',
+  ],
+  bookmark: ['bookmark_added', 'bookmark_removed'],
   commerce: [
     'subscription_started',
     'subscription_cancelled',
@@ -33,6 +55,7 @@ export type KnownActivityAction =
   | (typeof ACTIVITY_ACTIONS)['ai'][number]
   | (typeof ACTIVITY_ACTIONS)['contentView'][number]
   | (typeof ACTIVITY_ACTIONS)['contentCreate'][number]
+  | (typeof ACTIVITY_ACTIONS)['bookmark'][number]
   | (typeof ACTIVITY_ACTIONS)['commerce'][number]
   | (typeof ACTIVITY_ACTIONS)['export'][number];
 
@@ -52,6 +75,7 @@ export interface ActivityUser {
 export interface ActivitySubject {
   type: string;
   id: number;
+  label: string | null;
 }
 
 export interface ActivityIp {
@@ -126,6 +150,9 @@ export interface ActivityFeedParams {
   device_id?: string;
   ip_address?: string;
   country?: string;
+  university?: string;
+  law_school?: string;
+  profession?: string;
   search?: string;
   date_from?: string;
   date_to?: string;
@@ -149,3 +176,28 @@ export type ActivityStatsParams = Omit<
   ActivityFeedParams,
   'per_page' | 'cursor'
 >;
+
+// Facets
+export type ActivityFacetsParams = ActivityStatsParams;
+
+export interface ActivityFacetValue {
+  value: string;
+  count: number;
+}
+
+export interface ActivityCountryFacetValue extends ActivityFacetValue {
+  code: string | null;
+}
+
+export interface ActivityFacets {
+  actions: ActivityFacetValue[];
+  countries: ActivityCountryFacetValue[];
+  universities: ActivityFacetValue[];
+  law_schools: ActivityFacetValue[];
+  professions: ActivityFacetValue[];
+}
+
+export interface ActivityFacetsResponse {
+  success: boolean;
+  data: ActivityFacets;
+}

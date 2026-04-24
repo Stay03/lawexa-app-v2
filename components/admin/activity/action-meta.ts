@@ -9,18 +9,31 @@ import {
   MessageSquare,
   MessageSquarePlus,
   MessageSquareOff,
+  Eye,
   Send,
   FileSearch,
   Scroll,
   NotebookText,
   NotebookPen,
+  FileCheck2,
+  FileX2,
+  Trash2,
+  Undo2,
   FolderPlus,
+  Folder,
+  FolderOpen,
+  FolderMinus,
+  FilePlus2,
+  FileMinus2,
   Inbox,
   CreditCard,
   XCircle,
   ShoppingBag,
   FileDown,
+  Bookmark,
+  BookmarkMinus,
   Activity,
+  Pencil,
 } from 'lucide-react';
 
 export type ActivityCategory =
@@ -50,6 +63,7 @@ const META: Record<string, ActionMeta> = {
   password_reset_completed: { label: 'Password reset', icon: KeyRound, category: 'auth', tone: 'success' },
 
   conversation_created: { label: 'Conversation started', icon: MessageSquarePlus, category: 'ai', tone: 'info' },
+  conversation_viewed: { label: 'Viewed conversation', icon: Eye, category: 'ai', tone: 'muted' },
   conversation_published: { label: 'Conversation published', icon: MessageSquare, category: 'ai', tone: 'success' },
   conversation_deleted: { label: 'Conversation deleted', icon: MessageSquareOff, category: 'ai', tone: 'danger' },
   ai_message_sent: { label: 'AI message sent', icon: Send, category: 'ai', tone: 'info' },
@@ -57,10 +71,28 @@ const META: Record<string, ActionMeta> = {
   case_viewed: { label: 'Viewed case', icon: FileSearch, category: 'content_view', tone: 'muted' },
   statute_viewed: { label: 'Viewed statute', icon: Scroll, category: 'content_view', tone: 'muted' },
   note_viewed: { label: 'Viewed note', icon: NotebookText, category: 'content_view', tone: 'muted' },
+  folder_viewed: { label: 'Viewed folder', icon: FolderOpen, category: 'content_view', tone: 'muted' },
 
   note_created: { label: 'Note created', icon: NotebookPen, category: 'content_create', tone: 'info' },
+  note_published: { label: 'Note published', icon: FileCheck2, category: 'content_create', tone: 'success' },
+  note_unpublished: { label: 'Note unpublished', icon: FileX2, category: 'content_create', tone: 'warn' },
+  note_deleted: { label: 'Note deleted', icon: Trash2, category: 'content_create', tone: 'danger' },
+  note_restored: { label: 'Note restored', icon: Undo2, category: 'content_create', tone: 'success' },
+
   folder_created: { label: 'Folder created', icon: FolderPlus, category: 'content_create', tone: 'info' },
+  folder_updated: { label: 'Folder updated', icon: Pencil, category: 'content_create', tone: 'muted' },
+  folder_deleted: { label: 'Folder deleted', icon: FolderMinus, category: 'content_create', tone: 'danger' },
+  folder_restored: { label: 'Folder restored', icon: Folder, category: 'content_create', tone: 'success' },
+  folder_item_added: { label: 'Added to folder', icon: FilePlus2, category: 'content_create', tone: 'info' },
+  folder_item_removed: { label: 'Removed from folder', icon: FileMinus2, category: 'content_create', tone: 'warn' },
+
   content_requested: { label: 'Content requested', icon: Inbox, category: 'content_create', tone: 'warn' },
+
+  case_deleted: { label: 'Case deleted', icon: Trash2, category: 'content_create', tone: 'danger' },
+  case_restored: { label: 'Case restored', icon: Undo2, category: 'content_create', tone: 'success' },
+
+  bookmark_added: { label: 'Bookmarked', icon: Bookmark, category: 'content_create', tone: 'info' },
+  bookmark_removed: { label: 'Removed bookmark', icon: BookmarkMinus, category: 'content_create', tone: 'muted' },
 
   subscription_started: { label: 'Subscription started', icon: CreditCard, category: 'commerce', tone: 'success' },
   subscription_cancelled: { label: 'Subscription cancelled', icon: XCircle, category: 'commerce', tone: 'warn' },
@@ -112,6 +144,7 @@ export const ACTION_GROUPS: { label: string; actions: string[] }[] = [
     label: 'AI',
     actions: [
       'conversation_created',
+      'conversation_viewed',
       'conversation_published',
       'conversation_deleted',
       'ai_message_sent',
@@ -119,11 +152,40 @@ export const ACTION_GROUPS: { label: string; actions: string[] }[] = [
   },
   {
     label: 'Content views',
-    actions: ['case_viewed', 'statute_viewed', 'note_viewed'],
+    actions: ['case_viewed', 'statute_viewed', 'note_viewed', 'folder_viewed'],
   },
   {
-    label: 'Content create',
-    actions: ['note_created', 'folder_created', 'content_requested'],
+    label: 'Notes',
+    actions: [
+      'note_created',
+      'note_published',
+      'note_unpublished',
+      'note_deleted',
+      'note_restored',
+    ],
+  },
+  {
+    label: 'Folders',
+    actions: [
+      'folder_created',
+      'folder_updated',
+      'folder_deleted',
+      'folder_restored',
+      'folder_item_added',
+      'folder_item_removed',
+    ],
+  },
+  {
+    label: 'Cases',
+    actions: ['case_deleted', 'case_restored'],
+  },
+  {
+    label: 'Bookmarks',
+    actions: ['bookmark_added', 'bookmark_removed'],
+  },
+  {
+    label: 'Content requests',
+    actions: ['content_requested'],
   },
   {
     label: 'Commerce',
