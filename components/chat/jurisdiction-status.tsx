@@ -76,6 +76,13 @@ export function JurisdictionStatus({
           align="start"
           sideOffset={6}
           className="w-[320px] p-2"
+          // React synthetic events bubble through the React tree even from
+          // portaled content. PromptInput's root div listens for onClick
+          // and refocuses its textarea, which Radix interprets as
+          // focus-outside and closes the popover. Stop propagation here
+          // so events inside the picker stay inside.
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <JurisdictionPicker
             jurisdictions={jurisdictions ?? []}
