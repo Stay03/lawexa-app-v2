@@ -67,6 +67,8 @@ import { browserNotify } from '@/lib/utils/browser-notify';
 import { hasPromptContent } from '@/lib/utils/parse-content-xml';
 import { useUserLimits } from '@/lib/hooks/useUserLimits';
 import { NoFreeMessagesBanner } from '@/components/chat/no-free-messages-banner';
+import { useJurisdictionChoice } from '@/lib/hooks/useJurisdictionChoice';
+import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -378,6 +380,10 @@ function ConversationPageContent() {
   // forwards this ref to the backend.
   const streamModeRef = useRef<'v2_stream' | undefined>('v2_stream');
 
+  // Per-conversation jurisdiction override. Resets to auto when conversationId
+  // changes (handled inside the hook).
+  const [jurisdictionChoice, setJurisdictionChoice] = useJurisdictionChoice(conversationId);
+
   // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
 
@@ -616,6 +622,7 @@ function ConversationPageContent() {
         file_size: attachment.file_size,
       } : undefined,
       streamMode: streamModeRef.current,
+      jurisdiction: jurisdictionChoice,
     });
 
     setIsSubmitting(false);
@@ -679,7 +686,11 @@ function ConversationPageContent() {
     if (!message.trim() || isStreaming || isSubmitting) return;
 
     setIsSubmitting(true);
-    await send(message, { conversationId, streamMode: streamModeRef.current });
+    await send(message, {
+      conversationId,
+      streamMode: streamModeRef.current,
+      jurisdiction: jurisdictionChoice,
+    });
     setIsSubmitting(false);
   };
 
@@ -1059,6 +1070,13 @@ function ConversationPageContent() {
           {isOwner && hasNoFreeMessages && <NoFreeMessagesBanner className="mb-3" />}
           {isOwner ? (
             <FileUpload onFilesAdded={handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
+              <div className="mb-2 flex items-center">
+                <JurisdictionStatus
+                  value={jurisdictionChoice}
+                  onChange={setJurisdictionChoice}
+                  disabled={isStreaming || isLoadingHistory || isSubmitting}
+                />
+              </div>
               <PromptInput
                 value={input}
                 onValueChange={setInput}

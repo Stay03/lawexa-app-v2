@@ -27,6 +27,8 @@ import {
   type PendingResponseData,
 } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
+import type { JurisdictionChoice } from '@/types/jurisdiction';
+import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -95,6 +97,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const agentTextRef = useRef<Map<string, string>>(new Map());
   // Stream mode for the current/last execution — persisted so retry can forward it
   const streamModeRef = useRef<'v2_stream' | undefined>(undefined);
+  // Jurisdiction choice for the current/last execution — persisted so retry can replay it
+  const jurisdictionRef = useRef<JurisdictionChoice>({ mode: 'auto' });
   // Tool call queue: maps tool name → ordered list of message IDs for pending calls.
   // Ensures tool_complete updates the correct message when duplicate tool names exist.
   const toolCallQueueRef = useRef<Map<string, string[]>>(new Map());
@@ -1345,6 +1349,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const clearChat = useCallback(() => {
     disconnect();
     conversationIdRef.current = null;
+    jurisdictionRef.current = { mode: 'auto' };
     setState({
       messages: [],
       isStreaming: false, isCancelling: false,
@@ -1386,16 +1391,20 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     try {
       // Persist stream mode so retry can forward it
       streamModeRef.current = options.streamMode;
+      // Persist jurisdiction choice so retry replays the same selection
+      const choice: JurisdictionChoice = options.jurisdiction ?? { mode: 'auto' };
+      jurisdictionRef.current = choice;
 
-      const response = await chatApi.start({
+      const baseBody = {
         message,
-        stream: true,
+        stream: true as const,
         ...(convId && { conversation_id: convId }),
         ...(options.fileId && { file_id: options.fileId }),
         ...(options.studyMode && { study_mode: true }),
         ...(options.workflowId && { workflow_id: options.workflowId }),
         ...(options.streamMode && { stream_mode: options.streamMode }),
-      });
+      };
+      const response = await chatApi.start(applyJurisdiction(baseBody, choice));
 
       if (response.success) {
         connectToStream(response.data.execution_id);
@@ -1507,13 +1516,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Preserve file attachment from original message
       const fileId = (lastUserMsg as ChatMessage)?.attachment?.file_id;
 
-      const response = await chatApi.start({
+      const retryBody = {
         message: lastUserMsg.content,
-        stream: true,
+        stream: true as const,
         conversation_id: convId,
         ...(fileId && { file_id: fileId }),
         ...(streamModeRef.current && { stream_mode: streamModeRef.current }),
-      });
+      };
+      const response = await chatApi.start(
+        applyJurisdiction(retryBody, jurisdictionRef.current),
+      );
 
       if (response.success) {
         connectToStream(response.data.execution_id);

@@ -1,3 +1,5 @@
+import type { JurisdictionChoice } from './jurisdiction';
+
 // Message role types
 export type MessageRole = 'user' | 'assistant' | 'tool';
 
@@ -292,6 +294,10 @@ export interface ChatStartRequest {
   agent_id?: number;
   study_mode?: boolean;
   file_id?: number;
+  // Three-state field. Absent = backend auto-resolves from profile/IP.
+  // String = override with that jurisdiction slug. Explicit null =
+  // skip jurisdiction injection (comparative / academic mode).
+  jurisdiction?: string | null;
 }
 
 export interface ChatStartResponse {
@@ -328,6 +334,9 @@ export interface SendMessageOptions {
   workflowId?: number;
   // Opt-in token streaming; forwarded into ChatStartRequest.stream_mode
   streamMode?: 'v2_stream';
+  // Per-conversation jurisdiction choice. Translated into the wire field
+  // by applyJurisdiction() at send time.
+  jurisdiction?: JurisdictionChoice;
 }
 
 // Chat state for hook

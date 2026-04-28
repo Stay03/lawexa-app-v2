@@ -43,6 +43,12 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { formatFileSize } from '@/lib/validations/admin-cases';
 import { useUserLimits } from '@/lib/hooks/useUserLimits';
 import { NoFreeMessagesBanner } from '@/components/chat/no-free-messages-banner';
+import {
+  useJurisdictionChoice,
+  bridgeHomeJurisdictionToConversation,
+} from '@/lib/hooks/useJurisdictionChoice';
+import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
+import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -85,6 +91,10 @@ export default function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
   const isGuest = useAuthStore((state) => state.isGuest);
+
+  // Home page has no conversation yet — choice lives under the home key
+  // and is bridged into the conversation slot once the backend creates one.
+  const [jurisdictionChoice, setJurisdictionChoice] = useJurisdictionChoice(null);
 
   // Check if user has no free AI messages (device abuse or zero-limit plan)
   const { data: limitsData } = useUserLimits();
@@ -189,19 +199,25 @@ export default function HomePage() {
 
     try {
       // Start chat to get conversation_id
-      const response = await chatApi.start({
+      const baseBody = {
         message: fullMessage,
-        stream: true,
+        stream: true as const,
         // Token-level streaming is on by default for everyone.
         stream_mode: 'v2_stream' as const,
         ...(studyMode && { study_mode: true }),
         ...(selectedWorkflowId && { workflow_id: Number(selectedWorkflowId) }),
         ...(uploadedFile && { file_id: uploadedFile.file_id }),
-      });
+      };
+      const response = await chatApi.start(
+        applyJurisdiction(baseBody, jurisdictionChoice),
+      );
 
       if (response.success) {
         const conversationId = response.data.conversation_id;
         const executionId = response.data.execution_id;
+        // Carry the home-page choice into the conversation's storage slot
+        // so subsequent sends in /c/[id] keep using it.
+        bridgeHomeJurisdictionToConversation(conversationId);
 
         // Store message in sessionStorage to avoid URL length limits
         sessionStorage.setItem(`conv_init_${conversationId}`, JSON.stringify({
@@ -482,17 +498,25 @@ export default function HomePage() {
               onLargePaste={setPastedContent}
             />
 
-            <PromptInputActions className="flex items-center justify-between px-3 pb-3">
-              {/* Left actions: Attach + Workflow selector — hidden for guests */}
-              <div className="flex items-center gap-1">
+            <PromptInputActions className="flex items-center justify-between px-3 pb-3 gap-2">
+              {/* Left actions: Attach + Jurisdiction + Workflow selector — hidden for guests */}
+              <div className="flex items-center gap-1.5 min-w-0">
                 {!isGuest && (
                   <PromptInputAction tooltip="Attach PDF">
                     <FileUploadTrigger asChild>
-                      <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
+                      <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl shrink-0">
                         <Paperclip className="text-primary h-5 w-5" />
                       </div>
                     </FileUploadTrigger>
                   </PromptInputAction>
+                )}
+
+                {!isGuest && (
+                  <JurisdictionStatus
+                    value={jurisdictionChoice}
+                    onChange={setJurisdictionChoice}
+                    disabled={isSubmitting}
+                  />
                 )}
 
                 {/* Workflow selector - admin/researcher get the full list from the API */}

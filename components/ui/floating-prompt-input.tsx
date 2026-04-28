@@ -24,6 +24,9 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useJurisdictionChoice } from '@/lib/hooks/useJurisdictionChoice';
+import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
+import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
 import {
   Message,
   MessageContent,
@@ -90,6 +93,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [jurisdictionChoice, setJurisdictionChoice] = useJurisdictionChoice(conversationId);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -352,11 +356,14 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     const optimisticMsg = addUserMessage(typedText || '(pasted content)');
 
     try {
-      const response = await chatApi.start({
+      const baseBody = {
         message: messageToSend,
-        stream: true,
-        conversation_id: conversationId ?? undefined,
-      });
+        stream: true as const,
+        ...(conversationId ? { conversation_id: conversationId } : {}),
+      };
+      const response = await chatApi.start(
+        applyJurisdiction(baseBody, jurisdictionChoice),
+      );
 
       if (response.success) {
         if (!conversationId) {
@@ -456,6 +463,13 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             <SheetDescription className="sr-only">
               Chat assistant for this {contextType || 'page'}
             </SheetDescription>
+            <div className="mt-2 flex items-center">
+              <JurisdictionStatus
+                value={jurisdictionChoice}
+                onChange={setJurisdictionChoice}
+                disabled={isStreaming}
+              />
+            </div>
           </SheetHeader>
 
           {/* Chat messages — scrollable */}
