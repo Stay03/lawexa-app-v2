@@ -448,6 +448,17 @@ export default function HomePage() {
       <div ref={inputAreaRef} className="shrink-0 w-full max-w-2xl pb-2 md:pb-0">
         {hasNoFreeMessages && <NoFreeMessagesBanner className="mb-3" />}
         <FileUpload onFilesAdded={isGuest ? () => {} : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
+          {/* Mobile-only jurisdiction badge — sits above the input card, top-left */}
+          {!isGuest && (
+            <div className="md:hidden mb-2 flex items-center">
+              <JurisdictionStatus
+                value={jurisdictionChoice}
+                onChange={setJurisdictionChoice}
+                disabled={isSubmitting}
+                triggerClassName="bg-background hover:bg-muted"
+              />
+            </div>
+          )}
           <PromptInput
             value={input}
             onValueChange={(value) => {
@@ -489,18 +500,6 @@ export default function HomePage() {
             {pastedContent && (
               <div className="mx-3 mt-2">
                 <PastedContentCard content={pastedContent} onRemove={() => setPastedContent(null)} />
-              </div>
-            )}
-
-            {/* Mobile-only jurisdiction badge — sits above the textarea, top-left */}
-            {!isGuest && (
-              <div className="md:hidden flex items-center px-3 pt-2">
-                <JurisdictionStatus
-                  value={jurisdictionChoice}
-                  onChange={setJurisdictionChoice}
-                  disabled={isSubmitting}
-                  triggerClassName="bg-background hover:bg-muted"
-                />
               </div>
             )}
 
