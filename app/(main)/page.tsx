@@ -492,13 +492,14 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Mobile-only jurisdiction badge — sits above the textarea, top-right */}
+            {/* Mobile-only jurisdiction badge — sits above the textarea, top-left */}
             {!isGuest && (
-              <div className="md:hidden flex justify-end px-3 pt-2">
+              <div className="md:hidden flex items-center px-3 pt-2">
                 <JurisdictionStatus
                   value={jurisdictionChoice}
                   onChange={setJurisdictionChoice}
                   disabled={isSubmitting}
+                  triggerClassName="bg-background hover:bg-muted"
                 />
               </div>
             )}
