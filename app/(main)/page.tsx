@@ -492,6 +492,17 @@ export default function HomePage() {
               </div>
             )}
 
+            {/* Mobile-only jurisdiction badge — sits above the textarea, top-right */}
+            {!isGuest && (
+              <div className="md:hidden flex justify-end px-3 pt-2">
+                <JurisdictionStatus
+                  value={jurisdictionChoice}
+                  onChange={setJurisdictionChoice}
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
+
             <PromptInputTextarea
               placeholder={pastedContent ? 'Add a message...' : 'Ask a legal question'}
               className="text-foreground"
@@ -571,14 +582,16 @@ export default function HomePage() {
                 })()}
               </div>
 
-              {/* Right group: Jurisdiction badge + Send button */}
+              {/* Right group: Jurisdiction badge (desktop only) + Send button */}
               <div className="flex items-center gap-2 shrink-0">
                 {!isGuest && (
-                  <JurisdictionStatus
-                    value={jurisdictionChoice}
-                    onChange={setJurisdictionChoice}
-                    disabled={isSubmitting}
-                  />
+                  <div className="hidden md:flex">
+                    <JurisdictionStatus
+                      value={jurisdictionChoice}
+                      onChange={setJurisdictionChoice}
+                      disabled={isSubmitting}
+                    />
+                  </div>
                 )}
                 <PromptInputAction tooltip="Send message">
                   <Button
