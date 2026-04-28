@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Layers, RotateCcw, ChevronDown } from 'lucide-react';
+import { RotateCcw, ChevronDown } from 'lucide-react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ interface JurisdictionStatusProps {
   value: JurisdictionChoice;
   onChange: (next: JurisdictionChoice) => void;
   className?: string;
+  triggerClassName?: string;
   disabled?: boolean;
 }
 
@@ -26,6 +27,7 @@ export function JurisdictionStatus({
   value,
   onChange,
   className,
+  triggerClassName,
   disabled,
 }: JurisdictionStatusProps) {
   const [open, setOpen] = useState(false);
@@ -55,16 +57,18 @@ export function JurisdictionStatus({
           <button
             type="button"
             disabled={disabled}
+            title={display.tooltip}
+            aria-label={display.tooltip}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2.5 py-1',
               'text-foreground/80 hover:bg-muted hover:text-foreground transition-colors',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               isOverridden && 'border-primary/50 bg-primary/5 text-foreground',
+              triggerClassName,
             )}
-            aria-label={`Jurisdiction: ${display.label}`}
           >
-            {display.icon}
-            <span className="truncate max-w-[200px] font-medium">{display.label}</span>
+            <span className="font-medium">Jurisdiction:</span>
+            {display.value}
             <ChevronDown className="size-3 opacity-60" />
           </button>
         </PopoverTrigger>
@@ -110,15 +114,16 @@ function renderDisplay(args: {
 
   if (choice.mode === 'none') {
     return {
-      icon: <Layers className="size-3.5 text-muted-foreground" />,
-      label: 'No jurisdiction',
+      value: <span className="font-medium">None</span>,
+      tooltip: 'Jurisdiction: None (comparative)',
     };
   }
 
   const j = choice.mode === 'override' ? overrideMatch : autoMatch;
   const code = jurisdictionFlagCode(j);
+  const name = j?.name ?? (choice.mode === 'override' ? choice.slug : 'Loading…');
   return {
-    icon: <JurisdictionFlag code={code} />,
-    label: j?.name ?? (choice.mode === 'override' ? choice.slug : 'Loading…'),
+    value: <JurisdictionFlag code={code} />,
+    tooltip: `Jurisdiction: ${name}`,
   };
 }

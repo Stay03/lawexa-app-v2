@@ -1,22 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Layers } from 'lucide-react';
+import { Check, Layers, Search } from 'lucide-react';
 
-import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-  ComboboxSeparator,
-} from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
 import { JurisdictionFlag, jurisdictionFlagCode } from '@/components/chat/jurisdiction-flag';
 import type { Jurisdiction, JurisdictionChoice } from '@/types/jurisdiction';
-
-const NONE_VALUE = '__none__';
 
 interface JurisdictionPickerProps {
   jurisdictions: Jurisdiction[];
@@ -24,18 +13,6 @@ interface JurisdictionPickerProps {
   onChange: (next: JurisdictionChoice) => void;
   isLoading?: boolean;
   className?: string;
-}
-
-function choiceToValue(choice: JurisdictionChoice): string {
-  if (choice.mode === 'none') return NONE_VALUE;
-  if (choice.mode === 'override') return choice.slug;
-  return ''; // 'auto' — no item selected
-}
-
-function valueToChoice(value: string): JurisdictionChoice {
-  if (value === NONE_VALUE) return { mode: 'none' };
-  if (!value) return { mode: 'auto' };
-  return { mode: 'override', slug: value };
 }
 
 export function JurisdictionPicker({
@@ -63,61 +40,90 @@ export function JurisdictionPicker({
     });
   }, [sortedList, search]);
 
-  const currentValue = choiceToValue(value);
+  const selectedSlug = value.mode === 'override' ? value.slug : null;
+  const isNoneSelected = value.mode === 'none';
 
   return (
-    <Combobox
-      value={currentValue}
-      onValueChange={(next) => {
-        if (typeof next !== 'string') return;
-        onChange(valueToChoice(next));
-        setSearch('');
-      }}
-    >
-      <ComboboxInput
-        placeholder={isLoading ? 'Loading…' : 'Search jurisdictions…'}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        disabled={isLoading}
-        className={cn('w-full', className)}
-      />
-
-      <ComboboxContent>
-        <ComboboxList>
-          {filtered.map((j) => {
-            const code = jurisdictionFlagCode(j);
-            return (
-              <ComboboxItem
-                key={j.slug}
-                value={j.slug}
-                className="flex items-center gap-2.5"
-              >
-                <JurisdictionFlag code={code} className="shrink-0" />
-                <span className="font-medium truncate">{j.name}</span>
-                {j.parent && (
-                  <span className="text-xs text-muted-foreground truncate">
-                    ({j.parent.name})
-                  </span>
-                )}
-              </ComboboxItem>
-            );
-          })}
-
-          {filtered.length === 0 && !isLoading && (
-            <ComboboxEmpty>No jurisdictions match.</ComboboxEmpty>
+    <div className={cn('flex flex-col gap-1', className)}>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          disabled={isLoading}
+          placeholder={isLoading ? 'Loading…' : 'Search jurisdictions…'}
+          className={cn(
+            'w-full rounded-lg border bg-background pl-8 pr-2 py-1.5 text-sm',
+            'placeholder:text-muted-foreground',
+            'focus:outline-none focus:ring-2 focus:ring-ring/30',
+            'disabled:opacity-50',
           )}
+          autoFocus
+        />
+      </div>
 
-          <ComboboxSeparator />
+      <div
+        role="listbox"
+        aria-label="Jurisdictions"
+        className="max-h-72 overflow-y-auto overscroll-contain pt-1"
+      >
+        {filtered.map((j) => {
+          const code = jurisdictionFlagCode(j);
+          const isSelected = selectedSlug === j.slug;
+          return (
+            <button
+              key={j.slug}
+              type="button"
+              role="option"
+              aria-selected={isSelected}
+              onClick={() => onChange({ mode: 'override', slug: j.slug })}
+              className={cn(
+                'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm',
+                'hover:bg-accent hover:text-accent-foreground transition-colors',
+                isSelected && 'bg-accent/60 text-accent-foreground',
+              )}
+            >
+              <JurisdictionFlag code={code} className="shrink-0" />
+              <span className="font-medium truncate">{j.name}</span>
+              {j.parent && (
+                <span className="text-xs text-muted-foreground truncate">
+                  ({j.parent.name})
+                </span>
+              )}
+              {isSelected && (
+                <Check className="ml-auto size-4 shrink-0 text-primary" />
+              )}
+            </button>
+          );
+        })}
 
-          <ComboboxItem
-            value={NONE_VALUE}
-            className="flex items-center gap-2.5"
-          >
-            <Layers className="size-4 text-muted-foreground shrink-0" />
-            <span>No specific jurisdiction (comparative)</span>
-          </ComboboxItem>
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
+        {filtered.length === 0 && !isLoading && (
+          <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+            No jurisdictions match.
+          </div>
+        )}
+      </div>
+
+      <div className="border-t pt-1">
+        <button
+          type="button"
+          role="option"
+          aria-selected={isNoneSelected}
+          onClick={() => onChange({ mode: 'none' })}
+          className={cn(
+            'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm',
+            'hover:bg-accent hover:text-accent-foreground transition-colors',
+            isNoneSelected && 'bg-accent/60 text-accent-foreground',
+          )}
+        >
+          <Layers className="size-4 shrink-0 text-muted-foreground" />
+          <span>No specific jurisdiction (comparative)</span>
+          {isNoneSelected && (
+            <Check className="ml-auto size-4 shrink-0 text-primary" />
+          )}
+        </button>
+      </div>
+    </div>
   );
 }

@@ -511,14 +511,6 @@ export default function HomePage() {
                   </PromptInputAction>
                 )}
 
-                {!isGuest && (
-                  <JurisdictionStatus
-                    value={jurisdictionChoice}
-                    onChange={setJurisdictionChoice}
-                    disabled={isSubmitting}
-                  />
-                )}
-
                 {/* Workflow selector - admin/researcher get the full list from the API */}
                 {canSelectWorkflow && workflows.length > 0 && (
                   <Select
@@ -579,21 +571,30 @@ export default function HomePage() {
                 })()}
               </div>
 
-              {/* Send button - RIGHT */}
-              <PromptInputAction tooltip="Send message">
-                <Button
-                  size="icon"
-                  className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
-                  onClick={handleSubmit}
-                  disabled={(!input.trim() && !uploadedFile && !pastedContent) || isSubmitting || isUploading}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <ArrowUp className="h-5 w-5" />
-                  )}
-                </Button>
-              </PromptInputAction>
+              {/* Right group: Jurisdiction badge + Send button */}
+              <div className="flex items-center gap-2 shrink-0">
+                {!isGuest && (
+                  <JurisdictionStatus
+                    value={jurisdictionChoice}
+                    onChange={setJurisdictionChoice}
+                    disabled={isSubmitting}
+                  />
+                )}
+                <PromptInputAction tooltip="Send message">
+                  <Button
+                    size="icon"
+                    className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
+                    onClick={handleSubmit}
+                    disabled={(!input.trim() && !uploadedFile && !pastedContent) || isSubmitting || isUploading}
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <ArrowUp className="h-5 w-5" />
+                    )}
+                  </Button>
+                </PromptInputAction>
+              </div>
             </PromptInputActions>
           </PromptInput>
 

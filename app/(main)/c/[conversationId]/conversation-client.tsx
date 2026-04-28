@@ -1075,6 +1075,7 @@ function ConversationPageContent() {
                   value={jurisdictionChoice}
                   onChange={setJurisdictionChoice}
                   disabled={isStreaming || isLoadingHistory || isSubmitting}
+                  triggerClassName="bg-background hover:bg-muted"
                 />
               </div>
               <PromptInput
