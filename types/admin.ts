@@ -778,6 +778,7 @@ export interface ViewAnalyticsParams {
 export interface ViewAnalyticsStatCards {
   total_views: AnalyticsStatCard;
   unique_visitors: AnalyticsStatCard;
+  unique_bot_crawlers: AnalyticsStatCard;
   human_views: AnalyticsStatCard;
   bot_views: AnalyticsStatCard;
   search_engine_crawls: AnalyticsStatCard;
@@ -794,6 +795,14 @@ export interface ViewsOverTimePoint {
   human_views: number;
   bot_views: number;
   total_views: number;
+}
+
+export interface BotCrawlsOverTimePoint {
+  date?: string;
+  hour?: string;
+  search_engine_crawls: number;
+  social_media_crawls: number;
+  total_crawls: number;
 }
 
 export interface ViewsByContentTypePoint {
@@ -860,6 +869,8 @@ export interface ViewAnalyticsCharts {
   browser_usage: BrowserUsagePoint[];
   human_vs_bot: HumanVsBotPoint[];
   bot_breakdown: BotBreakdownPoint[];
+  bot_crawls_over_time: BotCrawlsOverTimePoint[];
+  bot_views_by_country: ViewsByCountryPoint[];
   views_by_country: ViewsByCountryPoint[];
   views_by_continent: ViewsByContinentPoint[];
   views_by_profession: ViewsByProfessionPoint[];
@@ -873,6 +884,16 @@ export interface TopViewedContentRow {
   viewable_type: string;
   viewable_id: number;
   view_count: number;
+  title: string | null;
+  slug: string | null;
+}
+
+export interface TopCrawledContentRow {
+  viewable_type: string;
+  viewable_id: number;
+  crawl_count: number;
+  title: string | null;
+  slug: string | null;
 }
 
 export interface RecentViewRow {
@@ -880,6 +901,9 @@ export interface RecentViewRow {
   profession: string | null;
   profile_country: string | null;
   viewable_type: string;
+  viewable_id: number;
+  title: string | null;
+  slug: string | null;
   device_type: string | null;
   browser: string | null;
   ip_country: string | null;
@@ -890,9 +914,10 @@ export interface RecentViewRow {
 export interface TopViewerRow {
   uuid: string;
   name: string;
-  email: string;
+  email: string | null;
   profession: string | null;
   view_count: number;
+  is_guest: boolean;
 }
 
 export interface TopSearchQueryRow {
@@ -904,7 +929,16 @@ export interface BotActivityRow {
   bot_name: string | null;
   bot_type: string;
   viewable_type: string;
+  viewable_id: number;
+  title: string | null;
+  slug: string | null;
   viewed_at: string;
+}
+
+export interface TopBotRow {
+  bot_name: string;
+  bot_type: 'search_engine' | 'social_media' | 'other';
+  count: number;
 }
 
 export interface ViewsByCityRow {
@@ -922,8 +956,10 @@ export interface TopUniversityViewRow {
 
 export interface ViewAnalyticsTables {
   top_viewed_content: TopViewedContentRow[];
+  top_crawled_content: TopCrawledContentRow[];
   recent_views: RecentViewRow[];
   top_viewers: TopViewerRow[];
+  top_bots: TopBotRow[];
   top_search_queries: TopSearchQueryRow[];
   bot_activity: BotActivityRow[];
   views_by_city: ViewsByCityRow[];

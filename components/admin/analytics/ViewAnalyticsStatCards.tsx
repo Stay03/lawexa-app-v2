@@ -63,6 +63,7 @@ function ChangePercentBadge({ value }: { value: number | null }) {
 const cards = [
   { key: 'total_views' as const, label: 'Total Views', icon: Eye },
   { key: 'unique_visitors' as const, label: 'Unique Visitors', icon: Users },
+  { key: 'unique_bot_crawlers' as const, label: 'Unique Bot Crawlers', icon: Bot },
   { key: 'human_views' as const, label: 'Human Views', icon: UserCheck },
   { key: 'bot_views' as const, label: 'Bot Views', icon: Bot },
   { key: 'search_engine_crawls' as const, label: 'Search Engine Crawls', icon: Search },
@@ -80,14 +81,15 @@ const CARD_COLORS = [
   'var(--chart-1)',
   'var(--chart-2)',
   'var(--chart-3)',
+  'var(--chart-4)',
 ];
 
 /**
- * Default component. Renders 8 view analytics stat cards in a responsive grid.
+ * Default component. Renders 9 view analytics stat cards in a responsive 3×3 grid.
  */
 function ViewAnalyticsStatCards({ statCards }: ViewAnalyticsStatCardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {cards.map((card, index) => {
         const stat = statCards[card.key];
         const color = CARD_COLORS[index];

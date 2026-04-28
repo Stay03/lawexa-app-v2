@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardContent,
@@ -54,21 +55,30 @@ export function TopViewersTable({ data }: TopViewersTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row) => (
-              <TableRow key={row.uuid}>
+            {data.map((row, index) => (
+              <TableRow key={row.is_guest ? `guest-${index}-${row.name}` : row.uuid}>
                 <TableCell className="font-medium">
-                  <Link
-                    href={`/admin/users/${row.uuid}`}
-                    className="hover:underline text-primary"
-                  >
-                    {row.name}
-                  </Link>
+                  {row.is_guest ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="truncate">{row.name}</span>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        Guest
+                      </Badge>
+                    </span>
+                  ) : (
+                    <Link
+                      href={`/admin/users/${row.uuid}`}
+                      className="hover:underline text-primary"
+                    >
+                      {row.name}
+                    </Link>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground max-w-[180px] truncate">
-                  {row.email}
+                  {row.email || '—'}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {row.profession || 'N/A'}
+                  {row.profession || (row.is_guest ? '—' : 'N/A')}
                 </TableCell>
                 <TableCell className="text-right tabular-nums font-medium">
                   {row.view_count.toLocaleString()}

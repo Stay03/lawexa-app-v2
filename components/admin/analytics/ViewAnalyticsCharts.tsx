@@ -6,6 +6,8 @@ import { DeviceBreakdownChart } from './view-charts/DeviceBreakdownChart';
 import { BrowserUsageChart } from './view-charts/BrowserUsageChart';
 import { HumanVsBotChart } from './view-charts/HumanVsBotChart';
 import { BotBreakdownChart } from './view-charts/BotBreakdownChart';
+import { BotCrawlsOverTimeChart } from './view-charts/BotCrawlsOverTimeChart';
+import { BotViewsByCountryChart } from './view-charts/BotViewsByCountryChart';
 import { ViewsByCountryChart } from './view-charts/ViewsByCountryChart';
 import { ViewsByContinentChart } from './view-charts/ViewsByContinentChart';
 import { ViewsByProfessionChart } from './view-charts/ViewsByProfessionChart';
@@ -42,22 +44,31 @@ function ViewAnalyticsCharts({ charts, granularity }: ViewAnalyticsChartsProps) 
         <HumanVsBotChart data={charts.human_vs_bot} />
       </div>
 
-      {/* Row 4: Bot breakdown + Views by country */}
+      {/* Row 4: Views by country + Views by continent */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ViewsByCountryChart data={charts.views_by_country} />
+        <ViewsByContinentChart data={charts.views_by_continent} />
+      </div>
+
+      {/* Row 5: Views by profession + Profile vs IP country */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ViewsByProfessionChart data={charts.views_by_profession} />
+        <ProfileVsIpCountryChart data={charts.profile_country_vs_ip_country} />
+      </div>
+
+      {/* Row 6: Views by university - full width */}
+      <ViewsByUniversityChart data={charts.views_by_university} />
+
+      {/* Row 7: Bot crawls over time - full width */}
+      <BotCrawlsOverTimeChart
+        data={charts.bot_crawls_over_time}
+        granularity={granularity}
+      />
+
+      {/* Row 8: Bot breakdown + Bot crawls by country */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <BotBreakdownChart data={charts.bot_breakdown} />
-        <ViewsByCountryChart data={charts.views_by_country} />
-      </div>
-
-      {/* Row 5: Views by continent + Views by profession */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ViewsByContinentChart data={charts.views_by_continent} />
-        <ViewsByProfessionChart data={charts.views_by_profession} />
-      </div>
-
-      {/* Row 6: Profile vs IP country + Views by university */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ProfileVsIpCountryChart data={charts.profile_country_vs_ip_country} />
-        <ViewsByUniversityChart data={charts.views_by_university} />
+        <BotViewsByCountryChart data={charts.bot_views_by_country} />
       </div>
     </div>
   );

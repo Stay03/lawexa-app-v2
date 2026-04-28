@@ -8,10 +8,12 @@ import { ViewAnalyticsPeriodSelector } from '@/components/admin/analytics/ViewAn
 import { ViewAnalyticsStatCards } from '@/components/admin/analytics/ViewAnalyticsStatCards';
 import { ViewAnalyticsCharts } from '@/components/admin/analytics/ViewAnalyticsCharts';
 import { TopViewedContentTable } from '@/components/admin/analytics/view-tables/TopViewedContentTable';
+import { TopCrawledContentTable } from '@/components/admin/analytics/view-tables/TopCrawledContentTable';
 import { RecentViewsTable } from '@/components/admin/analytics/view-tables/RecentViewsTable';
 import { TopViewersTable } from '@/components/admin/analytics/view-tables/TopViewersTable';
 import { TopSearchQueriesTable } from '@/components/admin/analytics/view-tables/TopSearchQueriesTable';
 import { BotActivityTable } from '@/components/admin/analytics/view-tables/BotActivityTable';
+import { TopBotsTable } from '@/components/admin/analytics/view-tables/TopBotsTable';
 import { ViewsByCityTable } from '@/components/admin/analytics/view-tables/ViewsByCityTable';
 import { TopUniversitiesViewTable } from '@/components/admin/analytics/view-tables/TopUniversitiesViewTable';
 import type { ViewAnalyticsParams, ViewAnalyticsPeriod } from '@/types/admin';
@@ -134,8 +136,8 @@ function ViewAnalyticsContent() {
 
       {/* Stat Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(9)].map((_, i) => (
             <Skeleton key={i} className="h-[120px] rounded-2xl" />
           ))}
         </div>
@@ -189,6 +191,10 @@ function ViewAnalyticsContent() {
             <Skeleton className="h-[300px] rounded-2xl" />
             <Skeleton className="h-[300px] rounded-2xl" />
           </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Skeleton className="h-[300px] rounded-2xl" />
+            <Skeleton className="h-[300px] rounded-2xl" />
+          </div>
         </div>
       ) : data?.data?.tables ? (
         <div className="space-y-6">
@@ -206,6 +212,12 @@ function ViewAnalyticsContent() {
 
           {/* Bot activity - full width */}
           <BotActivityTable data={data.data.tables.bot_activity} />
+
+          {/* Top crawled content + Top bots - side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TopCrawledContentTable data={data.data.tables.top_crawled_content} />
+            <TopBotsTable data={data.data.tables.top_bots} />
+          </div>
 
           {/* Views by city + Top universities - side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -227,8 +239,8 @@ export default function ViewAnalyticsPage() {
             <Skeleton className="h-8 w-[200px]" />
             <Skeleton className="h-9 w-[180px]" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(9)].map((_, i) => (
               <Skeleton key={i} className="h-[120px] rounded-2xl" />
             ))}
           </div>

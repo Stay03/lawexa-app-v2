@@ -18,23 +18,23 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { viewableHref, viewableLabel } from '@/lib/utils/viewable-content';
-import type { TopViewedContentRow } from '@/types/admin';
+import type { TopCrawledContentRow } from '@/types/admin';
 
-interface TopViewedContentTableProps {
-  data: TopViewedContentRow[];
+interface TopCrawledContentTableProps {
+  data: TopCrawledContentRow[];
 }
 
 function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-export function TopViewedContentTable({ data }: TopViewedContentTableProps) {
+export function TopCrawledContentTable({ data }: TopCrawledContentTableProps) {
   if (!data.length) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Top Viewed Content</CardTitle>
-          <CardDescription>Most viewed content by human views</CardDescription>
+          <CardTitle>Top Crawled Content</CardTitle>
+          <CardDescription>Most crawled content by bots</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -46,8 +46,8 @@ export function TopViewedContentTable({ data }: TopViewedContentTableProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Top Viewed Content</CardTitle>
-        <CardDescription>Most viewed content by human views</CardDescription>
+        <CardTitle>Top Crawled Content</CardTitle>
+        <CardDescription>Most crawled content by bots</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
@@ -56,7 +56,7 @@ export function TopViewedContentTable({ data }: TopViewedContentTableProps) {
               <TableHead className="w-12">#</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Content</TableHead>
-              <TableHead className="text-right">Views</TableHead>
+              <TableHead className="text-right">Crawls</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -79,7 +79,7 @@ export function TopViewedContentTable({ data }: TopViewedContentTableProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
-                    {row.view_count.toLocaleString()}
+                    {row.crawl_count.toLocaleString()}
                   </TableCell>
                 </TableRow>
               );
