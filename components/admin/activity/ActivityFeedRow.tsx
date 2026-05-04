@@ -56,6 +56,10 @@ function propertyHint(action: string, properties: Record<string, unknown>): stri
       return typeof properties.has_attachment === 'boolean'
         ? `attachment: ${properties.has_attachment ? 'yes' : 'no'}`
         : null;
+    case 'ai_message_blocked':
+      return typeof properties.reason === 'string'
+        ? `reason: ${properties.reason.replace(/_/g, ' ')}`
+        : null;
     case 'note_created':
       return typeof properties.status === 'string' ? properties.status : null;
     case 'note_exported':

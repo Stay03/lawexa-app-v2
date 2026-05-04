@@ -67,6 +67,7 @@ const META: Record<string, ActionMeta> = {
   conversation_published: { label: 'Conversation published', icon: MessageSquare, category: 'ai', tone: 'success' },
   conversation_deleted: { label: 'Conversation deleted', icon: MessageSquareOff, category: 'ai', tone: 'danger' },
   ai_message_sent: { label: 'AI message sent', icon: Send, category: 'ai', tone: 'info' },
+  ai_message_blocked: { label: 'AI message blocked', icon: Ban, category: 'ai', tone: 'danger' },
 
   case_viewed: { label: 'Viewed case', icon: FileSearch, category: 'content_view', tone: 'muted' },
   statute_viewed: { label: 'Viewed statute', icon: Scroll, category: 'content_view', tone: 'muted' },
@@ -148,6 +149,7 @@ export const ACTION_GROUPS: { label: string; actions: string[] }[] = [
       'conversation_published',
       'conversation_deleted',
       'ai_message_sent',
+      'ai_message_blocked',
     ],
   },
   {
