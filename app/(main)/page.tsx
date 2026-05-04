@@ -17,7 +17,7 @@ import {
   FileUploadTrigger,
   FileUploadContent,
 } from '@/components/ui/file-upload';
-import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle, FileUp, Scale, NotebookPen, Info } from 'lucide-react';
+import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle, FileUp, Scale, NotebookPen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { PulsingHeart } from '@/components/ui/pulsing-heart';
@@ -28,11 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -51,23 +46,6 @@ import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
-
-// Curated workflow options shown to regular users (non-admin/researcher).
-// Hardcoded to avoid hitting the admin-only /ai-workflows endpoint.
-const REGULAR_USER_WORKFLOWS = [
-  {
-    id: 5,
-    name: 'Lawexa Lite',
-    description:
-      'Lawexa Lite is a single agent: fast and lightweight, best for quick questions and short follow-ups.',
-  },
-  {
-    id: 12,
-    name: 'Lawexa Expert',
-    description:
-      'Lawexa Expert orchestrates multiple Lawexa agents to research, cross-check, and ground answers — slower but deeper and more thorough.',
-  },
-] as const;
 
 export default function HomePage() {
   const [input, setInput] = useState(() => {
@@ -125,10 +103,9 @@ export default function HomePage() {
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
 
-  // Workflow selector - admin/researcher get the full list from the API;
-  // everyone else (including guests) gets the curated Lite/Expert pair.
+  // Workflow selector — only admin/researcher can pick. Regular users and
+  // guests don't send a workflow_id so the backend uses its own default.
   const canSelectWorkflow = !!user?.role && ['superadmin', 'admin', 'researcher'].includes(user.role);
-  const showRegularUserWorkflows = !canSelectWorkflow;
   const workflowParams = { active_only: true, per_page: 50 };
   const { data: workflowsData } = useQuery({
     queryKey: adminAiKeys.workflowsList(workflowParams),
@@ -138,19 +115,15 @@ export default function HomePage() {
   });
   const workflows = workflowsData?.data ?? [];
 
-  // Pre-select the default workflow when data loads
+  // Pre-select the default workflow for admin/researcher when data loads.
   useEffect(() => {
     if (selectedWorkflowId) return;
-    if (showRegularUserWorkflows) {
-      // Default to Lawexa Lite for regular users / guests
-      setSelectedWorkflowId(String(REGULAR_USER_WORKFLOWS[0].id));
-      return;
-    }
+    if (!canSelectWorkflow) return;
     if (workflows.length > 0) {
       const defaultWorkflow = workflows.find((w) => w.is_default);
       setSelectedWorkflowId(String((defaultWorkflow ?? workflows[0]).id));
     }
-  }, [workflows, selectedWorkflowId, showRegularUserWorkflows]);
+  }, [workflows, selectedWorkflowId, canSelectWorkflow]);
 
   useEffect(() => {
     // Slide in after a short delay
@@ -522,7 +495,7 @@ export default function HomePage() {
                   </PromptInputAction>
                 )}
 
-                {/* Workflow selector - admin/researcher get the full list from the API */}
+                {/* Workflow selector - admin/researcher only */}
                 {canSelectWorkflow && workflows.length > 0 && (
                   <Select
                     value={selectedWorkflowId}
@@ -540,46 +513,6 @@ export default function HomePage() {
                     </SelectContent>
                   </Select>
                 )}
-
-                {/* Curated Lite/Expert selector - everyone else (incl. guests) */}
-                {showRegularUserWorkflows && (() => {
-                  const activeWorkflow =
-                    REGULAR_USER_WORKFLOWS.find((wf) => String(wf.id) === selectedWorkflowId) ??
-                    REGULAR_USER_WORKFLOWS[0];
-                  return (
-                    <div className="flex items-center gap-0.5">
-                      <Select
-                        value={selectedWorkflowId}
-                        onValueChange={setSelectedWorkflowId}
-                      >
-                        <SelectTrigger size="sm" className="h-7 text-xs border-none bg-transparent hover:bg-secondary-foreground/10 px-2 gap-1 min-w-0 max-w-[140px] sm:max-w-none [&>span]:truncate">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {REGULAR_USER_WORKFLOWS.map((wf) => (
-                            <SelectItem key={wf.id} value={String(wf.id)}>
-                              {wf.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label={`About ${activeWorkflow.name}`}
-                            className="text-muted-foreground hover:text-foreground rounded-full p-1"
-                          >
-                            <Info className="h-3.5 w-3.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          {activeWorkflow.description}
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  );
-                })()}
               </div>
 
               {/* Right group: Jurisdiction badge (desktop only) + Send button */}
