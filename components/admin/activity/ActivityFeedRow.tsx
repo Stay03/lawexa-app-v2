@@ -24,6 +24,21 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+function formatFutureTime(iso: string): string {
+  const target = new Date(iso).getTime();
+  const diff = target - Date.now();
+  if (diff <= 0) return 'now';
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `in ${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `in ${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `in ${hr}h`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `in ${day}d`;
+  return new Date(iso).toLocaleDateString();
+}
+
 function subjectType(raw: string): string {
   const tail = raw.split('\\').pop() ?? raw;
   return tail.toLowerCase();
@@ -56,10 +71,22 @@ function propertyHint(action: string, properties: Record<string, unknown>): stri
       return typeof properties.has_attachment === 'boolean'
         ? `attachment: ${properties.has_attachment ? 'yes' : 'no'}`
         : null;
-    case 'ai_message_blocked':
-      return typeof properties.reason === 'string'
-        ? `reason: ${properties.reason.replace(/_/g, ' ')}`
-        : null;
+    case 'ai_message_blocked': {
+      const parts: string[] = [];
+      if (typeof properties.reason === 'string') {
+        parts.push(`reason: ${properties.reason.replace(/_/g, ' ')}`);
+      }
+      if (typeof properties.plan_remaining === 'number') {
+        parts.push(`plan ${properties.plan_remaining}`);
+      }
+      if (typeof properties.payg_remaining === 'number') {
+        parts.push(`payg ${properties.payg_remaining}`);
+      }
+      if (typeof properties.resets_at === 'string') {
+        parts.push(`resets ${formatFutureTime(properties.resets_at)}`);
+      }
+      return parts.length > 0 ? parts.join(' • ') : null;
+    }
     case 'note_created':
       return typeof properties.status === 'string' ? properties.status : null;
     case 'note_exported':
