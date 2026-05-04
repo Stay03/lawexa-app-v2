@@ -101,6 +101,11 @@ export interface AdminAiModelProvider {
   updated_at: string;
 }
 
+export interface AdminAiProviderRouting {
+  order?: string[];
+  allow_fallbacks?: boolean;
+}
+
 export interface AdminAiModel {
   id: number;
   provider_id: number;
@@ -111,6 +116,7 @@ export interface AdminAiModel {
   max_context_tokens: number;
   supports_vision: boolean;
   supports_streaming: boolean;
+  provider_routing?: AdminAiProviderRouting | null;
   provider?: AdminAiModelProvider;
   created_at: string;
   updated_at: string;
@@ -135,6 +141,7 @@ export interface AdminAiCreateModelData {
   max_context_tokens?: number;
   supports_vision?: boolean;
   supports_streaming?: boolean;
+  provider_routing?: AdminAiProviderRouting | null;
 }
 
 export interface AdminAiUpdateModelData {
@@ -146,6 +153,7 @@ export interface AdminAiUpdateModelData {
   max_context_tokens?: number;
   supports_vision?: boolean;
   supports_streaming?: boolean;
+  provider_routing?: AdminAiProviderRouting | null;
 }
 
 export interface AdminAiModelsListResponse {

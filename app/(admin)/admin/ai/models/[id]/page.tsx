@@ -273,6 +273,69 @@ export default function AiModelDetailPage({
         </Card>
       )}
 
+      {/* Provider Routing Card (OpenRouter only) */}
+      {(() => {
+        const routing = model.provider_routing;
+        if (!routing) return null;
+        const hasOrder = Array.isArray(routing.order) && routing.order.length > 0;
+        const hasAllowFallbacks =
+          routing.allow_fallbacks !== undefined && routing.allow_fallbacks !== null;
+        if (!hasOrder && !hasAllowFallbacks) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Provider Routing</CardTitle>
+              <CardDescription className="text-xs">
+                Maps to OpenRouter&apos;s{' '}
+                <code className="font-mono">provider</code> parameter.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div>
+                <p className="text-muted-foreground mb-2">Preferred order</p>
+                {hasOrder ? (
+                  <ol className="space-y-1.5">
+                    {routing.order!.map((slug, index) => (
+                      <li
+                        key={`${slug}-${index}`}
+                        className="flex items-center gap-2"
+                      >
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs tabular-nums text-muted-foreground">
+                          {index + 1}
+                        </span>
+                        <span className="font-mono">{slug}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-muted-foreground">—</p>
+                )}
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">Allow fallbacks</p>
+                {hasAllowFallbacks ? (
+                  <div className="flex items-center gap-1.5">
+                    {routing.allow_fallbacks ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span>Yes</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">No</span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">—</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Dialogs */}
       <AiModelFormSheet
         open={formOpen}

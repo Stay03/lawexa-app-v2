@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
@@ -34,6 +34,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { ProviderRoutingSection } from '@/components/admin/ai/ProviderRoutingSection';
 
 import {
   useAdminAiProviders,
@@ -41,13 +42,28 @@ import {
   useUpdateAiModel,
 } from '@/lib/hooks/useAdminAi';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { AdminAiModel, AdminAiUpdateModelData } from '@/types/admin-ai';
+import type {
+  AdminAiCreateModelData,
+  AdminAiModel,
+  AdminAiProviderRouting,
+  AdminAiUpdateModelData,
+} from '@/types/admin-ai';
 
 interface AiModelFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   model?: AdminAiModel | null;
 }
+
+const providerRoutingSchema = z
+  .object({
+    order: z
+      .array(z.string().trim().min(1).max(50, 'Provider slug must be ≤ 50 characters'))
+      .optional(),
+    allow_fallbacks: z.boolean().optional(),
+  })
+  .nullable()
+  .optional();
 
 const createSchema = z.object({
   provider_id: z.number({ message: 'Provider is required' }).int().positive('Provider is required'),
@@ -58,6 +74,8 @@ const createSchema = z.object({
   max_context_tokens: z.number().int().min(1000, 'Minimum context is 1000 tokens').optional(),
   supports_vision: z.boolean().optional(),
   supports_streaming: z.boolean().optional(),
+  provider_routing: providerRoutingSchema,
+  _allowFallbacksTouched: z.boolean().optional(),
 });
 
 type ModelFormData = z.infer<typeof createSchema>;
@@ -87,13 +105,22 @@ export function AiModelFormSheet({
       max_context_tokens: undefined,
       supports_vision: false,
       supports_streaming: false,
+      provider_routing: null,
+      _allowFallbacksTouched: false,
     },
   });
+
+  const watchedProviderId = form.watch('provider_id');
+  const selectedProvider = activeProviders.find(
+    (p) => p.id === watchedProviderId
+  );
+  const isOpenRouter = selectedProvider?.slug === 'openrouter';
 
   // Reset form when sheet opens/closes or model changes
   useEffect(() => {
     if (open) {
       if (model) {
+        const routing = model.provider_routing ?? null;
         form.reset({
           provider_id: model.provider_id,
           name: model.name,
@@ -103,6 +130,14 @@ export function AiModelFormSheet({
           max_context_tokens: model.max_context_tokens || undefined,
           supports_vision: model.supports_vision,
           supports_streaming: model.supports_streaming,
+          provider_routing: routing
+            ? {
+                order: routing.order ?? undefined,
+                allow_fallbacks: routing.allow_fallbacks ?? undefined,
+              }
+            : null,
+          _allowFallbacksTouched:
+            routing?.allow_fallbacks !== undefined && routing?.allow_fallbacks !== null,
         });
       } else {
         form.reset({
@@ -114,12 +149,54 @@ export function AiModelFormSheet({
           max_context_tokens: undefined,
           supports_vision: false,
           supports_streaming: false,
+          provider_routing: null,
+          _allowFallbacksTouched: false,
         });
       }
     }
   }, [open, model, form]);
 
+  // Clear provider_routing when switching away from OpenRouter
+  useEffect(() => {
+    if (watchedProviderId && !isOpenRouter) {
+      const current = form.getValues('provider_routing');
+      const touched = form.getValues('_allowFallbacksTouched');
+      if (current || touched) {
+        form.setValue('provider_routing', null, { shouldDirty: true });
+        form.setValue('_allowFallbacksTouched', false, { shouldDirty: true });
+      }
+    }
+  }, [watchedProviderId, isOpenRouter, form]);
+
   const onSubmit = (data: ModelFormData) => {
+    const {
+      _allowFallbacksTouched,
+      provider_routing: pr,
+      ...rest
+    } = data;
+
+    let routing: AdminAiProviderRouting | null | undefined;
+    if (isOpenRouter) {
+      const order = pr?.order && pr.order.length > 0 ? pr.order : undefined;
+      const allow_fallbacks = _allowFallbacksTouched
+        ? pr?.allow_fallbacks ?? false
+        : undefined;
+      if (order !== undefined || allow_fallbacks !== undefined) {
+        routing = {
+          ...(order !== undefined && { order }),
+          ...(allow_fallbacks !== undefined && { allow_fallbacks }),
+        };
+      } else {
+        routing = null;
+      }
+    }
+    // For non-OpenRouter providers, omit the field entirely (routing stays undefined).
+
+    const payload = {
+      ...rest,
+      ...(routing !== undefined && { provider_routing: routing }),
+    };
+
     const onSuccess = (response: { message: string }) => {
       toast.success(response.message);
       onOpenChange(false);
@@ -129,7 +206,7 @@ export function AiModelFormSheet({
       const apiError = extractApiError(error);
       if (apiError.errors) {
         Object.entries(apiError.errors).forEach(([field, messages]) => {
-          form.setError(field as keyof ModelFormData, {
+          form.setError(field as Path<ModelFormData>, {
             message: messages[0],
           });
         });
@@ -140,11 +217,14 @@ export function AiModelFormSheet({
 
     if (isEditMode && model) {
       updateMutation.mutate(
-        { id: model.id, data: data as AdminAiUpdateModelData },
+        { id: model.id, data: payload as AdminAiUpdateModelData },
         { onSuccess, onError }
       );
     } else {
-      createMutation.mutate(data, { onSuccess, onError });
+      createMutation.mutate(payload as AdminAiCreateModelData, {
+        onSuccess,
+        onError,
+      });
     }
   };
 
@@ -358,6 +438,8 @@ export function AiModelFormSheet({
                   )}
                 />
               </div>
+
+              <ProviderRoutingSection visible={isOpenRouter} />
             </div>
 
             <SheetFooter className="flex-row justify-end gap-2 border-t">
