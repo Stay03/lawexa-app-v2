@@ -168,12 +168,13 @@ function BlockedBanner({
   planIsFree: boolean;
 }) {
   const cta = blockedCta(blocked.reason, planIsFree);
+  const heading = blockedHeading(blocked.reason);
   return (
-    <div className="mb-6 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mb-6 flex flex-col gap-3 rounded-lg border border-amber-300/50 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
-        <ShieldAlert className="size-5 shrink-0 text-destructive" />
+        <ShieldAlert className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
         <div>
-          <p className="text-sm font-medium">You&rsquo;re currently blocked from sending</p>
+          <p className="text-sm font-medium">{heading}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">{blocked.message}</p>
         </div>
       </div>
@@ -184,6 +185,21 @@ function BlockedBanner({
       )}
     </div>
   );
+}
+
+function blockedHeading(reason: IBlockedReason['reason']): string {
+  switch (reason) {
+    case 'account_flagged':
+      return 'Your account needs attention';
+    case 'hard_limit':
+      return 'You’ve hit your usage limit';
+    case 'cancelled_grace_exhausted':
+      return 'Your plan access has ended';
+    case 'free_no_subscription':
+    case 'plan_exhausted':
+    default:
+      return 'You’ve used your messages for now';
+  }
 }
 
 function blockedCta(
@@ -378,10 +394,12 @@ function ProgressBar({ percent }: { percent: number }) {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
+  return new Date(iso).toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   });
 }
 
