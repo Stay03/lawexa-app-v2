@@ -104,18 +104,18 @@ function blockedHeading(reason: TBlockedReasonCode): string {
 const BUY_PACK_CTA: BlockedCta = {
   label: 'Buy message pack',
   href: '/settings/message-packs',
+  variant: 'outline',
 };
 const UPGRADE_CTA: BlockedCta = {
   label: 'Upgrade plan',
   href: '/pricing',
-  variant: 'outline',
 };
 
 function blockedCtas(reason: TBlockedReasonCode): BlockedCta[] {
   switch (reason) {
     case 'free_no_subscription':
     case 'plan_exhausted':
-      return [BUY_PACK_CTA, UPGRADE_CTA];
+      return [UPGRADE_CTA, BUY_PACK_CTA];
     case 'cancelled_grace_exhausted':
       return [
         { label: 'Reactivate plan', href: '/pricing' },
