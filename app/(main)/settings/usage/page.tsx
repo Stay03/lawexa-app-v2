@@ -9,7 +9,6 @@ import {
   MessageSquare,
   NotebookPen,
   Plus,
-  ShieldAlert,
   Sparkles,
 } from 'lucide-react';
 
@@ -18,11 +17,11 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/common/ErrorState';
 import PurchaseDialog from '@/components/payg/PurchaseDialog';
+import { MessageBlockBanner } from '@/components/chat/message-block-banner';
 import { useUserLimits } from '@/lib/hooks/useUserLimits';
 import { cn } from '@/lib/utils';
 import type {
   IAiMessagesLimit,
-  IBlockedReason,
   IGenericLimit,
   IUserLimits,
   IUserLimitsPlan,
@@ -51,7 +50,14 @@ export default function UsagePage() {
 
   return (
     <div>
-      {blocked && <BlockedBanner blocked={blocked} planIsFree={data.plan.is_free} />}
+      {blocked && (
+        <MessageBlockBanner
+          message={blocked.message}
+          reason={blocked.reason}
+          planIsFree={data.plan.is_free}
+          className="mb-6"
+        />
+      )}
 
       <PlanHeader plan={data.plan} />
 
@@ -146,7 +152,7 @@ function PlanHeader({ plan }: { plan: IUserLimitsPlan }) {
       </div>
       {plan.is_free && (
         <Button asChild>
-          <Link href="/upgrade">
+          <Link href="/pricing">
             Upgrade
             <ArrowRight className="size-4" />
           </Link>
@@ -154,74 +160,6 @@ function PlanHeader({ plan }: { plan: IUserLimitsPlan }) {
       )}
     </div>
   );
-}
-
-/******************************************************************************
-                               Blocked banner
-******************************************************************************/
-
-function BlockedBanner({
-  blocked,
-  planIsFree,
-}: {
-  blocked: IBlockedReason;
-  planIsFree: boolean;
-}) {
-  const cta = blockedCta(blocked.reason, planIsFree);
-  const heading = blockedHeading(blocked.reason);
-  return (
-    <div className="mb-6 flex flex-col gap-3 rounded-lg border border-amber-300/50 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-3">
-        <ShieldAlert className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
-        <div>
-          <p className="text-sm font-medium">{heading}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">{blocked.message}</p>
-        </div>
-      </div>
-      {cta && (
-        <Button asChild variant={cta.variant ?? 'default'} size="sm">
-          <Link href={cta.href}>{cta.label}</Link>
-        </Button>
-      )}
-    </div>
-  );
-}
-
-function blockedHeading(reason: IBlockedReason['reason']): string {
-  switch (reason) {
-    case 'account_flagged':
-      return 'Your account needs attention';
-    case 'hard_limit':
-      return 'You’ve hit your usage limit';
-    case 'cancelled_grace_exhausted':
-      return 'Your plan access has ended';
-    case 'free_no_subscription':
-    case 'plan_exhausted':
-    default:
-      return 'You’ve used your messages for now';
-  }
-}
-
-function blockedCta(
-  reason: IBlockedReason['reason'],
-  planIsFree: boolean
-): { label: string; href: string; variant?: 'default' | 'outline' } | null {
-  switch (reason) {
-    case 'free_no_subscription':
-      return { label: 'Upgrade', href: '/upgrade' };
-    case 'plan_exhausted':
-      return planIsFree
-        ? { label: 'Upgrade', href: '/upgrade' }
-        : { label: 'Buy message pack', href: '/settings/message-packs' };
-    case 'cancelled_grace_exhausted':
-      return { label: 'Reactivate plan', href: '/upgrade' };
-    case 'hard_limit':
-      return null;
-    case 'account_flagged':
-      return { label: 'Contact support', href: 'mailto:support@lawexa.com', variant: 'outline' };
-    default:
-      return null;
-  }
 }
 
 /******************************************************************************

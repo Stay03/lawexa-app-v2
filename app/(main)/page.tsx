@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { PastedContentCard } from '@/components/chat/pasted-content-card';
-import Link from 'next/link';
 import { useGreetingParts } from '@/lib/hooks/useGreeting';
 import {
   PromptInput,
@@ -34,7 +33,9 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { useQuery } from '@tanstack/react-query';
 import { adminAiApi } from '@/lib/api/admin-ai';
 import { adminAiKeys } from '@/lib/hooks/useAdminAi';
-import { extractApiError } from '@/lib/utils/api-error';
+import { extractApiError, extractBlockedReason } from '@/lib/utils/api-error';
+import { MessageBlockBanner } from '@/components/chat/message-block-banner';
+import type { IBlockedReason } from '@/types/message-pack';
 import { formatFileSize } from '@/lib/validations/admin-cases';
 import { useUserLimits } from '@/lib/hooks/useUserLimits';
 import { NoFreeMessagesBanner } from '@/components/chat/no-free-messages-banner';
@@ -63,6 +64,7 @@ export default function HomePage() {
   const [studyMode, setStudyMode] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
   const [error, setError] = useState<{ message: string; status: number } | null>(null);
+  const [blockedReason, setBlockedReason] = useState<IBlockedReason | null>(null);
   const { greeting, name, isSpecial } = useGreetingParts();
   const router = useRouter();
   const [showLinks, setShowLinks] = useState(false);
@@ -219,8 +221,14 @@ export default function HomePage() {
         }
       }
 
-      const apiError = extractApiError(err);
-      setError({ message: apiError.message, status: apiError.status });
+      const blocked = extractBlockedReason(err);
+      if (blocked) {
+        setBlockedReason(blocked);
+        setError(null);
+      } else {
+        const apiError = extractApiError(err);
+        setError({ message: apiError.message, status: apiError.status });
+      }
       setIsSubmitting(false);
     }
   };
@@ -352,24 +360,20 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Error display */}
-        {error && (
+        {/* Block banner — soft amber, server-provided message + reason-aware CTA */}
+        {blockedReason && (
+          <MessageBlockBanner
+            message={blockedReason.message}
+            reason={blockedReason.reason}
+            planIsFree={limitsData?.data?.plan?.is_free ?? false}
+            className="mb-4 w-full"
+          />
+        )}
+
+        {/* Generic error display (network, validation, etc.) */}
+        {!blockedReason && error && (
           <div className="mb-4 w-full rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
-            {error.status === 403 && error.message.toLowerCase().includes('messages remaining') ? (
-              <>
-                You&apos;ve reached your AI message limit for this plan.{' '}
-                <Link href="/pricing" className="font-semibold underline hover:text-destructive/80">
-                  Upgrade to Pro
-                </Link>{' '}
-                for a higher monthly limit, or{' '}
-                <Link href="/pricing?tab=payg" className="font-semibold underline hover:text-destructive/80">
-                  Buy more messages
-                </Link>{' '}
-                to keep the conversation going right now.
-              </>
-            ) : (
-              error.message
-            )}
+            {error.message}
           </div>
         )}
 
@@ -437,6 +441,7 @@ export default function HomePage() {
             onValueChange={(value) => {
               setInput(value);
               if (error) setError(null);
+              if (blockedReason) setBlockedReason(null);
             }}
             onSubmit={handleSubmit}
             disabled={isSubmitting || hasNoFreeMessages}

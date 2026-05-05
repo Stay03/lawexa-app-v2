@@ -2,7 +2,6 @@
 
 import { Fragment, Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { useChatStream } from '@/lib/hooks/useChatStream';
 import { useCaseMentionTooltips } from '@/lib/hooks/useCaseMentionTooltips';
 import {
@@ -55,6 +54,7 @@ import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useNarrationPrefsStore } from '@/lib/stores/narrationPrefsStore';
 import { extractApiError } from '@/lib/utils/api-error';
+import { MessageBlockBanner } from '@/components/chat/message-block-banner';
 import { useRotatingText } from '@/lib/hooks/useRotatingText';
 import { THINKING_PHRASES } from '@/lib/constants/thinking-phrases';
 import { ChatProvider } from '@/lib/contexts/chat-context';
@@ -703,34 +703,30 @@ function ConversationPageContent() {
     if (isErrorMessage(message)) {
       const errorMsg = message as ErrorMessage;
       const isExhausted = errorMsg.errorCode === 'MESSAGES_EXHAUSTED';
+      if (isExhausted) {
+        return (
+          <div key={errorMsg.id} className="flex justify-start px-4">
+            <div className="mx-auto max-w-2xl w-full">
+              <MessageBlockBanner
+                message={errorMsg.content}
+                planIsFree={limitsData?.data?.plan?.is_free ?? false}
+              />
+            </div>
+          </div>
+        );
+      }
       return (
         <div key={errorMsg.id} className="flex justify-start px-4">
           <div className="mx-auto max-w-2xl w-full">
             <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
               <div className="flex-1">
-                {isExhausted ? (
-                  <p className="text-destructive font-medium">
-                    You&apos;ve reached your AI message limit for this plan.{' '}
-                    <Link href="/pricing" className="underline hover:text-destructive/80">
-                      Upgrade to Pro
-                    </Link>{' '}
-                    for a higher monthly limit, or{' '}
-                    <Link href="/pricing?tab=payg" className="underline hover:text-destructive/80">
-                      Buy more messages
-                    </Link>{' '}
-                    to keep the conversation going right now.
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-destructive font-medium">{errorMsg.content}</p>
-                    {errorMsg.retryable && (
-                      <p className="text-muted-foreground text-xs mt-0.5">You can try sending your message again.</p>
-                    )}
-                  </>
+                <p className="text-destructive font-medium">{errorMsg.content}</p>
+                {errorMsg.retryable && (
+                  <p className="text-muted-foreground text-xs mt-0.5">You can try sending your message again.</p>
                 )}
               </div>
-              {!isExhausted && errorMsg.retryable && (
+              {errorMsg.retryable && (
                 <Button
                   variant="ghost"
                   size="sm"

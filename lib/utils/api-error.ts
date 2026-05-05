@@ -1,6 +1,7 @@
 import { AxiosError } from 'axios';
 import type { ApiResponse } from '@/types/api';
 import type { CaseViewLimitError } from '@/types/case';
+import type { IBlockedReason } from '@/types/message-pack';
 
 export interface ApiError {
   message: string;
@@ -45,6 +46,24 @@ export function extractViewLimitError(error: unknown): CaseViewLimitError | null
     }
   }
   return null;
+}
+
+/**
+ * Extract a structured AI-message block reason from an error response.
+ *
+ * The chat-send endpoint returns the same blocked_reason shape that lives
+ * inside `/users/limits` (code, reason, message, plan_remaining, …) under
+ * the response's `errors` field when the user is gated server-side.
+ */
+export function extractBlockedReason(error: unknown): IBlockedReason | null {
+  if (!(error instanceof AxiosError) || !error.response?.data) return null;
+  const errors = (error.response.data as { errors?: unknown }).errors;
+  if (!errors || typeof errors !== 'object' || Array.isArray(errors)) return null;
+  const candidate = errors as Partial<IBlockedReason>;
+  if (typeof candidate.reason !== 'string' || typeof candidate.message !== 'string') {
+    return null;
+  }
+  return candidate as IBlockedReason;
 }
 
 /**
