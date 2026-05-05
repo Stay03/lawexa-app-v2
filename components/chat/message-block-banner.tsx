@@ -12,11 +12,17 @@ interface MessageBlockBannerProps {
   message: string;
   /** Why the user is blocked. Defaults to plan_exhausted when unknown (e.g. in-stream errors that only carry an error code). */
   reason?: TBlockedReasonCode;
-  /** Whether the user is on the free plan — switches the plan_exhausted CTA between Upgrade and Buy pack. */
+  /** Whether the user is on the free plan — currently unused but kept so callers can tag the user state for future per-plan CTA tweaks. */
   planIsFree?: boolean;
   /** ISO timestamp of when the limit resets — rendered as a precise date+time line under the message when present. The server's humanised message only carries the date. */
   resetsAt?: string | null;
   className?: string;
+}
+
+interface BlockedCta {
+  label: string;
+  href: string;
+  variant?: 'default' | 'outline';
 }
 
 /**
@@ -26,18 +32,17 @@ interface MessageBlockBannerProps {
 export function MessageBlockBanner({
   message,
   reason = 'plan_exhausted',
-  planIsFree = false,
   resetsAt,
   className,
 }: MessageBlockBannerProps) {
   const heading = blockedHeading(reason);
-  const cta = blockedCta(reason, planIsFree);
+  const ctas = blockedCtas(reason);
   const resetTimestamp = resetsAt ? formatResetTimestamp(resetsAt) : null;
 
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 rounded-lg border border-amber-300/50 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between',
+        'flex flex-col gap-3 rounded-lg border border-amber-300/50 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30 sm:flex-row sm:items-start sm:justify-between',
         className,
       )}
     >
@@ -53,10 +58,19 @@ export function MessageBlockBanner({
           )}
         </div>
       </div>
-      {cta && (
-        <Button asChild variant={cta.variant ?? 'default'} size="sm">
-          <Link href={cta.href}>{cta.label}</Link>
-        </Button>
+      {ctas.length > 0 && (
+        <div className="flex flex-wrap gap-2 sm:shrink-0">
+          {ctas.map((cta) => (
+            <Button
+              key={cta.href + cta.label}
+              asChild
+              variant={cta.variant ?? 'default'}
+              size="sm"
+            >
+              <Link href={cta.href}>{cta.label}</Link>
+            </Button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -87,28 +101,37 @@ function blockedHeading(reason: TBlockedReasonCode): string {
   }
 }
 
-function blockedCta(
-  reason: TBlockedReasonCode,
-  planIsFree: boolean,
-): { label: string; href: string; variant?: 'default' | 'outline' } | null {
+const BUY_PACK_CTA: BlockedCta = {
+  label: 'Buy message pack',
+  href: '/settings/message-packs',
+};
+const UPGRADE_CTA: BlockedCta = {
+  label: 'Upgrade plan',
+  href: '/pricing',
+  variant: 'outline',
+};
+
+function blockedCtas(reason: TBlockedReasonCode): BlockedCta[] {
   switch (reason) {
     case 'free_no_subscription':
-      return { label: 'Upgrade', href: '/pricing' };
     case 'plan_exhausted':
-      return planIsFree
-        ? { label: 'Upgrade', href: '/pricing' }
-        : { label: 'Buy message pack', href: '/settings/message-packs' };
+      return [BUY_PACK_CTA, UPGRADE_CTA];
     case 'cancelled_grace_exhausted':
-      return { label: 'Reactivate plan', href: '/pricing' };
+      return [
+        { label: 'Reactivate plan', href: '/pricing' },
+        BUY_PACK_CTA,
+      ];
     case 'hard_limit':
-      return null;
+      return [];
     case 'account_flagged':
-      return {
-        label: 'Contact support',
-        href: 'mailto:support@lawexa.com',
-        variant: 'outline',
-      };
+      return [
+        {
+          label: 'Contact support',
+          href: 'mailto:support@lawexa.com',
+          variant: 'outline',
+        },
+      ];
     default:
-      return null;
+      return [];
   }
 }
