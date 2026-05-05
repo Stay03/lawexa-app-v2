@@ -14,6 +14,8 @@ interface MessageBlockBannerProps {
   reason?: TBlockedReasonCode;
   /** Whether the user is on the free plan — switches the plan_exhausted CTA between Upgrade and Buy pack. */
   planIsFree?: boolean;
+  /** ISO timestamp of when the limit resets — rendered as a precise date+time line under the message when present. The server's humanised message only carries the date. */
+  resetsAt?: string | null;
   className?: string;
 }
 
@@ -25,10 +27,12 @@ export function MessageBlockBanner({
   message,
   reason = 'plan_exhausted',
   planIsFree = false,
+  resetsAt,
   className,
 }: MessageBlockBannerProps) {
   const heading = blockedHeading(reason);
   const cta = blockedCta(reason, planIsFree);
+  const resetTimestamp = resetsAt ? formatResetTimestamp(resetsAt) : null;
 
   return (
     <div
@@ -42,6 +46,11 @@ export function MessageBlockBanner({
         <div>
           <p className="text-sm font-medium">{heading}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">{message}</p>
+          {resetTimestamp && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Resets {resetTimestamp}
+            </p>
+          )}
         </div>
       </div>
       {cta && (
@@ -51,6 +60,16 @@ export function MessageBlockBanner({
       )}
     </div>
   );
+}
+
+function formatResetTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 function blockedHeading(reason: TBlockedReasonCode): string {

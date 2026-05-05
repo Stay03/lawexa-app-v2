@@ -366,6 +366,7 @@ export default function HomePage() {
             message={blockedReason.message}
             reason={blockedReason.reason}
             planIsFree={limitsData?.data?.plan?.is_free ?? false}
+            resetsAt={blockedReason.resets_at}
             className="mb-4 w-full"
           />
         )}

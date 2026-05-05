@@ -55,6 +55,7 @@ export default function UsagePage() {
           message={blocked.message}
           reason={blocked.reason}
           planIsFree={data.plan.is_free}
+          resetsAt={blocked.resets_at}
           className="mb-6"
         />
       )}

@@ -710,6 +710,7 @@ function ConversationPageContent() {
               <MessageBlockBanner
                 message={errorMsg.content}
                 planIsFree={limitsData?.data?.plan?.is_free ?? false}
+                resetsAt={limitsData?.data?.ai_messages?.resets_at ?? null}
               />
             </div>
           </div>
