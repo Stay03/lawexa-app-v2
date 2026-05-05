@@ -29,6 +29,7 @@ import {
 import { chatApi } from '@/lib/api/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
+import { extractBlockedReason } from '@/lib/utils/api-error';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -1454,6 +1455,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         return;
       }
 
+      // ── Server-side block (no messages remaining, account flagged, etc.) ──
+      // Surface as an in-stream ErrorMessage so the conversation page renders
+      // the soft block banner instead of the generic destructive error box.
+      const blocked = extractBlockedReason(err);
+      if (blocked) {
+        removeMessage(optimisticMsg.id);
+        addErrorMessage(blocked.message, 'MESSAGES_EXHAUSTED', false, null);
+        return;
+      }
+
       // ── Generic error ──
       removeMessage(optimisticMsg.id);
       const errorMsg = err instanceof AxiosError
@@ -1465,7 +1476,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         error: errorMsg,
       }));
     }
-  }, [addUserMessage, removeMessage, connectToStream, pollForCompletion]);
+  }, [addUserMessage, addErrorMessage, removeMessage, connectToStream, pollForCompletion]);
 
   // ─── Retry (fetch-before-retry with status check) ─────────
 
@@ -1546,13 +1557,20 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         }
       }
 
+      // Server-side block — surface as in-stream error so the soft banner renders.
+      const blocked = extractBlockedReason(err);
+      if (blocked) {
+        addErrorMessage(blocked.message, 'MESSAGES_EXHAUSTED', false, null);
+        return;
+      }
+
       setState((prev) => ({
         ...prev,
         error: 'Failed to retry. Please try again.',
         isStreaming: false, isCancelling: false,
       }));
     }
-  }, [state.messages, state.conversationId, state.isStreaming, connectToStream, mergeMissedMessages, pollForCompletion]);
+  }, [state.messages, state.conversationId, state.isStreaming, addErrorMessage, connectToStream, mergeMissedMessages, pollForCompletion]);
 
   // ─── Recovery (for page reload / direct navigation) ────────
 

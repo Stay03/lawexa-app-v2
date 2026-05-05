@@ -702,7 +702,8 @@ function ConversationPageContent() {
     // Error messages from backend (e.g. AUTH_ERROR, RATE_LIMITED)
     if (isErrorMessage(message)) {
       const errorMsg = message as ErrorMessage;
-      const isExhausted = errorMsg.errorCode === 'MESSAGES_EXHAUSTED';
+      const exhaustedCodes = new Set(['MESSAGES_EXHAUSTED', 'AI_MESSAGES_EXHAUSTED', 'ai_messages_exhausted']);
+      const isExhausted = exhaustedCodes.has(errorMsg.errorCode);
       if (isExhausted) {
         return (
           <div key={errorMsg.id} className="flex justify-start px-4">
