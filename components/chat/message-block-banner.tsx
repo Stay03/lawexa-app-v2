@@ -42,13 +42,13 @@ export function MessageBlockBanner({
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 rounded-lg border border-amber-300/50 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30 sm:flex-row sm:items-start sm:justify-between',
+        'rounded-lg border border-amber-300/50 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30',
         className,
       )}
     >
       <div className="flex items-start gap-3">
-        <ShieldAlert className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
-        <div>
+        <ShieldAlert className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{heading}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">{message}</p>
           {resetTimestamp && (
@@ -59,7 +59,7 @@ export function MessageBlockBanner({
         </div>
       </div>
       {ctas.length > 0 && (
-        <div className="flex flex-wrap gap-2 sm:shrink-0">
+        <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
           {ctas.map((cta) => (
             <Button
               key={cta.href + cta.label}
