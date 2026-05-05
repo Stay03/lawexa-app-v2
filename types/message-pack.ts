@@ -60,6 +60,24 @@ export interface IMessagePackListParams {
   per_page?: number;
 }
 
+// Block reasons surfaced when AI message sending is gated server-side.
+export type TBlockedReasonCode =
+  | 'free_no_subscription'
+  | 'plan_exhausted'
+  | 'account_flagged'
+  | 'hard_limit'
+  | 'cancelled_grace_exhausted';
+
+export interface IBlockedReason {
+  code: string;
+  reason: TBlockedReasonCode;
+  message: string;
+  plan_remaining: number;
+  payg_remaining: number;
+  resets_at: string | null;
+  subscription_ends_at: string | null;
+}
+
 // AI messages limit from GET /users/limits
 export interface IAiMessagesLimit {
   limit_type: 'ai_messages';
@@ -67,9 +85,12 @@ export interface IAiMessagesLimit {
   hard_limit: number | null;
   used: number;
   remaining: number | null;
-  resets_at: string;
+  // Null for lifetime/cumulative limits — render no countdown when null.
+  resets_at: string | null;
   payg_remaining: number;
   total_remaining: number | null;
+  reset_message: string;
+  blocked_reason: IBlockedReason | null;
 }
 
 // Generic limit shape for other limit types
@@ -79,11 +100,41 @@ export interface IGenericLimit {
   hard_limit: number | null;
   used: number;
   remaining: number | null;
-  resets_at: string;
+  resets_at: string | null;
+}
+
+// Plan + subscription summary bundled into the limits payload.
+export type TPlanInterval = 'daily' | 'weekly' | 'monthly' | 'annually' | string;
+export type TPlanSubscriptionStatus =
+  | 'active'
+  | 'past_due'
+  | 'cancelled'
+  | 'trialing'
+  | 'expired';
+
+export interface IUserLimitsPlanSubscription {
+  status: TPlanSubscriptionStatus;
+  start_date: string;
+  next_payment_date: string | null;
+  ends_at: string | null;
+}
+
+export interface IUserLimitsPlan {
+  name: string;
+  slug: string;
+  interval: TPlanInterval;
+  is_free: boolean;
+  subscription: IUserLimitsPlanSubscription | null;
+}
+
+export interface IUserLimitsPayg {
+  balance: number;
 }
 
 // GET /users/limits response data
 export interface IUserLimits {
+  plan: IUserLimitsPlan;
+  payg: IUserLimitsPayg;
   note_creations: IGenericLimit;
   bookmarks: IGenericLimit;
   ai_messages: IAiMessagesLimit;

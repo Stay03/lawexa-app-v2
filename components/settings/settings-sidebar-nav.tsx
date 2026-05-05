@@ -11,6 +11,7 @@ import {
   Bell,
   Lock,
   Link as LinkIcon,
+  Gauge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +27,12 @@ const navItems = [
     description: 'Basic account settings',
     href: '/settings/account',
     icon: Settings,
+  },
+  {
+    label: 'Usage',
+    description: 'Plan limits and message balance',
+    href: '/settings/usage',
+    icon: Gauge,
   },
   {
     label: 'Billing',
