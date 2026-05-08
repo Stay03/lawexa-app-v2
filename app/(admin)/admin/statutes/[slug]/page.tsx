@@ -140,7 +140,7 @@ export default function StatuteDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/statutes-v2/${statute.slug}`} target="_blank">
+            <Link href={`/statutes/${statute.slug}`} target="_blank">
               <Eye className="mr-2 h-4 w-4" />
               View Rendered
             </Link>

@@ -147,7 +147,7 @@ export function StatuteImportProgress({ uuid, onDone }: StatuteImportProgressPro
         {importData.status === 'completed' && importData.statute_slug && (
           <div className="flex items-center gap-2">
             <Link
-              href={`/statutes-v2/${importData.statute_slug}`}
+              href={`/statutes/${importData.statute_slug}`}
               className="text-sm text-primary hover:underline"
               target="_blank"
             >

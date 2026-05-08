@@ -270,7 +270,7 @@ export function StatutesTable({
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.open(`/statutes-v2/${statute.slug}`, '_blank');
+                        window.open(`/statutes/${statute.slug}`, '_blank');
                       }}
                     >
                       <Eye className="mr-2 h-4 w-4" />
