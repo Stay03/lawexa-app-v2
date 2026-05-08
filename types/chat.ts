@@ -475,6 +475,29 @@ export interface ListConversationsParams {
   sort_order?: 'asc' | 'desc';
 }
 
+// Activity / message-history endpoint (GET /api/messages)
+export interface ActivityMessage extends ApiMessage {
+  conversation: { uuid: string; title: string };
+}
+
+export interface ListMessagesParams {
+  page?: number;
+  per_page?: number;
+  sort_order?: 'asc' | 'desc';
+  conversation_id?: string;
+  role?: 'user' | 'assistant' | 'tool';
+  search?: string;
+  exclude_errors?: boolean;
+}
+
+export interface MessagesListResponse {
+  success: boolean;
+  message: string;
+  data: ActivityMessage[];
+  pagination: ConversationsListResponse['pagination'];
+  links: ConversationsListResponse['links'];
+}
+
 // ============================================
 // Conversation Sharing Types
 // ============================================

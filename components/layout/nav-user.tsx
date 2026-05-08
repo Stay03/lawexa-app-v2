@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   CreditCard,
   Gauge,
+  History,
   LogOut,
   Settings,
   Shield,
@@ -133,6 +134,12 @@ export function NavUser() {
                 <Link href="/settings/usage">
                   <Gauge />
                   Usage
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/activity">
+                  <History />
+                  Activity
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

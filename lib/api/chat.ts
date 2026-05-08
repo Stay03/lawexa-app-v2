@@ -6,6 +6,8 @@ import type {
   ConversationsListResponse,
   ConversationStatusResponse,
   ListConversationsParams,
+  ListMessagesParams,
+  MessagesListResponse,
   DocumentUploadResponse
 } from '@/types/chat';
 
@@ -58,6 +60,15 @@ export const chatApi = {
    */
   listConversations: async (params?: ListConversationsParams): Promise<ConversationsListResponse> => {
     const response = await apiClient.get<ConversationsListResponse>('/conversations', { params });
+    return response.data;
+  },
+
+  /**
+   * List the authenticated user's messages across all conversations.
+   * Each item includes its parent conversation (uuid + title).
+   */
+  listMessages: async (params?: ListMessagesParams): Promise<MessagesListResponse> => {
+    const response = await apiClient.get<MessagesListResponse>('/messages', { params });
     return response.data;
   },
 

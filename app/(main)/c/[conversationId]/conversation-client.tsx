@@ -48,6 +48,7 @@ import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn, stripPastedTags } from '@/lib/utils';
+import { formatMessageTimestamp } from '@/lib/utils/date';
 import { isToolMessage, isHandoverMessage, isErrorMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
@@ -350,27 +351,6 @@ function UserMessageContent({ content }: { content: string }) {
       )}
     </MessageContent>
   );
-}
-
-function formatMessageTimestamp(date: Date): string {
-  const day = date.getDate();
-  const ordinalSuffix = (n: number) => {
-    const v = n % 100;
-    if (v >= 11 && v <= 13) return 'th';
-    switch (n % 10) {
-      case 1: return 'st';
-      case 2: return 'nd';
-      case 3: return 'rd';
-      default: return 'th';
-    }
-  };
-  const month = date.toLocaleString('en-US', { month: 'short' });
-  const year = date.getFullYear();
-  let hours = date.getHours();
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  hours = hours % 12 || 12;
-  return `${day}${ordinalSuffix(day)} ${month} ${year} - ${hours}:${minutes}${ampm}`;
 }
 
 function UserMessageBlock({
