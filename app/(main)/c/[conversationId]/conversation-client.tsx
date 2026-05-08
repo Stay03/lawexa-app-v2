@@ -352,6 +352,76 @@ function UserMessageContent({ content }: { content: string }) {
   );
 }
 
+function formatMessageTimestamp(date: Date): string {
+  const day = date.getDate();
+  const ordinalSuffix = (n: number) => {
+    const v = n % 100;
+    if (v >= 11 && v <= 13) return 'th';
+    switch (n % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const year = date.getFullYear();
+  let hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12 || 12;
+  return `${day}${ordinalSuffix(day)} ${month} ${year} - ${hours}:${minutes}${ampm}`;
+}
+
+function UserMessageBlock({
+  message,
+  displayContent,
+  pastedText,
+  remainingText,
+}: {
+  message: ChatMessage;
+  displayContent: string;
+  pastedText: string | null;
+  remainingText: string | null;
+}) {
+  const [showTime, setShowTime] = useState(false);
+
+  return (
+    <div
+      onClick={() => setShowTime((v) => !v)}
+      className="flex flex-col items-end"
+    >
+      {pastedText ? (
+        <>
+          <PastedContentCard content={pastedText} />
+          {remainingText && (
+            <MessageContent className="bg-muted rounded-3xl px-5 py-2.5 mt-1.5">
+              {remainingText}
+            </MessageContent>
+          )}
+        </>
+      ) : (
+        <UserMessageContent content={displayContent} />
+      )}
+      {message.attachment && (
+        <div className="mt-1 flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground w-fit">
+          <FileUp className="h-3 w-3" />
+          <span className="max-w-[150px] truncate">{message.attachment.file_name}</span>
+          <span>{formatFileSize(message.attachment.file_size)}</span>
+        </div>
+      )}
+      <div
+        className={cn(
+          'mt-1.5 text-xs text-muted-foreground transition-opacity select-none',
+          showTime ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        )}
+      >
+        {formatMessageTimestamp(message.timestamp)}
+      </div>
+    </div>
+  );
+}
+
 function ConversationPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -816,28 +886,12 @@ function ConversationPageContent() {
             )}
           </>
         ) : (
-          <>
-            {messagePastedText ? (
-              <>
-                <PastedContentCard content={messagePastedText} />
-                {messageRemainingText && (
-                  <MessageContent className="bg-muted rounded-3xl px-5 py-2.5 mt-1.5">
-                    {messageRemainingText}
-                  </MessageContent>
-                )}
-              </>
-            ) : (
-              <UserMessageContent content={displayContent} />
-            )}
-            {/* Attachment badge for PDF files */}
-            {(message as ChatMessage).attachment && (
-              <div className="mt-1 flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground w-fit">
-                <FileUp className="h-3 w-3" />
-                <span className="max-w-[150px] truncate">{(message as ChatMessage).attachment!.file_name}</span>
-                <span>{formatFileSize((message as ChatMessage).attachment!.file_size)}</span>
-              </div>
-            )}
-          </>
+          <UserMessageBlock
+            message={message as ChatMessage}
+            displayContent={displayContent}
+            pastedText={messagePastedText}
+            remainingText={messageRemainingText}
+          />
         )}
       </Message>
     );
