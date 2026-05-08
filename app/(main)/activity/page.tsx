@@ -92,18 +92,18 @@ function ActivityPagination({
 function ActivityTableSkeleton() {
   return (
     <div className="rounded-md border">
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead>Message</TableHead>
-            <TableHead className="w-1/4">Conversation</TableHead>
-            <TableHead className="w-44 text-right">Time</TableHead>
+            <TableHead className="w-[28%]">Conversation</TableHead>
+            <TableHead className="w-48 text-right">Time</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {Array.from({ length: 6 }).map((_, i) => (
             <TableRow key={i}>
-              <TableCell><Skeleton className="h-4 w-full max-w-md" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
               <TableCell><Skeleton className="h-4 w-32" /></TableCell>
               <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-32" /></TableCell>
             </TableRow>
@@ -163,19 +163,20 @@ function ActivityPageContent() {
         className="cursor-pointer hover:bg-muted/50"
         onClick={() => router.push(`/c/${m.conversation.uuid}`)}
       >
-        <TableCell className="align-top">
-          <p className="line-clamp-2 text-sm">{cleaned}</p>
+        <TableCell className="align-middle">
+          <p className="truncate text-sm" title={cleaned}>{cleaned}</p>
         </TableCell>
-        <TableCell className="w-1/4 align-top">
+        <TableCell className="align-middle">
           <Link
             href={`/c/${m.conversation.uuid}`}
             onClick={(e) => e.stopPropagation()}
             className="block truncate text-sm text-primary hover:underline"
+            title={m.conversation.title}
           >
             {m.conversation.title}
           </Link>
         </TableCell>
-        <TableCell className="w-44 whitespace-nowrap text-right align-top text-xs text-muted-foreground">
+        <TableCell className="whitespace-nowrap text-right align-middle text-xs text-muted-foreground">
           {formatMessageTimestamp(new Date(m.created_at))}
         </TableCell>
       </TableRow>
@@ -213,12 +214,12 @@ function ActivityPageContent() {
     return (
       <>
         <div className="rounded-md border">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead>Message</TableHead>
-                <TableHead className="w-1/4">Conversation</TableHead>
-                <TableHead className="w-44 text-right">Time</TableHead>
+                <TableHead className="w-[28%]">Conversation</TableHead>
+                <TableHead className="w-48 text-right">Time</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>{items.map(renderRow)}</TableBody>
