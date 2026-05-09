@@ -3,8 +3,10 @@
 import * as React from 'react';
 import {
   ShieldCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { AdminNavConversationsSection } from '@/components/admin/admin-nav-conversations';
 import { AdminNavUsersSection } from '@/components/admin/admin-nav-users';
@@ -17,11 +19,14 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar';
 
 export function AdminSidebar({
@@ -70,11 +75,34 @@ export function AdminSidebar({
         <AdminNavFilesSection />
         <AdminNavBillingSection />
         <AdminNavAiSection />
+        <AdminNavSystemSection />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+function AdminNavSystemSection() {
+  const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
+  const isActive = pathname === '/admin/settings' || pathname.startsWith('/admin/settings/');
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>System</SidebarGroupLabel>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild tooltip="Settings" isActive={isActive}>
+            <Link href="/admin/settings" onClick={() => setOpenMobile(false)}>
+              <SlidersHorizontal />
+              <span>Settings</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarGroup>
   );
 }
