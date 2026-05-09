@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "@/components/common/Logo";
+import Image from "next/image";
 
 export default function LegalLayout({
   children,
@@ -10,8 +10,14 @@ export default function LegalLayout({
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between px-4">
-          <Link href="/" aria-label="Lawexa home">
-            <Logo size="sm" />
+          <Link href="/" aria-label="Lawexa home" className="flex items-center">
+            <Image
+              src="/images/logo.png"
+              alt="Lawexa"
+              width={140}
+              height={32}
+              priority
+            />
           </Link>
           <nav className="flex items-center gap-4 text-sm text-muted-foreground">
             <Link
