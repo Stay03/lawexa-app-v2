@@ -2,12 +2,15 @@
 
 import {
   BadgeCheck,
+  BookOpen,
   CreditCard,
+  FileText,
   Gauge,
   History,
   LogOut,
   Settings,
   Shield,
+  ShieldCheck,
   Sparkles,
 } from "lucide-react"
 import Link from "next/link"
@@ -24,6 +27,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -163,6 +169,27 @@ export function NavUser() {
                 </DropdownMenuItem>
               )}
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <BookOpen />
+                Learn more
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/privacy">
+                    <ShieldCheck />
+                    Privacy policy
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/terms">
+                    <FileText />
+                    Terms of service
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => logout()}

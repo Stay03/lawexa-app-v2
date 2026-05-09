@@ -8,9 +8,20 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Settings, User, ChevronUp } from 'lucide-react';
+import {
+  BookOpen,
+  ChevronUp,
+  FileText,
+  LogOut,
+  Settings,
+  ShieldCheck,
+  User,
+} from 'lucide-react';
 import Link from 'next/link';
 
 function SidebarUser() {
@@ -56,6 +67,27 @@ function SidebarUser() {
             Settings
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <BookOpen className="mr-2 h-4 w-4" />
+            Learn more
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuItem asChild>
+              <Link href="/privacy" className="flex items-center">
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Privacy policy
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/terms" className="flex items-center">
+                <FileText className="mr-2 h-4 w-4" />
+                Terms of service
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => logout()}
