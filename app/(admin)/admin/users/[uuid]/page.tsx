@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminUser, useAdminUserConversations } from '@/lib/hooks/useAdmin';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import { ArrowLeft, Activity } from 'lucide-react';
+import { ArrowLeft, Activity, Webhook } from 'lucide-react';
 import {
   UserIdentityCard,
   UserAttributionCard,
@@ -165,12 +165,20 @@ export default function AdminUserDetailPage({
             <h1 className="text-2xl font-semibold tracking-tight">User Details</h1>
             <p className="text-sm text-muted-foreground font-mono">{uuid}</p>
           </div>
-          <Link href={`/admin/activity-feed?user_id=${user.id}`}>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Activity className="h-3.5 w-3.5" />
-              View activity
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/admin/activity-feed?user_id=${user.id}`}>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Activity className="h-3.5 w-3.5" />
+                View activity
+              </Button>
+            </Link>
+            <Link href={`/admin/paystack-webhooks?user_id=${user.id}`}>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Webhook className="h-3.5 w-3.5" />
+                Paystack webhooks
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
