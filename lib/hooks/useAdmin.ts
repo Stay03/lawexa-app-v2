@@ -106,6 +106,32 @@ export function useAdminUsers(params: IAdminUserListParams = {}) {
 }
 
 /**
+ * Debounced typeahead search against /admin/users?search=...
+ * Caller debounces `query`; this hook short-circuits queries shorter than
+ * `minLength` so we don't fire on a single keystroke.
+ */
+export function useAdminUsersSearch(
+  query: string,
+  { perPage = 10, minLength = 2 }: { perPage?: number; minLength?: number } = {}
+) {
+  const trimmed = query.trim();
+  const enabled = trimmed.length >= minLength;
+  const params: IAdminUserListParams = {
+    search: trimmed,
+    per_page: perPage,
+    sort_by: 'created_at',
+    sort_order: 'desc',
+  };
+  return useQuery({
+    queryKey: adminKeys.usersList(params),
+    queryFn: () => adminApi.getUsers(params),
+    enabled,
+    staleTime: 30 * 1000,
+    placeholderData: (prev) => prev,
+  });
+}
+
+/**
  * Hook for fetching user details
  */
 export function useAdminUser(uuid: string) {

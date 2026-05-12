@@ -208,31 +208,37 @@ export interface AdminGrantsListResponse {
 ******************************************************************************/
 
 export interface AdminBulkGrantPayload {
-  emails: string[];
+  emails?: string[];
+  user_ids?: number[];
 }
 
 export interface AdminSkipAlreadyInCampaign {
   email: string;
+  user_uuid: string;
 }
 
 export interface AdminSkipAlreadyInOtherCampaign {
   email: string;
+  user_uuid: string;
   campaign_name: string;
 }
 
 export interface AdminSkipActivePaidSubscription {
   email: string;
+  user_uuid: string;
   plan: string;
   ends_at: string | null;
 }
 
 export interface AdminSkipTrialing {
   email: string;
+  user_uuid: string;
   trial_ends_at: string | null;
 }
 
 export interface AdminSkipCapReached {
   email: string;
+  user_uuid: string;
   max_grants: number;
   current_active: number;
 }
@@ -247,6 +253,7 @@ export interface AdminBulkGrantSkipped {
 
 export interface AdminBulkGrantFailure {
   email: string;
+  user_uuid: string | null;
   error: string;
 }
 

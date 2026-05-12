@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Copy,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -58,7 +60,9 @@ export function AdminBulkGrantResult({
         label="Already granted in this campaign"
         helpText="These users already have an active grant from this campaign — they were not double-granted."
         rows={skipped.already_granted_in_campaign}
-        renderRow={(row) => row.email}
+        renderRow={(row) => (
+          <UserRow email={row.email} userUuid={row.user_uuid} />
+        )}
       />
 
       <SkipBucket
@@ -66,12 +70,11 @@ export function AdminBulkGrantResult({
         helpText="A different active sponsor campaign already covers these users."
         rows={skipped.already_granted_other_campaign}
         renderRow={(row: AdminSkipAlreadyInOtherCampaign) => (
-          <span>
-            {row.email}
-            <span className="ml-2 text-xs text-muted-foreground">
-              ({row.campaign_name})
-            </span>
-          </span>
+          <UserRow
+            email={row.email}
+            userUuid={row.user_uuid}
+            detail={row.campaign_name}
+          />
         )}
       />
 
@@ -80,16 +83,15 @@ export function AdminBulkGrantResult({
         helpText="These users are paying for their own plan and were not granted — they keep their paid plan."
         rows={skipped.active_paid_subscription}
         renderRow={(row: AdminSkipActivePaidSubscription) => (
-          <span>
-            {row.email}
-            <span className="ml-2 text-xs text-muted-foreground">
-              ({row.plan}
-              {row.ends_at
+          <UserRow
+            email={row.email}
+            userUuid={row.user_uuid}
+            detail={`${row.plan}${
+              row.ends_at
                 ? `, ends ${new Date(row.ends_at).toLocaleDateString()}`
-                : ''}
-              )
-            </span>
-          </span>
+                : ''
+            }`}
+          />
         )}
       />
 
@@ -98,14 +100,15 @@ export function AdminBulkGrantResult({
         helpText="These users are mid-trial. They were not granted to avoid overriding the trial."
         rows={skipped.trialing}
         renderRow={(row: AdminSkipTrialing) => (
-          <span>
-            {row.email}
-            <span className="ml-2 text-xs text-muted-foreground">
-              {row.trial_ends_at
+          <UserRow
+            email={row.email}
+            userUuid={row.user_uuid}
+            detail={
+              row.trial_ends_at
                 ? `trial ends ${new Date(row.trial_ends_at).toLocaleDateString()}`
-                : 'trial active'}
-            </span>
-          </span>
+                : 'trial active'
+            }
+          />
         )}
       />
 
@@ -114,12 +117,11 @@ export function AdminBulkGrantResult({
         helpText="The campaign's max_grants limit was hit. Raise the cap or end-and-reissue."
         rows={skipped.cap_reached}
         renderRow={(row: AdminSkipCapReached) => (
-          <span>
-            {row.email}
-            <span className="ml-2 text-xs text-muted-foreground">
-              ({row.current_active} / {row.max_grants})
-            </span>
-          </span>
+          <UserRow
+            email={row.email}
+            userUuid={row.user_uuid}
+            detail={`${row.current_active} / ${row.max_grants}`}
+          />
         )}
       />
 
@@ -146,7 +148,7 @@ export function AdminBulkGrantResult({
                 key={`${row.email}-${i}`}
                 className="py-2 flex justify-between gap-3"
               >
-                <span className="font-medium truncate">{row.email}</span>
+                <UserRow email={row.email} userUuid={row.user_uuid} />
                 <span className="text-xs text-destructive shrink-0">
                   {row.error}
                 </span>
@@ -227,6 +229,39 @@ function SkipBucket<T extends { email: string }>({
         </div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/**
+ * Row showing an email plus, when the user resolved server-side, a profile
+ * link via user_uuid. Used by every skip bucket and the failed list.
+ */
+function UserRow({
+  email,
+  userUuid,
+  detail,
+}: {
+  email: string;
+  userUuid: string | null;
+  detail?: string;
+}) {
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+      <span className="font-medium truncate">{email}</span>
+      {userUuid && (
+        <Link
+          href={`/admin/users/${userUuid}`}
+          className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Profile
+          <ExternalLink className="h-3 w-3" />
+        </Link>
+      )}
+      {detail && (
+        <span className="text-xs text-muted-foreground">({detail})</span>
+      )}
+    </span>
   );
 }
 

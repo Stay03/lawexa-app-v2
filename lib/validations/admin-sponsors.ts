@@ -153,14 +153,28 @@ export function parseEmailsText(raw: string): string[] {
   return out;
 }
 
-export const bulkGrantSchema = z.object({
-  emails: z
-    .array(z.string().email('Invalid email'))
-    .min(1, 'Add at least one email')
-    .max(
-      BULK_GRANT_MAX_EMAILS,
-      `Maximum ${BULK_GRANT_MAX_EMAILS} emails per request`
-    ),
-});
+export const BULK_GRANT_MAX_USER_IDS = 500;
+
+export const bulkGrantSchema = z
+  .object({
+    emails: z
+      .array(z.string().email('Invalid email'))
+      .max(
+        BULK_GRANT_MAX_EMAILS,
+        `Maximum ${BULK_GRANT_MAX_EMAILS} emails per request`
+      )
+      .optional(),
+    user_ids: z
+      .array(z.number().int().positive())
+      .max(
+        BULK_GRANT_MAX_USER_IDS,
+        `Maximum ${BULK_GRANT_MAX_USER_IDS} users per request`
+      )
+      .optional(),
+  })
+  .refine(
+    (v) => (v.emails?.length ?? 0) + (v.user_ids?.length ?? 0) > 0,
+    { message: 'Select at least one user or paste at least one email' }
+  );
 
 export type BulkGrantValues = z.infer<typeof bulkGrantSchema>;

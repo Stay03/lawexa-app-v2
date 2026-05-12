@@ -28,8 +28,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCost } from '@/lib/utils/currency';
 
+import { CurrencySettings } from '@/components/admin/CurrencySettings';
 import { SponsorStatsGrid } from '@/components/admin/sponsors/SponsorStatsGrid';
 import { useCampaignUsage } from '@/lib/hooks/useAdminSponsors';
+import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import type {
   AdminCampaignStatus,
   AdminCampaignUsageTopUserGrant,
@@ -59,6 +61,8 @@ export default function CampaignUsagePage({
   const campaignId = Number(rawId);
 
   const { data, isLoading, error } = useCampaignUsage(campaignId);
+  const { showNGN, exchangeRate } = useCurrencyStore();
+  const costOptions = { showNGN, exchangeRate };
 
   const sortedTopUsers = useMemo(() => {
     if (!data?.data?.top_users) return [];
@@ -111,21 +115,26 @@ export default function CampaignUsagePage({
     <div className="space-y-6">
       {backLink}
 
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {campaign.name} usage
-        </h1>
-        <Badge
-          variant="outline"
-          className={cn('text-xs', STATUS_STYLES[campaign.status])}
-        >
-          {campaign.status}
-        </Badge>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {campaign.name} usage
+            </h1>
+            <Badge
+              variant="outline"
+              className={cn('text-xs', STATUS_STYLES[campaign.status])}
+            >
+              {campaign.status}
+            </Badge>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {campaign.sponsor.name} · {campaign.plan.name} ·{' '}
+            {campaign.duration_days}d per student
+          </p>
+        </div>
+        <CurrencySettings />
       </div>
-      <p className="text-sm text-muted-foreground -mt-4">
-        {campaign.sponsor.name} · {campaign.plan.name} ·{' '}
-        {campaign.duration_days}d per student
-      </p>
 
       <SponsorStatsGrid
         columns={4}
@@ -170,7 +179,7 @@ export default function CampaignUsagePage({
           },
           {
             label: 'Estimated cost',
-            value: formatCost(totals.estimated_cost),
+            value: formatCost(totals.estimated_cost, costOptions),
             icon: DollarSign,
             subtext: 'USD, handover specialists included',
           },
@@ -258,7 +267,7 @@ export default function CampaignUsagePage({
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                        {formatCost(row.estimated_cost)}
+                        {formatCost(row.estimated_cost, costOptions)}
                       </td>
                     </tr>
                   ))}

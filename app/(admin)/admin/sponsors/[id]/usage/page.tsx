@@ -25,8 +25,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCost } from '@/lib/utils/currency';
 
+import { CurrencySettings } from '@/components/admin/CurrencySettings';
 import { SponsorStatsGrid } from '@/components/admin/sponsors/SponsorStatsGrid';
 import { useSponsorUsage } from '@/lib/hooks/useAdminSponsors';
+import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import type { AdminCampaignStatus } from '@/types/admin-sponsors';
 
 const STATUS_STYLES: Record<AdminCampaignStatus, string> = {
@@ -46,6 +48,8 @@ export default function SponsorUsagePage({
   const sponsorId = Number(rawId);
 
   const { data, isLoading, error } = useSponsorUsage(sponsorId);
+  const { showNGN, exchangeRate } = useCurrencyStore();
+  const costOptions = { showNGN, exchangeRate };
 
   const backLink = (
     <Button variant="ghost" size="sm" asChild className="-ml-2">
@@ -91,13 +95,16 @@ export default function SponsorUsagePage({
     <div className="space-y-6">
       {backLink}
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {sponsor.name} usage
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Rollup across every campaign owned by this sponsor.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {sponsor.name} usage
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Rollup across every campaign owned by this sponsor.
+          </p>
+        </div>
+        <CurrencySettings />
       </div>
 
       <SponsorStatsGrid
@@ -133,7 +140,7 @@ export default function SponsorUsagePage({
           },
           {
             label: 'Estimated cost',
-            value: formatCost(totals.estimated_cost),
+            value: formatCost(totals.estimated_cost, costOptions),
             icon: DollarSign,
             subtext: 'Deduped across overlapping grants',
           },
@@ -234,7 +241,7 @@ export default function SponsorUsagePage({
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                        {formatCost(row.estimated_cost)}
+                        {formatCost(row.estimated_cost, costOptions)}
                       </td>
                     </tr>
                   ))}

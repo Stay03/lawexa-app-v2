@@ -252,6 +252,7 @@ export interface IAdminUserListAttribution {
 }
 
 export interface IAdminUserListItem {
+  id: number;
   uuid: string;
   name: string;
   email: string | null;
