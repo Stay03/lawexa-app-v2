@@ -6,7 +6,10 @@ import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
+  DollarSign,
+  Hash,
   MessageSquare,
+  Sparkles,
   Users,
 } from 'lucide-react';
 
@@ -20,6 +23,7 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { formatCost } from '@/lib/utils/currency';
 
 import { SponsorStatsGrid } from '@/components/admin/sponsors/SponsorStatsGrid';
 import { useSponsorUsage } from '@/lib/hooks/useAdminSponsors';
@@ -115,6 +119,24 @@ export default function SponsorUsagePage({
             icon: MessageSquare,
             subtext: 'Attributed via plan_granted tag',
           },
+          {
+            label: 'AI requests',
+            value: totals.ai_requests.toLocaleString(),
+            icon: Sparkles,
+            subtext: 'Billed LLM calls, errors excluded',
+          },
+          {
+            label: 'Tokens',
+            value: totals.tokens.total.toLocaleString(),
+            icon: Hash,
+            subtext: `${totals.tokens.prompt.toLocaleString()} prompt / ${totals.tokens.completion.toLocaleString()} completion`,
+          },
+          {
+            label: 'Estimated cost',
+            value: formatCost(totals.estimated_cost),
+            icon: DollarSign,
+            subtext: 'Deduped across overlapping grants',
+          },
         ]}
       />
 
@@ -154,6 +176,13 @@ export default function SponsorUsagePage({
                     <th className="px-4 py-3 text-right font-medium">
                       Messages
                     </th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      AI requests
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium">Tokens</th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      Estimated cost
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -161,7 +190,7 @@ export default function SponsorUsagePage({
                     <tr
                       key={row.id}
                       className={cn(
-                        'border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors',
+                        'border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors align-top',
                         index % 2 === 1 && 'bg-muted/30'
                       )}
                       onClick={() => {
@@ -191,13 +220,31 @@ export default function SponsorUsagePage({
                       <td className="px-4 py-3 text-right tabular-nums">
                         {row.grants_active.toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      <td className="px-4 py-3 text-right tabular-nums">
                         {row.messages_sent.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {row.ai_requests.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        <div>{row.tokens.total.toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.tokens.prompt.toLocaleString()} /{' '}
+                          {row.tokens.completion.toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        {formatCost(row.estimated_cost)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Sum of per-campaign cost may exceed the sponsor total when a
+                user holds overlapping grants — sponsor totals dedupe across
+                campaigns and are authoritative.
+              </p>
             </div>
           )}
         </CardContent>

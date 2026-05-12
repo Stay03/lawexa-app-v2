@@ -1,15 +1,18 @@
 'use client';
 
-import { use } from 'react';
+import { use, useMemo } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
+  DollarSign,
+  Hash,
+  Hourglass,
   MessageSquare,
+  Sparkles,
   Users,
   XCircle,
-  Hourglass,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -23,10 +26,14 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { formatCost } from '@/lib/utils/currency';
 
 import { SponsorStatsGrid } from '@/components/admin/sponsors/SponsorStatsGrid';
 import { useCampaignUsage } from '@/lib/hooks/useAdminSponsors';
-import type { AdminCampaignStatus } from '@/types/admin-sponsors';
+import type {
+  AdminCampaignStatus,
+  AdminCampaignUsageTopUserGrant,
+} from '@/types/admin-sponsors';
 
 const STATUS_STYLES: Record<AdminCampaignStatus, string> = {
   draft: 'text-muted-foreground border-border bg-muted/40',
@@ -35,6 +42,13 @@ const STATUS_STYLES: Record<AdminCampaignStatus, string> = {
   ended:
     'text-amber-700 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-900/50 dark:bg-amber-950/50',
 };
+
+const ACTIVE_PILL =
+  'text-green-600 border-green-200 bg-green-50 dark:text-green-400 dark:border-green-900/50 dark:bg-green-950/50';
+const REVOKED_PILL =
+  'text-muted-foreground border-border bg-muted/40';
+const DELETED_PILL =
+  'text-muted-foreground border-border bg-muted/40';
 
 export default function CampaignUsagePage({
   params,
@@ -45,6 +59,13 @@ export default function CampaignUsagePage({
   const campaignId = Number(rawId);
 
   const { data, isLoading, error } = useCampaignUsage(campaignId);
+
+  const sortedTopUsers = useMemo(() => {
+    if (!data?.data?.top_users) return [];
+    return [...data.data.top_users].sort(
+      (a, b) => Number(b.estimated_cost) - Number(a.estimated_cost)
+    );
+  }, [data]);
 
   const backLink = (
     <Button variant="ghost" size="sm" asChild className="-ml-2">
@@ -84,7 +105,7 @@ export default function CampaignUsagePage({
     );
   }
 
-  const { campaign, totals, top_users } = data.data;
+  const { campaign, totals } = data.data;
 
   return (
     <div className="space-y-6">
@@ -107,7 +128,7 @@ export default function CampaignUsagePage({
       </p>
 
       <SponsorStatsGrid
-        columns={5}
+        columns={4}
         stats={[
           {
             label: 'Grants issued',
@@ -135,18 +156,36 @@ export default function CampaignUsagePage({
             icon: MessageSquare,
             subtext: 'Attributed via plan_granted tag',
           },
+          {
+            label: 'AI requests',
+            value: totals.ai_requests.toLocaleString(),
+            icon: Sparkles,
+            subtext: 'Billed LLM calls, errors excluded',
+          },
+          {
+            label: 'Tokens',
+            value: totals.tokens.total.toLocaleString(),
+            icon: Hash,
+            subtext: `${totals.tokens.prompt.toLocaleString()} prompt / ${totals.tokens.completion.toLocaleString()} completion`,
+          },
+          {
+            label: 'Estimated cost',
+            value: formatCost(totals.estimated_cost),
+            icon: DollarSign,
+            subtext: 'USD, handover specialists included',
+          },
         ]}
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Top users by messages</CardTitle>
+          <CardTitle>Top users by estimated cost</CardTitle>
           <CardDescription>
-            Granted students with the highest message volume.
+            Granted students ranked by LLM spend.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {top_users.length === 0 ? (
+          {sortedTopUsers.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               No usage yet.
             </div>
@@ -156,28 +195,41 @@ export default function CampaignUsagePage({
                 <thead>
                   <tr className="border-b bg-muted/40">
                     <th className="px-4 py-3 text-left font-medium">Student</th>
-                    <th className="px-4 py-3 text-left font-medium">Granted</th>
-                    <th className="px-4 py-3 text-left font-medium">Ends</th>
-                    <th className="px-4 py-3 text-center font-medium">
-                      Status
-                    </th>
+                    <th className="px-4 py-3 text-left font-medium">Grants</th>
                     <th className="px-4 py-3 text-right font-medium">
                       Messages
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      AI requests
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium">Tokens</th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      Estimated cost
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {top_users.map((row, index) => (
+                  {sortedTopUsers.map((row, index) => (
                     <tr
                       key={row.user.uuid}
                       className={cn(
-                        'border-b last:border-b-0',
+                        'border-b last:border-b-0 align-top',
                         index % 2 === 1 && 'bg-muted/30'
                       )}
                     >
                       <td className="px-4 py-3 max-w-[280px]">
-                        <div className="font-medium truncate">
-                          {row.user.name || row.user.email}
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">
+                            {row.user.name || row.user.email}
+                          </span>
+                          {row.user.deleted_at && (
+                            <Badge
+                              variant="outline"
+                              className={cn('text-xs shrink-0', DELETED_PILL)}
+                            >
+                              Deleted account
+                            </Badge>
+                          )}
                         </div>
                         {row.user.name && (
                           <div className="text-xs text-muted-foreground truncate">
@@ -185,33 +237,28 @@ export default function CampaignUsagePage({
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {new Date(row.granted_at).toLocaleDateString()}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1.5">
+                          {row.grants.map((grant, i) => (
+                            <GrantChip key={i} grant={grant} />
+                          ))}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {row.ends_at
-                          ? new Date(row.ends_at).toLocaleDateString()
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {row.revoked_at ? (
-                          <Badge variant="outline" className="text-xs">
-                            Revoked
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              'text-xs',
-                              'text-green-600 border-green-200 bg-green-50 dark:text-green-400 dark:border-green-900/50 dark:bg-green-950/50'
-                            )}
-                          >
-                            Active
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      <td className="px-4 py-3 text-right tabular-nums">
                         {row.messages_sent.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {row.ai_requests.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        <div>{row.tokens.total.toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.tokens.prompt.toLocaleString()} /{' '}
+                          {row.tokens.completion.toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        {formatCost(row.estimated_cost)}
                       </td>
                     </tr>
                   ))}
@@ -222,6 +269,33 @@ export default function CampaignUsagePage({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function GrantChip({ grant }: { grant: AdminCampaignUsageTopUserGrant }) {
+  const start = new Date(grant.granted_at).toLocaleDateString();
+  let endLabel: string;
+  let pillClass: string;
+  if (grant.revoked_at) {
+    endLabel = `revoked ${new Date(grant.revoked_at).toLocaleDateString()}`;
+    pillClass = REVOKED_PILL;
+  } else if (grant.ends_at) {
+    endLabel = `ends ${new Date(grant.ends_at).toLocaleDateString()}`;
+    pillClass = ACTIVE_PILL;
+  } else {
+    endLabel = 'ongoing';
+    pillClass = ACTIVE_PILL;
+  }
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        'text-xs font-normal whitespace-nowrap justify-start',
+        pillClass
+      )}
+    >
+      {start} → {endLabel}
+    </Badge>
   );
 }
 

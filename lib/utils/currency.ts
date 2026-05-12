@@ -2,7 +2,7 @@
  * Format a USD amount as either USD or NGN based on settings
  */
 export function formatCost(
-  usdAmount: number,
+  usdAmount: string | number,
   options: {
     showNGN?: boolean;
     exchangeRate?: number;
@@ -10,9 +10,10 @@ export function formatCost(
   } = {}
 ): string {
   const { showNGN = false, exchangeRate = 1500, decimals = 4 } = options;
+  const numeric = typeof usdAmount === 'string' ? Number(usdAmount) : usdAmount;
 
   if (showNGN) {
-    const ngnAmount = usdAmount * exchangeRate;
+    const ngnAmount = numeric * exchangeRate;
     // For NGN, show 2 decimal places with thousands separator
     return `₦${ngnAmount.toLocaleString('en-NG', {
       minimumFractionDigits: 2,
@@ -21,7 +22,7 @@ export function formatCost(
   }
 
   // USD format with specified decimals
-  return `$${Number(usdAmount).toFixed(decimals)}`;
+  return `$${numeric.toFixed(decimals)}`;
 }
 
 /**

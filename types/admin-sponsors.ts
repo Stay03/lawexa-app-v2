@@ -175,6 +175,7 @@ export interface AdminGrantUser {
   uuid: string;
   name: string;
   email: string;
+  deleted_at: string | null;
 }
 
 export interface AdminGrant {
@@ -265,12 +266,25 @@ export interface AdminBulkGrantResponse {
                                   Analytics
 ******************************************************************************/
 
-export interface AdminCampaignUsageTopUser {
-  user: AdminGrantUser;
+export interface AdminCampaignUsageTokens {
+  prompt: number;
+  completion: number;
+  total: number;
+}
+
+export interface AdminCampaignUsageTopUserGrant {
   granted_at: string;
   ends_at: string | null;
   revoked_at: string | null;
+}
+
+export interface AdminCampaignUsageTopUser {
+  user: AdminGrantUser;
+  grants: AdminCampaignUsageTopUserGrant[];
   messages_sent: number;
+  ai_requests: number;
+  tokens: AdminCampaignUsageTokens;
+  estimated_cost: string;
 }
 
 export interface AdminCampaignUsageTotals {
@@ -279,6 +293,9 @@ export interface AdminCampaignUsageTotals {
   grants_revoked: number;
   grants_naturally_expired: number;
   messages_sent: number;
+  ai_requests: number;
+  tokens: AdminCampaignUsageTokens;
+  estimated_cost: string;
 }
 
 export interface AdminCampaignUsageCampaignMeta {
@@ -311,12 +328,18 @@ export interface AdminSponsorUsageCampaignRow {
   grants_total: number;
   grants_active: number;
   messages_sent: number;
+  ai_requests: number;
+  tokens: AdminCampaignUsageTokens;
+  estimated_cost: string;
 }
 
 export interface AdminSponsorUsageTotals {
   grants_total: number;
   grants_active: number;
   messages_sent: number;
+  ai_requests: number;
+  tokens: AdminCampaignUsageTokens;
+  estimated_cost: string;
 }
 
 export interface AdminSponsorUsage {
