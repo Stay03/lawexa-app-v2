@@ -26,6 +26,7 @@ export interface AdminPlanListItem {
   features: string[];
   limits: IPlanLimit[];
   subscriptions_count: number;
+  is_internal?: boolean;
 }
 
 // Plan detail (GET /api/admin/plans/{id}) — same shape, API returns recent subscriptions separately
