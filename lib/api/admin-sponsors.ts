@@ -189,6 +189,16 @@ export const adminSponsorsApi = {
     return response.data;
   },
 
+  revokePackGrant: async (
+    id: number
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.delete<{
+      success: boolean;
+      message: string;
+    }>(`/admin/pack-grants/${id}`);
+    return response.data;
+  },
+
   /******************************************************************************
                                    Analytics
   ******************************************************************************/

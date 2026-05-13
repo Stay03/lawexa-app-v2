@@ -129,8 +129,10 @@ export default function CampaignUsagePage({
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {campaign.sponsor.name} · {campaign.plan.name} ·{' '}
-            {campaign.duration_days}d per student
+            {campaign.sponsor.name} ·{' '}
+            {campaign.type === 'pack'
+              ? `Pack: ${campaign.pack_size?.toLocaleString() ?? '—'} messages`
+              : `${campaign.plan?.name ?? '—'} · ${campaign.duration_days ?? '—'}d per student`}
           </p>
         </div>
         <CurrencySettings />

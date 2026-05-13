@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 
 import type {
   AdminBulkGrantResult,
+  AdminCampaignType,
   AdminSkipActivePaidSubscription,
   AdminSkipAlreadyInCampaign,
   AdminSkipAlreadyInOtherCampaign,
@@ -33,13 +34,18 @@ import type {
 interface AdminBulkGrantResultProps {
   result: AdminBulkGrantResult;
   onReset: () => void;
+  campaignType: AdminCampaignType;
+  packSize: number | null;
 }
 
 export function AdminBulkGrantResult({
   result,
   onReset,
+  campaignType,
+  packSize,
 }: AdminBulkGrantResultProps) {
   const { granted, skipped, failed } = result;
+  const isPack = campaignType === 'pack';
 
   return (
     <div className="space-y-4">
@@ -50,8 +56,9 @@ export function AdminBulkGrantResult({
             {granted} grant{granted === 1 ? '' : 's'} issued
           </p>
           <p className="text-xs text-green-800/80 dark:text-green-300/80 mt-0.5">
-            Each granted student now has an active subscription for this
-            campaign&apos;s plan and duration.
+            {isPack
+              ? `Each granted student now has a pack of ${packSize?.toLocaleString() ?? ''} messages on top of any existing quota.`
+              : "Each granted student now has an active subscription for this campaign's plan and duration."}
           </p>
         </div>
       </div>

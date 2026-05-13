@@ -62,8 +62,8 @@ export function AdminCampaignsTable({
           <thead>
             <tr className="border-b bg-muted/40">
               <th className="px-4 py-3 text-left font-medium">Campaign</th>
-              <th className="px-4 py-3 text-left font-medium">Plan</th>
-              <th className="px-4 py-3 text-right font-medium">Duration</th>
+              <th className="px-4 py-3 text-left font-medium">Type</th>
+              <th className="px-4 py-3 text-left font-medium">Grants</th>
               <th className="px-4 py-3 text-right font-medium">Cap</th>
               <th className="px-4 py-3 text-center font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Created</th>
@@ -85,16 +85,31 @@ export function AdminCampaignsTable({
                     {campaign.slug}
                   </div>
                 </td>
-                <td className="px-4 py-3 max-w-[220px]">
-                  <div className="truncate">{campaign.plan.name}</div>
-                  {campaign.plan.is_internal && (
-                    <span className="text-xs text-muted-foreground">
-                      Internal sponsor plan
-                    </span>
-                  )}
+                <td className="px-4 py-3">
+                  <Badge variant="outline" className="text-xs">
+                    {campaign.type_label}
+                  </Badge>
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
-                  {campaign.duration_days}d
+                <td className="px-4 py-3 max-w-[260px]">
+                  {campaign.type === 'plan' ? (
+                    <>
+                      <div className="truncate">
+                        {campaign.plan.name}
+                        <span className="ml-1 text-muted-foreground tabular-nums">
+                          · {campaign.duration_days}d
+                        </span>
+                      </div>
+                      {campaign.plan.is_internal && (
+                        <span className="text-xs text-muted-foreground">
+                          Internal sponsor plan
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <div className="truncate tabular-nums">
+                      {campaign.pack_size.toLocaleString()} messages
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
                   {campaign.max_grants ?? '∞'}

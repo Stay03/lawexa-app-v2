@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Infinity as InfinityIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -43,17 +42,7 @@ import {
   campaignCreateSchema,
   type CampaignCreateValues,
 } from '@/lib/validations/admin-sponsors';
-import type {
-  AdminCampaignCreatePayload,
-  AdminCustomPeriod,
-} from '@/types/admin-sponsors';
-
-const PERIOD_OPTIONS: { value: AdminCustomPeriod; label: string }[] = [
-  { value: 'day', label: 'Per day' },
-  { value: 'month', label: 'Per month' },
-  { value: 'billing_interval', label: 'Per billing interval' },
-  { value: 'lifetime', label: 'Lifetime total' },
-];
+import type { AdminCampaignCreatePayload } from '@/types/admin-sponsors';
 
 interface AdminCampaignFormProps {
   sponsorId: number;
@@ -77,7 +66,7 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
   const form = useForm<CampaignCreateValues>({
     resolver: zodResolver(campaignCreateSchema),
     defaultValues: {
-      plan_source: 'existing',
+      type: 'plan',
       name: '',
       plan_id: 0,
       duration_days: 90,
@@ -86,23 +75,14 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
     } as CampaignCreateValues,
   });
 
-  const planSource = form.watch('plan_source');
-  // Watch custom_messages to render the Unlimited toggle.
-  const customMessagesValue = form.watch(
-    'custom_messages' as keyof CampaignCreateValues
-  ) as number | undefined;
-  const isUnlimited = customMessagesValue === -1;
+  const campaignType = form.watch('type');
 
   // Reset hidden branch fields when switching tabs to avoid stale errors.
   useEffect(() => {
     form.clearErrors();
-    if (planSource === 'existing') {
+    if (campaignType === 'plan') {
       form.setValue(
-        'custom_messages' as keyof CampaignCreateValues,
-        undefined as never
-      );
-      form.setValue(
-        'custom_period' as keyof CampaignCreateValues,
+        'pack_size' as keyof CampaignCreateValues,
         undefined as never
       );
     } else {
@@ -110,23 +90,30 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
         'plan_id' as keyof CampaignCreateValues,
         undefined as never
       );
+      form.setValue(
+        'duration_days' as keyof CampaignCreateValues,
+        undefined as never
+      );
     }
-  }, [planSource, form]);
+  }, [campaignType, form]);
 
   const onSubmit = (values: CampaignCreateValues) => {
-    const base = {
-      name: values.name,
-      duration_days: values.duration_days,
-      max_grants: values.max_grants ?? undefined,
-      notes: values.notes ?? undefined,
-    };
     const payload: AdminCampaignCreatePayload =
-      values.plan_source === 'existing'
-        ? { ...base, plan_id: values.plan_id }
+      values.type === 'plan'
+        ? {
+            name: values.name,
+            type: 'plan',
+            plan_id: values.plan_id,
+            duration_days: values.duration_days,
+            max_grants: values.max_grants ?? undefined,
+            notes: values.notes ?? undefined,
+          }
         : {
-            ...base,
-            custom_messages: values.custom_messages,
-            custom_period: values.custom_period,
+            name: values.name,
+            type: 'pack',
+            pack_size: values.pack_size,
+            max_grants: values.max_grants ?? undefined,
+            notes: values.notes ?? undefined,
           };
 
     createMutation.mutate(
@@ -209,16 +196,16 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Plan</CardTitle>
+            <CardTitle>What students get</CardTitle>
             <CardDescription>
-              Reuse an existing public plan, or create an internal sponsor plan
-              with a custom quota.
+              A subscription to an existing plan, or a one-shot bundle of AI
+              messages.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <FormField
               control={form.control}
-              name="plan_source"
+              name="type"
               render={({ field }) => (
                 <FormItem>
                   <Tabs
@@ -227,85 +214,54 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
                     className="w-full"
                   >
                     <TabsList className="grid w-full max-w-md grid-cols-2">
-                      <TabsTrigger value="existing">
-                        Use existing plan
-                      </TabsTrigger>
-                      <TabsTrigger value="custom">Custom quota</TabsTrigger>
+                      <TabsTrigger value="plan">Subscription plan</TabsTrigger>
+                      <TabsTrigger value="pack">Message pack</TabsTrigger>
                     </TabsList>
                   </Tabs>
                 </FormItem>
               )}
             />
 
-            {planSource === 'existing' && (
-              <FormField
-                control={form.control}
-                name="plan_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Plan</FormLabel>
-                    <Select
-                      value={field.value ? String(field.value) : ''}
-                      onValueChange={(value) => field.onChange(Number(value))}
-                      disabled={plansLoading}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              plansLoading
-                                ? 'Loading plans…'
-                                : 'Select a plan'
-                            }
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {eligiblePlans.map((plan) => (
-                          <SelectItem key={plan.id} value={String(plan.id)}>
-                            {plan.name}{' '}
-                            <span className="text-muted-foreground">
-                              ({plan.formatted_amount} / {plan.interval_label})
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Each granted student gets a subscription to this plan for{' '}
-                      <strong>duration_days</strong>.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {planSource === 'custom' && (
+            {campaignType === 'plan' && (
               <div className="space-y-5">
                 <FormField
                   control={form.control}
-                  name="custom_period"
+                  name="plan_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quota period</FormLabel>
+                      <FormLabel>Plan</FormLabel>
                       <Select
-                        value={field.value ?? ''}
-                        onValueChange={field.onChange}
+                        value={field.value ? String(field.value) : ''}
+                        onValueChange={(value) => field.onChange(Number(value))}
+                        disabled={plansLoading}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a period" />
+                            <SelectValue
+                              placeholder={
+                                plansLoading
+                                  ? 'Loading plans…'
+                                  : 'Select a plan'
+                              }
+                            />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {PERIOD_OPTIONS.map((p) => (
-                            <SelectItem key={p.value} value={p.value}>
-                              {p.label}
+                          {eligiblePlans.map((plan) => (
+                            <SelectItem key={plan.id} value={String(plan.id)}>
+                              {plan.name}{' '}
+                              <span className="text-muted-foreground">
+                                ({plan.formatted_amount} / {plan.interval_label}
+                                )
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormDescription>
+                        Each granted student gets a subscription to this plan
+                        for <strong>duration_days</strong>.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -313,48 +269,30 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
 
                 <FormField
                   control={form.control}
-                  name="custom_messages"
+                  name="duration_days"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center justify-between">
-                        <FormLabel>Messages</FormLabel>
-                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <InfinityIcon className="h-3.5 w-3.5" />
-                          <span>Unlimited</span>
-                          <Switch
-                            checked={isUnlimited}
-                            onCheckedChange={(on) =>
-                              field.onChange(on ? -1 : 200)
-                            }
-                          />
-                        </label>
-                      </div>
+                      <FormLabel>Duration (days, per student)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
                           min={1}
-                          placeholder="200"
-                          disabled={isUnlimited}
-                          value={
-                            isUnlimited
-                              ? ''
-                              : field.value === undefined ||
-                                  field.value === null
+                          max={3650}
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ''
                                 ? ''
-                                : String(field.value)
+                                : Number(e.target.value)
+                            )
                           }
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            field.onChange(v === '' ? '' : Number(v));
-                          }}
                           onBlur={field.onBlur}
                           name={field.name}
                           ref={field.ref}
                         />
                       </FormControl>
                       <FormDescription>
-                        Backend will create an internal sponsor plan with this
-                        quota. -1 = unlimited.
+                        Each granted subscription runs for this many days.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -362,59 +300,20 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
                 />
               </div>
             )}
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Limits</CardTitle>
-            <CardDescription>
-              Per-student duration and the optional cap on total grants.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-5 sm:grid-cols-2">
+            {campaignType === 'pack' && (
               <FormField
                 control={form.control}
-                name="duration_days"
+                name="pack_size"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Duration (days, per student)</FormLabel>
+                    <FormLabel>Pack size (messages per student)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         min={1}
-                        max={3650}
-                        value={field.value ?? ''}
-                        onChange={(e) =>
-                          field.onChange(
-                            e.target.value === '' ? '' : Number(e.target.value)
-                          )
-                        }
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Each granted subscription runs for this many days.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="max_grants"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Max grants (optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        placeholder="No cap"
+                        max={100_000}
+                        placeholder="50"
                         value={
                           field.value === undefined || field.value === null
                             ? ''
@@ -422,7 +321,7 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
                         }
                         onChange={(e) => {
                           const v = e.target.value;
-                          field.onChange(v === '' ? null : Number(v));
+                          field.onChange(v === '' ? '' : Number(v));
                         }}
                         onBlur={field.onBlur}
                         name={field.name}
@@ -430,14 +329,59 @@ export function AdminCampaignForm({ sponsorId }: AdminCampaignFormProps) {
                       />
                     </FormControl>
                     <FormDescription>
-                      Leave empty for no cap. Excess emails go to{' '}
-                      <code>cap_reached</code>.
+                      Each granted student receives a one-shot pack of this many
+                      AI messages. Stacks with existing quotas; no time limit.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Cap</CardTitle>
+            <CardDescription>
+              Optional ceiling on the total number of grants this campaign
+              issues.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <FormField
+              control={form.control}
+              name="max_grants"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Max grants (optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="No cap"
+                      value={
+                        field.value === undefined || field.value === null
+                          ? ''
+                          : String(field.value)
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        field.onChange(v === '' ? null : Number(v));
+                      }}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Leave empty for no cap. Excess emails go to{' '}
+                    <code>cap_reached</code>.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </CardContent>
         </Card>
 

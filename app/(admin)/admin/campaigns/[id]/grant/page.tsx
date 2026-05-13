@@ -87,12 +87,23 @@ export default function BulkGrantPage({
 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          Grant subscriptions
+          {campaign.type === 'pack'
+            ? 'Grant message packs'
+            : 'Grant subscriptions'}
         </h1>
         <p className="text-sm text-muted-foreground">
           {campaign.sponsor.name} · {campaign.name} ·{' '}
-          {campaign.duration_days}-day grants on{' '}
-          <strong>{campaign.plan.name}</strong>
+          {campaign.type === 'pack' ? (
+            <>
+              <strong>{campaign.pack_size.toLocaleString()}</strong> messages
+              per student
+            </>
+          ) : (
+            <>
+              {campaign.duration_days}-day grants on{' '}
+              <strong>{campaign.plan.name}</strong>
+            </>
+          )}
         </p>
       </div>
 
@@ -100,9 +111,15 @@ export default function BulkGrantPage({
         <AdminBulkGrantResult
           result={result}
           onReset={() => setResult(null)}
+          campaignType={campaign.type}
+          packSize={campaign.type === 'pack' ? campaign.pack_size : null}
         />
       ) : (
-        <AdminBulkGrantForm campaignId={campaignId} onResult={setResult} />
+        <AdminBulkGrantForm
+          campaignId={campaignId}
+          onResult={setResult}
+          campaignType={campaign.type}
+        />
       )}
     </div>
   );

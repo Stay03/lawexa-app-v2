@@ -35,6 +35,7 @@ export function AdminCampaignEndDialog({
 }: AdminCampaignEndDialogProps) {
   const mutation = useEndCampaign();
   const [forceExpire, setForceExpire] = useState(false);
+  const isPack = campaign.type === 'pack';
 
   const handleOpenChange = (next: boolean) => {
     // Reset checkbox each time the dialog opens.
@@ -85,8 +86,9 @@ export function AdminCampaignEndDialog({
                   ) : (
                     <>There are no active grants on this campaign.</>
                   )}{' '}
-                  By default, existing grants run their natural{' '}
-                  <code>ends_at</code>.
+                  {isPack
+                    ? 'By default, students keep any unused messages in their granted packs.'
+                    : 'By default, existing grants run their natural ends_at.'}
                 </p>
               </div>
               <div className="flex items-start gap-3 rounded-md border p-3">
@@ -105,7 +107,9 @@ export function AdminCampaignEndDialog({
                     immediately
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Subscriptions will be expired in the same transaction.
+                    {isPack
+                      ? 'Remaining messages will be zeroed on every active pack. Already-sent messages stay sent.'
+                      : 'Subscriptions will be expired in the same transaction.'}
                   </p>
                 </div>
               </div>

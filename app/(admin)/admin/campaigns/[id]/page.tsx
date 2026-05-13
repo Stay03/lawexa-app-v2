@@ -8,7 +8,9 @@ import {
   BarChart3,
   CheckCircle2,
   Hourglass,
+  MessageSquare,
   Megaphone,
+  Package,
   PlayCircle,
   Plus,
   StopCircle,
@@ -123,6 +125,9 @@ export default function CampaignDetailPage({
               <h1 className="text-2xl font-semibold tracking-tight">
                 {campaign.name}
               </h1>
+              <Badge variant="outline" className="text-xs">
+                {campaign.type_label}
+              </Badge>
               <Badge
                 variant="outline"
                 className={cn('text-xs', STATUS_STYLES[campaign.status])}
@@ -147,7 +152,9 @@ export default function CampaignDetailPage({
             <Button size="sm" asChild>
               <Link href={`/admin/campaigns/${campaign.id}/grant`}>
                 <Plus className="mr-1.5 h-4 w-4" />
-                Grant subscriptions
+                {campaign.type === 'pack'
+                  ? 'Grant packs'
+                  : 'Grant subscriptions'}
               </Link>
             </Button>
           )}
@@ -174,34 +181,64 @@ export default function CampaignDetailPage({
       {/* Stats */}
       <SponsorStatsGrid
         columns={4}
-        stats={[
-          {
-            label: 'Plan',
-            value: campaign.plan.name,
-            icon: Megaphone,
-            subtext: campaign.plan.is_internal
-              ? 'Internal sponsor plan'
-              : null,
-          },
-          {
-            label: 'Duration / student',
-            value: `${campaign.duration_days}d`,
-            icon: Hourglass,
-          },
-          {
-            label: 'Grants issued',
-            value: campaign.grants_count ?? '—',
-            icon: Users,
-            subtext: campaign.max_grants
-              ? `Cap: ${campaign.max_grants}`
-              : 'No cap',
-          },
-          {
-            label: 'Active grants',
-            value: activeGrantsCount,
-            icon: CheckCircle2,
-          },
-        ]}
+        stats={
+          campaign.type === 'plan'
+            ? [
+                {
+                  label: 'Plan',
+                  value: campaign.plan.name,
+                  icon: Megaphone,
+                  subtext: campaign.plan.is_internal
+                    ? 'Internal sponsor plan'
+                    : null,
+                },
+                {
+                  label: 'Duration / student',
+                  value: `${campaign.duration_days}d`,
+                  icon: Hourglass,
+                },
+                {
+                  label: 'Grants issued',
+                  value: campaign.grants_count ?? '—',
+                  icon: Users,
+                  subtext: campaign.max_grants
+                    ? `Cap: ${campaign.max_grants}`
+                    : 'No cap',
+                },
+                {
+                  label: 'Active grants',
+                  value: activeGrantsCount,
+                  icon: CheckCircle2,
+                },
+              ]
+            : [
+                {
+                  label: 'Pack size',
+                  value: `${campaign.pack_size.toLocaleString()} msg`,
+                  icon: Package,
+                  subtext: 'Per student, one-shot',
+                },
+                {
+                  label: 'Time limit',
+                  value: '—',
+                  icon: MessageSquare,
+                  subtext: 'Packs do not expire',
+                },
+                {
+                  label: 'Grants issued',
+                  value: campaign.grants_count ?? '—',
+                  icon: Users,
+                  subtext: campaign.max_grants
+                    ? `Cap: ${campaign.max_grants}`
+                    : 'No cap',
+                },
+                {
+                  label: 'Active grants',
+                  value: activeGrantsCount,
+                  icon: CheckCircle2,
+                },
+              ]
+        }
       />
 
       {/* Metadata */}
@@ -251,7 +288,9 @@ export default function CampaignDetailPage({
           <div>
             <CardTitle>Grants</CardTitle>
             <CardDescription>
-              Students whose subscriptions are being sponsored by this campaign.
+              {campaign.type === 'pack'
+                ? 'Students who received a message pack from this campaign.'
+                : 'Students whose subscriptions are being sponsored by this campaign.'}
             </CardDescription>
           </div>
           {campaign.status === 'active' && (
@@ -264,7 +303,11 @@ export default function CampaignDetailPage({
           )}
         </CardHeader>
         <CardContent>
-          <AdminGrantsTable grants={grants} isLoading={grantsLoading} />
+          <AdminGrantsTable
+            grants={grants}
+            isLoading={grantsLoading}
+            campaignType={campaign.type}
+          />
         </CardContent>
       </Card>
 

@@ -26,12 +26,14 @@ import {
 import type {
   AdminBulkGrantPayload,
   AdminBulkGrantResult,
+  AdminCampaignType,
 } from '@/types/admin-sponsors';
 import type { IAdminUserListItem } from '@/types/admin';
 
 interface AdminBulkGrantFormProps {
   campaignId: number;
   onResult: (result: AdminBulkGrantResult) => void;
+  campaignType: AdminCampaignType;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,7 +41,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function AdminBulkGrantForm({
   campaignId,
   onResult,
+  campaignType,
 }: AdminBulkGrantFormProps) {
+  const isPack = campaignType === 'pack';
   const mutation = useBulkGrant();
   const [text, setText] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<IAdminUserListItem[]>([]);
@@ -184,7 +188,8 @@ export function AdminBulkGrantForm({
             {mutation.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Grant {totalToSubmit > 0 ? totalToSubmit : ''} subscription
+            Grant {totalToSubmit > 0 ? totalToSubmit : ''}{' '}
+            {isPack ? 'pack' : 'subscription'}
             {totalToSubmit === 1 ? '' : 's'}
           </Button>
         </div>

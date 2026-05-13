@@ -69,11 +69,7 @@ export interface AdminSponsorDetailResponse {
 
 export type AdminCampaignStatus = 'draft' | 'active' | 'ended';
 
-export type AdminCustomPeriod =
-  | 'day'
-  | 'month'
-  | 'billing_interval'
-  | 'lifetime';
+export type AdminCampaignType = 'plan' | 'pack';
 
 export interface AdminCampaignSponsorRef {
   id: number;
@@ -88,51 +84,66 @@ export interface AdminCampaignPlanRef {
   is_internal: boolean;
 }
 
-export interface AdminCampaign {
+interface AdminCampaignBase {
   id: number;
   sponsor: AdminCampaignSponsorRef;
   name: string;
   slug: string;
-  plan: AdminCampaignPlanRef;
-  duration_days: number;
   max_grants: number | null;
   starts_at: string | null;
   ends_at: string | null;
   status: AdminCampaignStatus;
   status_label: string;
+  type_label: string;
   notes: string | null;
   grants_count?: number;
   active_grants_count?: number;
   created_at: string;
 }
 
+export interface AdminPlanCampaign extends AdminCampaignBase {
+  type: 'plan';
+  plan: AdminCampaignPlanRef;
+  duration_days: number;
+  pack_size: null;
+}
+
+export interface AdminPackCampaign extends AdminCampaignBase {
+  type: 'pack';
+  plan: null;
+  duration_days: null;
+  pack_size: number;
+}
+
+export type AdminCampaign = AdminPlanCampaign | AdminPackCampaign;
+
 export interface AdminCampaignsParams {
   per_page?: number;
   page?: number;
 }
 
-// Branch A — reuse an existing plan (e.g. basic-monthly)
-export interface AdminCampaignCreateExistingPlanPayload {
+// Plan campaign — reuse an existing public plan
+export interface AdminCampaignCreatePlanPayload {
   name: string;
+  type: 'plan';
   plan_id: number;
   duration_days: number;
   max_grants?: number | null;
   notes?: string | null;
 }
 
-// Branch B — auto-create an internal sponsor plan with a custom quota
-export interface AdminCampaignCreateCustomPlanPayload {
+// Pack campaign — grant a fixed bundle of AI messages per student
+export interface AdminCampaignCreatePackPayload {
   name: string;
-  custom_messages: number; // -1 = unlimited
-  custom_period: AdminCustomPeriod;
-  duration_days: number;
+  type: 'pack';
+  pack_size: number;
   max_grants?: number | null;
   notes?: string | null;
 }
 
 export type AdminCampaignCreatePayload =
-  | AdminCampaignCreateExistingPlanPayload
-  | AdminCampaignCreateCustomPlanPayload;
+  | AdminCampaignCreatePlanPayload
+  | AdminCampaignCreatePackPayload;
 
 // PATCH only allows these fields — everything else returns 422
 export interface AdminCampaignUpdatePayload {
@@ -171,6 +182,13 @@ export interface AdminGrantSubscription {
   ends_at: string | null;
 }
 
+export interface AdminGrantPack {
+  id: number;
+  messages_total: number;
+  messages_remaining: number;
+  status: string;
+}
+
 export interface AdminGrantUser {
   uuid: string;
   name: string;
@@ -178,15 +196,32 @@ export interface AdminGrantUser {
   deleted_at: string | null;
 }
 
-export interface AdminGrant {
+interface AdminGrantBase {
   id: number;
   campaign_id: number;
-  subscription: AdminGrantSubscription;
   user: AdminGrantUser;
   granted_at: string;
   revoked_at: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+export interface AdminPlanGrant extends AdminGrantBase {
+  subscription: AdminGrantSubscription;
+}
+
+export interface AdminPackGrant extends AdminGrantBase {
+  pack: AdminGrantPack;
+}
+
+export type AdminGrant = AdminPlanGrant | AdminPackGrant;
+
+export function isPackGrant(grant: AdminGrant): grant is AdminPackGrant {
+  return 'pack' in grant;
+}
+
+export function isPlanGrant(grant: AdminGrant): grant is AdminPlanGrant {
+  return 'subscription' in grant;
 }
 
 export interface AdminGrantsParams {
@@ -309,11 +344,13 @@ export interface AdminCampaignUsageCampaignMeta {
   id: number;
   name: string;
   sponsor: { id: number; name: string };
-  plan: { id: number; name: string };
+  plan: { id: number; name: string } | null;
   status: AdminCampaignStatus;
+  type: AdminCampaignType;
   starts_at: string | null;
   ends_at: string | null;
-  duration_days: number;
+  duration_days: number | null;
+  pack_size: number | null;
 }
 
 export interface AdminCampaignUsage {

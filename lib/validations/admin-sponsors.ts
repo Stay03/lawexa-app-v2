@@ -56,19 +56,12 @@ export type SponsorUpdateValues = z.infer<typeof sponsorUpdateSchema>;
                                   Campaigns
 ******************************************************************************/
 
-const CUSTOM_PERIODS = ['day', 'month', 'billing_interval', 'lifetime'] as const;
-
 const sharedCampaignFields = {
   name: z
     .string()
     .trim()
     .min(1, 'Campaign name is required')
     .max(255, 'Name must be 255 characters or less'),
-  duration_days: z
-    .number({ message: 'Enter a duration' })
-    .int('Duration must be a whole number')
-    .min(1, 'Duration must be at least 1 day')
-    .max(3650, 'Duration must be 3650 days or less'),
   max_grants: z
     .number()
     .int()
@@ -78,34 +71,35 @@ const sharedCampaignFields = {
   notes: optionalLongText,
 };
 
-// Branch A — reuse an existing plan
-export const campaignCreateExistingPlanSchema = z.object({
-  plan_source: z.literal('existing'),
+// Plan campaign — reuse an existing public plan, time-limited subscription
+export const campaignCreatePlanSchema = z.object({
+  type: z.literal('plan'),
   plan_id: z
     .number({ message: 'Select a plan' })
     .int()
     .positive('Select a plan'),
+  duration_days: z
+    .number({ message: 'Enter a duration' })
+    .int('Duration must be a whole number')
+    .min(1, 'Duration must be at least 1 day')
+    .max(3650, 'Duration must be 3650 days or less'),
   ...sharedCampaignFields,
 });
 
-// Branch B — auto-create an internal plan with custom quota
-export const campaignCreateCustomPlanSchema = z.object({
-  plan_source: z.literal('custom'),
-  custom_messages: z
-    .number({ message: 'Enter a message count' })
-    .int('Message count must be a whole number')
-    .refine((v) => v === -1 || v > 0, {
-      message: 'Use -1 for unlimited, otherwise a positive number',
-    }),
-  custom_period: z.enum(CUSTOM_PERIODS, {
-    message: 'Select a billing period',
-  }),
+// Pack campaign — bundle of AI messages per student, no time limit
+export const campaignCreatePackSchema = z.object({
+  type: z.literal('pack'),
+  pack_size: z
+    .number({ message: 'Enter a pack size' })
+    .int('Pack size must be a whole number')
+    .min(1, 'Pack size must be at least 1')
+    .max(100_000, 'Pack size must be 100,000 or less'),
   ...sharedCampaignFields,
 });
 
-export const campaignCreateSchema = z.discriminatedUnion('plan_source', [
-  campaignCreateExistingPlanSchema,
-  campaignCreateCustomPlanSchema,
+export const campaignCreateSchema = z.discriminatedUnion('type', [
+  campaignCreatePlanSchema,
+  campaignCreatePackSchema,
 ]);
 
 export type CampaignCreateValues = z.infer<typeof campaignCreateSchema>;

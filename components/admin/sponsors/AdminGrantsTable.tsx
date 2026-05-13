@@ -14,18 +14,28 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 import { AdminGrantRevokeDialog } from './AdminGrantRevokeDialog';
-import type { AdminGrant } from '@/types/admin-sponsors';
+import type {
+  AdminCampaignType,
+  AdminGrant,
+} from '@/types/admin-sponsors';
+import { isPackGrant } from '@/types/admin-sponsors';
 
 interface AdminGrantsTableProps {
   grants: AdminGrant[];
   isLoading: boolean;
+  campaignType: AdminCampaignType;
 }
 
 const ACTIVE_BADGE =
   'text-green-600 border-green-200 bg-green-50 dark:text-green-400 dark:border-green-900/50 dark:bg-green-950/50';
 
-export function AdminGrantsTable({ grants, isLoading }: AdminGrantsTableProps) {
+export function AdminGrantsTable({
+  grants,
+  isLoading,
+  campaignType,
+}: AdminGrantsTableProps) {
   const [revokeTarget, setRevokeTarget] = useState<AdminGrant | null>(null);
+  const isPackCampaign = campaignType === 'pack';
 
   if (isLoading) {
     return (
@@ -61,7 +71,9 @@ export function AdminGrantsTable({ grants, isLoading }: AdminGrantsTableProps) {
               <tr className="border-b bg-muted/40">
                 <th className="px-4 py-3 text-left font-medium">Student</th>
                 <th className="px-4 py-3 text-left font-medium">Granted</th>
-                <th className="px-4 py-3 text-left font-medium">Ends</th>
+                <th className="px-4 py-3 text-left font-medium">
+                  {isPackCampaign ? 'Messages' : 'Ends'}
+                </th>
                 <th className="px-4 py-3 text-center font-medium">Status</th>
                 <th className="px-4 py-3 w-10" />
               </tr>
@@ -88,12 +100,14 @@ export function AdminGrantsTable({ grants, isLoading }: AdminGrantsTableProps) {
                   <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                     {new Date(grant.granted_at).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                    {grant.subscription.ends_at
-                      ? new Date(
-                          grant.subscription.ends_at
-                        ).toLocaleDateString()
-                      : '—'}
+                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">
+                    {isPackGrant(grant)
+                      ? `${grant.pack.messages_remaining.toLocaleString()} / ${grant.pack.messages_total.toLocaleString()}`
+                      : grant.subscription.ends_at
+                        ? new Date(
+                            grant.subscription.ends_at
+                          ).toLocaleDateString()
+                        : '—'}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {grant.is_active ? (
@@ -146,6 +160,7 @@ export function AdminGrantsTable({ grants, isLoading }: AdminGrantsTableProps) {
             if (!next) setRevokeTarget(null);
           }}
           grant={revokeTarget}
+          campaignType={campaignType}
         />
       )}
     </>

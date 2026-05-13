@@ -10,6 +10,7 @@ import type {
   AdminCampaignCreatePayload,
   AdminCampaignUpdatePayload,
   AdminCampaignEndPayload,
+  AdminCampaignType,
   AdminGrantsParams,
   AdminBulkGrantPayload,
 } from '@/types/admin-sponsors';
@@ -258,7 +259,10 @@ export function useBulkGrant() {
 export function useRevokeGrant() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => adminSponsorsApi.revokeGrant(id),
+    mutationFn: ({ id, type }: { id: number; type: AdminCampaignType }) =>
+      type === 'pack'
+        ? adminSponsorsApi.revokePackGrant(id)
+        : adminSponsorsApi.revokeGrant(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sponsorKeys.grants() });
       queryClient.invalidateQueries({ queryKey: sponsorKeys.campaigns() });
