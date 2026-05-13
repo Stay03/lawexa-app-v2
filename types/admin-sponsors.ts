@@ -314,49 +314,113 @@ export interface AdminCampaignUsageTokens {
   total: number;
 }
 
+interface AdminCampaignUsageLlmTotals {
+  messages_sent: number;
+  ai_requests: number;
+  tokens: AdminCampaignUsageTokens;
+  estimated_cost: string;
+}
+
 export interface AdminCampaignUsageTopUserGrant {
   granted_at: string;
   ends_at: string | null;
   revoked_at: string | null;
 }
 
-export interface AdminCampaignUsageTopUser {
-  user: AdminGrantUser;
-  grants: AdminCampaignUsageTopUserGrant[];
-  messages_sent: number;
-  ai_requests: number;
-  tokens: AdminCampaignUsageTokens;
-  estimated_cost: string;
+export interface AdminCampaignUsageTopUserPack {
+  id: number;
+  messages_total: number;
+  messages_remaining: number;
+  granted_at: string;
+  revoked_at: string | null;
 }
 
-export interface AdminCampaignUsageTotals {
+interface AdminCampaignUsageTopUserBase extends AdminCampaignUsageLlmTotals {
+  user: AdminGrantUser;
+}
+
+export interface AdminPlanCampaignUsageTopUser
+  extends AdminCampaignUsageTopUserBase {
+  grants: AdminCampaignUsageTopUserGrant[];
+}
+
+export interface AdminPackCampaignUsageTopUser
+  extends AdminCampaignUsageTopUserBase {
+  packs: AdminCampaignUsageTopUserPack[];
+}
+
+export type AdminCampaignUsageTopUser =
+  | AdminPlanCampaignUsageTopUser
+  | AdminPackCampaignUsageTopUser;
+
+export interface AdminPlanCampaignUsageTotals
+  extends AdminCampaignUsageLlmTotals {
   grants_issued: number;
   grants_active: number;
   grants_revoked: number;
   grants_naturally_expired: number;
-  messages_sent: number;
-  ai_requests: number;
-  tokens: AdminCampaignUsageTokens;
-  estimated_cost: string;
 }
 
-export interface AdminCampaignUsageCampaignMeta {
+export interface AdminPackCampaignUsageTotals
+  extends AdminCampaignUsageLlmTotals {
+  packs_issued: number;
+  packs_active: number;
+  packs_revoked: number;
+  messages_funded: number;
+  messages_used: number;
+  messages_remaining: number;
+}
+
+export type AdminCampaignUsageTotals =
+  | AdminPlanCampaignUsageTotals
+  | AdminPackCampaignUsageTotals;
+
+interface AdminCampaignUsageCampaignMetaBase {
   id: number;
   name: string;
   sponsor: { id: number; name: string };
-  plan: { id: number; name: string } | null;
   status: AdminCampaignStatus;
-  type: AdminCampaignType;
   starts_at: string | null;
   ends_at: string | null;
-  duration_days: number | null;
-  pack_size: number | null;
 }
 
-export interface AdminCampaignUsage {
-  campaign: AdminCampaignUsageCampaignMeta;
-  totals: AdminCampaignUsageTotals;
-  top_users: AdminCampaignUsageTopUser[];
+export interface AdminPlanCampaignUsageCampaignMeta
+  extends AdminCampaignUsageCampaignMetaBase {
+  type: 'plan';
+  plan: { id: number; name: string };
+  duration_days: number;
+}
+
+export interface AdminPackCampaignUsageCampaignMeta
+  extends AdminCampaignUsageCampaignMetaBase {
+  type: 'pack';
+  pack_size: number;
+}
+
+export type AdminCampaignUsageCampaignMeta =
+  | AdminPlanCampaignUsageCampaignMeta
+  | AdminPackCampaignUsageCampaignMeta;
+
+export interface AdminPlanCampaignUsage {
+  campaign: AdminPlanCampaignUsageCampaignMeta;
+  totals: AdminPlanCampaignUsageTotals;
+  top_users: AdminPlanCampaignUsageTopUser[];
+}
+
+export interface AdminPackCampaignUsage {
+  campaign: AdminPackCampaignUsageCampaignMeta;
+  totals: AdminPackCampaignUsageTotals;
+  top_users: AdminPackCampaignUsageTopUser[];
+}
+
+export type AdminCampaignUsage =
+  | AdminPlanCampaignUsage
+  | AdminPackCampaignUsage;
+
+export function isPackCampaignUsage(
+  usage: AdminCampaignUsage
+): usage is AdminPackCampaignUsage {
+  return usage.campaign.type === 'pack';
 }
 
 export interface AdminCampaignUsageResponse {
@@ -365,25 +429,39 @@ export interface AdminCampaignUsageResponse {
   data: AdminCampaignUsage;
 }
 
-export interface AdminSponsorUsageCampaignRow {
+interface AdminSponsorUsageCampaignRowBase extends AdminCampaignUsageLlmTotals {
   id: number;
   name: string;
   status: AdminCampaignStatus;
-  grants_total: number;
-  grants_active: number;
-  messages_sent: number;
-  ai_requests: number;
-  tokens: AdminCampaignUsageTokens;
-  estimated_cost: string;
 }
 
-export interface AdminSponsorUsageTotals {
+export interface AdminSponsorUsageCampaignPlanRow
+  extends AdminSponsorUsageCampaignRowBase {
+  type: 'plan';
   grants_total: number;
   grants_active: number;
-  messages_sent: number;
-  ai_requests: number;
-  tokens: AdminCampaignUsageTokens;
-  estimated_cost: string;
+}
+
+export interface AdminSponsorUsageCampaignPackRow
+  extends AdminSponsorUsageCampaignRowBase {
+  type: 'pack';
+  packs_total: number;
+  packs_active: number;
+  packs_revoked: number;
+  messages_funded: number;
+  messages_used: number;
+  messages_remaining: number;
+}
+
+export type AdminSponsorUsageCampaignRow =
+  | AdminSponsorUsageCampaignPlanRow
+  | AdminSponsorUsageCampaignPackRow;
+
+export interface AdminSponsorUsageTotals extends AdminCampaignUsageLlmTotals {
+  grants_total: number;
+  grants_active: number;
+  packs_total: number;
+  packs_active: number;
 }
 
 export interface AdminSponsorUsage {

@@ -9,6 +9,8 @@ import {
   DollarSign,
   Hash,
   MessageSquare,
+  Package,
+  PackageCheck,
   Sparkles,
   Users,
 } from 'lucide-react';
@@ -29,7 +31,10 @@ import { CurrencySettings } from '@/components/admin/CurrencySettings';
 import { SponsorStatsGrid } from '@/components/admin/sponsors/SponsorStatsGrid';
 import { useSponsorUsage } from '@/lib/hooks/useAdminSponsors';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import type { AdminCampaignStatus } from '@/types/admin-sponsors';
+import type {
+  AdminCampaignStatus,
+  AdminSponsorUsageCampaignRow,
+} from '@/types/admin-sponsors';
 
 const STATUS_STYLES: Record<AdminCampaignStatus, string> = {
   draft: 'text-muted-foreground border-border bg-muted/40',
@@ -108,7 +113,7 @@ export default function SponsorUsagePage({
       </div>
 
       <SponsorStatsGrid
-        columns={3}
+        columns={8}
         stats={[
           {
             label: 'Grants total',
@@ -121,10 +126,20 @@ export default function SponsorUsagePage({
             icon: CheckCircle2,
           },
           {
+            label: 'Packs total',
+            value: totals.packs_total.toLocaleString(),
+            icon: Package,
+          },
+          {
+            label: 'Active packs',
+            value: totals.packs_active.toLocaleString(),
+            icon: PackageCheck,
+          },
+          {
             label: 'Messages sent',
             value: totals.messages_sent.toLocaleString(),
             icon: MessageSquare,
-            subtext: 'Attributed via plan_granted tag',
+            subtext: 'Plan-funded + pack-funded',
           },
           {
             label: 'AI requests',
@@ -142,7 +157,7 @@ export default function SponsorUsagePage({
             label: 'Estimated cost',
             value: formatCost(totals.estimated_cost, costOptions),
             icon: DollarSign,
-            subtext: 'Deduped across overlapping grants',
+            subtext: 'Plan side deduped, pack side exact',
           },
         ]}
       />
@@ -171,15 +186,12 @@ export default function SponsorUsagePage({
                     <th className="px-4 py-3 text-left font-medium">
                       Campaign
                     </th>
+                    <th className="px-4 py-3 text-left font-medium">Type</th>
                     <th className="px-4 py-3 text-center font-medium">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-right font-medium">
-                      Grants total
-                    </th>
-                    <th className="px-4 py-3 text-right font-medium">
-                      Active
-                    </th>
+                    <th className="px-4 py-3 text-right font-medium">Issued</th>
+                    <th className="px-4 py-3 text-right font-medium">Active</th>
                     <th className="px-4 py-3 text-right font-medium">
                       Messages
                     </th>
@@ -194,69 +206,103 @@ export default function SponsorUsagePage({
                 </thead>
                 <tbody>
                   {campaigns.map((row, index) => (
-                    <tr
+                    <CampaignRow
                       key={row.id}
-                      className={cn(
-                        'border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors align-top',
-                        index % 2 === 1 && 'bg-muted/30'
-                      )}
-                      onClick={() => {
-                        window.location.href = `/admin/campaigns/${row.id}/usage`;
-                      }}
-                    >
-                      <td className="px-4 py-3 max-w-[280px] font-medium">
-                        <Link
-                          href={`/admin/campaigns/${row.id}/usage`}
-                          className="hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {row.name}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge
-                          variant="outline"
-                          className={cn('text-xs', STATUS_STYLES[row.status])}
-                        >
-                          {row.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {row.grants_total.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {row.grants_active.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {row.messages_sent.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {row.ai_requests.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        <div>{row.tokens.total.toLocaleString()}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {row.tokens.prompt.toLocaleString()} /{' '}
-                          {row.tokens.completion.toLocaleString()}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                        {formatCost(row.estimated_cost, costOptions)}
-                      </td>
-                    </tr>
+                      row={row}
+                      index={index}
+                      costOptions={costOptions}
+                    />
                   ))}
                 </tbody>
               </table>
               <p className="mt-3 text-xs text-muted-foreground">
-                Sum of per-campaign cost may exceed the sponsor total when a
-                user holds overlapping grants — sponsor totals dedupe across
-                campaigns and are authoritative.
+                Plan-side rows: sum of per-campaign cost may exceed the sponsor
+                total when a user holds overlapping grants — sponsor totals
+                dedupe across campaigns and are authoritative. Pack-side rows
+                are exact (every message is tagged with one pack).
               </p>
             </div>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function CampaignRow({
+  row,
+  index,
+  costOptions,
+}: {
+  row: AdminSponsorUsageCampaignRow;
+  index: number;
+  costOptions: { showNGN: boolean; exchangeRate: number };
+}) {
+  const isPack = row.type === 'pack';
+  const issued = isPack ? row.packs_total : row.grants_total;
+  const active = isPack ? row.packs_active : row.grants_active;
+
+  return (
+    <tr
+      className={cn(
+        'border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors align-top',
+        index % 2 === 1 && 'bg-muted/30'
+      )}
+      onClick={() => {
+        window.location.href = `/admin/campaigns/${row.id}/usage`;
+      }}
+    >
+      <td className="px-4 py-3 max-w-[280px] font-medium">
+        <Link
+          href={`/admin/campaigns/${row.id}/usage`}
+          className="hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.name}
+        </Link>
+        {row.type === 'pack' && (
+          <div className="text-xs text-muted-foreground tabular-nums">
+            {row.messages_used.toLocaleString()} /{' '}
+            {row.messages_funded.toLocaleString()} messages spent
+          </div>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <Badge variant="outline" className="text-xs">
+          {isPack ? 'Pack' : 'Plan'}
+        </Badge>
+      </td>
+      <td className="px-4 py-3 text-center">
+        <Badge
+          variant="outline"
+          className={cn('text-xs', STATUS_STYLES[row.status])}
+        >
+          {row.status}
+        </Badge>
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        {issued.toLocaleString()}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        {active.toLocaleString()}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        {row.messages_sent.toLocaleString()}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        {row.ai_requests.toLocaleString()}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        <div>{row.tokens.total.toLocaleString()}</div>
+        <div className="text-xs text-muted-foreground">
+          {row.tokens.prompt.toLocaleString()} /{' '}
+          {row.tokens.completion.toLocaleString()}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+        {formatCost(row.estimated_cost, costOptions)}
+      </td>
+    </tr>
   );
 }
 

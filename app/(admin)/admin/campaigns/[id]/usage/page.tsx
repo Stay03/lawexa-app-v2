@@ -9,9 +9,14 @@ import {
   DollarSign,
   Hash,
   Hourglass,
+  Inbox,
   MessageSquare,
+  Package,
+  PackageCheck,
+  PackageMinus,
   Sparkles,
   Users,
+  Wallet,
   XCircle,
 } from 'lucide-react';
 
@@ -29,12 +34,19 @@ import { cn } from '@/lib/utils';
 import { formatCost } from '@/lib/utils/currency';
 
 import { CurrencySettings } from '@/components/admin/CurrencySettings';
-import { SponsorStatsGrid } from '@/components/admin/sponsors/SponsorStatsGrid';
+import {
+  SponsorStatsGrid,
+  type SponsorStat,
+} from '@/components/admin/sponsors/SponsorStatsGrid';
 import { useCampaignUsage } from '@/lib/hooks/useAdminSponsors';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import type {
-  AdminCampaignStatus,
-  AdminCampaignUsageTopUserGrant,
+import {
+  isPackCampaignUsage,
+  type AdminCampaignStatus,
+  type AdminCampaignUsageTopUserGrant,
+  type AdminCampaignUsageTopUserPack,
+  type AdminPackCampaignUsageTotals,
+  type AdminPlanCampaignUsageTotals,
 } from '@/types/admin-sponsors';
 
 const STATUS_STYLES: Record<AdminCampaignStatus, string> = {
@@ -47,10 +59,8 @@ const STATUS_STYLES: Record<AdminCampaignStatus, string> = {
 
 const ACTIVE_PILL =
   'text-green-600 border-green-200 bg-green-50 dark:text-green-400 dark:border-green-900/50 dark:bg-green-950/50';
-const REVOKED_PILL =
-  'text-muted-foreground border-border bg-muted/40';
-const DELETED_PILL =
-  'text-muted-foreground border-border bg-muted/40';
+const REVOKED_PILL = 'text-muted-foreground border-border bg-muted/40';
+const DELETED_PILL = 'text-muted-foreground border-border bg-muted/40';
 
 export default function CampaignUsagePage({
   params,
@@ -109,7 +119,9 @@ export default function CampaignUsagePage({
     );
   }
 
-  const { campaign, totals } = data.data;
+  const usage = data.data;
+  const isPack = isPackCampaignUsage(usage);
+  const { campaign } = usage;
 
   return (
     <div className="space-y-6">
@@ -121,6 +133,9 @@ export default function CampaignUsagePage({
             <h1 className="text-2xl font-semibold tracking-tight">
               {campaign.name} usage
             </h1>
+            <Badge variant="outline" className="text-xs">
+              {isPack ? 'Pack' : 'Plan'}
+            </Badge>
             <Badge
               variant="outline"
               className={cn('text-xs', STATUS_STYLES[campaign.status])}
@@ -130,69 +145,34 @@ export default function CampaignUsagePage({
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {campaign.sponsor.name} ·{' '}
-            {campaign.type === 'pack'
-              ? `Pack: ${campaign.pack_size?.toLocaleString() ?? '—'} messages`
-              : `${campaign.plan?.name ?? '—'} · ${campaign.duration_days ?? '—'}d per student`}
+            {isPackCampaignUsage(usage)
+              ? `Pack: ${usage.campaign.pack_size.toLocaleString()} messages`
+              : `${usage.campaign.plan.name} · ${usage.campaign.duration_days}d per student`}
           </p>
         </div>
         <CurrencySettings />
       </div>
 
+      {isPackCampaignUsage(usage) ? (
+        <PackBudgetCard totals={usage.totals} />
+      ) : null}
+
       <SponsorStatsGrid
-        columns={4}
-        stats={[
-          {
-            label: 'Grants issued',
-            value: totals.grants_issued.toLocaleString(),
-            icon: Users,
-          },
-          {
-            label: 'Active',
-            value: totals.grants_active.toLocaleString(),
-            icon: CheckCircle2,
-          },
-          {
-            label: 'Revoked',
-            value: totals.grants_revoked.toLocaleString(),
-            icon: XCircle,
-          },
-          {
-            label: 'Naturally expired',
-            value: totals.grants_naturally_expired.toLocaleString(),
-            icon: Hourglass,
-          },
-          {
-            label: 'Messages sent',
-            value: totals.messages_sent.toLocaleString(),
-            icon: MessageSquare,
-            subtext: 'Attributed via plan_granted tag',
-          },
-          {
-            label: 'AI requests',
-            value: totals.ai_requests.toLocaleString(),
-            icon: Sparkles,
-            subtext: 'Billed LLM calls, errors excluded',
-          },
-          {
-            label: 'Tokens',
-            value: totals.tokens.total.toLocaleString(),
-            icon: Hash,
-            subtext: `${totals.tokens.prompt.toLocaleString()} prompt / ${totals.tokens.completion.toLocaleString()} completion`,
-          },
-          {
-            label: 'Estimated cost',
-            value: formatCost(totals.estimated_cost, costOptions),
-            icon: DollarSign,
-            subtext: 'USD, handover specialists included',
-          },
-        ]}
+        columns={8}
+        stats={
+          isPackCampaignUsage(usage)
+            ? packStats(usage.totals, costOptions)
+            : planStats(usage.totals, costOptions)
+        }
       />
 
       <Card>
         <CardHeader>
           <CardTitle>Top users by estimated cost</CardTitle>
           <CardDescription>
-            Granted students ranked by LLM spend.
+            {isPack
+              ? 'Granted students ranked by LLM spend on pack-funded messages.'
+              : 'Granted students ranked by LLM spend.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -206,7 +186,9 @@ export default function CampaignUsagePage({
                 <thead>
                   <tr className="border-b bg-muted/40">
                     <th className="px-4 py-3 text-left font-medium">Student</th>
-                    <th className="px-4 py-3 text-left font-medium">Grants</th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      {isPack ? 'Packs' : 'Grants'}
+                    </th>
                     <th className="px-4 py-3 text-right font-medium">
                       Messages
                     </th>
@@ -250,9 +232,13 @@ export default function CampaignUsagePage({
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1.5">
-                          {row.grants.map((grant, i) => (
-                            <GrantChip key={i} grant={grant} />
-                          ))}
+                          {'packs' in row
+                            ? row.packs.map((pack) => (
+                                <PackChip key={pack.id} pack={pack} />
+                              ))
+                            : row.grants.map((grant, i) => (
+                                <GrantChip key={i} grant={grant} />
+                              ))}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
@@ -283,6 +269,177 @@ export default function CampaignUsagePage({
   );
 }
 
+type CostOpts = { showNGN: boolean; exchangeRate: number };
+
+function planStats(
+  totals: AdminPlanCampaignUsageTotals,
+  costOpts: CostOpts
+): SponsorStat[] {
+  return [
+    {
+      label: 'Grants issued',
+      value: totals.grants_issued.toLocaleString(),
+      icon: Users,
+    },
+    {
+      label: 'Active',
+      value: totals.grants_active.toLocaleString(),
+      icon: CheckCircle2,
+    },
+    {
+      label: 'Revoked',
+      value: totals.grants_revoked.toLocaleString(),
+      icon: XCircle,
+    },
+    {
+      label: 'Naturally expired',
+      value: totals.grants_naturally_expired.toLocaleString(),
+      icon: Hourglass,
+    },
+    {
+      label: 'Messages sent',
+      value: totals.messages_sent.toLocaleString(),
+      icon: MessageSquare,
+      subtext: 'Attributed via plan_granted tag',
+    },
+    {
+      label: 'AI requests',
+      value: totals.ai_requests.toLocaleString(),
+      icon: Sparkles,
+      subtext: 'Billed LLM calls, errors excluded',
+    },
+    {
+      label: 'Tokens',
+      value: totals.tokens.total.toLocaleString(),
+      icon: Hash,
+      subtext: `${totals.tokens.prompt.toLocaleString()} prompt / ${totals.tokens.completion.toLocaleString()} completion`,
+    },
+    {
+      label: 'Estimated cost',
+      value: formatCost(totals.estimated_cost, costOpts),
+      icon: DollarSign,
+      subtext: 'USD, handover specialists included',
+    },
+  ];
+}
+
+function packStats(
+  totals: AdminPackCampaignUsageTotals,
+  costOpts: CostOpts
+): SponsorStat[] {
+  return [
+    {
+      label: 'Packs issued',
+      value: totals.packs_issued.toLocaleString(),
+      icon: Package,
+    },
+    {
+      label: 'Active',
+      value: totals.packs_active.toLocaleString(),
+      icon: PackageCheck,
+    },
+    {
+      label: 'Revoked',
+      value: totals.packs_revoked.toLocaleString(),
+      icon: PackageMinus,
+    },
+    {
+      label: 'Messages sent',
+      value: totals.messages_sent.toLocaleString(),
+      icon: MessageSquare,
+      subtext: 'Pack-funded, exact via FK filter',
+    },
+    {
+      label: 'AI requests',
+      value: totals.ai_requests.toLocaleString(),
+      icon: Sparkles,
+      subtext: 'Billed LLM calls, errors excluded',
+    },
+    {
+      label: 'Tokens',
+      value: totals.tokens.total.toLocaleString(),
+      icon: Hash,
+      subtext: `${totals.tokens.prompt.toLocaleString()} prompt / ${totals.tokens.completion.toLocaleString()} completion`,
+    },
+    {
+      label: 'Estimated cost',
+      value: formatCost(totals.estimated_cost, costOpts),
+      icon: DollarSign,
+      subtext: 'USD, handover specialists included',
+    },
+    {
+      label: 'Unused budget',
+      value: totals.messages_remaining.toLocaleString(),
+      icon: Inbox,
+      subtext: `of ${totals.messages_funded.toLocaleString()} messages`,
+    },
+  ];
+}
+
+function PackBudgetCard({ totals }: { totals: AdminPackCampaignUsageTotals }) {
+  const funded = totals.messages_funded;
+  const used = totals.messages_used;
+  const remaining = totals.messages_remaining;
+  const pct = funded > 0 ? Math.min(100, (used / funded) * 100) : 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-base">Message budget</CardTitle>
+        </div>
+        <CardDescription>
+          Gifted vs spent vs unused. Past consumption stays counted even if the
+          campaign ends.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-3 gap-4">
+          <BudgetCell label="Funded" value={funded} tone="muted" />
+          <BudgetCell label="Used" value={used} tone="primary" />
+          <BudgetCell label="Remaining" value={remaining} tone="accent" />
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full bg-primary transition-[width]"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground tabular-nums">
+          {used.toLocaleString()} / {funded.toLocaleString()} messages spent
+          {funded > 0 && ` · ${pct.toFixed(1)}%`}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BudgetCell({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'muted' | 'primary' | 'accent';
+}) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          'text-2xl font-bold tabular-nums',
+          tone === 'primary' && 'text-primary',
+          tone === 'accent' && 'text-foreground'
+        )}
+      >
+        {value.toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
 function GrantChip({ grant }: { grant: AdminCampaignUsageTopUserGrant }) {
   const start = new Date(grant.granted_at).toLocaleDateString();
   let endLabel: string;
@@ -306,6 +463,26 @@ function GrantChip({ grant }: { grant: AdminCampaignUsageTopUserGrant }) {
       )}
     >
       {start} → {endLabel}
+    </Badge>
+  );
+}
+
+function PackChip({ pack }: { pack: AdminCampaignUsageTopUserPack }) {
+  const start = new Date(pack.granted_at).toLocaleDateString();
+  const isRevoked = !!pack.revoked_at;
+  const pillClass = isRevoked ? REVOKED_PILL : ACTIVE_PILL;
+  const tail = isRevoked
+    ? `revoked ${new Date(pack.revoked_at as string).toLocaleDateString()}`
+    : `${pack.messages_remaining.toLocaleString()} / ${pack.messages_total.toLocaleString()} left`;
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        'text-xs font-normal whitespace-nowrap justify-start tabular-nums',
+        pillClass
+      )}
+    >
+      {start} · {tail}
     </Badge>
   );
 }
