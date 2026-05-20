@@ -1,8 +1,6 @@
 'use client';
 
-import { Calendar, Star } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Star } from 'lucide-react';
 import { UserAvatar } from '@/components/common/UserAvatar';
 import { cn } from '@/lib/utils';
 import type { NoteUser } from '@/types/note';
@@ -15,14 +13,14 @@ interface NoteAuthorCardProps {
 }
 
 /**
- * Card displaying note author information
+ * Editorial footer byline — slim row with avatar, name, and join date.
+ * No Card chrome; sits beneath a hairline rule.
  */
 function NoteAuthorCard({
   author,
   animationDelay = 0,
   className,
 }: NoteAuthorCardProps) {
-  // Format join date if available
   const joinDate = author.created_at
     ? new Date(author.created_at).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -30,7 +28,6 @@ function NoteAuthorCard({
       })
     : null;
 
-  // Convert NoteUser to User type for UserAvatar component
   const userForAvatar: User = {
     id: author.id,
     name: author.name,
@@ -45,40 +42,43 @@ function NoteAuthorCard({
   };
 
   return (
-    <Card
+    <footer
       className={cn(
-        'animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-300',
+        'animate-in fade-in-0 fill-mode-both duration-500 mt-6 pt-8',
+        'border-t border-foreground/10',
         className
       )}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      <CardContent className="flex items-center gap-4 pt-6">
-        {/* Avatar */}
-        <UserAvatar
-          user={userForAvatar}
-          className="h-12 w-12"
-        />
-
-        {/* Info */}
+      <p className="note-editorial-eyebrow mb-3">Written by</p>
+      <div className="flex items-center gap-4">
+        <UserAvatar user={userForAvatar} className="h-12 w-12 ring-1 ring-foreground/10" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate font-medium">{author.name}</h3>
+            <h3
+              className="truncate font-medium"
+              style={{ fontFamily: 'var(--font-fraunces), Georgia, serif' }}
+            >
+              {author.name}
+            </h3>
             {author.is_creator && (
-              <Badge variant="default" className="gap-1 text-[10px]">
-                <Star className="h-3 w-3" />
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                title="Verified creator"
+              >
+                <Star className="h-2.5 w-2.5 fill-current" />
                 Creator
-              </Badge>
+              </span>
             )}
           </div>
           {joinDate && (
-            <p className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Calendar className="h-3 w-3" />
+            <p className="text-sm italic text-muted-foreground">
               Joined {joinDate}
             </p>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </footer>
   );
 }
 

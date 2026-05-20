@@ -1,14 +1,12 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
-import { User, Calendar, Lock, Globe } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Note } from '@/types/note';
 import {
   formatNotePrice,
-  formatNoteDate,
-  getNoteStatusVariant,
   getNoteStatusText,
 } from '@/lib/utils/note-utils';
 
@@ -20,7 +18,8 @@ interface NoteDetailHeaderProps {
 }
 
 /**
- * Hero header section for note detail page
+ * Editorial hero for the note detail page.
+ * Serif display title, italic meta line, inline tag row, hairline rule.
  */
 function NoteDetailHeader({
   note,
@@ -28,94 +27,84 @@ function NoteDetailHeader({
   className,
   animationDelay = 0,
 }: NoteDetailHeaderProps) {
-  const {
-    title,
-    user,
-    created_at,
-    is_free,
-    is_private,
-    status,
-    tags,
-  } = note;
+  const { title, user, created_at, is_private, status, tags } = note;
 
-  // Format date
   const formattedDate = new Date(created_at).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
 
-  // Price display
   const priceDisplay = formatNotePrice(note);
-
   const hasTags = tags && tags.length > 0;
 
+  // Build the meta line items in editorial order: byline, date, price/free,
+  // optional private flag, optional draft/owner status.
+  const metaItems: React.ReactNode[] = [
+    <span key="author">By {user.name}</span>,
+    <span key="date">{formattedDate}</span>,
+    <span key="price">{priceDisplay}</span>,
+  ];
+  if (is_private) {
+    metaItems.push(
+      <span key="private" className="inline-flex items-center gap-1">
+        <Lock className="h-3 w-3" aria-hidden />
+        Private
+      </span>
+    );
+  }
+  if (showStatus) {
+    metaItems.push(<span key="status">{getNoteStatusText(status)}</span>);
+  }
+
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Title */}
-      <h1
-        className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both text-2xl font-semibold tracking-tight duration-300"
+    <header className={cn('space-y-5', className)}>
+      <p
+        className="note-editorial-eyebrow animate-in fade-in-0 fill-mode-both duration-300"
         style={{ animationDelay: `${animationDelay}ms` }}
+      >
+        Lawexa · Notes
+      </p>
+
+      <h1
+        className="note-editorial-title animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-500"
+        style={{ animationDelay: `${animationDelay + 40}ms` }}
       >
         {title}
       </h1>
 
-      {/* Metadata badges */}
-      <div
-        className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both flex flex-wrap items-center gap-2 duration-200"
-        style={{ animationDelay: `${animationDelay + 50}ms` }}
+      <p
+        className="note-editorial-meta animate-in fade-in-0 fill-mode-both duration-300"
+        style={{ animationDelay: `${animationDelay + 120}ms` }}
       >
-        {/* Author */}
-        <Badge variant="outline" className="gap-1.5">
-          <User className="h-3 w-3" />
-          {user.name}
-        </Badge>
+        {metaItems.map((node, idx) => (
+          <React.Fragment key={idx}>
+            {idx > 0 && <span className="meta-sep" aria-hidden>·</span>}
+            {node}
+          </React.Fragment>
+        ))}
+      </p>
 
-        {/* Date */}
-        <Badge variant="secondary" className="gap-1.5">
-          <Calendar className="h-3 w-3" />
-          {formattedDate}
-        </Badge>
-
-        {/* Privacy indicator */}
-        {is_private && (
-          <Badge variant="outline" className="gap-1.5">
-            <Lock className="h-3 w-3" />
-            Private
-          </Badge>
-        )}
-
-        {/* Status (for owner) */}
-        {showStatus && (
-          <Badge variant={getNoteStatusVariant(status)}>
-            {getNoteStatusText(status)}
-          </Badge>
-        )}
-
-        {/* Price */}
-        <Badge variant={is_free ? 'secondary' : 'default'}>
-          {priceDisplay}
-        </Badge>
-      </div>
-
-      {/* Tags */}
       {hasTags && (
         <div
-          className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both flex flex-wrap gap-1.5 duration-200"
-          style={{ animationDelay: `${animationDelay + 100}ms` }}
+          className="note-editorial-tags animate-in fade-in-0 fill-mode-both flex flex-wrap items-center gap-x-1 gap-y-1.5 duration-300"
+          style={{ animationDelay: `${animationDelay + 180}ms` }}
         >
-          {tags.map((tag) => (
-            <Link
-              key={tag}
-              href={`/notes?tags=${encodeURIComponent(tag)}`}
-              className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs text-primary transition-colors hover:bg-primary/20"
-            >
-              {tag}
-            </Link>
+          {tags.map((tag, idx) => (
+            <React.Fragment key={tag}>
+              {idx > 0 && <span className="tag-sep" aria-hidden>/</span>}
+              <Link href={`/notes?tags=${encodeURIComponent(tag)}`}>{tag}</Link>
+            </React.Fragment>
           ))}
         </div>
       )}
-    </div>
+
+      <div
+        className="note-editorial-rule animate-in fade-in-0 fill-mode-both duration-500"
+        style={{ animationDelay: `${animationDelay + 240}ms` }}
+        aria-hidden
+      />
+    </header>
   );
 }
 

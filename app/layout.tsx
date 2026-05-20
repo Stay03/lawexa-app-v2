@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Comfortaa } from "next/font/google";
+import { Comfortaa, Fraunces } from "next/font/google";
 import "./globals.css";
 
 import { QueryProvider } from "@/providers/QueryProvider";
@@ -8,6 +8,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { AttributionBootstrap } from "@/components/AttributionBootstrap";
 
 const comfortaa = Comfortaa({ subsets: ["latin"], variable: "--font-comfortaa" });
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  axes: ["SOFT", "WONK", "opsz"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://lawexa.com"),
@@ -42,7 +48,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={comfortaa.variable} suppressHydrationWarning>
+    <html lang="en" className={`${comfortaa.variable} ${fraunces.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <QueryProvider>

@@ -99,78 +99,84 @@ function NoteViewPage({ params, searchParams }: NoteViewPageProps) {
 
   return (
     <>
-      <PageContainer variant="detail" className="pb-24">
-        {/* Hero Header */}
-      <NoteDetailHeader
-        note={note}
-        showStatus={isOwner}
-        animationDelay={ANIMATION_DELAYS.header}
-      />
+      {/* Negative-margin breakout to let the editorial column claim the full
+          mobile viewport width, neutralising the (main) layout's p-4 frame. */}
+      <div className="-mx-4 sm:mx-0">
+        <PageContainer variant="detail" className="px-5 pb-24 sm:px-6">
+          {/* Editorial header */}
+          <NoteDetailHeader
+            note={note}
+            showStatus={isOwner}
+            animationDelay={ANIMATION_DELAYS.header}
+          />
 
-      {/* Actions */}
-      <div
-        className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both flex items-center gap-2 duration-200"
-        style={{ animationDelay: `${ANIMATION_DELAYS.actions}ms` }}
-      >
-        <BookmarkButton
-          type="note"
-          id={note.id}
-          isBookmarked={note.is_bookmarked}
-          bookmarksCount={note.bookmarks_count}
-          variant="full"
-        />
-        <FeedbackButton
-          context={{
-            contentType: 'note',
-            contentId: note.id,
-            contentTitle: note.title,
-          }}
-          variant="full"
-        />
-        <AddToFolderButton itemType="note" itemId={note.id} />
-        {hasFullContent && <ExportDocxButton slug={slug} />}
-        <NoteActions
-          note={note}
-          canEdit={canEdit}
-          animationDelay={0}
-        />
+          {/* Action row — horizontally scrollable on mobile so nothing clips */}
+          <div
+            className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both -mx-5 overflow-x-auto duration-200 sm:mx-0 sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{ animationDelay: `${ANIMATION_DELAYS.actions}ms` }}
+          >
+            <div className="flex w-max items-center gap-2 px-5 sm:w-auto sm:flex-wrap sm:px-0">
+              <BookmarkButton
+                type="note"
+                id={note.id}
+                isBookmarked={note.is_bookmarked}
+                bookmarksCount={note.bookmarks_count}
+                variant="full"
+              />
+              <FeedbackButton
+                context={{
+                  contentType: 'note',
+                  contentId: note.id,
+                  contentTitle: note.title,
+                }}
+                variant="full"
+              />
+              <AddToFolderButton itemType="note" itemId={note.id} />
+              {hasFullContent && <ExportDocxButton slug={slug} />}
+              <NoteActions
+                note={note}
+                canEdit={canEdit}
+                animationDelay={0}
+              />
+            </div>
+          </div>
+
+          {/* Price Card (for paid notes when user doesn't have access) */}
+          {!hasFullContent && note.is_paid && (
+            <NotePriceCard
+              note={note}
+              onPurchase={() => {
+                // TODO: Implement purchase flow
+                console.log('Purchase note:', note.id);
+              }}
+              animationDelay={ANIMATION_DELAYS.priceCard}
+            />
+          )}
+
+          {/* Content */}
+          {hasFullContent ? (
+            <NoteContent
+              content={note.content}
+              animationDelay={ANIMATION_DELAYS.content}
+            />
+          ) : (
+            <div
+              className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both border-y border-dashed border-foreground/15 px-2 py-10 text-center duration-300"
+              style={{ animationDelay: `${ANIMATION_DELAYS.content}ms` }}
+            >
+              <p className="italic text-muted-foreground" style={{ fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
+                Purchase this note to read the full text.
+              </p>
+            </div>
+          )}
+
+          {/* Author footer */}
+          <NoteAuthorCard
+            author={note.user}
+            animationDelay={ANIMATION_DELAYS.author}
+          />
+        </PageContainer>
       </div>
-
-      {/* Price Card (for paid notes when user doesn't have access) */}
-      {!hasFullContent && note.is_paid && (
-        <NotePriceCard
-          note={note}
-          onPurchase={() => {
-            // TODO: Implement purchase flow
-            console.log('Purchase note:', note.id);
-          }}
-          animationDelay={ANIMATION_DELAYS.priceCard}
-        />
-      )}
-
-      {/* Content */}
-      {hasFullContent ? (
-        <NoteContent
-          content={note.content}
-          animationDelay={ANIMATION_DELAYS.content}
-        />
-      ) : (
-        <div
-          className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both rounded-lg border border-dashed border-muted-foreground/25 bg-muted/30 p-8 text-center duration-300"
-          style={{ animationDelay: `${ANIMATION_DELAYS.content}ms` }}
-        >
-          <p className="text-muted-foreground">
-            Purchase this note to view the full content.
-          </p>
-        </div>
-      )}
-
-        {/* Author Card */}
-        <NoteAuthorCard
-          author={note.user}
-          animationDelay={ANIMATION_DELAYS.author}
-        />
-      </PageContainer>
       <FloatingPromptInput
         contextSlug={slug}
         contextType="note"
