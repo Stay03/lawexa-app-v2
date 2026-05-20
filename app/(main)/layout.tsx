@@ -28,6 +28,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useBreadcrumbStore } from "@/lib/stores/breadcrumbStore"
 import { useAuthStore } from "@/lib/stores/authStore"
 import { useGuestAuth } from "@/lib/hooks/useGuestAuth"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Button } from "@/components/ui/button"
+import { MoreHorizontal } from "lucide-react"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 function getBreadcrumbs(pathname: string, getOverrideLabel: (segment: string) => string | undefined) {
   const segments = pathname.split('/').filter(Boolean)
@@ -97,6 +101,7 @@ export default function MainLayout({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const breadcrumbs = React.useMemo(() => getBreadcrumbs(pathname, getOverrideLabel), [pathname, overrides])
   const [mounted, setMounted] = useState(false)
+  const isMobile = useIsMobile()
   useGuestAuth()
 
   useEffect(() => {
@@ -145,20 +150,48 @@ export default function MainLayout({
             </Breadcrumb>
           </div>
           <div className="flex items-center gap-2 px-4">
-            {/* Show Share on case detail and report pages */}
-            {pathname.startsWith('/cases/') && pathname.split('/').length >= 3 && (
-              <ShareButton />
-            )}
-            {/* Show Reader Mode toggle only on case detail page (not report page) */}
-            {pathname.startsWith('/cases/') && pathname.split('/').length === 3 && (
-              <ReaderModeToggle />
-            )}
-            {/* Show conversation share button on conversation pages (not for guests) */}
-            {pathname.startsWith('/c/') && !isGuest && (
-              <ConversationShareHeaderButton />
-            )}
-            {!isGuest && <NotificationBell />}
-            <ThemeToggle />
+            {(() => {
+              const shareNode = pathname.startsWith('/cases/') && pathname.split('/').length >= 3
+                ? <ShareButton />
+                : null;
+              const readerModeNode = pathname.startsWith('/cases/') && pathname.split('/').length === 3
+                ? <ReaderModeToggle />
+                : null;
+              const conversationShareNode = pathname.startsWith('/c/') && !isGuest
+                ? <ConversationShareHeaderButton />
+                : null;
+
+              if (isMobile) {
+                return (
+                  <>
+                    {!isGuest && <NotificationBell />}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More options">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="flex w-auto flex-col gap-1 p-1">
+                        {shareNode}
+                        {readerModeNode}
+                        {conversationShareNode}
+                        <ThemeToggle />
+                      </PopoverContent>
+                    </Popover>
+                  </>
+                );
+              }
+
+              return (
+                <>
+                  {shareNode}
+                  {readerModeNode}
+                  {conversationShareNode}
+                  {!isGuest && <NotificationBell />}
+                  <ThemeToggle />
+                </>
+              );
+            })()}
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto min-h-0 p-4 pt-0">
