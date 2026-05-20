@@ -319,6 +319,27 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const transformApiMessages = useCallback((apiMessages: ApiMessage[]): ConversationMessage[] => {
     const messages: ConversationMessage[] = [];
 
+    // Option A heuristic: classify untagged assistant text messages as narration
+    // if they are followed by tool/handover work in the same turn (before the
+    // next user message). The backend currently saves inter-tool narration with
+    // metadata:null, indistinguishable from a final answer; this lookahead
+    // recovers the distinction. (Track for backend: tag these with
+    // metadata.type:"narration" and this pre-pass becomes unnecessary.)
+    const narrationApiIds = new Set<number>();
+    for (let i = 0; i < apiMessages.length; i++) {
+      const m = apiMessages[i];
+      if (m.role !== 'assistant' || m.metadata?.type || m.metadata?.partial) continue;
+      for (let j = i + 1; j < apiMessages.length; j++) {
+        const next = apiMessages[j];
+        if (next.role === 'user') break;
+        const t = next.metadata?.type;
+        if (next.role === 'tool' || t === 'tool_call' || t === 'handover') {
+          narrationApiIds.add(m.id);
+          break;
+        }
+      }
+    }
+
     // Build lists of tool results by iteration for matching (lists handle iteration resets across executions)
     const toolResultsByIteration = new Map<number, ApiMessage[]>();
     apiMessages.forEach(msg => {
@@ -469,6 +490,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           retryable: apiMsg.metadata.retryable ?? false,
           retryAfterMs: apiMsg.metadata.retry_after_ms ?? null,
         } as ErrorMessage);
+      }
+      // Inter-tool narration identified by lookahead — drop, matches behavior
+      // for backend-tagged narration above.
+      else if (apiMsg.role === 'assistant' && !apiMsg.metadata?.type && narrationApiIds.has(apiMsg.id)) {
+        continue;
       }
       // Regular assistant message (final response)
       else if (apiMsg.role === 'assistant' && !apiMsg.metadata?.type) {
@@ -924,13 +950,20 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
         const currentText = textByIterationRef.current.get(event.iteration) ?? '';
         const msgId = streamingMessageIdRef.current;
-        const isResponse = event.text_type === 'response';
+        // Option A heuristic: backend currently emits text_type:"response" for
+        // inter-tool narration too, so text_type alone misclassifies narration
+        // as a final answer. The real discriminator is reason:"tool_call" — a
+        // genuine final response is terminated by text_done, never by text_reset
+        // with reason:"tool_call". (Track for backend: persist metadata.type
+        // "narration" on these messages so we can drop this heuristic.)
+        const isFinalResponse =
+          event.text_type === 'response' && event.reason !== 'tool_call';
 
-        if (isResponse && currentText.trim() && msgId && currentIterationRef.current === event.iteration) {
-          // Response-type text is the orchestrator's real answer. The backend
-          // persists it as metadata:null, so it survives refresh. Keep the
-          // already-rendered text visible by finalizing the placeholder in
-          // place — detach refs so the next iteration creates a fresh one.
+        if (isFinalResponse && currentText.trim() && msgId && currentIterationRef.current === event.iteration) {
+          // The orchestrator's real answer. The backend persists it as
+          // metadata:null, so it survives refresh. Keep the already-rendered
+          // text visible by finalizing the placeholder in place — detach refs
+          // so the next iteration creates a fresh one.
           setState((prev) => ({
             ...prev,
             messages: prev.messages.map((m) =>
@@ -943,8 +976,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           return;
         }
 
-        // Narration-type text: show transiently via onNarration.
-        if (currentText.trim() && !isResponse) {
+        // Narration text: show transiently via onNarration.
+        if (currentText.trim() && !isFinalResponse) {
           onNarration?.(currentText.trim());
         }
 
