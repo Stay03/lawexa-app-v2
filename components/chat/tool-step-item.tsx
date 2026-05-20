@@ -1,5 +1,6 @@
 'use client';
 
+import { Brain } from 'lucide-react';
 import {
   ChainOfThoughtStep,
   ChainOfThoughtTrigger,
@@ -112,6 +113,15 @@ export function formatToolMessage(
         detail: urlCount ? `from ${urlCount} page${urlCount > 1 ? 's' : ''}` : undefined,
       };
     }
+    case 'search_my_conversations':
+      return {
+        action: isComplete ? 'Checked memory' : 'Checking memory',
+        detail: query ? `for "${query}"` : undefined,
+      };
+    case 'view_conversation':
+      return {
+        action: isComplete ? 'Memory recalled' : 'Recalling memory',
+      };
     default: {
       const readable = toolName
         .replace(/_/g, ' ')
@@ -151,6 +161,9 @@ export function ToolStepItem({
   const status = !isComplete ? 'loading' : isSuccess ? 'success' : 'error';
 
   const isStatuteTool = message.toolName === 'search_statutes' || message.toolName === 'read_statute';
+  const isMemoryTool =
+    message.toolName === 'search_my_conversations' ||
+    message.toolName === 'view_conversation';
   const { action, detail } = formatToolMessage(
     message.toolName,
     message.toolParameters,
@@ -159,7 +172,12 @@ export function ToolStepItem({
   );
 
   return (
-    <ChainOfThoughtStep isLast={isLast} status={status} className={className}>
+    <ChainOfThoughtStep
+      isLast={isLast}
+      status={status}
+      icon={isMemoryTool ? <Brain className="h-3 w-3" /> : undefined}
+      className={className}
+    >
       <Collapsible open={isExpanded} onOpenChange={() => isComplete && onToggle()}>
         <CollapsibleTrigger asChild disabled={!isComplete}>
           <ChainOfThoughtTrigger

@@ -29,10 +29,11 @@ export interface ChainOfThoughtStepProps extends React.HTMLAttributes<HTMLDivEle
   children: React.ReactNode;
   isLast?: boolean;
   status?: 'loading' | 'success' | 'error';
+  icon?: React.ReactNode;
 }
 
 export const ChainOfThoughtStep = forwardRef<HTMLDivElement, ChainOfThoughtStepProps>(
-  ({ children, className, isLast = false, status = 'loading', ...props }, ref) => {
+  ({ children, className, isLast = false, status = 'loading', icon, ...props }, ref) => {
     return (
       <div
         ref={ref}
@@ -50,18 +51,20 @@ export const ChainOfThoughtStep = forwardRef<HTMLDivElement, ChainOfThoughtStepP
             )}
           >
             {status === 'loading' && (
-              <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
+              icon ?? <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
             )}
             {status === 'success' && (
-              <svg
-                className="h-3 w-3"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={3}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+              icon ?? (
+                <svg
+                  className="h-3 w-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )
             )}
             {status === 'error' && (
               <svg
