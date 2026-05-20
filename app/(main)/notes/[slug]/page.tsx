@@ -54,12 +54,13 @@ function NoteViewPage({ params, searchParams }: NoteViewPageProps) {
   const { user } = useAuthStore();
   const { data, isLoading, isError, refetch } = useNote(slug, searchQuery);
 
-  // Loading state
+  // Loading state — match the editorial layout's gutter breakout so the
+  // skeleton lands in exactly the same column as the loaded content.
   if (isLoading) {
     return (
-      <PageContainer variant="detail">
+      <div className="-mx-4 sm:mx-0">
         <NoteDetailSkeleton />
-      </PageContainer>
+      </div>
     );
   }
 

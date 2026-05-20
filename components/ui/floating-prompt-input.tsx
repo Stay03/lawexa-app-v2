@@ -568,7 +568,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
               {/* Textarea */}
               <PromptInputTextarea
-                placeholder={pastedContent ? 'Add a message...' : 'Ask me anything'}
+                placeholder={pastedContent ? 'Add a message...' : 'Ask a question...'}
                 className="text-foreground min-h-[36px] py-2 px-3"
                 onLargePaste={setPastedContent}
               />
@@ -618,53 +618,63 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         </SheetContent>
       </Sheet>
 
-      {/* Fixed bottom input — visible when sheet is closed */}
-      {!isOpen && (
-        <div
-          className={cn(
-            'fixed bottom-4 z-50 right-0 px-4 transition-[left] duration-200 ease-linear',
-            className
-          )}
-          style={{ left: sidebarWidth }}
-        >
-          <div className="mx-auto max-w-xs sm:max-w-md">
-            <PromptInput
-              value={input}
-              onValueChange={setInput}
-              onSubmit={handleSubmit}
-              disabled={isSubmitting}
-              maxHeight={36}
-            >
-              {/* Textarea — single line tap target */}
-              <PromptInputTextarea
-                placeholder="Ask a question..."
-                className="text-foreground min-h-[36px] py-2 px-3"
-                disableAutosize
-                onFocus={() => setIsOpen(true)}
-              />
+      {/* Fixed bottom input — always mounted so the show/hide is animatable.
+          Slides up from below the viewport on show, drops down on hide.
+          aria-hidden + pointer-events-none keep it inert while the sheet owns
+          input focus. */}
+      <div
+        className={cn(
+          'fixed bottom-4 z-50 right-0 px-4',
+          // animate three things together: vertical position, opacity, and
+          // the left offset that tracks the sidebar collapse/expand
+          'transition-[left,transform,opacity] duration-300 ease-out',
+          isOpen
+            ? 'pointer-events-none translate-y-[calc(100%+1.5rem)] opacity-0'
+            : 'translate-y-0 opacity-100',
+          className
+        )}
+        style={{ left: sidebarWidth }}
+        aria-hidden={isOpen}
+      >
+        <div className="mx-auto max-w-xs sm:max-w-md">
+          <PromptInput
+            value={input}
+            onValueChange={setInput}
+            onSubmit={handleSubmit}
+            disabled={isSubmitting}
+            maxHeight={36}
+          >
+            {/* Textarea — single line tap target */}
+            <PromptInputTextarea
+              placeholder="Ask a question..."
+              className="text-foreground min-h-[36px] py-2 px-3"
+              disableAutosize
+              onFocus={() => setIsOpen(true)}
+              tabIndex={isOpen ? -1 : 0}
+            />
 
-              {/* Send button — bottom right */}
-              <div className="flex items-center justify-end px-2 pb-1">
-                <PromptInputAction tooltip="Send message">
-                  <Button
-                    size="icon"
-                    className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
-                    onClick={handleSubmit}
-                    onMouseDown={(e) => e.preventDefault()}
-                    disabled={!input.trim() || isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <ArrowUp className="h-4 w-4" />
-                    )}
-                  </Button>
-                </PromptInputAction>
-              </div>
-            </PromptInput>
-          </div>
+            {/* Send button — bottom right */}
+            <div className="flex items-center justify-end px-2 pb-1">
+              <PromptInputAction tooltip="Send message">
+                <Button
+                  size="icon"
+                  className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
+                  onClick={handleSubmit}
+                  onMouseDown={(e) => e.preventDefault()}
+                  disabled={!input.trim() || isSubmitting}
+                  tabIndex={isOpen ? -1 : 0}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className="h-4 w-4" />
+                  )}
+                </Button>
+              </PromptInputAction>
+            </div>
+          </PromptInput>
         </div>
-      )}
+      </div>
     </>
   );
 }
