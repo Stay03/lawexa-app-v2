@@ -51,7 +51,6 @@ import {
   deleteTranscript,
   renameTranscript,
 } from '@/lib/storage/confidentialTranscriptStore';
-import { ConfidentialFileNotice } from '@/components/chat/confidential-file-notice';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -389,11 +388,14 @@ export default function HomePage() {
         {/* Greeting — swaps to a Confidential Chat heading when the user opts in */}
         {isConfidentialPending ? (
           <div className="mb-4 md:mb-6 flex flex-col items-center text-center">
-            <h1 className="text-[26px] md:text-[36px] font-medium text-red-600 dark:text-red-500">
+            <h1 className="text-[26px] md:text-[36px] font-medium text-emerald-600 dark:text-emerald-500">
               Confidential Chat
             </h1>
             <p className="mt-1 max-w-md text-sm md:text-base text-muted-foreground">
               This chat will not be retained on our servers.
+            </p>
+            <p className="mt-2 max-w-md text-xs text-muted-foreground">
+              Files in confidential chats are kept for up to 24 hours, then permanently deleted. Make a local copy if you need to keep this file.
             </p>
           </div>
         ) : (
@@ -503,9 +505,6 @@ export default function HomePage() {
       {/* shrink-0 keeps the input at its natural size on mobile; it always stays at the bottom */}
       <div ref={inputAreaRef} className="shrink-0 w-full max-w-2xl pb-2 md:pb-0">
         {hasNoFreeMessages && <NoFreeMessagesBanner className="mb-3" />}
-        {isConfidentialPending && !isGuest && (
-          <ConfidentialFileNotice className="mb-3" />
-        )}
         <FileUpload onFilesAdded={isGuest ? () => {} : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
           {/* Mobile-only jurisdiction badge — sits above the input card, top-left */}
           {!isGuest && (

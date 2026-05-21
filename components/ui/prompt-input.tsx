@@ -102,7 +102,7 @@ function PromptInput({
           className={cn(
             "rounded-3xl",
             isConfidential
-              ? "border-2 border-red-600 dark:border-red-500"
+              ? "border border-emerald-600/70 dark:border-emerald-500/70"
               : "gold-shimmer p-[1px]",
             disabled && "cursor-not-allowed opacity-60"
           )}

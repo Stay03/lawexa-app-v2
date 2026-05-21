@@ -56,7 +56,7 @@ export function ConfidentialModeToggle({ variant = 'icon' }: ConfidentialModeTog
         className={cn(
           'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
           'hover:bg-accent hover:text-accent-foreground',
-          active && 'text-red-600 dark:text-red-500',
+          active && 'text-emerald-600 dark:text-emerald-500',
           !interactive && 'cursor-default opacity-90',
         )}
       >
@@ -64,9 +64,6 @@ export function ConfidentialModeToggle({ variant = 'icon' }: ConfidentialModeTog
         <span className="flex-1 text-left">
           {active ? 'Confidential Chat: On' : 'Confidential Chat'}
         </span>
-        {active && (
-          <span className="h-1.5 w-1.5 rounded-full bg-red-600 dark:bg-red-500" />
-        )}
       </button>
     );
   }
@@ -85,15 +82,12 @@ export function ConfidentialModeToggle({ variant = 'icon' }: ConfidentialModeTog
             className={cn(
               'relative h-8 w-8 transition-colors',
               active
-                ? 'text-red-600 ring-1 ring-red-600/40 hover:text-red-700 dark:text-red-500 dark:ring-red-500/50'
+                ? 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-500'
                 : 'text-muted-foreground hover:text-foreground',
               !interactive && 'cursor-default',
             )}
           >
             <Icon className="h-4 w-4" />
-            {active && (
-              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-600 dark:bg-red-500" />
-            )}
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-[220px] text-center">
