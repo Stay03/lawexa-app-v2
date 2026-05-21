@@ -72,15 +72,6 @@ type FileUploadEntry = {
   error?: string;
 };
 
-// Workflow choices exposed to regular (non-admin) users. Admin/researcher
-// see the full API-driven list instead.
-const USER_WORKFLOWS = [
-  { id: 15, name: 'Lawexa Lite' },
-  { id: 16, name: 'Lawexa Expert' },
-] as const;
-const USER_WORKFLOW_STORAGE_KEY = 'lawexa_user_workflow';
-const DEFAULT_USER_WORKFLOW_ID = '15';
-
 export default function HomePage() {
   const [input, setInput] = useState(() => {
     if (typeof window === 'undefined') return '';
@@ -95,14 +86,7 @@ export default function HomePage() {
   const isUploading = uploads.some((u) => u.status === 'uploading');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>(() => {
-    if (typeof window === 'undefined') return '';
-    const stored = window.localStorage.getItem(USER_WORKFLOW_STORAGE_KEY);
-    if (stored && USER_WORKFLOWS.some((w) => String(w.id) === stored)) {
-      return stored;
-    }
-    return DEFAULT_USER_WORKFLOW_ID;
-  });
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
   const [error, setError] = useState<{ message: string; status: number } | null>(null);
   const [blockedReason, setBlockedReason] = useState<IBlockedReason | null>(null);
   const { greeting, name, isSpecial } = useGreetingParts();
@@ -148,11 +132,9 @@ export default function HomePage() {
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
 
-  // Workflow selector — admin/researcher get the full API-driven list;
-  // regular signed-in users get a fixed Lite/Expert choice; guests don't
-  // see any selector.
+  // Workflow selector — only admin/researcher can pick. Regular users and
+  // guests don't send a workflow_id so the backend uses its own default.
   const canSelectWorkflow = !!user?.role && ['superadmin', 'admin', 'researcher'].includes(user.role);
-  const isRegularUser = !!user && !isGuest && !canSelectWorkflow;
   const workflowParams = { active_only: true, per_page: 50 };
   const { data: workflowsData } = useQuery({
     queryKey: adminAiKeys.workflowsList(workflowParams),
@@ -163,24 +145,14 @@ export default function HomePage() {
   const workflows = workflowsData?.data ?? [];
 
   // Pre-select the default workflow for admin/researcher when data loads.
-  // Guard against overwriting a regular user's stored Lite/Expert choice.
   useEffect(() => {
+    if (selectedWorkflowId) return;
     if (!canSelectWorkflow) return;
-    // Admin/researcher path: only set if value isn't already a valid admin id.
-    if (selectedWorkflowId && workflows.some((w) => String(w.id) === selectedWorkflowId)) return;
     if (workflows.length > 0) {
       const defaultWorkflow = workflows.find((w) => w.is_default);
       setSelectedWorkflowId(String((defaultWorkflow ?? workflows[0]).id));
     }
   }, [workflows, selectedWorkflowId, canSelectWorkflow]);
-
-  // Persist regular-user workflow choice across sessions.
-  useEffect(() => {
-    if (!isRegularUser) return;
-    if (!selectedWorkflowId) return;
-    if (!USER_WORKFLOWS.some((w) => String(w.id) === selectedWorkflowId)) return;
-    window.localStorage.setItem(USER_WORKFLOW_STORAGE_KEY, selectedWorkflowId);
-  }, [isRegularUser, selectedWorkflowId]);
 
   useEffect(() => {
     // Slide in after a short delay
@@ -696,26 +668,6 @@ export default function HomePage() {
                       </div>
                     </FileUploadTrigger>
                   </PromptInputAction>
-                )}
-
-                {/* Workflow selector — regular signed-in users pick between
-                    Lawexa Lite and Lawexa Expert. */}
-                {isRegularUser && (
-                  <Select
-                    value={selectedWorkflowId}
-                    onValueChange={setSelectedWorkflowId}
-                  >
-                    <SelectTrigger size="sm" className="h-7 text-xs border-none bg-transparent hover:bg-secondary-foreground/10 px-2 gap-1 min-w-0 max-w-[140px] sm:max-w-none [&>span]:truncate">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {USER_WORKFLOWS.map((wf) => (
-                        <SelectItem key={wf.id} value={String(wf.id)}>
-                          {wf.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 )}
 
                 {/* Workflow selector - admin/researcher only */}
