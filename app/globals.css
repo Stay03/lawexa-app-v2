@@ -1535,21 +1535,3 @@
   border-radius: 0.5rem;
 }
 
-/* Drop-cap on the very first paragraph for that magazine touch */
-.note-prose > p:first-of-type::first-letter {
-  font-family: var(--font-fraunces), serif;
-  font-variation-settings: "SOFT" 100, "opsz" 144;
-  font-weight: 700;
-  font-size: 3.2em;
-  line-height: 0.88;
-  float: left;
-  margin: 0.08em 0.12em 0 -0.04em;
-  color: var(--primary);
-}
-
-@media (max-width: 480px) {
-  .note-prose > p:first-of-type::first-letter {
-    font-size: 2.8em;
-  }
-}
-
