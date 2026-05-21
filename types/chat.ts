@@ -17,6 +17,9 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  // Canonical multi-attachment shape. Always check `attachments` first.
+  attachments?: MessageAttachment[];
+  // Legacy alias for renderers not migrated yet — always equals attachments[0].
   attachment?: MessageAttachment;
   // Marks a message that was cut short mid-stream (cancelled or errored).
   // content holds the partial text the user saw before the stream ended.
@@ -305,7 +308,12 @@ export interface ChatStartRequest {
   workflow_id?: number;
   agent_id?: number;
   study_mode?: boolean;
+  // Legacy single-file field. Prefer `file_ids` for new code. The server
+  // returns 422 if both are populated with non-empty values.
   file_id?: number;
+  // Canonical multi-file field. Up to 10 IDs per turn; duplicates are
+  // silently deduped server-side.
+  file_ids?: number[];
   // Three-state field. Absent = backend auto-resolves from profile/IP.
   // String = override with that jurisdiction slug. Explicit null =
   // skip jurisdiction injection (comparative / academic mode).
@@ -346,8 +354,14 @@ export interface UseChatStreamOptions {
 // Options for the send() method
 export interface SendMessageOptions {
   conversationId?: string;
+  // Legacy single-file convenience. Prefer fileIds[] for new code.
   fileId?: number;
+  // Canonical multi-file IDs (max 10 per turn).
+  fileIds?: number[];
+  // Single-attachment convenience for optimistic message rendering.
   attachment?: MessageAttachment;
+  // Multi-attachment list for optimistic message rendering.
+  attachments?: MessageAttachment[];
   studyMode?: boolean;
   workflowId?: number;
   // Opt-in token streaming; forwarded into ChatStartRequest.stream_mode
@@ -405,6 +419,10 @@ export interface ApiMessage {
     partial?: boolean;
     reason?: 'cancelled' | 'error' | 'timeout';
   } | null;
+  // Canonical multi-attachment shape (backend normalizes both legacy and new
+  // storage shapes into this array). Always check `attachments` first.
+  attachments?: MessageAttachment[];
+  // Legacy alias for clients not migrated — equals attachments[0].
   attachment?: MessageAttachment;
   created_at: string;
 }

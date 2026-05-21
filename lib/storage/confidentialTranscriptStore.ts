@@ -19,7 +19,7 @@ export interface ConfidentialTranscriptEntry {
   content: string;
   created_at: string;
   local_id: string;
-  attachment?: ConfidentialAttachment;
+  attachments?: ConfidentialAttachment[];
 }
 
 export interface ConfidentialTranscript {
@@ -99,7 +99,7 @@ export async function hasTranscript(conversation_id: string): Promise<boolean> {
 
 export async function appendUserTurn(
   conversation_id: string,
-  payload: { content: string; attachment?: ConfidentialAttachment },
+  payload: { content: string; attachments?: ConfidentialAttachment[] },
 ): Promise<ConfidentialTranscriptEntry> {
   const transcript = await ensureTranscript(conversation_id);
   const entry: ConfidentialTranscriptEntry = {
@@ -107,7 +107,9 @@ export async function appendUserTurn(
     content: payload.content,
     created_at: nowIso(),
     local_id: newLocalId(),
-    ...(payload.attachment && { attachment: payload.attachment }),
+    ...(payload.attachments && payload.attachments.length > 0 && {
+      attachments: payload.attachments,
+    }),
   };
   const updated: ConfidentialTranscript = {
     ...transcript,

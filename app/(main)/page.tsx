@@ -45,6 +45,7 @@ import {
 } from '@/lib/hooks/useJurisdictionChoice';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
+import { cn } from '@/lib/utils';
 import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
 import {
   appendUserTurn,
@@ -53,6 +54,23 @@ import {
 } from '@/lib/storage/confidentialTranscriptStore';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILES_PER_TURN = 10;
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/rtf',
+  'text/rtf',
+];
+
+type FileUploadEntry = {
+  key: string;
+  file_name: string;
+  file_size: number;
+  status: 'uploading' | 'uploaded' | 'failed';
+  file_id?: number;
+  error?: string;
+};
 
 export default function HomePage() {
   const [input, setInput] = useState(() => {
@@ -63,9 +81,9 @@ export default function HomePage() {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('home_input_pasted') || null;
   });
-  const [uploadedFile, setUploadedFile] = useState<{ file_id: number; file_name: string; file_size: number } | null>(null);
-  const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
+  const uploadedFiles = uploads.filter((u) => u.status === 'uploaded');
+  const isUploading = uploads.some((u) => u.status === 'uploading');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
@@ -160,7 +178,7 @@ export default function HomePage() {
   }, [isGuest, user]);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && !uploadedFile && !pastedContent) || isSubmitting || isUploading) return;
+    if ((!input.trim() && uploadedFiles.length === 0 && !pastedContent) || isSubmitting || isUploading) return;
 
     const typedText = input.trim();
     const fullMessage = pastedContent
@@ -195,12 +213,12 @@ export default function HomePage() {
       try {
         await appendUserTurn(tempConvId, {
           content: fullMessage,
-          ...(uploadedFile && {
-            attachment: {
-              file_id: uploadedFile.file_id,
-              file_name: uploadedFile.file_name,
-              file_size: uploadedFile.file_size,
-            },
+          ...(uploadedFiles.length > 0 && {
+            attachments: uploadedFiles.map((u) => ({
+              file_id: u.file_id!,
+              file_name: u.file_name,
+              file_size: u.file_size,
+            })),
           }),
         });
       } catch {
@@ -211,6 +229,7 @@ export default function HomePage() {
 
     try {
       // Start chat to get conversation_id
+      const fileIds = uploadedFiles.map((u) => u.file_id!).filter((id) => id !== undefined);
       const baseBody = {
         message: fullMessage,
         stream: true as const,
@@ -218,7 +237,7 @@ export default function HomePage() {
         stream_mode: 'v2_stream' as const,
         ...(studyMode && { study_mode: true }),
         ...(selectedWorkflowId && { workflow_id: Number(selectedWorkflowId) }),
-        ...(uploadedFile && { file_id: uploadedFile.file_id }),
+        ...(fileIds.length > 0 && { file_ids: fileIds }),
         // Confidential turn 1: send the flag + an empty history array.
         // Subsequent turns omit `is_confidential` (immutable) but keep `messages`.
         ...(isConfidential && { is_confidential: true, messages: [] }),
@@ -253,10 +272,12 @@ export default function HomePage() {
           msg: fullMessage,
           exec: executionId,
           stream_mode: 'v2_stream',
-          ...(uploadedFile && {
-            file_id: uploadedFile.file_id,
-            file_name: uploadedFile.file_name,
-            file_size: uploadedFile.file_size,
+          ...(uploadedFiles.length > 0 && {
+            attachments: uploadedFiles.map((u) => ({
+              file_id: u.file_id!,
+              file_name: u.file_name,
+              file_size: u.file_size,
+            })),
           }),
         }));
         router.push(`/c/${conversationId}?init=1`);
@@ -300,49 +321,104 @@ export default function HomePage() {
   };
 
   const handleFilesAdded = async (newFiles: File[]) => {
-    const pdfFile = newFiles[0];
-    if (!pdfFile) return;
-
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/rtf',
-      'text/rtf'
-    ];
-    if (!allowedTypes.includes(pdfFile.type)) {
-      setError({ message: 'Only PDF, DOC, DOCX, and RTF files are supported.', status: 0 });
-      return;
-    }
-    if (pdfFile.size > MAX_DOCUMENT_SIZE) {
-      setError({ message: 'File size must be 10MB or less.', status: 0 });
-      return;
-    }
-
+    if (newFiles.length === 0) return;
     if (error) setError(null);
-    setUploadingFileName(pdfFile.name);
-    setIsUploading(true);
 
-    try {
-      const uploadRes = await chatApi.uploadDocument(pdfFile);
-      setUploadedFile({
-        file_id: uploadRes.data.id,
-        file_name: uploadRes.data.original_name,
-        file_size: uploadRes.data.size,
+    // Reserve "slots" — accept up to the remaining cap, dedupe by name+size
+    // against anything already in the list (uploading or done).
+    const existingKeys = new Set(
+      uploads.map((u) => `${u.file_name}::${u.file_size}`),
+    );
+    const remainingSlots = MAX_FILES_PER_TURN - uploads.length;
+    const accepted: { file: File; entry: FileUploadEntry }[] = [];
+    let rejectedType = false;
+    let rejectedSize = false;
+    let rejectedDuplicate = false;
+    let rejectedCap = false;
+
+    for (const file of newFiles) {
+      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+        rejectedType = true;
+        continue;
+      }
+      if (file.size > MAX_DOCUMENT_SIZE) {
+        rejectedSize = true;
+        continue;
+      }
+      const dedupKey = `${file.name}::${file.size}`;
+      if (existingKeys.has(dedupKey)) {
+        rejectedDuplicate = true;
+        continue;
+      }
+      if (accepted.length >= remainingSlots) {
+        rejectedCap = true;
+        break;
+      }
+      existingKeys.add(dedupKey);
+      const slotKey =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      accepted.push({
+        file,
+        entry: {
+          key: slotKey,
+          file_name: file.name,
+          file_size: file.size,
+          status: 'uploading',
+        },
       });
-    } catch (err) {
-      const apiError = extractApiError(err);
-      setError({ message: apiError.message, status: apiError.status });
-    } finally {
-      setIsUploading(false);
-      setUploadingFileName(null);
     }
+
+    if (rejectedType) {
+      setError({ message: 'Only PDF, DOC, DOCX, and RTF files are supported.', status: 0 });
+    } else if (rejectedSize) {
+      setError({ message: 'Each file must be 10MB or less.', status: 0 });
+    } else if (rejectedCap) {
+      setError({ message: `You can attach at most ${MAX_FILES_PER_TURN} files per message.`, status: 0 });
+    } else if (rejectedDuplicate && accepted.length === 0) {
+      setError({ message: 'That file is already attached.', status: 0 });
+    }
+
+    if (accepted.length === 0) return;
+
+    setUploads((prev) => [...prev, ...accepted.map((a) => a.entry)]);
+
+    // Upload in parallel — settle each independently so one failure doesn't
+    // block the others. Update each slot in place by key.
+    await Promise.all(
+      accepted.map(async ({ file, entry }) => {
+        try {
+          const uploadRes = await chatApi.uploadDocument(file);
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.key === entry.key
+                ? {
+                    ...u,
+                    status: 'uploaded',
+                    file_id: uploadRes.data.id,
+                    file_name: uploadRes.data.original_name,
+                    file_size: uploadRes.data.size,
+                  }
+                : u,
+            ),
+          );
+        } catch (err) {
+          const apiError = extractApiError(err);
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.key === entry.key
+                ? { ...u, status: 'failed', error: apiError.message }
+                : u,
+            ),
+          );
+        }
+      }),
+    );
   };
 
-  const removeFile = () => {
-    setUploadedFile(null);
-    setUploadingFileName(null);
-    setIsUploading(false);
+  const removeUpload = (key: string) => {
+    setUploads((prev) => prev.filter((u) => u.key !== key));
   };
 
   const inputAreaRef = useRef<HTMLDivElement>(null);
@@ -502,7 +578,7 @@ export default function HomePage() {
       {/* shrink-0 keeps the input at its natural size on mobile; it always stays at the bottom */}
       <div ref={inputAreaRef} className="shrink-0 w-full max-w-2xl pb-2 md:pb-0">
         {hasNoFreeMessages && <NoFreeMessagesBanner className="mb-3" />}
-        <FileUpload onFilesAdded={isGuest ? () => {} : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
+        <FileUpload onFilesAdded={isGuest ? () => {} : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple>
           {/* Mobile-only jurisdiction badge — sits above the input card, top-left */}
           {!isGuest && (
             <div className="md:hidden mb-2 flex items-center">
@@ -525,31 +601,46 @@ export default function HomePage() {
             disabled={isSubmitting || hasNoFreeMessages}
             variant={isConfidentialPending ? 'confidential' : 'default'}
           >
-            {/* Document File Preview inside input — hidden for guests */}
-            {!isGuest && (isUploading || uploadedFile) && (
+            {/* Attachment chips — one per pending/uploaded/failed file (max 10) */}
+            {!isGuest && uploads.length > 0 && (
               <div className="flex flex-wrap gap-2 px-3 pt-3">
-                <div
-                  className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {isUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <FileUp className="h-4 w-4" />
-                  )}
-                  <span className="max-w-[120px] truncate">
-                    {uploadedFile?.file_name || uploadingFileName}
-                  </span>
-                  {uploadedFile && (
-                    <span className="text-muted-foreground text-xs">{formatFileSize(uploadedFile.file_size)}</span>
-                  )}
-                  <button
-                    onClick={removeFile}
-                    className="hover:bg-secondary/50 rounded-full p-1"
+                {uploads.map((u) => (
+                  <div
+                    key={u.key}
+                    className={cn(
+                      'flex items-center gap-2 rounded-lg px-3 py-2 text-sm',
+                      u.status === 'failed'
+                        ? 'bg-destructive/10 text-destructive'
+                        : 'bg-secondary',
+                    )}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+                    {u.status === 'uploading' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : u.status === 'failed' ? (
+                      <X className="h-4 w-4" />
+                    ) : (
+                      <FileUp className="h-4 w-4" />
+                    )}
+                    <span className="max-w-[140px] truncate" title={u.file_name}>
+                      {u.file_name}
+                    </span>
+                    {u.status === 'uploaded' && (
+                      <span className="text-muted-foreground text-xs">{formatFileSize(u.file_size)}</span>
+                    )}
+                    {u.status === 'failed' && u.error && (
+                      <span className="text-xs opacity-80">{u.error}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeUpload(u.key)}
+                      className="hover:bg-secondary/50 rounded-full p-1"
+                      aria-label={`Remove ${u.file_name}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -615,7 +706,7 @@ export default function HomePage() {
                     size="icon"
                     className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
                     onClick={handleSubmit}
-                    disabled={(!input.trim() && !uploadedFile && !pastedContent) || isSubmitting || isUploading}
+                    disabled={(!input.trim() && uploadedFiles.length === 0 && !pastedContent) || isSubmitting || isUploading}
                   >
                     {isSubmitting ? (
                       <Loader2 className="h-5 w-5 animate-spin" />

@@ -117,13 +117,24 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   // ─── Internal helpers ──────────────────────────────────────
 
   // Add user message to state
-  const addUserMessage = useCallback((content: string, attachment?: MessageAttachment): ChatMessage => {
+  const addUserMessage = useCallback((
+    content: string,
+    attachments?: MessageAttachment[] | MessageAttachment,
+  ): ChatMessage => {
+    const list: MessageAttachment[] | undefined = Array.isArray(attachments)
+      ? attachments
+      : attachments
+        ? [attachments]
+        : undefined;
     const message: ChatMessage = {
       id: generateId(),
       role: 'user',
       content,
       timestamp: new Date(),
-      ...(attachment && { attachment }),
+      ...(list && list.length > 0 && {
+        attachments: list,
+        attachment: list[0],
+      }),
     };
     setState((prev) => ({
       ...prev,
@@ -370,12 +381,23 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     for (const apiMsg of apiMessages) {
       // User message
       if (apiMsg.role === 'user') {
+        // Normalize the two server shapes: prefer `attachments` (array,
+        // new), fall back to `attachment` (singular, legacy). Always set
+        // both on the local message so old and new renderers both work.
+        const list = apiMsg.attachments && apiMsg.attachments.length > 0
+          ? apiMsg.attachments
+          : apiMsg.attachment
+            ? [apiMsg.attachment]
+            : undefined;
         messages.push({
           id: `msg_${apiMsg.id}`,
           role: 'user',
           content: apiMsg.content,
           timestamp: new Date(apiMsg.created_at),
-          ...(apiMsg.attachment && { attachment: apiMsg.attachment }),
+          ...(list && {
+            attachments: list,
+            attachment: list[0],
+          }),
         } as ChatMessage);
       }
       // Handover message - orchestrator delegating to sub-agent
@@ -753,19 +775,25 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         return false;
       }
 
-      const messages: ConversationMessage[] = transcript.messages.map((m, idx) => ({
-        id: `${m.local_id}_${idx}`,
-        role: m.role === 'tool' ? 'assistant' : m.role,
-        content: m.content,
-        timestamp: new Date(m.created_at),
-        ...(m.attachment && {
-          attachment: {
-            file_id: m.attachment.file_id,
-            file_name: m.attachment.file_name,
-            file_size: m.attachment.file_size,
-          },
-        }),
-      }));
+      const messages: ConversationMessage[] = transcript.messages.map((m, idx) => {
+        const list: MessageAttachment[] | undefined = m.attachments && m.attachments.length > 0
+          ? m.attachments.map((a) => ({
+              file_id: a.file_id,
+              file_name: a.file_name,
+              file_size: a.file_size,
+            }))
+          : undefined;
+        return {
+          id: `${m.local_id}_${idx}`,
+          role: m.role === 'tool' ? 'assistant' : m.role,
+          content: m.content,
+          timestamp: new Date(m.created_at),
+          ...(list && {
+            attachments: list,
+            attachment: list[0],
+          }),
+        };
+      });
 
       setState((prev) => ({
         ...prev,
@@ -803,7 +831,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
   // Connect to existing SSE stream (for when navigating from home page or reconnecting)
   const connectToStream = useCallback(
-    (executionId: string, initialMessage?: string, initialAttachment?: MessageAttachment) => {
+    (
+      executionId: string,
+      initialMessage?: string,
+      initialAttachments?: MessageAttachment[] | MessageAttachment,
+    ) => {
       if (!token) {
         const error = 'Authentication required';
         setState((prev) => ({ ...prev, error }));
@@ -819,7 +851,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       // Add initial user message if provided
       if (initialMessage) {
-        addUserMessage(initialMessage, initialAttachment);
+        addUserMessage(initialMessage, initialAttachments);
       }
 
       // Set streaming state (no assistant placeholder - we'll add it when completed)
@@ -1551,6 +1583,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
     const convId = options.conversationId || conversationIdRef.current;
 
+    // Normalize attachments + file IDs into arrays. Callers may pass either
+    // the legacy singular shape or the new plural shape — never both.
+    const attachmentsList: MessageAttachment[] = options.attachments
+      ?? (options.attachment ? [options.attachment] : []);
+    const fileIdsList: number[] = options.fileIds
+      ?? (options.fileId !== undefined ? [options.fileId] : []);
+
     // Confidential mode: source-of-truth is the Zustand confidentialIds set.
     // Subsequent turns (turn N>1) re-send the full prior transcript from IDB.
     const confidentialStore = useConfidentialModeStore.getState();
@@ -1571,12 +1610,12 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       try {
         await appendUserTurn(convId, {
           content: message,
-          ...(options.attachment && {
-            attachment: {
-              file_id: options.attachment.file_id,
-              file_name: options.attachment.file_name,
-              file_size: options.attachment.file_size,
-            },
+          ...(attachmentsList.length > 0 && {
+            attachments: attachmentsList.map((a) => ({
+              file_id: a.file_id,
+              file_name: a.file_name,
+              file_size: a.file_size,
+            })),
           }),
         });
       } catch {
@@ -1585,7 +1624,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }
 
     // Add optimistic user message
-    const optimisticMsg = addUserMessage(message, options.attachment);
+    const optimisticMsg = addUserMessage(message, attachmentsList);
 
     // Set streaming state
     setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
@@ -1601,7 +1640,10 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         message,
         stream: true as const,
         ...(convId && { conversation_id: convId }),
-        ...(options.fileId && { file_id: options.fileId }),
+        // Canonical multi-file shape. Empty array would still validate but
+        // we omit the field entirely when no files are attached to keep
+        // the request body lean.
+        ...(fileIdsList.length > 0 && { file_ids: fileIdsList }),
         ...(options.studyMode && { study_mode: true }),
         ...(options.workflowId && { workflow_id: options.workflowId }),
         ...(options.streamMode && { stream_mode: options.streamMode }),
@@ -1729,14 +1771,17 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       }
 
       // Status is expired or idle — truly retry
-      // Preserve file attachment from original message
-      const fileId = (lastUserMsg as ChatMessage)?.attachment?.file_id;
+      // Preserve all file attachments from the original message
+      const originalMsg = lastUserMsg as ChatMessage;
+      const retryAttachments = originalMsg.attachments
+        ?? (originalMsg.attachment ? [originalMsg.attachment] : []);
+      const retryFileIds = retryAttachments.map((a) => a.file_id);
 
       const retryBody = {
         message: lastUserMsg.content,
         stream: true as const,
         conversation_id: convId,
-        ...(fileId && { file_id: fileId }),
+        ...(retryFileIds.length > 0 && { file_ids: retryFileIds }),
         ...(streamModeRef.current && { stream_mode: streamModeRef.current }),
       };
       const response = await chatApi.start(
