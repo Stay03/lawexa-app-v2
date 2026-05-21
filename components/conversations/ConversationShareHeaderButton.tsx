@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToggleConversationVisibility } from '@/lib/hooks/useConversationSharing';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
 import { chatApi } from '@/lib/api/chat';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,9 @@ function ConversationShareHeaderButton() {
 
   // Extract conversation ID from pathname
   const conversationId = pathname.startsWith('/c/') ? pathname.split('/')[2] : null;
+  // Confidential conversations cannot be published. Short-circuit the API call
+  // (it 404s) and never render the share affordance.
+  const isConfidential = useConfidentialModeStore((s) => s.isConfidential(conversationId));
 
   // Generate shareable link
   const shareableLink = conversationId
@@ -44,7 +48,7 @@ function ConversationShareHeaderButton() {
 
   // Fetch conversation metadata on mount or when pathname changes
   useEffect(() => {
-    if (!conversationId || !user?.id) {
+    if (!conversationId || !user?.id || isConfidential) {
       setIsLoading(false);
       setIsOwner(false);
       return;
@@ -55,6 +59,10 @@ function ConversationShareHeaderButton() {
       .getConversation(conversationId)
       .then((response) => {
         if (response.success && response.data) {
+          if (response.data.is_confidential) {
+            setIsOwner(false);
+            return;
+          }
           setIsPrivate(response.data.is_private);
           setIsOwner(response.data.user_id === user.id);
         } else {
@@ -67,10 +75,10 @@ function ConversationShareHeaderButton() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, isConfidential]);
 
-  // Don't render if not on a conversation page, not the owner, or still loading
-  if (!conversationId || isLoading || !isOwner) {
+  // Don't render if not on a conversation page, confidential, not the owner, or still loading
+  if (!conversationId || isConfidential || isLoading || !isOwner) {
     return null;
   }
 

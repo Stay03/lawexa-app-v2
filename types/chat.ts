@@ -179,6 +179,11 @@ export interface CompletedEvent {
     prompt: number;
     completion: number;
   };
+  // Late-connect / SSE-replay flag. Always present on the terminal event
+  // emitted from the DB. true = server has content (event.content is set).
+  // false = server discarded the content (confidential mode); client must
+  // fall back to local IndexedDB transcript.
+  replayable?: boolean;
   timestamp: string;
 }
 
@@ -283,6 +288,13 @@ export interface ConversationStatusResponse {
   data: ConversationStatusData;
 }
 
+// Prior-turn entry sent in the `messages` array for confidential chats.
+// The device owns the transcript; server reads but does not store these.
+export interface ConfidentialHistoryEntry {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+}
+
 // Chat API request/response types
 export interface ChatStartRequest {
   message: string;
@@ -298,6 +310,12 @@ export interface ChatStartRequest {
   // String = override with that jurisdiction slug. Explicit null =
   // skip jurisdiction injection (comparative / academic mode).
   jurisdiction?: string | null;
+  // Confidential mode: set once at conversation creation (turn 1). Immutable
+  // afterwards — sending on an existing conversation returns 422.
+  is_confidential?: boolean;
+  // Prior transcript for confidential chats. Required (even as []) on every
+  // confidential turn. Forbidden for non-confidential — server returns 422.
+  messages?: ConfidentialHistoryEntry[];
 }
 
 export interface ChatStartResponse {
@@ -337,6 +355,9 @@ export interface SendMessageOptions {
   // Per-conversation jurisdiction choice. Translated into the wire field
   // by applyJurisdiction() at send time.
   jurisdiction?: JurisdictionChoice;
+  // Set on turn 1 when the user opted into confidential mode on the home page.
+  // The hook reads the prior transcript from IndexedDB on subsequent turns.
+  isConfidential?: boolean;
 }
 
 // Chat state for hook
@@ -410,6 +431,7 @@ export interface ConversationData {
   title: string;
   status: 'active' | 'archived';
   is_private: boolean;
+  is_confidential?: boolean;
   messages: ApiMessage[];
   messages_count: number;
   views_count?: number;
@@ -433,6 +455,7 @@ export interface ConversationListItem {
   title: string;
   status: 'active' | 'archived';
   is_private: boolean;
+  is_confidential?: boolean;
   agent: {
     id: number;
     name: string;

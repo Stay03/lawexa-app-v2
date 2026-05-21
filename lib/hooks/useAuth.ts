@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
+import { clearAllTranscripts } from '@/lib/storage/confidentialTranscriptStore';
 import { extractApiError, type ApiError } from '@/lib/utils/api-error';
 import { clearAttribution } from '@/lib/utils/attribution';
 import type { LoginFormData, RegisterFormData } from '@/types/auth';
@@ -66,7 +68,15 @@ export function useAuth() {
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: () => authApi.logout(),
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Wipe confidential transcripts and reset session state — confidential
+      // chats are device-only and must not survive a logout.
+      try {
+        await clearAllTranscripts();
+      } catch {
+        // Non-fatal — IDB unavailable on server / private mode.
+      }
+      useConfidentialModeStore.getState().reset();
       clearAuth();
       queryClient.clear();
       router.push('/login');

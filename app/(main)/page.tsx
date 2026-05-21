@@ -45,6 +45,13 @@ import {
 } from '@/lib/hooks/useJurisdictionChoice';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
+import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
+import {
+  appendUserTurn,
+  deleteTranscript,
+  renameTranscript,
+} from '@/lib/storage/confidentialTranscriptStore';
+import { ConfidentialFileNotice } from '@/components/chat/confidential-file-notice';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -71,6 +78,9 @@ export default function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
   const isGuest = useAuthStore((state) => state.isGuest);
+  const isConfidentialPending = useConfidentialModeStore((s) => s.isPending);
+  const setConfidentialPending = useConfidentialModeStore((s) => s.setPending);
+  const markConfidential = useConfidentialModeStore((s) => s.markConfidential);
 
   // Home page has no conversation yet — choice lives under the home key
   // and is bridged into the conversation slot once the backend creates one.
@@ -172,6 +182,34 @@ export default function HomePage() {
     setPastedContent(null);
     setIsSubmitting(true);
 
+    // Snapshot the toggle so we can clear it once the conversation exists.
+    const isConfidential = isConfidentialPending;
+
+    // For confidential chats, persist the user turn to IndexedDB BEFORE the
+    // POST so a crash doesn't lose it. Use a temp UUID until the server
+    // returns the real conversation_id; we rename the row on success.
+    let tempConvId: string | null = null;
+    if (isConfidential) {
+      tempConvId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      try {
+        await appendUserTurn(tempConvId, {
+          content: fullMessage,
+          ...(uploadedFile && {
+            attachment: {
+              file_id: uploadedFile.file_id,
+              file_name: uploadedFile.file_name,
+              file_size: uploadedFile.file_size,
+            },
+          }),
+        });
+      } catch {
+        // IndexedDB unavailable — fall through and let the user see the
+        // standard error path if it actually breaks server-side.
+      }
+    }
+
     try {
       // Start chat to get conversation_id
       const baseBody = {
@@ -182,6 +220,9 @@ export default function HomePage() {
         ...(studyMode && { study_mode: true }),
         ...(selectedWorkflowId && { workflow_id: Number(selectedWorkflowId) }),
         ...(uploadedFile && { file_id: uploadedFile.file_id }),
+        // Confidential turn 1: send the flag + an empty history array.
+        // Subsequent turns omit `is_confidential` (immutable) but keep `messages`.
+        ...(isConfidential && { is_confidential: true, messages: [] }),
       };
       const response = await chatApi.start(
         applyJurisdiction(baseBody, jurisdictionChoice),
@@ -193,6 +234,20 @@ export default function HomePage() {
         // Carry the home-page choice into the conversation's storage slot
         // so subsequent sends in /c/[id] keep using it.
         bridgeHomeJurisdictionToConversation(conversationId);
+
+        // Reconcile the IDB row's temp UUID with the server-assigned one,
+        // and mark the conversation as confidential in the session store.
+        if (isConfidential) {
+          if (tempConvId && tempConvId !== conversationId) {
+            try {
+              await renameTranscript(tempConvId, conversationId);
+            } catch {
+              // Non-fatal — rename is best-effort.
+            }
+          }
+          markConfidential(conversationId);
+          setConfidentialPending(false);
+        }
 
         // Store message in sessionStorage to avoid URL length limits
         sessionStorage.setItem(`conv_init_${conversationId}`, JSON.stringify({
@@ -207,7 +262,10 @@ export default function HomePage() {
         }));
         router.push(`/c/${conversationId}?init=1`);
       } else {
-        // Backend returned success: false
+        // Backend returned success: false — drop the orphan IDB row.
+        if (tempConvId) {
+          try { await deleteTranscript(tempConvId); } catch { /* noop */ }
+        }
         setError({ message: response.message || 'Failed to start conversation', status: 0 });
         setIsSubmitting(false);
       }
@@ -216,9 +274,18 @@ export default function HomePage() {
       if (err instanceof AxiosError && err.response?.status === 409) {
         const data = err.response.data?.data;
         if (data?.conversation_id) {
+          if (isConfidential && tempConvId && tempConvId !== data.conversation_id) {
+            try { await renameTranscript(tempConvId, data.conversation_id); } catch { /* noop */ }
+          }
           router.push(`/c/${data.conversation_id}`);
           return;
         }
+      }
+
+      // Any other error — drop the orphan IDB row so we don't leak rows
+      // when, e.g., the backend gate is off and returns 422.
+      if (tempConvId) {
+        try { await deleteTranscript(tempConvId); } catch { /* noop */ }
       }
 
       const blocked = extractBlockedReason(err);
@@ -319,21 +386,32 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Greeting */}
-        <h1 className="mb-4 md:mb-6 text-center text-[26px] md:text-[36px] font-medium">
-          {isSpecial === '__PULSING_HEART__' ? (
-            <PulsingHeart />
-          ) : (
-            <>
-              {greeting}
-              {name && (
-                <>
-                  , <span className="text-primary">{name}!</span>
-                </>
-              )}
-            </>
-          )}
-        </h1>
+        {/* Greeting — swaps to a Confidential Chat heading when the user opts in */}
+        {isConfidentialPending ? (
+          <div className="mb-4 md:mb-6 flex flex-col items-center text-center">
+            <h1 className="text-[26px] md:text-[36px] font-medium text-red-600 dark:text-red-500">
+              Confidential Chat
+            </h1>
+            <p className="mt-1 max-w-md text-sm md:text-base text-muted-foreground">
+              This chat will not be retained on our servers.
+            </p>
+          </div>
+        ) : (
+          <h1 className="mb-4 md:mb-6 text-center text-[26px] md:text-[36px] font-medium">
+            {isSpecial === '__PULSING_HEART__' ? (
+              <PulsingHeart />
+            ) : (
+              <>
+                {greeting}
+                {name && (
+                  <>
+                    , <span className="text-primary">{name}!</span>
+                  </>
+                )}
+              </>
+            )}
+          </h1>
+        )}
 
         {/* Resource Links */}
         <div
@@ -425,6 +503,9 @@ export default function HomePage() {
       {/* shrink-0 keeps the input at its natural size on mobile; it always stays at the bottom */}
       <div ref={inputAreaRef} className="shrink-0 w-full max-w-2xl pb-2 md:pb-0">
         {hasNoFreeMessages && <NoFreeMessagesBanner className="mb-3" />}
+        {isConfidentialPending && !isGuest && (
+          <ConfidentialFileNotice className="mb-3" />
+        )}
         <FileUpload onFilesAdded={isGuest ? () => {} : handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple={false}>
           {/* Mobile-only jurisdiction badge — sits above the input card, top-left */}
           {!isGuest && (
@@ -446,6 +527,7 @@ export default function HomePage() {
             }}
             onSubmit={handleSubmit}
             disabled={isSubmitting || hasNoFreeMessages}
+            variant={isConfidentialPending ? 'confidential' : 'default'}
           >
             {/* Document File Preview inside input — hidden for guests */}
             {!isGuest && (isUploading || uploadedFile) && (

@@ -30,6 +30,13 @@ import { chatApi } from '@/lib/api/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { extractBlockedReason } from '@/lib/utils/api-error';
+import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
+import {
+  appendAssistantTurn,
+  appendUserTurn,
+  getTranscript,
+  historyEntriesFor,
+} from '@/lib/storage/confidentialTranscriptStore';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -719,6 +726,64 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }
   }, [transformApiMessages, onError, onHistoryLoaded]);
 
+  // Load a confidential conversation's history from IndexedDB. Confidential
+  // conversations 404 from the server by design; this is the local-storage
+  // sibling of loadConversationHistory(). Returns true if a transcript was
+  // found, false if the user hit a cold-load (transcript wiped or new device).
+  const loadConversationHistoryFromIDB = useCallback(async (
+    conversationId: string,
+  ): Promise<boolean> => {
+    setState((prev) => ({
+      ...prev,
+      isLoadingHistory: true,
+      error: null,
+      conversationId,
+    }));
+    conversationIdRef.current = conversationId;
+
+    try {
+      const transcript = await getTranscript(conversationId);
+      if (!transcript) {
+        setState((prev) => ({
+          ...prev,
+          messages: [],
+          isLoadingHistory: false,
+          error: 'confidential_transcript_lost',
+        }));
+        return false;
+      }
+
+      const messages: ConversationMessage[] = transcript.messages.map((m, idx) => ({
+        id: `${m.local_id}_${idx}`,
+        role: m.role === 'tool' ? 'assistant' : m.role,
+        content: m.content,
+        timestamp: new Date(m.created_at),
+        ...(m.attachment && {
+          attachment: {
+            file_id: m.attachment.file_id,
+            file_name: m.attachment.file_name,
+            file_size: m.attachment.file_size,
+          },
+        }),
+      }));
+
+      setState((prev) => ({
+        ...prev,
+        messages,
+        conversationTitle: transcript.title ?? prev.conversationTitle,
+        isLoadingHistory: false,
+      }));
+      return true;
+    } catch {
+      setState((prev) => ({
+        ...prev,
+        isLoadingHistory: false,
+        error: 'confidential_transcript_lost',
+      }));
+      return false;
+    }
+  }, []);
+
   // Fetch only the conversation title (for after streaming completes)
   const fetchConversationTitle = useCallback(async (convId: string) => {
     try {
@@ -927,6 +992,19 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               ),
             }));
           }
+
+          // Confidential: persist the orchestrator's accumulated text to IDB
+          // as soon as text_done fires — this is the device's one shot to
+          // capture content before the server discards it. The subsequent
+          // `completed` event will idempotently update the same row with
+          // the authoritative final text. Confidential content — never log.
+          const convId = conversationIdRef.current;
+          if (convId && useConfidentialModeStore.getState().isConfidential(convId)) {
+            const accumulated = textByIterationRef.current.get(event.iteration) ?? '';
+            if (accumulated.trim()) {
+              void appendAssistantTurn(convId, accumulated).catch(() => {});
+            }
+          }
         }
       });
 
@@ -1021,7 +1099,64 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         const event: CompletedEvent = JSON.parse(e.data);
         if (event.seq !== undefined && dedup.has(event.seq)) return;
 
+        const convId = conversationIdRef.current;
+        const isConfidential = !!convId && useConfidentialModeStore.getState().isConfidential(convId);
+
+        // replayable === false: the server discarded the content (confidential
+        // mode, late connect or DB replay). Fall back to the local transcript.
+        // Never render a blank bubble.
         const finalText = event.content ?? event.message ?? '';
+        if (event.replayable === false && isConfidential && convId) {
+          void (async () => {
+            try {
+              const transcript = await getTranscript(convId);
+              const lastAssistant = transcript?.messages
+                .filter((m) => m.role === 'assistant')
+                .slice(-1)[0];
+              if (lastAssistant && lastAssistant.content) {
+                const placeholderId = streamingMessageIdRef.current;
+                if (placeholderId) {
+                  setState((prev) => ({
+                    ...prev,
+                    messages: prev.messages.map((m) =>
+                      m.id === placeholderId
+                        ? { ...m, content: lastAssistant.content, isStreaming: false }
+                        : m,
+                    ),
+                  }));
+                  streamingMessageIdRef.current = null;
+                  currentIterationRef.current = null;
+                } else {
+                  addAssistantMessage(lastAssistant.content);
+                }
+              } else {
+                addErrorMessage(
+                  'This confidential conversation has ended on this device.',
+                  'TRANSCRIPT_LOST',
+                  false,
+                  null,
+                );
+              }
+            } catch {
+              addErrorMessage(
+                'This confidential conversation has ended on this device.',
+                'TRANSCRIPT_LOST',
+                false,
+                null,
+              );
+            }
+          })();
+          onCompleted?.(event);
+          return;
+        }
+
+        // Confidential live path: persist the assistant's final content to IDB.
+        // Idempotent with the text_done write — appendAssistantTurn updates the
+        // last assistant row if one already exists for this turn.
+        if (isConfidential && convId && finalText.trim()) {
+          void appendAssistantTurn(convId, finalText).catch(() => {});
+        }
+
         const placeholderId = streamingMessageIdRef.current;
 
         if (placeholderId) {
@@ -1416,6 +1551,39 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
     const convId = options.conversationId || conversationIdRef.current;
 
+    // Confidential mode: source-of-truth is the Zustand confidentialIds set.
+    // Subsequent turns (turn N>1) re-send the full prior transcript from IDB.
+    const confidentialStore = useConfidentialModeStore.getState();
+    const isConfidentialTurnN = !!convId && confidentialStore.isConfidential(convId);
+
+    // Read prior history from IDB BEFORE appending the new user turn.
+    let priorHistory: { role: 'user' | 'assistant' | 'tool'; content: string }[] = [];
+    if (isConfidentialTurnN) {
+      try {
+        const transcript = await getTranscript(convId);
+        priorHistory = historyEntriesFor(transcript);
+      } catch {
+        priorHistory = [];
+      }
+
+      // Persist the new user turn to IDB BEFORE the POST so a crash doesn't
+      // lose it. Confidential content — never log or send to analytics.
+      try {
+        await appendUserTurn(convId, {
+          content: message,
+          ...(options.attachment && {
+            attachment: {
+              file_id: options.attachment.file_id,
+              file_name: options.attachment.file_name,
+              file_size: options.attachment.file_size,
+            },
+          }),
+        });
+      } catch {
+        // Non-fatal — proceed with the POST.
+      }
+    }
+
     // Add optimistic user message
     const optimisticMsg = addUserMessage(message, options.attachment);
 
@@ -1437,6 +1605,10 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         ...(options.studyMode && { study_mode: true }),
         ...(options.workflowId && { workflow_id: options.workflowId }),
         ...(options.streamMode && { stream_mode: options.streamMode }),
+        // Confidential turn N: re-send the prior transcript from IDB. The
+        // `is_confidential` flag is set once at creation (turn 1) and is
+        // immutable — never re-send it on subsequent turns.
+        ...(isConfidentialTurnN && { messages: priorHistory }),
       };
       const response = await chatApi.start(applyJurisdiction(baseBody, choice));
 
@@ -1647,6 +1819,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     send,
     connectToStream,
     loadConversationHistory,
+    loadConversationHistoryFromIDB,
     fetchConversationTitle,
     setConversationId,
     addUserMessage,

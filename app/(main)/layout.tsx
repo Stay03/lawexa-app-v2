@@ -23,6 +23,7 @@ import { NotificationBell } from "@/components/notifications"
 import { ShareButton } from "@/components/common/ShareButton"
 import { ReaderModeToggle } from "@/components/cases/ReaderModeToggle"
 import { ConversationShareHeaderButton } from "@/components/conversations"
+import { ConfidentialModeToggle } from "@/components/common/ConfidentialModeToggle"
 import { usePathname } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useBreadcrumbStore } from "@/lib/stores/breadcrumbStore"
@@ -161,9 +162,12 @@ export default function MainLayout({
                 ? <ConversationShareHeaderButton />
                 : null;
 
+              const confidentialNode = !isGuest ? <ConfidentialModeToggle /> : null;
+
               if (isMobile) {
                 return (
                   <>
+                    {confidentialNode}
                     {!isGuest && <NotificationBell />}
                     <Popover>
                       <PopoverTrigger asChild>
@@ -187,6 +191,7 @@ export default function MainLayout({
                   {shareNode}
                   {readerModeNode}
                   {conversationShareNode}
+                  {confidentialNode}
                   {!isGuest && <NotificationBell />}
                   <ThemeToggle />
                 </>

@@ -41,6 +41,8 @@ function usePromptInput() {
   return useContext(PromptInputContext)
 }
 
+export type PromptInputVariant = "default" | "confidential"
+
 export type PromptInputProps = {
   isLoading?: boolean
   value?: string
@@ -50,6 +52,9 @@ export type PromptInputProps = {
   children: React.ReactNode
   className?: string
   disabled?: boolean
+  // "confidential" replaces the animated gold-shimmer with a flat red outline
+  // so the UI plainly signals that the chat won't be retained.
+  variant?: PromptInputVariant
 } & React.ComponentProps<"div">
 
 function PromptInput({
@@ -61,6 +66,7 @@ function PromptInput({
   onSubmit,
   children,
   disabled = false,
+  variant = "default",
   onClick,
   ...props
 }: PromptInputProps) {
@@ -77,6 +83,8 @@ function PromptInput({
     onClick?.(e)
   }
 
+  const isConfidential = variant === "confidential"
+
   return (
     <TooltipProvider>
       <PromptInputContext.Provider
@@ -92,7 +100,10 @@ function PromptInput({
       >
         <div
           className={cn(
-            "gold-shimmer rounded-3xl p-[1px]",
+            "rounded-3xl",
+            isConfidential
+              ? "border-2 border-red-600 dark:border-red-500"
+              : "gold-shimmer p-[1px]",
             disabled && "cursor-not-allowed opacity-60"
           )}
         >

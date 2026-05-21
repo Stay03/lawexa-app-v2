@@ -70,6 +70,10 @@ import { useUserLimits } from '@/lib/hooks/useUserLimits';
 import { NoFreeMessagesBanner } from '@/components/chat/no-free-messages-banner';
 import { useJurisdictionChoice } from '@/lib/hooks/useJurisdictionChoice';
 import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
+import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
+import { hasTranscript } from '@/lib/storage/confidentialTranscriptStore';
+import { ConfidentialEmptyState } from '@/components/chat/confidential-empty-state';
+import { ConfidentialFileNotice } from '@/components/chat/confidential-file-notice';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -437,6 +441,12 @@ function ConversationPageContent() {
   // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
 
+  // Confidential mode: the session-store tracks UUIDs known to be confidential.
+  // We populate it on init (IDB lookup) and on first send from the home page.
+  const isConfidentialId = useConfidentialModeStore((s) => s.isConfidential);
+  const markConfidential = useConfidentialModeStore((s) => s.markConfidential);
+  const isConfidential = isConfidentialId(conversationId);
+
   // Sync input draft to localStorage
   useEffect(() => {
     if (input) {
@@ -487,6 +497,7 @@ function ConversationPageContent() {
     send,
     connectToStream,
     loadConversationHistory,
+    loadConversationHistoryFromIDB,
     fetchConversationTitle,
     setConversationId,
     disconnect,
@@ -622,19 +633,30 @@ function ConversationPageContent() {
       // Direct navigation or page refresh during stream
       initializedRef.current = true;
 
-      // Always load history first, then check if there's a pending stream to reconnect to.
-      // This is more reliable than localStorage (which can be lost on hard refresh).
       (async () => {
+        // Confidential conversations 404 from the server by design — check
+        // IndexedDB first. If we find a local transcript, hydrate from it
+        // and skip the server call. Treat the user as the owner; confidential
+        // pages are accessible only to the device holding the transcript.
+        const localExists = await hasTranscript(conversationId).catch(() => false);
+        if (localExists) {
+          markConfidential(conversationId);
+          await loadConversationHistoryFromIDB(conversationId);
+          if (user?.id) setConversationOwnerId(user.id);
+          // Still attempt to recover any in-flight execution (confidential
+          // status endpoint returns messages: [] but does carry execution_id).
+          await recoverPendingState(conversationId).catch(() => {});
+          return;
+        }
+
+        // Standard server-load path.
         await loadConversationHistory(conversationId);
 
         // After history is loaded, check if the AI is still processing
-        const result = await recoverPendingState(conversationId);
-        // If 'reconnected', recoverPendingState already set isStreaming and connected.
-        // Otherwise, history is loaded — nothing else to do.
-        // If reconnected, ChatContainerRoot's scroll-to-bottom button will handle it
+        await recoverPendingState(conversationId);
       })();
     }
-  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, recoverPendingState, user?.id, isGuestReady]);
+  }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, loadConversationHistoryFromIDB, recoverPendingState, user?.id, isGuestReady, markConfidential]);
 
   const handleSubmit = async () => {
     if ((!input.trim() && !uploadedFile && !pastedContent) || isStreaming || isSubmitting || isUploading) return;
@@ -958,7 +980,14 @@ function ConversationPageContent() {
       />
     );
   }
-  // Conversation not found (private, archived, or doesn't exist)
+  // Confidential transcript wiped locally — render the cold-load empty state
+  // from privacy-copy.md instead of the generic "not available" page.
+  if (error === 'confidential_transcript_lost') {
+    return <ConfidentialEmptyState />;
+  }
+  // Conversation not found (private, archived, or doesn't exist). For a 404
+  // that hits a UUID we've never seen, this could also be a confidential
+  // chat opened on a different device — surface the same lost-transcript UI.
   if (error === 'not_found') {
     return <ConversationNotAvailable />;
   }
@@ -1110,12 +1139,16 @@ function ConversationPageContent() {
                   triggerClassName="bg-background hover:bg-muted"
                 />
               </div>
+              {isConfidential && (isUploading || uploadedFile) && (
+                <ConfidentialFileNotice className="mb-2" />
+              )}
               <PromptInput
                 value={input}
                 onValueChange={setInput}
                 onSubmit={handleSubmit}
                 disabled={isStreaming || isLoadingHistory || isSubmitting || hasNoFreeMessages}
                 maxHeight={150}
+                variant={isConfidential ? 'confidential' : 'default'}
               >
                 {/* Document File Preview - only shown when uploading or uploaded */}
                 {(isUploading || uploadedFile) && (
