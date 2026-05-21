@@ -392,10 +392,7 @@ export default function HomePage() {
               Confidential Chat
             </h1>
             <p className="mt-1 max-w-md text-sm md:text-base text-muted-foreground">
-              This chat will not be retained on our servers.
-            </p>
-            <p className="mt-2 max-w-md text-xs text-muted-foreground">
-              Files in confidential chats are kept for up to 24 hours, then permanently deleted. Make a local copy if you need to keep this file.
+              This conversation will not be retained on our servers — zero data retention.
             </p>
           </div>
         ) : (
