@@ -3,16 +3,13 @@
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Building2, Check, Loader2, Mail } from 'lucide-react';
+import { Building2, Check, Globe, Loader2, Mail } from 'lucide-react';
 
 import { PageContainer } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ErrorState } from '@/components/common/ErrorState';
-import PlanCard from '@/components/subscriptions/PlanCard';
-import type { TPlanAction } from '@/components/subscriptions/PlanCard';
 import {
   Select,
   SelectContent,
@@ -20,9 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { usePurchaseMessagePack } from '@/lib/hooks/useMessagePacks';
-import { extractApiError } from '@/lib/utils/api-error';
-import type { IPlan, IUpgradeInitData, ICurrentSubscriptionData } from '@/types/subscription';
+import { ErrorState } from '@/components/common/ErrorState';
+import CurrencyPicker from '@/components/payments/CurrencyPicker';
+import PlanCard from '@/components/subscriptions/PlanCard';
+import type { TPlanAction } from '@/components/subscriptions/PlanCard';
+import { usePurchaseMessagePack, useMessagePackPricing } from '@/lib/hooks/useMessagePacks';
 import {
   usePlans,
   useCurrentSubscription,
@@ -31,7 +30,12 @@ import {
   useInitializeUpgrade,
 } from '@/lib/hooks/useSubscriptions';
 import { useTrialEligibility, useStartTrial } from '@/lib/hooks/useTrial';
+import { useUserCurrency } from '@/lib/hooks/useUserCurrency';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { extractApiError } from '@/lib/utils/api-error';
+import { formatMoneyMajor } from '@/lib/utils/payment-format';
+import type { TCurrency } from '@/types/payment';
+import type { IPlan, IUpgradeInitData, ICurrentSubscriptionData } from '@/types/subscription';
 
 /******************************************************************************
                                Types
@@ -44,7 +48,6 @@ interface ITierGroup {
   tierKey: string;
   displayName: string;
   plansByInterval: Partial<Record<TInterval, IPlan>>;
-  freePlan?: IPlan;
 }
 
 /******************************************************************************
@@ -56,7 +59,6 @@ const INTERVAL_ORDER: TInterval[] = ['daily', 'monthly', 'annually'];
 const TIER_ORDER = ['basic', 'pro', 'ai-counsel'];
 
 const TIER_DISPLAY_NAMES: Record<string, string> = {
-  free: 'Free',
   basic: 'Basic',
   pro: 'Pro',
   'ai-counsel': 'AI Counsel',
@@ -67,7 +69,8 @@ const TIER_DISPLAY_NAMES: Record<string, string> = {
 ******************************************************************************/
 
 /**
- * Default component. Pricing page with category tabs and tiered plan grid.
+ * Default component. Pricing page with category tabs, currency picker, and a
+ * tiered plan grid filtered to the user's selected currency.
  */
 function PricingPage() {
   const router = useRouter();
@@ -77,6 +80,9 @@ function PricingPage() {
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
   const [trialPlanId, setTrialPlanId] = useState<number | null>(null);
   const userRole = useAuthStore((s) => s.user?.role);
+
+  // Currency selection (triggers geo detection on first visit)
+  const { currency, manualOverride, isDetecting } = useUserCurrency();
 
   // Data
   const plansQuery = usePlans();
@@ -88,35 +94,46 @@ function PricingPage() {
   const initUpgrade = useInitializeUpgrade();
   const startTrial = useStartTrial();
 
-  // Trial eligibility (graceful — does not block page render)
+  const isLoading = plansQuery.isLoading || currentQuery.isLoading;
+  const isError = plansQuery.isError || currentQuery.isError;
+  const allPlans = plansQuery.data?.data ?? [];
+  const currentData = currentQuery.data?.data ?? null;
+
+  // Filter plans to the active currency
+  const plans = useMemo(
+    () => allPlans.filter((p) => p.is_free || p.currency === currency),
+    [allPlans, currency]
+  );
+
+  // Trial eligibility — only meaningful for NGN (Paystack); USD trials deferred.
   const isTrialAvailable = !!(
+    currency === 'NGN' &&
     eligibilityQuery.data?.data?.trial_enabled &&
     eligibilityQuery.data?.data?.user_eligible
   );
 
-  const isLoading = plansQuery.isLoading || currentQuery.isLoading;
-  const isError = plansQuery.isError || currentQuery.isError;
-  const plans = plansQuery.data?.data ?? [];
-  const currentData = currentQuery.data?.data ?? null;
-
-  // Derived data
+  // Derived
   const availableIntervals = useMemo(() => {
     const intervals = getAvailableIntervals(plans);
     if (userRole !== 'superadmin') return intervals.filter((i) => i !== 'daily');
     return intervals;
   }, [plans, userRole]);
   const tierGroups = useMemo(() => groupPlansByTier(plans), [plans]);
-  const paidTierGroups = tierGroups.filter((g) => g.tierKey !== 'free');
 
   /** Handle plan selection based on the resolved action. */
   const handleSelect = useCallback(
     async (plan: IPlan, action: TPlanAction) => {
-      if (action === 'current' || action === 'downgrade' || action === 'unavailable') {
-        if (action === 'downgrade') {
-          toast.info(
-            'To switch to a lower plan, cancel your current subscription first. Once your billing period ends, you can subscribe to the new plan.'
-          );
-        }
+      if (action === 'current' || action === 'unavailable') return;
+      if (action === 'downgrade') {
+        toast.info(
+          'To switch to a lower plan, cancel your current subscription first. Once your billing period ends, you can subscribe to the new plan.'
+        );
+        return;
+      }
+      if (action === 'cross-currency') {
+        toast.info(
+          'Cancel your current plan to switch billing currency. Access continues until your current period ends.'
+        );
         return;
       }
       setActivePlanId(plan.id);
@@ -128,10 +145,10 @@ function PricingPage() {
           router.push('/settings/billing');
         } else if (action === 'upgrade') {
           // Upgrade from a paid plan
-          const result = await initUpgrade.mutateAsync(plan.id);
+          const result = await initUpgrade.mutateAsync({ planId: plan.id, currency: plan.currency });
           const data = result.data;
           if (data && 'authorization_url' in data) {
-            // Payment required — redirect to Paystack
+            // Payment required — redirect to provider checkout
             window.location.href = (data as IUpgradeInitData).authorization_url;
           } else {
             // Proration covered the cost — upgrade complete
@@ -140,15 +157,14 @@ function PricingPage() {
           }
         } else {
           // New subscription (from free tier or no subscription)
-          const result = await initPayment.mutateAsync(plan.id);
+          const result = await initPayment.mutateAsync({ planId: plan.id, currency: plan.currency });
           if (result.data?.authorization_url) {
             window.location.href = result.data.authorization_url;
           }
         }
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Something went wrong. Please try again.';
-        toast.error(message);
+        const apiError = extractApiError(err);
+        toast.error(apiError.message);
       } finally {
         setActivePlanId(null);
       }
@@ -209,8 +225,8 @@ function PricingPage() {
     <PageContainer className="max-w-6xl">
       <PricingHeader />
 
-      {/* Main category tabs */}
-      <div className="flex justify-center">
+      {/* Tabs + currency picker row */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <Tabs
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as TTab)}
@@ -221,23 +237,31 @@ function PricingPage() {
             <TabsTrigger value="enterprise">Enterprise</TabsTrigger>
           </TabsList>
         </Tabs>
+        {activeTab !== 'enterprise' && (
+          <CurrencyPicker
+            currency={currency}
+            isDetecting={isDetecting}
+            manualOverride={manualOverride}
+          />
+        )}
       </div>
 
       {/* Tab content */}
       {activeTab === 'plans' && (
         <PersonalTabContent
           currentData={currentData}
-          paidTierGroups={paidTierGroups}
+          tierGroups={tierGroups}
           availableIntervals={availableIntervals}
           activePlanId={activePlanId}
           onSelect={handleSelect}
           trialAvailable={isTrialAvailable}
           trialPlanId={trialPlanId}
           onStartTrial={handleStartTrial}
+          currency={currency}
         />
       )}
 
-      {activeTab === 'payg' && <PackTabContent />}
+      {activeTab === 'payg' && <PackTabContent currency={currency} />}
 
       {activeTab === 'enterprise' && <EnterpriseTabContent />}
     </PageContainer>
@@ -249,18 +273,45 @@ function PricingPage() {
  */
 function PersonalTabContent(props: {
   currentData: ICurrentSubscriptionData | null;
-  paidTierGroups: ITierGroup[];
+  tierGroups: ITierGroup[];
   availableIntervals: TInterval[];
   activePlanId: number | null;
   onSelect: (plan: IPlan, action: TPlanAction) => void;
   trialAvailable: boolean;
   trialPlanId: number | null;
   onStartTrial: (plan: IPlan) => void;
+  currency: TCurrency;
 }) {
   const {
-    currentData, paidTierGroups, availableIntervals,
-    activePlanId, onSelect, trialAvailable, trialPlanId, onStartTrial,
+    currentData, tierGroups, availableIntervals,
+    activePlanId, onSelect, trialAvailable, trialPlanId, onStartTrial, currency,
   } = props;
+
+  // Cross-currency notice — surface when the user is currently paying in
+  // another currency than the one they're browsing.
+  const showCrossCurrencyNotice =
+    currentData?.subscription &&
+    !currentData.is_free_tier &&
+    currentData.subscription.currency !== currency &&
+    currentData.subscription.has_access;
+
+  // No plans for this currency (e.g., FW kill switch on while USD selected)
+  if (tierGroups.length === 0) {
+    return (
+      <Card className="mx-auto max-w-md">
+        <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <Globe className="size-5 text-muted-foreground" />
+          </div>
+          <h3 className="font-semibold">No {currency} plans available</h3>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Plans in {currency} aren&apos;t available right now. Try switching currency above
+            or check back soon.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -273,9 +324,18 @@ function PersonalTabContent(props: {
         </div>
       )}
 
+      {/* Cross-currency notice */}
+      {showCrossCurrencyNotice && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-200">
+          You&apos;re currently billed in {currentData!.subscription!.currency}. To switch to
+          {' '}{currency} pricing, cancel your current plan first — access continues until your
+          period ends.
+        </div>
+      )}
+
       {/* Plan grid */}
       <div className="flex flex-wrap justify-center gap-6">
-        {paidTierGroups.map((group) => {
+        {tierGroups.map((group) => {
           // Use the first available plan as the base plan for the card
           const basePlan = group.plansByInterval.monthly
             ?? group.plansByInterval[availableIntervals[0]]
@@ -304,33 +364,69 @@ function PersonalTabContent(props: {
 }
 
 /**
- * Pack tab — PAYG message pack purchase card.
+ * Pack tab — PAYG message pack purchase card. Pricing pulled from backend per
+ * currency; the frontend never hardcodes pack prices.
  */
-function PackTabContent() {
-  const PRICE_PER_PACK = 2000;
-  const MESSAGES_PER_PACK = 10;
+function PackTabContent({ currency }: { currency: TCurrency }) {
   const MAX_QUANTITY = 10;
-
   const [quantity, setQuantity] = useState(1);
+  const pricingQuery = useMessagePackPricing(currency);
   const purchaseMutation = usePurchaseMessagePack();
 
-  const totalPrice = quantity * PRICE_PER_PACK;
-  const totalMessages = quantity * MESSAGES_PER_PACK;
+  const priceRow = pricingQuery.data?.data?.prices.find((p) => p.currency === currency);
+  const messagesPerPack = pricingQuery.data?.data?.messages_per_pack ?? 10;
+  const totalMessages = quantity * messagesPerPack;
 
   const handlePurchase = () => {
-    purchaseMutation.mutate(quantity, {
-      onSuccess: (data) => {
-        if (data.success && data.data) {
-          sessionStorage.setItem('payg_reference', data.data.reference);
-          window.location.href = data.data.authorization_url;
-        }
-      },
-      onError: (err) => {
-        const apiError = extractApiError(err);
-        toast.error(apiError.message);
-      },
-    });
+    purchaseMutation.mutate(
+      { quantity, currency },
+      {
+        onSuccess: (data) => {
+          if (data.success && data.data) {
+            sessionStorage.setItem('payg_reference', data.data.reference);
+            window.location.href = data.data.authorization_url;
+          }
+        },
+        onError: (err) => {
+          const apiError = extractApiError(err);
+          toast.error(apiError.message);
+        },
+      }
+    );
   };
+
+  // Pricing not yet loaded
+  if (pricingQuery.isLoading) {
+    return (
+      <div className="flex justify-center">
+        <div className="min-w-[240px] max-w-[380px] w-full space-y-4 rounded-2xl border p-6">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-10 w-36" />
+          <Skeleton className="h-9 w-full rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Pricing missing for currency (e.g., USD pricing not seeded yet)
+  if (!priceRow) {
+    return (
+      <Card className="mx-auto max-w-md">
+        <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <Globe className="size-5 text-muted-foreground" />
+          </div>
+          <h3 className="font-semibold">Pay-as-you-go in {currency} unavailable</h3>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Try switching currency above or check back soon.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalPrice = priceRow.price_major * quantity;
 
   return (
     <div className="flex justify-center">
@@ -345,14 +441,14 @@ function PackTabContent() {
             {/* Price */}
             <div>
               <div className="text-3xl font-bold">
-                from ₦{PRICE_PER_PACK.toLocaleString()}
+                from {formatMoneyMajor(priceRow.price_major, currency)}
               </div>
             </div>
 
             {/* Features */}
             <ul className="space-y-2.5">
               {[
-                `${MESSAGES_PER_PACK} AI messages per pack`,
+                `${messagesPerPack} AI messages per pack`,
                 'Messages never expire',
                 'Used after plan messages run out',
                 'Buy more anytime',
@@ -375,7 +471,7 @@ function PackTabContent() {
               <SelectContent>
                 {Array.from({ length: MAX_QUANTITY }, (_, i) => i + 1).map((n) => (
                   <SelectItem key={n} value={String(n)}>
-                    {n} {n === 1 ? 'pack' : 'packs'} — {n * MESSAGES_PER_PACK} messages
+                    {n} {n === 1 ? 'pack' : 'packs'} — {n * messagesPerPack} messages
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -393,9 +489,14 @@ function PackTabContent() {
                   Processing...
                 </>
               ) : (
-                `Buy - ₦${totalPrice.toLocaleString()}`
+                `Buy ${formatMoneyMajor(totalPrice, currency)}`
               )}
             </Button>
+            {totalMessages > 0 && (
+              <p className="text-center text-xs text-muted-foreground">
+                {totalMessages} messages total
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -492,12 +593,15 @@ function PricingGridSkeleton() {
                                Functions
 ******************************************************************************/
 
-/** Derive the tier key from a plan slug. Free plans always return 'free'. */
+/**
+ * Derive the tier key from a plan. Uses `slug_base` (currency-agnostic) so the
+ * NGN and USD variants of the same logical plan share a key.
+ */
 function getTierKey(plan: IPlan): string {
-  if (plan.is_free) return 'free';
-  // Slug pattern: "{tier}-{interval}" e.g. "basic-monthly", "ai-counsel-annually"
-  const parts = plan.slug.split('-');
-  // Last segment is the interval — everything before is the tier
+  // The slug_base shape is "{tier}-{interval}" (e.g., "pro-monthly"). Strip the
+  // interval suffix to get the tier identifier.
+  const base = plan.slug_base ?? plan.slug;
+  const parts = base.split('-');
   return parts.slice(0, -1).join('-');
 }
 
@@ -515,6 +619,7 @@ function groupPlansByTier(plans: IPlan[]): ITierGroup[] {
   const tierMap = new Map<string, ITierGroup>();
 
   for (const plan of plans) {
+    if (plan.is_free) continue;
     const key = getTierKey(plan);
     if (!tierMap.has(key)) {
       tierMap.set(key, {
@@ -524,24 +629,14 @@ function groupPlansByTier(plans: IPlan[]): ITierGroup[] {
       });
     }
     const group = tierMap.get(key)!;
-    if (plan.is_free) {
-      group.freePlan = plan;
-    } else {
-      group.plansByInterval[plan.interval as TInterval] = plan;
-    }
+    group.plansByInterval[plan.interval as TInterval] = plan;
   }
 
-  // Free first, then paid tiers in explicit order
-  const groups = Array.from(tierMap.values());
-  const freeGroup = groups.find((g) => g.tierKey === 'free');
-  const paidGroups = groups
-    .filter((g) => g.tierKey !== 'free')
-    .sort((a, b) => {
-      const ai = TIER_ORDER.indexOf(a.tierKey);
-      const bi = TIER_ORDER.indexOf(b.tierKey);
-      return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
-    });
-  return freeGroup ? [freeGroup, ...paidGroups] : paidGroups;
+  return Array.from(tierMap.values()).sort((a, b) => {
+    const ai = TIER_ORDER.indexOf(a.tierKey);
+    const bi = TIER_ORDER.indexOf(b.tierKey);
+    return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+  });
 }
 
 /** Get available billing intervals from paid plans, in preferred order. */

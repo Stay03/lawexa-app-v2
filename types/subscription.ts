@@ -1,3 +1,5 @@
+import type { TCurrency, TPaymentProvider } from '@/types/payment';
+
 // Limit types
 export type TLimitType = 'ai_messages' | 'bookmarks' | 'note_creations';
 export type TLimitPeriod = 'month' | 'billing_interval' | 'lifetime';
@@ -21,15 +23,23 @@ export interface IPlan {
   id: number;
   name: string;
   slug: string;
+  // Slug minus any per-currency suffix (e.g. "pro-monthly" for both NGN and USD
+  // versions of the same logical plan). Use this to group currency variants.
+  slug_base: string;
   description: string | null;
   amount: string;
+  // Source of truth for arithmetic (kobo for NGN, cents for USD).
+  amount_minor: number;
   formatted_amount: string;
-  currency: string;
+  currency: TCurrency;
+  provider: TPaymentProvider;
   interval: string;
   interval_label: string;
   interval_count: number;
   is_free: boolean;
   is_featured: boolean;
+  // Flutterwave plans are not trial-eligible in v1 — backend enforces this.
+  trial_eligible: boolean;
   features: string[];
   limits: IPlanLimit[];
 }
@@ -41,7 +51,8 @@ export interface ISubscription {
   status: TSubscriptionStatus;
   status_label: string;
   amount: string;
-  currency: string;
+  currency: TCurrency;
+  provider: TPaymentProvider;
   start_date: string;
   next_payment_date: string | null;
   cancelled_at: string | null;
@@ -96,7 +107,7 @@ export interface IInvoice {
   invoice_code: string;
   amount: string;
   formatted_amount: string;
-  currency: string;
+  currency: TCurrency;
   status: TInvoiceStatus;
   status_label: string;
   paid: boolean;

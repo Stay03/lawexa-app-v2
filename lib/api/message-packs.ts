@@ -1,13 +1,25 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
+import type { TCurrency } from '@/types/payment';
 import type {
   IMessagePacksResponse,
   IMessagePackListParams,
   IPaygBalance,
   IMessagePackPurchaseData,
   IMessagePack,
+  IMessagePackPricingData,
   IUserLimits,
 } from '@/types/message-pack';
+
+/******************************************************************************
+                               Types
+******************************************************************************/
+
+interface IPurchaseInput {
+  quantity: number;
+  currency?: TCurrency;
+  callbackUrl?: string;
+}
 
 /******************************************************************************
                                Functions
@@ -38,24 +50,36 @@ async function getBalance(): Promise<ApiResponse<IPaygBalance>> {
 }
 
 /**
- * Initialize a Paystack payment for message pack purchase.
+ * Get per-currency pack pricing. Backend is the source of truth — the frontend
+ * does NOT hardcode pack prices. Optionally filter to a single currency.
  */
-async function purchase(
-  quantity: number,
-  callbackUrl?: string
-): Promise<ApiResponse<IMessagePackPurchaseData>> {
+async function getPricing(currency?: TCurrency): Promise<ApiResponse<IMessagePackPricingData>> {
+  const response = await apiClient.get<ApiResponse<IMessagePackPricingData>>(
+    '/message-packs/pricing',
+    { params: currency ? { currency } : undefined }
+  );
+  return response.data;
+}
+
+/**
+ * Initialize a payment session for a message pack purchase. Backend routes to
+ * Paystack (NGN) or Flutterwave (USD) based on `currency`.
+ */
+async function purchase(input: IPurchaseInput): Promise<ApiResponse<IMessagePackPurchaseData>> {
   const response = await apiClient.post<ApiResponse<IMessagePackPurchaseData>>(
     '/message-packs/purchase',
     {
-      quantity,
-      callback_url: callbackUrl || `${window.location.origin}/payg/callback`,
+      quantity: input.quantity,
+      callback_url: input.callbackUrl || `${window.location.origin}/payg/callback`,
+      ...(input.currency ? { currency: input.currency } : {}),
     }
   );
   return response.data;
 }
 
 /**
- * Verify a Paystack payment and complete the message pack purchase.
+ * Verify a payment reference and complete the message pack purchase. Accepts
+ * either Paystack or Flutterwave references — backend dispatches by provider.
  */
 async function verify(reference: string): Promise<ApiResponse<IMessagePack>> {
   const response = await apiClient.get<ApiResponse<IMessagePack>>(
@@ -81,6 +105,7 @@ async function getUserLimits(): Promise<ApiResponse<IUserLimits>> {
 export const messagePacksApi = {
   list,
   getBalance,
+  getPricing,
   purchase,
   verify,
   getUserLimits,

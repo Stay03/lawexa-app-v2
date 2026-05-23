@@ -11,6 +11,11 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import {
+  formatPlanAmount,
+  formatPlanMonthlyFromAnnual,
+  calculateAnnualSavingsPct,
+} from '@/lib/utils/payment-format';
 import type { IPlan, ICurrentSubscriptionData } from '@/types/subscription';
 import TrialStartDialog from './TrialStartDialog';
 
@@ -19,7 +24,7 @@ import TrialStartDialog from './TrialStartDialog';
 ******************************************************************************/
 
 type TInterval = 'daily' | 'monthly' | 'annually';
-type TPlanAction = 'current' | 'subscribe' | 'upgrade' | 'downgrade' | 'unavailable';
+type TPlanAction = 'current' | 'subscribe' | 'upgrade' | 'downgrade' | 'cross-currency' | 'unavailable';
 
 interface IPlanCardProps {
   plan: IPlan;
@@ -52,6 +57,8 @@ const BUTTON_CONFIG: Record<
   subscribe: { label: 'Get Started', variant: 'default', disabled: false },
   upgrade: { label: 'Upgrade', variant: 'default', disabled: false },
   downgrade: { label: 'Downgrade', variant: 'secondary', disabled: true },
+  // Cross-currency switches require cancellation first (backend rejects with 422).
+  'cross-currency': { label: 'Cancel current plan to switch', variant: 'outline', disabled: true },
   unavailable: { label: 'Not Available', variant: 'ghost', disabled: true },
 };
 
@@ -162,20 +169,20 @@ function PlanCard(props: IPlanCardProps) {
   const isCurrent = action === 'current';
 
   // Trial mode — transforms the entire card when trial is available
-  const isTrialMode = trialEligible && action === 'subscribe' && !!onStartTrial;
+  const isTrialMode =
+    trialEligible && action === 'subscribe' && !!onStartTrial && activePlan.trial_eligible;
   const isTrialLoading = trialLoadingPlanId === activePlan.id;
   const [isTrialDialogOpen, setIsTrialDialogOpen] = useState(false);
 
-  // Calculate savings for the annually badge
+  // Calculate annual savings using minor units (currency-agnostic)
   const annualSavings = useMemo(() => {
-    if (!allIntervalPlans?.monthly || !allIntervalPlans?.annually) return 0;
-    const monthlyYearly = parseFloat(allIntervalPlans.monthly.amount) * 12;
-    const annual = parseFloat(allIntervalPlans.annually.amount);
-    if (monthlyYearly <= 0) return 0;
-    return Math.round(((monthlyYearly - annual) / monthlyYearly) * 100);
+    const monthly = allIntervalPlans?.monthly;
+    const annual = allIntervalPlans?.annually;
+    if (!monthly || !annual) return 0;
+    return calculateAnnualSavingsPct(monthly.amount_minor, annual.amount_minor);
   }, [allIntervalPlans]);
 
-  // Resolve features
+  // Resolve features by tier
   const tierKey = getTierKeyFromSlug(plan);
   const tierFeatures = TIER_FEATURES[tierKey];
   const highlightedFeatures = tierFeatures?.highlighted ?? plan.features;
@@ -257,11 +264,11 @@ function PlanCard(props: IPlanCardProps) {
                   variant="secondary"
                   className="text-[10px] px-1.5 py-0 font-semibold text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50"
                 >
-                  Save {formatNaira(activePlan.formatted_amount)}
+                  Save {formatPlanAmount(activePlan)}
                 </Badge>
               </div>
               <div className="text-xs text-muted-foreground">
-                Then {formatNaira(activePlan.formatted_amount)}/{activePlan.interval_label.toLowerCase()} after trial
+                Then {formatPlanAmount(activePlan)}/{activePlan.interval_label.toLowerCase()} after trial
               </div>
             </>
           ) : activePlan.is_free ? (
@@ -272,14 +279,14 @@ function PlanCard(props: IPlanCardProps) {
           ) : selectedInterval === 'annually' ? (
             <>
               <div className="text-3xl font-bold">
-                {formatNaira(formatMonthlyFromAnnual(activePlan.amount))}
+                {formatPlanMonthlyFromAnnual(activePlan)}
               </div>
               <div className="text-sm text-muted-foreground">/ month</div>
               <div className="text-xs text-muted-foreground">billed annually</div>
             </>
           ) : (
             <>
-              <div className="text-3xl font-bold">{formatNaira(activePlan.formatted_amount)}</div>
+              <div className="text-3xl font-bold">{formatPlanAmount(activePlan)}</div>
               <div className="text-sm text-muted-foreground">
                 / {activePlan.interval_label.toLowerCase()}
               </div>
@@ -316,6 +323,14 @@ function PlanCard(props: IPlanCardProps) {
             isLoading={loadingPlanId === activePlan.id}
             onClick={() => onSelect(activePlan, action)}
           />
+        )}
+
+        {/* Inline note for cross-currency cases — explains why the CTA is disabled. */}
+        {action === 'cross-currency' && currentData?.subscription && (
+          <p className="text-xs text-muted-foreground text-center">
+            Your current plan is billed in {currentData.subscription.currency}. Cancel it first
+            to switch to a {activePlan.currency} plan.
+          </p>
         )}
 
         {/* Collapsible additional features */}
@@ -405,26 +420,20 @@ function PlanButton(props: {
                                Functions
 ******************************************************************************/
 
-/** Replace "NGN " prefix with "₦" for display. */
-function formatNaira(formatted: string): string {
-  return formatted.replace(/^NGN\s*/, '₦').replace(/\.00$/, '');
-}
-
-/** Convert annual amount to a formatted monthly equivalent string. */
-function formatMonthlyFromAnnual(amount: string): string {
-  const monthly = parseFloat(amount) / 12;
-  return `NGN ${monthly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
-
 /** Derive the tier key from a plan slug (e.g. "basic-monthly" → "basic"). */
 function getTierKeyFromSlug(plan: IPlan): string {
   if (plan.is_free) return 'free';
-  const parts = plan.slug.split('-');
+  // Prefer slug_base (currency-agnostic) over slug, then strip the interval suffix.
+  const base = plan.slug_base ?? plan.slug;
+  const parts = base.split('-');
   return parts.slice(0, -1).join('-');
 }
 
 /**
- * Determine what action the user can take on a plan.
+ * Determine what action the user can take on a plan. Comparisons use
+ * `amount_minor` (integer minor units) — never the float decimal — so currency
+ * units mix safely after a switch. Cross-currency targets short-circuit to a
+ * dedicated action that explains the cancel-first requirement.
  */
 function getPlanAction(plan: IPlan, currentData: ICurrentSubscriptionData | null): TPlanAction {
   if (!currentData) return 'subscribe';
@@ -437,10 +446,11 @@ function getPlanAction(plan: IPlan, currentData: ICurrentSubscriptionData | null
   }
   // User on paid plan
   if (plan.is_free) return 'unavailable';
-  const currentAmount = parseFloat(currentPlan.amount);
-  const targetAmount = parseFloat(plan.amount);
-  if (targetAmount > currentAmount) return 'upgrade';
-  if (targetAmount < currentAmount) return 'downgrade';
+  // Cross-currency target — backend rejects upgrade attempts across currencies.
+  if (currentPlan.currency !== plan.currency) return 'cross-currency';
+  // Same currency — compare on minor units.
+  if (plan.amount_minor > currentPlan.amount_minor) return 'upgrade';
+  if (plan.amount_minor < currentPlan.amount_minor) return 'downgrade';
   return 'subscribe';
 }
 

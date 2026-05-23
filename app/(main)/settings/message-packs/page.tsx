@@ -3,6 +3,9 @@
 import { Separator } from '@/components/ui/separator';
 import PaygBalanceCard from '@/components/payg/PaygBalanceCard';
 import MessagePackTable from '@/components/payg/MessagePackTable';
+import { useMessagePackPricing } from '@/lib/hooks/useMessagePacks';
+import { useUserCurrency } from '@/lib/hooks/useUserCurrency';
+import { formatMoneyMajor } from '@/lib/utils/payment-format';
 
 /******************************************************************************
                                Components
@@ -12,6 +15,15 @@ import MessagePackTable from '@/components/payg/MessagePackTable';
  * Default component. Message packs settings page with balance, purchase history, and info.
  */
 function MessagePacksPage() {
+  const { currency } = useUserCurrency();
+  const pricingQuery = useMessagePackPricing(currency);
+  const priceRow = pricingQuery.data?.data?.prices.find((p) => p.currency === currency);
+  const messagesPerPack = pricingQuery.data?.data?.messages_per_pack ?? 10;
+
+  const pricingCopy = priceRow
+    ? `Each message pack contains ${messagesPerPack} AI messages for ${formatMoneyMajor(priceRow.price_major, currency)}.`
+    : `Each message pack contains ${messagesPerPack} AI messages.`;
+
   return (
     <div>
       {/* PAYG balance + buy button */}
@@ -36,8 +48,7 @@ function MessagePacksPage() {
         </h3>
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>
-            <span className="font-medium text-foreground">Pricing:</span> Each message
-            pack contains 10 AI messages for ₦2,000.
+            <span className="font-medium text-foreground">Pricing:</span> {pricingCopy}
           </p>
           <p>
             <span className="font-medium text-foreground">No expiry:</span> PAYG

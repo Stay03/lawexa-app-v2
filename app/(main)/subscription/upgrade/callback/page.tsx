@@ -30,7 +30,11 @@ function UpgradeCallbackPage() {
 function UpgradeCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reference = searchParams.get('reference') || searchParams.get('trxref');
+  // Paystack returns ?reference= or ?trxref=. Flutterwave returns ?tx_ref=.
+  const reference =
+    searchParams.get('reference') ||
+    searchParams.get('trxref') ||
+    searchParams.get('tx_ref');
   const verifyUpgrade = useVerifyUpgrade();
   const hasVerified = useRef(false);
 

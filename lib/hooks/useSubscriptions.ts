@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { useAuthStore } from '@/lib/stores/authStore';
+import type { TCurrency } from '@/types/payment';
 import type { IInvoiceListParams } from '@/types/subscription';
 
 /******************************************************************************
@@ -16,6 +17,15 @@ export const subscriptionKeys = {
   invoices: (params: IInvoiceListParams) =>
     [...subscriptionKeys.all, 'invoices', params] as const,
 };
+
+/******************************************************************************
+                               Types
+******************************************************************************/
+
+interface IInitializeInput {
+  planId: number;
+  currency?: TCurrency;
+}
 
 /******************************************************************************
                                Query Hooks
@@ -75,16 +85,16 @@ export function useSubscribeFree() {
 }
 
 /**
- * Initialize a Paystack payment session for a paid plan.
+ * Initialize a payment session for a paid plan.
  */
 export function useInitializePayment() {
   return useMutation({
-    mutationFn: (planId: number) => subscriptionsApi.initializePayment(planId),
+    mutationFn: (input: IInitializeInput) => subscriptionsApi.initializePayment(input),
   });
 }
 
 /**
- * Verify a Paystack payment reference.
+ * Verify a payment reference.
  */
 export function useVerifyPayment() {
   const queryClient = useQueryClient();
@@ -103,7 +113,7 @@ export function useVerifyPayment() {
 export function useInitializeUpgrade() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (planId: number) => subscriptionsApi.initializeUpgrade(planId),
+    mutationFn: (input: IInitializeInput) => subscriptionsApi.initializeUpgrade(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
     },

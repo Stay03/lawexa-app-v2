@@ -57,7 +57,7 @@ export interface AdminMessageAttachment {
 
 export interface AdminMessageAttributionSubscription {
   id: number;
-  source: string;
+  provider: string;
   ends_at: string | null;
 }
 

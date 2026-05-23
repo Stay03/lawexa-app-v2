@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Minus, Plus, Loader2 } from 'lucide-react';
+import { Minus, Plus, Loader2, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -13,15 +13,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { usePurchaseMessagePack } from '@/lib/hooks/useMessagePacks';
+import { Skeleton } from '@/components/ui/skeleton';
+import CurrencyPicker from '@/components/payments/CurrencyPicker';
+import { usePurchaseMessagePack, useMessagePackPricing } from '@/lib/hooks/useMessagePacks';
+import { useUserCurrency } from '@/lib/hooks/useUserCurrency';
 import { extractApiError } from '@/lib/utils/api-error';
+import { formatMoneyMajor } from '@/lib/utils/payment-format';
 
 /******************************************************************************
                                Constants
 ******************************************************************************/
 
-const PRICE_PER_PACK = 2000;
-const MESSAGES_PER_PACK = 10;
 const MIN_QUANTITY = 1;
 const MAX_QUANTITY = 10;
 
@@ -39,15 +41,21 @@ interface IPurchaseDialogProps {
 ******************************************************************************/
 
 /**
- * Default component. Dialog for selecting quantity and initiating a message pack purchase.
+ * Default component. Dialog for selecting quantity and initiating a message
+ * pack purchase. Pricing is currency-aware and pulled from the backend.
  */
 function PurchaseDialog(props: IPurchaseDialogProps) {
   const { open, onOpenChange } = props;
   const [quantity, setQuantity] = useState(1);
+
+  const { currency, manualOverride, isDetecting } = useUserCurrency();
+  const pricingQuery = useMessagePackPricing(currency);
   const purchaseMutation = usePurchaseMessagePack();
 
-  const totalPrice = quantity * PRICE_PER_PACK;
-  const totalMessages = quantity * MESSAGES_PER_PACK;
+  const priceRow = pricingQuery.data?.data?.prices.find((p) => p.currency === currency);
+  const messagesPerPack = pricingQuery.data?.data?.messages_per_pack ?? 10;
+  const totalMessages = quantity * messagesPerPack;
+  const totalPrice = priceRow ? priceRow.price_major * quantity : 0;
 
   /** Decrease quantity. */
   const decrement = () => setQuantity((q) => Math.max(MIN_QUANTITY, q - 1));
@@ -57,75 +65,102 @@ function PurchaseDialog(props: IPurchaseDialogProps) {
 
   /** Handle purchase submission. */
   const handlePurchase = () => {
-    purchaseMutation.mutate(quantity, {
-      onSuccess: (data) => {
-        if (data.success && data.data) {
-          // Store reference for verification after redirect
-          sessionStorage.setItem('payg_reference', data.data.reference);
-          // Redirect to Paystack checkout
-          window.location.href = data.data.authorization_url;
-        }
-      },
-      onError: (err) => {
-        const apiError = extractApiError(err);
-        toast.error(apiError.message);
-      },
-    });
+    purchaseMutation.mutate(
+      { quantity, currency },
+      {
+        onSuccess: (data) => {
+          if (data.success && data.data) {
+            sessionStorage.setItem('payg_reference', data.data.reference);
+            window.location.href = data.data.authorization_url;
+          }
+        },
+        onError: (err) => {
+          const apiError = extractApiError(err);
+          toast.error(apiError.message);
+        },
+      }
+    );
   };
 
-  // Return
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
-          <DialogTitle>Buy Message Packs</DialogTitle>
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle>Buy Message Packs</DialogTitle>
+            <CurrencyPicker
+              currency={currency}
+              isDetecting={isDetecting}
+              manualOverride={manualOverride}
+            />
+          </div>
           <DialogDescription>
-            Each pack contains {MESSAGES_PER_PACK} AI messages for ₦{PRICE_PER_PACK.toLocaleString()}.
-            Messages never expire.
+            {priceRow
+              ? `Each pack contains ${messagesPerPack} AI messages for ${formatMoneyMajor(priceRow.price_major, currency)}. Messages never expire.`
+              : 'Each pack contains AI messages that never expire.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Quantity selector */}
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={decrement}
-              disabled={quantity <= MIN_QUANTITY}
-              className="h-10 w-10 rounded-full"
-            >
-              <Minus className="size-4" />
-            </Button>
-            <div className="text-center min-w-[80px]">
-              <span className="text-4xl font-bold">{quantity}</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {quantity === 1 ? 'pack' : 'packs'}
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={increment}
-              disabled={quantity >= MAX_QUANTITY}
-              className="h-10 w-10 rounded-full"
-            >
-              <Plus className="size-4" />
-            </Button>
+        {/* Pricing not available — graceful empty state */}
+        {pricingQuery.isLoading ? (
+          <div className="space-y-4 py-4">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-20 w-full" />
           </div>
+        ) : !priceRow ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+              <Globe className="size-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium">Unavailable in {currency}</p>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              Pay-as-you-go isn&apos;t currently available in {currency}. Switch currency above
+              or check back soon.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6 py-4">
+            {/* Quantity selector */}
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={decrement}
+                disabled={quantity <= MIN_QUANTITY}
+                className="h-10 w-10 rounded-full"
+              >
+                <Minus className="size-4" />
+              </Button>
+              <div className="text-center min-w-[80px]">
+                <span className="text-4xl font-bold">{quantity}</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {quantity === 1 ? 'pack' : 'packs'}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={increment}
+                disabled={quantity >= MAX_QUANTITY}
+                className="h-10 w-10 rounded-full"
+              >
+                <Plus className="size-4" />
+              </Button>
+            </div>
 
-          {/* Price summary */}
-          <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Messages</span>
-              <span className="font-medium">{totalMessages} messages</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Price</span>
-              <span className="font-semibold">₦{totalPrice.toLocaleString()}</span>
+            {/* Price summary */}
+            <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Messages</span>
+                <span className="font-medium">{totalMessages} messages</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Price</span>
+                <span className="font-semibold">{formatMoneyMajor(totalPrice, currency)}</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <DialogFooter>
           <Button
@@ -137,15 +172,17 @@ function PurchaseDialog(props: IPurchaseDialogProps) {
           </Button>
           <Button
             onClick={handlePurchase}
-            disabled={purchaseMutation.isPending}
+            disabled={!priceRow || purchaseMutation.isPending}
           >
             {purchaseMutation.isPending ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 Processing...
               </>
+            ) : priceRow ? (
+              `Pay ${formatMoneyMajor(totalPrice, currency)}`
             ) : (
-              `Pay ₦${totalPrice.toLocaleString()}`
+              'Pay'
             )}
           </Button>
         </DialogFooter>

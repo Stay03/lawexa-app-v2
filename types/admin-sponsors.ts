@@ -177,7 +177,7 @@ export interface AdminCampaignDetailResponse {
 export interface AdminGrantSubscription {
   id: number;
   status: string;
-  source: string;
+  provider: string;
   start_date: string | null;
   ends_at: string | null;
 }

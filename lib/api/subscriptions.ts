@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
+import type { TCurrency } from '@/types/payment';
 import type {
   IPlansResponse,
   ICurrentSubscriptionData,
@@ -12,11 +13,28 @@ import type {
 } from '@/types/subscription';
 
 /******************************************************************************
+                               Types
+******************************************************************************/
+
+interface IInitializePaymentInput {
+  planId: number;
+  currency?: TCurrency;
+  callbackUrl?: string;
+}
+
+interface IInitializeUpgradeInput {
+  planId: number;
+  currency?: TCurrency;
+  callbackUrl?: string;
+}
+
+/******************************************************************************
                                Functions
 ******************************************************************************/
 
 /**
- * Get all active plans sorted by sort_order.
+ * Get all active plans sorted by sort_order. Backend includes both currency
+ * variants when the Flutterwave kill switch is on; FW plans are filtered when off.
  */
 async function getPlans(): Promise<IPlansResponse> {
   const response = await apiClient.get<IPlansResponse>('/subscriptions/plans');
@@ -45,24 +63,27 @@ async function subscribeFree(planId: number): Promise<ApiResponse<ISubscription>
 }
 
 /**
- * Initialize a Paystack payment session for a paid plan.
+ * Initialize a payment session for a paid plan. Backend routes to Paystack
+ * (NGN) or Flutterwave (USD) based on the plan's currency; the explicit
+ * `currency` field must match `plan.currency` if sent.
  */
 async function initializePayment(
-  planId: number,
-  callbackUrl?: string
+  input: IInitializePaymentInput
 ): Promise<ApiResponse<IPaymentInitData>> {
   const response = await apiClient.post<ApiResponse<IPaymentInitData>>(
     '/subscriptions/initialize',
     {
-      plan_id: planId,
-      callback_url: callbackUrl || `${window.location.origin}/subscription/callback`,
+      plan_id: input.planId,
+      callback_url: input.callbackUrl || `${window.location.origin}/subscription/callback`,
+      ...(input.currency ? { currency: input.currency } : {}),
     }
   );
   return response.data;
 }
 
 /**
- * Verify a Paystack payment and create the subscription.
+ * Verify a payment reference. Accepts Paystack `reference`/`trxref` or
+ * Flutterwave `tx_ref`; backend dispatches by provider internally.
  */
 async function verifyPayment(reference: string): Promise<ApiResponse<ISubscription>> {
   const response = await apiClient.get<ApiResponse<ISubscription>>(
@@ -73,17 +94,19 @@ async function verifyPayment(reference: string): Promise<ApiResponse<ISubscripti
 }
 
 /**
- * Initialize an upgrade to a higher-priced plan.
+ * Initialize an upgrade to a higher-priced plan. Cross-currency upgrades are
+ * rejected by backend with HTTP 422 — caller should hide the CTA when the
+ * current subscription's currency differs from the target plan's.
  */
 async function initializeUpgrade(
-  planId: number,
-  callbackUrl?: string
+  input: IInitializeUpgradeInput
 ): Promise<ApiResponse<IUpgradeInitData | IUpgradeCompleteData>> {
   const response = await apiClient.post<ApiResponse<IUpgradeInitData | IUpgradeCompleteData>>(
     '/subscriptions/upgrade',
     {
-      plan_id: planId,
-      callback_url: callbackUrl || `${window.location.origin}/subscription/upgrade/callback`,
+      plan_id: input.planId,
+      callback_url: input.callbackUrl || `${window.location.origin}/subscription/upgrade/callback`,
+      ...(input.currency ? { currency: input.currency } : {}),
     }
   );
   return response.data;

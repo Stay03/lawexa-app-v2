@@ -265,7 +265,7 @@ export function MessageDetailSheet({
                       <MetaRow label="Subscription">
                         #{row.attribution.subscription.id}
                         <span className="ml-1 text-muted-foreground font-normal">
-                          ({row.attribution.subscription.source})
+                          ({row.attribution.subscription.provider})
                         </span>
                       </MetaRow>
                     )}

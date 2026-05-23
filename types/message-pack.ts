@@ -1,3 +1,5 @@
+import type { TCurrency, TPaymentProvider } from '@/types/payment';
+
 // Message pack statuses
 export type TMessagePackStatus = 'pending' | 'completed' | 'failed' | 'refunded';
 
@@ -9,7 +11,8 @@ export interface IMessagePack {
   messages_remaining: number;
   amount: number;
   formatted_amount: string;
-  currency: string;
+  currency: TCurrency;
+  provider: TPaymentProvider;
   status: TMessagePackStatus;
   status_label: string;
   paid_at: string | null;
@@ -21,10 +24,27 @@ export interface IMessagePackPurchaseData {
   authorization_url: string;
   access_code: string;
   reference: string;
+  provider: TPaymentProvider;
   quantity: number;
   messages: number;
   amount: number;
-  currency: string;
+  currency: TCurrency;
+}
+
+// GET /message-packs/pricing — one row per currency the backend offers
+export interface IMessagePackPriceRow {
+  currency: TCurrency;
+  provider: TPaymentProvider;
+  // Minor units (kobo for NGN, cents for USD). Source of truth for arithmetic.
+  price_minor: number;
+  // Major units (naira / dollars). Convenience for display.
+  price_major: number;
+}
+
+// GET /message-packs/pricing response data
+export interface IMessagePackPricingData {
+  messages_per_pack: number;
+  prices: IMessagePackPriceRow[];
 }
 
 // GET /message-packs/balance response data

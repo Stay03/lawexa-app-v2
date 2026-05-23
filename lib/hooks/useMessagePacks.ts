@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { messagePacksApi } from '@/lib/api/message-packs';
 import { userLimitsKeys } from '@/lib/hooks/useUserLimits';
+import type { TCurrency } from '@/types/payment';
 import type { IMessagePackListParams } from '@/types/message-pack';
 
 /******************************************************************************
@@ -14,7 +15,18 @@ export const messagePackKeys = {
   list: (params: IMessagePackListParams) =>
     [...messagePackKeys.all, 'list', params] as const,
   balance: () => [...messagePackKeys.all, 'balance'] as const,
+  pricing: (currency?: TCurrency) =>
+    [...messagePackKeys.all, 'pricing', currency ?? 'all'] as const,
 };
+
+/******************************************************************************
+                               Types
+******************************************************************************/
+
+interface IPurchaseInput {
+  quantity: number;
+  currency?: TCurrency;
+}
 
 /******************************************************************************
                                Query Hooks
@@ -42,16 +54,29 @@ export function usePaygBalance() {
   });
 }
 
+/**
+ * Fetch per-currency message pack pricing from backend. Pack prices are
+ * settings-driven server-side — the frontend never hardcodes them.
+ */
+export function useMessagePackPricing(currency?: TCurrency) {
+  return useQuery({
+    queryKey: messagePackKeys.pricing(currency),
+    queryFn: () => messagePacksApi.getPricing(currency),
+    // Prices change rarely; backend settings flip would warrant a manual refresh.
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
 /******************************************************************************
                                Mutation Hooks
 ******************************************************************************/
 
 /**
- * Initialize a message pack purchase via Paystack.
+ * Initialize a message pack purchase.
  */
 export function usePurchaseMessagePack() {
   return useMutation({
-    mutationFn: (quantity: number) => messagePacksApi.purchase(quantity),
+    mutationFn: (input: IPurchaseInput) => messagePacksApi.purchase(input),
   });
 }
 

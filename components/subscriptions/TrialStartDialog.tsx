@@ -12,6 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { formatPlanAmount } from '@/lib/utils/payment-format';
 import type { IPlan } from '@/types/subscription';
 
 /******************************************************************************
@@ -27,26 +28,18 @@ interface ITrialStartDialogProps {
 }
 
 /******************************************************************************
-                               Functions
-******************************************************************************/
-
-/** Replace "NGN " prefix with "₦" for display. */
-function formatNaira(formatted: string): string {
-  return formatted.replace(/^NGN\s*/, '₦').replace(/\.00$/, '');
-}
-
-/******************************************************************************
                                Components
 ******************************************************************************/
 
 /**
  * Default component. Confirmation dialog before starting a free trial.
+ * Trials are Paystack/NGN-only in v1; the caller gates non-NGN plans out.
  */
 function TrialStartDialog(props: ITrialStartDialogProps) {
   const { open, onOpenChange, plan, isPending, onConfirm } = props;
 
   const planName = plan?.name ?? 'this plan';
-  const formattedPrice = plan ? formatNaira(plan.formatted_amount) : '';
+  const formattedPrice = plan ? formatPlanAmount(plan) : '';
   const interval = plan?.interval_label?.toLowerCase() ?? 'month';
 
   return (

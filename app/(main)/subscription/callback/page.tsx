@@ -30,7 +30,12 @@ function SubscriptionCallbackPage() {
 function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reference = searchParams.get('reference') || searchParams.get('trxref');
+  // Paystack returns ?reference= or ?trxref=. Flutterwave returns ?tx_ref=.
+  // Backend's verify endpoint dispatches by provider internally.
+  const reference =
+    searchParams.get('reference') ||
+    searchParams.get('trxref') ||
+    searchParams.get('tx_ref');
   const verifyPayment = useVerifyPayment();
   const hasVerified = useRef(false);
 
