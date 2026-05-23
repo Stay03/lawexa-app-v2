@@ -27,7 +27,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatNaira } from '@/lib/utils/currency';
+import { formatMoneyMinor } from '@/lib/utils/payment-format';
 import { AdminSubscriptionCancelDialog } from './AdminSubscriptionCancelDialog';
 import { AdminSubscriptionReactivateDialog } from './AdminSubscriptionReactivateDialog';
 import type { AdminSubscriptionDetail as TSubscriptionDetail } from '@/types/admin';
@@ -117,7 +117,7 @@ function AdminSubscriptionDetailView({ subscription }: AdminSubscriptionDetailPr
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6">
               <DetailField label="Plan" value={sub.plan.name} />
-              <DetailField label="Amount" value={formatNaira(Number(sub.amount))} />
+              <DetailField label="Amount" value={formatMoneyMinor(sub.amount_minor, sub.currency)} />
               <DetailField label="Interval" value={sub.plan.interval_label} />
               <DetailField
                 label="Start Date"

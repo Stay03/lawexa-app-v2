@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ArrowUpDown, CheckCircle2, XCircle, Table2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatNaira } from '@/lib/utils/currency';
+import { formatMoneyMinor } from '@/lib/utils/payment-format';
 import type {
   AdminSubscriptionListItem,
   AdminSubscriptionsParams,
@@ -167,9 +167,9 @@ function AdminSubscriptionsTable({
                   {sub.status_label}
                 </Badge>
               </TableCell>
-              {/* Amount */}
+              {/* Amount — currency-aware (NGN/USD) using minor-unit source of truth */}
               <TableCell className="text-right tabular-nums text-sm">
-                {formatNaira(Number(sub.amount))}
+                {formatMoneyMinor(sub.amount_minor, sub.currency)}
               </TableCell>
               {/* Start Date */}
               <TableCell>

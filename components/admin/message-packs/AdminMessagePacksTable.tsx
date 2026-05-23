@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ArrowUpDown, Table2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatNaira } from '@/lib/utils/currency';
+import { formatMoneyMinor } from '@/lib/utils/payment-format';
 import type {
   AdminMessagePackListItem,
   AdminMessagePacksParams,
@@ -168,9 +168,9 @@ function AdminMessagePacksTable({
                   </TooltipContent>
                 </Tooltip>
               </TableCell>
-              {/* Amount */}
+              {/* Amount — currency-aware */}
               <TableCell className="text-right tabular-nums text-sm">
-                {formatNaira(pack.amount)}
+                {formatMoneyMinor(pack.amount_minor, pack.currency)}
               </TableCell>
               {/* Status */}
               <TableCell>

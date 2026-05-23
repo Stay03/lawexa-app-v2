@@ -1,3 +1,5 @@
+import type { TCurrency, TPaymentProvider } from '@/types/payment';
+
 // Admin Conversation Management Types
 // Based on API documentation: /docs/apiDocs/admin-conversation-api-documentation.md
 
@@ -1068,8 +1070,9 @@ export interface RecentSubscriptionRow {
   plan_name: string;
   status: string;
   status_label: string;
+  // Major units (₦4,900 or $9.99) — analytics endpoint does not expose `amount_minor`.
   amount: number;
-  currency: string;
+  currency: TCurrency;
   created_at: string;
 }
 
@@ -1121,15 +1124,19 @@ export interface AdminSubscriptionPlan {
   id: number;
   name: string;
   slug: string;
+  slug_base: string;
   description: string;
   amount: string;
+  amount_minor: number;
   formatted_amount: string;
-  currency: string;
+  currency: TCurrency;
+  provider: TPaymentProvider;
   interval: string;
   interval_label: string;
   interval_count: number;
   is_free: boolean;
   is_featured: boolean;
+  trial_eligible: boolean;
   features: string[];
   limits: { type: string; value: number; is_unlimited: boolean; period: string }[];
 }
@@ -1138,13 +1145,18 @@ export type AdminSubscriptionStatus = 'active' | 'past_due' | 'cancelled' | 'exp
 
 export interface AdminSubscriptionListItem {
   id: number;
+  // Admin endpoints expose `provider` (Phase 3 rename from `source`). Includes
+  // `"granted"` for admin-issued grants alongside the payment providers.
+  provider: TPaymentProvider | 'granted';
   subscription_code: string | null;
+  flw_subscription_id: string | null;
   user: AdminSubscriptionUser;
   plan: AdminSubscriptionPlan;
   status: AdminSubscriptionStatus;
   status_label: string;
   amount: string;
-  currency: string;
+  amount_minor: number;
+  currency: TCurrency;
   start_date: string | null;
   next_payment_date: string | null;
   cancelled_at: string | null;
@@ -1160,7 +1172,8 @@ export interface AdminSubscriptionInvoice {
   id: number;
   invoice_code: string;
   amount: string;
-  currency: string;
+  amount_minor: number;
+  currency: TCurrency;
   formatted_amount: string;
   status: string;
   paid: boolean;
@@ -1234,14 +1247,17 @@ export interface AdminMessagePackDetailUser extends AdminMessagePackUser {
 
 export interface AdminMessagePackListItem {
   id: number;
+  // Admin endpoints expose `provider` (Phase 3 rename from `source`).
+  provider: TPaymentProvider;
   user: AdminMessagePackUser;
   quantity: number;
   messages_total: number;
   messages_remaining: number;
   messages_consumed: number;
   amount: number;
+  amount_minor: number;
   formatted_amount: string;
-  currency: string;
+  currency: TCurrency;
   status: MessagePackStatus;
   status_label: string;
   paid_at: string | null;
@@ -1335,8 +1351,9 @@ export interface MessagePackRecentPurchaseRow {
   is_deleted: boolean;
   quantity: number;
   messages_total: number;
+  // Major units — analytics endpoint does not expose `amount_minor`.
   amount: number;
-  currency: string;
+  currency: TCurrency;
   paid_at: string;
 }
 

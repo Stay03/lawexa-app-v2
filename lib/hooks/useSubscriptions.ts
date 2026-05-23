@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { TCurrency } from '@/types/payment';
+import type { TCurrency, PaymentVerifyRef } from '@/types/payment';
 import type { IInvoiceListParams } from '@/types/subscription';
 
 /******************************************************************************
@@ -99,7 +99,7 @@ export function useInitializePayment() {
 export function useVerifyPayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (reference: string) => subscriptionsApi.verifyPayment(reference),
+    mutationFn: (ref: PaymentVerifyRef) => subscriptionsApi.verifyPayment(ref),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.invoices({}) });
@@ -126,7 +126,7 @@ export function useInitializeUpgrade() {
 export function useVerifyUpgrade() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (reference: string) => subscriptionsApi.verifyUpgrade(reference),
+    mutationFn: (ref: PaymentVerifyRef) => subscriptionsApi.verifyUpgrade(ref),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.invoices({}) });

@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Receipt, CheckCircle2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { formatNaira } from '@/lib/utils/currency';
+import { formatMoneyMinor } from '@/lib/utils/payment-format';
 import type { AdminSubscriptionInvoice } from '@/types/admin';
 
 /******************************************************************************
@@ -114,7 +114,7 @@ function AdminSubscriptionInvoicesTable({ invoices }: AdminSubscriptionInvoicesT
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums text-sm">
-                  {formatNaira(Number(inv.amount))}
+                  {formatMoneyMinor(inv.amount_minor, inv.currency)}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                   {inv.period_start && inv.period_end

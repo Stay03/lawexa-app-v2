@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
-import type { TCurrency } from '@/types/payment';
+import type { TCurrency, PaymentVerifyRef } from '@/types/payment';
 import type {
   IPlansResponse,
   ICurrentSubscriptionData,
@@ -82,13 +82,14 @@ async function initializePayment(
 }
 
 /**
- * Verify a payment reference. Accepts Paystack `reference`/`trxref` or
- * Flutterwave `tx_ref`; backend dispatches by provider internally.
+ * Verify a payment reference. Backend dispatches on the query-param NAME:
+ * Paystack expects `reference`, Flutterwave expects `tx_ref`. The caller
+ * passes a discriminated union built from the callback URL.
  */
-async function verifyPayment(reference: string): Promise<ApiResponse<ISubscription>> {
+async function verifyPayment(ref: PaymentVerifyRef): Promise<ApiResponse<ISubscription>> {
   const response = await apiClient.get<ApiResponse<ISubscription>>(
     '/subscriptions/verify',
-    { params: { reference } }
+    { params: ref }
   );
   return response.data;
 }
@@ -113,12 +114,13 @@ async function initializeUpgrade(
 }
 
 /**
- * Verify an upgrade payment and complete the plan switch.
+ * Verify an upgrade payment and complete the plan switch. Same param-name
+ * dispatch rule as `verifyPayment`.
  */
-async function verifyUpgrade(reference: string): Promise<ApiResponse<IUpgradeCompleteData>> {
+async function verifyUpgrade(ref: PaymentVerifyRef): Promise<ApiResponse<IUpgradeCompleteData>> {
   const response = await apiClient.get<ApiResponse<IUpgradeCompleteData>>(
     '/subscriptions/upgrade/verify',
-    { params: { reference } }
+    { params: ref }
   );
   return response.data;
 }

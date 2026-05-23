@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/tooltip';
 import { formatDistanceToNow, format } from 'date-fns';
 import { Clock } from 'lucide-react';
-import { formatNaira } from '@/lib/utils/currency';
+import { formatMoneyMajor } from '@/lib/utils/payment-format';
 import type { MessagePackRecentPurchaseRow } from '@/types/admin';
 
 /******************************************************************************
@@ -96,7 +96,7 @@ function RecentPurchasesTable({ data }: RecentPurchasesTableProps) {
                   {row.messages_total.toLocaleString()}
                 </TableCell>
                 <TableCell className="text-right tabular-nums text-xs">
-                  {formatNaira(row.amount)}
+                  {formatMoneyMajor(row.amount, row.currency)}
                 </TableCell>
                 <TableCell>
                   <Tooltip>

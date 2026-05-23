@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { PageContainer } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { useVerifyPayment } from '@/lib/hooks/useSubscriptions';
+import { extractPaymentRef } from '@/lib/utils/payment-callback';
 
 /******************************************************************************
                                Components
@@ -30,20 +31,21 @@ function SubscriptionCallbackPage() {
 function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Paystack returns ?reference= or ?trxref=. Flutterwave returns ?tx_ref=.
-  // Backend's verify endpoint dispatches by provider internally.
-  const reference =
-    searchParams.get('reference') ||
-    searchParams.get('trxref') ||
-    searchParams.get('tx_ref');
+  // Backend dispatches on the query-param NAME — Paystack via ?reference= /
+  // ?trxref=, Flutterwave via ?tx_ref=. Extracting into a discriminated union
+  // preserves which provider routed the redirect.
+  const paymentRef = useMemo(
+    () => extractPaymentRef(new URLSearchParams(searchParams.toString())),
+    [searchParams]
+  );
   const verifyPayment = useVerifyPayment();
   const hasVerified = useRef(false);
 
   // Verify on mount
   useEffect(() => {
-    if (!reference || hasVerified.current) return;
+    if (!paymentRef || hasVerified.current) return;
     hasVerified.current = true;
-    verifyPayment.mutate(reference, {
+    verifyPayment.mutate(paymentRef, {
       onSuccess: (data) => {
         toast.success(data.message || 'Subscription activated successfully!');
         router.replace('/settings/billing');
@@ -52,10 +54,10 @@ function CallbackContent() {
         toast.error('Payment verification failed. Please contact support if you were charged.');
       },
     });
-  }, [reference, verifyPayment, router]);
+  }, [paymentRef, verifyPayment, router]);
 
   // No reference in URL
-  if (!reference) {
+  if (!paymentRef) {
     return (
       <CallbackLayout
         icon={<XCircle className="size-8 text-destructive" />}
@@ -79,7 +81,7 @@ function CallbackContent() {
           <Button variant="outline" onClick={() => router.push('/pricing')}>
             Back to Pricing
           </Button>
-          <Button onClick={() => { hasVerified.current = false; verifyPayment.mutate(reference); }}>
+          <Button onClick={() => { hasVerified.current = false; verifyPayment.mutate(paymentRef); }}>
             Retry
           </Button>
         </div>

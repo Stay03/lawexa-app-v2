@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { PageContainer } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { useVerifyMessagePack } from '@/lib/hooks/useMessagePacks';
+import { extractPaymentRef, refValue } from '@/lib/utils/payment-callback';
 
 /******************************************************************************
                                Components
@@ -30,11 +31,13 @@ function PaygCallbackPage() {
 function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Paystack returns ?reference= or ?trxref=. Flutterwave returns ?tx_ref=.
-  const reference =
-    searchParams.get('reference') ||
-    searchParams.get('trxref') ||
-    searchParams.get('tx_ref');
+  // PAYG verify is path-based and both providers use the same `msgpack_*`
+  // reference shape, so we just need the raw string regardless of which
+  // query param it came from (?reference=, ?trxref=, or ?tx_ref=).
+  const reference = useMemo(() => {
+    const ref = extractPaymentRef(new URLSearchParams(searchParams.toString()));
+    return ref ? refValue(ref) : null;
+  }, [searchParams]);
   const verifyMutation = useVerifyMessagePack();
   const hasVerified = useRef(false);
 

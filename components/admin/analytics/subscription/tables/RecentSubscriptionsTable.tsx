@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { formatNaira } from '@/lib/utils/currency';
+import { formatMoneyMajor } from '@/lib/utils/payment-format';
 import type { RecentSubscriptionRow } from '@/types/admin';
 
 /******************************************************************************
@@ -112,7 +112,7 @@ function RecentSubscriptionsTable({ data }: RecentSubscriptionsTableProps) {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right tabular-nums text-xs">
-                  {formatNaira(row.amount)}
+                  {formatMoneyMajor(row.amount, row.currency)}
                 </TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   <Tooltip>

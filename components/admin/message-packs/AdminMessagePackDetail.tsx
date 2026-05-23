@@ -21,7 +21,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatNaira } from '@/lib/utils/currency';
+import { formatMoneyMinor } from '@/lib/utils/payment-format';
 import type { AdminMessagePackDetail as TMessagePackDetail } from '@/types/admin';
 
 /******************************************************************************
@@ -84,7 +84,7 @@ function AdminMessagePackDetailView({ messagePack }: AdminMessagePackDetailProps
               <DetailField label="Messages Total" value={pack.messages_total.toLocaleString()} />
               <DetailField label="Messages Consumed" value={pack.messages_consumed.toLocaleString()} />
               <DetailField label="Messages Remaining" value={pack.messages_remaining.toLocaleString()} />
-              <DetailField label="Amount" value={formatNaira(pack.amount)} />
+              <DetailField label="Amount" value={formatMoneyMinor(pack.amount_minor, pack.currency)} />
               <DetailField label="Currency" value={pack.currency} />
               {pack.paid_at && (
                 <DetailField
