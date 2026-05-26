@@ -468,7 +468,7 @@ export default function HomePage() {
               Confidential Chat
             </h1>
             <p className="mt-1 max-w-md text-sm md:text-base text-muted-foreground">
-              This conversation will not be retained on our servers.
+              For privileged legal discussions and sensitive client matters. Chats are not stored after your session.
             </p>
           </div>
         ) : (
