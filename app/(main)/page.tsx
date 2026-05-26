@@ -13,10 +13,10 @@ import {
 } from '@/components/ui/prompt-input';
 import {
   FileUpload,
-  FileUploadTrigger,
   FileUploadContent,
 } from '@/components/ui/file-upload';
-import { ArrowUp, Paperclip, X, Loader2, FileText, MessageCircle, FileUp, Scale, NotebookPen } from 'lucide-react';
+import { ArrowUp, X, Loader2, FileText, MessageCircle, FileUp, Scale, NotebookPen } from 'lucide-react';
+import { ComposerPlusMenu } from '@/components/chat/composer-plus-menu';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { PulsingHeart } from '@/components/ui/pulsing-heart';
@@ -47,10 +47,12 @@ import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
 import { cn } from '@/lib/utils';
 import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
+import { useRedactedModeStore } from '@/lib/stores/redactedModeStore';
 import {
   appendUserTurn,
   deleteTranscript,
   renameTranscript,
+  replaceLastUserTurnContent,
 } from '@/lib/storage/confidentialTranscriptStore';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
@@ -114,6 +116,10 @@ export default function HomePage() {
   const isConfidentialPending = useConfidentialModeStore((s) => s.isPending);
   const setConfidentialPending = useConfidentialModeStore((s) => s.setPending);
   const markConfidential = useConfidentialModeStore((s) => s.markConfidential);
+  const isRedactedPending = useRedactedModeStore((s) => s.isPending);
+  const toggleRedactedPending = useRedactedModeStore((s) => s.togglePending);
+  const setRedactedPending = useRedactedModeStore((s) => s.setPending);
+  const markRedacted = useRedactedModeStore((s) => s.markRedacted);
 
   // Home page has no conversation yet — choice lives under the home key
   // and is bridged into the conversation slot once the backend creates one.
@@ -227,8 +233,9 @@ export default function HomePage() {
     setPastedContent(null);
     setIsSubmitting(true);
 
-    // Snapshot the toggle so we can clear it once the conversation exists.
+    // Snapshot the toggles so we can clear them once the conversation exists.
     const isConfidential = isConfidentialPending;
+    const isRedacted = isRedactedPending;
 
     // For confidential chats, persist the user turn to IndexedDB BEFORE the
     // POST so a crash doesn't lose it. Use a temp UUID until the server
@@ -269,6 +276,9 @@ export default function HomePage() {
         // Confidential turn 1: send the flag + an empty history array.
         // Subsequent turns omit `is_confidential` (immutable) but keep `messages`.
         ...(isConfidential && { is_confidential: true, messages: [] }),
+        // Redacted turn 1: sticky flag, server replaces the message text with
+        // the redacted form before persistence and before the LLM call.
+        ...(isRedacted && { is_redacted: true }),
       };
       const response = await chatApi.start(
         applyJurisdiction(baseBody, jurisdictionChoice),
@@ -295,9 +305,32 @@ export default function HomePage() {
           setConfidentialPending(false);
         }
 
+        if (isRedacted) {
+          markRedacted(conversationId);
+          setRedactedPending(false);
+        }
+
+        // For redacted chats, the canonical user-visible text is the server's
+        // redacted form — never the raw input. Falls back to the original text
+        // when the backend stub is in passthrough mode (also a no-op when the
+        // chat is not redacted).
+        const displayMessage = response.data.user_message_content ?? fullMessage;
+
+        // Confidential + redacted: the IDB row currently holds the raw input
+        // we wrote pre-POST for crash recovery. Replace it with the redacted
+        // form so future turns send the redacted text in messages[] (raw text
+        // would otherwise reach the LLM on turn 2).
+        if (isConfidential && isRedacted && response.data.user_message_content) {
+          try {
+            await replaceLastUserTurnContent(conversationId, response.data.user_message_content);
+          } catch {
+            // Non-fatal — worst case, turn 2 sends raw text.
+          }
+        }
+
         // Store message in sessionStorage to avoid URL length limits
         sessionStorage.setItem(`conv_init_${conversationId}`, JSON.stringify({
-          msg: fullMessage,
+          msg: displayMessage,
           exec: executionId,
           stream_mode: 'v2_stream',
           ...(uploadedFiles.length > 0 && {
@@ -334,6 +367,23 @@ export default function HomePage() {
       // when, e.g., the backend gate is off and returns 422.
       if (tempConvId) {
         try { await deleteTranscript(tempConvId); } catch { /* noop */ }
+      }
+
+      // 503 from the redaction service — fail-closed per spec. Never fall back
+      // to sending raw text. Surface a retry-aware message and keep the toggle
+      // on so the user can simply press Send again.
+      if (
+        isRedacted &&
+        err instanceof AxiosError &&
+        err.response?.status === 503
+      ) {
+        const retryAfter = err.response.headers?.['retry-after'];
+        const retryMsg = retryAfter
+          ? `Redaction service is temporarily unavailable. Try again in ${retryAfter}s.`
+          : 'Redaction service is temporarily unavailable. Please try again shortly.';
+        setError({ message: retryMsg, status: 503 });
+        setIsSubmitting(false);
+        return;
       }
 
       const blocked = extractBlockedReason(err);
@@ -686,16 +736,15 @@ export default function HomePage() {
             />
 
             <PromptInputActions className="flex items-center justify-between px-3 pb-3 gap-2">
-              {/* Left actions: Attach + Jurisdiction + Workflow selector — hidden for guests */}
+              {/* Left actions: + menu (Attach / Redacted mode) + Workflow
+                  selector — hidden for guests. */}
               <div className="flex items-center gap-1.5 min-w-0">
                 {!isGuest && (
-                  <PromptInputAction tooltip="Attach PDF">
-                    <FileUploadTrigger asChild>
-                      <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl shrink-0">
-                        <Paperclip className="text-primary h-5 w-5" />
-                      </div>
-                    </FileUploadTrigger>
-                  </PromptInputAction>
+                  <ComposerPlusMenu
+                    isRedactedPending={isRedactedPending}
+                    onRedactedToggle={toggleRedactedPending}
+                    disabled={isSubmitting || hasNoFreeMessages}
+                  />
                 )}
 
                 {/* Workflow selector — regular signed-in users pick between

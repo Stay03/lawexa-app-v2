@@ -31,11 +31,13 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { extractBlockedReason } from '@/lib/utils/api-error';
 import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
+import { useRedactedModeStore } from '@/lib/stores/redactedModeStore';
 import {
   appendAssistantTurn,
   appendUserTurn,
   getTranscript,
   historyEntriesFor,
+  replaceLastUserTurnContent,
 } from '@/lib/storage/confidentialTranscriptStore';
 
 const API_BASE_URL =
@@ -1595,6 +1597,12 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     const confidentialStore = useConfidentialModeStore.getState();
     const isConfidentialTurnN = !!convId && confidentialStore.isConfidential(convId);
 
+    // Redacted mode: the flag is sticky after turn 1, so we never re-send it
+    // on subsequent turns — but we still need to know locally so we can swap
+    // the optimistic user message for the server's redacted form on response.
+    const redactedStore = useRedactedModeStore.getState();
+    const isRedactedTurnN = !!convId && redactedStore.isRedacted(convId);
+
     // Read prior history from IDB BEFORE appending the new user turn.
     let priorHistory: { role: 'user' | 'assistant' | 'tool'; content: string }[] = [];
     if (isConfidentialTurnN) {
@@ -1655,6 +1663,28 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const response = await chatApi.start(applyJurisdiction(baseBody, choice));
 
       if (response.success) {
+        // Redacted-mode response carries the canonical (redacted) form of the
+        // user's turn so the local store stays in sync without a refetch.
+        // Replace the optimistic message's text and patch the IDB row when
+        // confidential is also on (raw text would otherwise reach the LLM
+        // on the next turn via messages[]).
+        const redactedText = response.data.user_message_content;
+        if (isRedactedTurnN && redactedText && redactedText !== message) {
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === optimisticMsg.id ? { ...m, content: redactedText } : m,
+            ),
+          }));
+          if (isConfidentialTurnN && convId) {
+            try {
+              await replaceLastUserTurnContent(convId, redactedText);
+            } catch {
+              // Non-fatal — worst case, next turn sends the raw text.
+            }
+          }
+        }
+
         connectToStream(response.data.execution_id);
       } else {
         // Backend returned success: false — reset state
@@ -1689,6 +1719,28 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           }
           return;
         }
+      }
+
+      // ── 503 redaction service unavailable ──
+      // Per spec, fail-closed: never fall back to sending raw text. Drop the
+      // optimistic message and surface a retry-aware error so the user can
+      // try again. Honor Retry-After if present.
+      if (
+        isRedactedTurnN &&
+        err instanceof AxiosError &&
+        err.response?.status === 503
+      ) {
+        removeMessage(optimisticMsg.id);
+        const retryAfter = err.response.headers?.['retry-after'];
+        const retryMsg = retryAfter
+          ? `Redaction service is temporarily unavailable. Try again in ${retryAfter}s.`
+          : 'Redaction service is temporarily unavailable. Please try again shortly.';
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false, isCancelling: false,
+          error: retryMsg,
+        }));
+        return;
       }
 
       // ── 429 content duplicate ──

@@ -121,6 +121,28 @@ export async function appendUserTurn(
   return entry;
 }
 
+// Replace the content of the most recent user turn. Used by redacted-mode
+// chats to swap the raw input (written pre-POST for crash recovery) with the
+// server-returned redacted form once the response lands. Idempotent — no-op
+// if the tail isn't a user turn.
+export async function replaceLastUserTurnContent(
+  conversation_id: string,
+  content: string,
+): Promise<void> {
+  const transcript = await getTranscript(conversation_id);
+  if (!transcript) return;
+  const tail = transcript.messages[transcript.messages.length - 1];
+  if (!tail || tail.role !== 'user') return;
+  const merged: ConfidentialTranscriptEntry = { ...tail, content };
+  const updated: ConfidentialTranscript = {
+    ...transcript,
+    updated_at: nowIso(),
+    messages: [...transcript.messages.slice(0, -1), merged],
+  };
+  const db = await getDB();
+  await db.put(STORE, updated);
+}
+
 export async function appendAssistantTurn(
   conversation_id: string,
   content: string,

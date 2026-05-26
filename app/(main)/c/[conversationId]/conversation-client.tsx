@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/prompt-input';
 import {
   FileUpload,
-  FileUploadTrigger,
   FileUploadContent,
 } from '@/components/ui/file-upload';
 import {
@@ -29,7 +28,6 @@ import { PastedContentCard } from '@/components/chat/pasted-content-card';
 import {
   ArrowDown,
   ArrowUp,
-  Paperclip,
   X,
   Square,
   Copy,
@@ -71,9 +69,12 @@ import { NoFreeMessagesBanner } from '@/components/chat/no-free-messages-banner'
 import { useJurisdictionChoice } from '@/lib/hooks/useJurisdictionChoice';
 import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
 import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
+import { useRedactedModeStore } from '@/lib/stores/redactedModeStore';
 import { hasTranscript } from '@/lib/storage/confidentialTranscriptStore';
 import { ConfidentialEmptyState } from '@/components/chat/confidential-empty-state';
 import { ConfidentialFileNotice } from '@/components/chat/confidential-file-notice';
+import { ComposerPlusMenu } from '@/components/chat/composer-plus-menu';
+import { VenetianMask } from 'lucide-react';
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES_PER_TURN = 10;
@@ -481,6 +482,12 @@ function ConversationPageContent() {
   const markConfidential = useConfidentialModeStore((s) => s.markConfidential);
   const isConfidential = isConfidentialId(conversationId);
 
+  // Redacted mode: same session-store pattern. Marked when server-loaded
+  // conversation carries is_redacted: true. Sticky after turn 1.
+  const isRedactedId = useRedactedModeStore((s) => s.isRedacted);
+  const markRedacted = useRedactedModeStore((s) => s.markRedacted);
+  const isRedacted = isRedactedId(conversationId);
+
   // Sync input draft to localStorage
   useEffect(() => {
     if (input) {
@@ -541,7 +548,12 @@ function ConversationPageContent() {
     recoverPendingState,
   } = useChatStream({
     onError: (err) => console.error('Chat error:', err),
-    onHistoryLoaded: (data) => setConversationOwnerId(data.user_id),
+    onHistoryLoaded: (data) => {
+      setConversationOwnerId(data.user_id);
+      // Mirror the server-side stickiness into the local session store so the
+      // composer reflects the conversation's mode without re-fetching.
+      if (data.is_redacted) markRedacted(data.id);
+    },
     onCompleted: (event) => {
       // Prefer canonical `content` (v2_stream), fall back to legacy `message`
       const finalText = event.content ?? event.message ?? '';
@@ -1223,13 +1235,22 @@ function ConversationPageContent() {
           {isOwner && hasNoFreeMessages && <NoFreeMessagesBanner className="mb-3" />}
           {isOwner ? (
             <FileUpload onFilesAdded={handleFilesAdded} accept=".pdf,.doc,.docx,.rtf" multiple>
-              <div className="mb-2 flex items-center">
+              <div className="mb-2 flex items-center gap-2">
                 <JurisdictionStatus
                   value={jurisdictionChoice}
                   onChange={setJurisdictionChoice}
                   disabled={isStreaming || isLoadingHistory || isSubmitting}
                   triggerClassName="bg-background hover:bg-muted"
                 />
+                {isRedacted && (
+                  <div
+                    className="bg-background flex items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
+                    aria-label="Redacted mode is on for this conversation"
+                  >
+                    <VenetianMask className="h-3.5 w-3.5" />
+                    <span className="font-medium">Redacted</span>
+                  </div>
+                )}
               </div>
               {isConfidential && uploads.length > 0 && (
                 <ConfidentialFileNotice className="mb-2" />
@@ -1299,13 +1320,15 @@ function ConversationPageContent() {
                   onLargePaste={setPastedContent}
                 />
 
-                {/* Bottom bar: attach left, send right */}
+                {/* Bottom bar: + menu left, send right */}
                 <div className="flex items-center justify-between px-2 pb-1">
-                  <FileUploadTrigger asChild>
-                    <button className="hover:bg-secondary-foreground/10 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-2xl">
-                      <Paperclip className="text-primary h-4 w-4" />
-                    </button>
-                  </FileUploadTrigger>
+                  <ComposerPlusMenu
+                    isRedactedPending={false}
+                    onRedactedToggle={() => {}}
+                    isRedactedLocked={isRedacted}
+                    size="sm"
+                    disabled={isStreaming || isLoadingHistory || isSubmitting || hasNoFreeMessages}
+                  />
 
                   {/* Send/Stop button */}
                   {isStreaming ? (

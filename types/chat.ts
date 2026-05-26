@@ -321,6 +321,10 @@ export interface ChatStartRequest {
   // Confidential mode: set once at conversation creation (turn 1). Immutable
   // afterwards — sending on an existing conversation returns 422.
   is_confidential?: boolean;
+  // Redacted mode: same sticky-on-turn-1 contract as is_confidential. Composes
+  // with it. Server replaces the message text with the redacted form before
+  // persistence and before the LLM call.
+  is_redacted?: boolean;
   // Prior transcript for confidential chats. Required (even as []) on every
   // confidential turn. Forbidden for non-confidential — server returns 422.
   messages?: ConfidentialHistoryEntry[];
@@ -336,6 +340,10 @@ export interface ChatStartResponse {
     stream_url: string;
     // Echoed back by backend to confirm what's active
     stream_mode?: 'v2_stream' | null;
+    // For redacted conversations, the canonical (redacted) form of the user's
+    // turn. Use this in place of the raw input so the local store stays in
+    // sync without a refetch.
+    user_message_content?: string;
   };
 }
 
@@ -372,6 +380,9 @@ export interface SendMessageOptions {
   // Set on turn 1 when the user opted into confidential mode on the home page.
   // The hook reads the prior transcript from IndexedDB on subsequent turns.
   isConfidential?: boolean;
+  // Set on turn 1 when the user opted into redacted mode on the home page.
+  // Subsequent turns omit the flag — the server reads the persisted setting.
+  isRedacted?: boolean;
 }
 
 // Chat state for hook
@@ -450,6 +461,7 @@ export interface ConversationData {
   status: 'active' | 'archived';
   is_private: boolean;
   is_confidential?: boolean;
+  is_redacted?: boolean;
   messages: ApiMessage[];
   messages_count: number;
   views_count?: number;
@@ -474,6 +486,7 @@ export interface ConversationListItem {
   status: 'active' | 'archived';
   is_private: boolean;
   is_confidential?: boolean;
+  is_redacted?: boolean;
   agent: {
     id: number;
     name: string;
