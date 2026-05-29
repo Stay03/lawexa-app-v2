@@ -74,8 +74,8 @@ type FileUploadEntry = {
   error?: string;
 };
 
-// Workflow choices exposed to regular (non-admin) users. Admin/researcher
-// see the full API-driven list instead.
+// Workflow choices exposed to non-admin users (including researchers).
+// Superadmin/admin see the full API-driven list instead.
 const USER_WORKFLOWS = [
   { id: 15, name: 'Lawexa Lite' },
   { id: 16, name: 'Lawexa Expert' },
@@ -154,10 +154,10 @@ export default function HomePage() {
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
 
-  // Workflow selector — admin/researcher get the full API-driven list;
-  // regular signed-in users get a fixed Lite/Expert choice; guests don't
-  // see any selector.
-  const canSelectWorkflow = !!user?.role && ['superadmin', 'admin', 'researcher'].includes(user.role);
+  // Workflow selector — superadmin/admin get the full API-driven list;
+  // everyone else signed in (including researchers) gets the fixed
+  // Lite/Expert choice; guests don't see any selector.
+  const canSelectWorkflow = !!user?.role && ['superadmin', 'admin'].includes(user.role);
   const isRegularUser = !!user && !isGuest && !canSelectWorkflow;
   const workflowParams = { active_only: true, per_page: 50 };
   const { data: workflowsData } = useQuery({
@@ -168,11 +168,11 @@ export default function HomePage() {
   });
   const workflows = workflowsData?.data ?? [];
 
-  // Pre-select the default workflow for admin/researcher when data loads.
+  // Pre-select the default workflow for superadmin/admin when data loads.
   // Guard against overwriting a regular user's stored Lite/Expert choice.
   useEffect(() => {
     if (!canSelectWorkflow) return;
-    // Admin/researcher path: only set if value isn't already a valid admin id.
+    // Admin path: only set if value isn't already a valid admin id.
     if (selectedWorkflowId && workflows.some((w) => String(w.id) === selectedWorkflowId)) return;
     if (workflows.length > 0) {
       const defaultWorkflow = workflows.find((w) => w.is_default);
@@ -767,7 +767,7 @@ export default function HomePage() {
                   </Select>
                 )}
 
-                {/* Workflow selector - admin/researcher only */}
+                {/* Workflow selector - superadmin/admin only */}
                 {canSelectWorkflow && workflows.length > 0 && (
                   <Select
                     value={selectedWorkflowId}
