@@ -53,6 +53,7 @@ const CONTENT_TYPE_TABS = [
   { value: 'case', label: 'Cases' },
   { value: 'note', label: 'Notes' },
   { value: 'conversation', label: 'Conversations' },
+  { value: 'file', label: 'Files' },
 ];
 
 /******************************************************************************
@@ -287,7 +288,7 @@ function FolderDetailContent() {
                 isOwner
                   ? typeFilter === 'subfolder'
                     ? 'Create a subfolder to organize content within this folder.'
-                    : 'Add cases, notes, or conversations to this folder.'
+                    : 'Add cases, notes, conversations, or files to this folder.'
                   : 'This folder is empty.'
               }
               className="py-6"

@@ -29,7 +29,20 @@ export interface FolderUser {
 export type FolderSortField = 'created_at' | 'updated_at' | 'name';
 
 // Folder item content types
-export type FolderItemType = 'case' | 'note' | 'conversation' | 'folder' | 'statute';
+export type FolderItemType = 'case' | 'note' | 'conversation' | 'folder' | 'statute' | 'file';
+
+// Content payload for a folder item of type 'file' — mirrors the UserFile
+// resource that the backend embeds under `content`.
+export interface FolderFileContent {
+  id: number;
+  url: string | null;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  category: string;
+  upload_status: string;
+  created_at: string;
+}
 
 // Folder summary (used in lists, children arrays, parent references)
 export interface FolderSummary {
@@ -92,13 +105,22 @@ export interface MyFolder {
   updated_at: string;
 }
 
-// Folder item (polymorphic content in a folder)
-export interface FolderItem {
-  id: number;
-  type: FolderItemType;
-  content: Record<string, unknown>;
-  added_at: string;
-}
+// Folder item (polymorphic content in a folder).
+// Discriminated on `type`: file items carry a typed FolderFileContent,
+// other types keep a loose content bag for now.
+export type FolderItem =
+  | {
+      id: number;
+      type: 'file';
+      content: FolderFileContent;
+      added_at: string;
+    }
+  | {
+      id: number;
+      type: Exclude<FolderItemType, 'file'>;
+      content: Record<string, unknown>;
+      added_at: string;
+    };
 
 // Query params for public folders list (GET /api/folders)
 export interface FolderListParams {

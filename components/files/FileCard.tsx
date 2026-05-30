@@ -1,35 +1,11 @@
 'use client';
 
-import { Download, Trash2, Image as ImageIcon, FileText, File } from 'lucide-react';
+import { Download, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { formatFileSize, getFileExtension, getFileIcon } from '@/lib/utils/file-display';
 import type { UserFile } from '@/types/file';
-
-/**
- * Format bytes to a human-readable size string
- */
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  const size = bytes / Math.pow(1024, i);
-  return `${size.toFixed(size < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
-}
-
-/**
- * Get the appropriate icon for a file based on its mime type
- */
-function getFileIcon(mimeType: string) {
-  if (mimeType.startsWith('image/')) return ImageIcon;
-  if (mimeType === 'application/pdf') return FileText;
-  if (
-    mimeType === 'application/msword' ||
-    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    mimeType === 'application/rtf'
-  ) return FileText;
-  return File;
-}
 
 /**
  * Format a date string to a short display format
@@ -41,23 +17,6 @@ function formatDate(dateString: string): string {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-/**
- * Get file extension from mime type
- */
-function getExtension(mimeType: string): string {
-  const map: Record<string, string> = {
-    'image/jpeg': 'JPG',
-    'image/png': 'PNG',
-    'image/gif': 'GIF',
-    'image/webp': 'WEBP',
-    'application/pdf': 'PDF',
-    'application/msword': 'DOC',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
-    'application/rtf': 'RTF',
-  };
-  return map[mimeType] || 'FILE';
 }
 
 interface FileCardProps {
@@ -72,7 +31,7 @@ interface FileCardProps {
 export function FileCard({ file, onDelete, onDownload, index, className, style }: FileCardProps) {
   const isImage = file.category === 'content-image';
   const Icon = getFileIcon(file.mime_type);
-  const extension = getExtension(file.mime_type);
+  const extension = getFileExtension(file.mime_type);
 
   return (
     <div
