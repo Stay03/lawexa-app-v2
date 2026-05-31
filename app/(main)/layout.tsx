@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
 
 function getBreadcrumbs(pathname: string, getOverrideLabel: (segment: string) => string | undefined) {
   const segments = pathname.split('/').filter(Boolean)
@@ -199,7 +200,15 @@ export default function MainLayout({
             })()}
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto min-h-0 p-4 pt-0">
+        <div
+          className={cn(
+            "flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto min-h-0 p-4 pt-0",
+            // Chat manages its own horizontal breathing room (ChatContainerContent
+            // has px-4); drop the layout's outer px on mobile so the message
+            // column reclaims the gutter.
+            pathname.startsWith('/c/') && "max-md:px-0"
+          )}
+        >
           {children}
         </div>
         </SidebarInset>
