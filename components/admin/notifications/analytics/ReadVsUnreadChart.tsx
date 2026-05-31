@@ -1,6 +1,6 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -60,7 +60,7 @@ export function ReadVsUnreadChart({ data }: ReadVsUnreadChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <LineChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
@@ -90,49 +90,23 @@ export function ReadVsUnreadChart({ data }: ReadVsUnreadChartProps) {
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <defs>
-              <linearGradient id="fillRead" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-read)"
-                  stopOpacity={0.3}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-read)"
-                  stopOpacity={0.05}
-                />
-              </linearGradient>
-              <linearGradient id="fillUnread" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-unread)"
-                  stopOpacity={0.3}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-unread)"
-                  stopOpacity={0.05}
-                />
-              </linearGradient>
-            </defs>
-            <Area
+            <Line
               dataKey="read"
               type="monotone"
-              fill="url(#fillRead)"
               stroke="var(--color-read)"
               strokeWidth={2}
-              stackId="a"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-            <Area
+            <Line
               dataKey="unread"
               type="monotone"
-              fill="url(#fillUnread)"
               stroke="var(--color-unread)"
               strokeWidth={2}
-              stackId="a"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-          </AreaChart>
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

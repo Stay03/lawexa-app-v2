@@ -1,6 +1,6 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -70,7 +70,7 @@ export function ConversationsAndMessagesChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <LineChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey={dataKey}
@@ -100,31 +100,23 @@ export function ConversationsAndMessagesChart({
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <defs>
-              <linearGradient id="fillUserConversations" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-conversations)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-conversations)" stopOpacity={0.05} />
-              </linearGradient>
-              <linearGradient id="fillUserMessages" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-messages)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-messages)" stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
-            <Area
+            <Line
               dataKey="conversations"
               type="monotone"
-              fill="url(#fillUserConversations)"
               stroke="var(--color-conversations)"
               strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-            <Area
+            <Line
               dataKey="messages"
               type="monotone"
-              fill="url(#fillUserMessages)"
               stroke="var(--color-messages)"
               strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-          </AreaChart>
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -62,7 +62,7 @@ export function BroadcastsOverTimeChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <LineChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
@@ -92,59 +92,23 @@ export function BroadcastsOverTimeChart({
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <defs>
-              <linearGradient
-                id="fillBroadcasts"
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-broadcasts)"
-                  stopOpacity={0.3}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-broadcasts)"
-                  stopOpacity={0.05}
-                />
-              </linearGradient>
-              <linearGradient
-                id="fillNotificationsSent"
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-notifications_sent)"
-                  stopOpacity={0.3}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-notifications_sent)"
-                  stopOpacity={0.05}
-                />
-              </linearGradient>
-            </defs>
-            <Area
+            <Line
               dataKey="broadcasts"
               type="monotone"
-              fill="url(#fillBroadcasts)"
               stroke="var(--color-broadcasts)"
               strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-            <Area
+            <Line
               dataKey="notifications_sent"
               type="monotone"
-              fill="url(#fillNotificationsSent)"
               stroke="var(--color-notifications_sent)"
               strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-          </AreaChart>
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

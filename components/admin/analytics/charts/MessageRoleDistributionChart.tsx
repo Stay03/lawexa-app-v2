@@ -1,6 +1,6 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -75,7 +75,7 @@ export function MessageRoleDistributionChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <LineChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey={xKey}
@@ -105,34 +105,31 @@ export function MessageRoleDistributionChart({
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Area
-              dataKey="tool_count"
-              type="monotone"
-              fill="var(--color-tool_count)"
-              fillOpacity={0.2}
-              stroke="var(--color-tool_count)"
-              strokeWidth={2}
-              stackId="1"
-            />
-            <Area
-              dataKey="assistant_count"
-              type="monotone"
-              fill="var(--color-assistant_count)"
-              fillOpacity={0.2}
-              stroke="var(--color-assistant_count)"
-              strokeWidth={2}
-              stackId="1"
-            />
-            <Area
+            <Line
               dataKey="user_count"
               type="monotone"
-              fill="var(--color-user_count)"
-              fillOpacity={0.2}
               stroke="var(--color-user_count)"
               strokeWidth={2}
-              stackId="1"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-          </AreaChart>
+            <Line
+              dataKey="assistant_count"
+              type="monotone"
+              stroke="var(--color-assistant_count)"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
+            />
+            <Line
+              dataKey="tool_count"
+              type="monotone"
+              stroke="var(--color-tool_count)"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
+            />
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>
