@@ -1,6 +1,6 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -70,7 +70,7 @@ export function ViewsOverTimeChart({ data, granularity }: ViewsOverTimeChartProp
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <LineChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey={dataKey}
@@ -100,33 +100,23 @@ export function ViewsOverTimeChart({ data, granularity }: ViewsOverTimeChartProp
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <defs>
-              <linearGradient id="fillHumanViews" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-human_views)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-human_views)" stopOpacity={0.05} />
-              </linearGradient>
-              <linearGradient id="fillBotViews" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-bot_views)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-bot_views)" stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
-            <Area
+            <Line
               dataKey="human_views"
               type="monotone"
-              fill="url(#fillHumanViews)"
               stroke="var(--color-human_views)"
               strokeWidth={2}
-              stackId="views"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-            <Area
+            <Line
               dataKey="bot_views"
               type="monotone"
-              fill="url(#fillBotViews)"
               stroke="var(--color-bot_views)"
               strokeWidth={2}
-              stackId="views"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-          </AreaChart>
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

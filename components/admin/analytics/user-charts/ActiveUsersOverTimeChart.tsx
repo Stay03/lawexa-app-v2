@@ -1,6 +1,6 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -70,7 +70,7 @@ export function ActiveUsersOverTimeChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <LineChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey={dataKey}
@@ -100,33 +100,23 @@ export function ActiveUsersOverTimeChart({
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <defs>
-              <linearGradient id="fillActiveRegistered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-registered)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-registered)" stopOpacity={0.05} />
-              </linearGradient>
-              <linearGradient id="fillActiveGuest" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-guest)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-guest)" stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
-            <Area
+            <Line
               dataKey="registered"
               type="monotone"
-              fill="url(#fillActiveRegistered)"
               stroke="var(--color-registered)"
               strokeWidth={2}
-              stackId="active"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-            <Area
+            <Line
               dataKey="guest"
               type="monotone"
-              fill="url(#fillActiveGuest)"
               stroke="var(--color-guest)"
               strokeWidth={2}
-              stackId="active"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-          </AreaChart>
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

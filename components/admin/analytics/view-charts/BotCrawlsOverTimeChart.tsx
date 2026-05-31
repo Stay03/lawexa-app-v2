@@ -1,6 +1,6 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -77,7 +77,7 @@ export function BotCrawlsOverTimeChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} accessibilityLayer>
+          <LineChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey={dataKey}
@@ -107,33 +107,23 @@ export function BotCrawlsOverTimeChart({
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <defs>
-              <linearGradient id="fillSearchCrawls" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-search_engine_crawls)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-search_engine_crawls)" stopOpacity={0.05} />
-              </linearGradient>
-              <linearGradient id="fillSocialCrawls" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-social_media_crawls)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-social_media_crawls)" stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
-            <Area
+            <Line
               dataKey="search_engine_crawls"
               type="monotone"
-              fill="url(#fillSearchCrawls)"
               stroke="var(--color-search_engine_crawls)"
               strokeWidth={2}
-              stackId="crawls"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-            <Area
+            <Line
               dataKey="social_media_crawls"
               type="monotone"
-              fill="url(#fillSocialCrawls)"
               stroke="var(--color-social_media_crawls)"
               strokeWidth={2}
-              stackId="crawls"
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-          </AreaChart>
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>
