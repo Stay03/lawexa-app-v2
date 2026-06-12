@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Coins, Globe, SlidersHorizontal } from 'lucide-react';
+import { useState, useSyncExternalStore } from 'react';
+import { Clock, Coins } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import {
   Combobox,
   ComboboxContent,
@@ -13,14 +14,23 @@ import {
 } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useUserLimits } from '@/lib/hooks/useUserLimits';
-import { cn } from '@/lib/utils';
 import {
-  SCHEDULE_PRESETS,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useUserLimits } from '@/lib/hooks/useUserLimits';
+import {
+  DEFAULT_BUILDER_STATE,
+  builderToCron,
+  cronToBuilder,
   describeCron,
   estimateScansPerMonth,
-  matchPreset,
   parseCronExpression,
+  type ScheduleBuilderState,
+  type ScheduleFrequency,
 } from '@/lib/utils/cron';
 
 export interface ScheduleValue {
@@ -34,6 +44,70 @@ interface SchedulePickerProps {
 }
 
 const TIMEZONES = Intl.supportedValuesOf('timeZone');
+
+const FREQUENCY_OPTIONS: { value: ScheduleFrequency; label: string }[] = [
+  { value: 'daily', label: 'Every day' },
+  { value: 'weekdays', label: 'Weekdays (Mon–Fri)' },
+  { value: 'weekly', label: 'Once a week' },
+  { value: 'monthly', label: 'Once a month' },
+];
+
+const WEEKDAY_OPTIONS = [
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+  { value: 0, label: 'Sunday' },
+];
+
+function ordinal(day: number): string {
+  if (day >= 11 && day <= 13) return `${day}th`;
+  switch (day % 10) {
+    case 1:
+      return `${day}st`;
+    case 2:
+      return `${day}nd`;
+    case 3:
+      return `${day}rd`;
+    default:
+      return `${day}th`;
+  }
+}
+
+const MONTH_DAY_OPTIONS = Array.from({ length: 28 }, (_, index) => index + 1);
+
+// A coarse clock for the "current time" confirmation line. Time is external
+// mutable state, so it's read through useSyncExternalStore to keep renders
+// pure; the snapshot is quantized so it only changes once per tick.
+const CLOCK_TICK_MS = 30_000;
+
+function subscribeToClock(onTick: () => void): () => void {
+  const id = setInterval(onTick, CLOCK_TICK_MS);
+  return () => clearInterval(id);
+}
+
+function useNowMs(): number {
+  return useSyncExternalStore(
+    subscribeToClock,
+    () => Math.floor(Date.now() / CLOCK_TICK_MS) * CLOCK_TICK_MS,
+    () => 0
+  );
+}
+
+function formatTimeIn(nowMs: number, timeZone: string): string | null {
+  if (nowMs === 0) return null;
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone,
+    }).format(new Date(nowMs));
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Billing copy for the schedule's firing rate. Sparse schedules (fewer than
@@ -64,54 +138,37 @@ function formatScanRate(scansPerMonth: number | null): React.ReactNode {
   );
 }
 
-function OptionCard({
-  selected,
-  onSelect,
-  title,
-  subtitle,
-}: {
-  selected: boolean;
-  onSelect: () => void;
-  title: React.ReactNode;
-  subtitle: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      data-selected={selected}
-      className={cn(
-        'rounded-xl border p-3 text-left transition-colors',
-        'hover:border-primary/40 hover:bg-muted/40',
-        'data-[selected=true]:border-primary data-[selected=true]:bg-primary/5'
-      )}
-    >
-      <span className="block text-sm font-medium">{title}</span>
-      <span className="mt-0.5 block text-xs text-muted-foreground">
-        {subtitle}
-      </span>
-    </button>
-  );
-}
-
 /**
- * Schedule selection: human presets first, raw cron as the advanced option,
- * a timezone picker, and an always-visible billing line (every scan debits
- * one AI message).
+ * Schedule selection without cron literacy: a frequency + day + time builder
+ * that writes the cron expression behind the scenes, a current-time line so
+ * the user confirms (rather than hunts for) their timezone, and an
+ * always-visible billing estimate. A raw cron input remains available as a
+ * discreet advanced option and is forced on for expressions the builder
+ * can't represent.
  */
 function SchedulePicker({ value, onChange }: SchedulePickerProps) {
-  const [isCustom, setIsCustom] = useState(() => matchPreset(value.cron) === null);
+  const builder = cronToBuilder(value.cron);
+  const [advancedToggled, setAdvancedToggled] = useState(false);
+  const advanced = advancedToggled || builder === null;
+
+  const [editingTimezone, setEditingTimezone] = useState(false);
   const [timezoneSearch, setTimezoneSearch] = useState('');
-  const [isTimezoneSearching, setIsTimezoneSearching] = useState(false);
   const { data: limitsData } = useUserLimits();
 
-  const selectedPreset = isCustom ? null : matchPreset(value.cron);
+  const nowMs = useNowMs();
+  const localTime = formatTimeIn(nowMs, value.timezone);
+
   const cronIsValid = parseCronExpression(value.cron) !== null;
   const cronSummary = describeCron(value.cron);
   const scansPerMonth = estimateScansPerMonth(value.cron);
   const messagesRemaining = limitsData?.data?.ai_messages.total_remaining ?? null;
 
-  const filteredTimezones = isTimezoneSearching
+  const updateBuilder = (patch: Partial<ScheduleBuilderState>) => {
+    const next = { ...(builder ?? DEFAULT_BUILDER_STATE), ...patch };
+    onChange({ ...value, cron: builderToCron(next) });
+  };
+
+  const filteredTimezones = timezoneSearch.trim()
     ? TIMEZONES.filter((timezone) =>
         timezone.toLowerCase().includes(timezoneSearch.trim().toLowerCase())
       )
@@ -119,33 +176,91 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {SCHEDULE_PRESETS.map((preset) => (
-          <OptionCard
-            key={preset.id}
-            selected={selectedPreset === preset.id}
-            onSelect={() => {
-              setIsCustom(false);
-              onChange({ ...value, cron: preset.cron });
-            }}
-            title={preset.label}
-            subtitle={preset.sublabel}
-          />
-        ))}
-        <OptionCard
-          selected={isCustom}
-          onSelect={() => setIsCustom(true)}
-          title={
-            <span className="inline-flex items-center gap-1.5">
-              <SlidersHorizontal className="size-3.5" />
-              Custom
-            </span>
-          }
-          subtitle="Write a cron expression"
-        />
-      </div>
+      {!advanced && builder && (
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="radar-frequency">How often</Label>
+            <Select
+              value={builder.frequency}
+              onValueChange={(frequency) =>
+                updateBuilder({ frequency: frequency as ScheduleFrequency })
+              }
+            >
+              <SelectTrigger id="radar-frequency" className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FREQUENCY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {isCustom && (
+          {builder.frequency === 'weekly' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="radar-weekday">On</Label>
+              <Select
+                value={String(builder.weekday)}
+                onValueChange={(weekday) =>
+                  updateBuilder({ weekday: Number(weekday) })
+                }
+              >
+                <SelectTrigger id="radar-weekday" className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WEEKDAY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {builder.frequency === 'monthly' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="radar-month-day">On the</Label>
+              <Select
+                value={String(builder.monthDay)}
+                onValueChange={(monthDay) =>
+                  updateBuilder({ monthDay: Number(monthDay) })
+                }
+              >
+                <SelectTrigger id="radar-month-day" className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTH_DAY_OPTIONS.map((day) => (
+                    <SelectItem key={day} value={String(day)}>
+                      {ordinal(day)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="radar-time">At</Label>
+            <Input
+              id="radar-time"
+              type="time"
+              value={builder.time}
+              onChange={(event) => {
+                if (event.target.value) updateBuilder({ time: event.target.value });
+              }}
+              className="w-32"
+            />
+          </div>
+        </div>
+      )}
+
+      {advanced && (
         <div className="space-y-1.5">
           <Label htmlFor="radar-custom-cron">Cron expression</Label>
           <Input
@@ -173,51 +288,84 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
         </div>
       )}
 
-      <div className="space-y-1.5">
-        <Label htmlFor="radar-timezone">Timezone</Label>
-        <Combobox
-          value={value.timezone}
-          onValueChange={(timezone) => {
-            if (typeof timezone === 'string' && timezone) {
-              onChange({ ...value, timezone });
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        onClick={() => {
+          if (advanced) {
+            // Returning to the builder from an unrepresentable expression
+            // deliberately resets to the default daily schedule.
+            if (builder === null) {
+              onChange({ ...value, cron: builderToCron(DEFAULT_BUILDER_STATE) });
             }
-            setTimezoneSearch('');
-            setIsTimezoneSearching(false);
-          }}
-        >
-          <ComboboxInput
-            id="radar-timezone"
-            placeholder="Search timezones…"
-            value={isTimezoneSearching ? timezoneSearch : value.timezone}
-            onChange={(event) => {
-              setIsTimezoneSearching(true);
-              setTimezoneSearch(event.target.value);
-            }}
-            onFocus={() => {
-              setIsTimezoneSearching(true);
+            setAdvancedToggled(false);
+          } else {
+            setAdvancedToggled(true);
+          }
+        }}
+      >
+        {advanced ? 'Switch to simple schedule' : 'Use a cron expression instead'}
+      </button>
+
+      <div className="space-y-2 rounded-lg border px-3.5 py-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <Clock className="size-4 shrink-0 text-muted-foreground" />
+          <span className="text-muted-foreground">
+            Your current time:{' '}
+            <span className="font-medium text-foreground">
+              {localTime ?? '—'}
+            </span>{' '}
+            · {value.timezone.replace(/_/g, ' ')}
+          </span>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs"
+            onClick={() => {
+              setEditingTimezone((editing) => !editing);
               setTimezoneSearch('');
             }}
-            onBlur={() => {
-              setIsTimezoneSearching(false);
+          >
+            {editingTimezone ? 'Done' : 'Wrong? Change it'}
+          </Button>
+        </div>
+
+        {editingTimezone && (
+          <Combobox
+            value={value.timezone}
+            onValueChange={(timezone) => {
+              if (typeof timezone === 'string' && timezone) {
+                onChange({ ...value, timezone });
+                setEditingTimezone(false);
+              }
               setTimezoneSearch('');
             }}
-          />
-          <ComboboxContent>
-            <ComboboxList>
-              {filteredTimezones.slice(0, 50).map((timezone) => (
-                <ComboboxItem key={timezone} value={timezone}>
-                  <Globe className="text-muted-foreground" />
-                  {timezone}
-                </ComboboxItem>
-              ))}
-              {filteredTimezones.length === 0 && (
-                <ComboboxEmpty>No timezones found</ComboboxEmpty>
-              )}
-            </ComboboxList>
-          </ComboboxContent>
-        </Combobox>
+          >
+            <ComboboxInput
+              placeholder="Search timezones…"
+              value={timezoneSearch}
+              onChange={(event) => setTimezoneSearch(event.target.value)}
+              autoFocus
+            />
+            <ComboboxContent>
+              <ComboboxList>
+                {filteredTimezones.slice(0, 50).map((timezone) => (
+                  <ComboboxItem key={timezone} value={timezone}>
+                    {timezone.replace(/_/g, ' ')}
+                  </ComboboxItem>
+                ))}
+                {filteredTimezones.length === 0 && (
+                  <ComboboxEmpty>No timezones found</ComboboxEmpty>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        )}
+
         <p className="text-xs text-muted-foreground">
-          The schedule runs in this timezone.
+          Scans run on this clock — if the time above looks right, you&apos;re
+          set.
         </p>
       </div>
 

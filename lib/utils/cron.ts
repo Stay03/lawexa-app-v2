@@ -238,56 +238,80 @@ export function estimateScansPerMonth(expression: string): number | null {
   return total / 12;
 }
 
-export type SchedulePresetId =
-  | 'every-morning'
-  | 'every-evening'
-  | 'weekdays'
-  | 'weekly'
-  | 'monthly';
+/******************************************************************************
+                      Visual schedule builder <-> cron
+******************************************************************************/
 
-export interface SchedulePreset {
-  id: SchedulePresetId;
-  label: string;
-  sublabel: string;
-  cron: string;
+export type ScheduleFrequency = 'daily' | 'weekdays' | 'weekly' | 'monthly';
+
+export interface ScheduleBuilderState {
+  frequency: ScheduleFrequency;
+  /** 24h "HH:MM", straight from an <input type="time"> */
+  time: string;
+  /** 0 (Sunday) – 6 (Saturday); only meaningful for weekly */
+  weekday: number;
+  /** 1–28 to exist in every month; only meaningful for monthly */
+  monthDay: number;
 }
 
-export const SCHEDULE_PRESETS: readonly SchedulePreset[] = [
-  {
-    id: 'every-morning',
-    label: 'Every morning',
-    sublabel: 'Daily at 8:00 AM',
-    cron: '0 8 * * *',
-  },
-  {
-    id: 'every-evening',
-    label: 'Every evening',
-    sublabel: 'Daily at 6:00 PM',
-    cron: '0 18 * * *',
-  },
-  {
-    id: 'weekdays',
-    label: 'Weekdays',
-    sublabel: 'Mon–Fri at 9:00 AM',
-    cron: '0 9 * * 1-5',
-  },
-  {
-    id: 'weekly',
-    label: 'Weekly',
-    sublabel: 'Mondays at 9:00 AM',
-    cron: '0 9 * * 1',
-  },
-  {
-    id: 'monthly',
-    label: 'Monthly',
-    sublabel: '1st of the month, 9:00 AM',
-    cron: '0 9 1 * *',
-  },
-];
+export const DEFAULT_BUILDER_STATE: ScheduleBuilderState = {
+  frequency: 'daily',
+  time: '08:00',
+  weekday: 1,
+  monthDay: 1,
+};
 
-export function matchPreset(cron: string): SchedulePresetId | null {
-  const normalized = cron.trim().replace(/\s+/g, ' ');
-  return (
-    SCHEDULE_PRESETS.find((preset) => preset.cron === normalized)?.id ?? null
-  );
+export function builderToCron(state: ScheduleBuilderState): string {
+  const [hour, minute] = state.time.split(':').map(Number);
+  switch (state.frequency) {
+    case 'daily':
+      return `${minute} ${hour} * * *`;
+    case 'weekdays':
+      return `${minute} ${hour} * * 1-5`;
+    case 'weekly':
+      return `${minute} ${hour} * * ${state.weekday}`;
+    case 'monthly':
+      return `${minute} ${hour} ${state.monthDay} * *`;
+  }
+}
+
+/**
+ * Recover builder state from a cron expression. Returns null for any shape
+ * the visual builder can't represent (those fall back to the advanced cron
+ * input).
+ */
+export function cronToBuilder(expression: string): ScheduleBuilderState | null {
+  const fields = expression.trim().split(/\s+/);
+  if (fields.length !== 5) return null;
+  const [minuteField, hourField, domField, monthField, dowField] = fields;
+
+  if (monthField !== '*') return null;
+  if (!/^\d+$/.test(minuteField) || !/^\d+$/.test(hourField)) return null;
+  const minute = Number(minuteField);
+  const hour = Number(hourField);
+  if (minute > 59 || hour > 23) return null;
+
+  const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  const base = { ...DEFAULT_BUILDER_STATE, time };
+
+  if (domField === '*') {
+    if (dowField === '*') return { ...base, frequency: 'daily' };
+    if (dowField === '1-5') return { ...base, frequency: 'weekdays' };
+    if (/^\d+$/.test(dowField)) {
+      const weekday = Number(dowField);
+      if (weekday <= 7) {
+        return { ...base, frequency: 'weekly', weekday: weekday === 7 ? 0 : weekday };
+      }
+    }
+    return null;
+  }
+
+  if (dowField === '*' && /^\d+$/.test(domField)) {
+    const monthDay = Number(domField);
+    if (monthDay >= 1 && monthDay <= 28) {
+      return { ...base, frequency: 'monthly', monthDay };
+    }
+  }
+
+  return null;
 }

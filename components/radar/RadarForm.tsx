@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
@@ -25,6 +26,10 @@ import { SchedulePicker } from './SchedulePicker';
 import { SourcesField } from './SourcesField';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
+  findDefaultJurisdiction,
+  useJurisdictions,
+} from '@/lib/hooks/useJurisdictions';
+import {
   RADAR_LIMITS,
   applyRadarServerErrors,
   buildRadarPayload,
@@ -34,6 +39,9 @@ import {
   type RadarFormValues,
 } from '@/lib/utils/radar-validation';
 import type { CreateRadarPayload, Radar } from '@/types/radar';
+
+// Matches the chat jurisdiction default: profile country, else Nigeria.
+const DEFAULT_JURISDICTION_FALLBACK_SLUG = 'nigeria';
 
 export interface RadarFormHelpers {
   /** Map a 422 error bag onto form fields; returns false when nothing matched. */
@@ -48,19 +56,30 @@ interface RadarFormProps {
   onSubmit: (payload: CreateRadarPayload, helpers: RadarFormHelpers) => void;
 }
 
+function OptionalTag() {
+  return (
+    <span className="font-normal text-muted-foreground"> (optional)</span>
+  );
+}
+
 function FormSection({
   title,
   description,
+  optional = false,
   children,
 }: {
   title: string;
   description?: string;
+  optional?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <section className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold">{title}</h3>
+        <h3 className="text-sm font-semibold">
+          {title}
+          {optional && <OptionalTag />}
+        </h3>
         {description && (
           <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
         )}
@@ -71,9 +90,10 @@ function FormSection({
 }
 
 /**
- * Shared create/edit radar form. The payload builder always emits every
- * perimeter array in full so PATCH wholesale-replace semantics can never
- * silently wipe data.
+ * Shared create/edit radar form, ordered by importance: what to call it,
+ * what to watch, when to scan, then the optional extras. The payload builder
+ * always emits every perimeter array in full so PATCH wholesale-replace
+ * semantics can never silently wipe data.
  */
 function RadarForm({
   mode,
@@ -83,6 +103,8 @@ function RadarForm({
   onSubmit,
 }: RadarFormProps) {
   const userEmail = useAuthStore((s) => s.user?.email);
+  const profileCountry = useAuthStore((s) => s.user?.profile?.country);
+  const { data: jurisdictions } = useJurisdictions();
 
   const form = useForm<RadarFormValues>({
     resolver: zodResolver(radarFormSchema),
@@ -90,6 +112,24 @@ function RadarForm({
       ? radarFormValuesFromRadar(radar)
       : emptyRadarFormValues(Intl.DateTimeFormat().resolvedOptions().timeZone),
   });
+
+  // Pre-fill the user's own jurisdiction on create, once the list is
+  // available — applied a single time so removing it deliberately sticks.
+  const jurisdictionPrefilled = useRef(mode === 'edit');
+  useEffect(() => {
+    if (jurisdictionPrefilled.current || !jurisdictions) return;
+    jurisdictionPrefilled.current = true;
+    if (form.getValues('jurisdictions').length > 0) return;
+    const match =
+      findDefaultJurisdiction(jurisdictions, profileCountry) ??
+      jurisdictions.find(
+        (jurisdiction) =>
+          jurisdiction.slug === DEFAULT_JURISDICTION_FALLBACK_SLUG
+      );
+    if (match) {
+      form.setValue('jurisdictions', [match.slug]);
+    }
+  }, [jurisdictions, profileCountry, form]);
 
   const instructionsLength = form.watch('instructions').length;
 
@@ -127,7 +167,10 @@ function RadarForm({
             name="description"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Description (optional)</FormLabel>
+                <FormLabel>
+                  Description
+                  <OptionalTag />
+                </FormLabel>
                 <FormControl>
                   <Textarea
                     rows={2}
@@ -144,8 +187,78 @@ function RadarForm({
         <Separator />
 
         <FormSection
+          title="Watch scope"
+          description="Where to look and what to look for."
+        >
+          <FormField
+            control={form.control}
+            name="jurisdictions"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Jurisdictions</FormLabel>
+                <FormControl>
+                  <JurisdictionsField
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="topics"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Topics
+                  <OptionalTag />
+                </FormLabel>
+                <FormControl>
+                  <FreeTextChipsField
+                    value={field.value}
+                    onChange={field.onChange}
+                    itemNoun="topic"
+                    placeholder="e.g. NDPA enforcement"
+                    maxItems={RADAR_LIMITS.topics}
+                    maxItemLength={RADAR_LIMITS.topicLength}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="keywords"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Keywords
+                  <OptionalTag />
+                </FormLabel>
+                <FormControl>
+                  <FreeTextChipsField
+                    value={field.value}
+                    onChange={field.onChange}
+                    itemNoun="keyword"
+                    placeholder="e.g. NDPC, data protection fine"
+                    maxItems={RADAR_LIMITS.keywords}
+                    maxItemLength={RADAR_LIMITS.keywordLength}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </FormSection>
+
+        <Separator />
+
+        <FormSection
           title="Schedule"
-          description="How often the agent investigates. Every scan uses one AI message."
+          description="How often the agent investigates."
         >
           <FormField
             control={form.control}
@@ -175,70 +288,9 @@ function RadarForm({
         <Separator />
 
         <FormSection
-          title="Watch scope"
-          description="Jurisdictions, topics, and keywords that focus the investigation."
-        >
-          <FormField
-            control={form.control}
-            name="jurisdictions"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Jurisdictions</FormLabel>
-                <FormControl>
-                  <JurisdictionsField
-                    value={field.value}
-                    onChange={field.onChange}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="topics"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Topics</FormLabel>
-                <FormControl>
-                  <FreeTextChipsField
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="e.g. NDPA enforcement"
-                    maxItems={RADAR_LIMITS.topics}
-                    maxItemLength={RADAR_LIMITS.topicLength}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="keywords"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Keywords</FormLabel>
-                <FormControl>
-                  <FreeTextChipsField
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="e.g. NDPC, data protection fine"
-                    maxItems={RADAR_LIMITS.keywords}
-                    maxItemLength={RADAR_LIMITS.keywordLength}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </FormSection>
-
-        <Separator />
-
-        <FormSection
           title="Pinned sources"
           description="URLs the agent must check on every scan."
+          optional
         >
           <FormField
             control={form.control}
@@ -257,6 +309,7 @@ function RadarForm({
         <FormSection
           title="Watched entities"
           description="Lawexa cases, statutes, courts, judges, or notes to keep an eye on."
+          optional
         >
           <FormField
             control={form.control}
@@ -277,6 +330,7 @@ function RadarForm({
         <FormSection
           title="Agent instructions"
           description="Free-form guidance for the investigator — scopes, priorities, what to ignore."
+          optional
         >
           <FormField
             control={form.control}

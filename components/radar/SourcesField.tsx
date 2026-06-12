@@ -70,15 +70,14 @@ function SourcesField({ control }: SourcesFieldProps) {
       ))}
 
       {fields.length < RADAR_LIMITS.sources && (
-        <Button
+        <button
           type="button"
-          variant="outline"
-          size="sm"
           onClick={() => append({ url: '', label: '' })}
+          className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
         >
-          <Plus />
+          <Plus className="size-3" />
           Add source
-        </Button>
+        </button>
       )}
     </div>
   );

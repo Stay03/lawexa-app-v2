@@ -2,7 +2,15 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Gavel, Landmark, Scale, StickyNote, X } from 'lucide-react';
+import {
+  BookOpen,
+  Gavel,
+  Landmark,
+  Plus,
+  Scale,
+  StickyNote,
+  X,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +65,7 @@ interface EntityPickerProps {
  * matches as chips. Stored entities without labels render as "Type #id".
  */
 function EntityPicker({ value, onChange }: EntityPickerProps) {
+  const [adding, setAdding] = useState(false);
   const [entityType, setEntityType] = useState<RadarEntityType>('case');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search.trim(), 300);
@@ -82,8 +91,9 @@ function EntityPicker({ value, onChange }: EntityPickerProps) {
   const addEntity = (option: RadarEntityOption) => {
     if (!isSelected(option) && !atCapacity) {
       onChange([...value, option]);
-      setSearch('');
     }
+    setSearch('');
+    setAdding(false);
   };
 
   const removeEntity = (entity: RadarEntityOption) => {
@@ -98,101 +108,120 @@ function EntityPicker({ value, onChange }: EntityPickerProps) {
 
   return (
     <div className="space-y-2">
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {value.map((entity) => {
-            const Icon = ENTITY_TYPE_ICONS[entity.entity_type];
-            return (
-              <Badge
-                key={`${entity.entity_type}-${entity.entity_id}`}
-                variant="secondary"
-                className="gap-1"
+      <div className="flex flex-wrap items-center gap-2">
+        {value.map((entity) => {
+          const Icon = ENTITY_TYPE_ICONS[entity.entity_type];
+          return (
+            <Badge
+              key={`${entity.entity_type}-${entity.entity_id}`}
+              variant="secondary"
+              className="gap-1"
+            >
+              <Icon />
+              {entity.label}
+              <button
+                type="button"
+                onClick={() => removeEntity(entity)}
+                className="ml-0.5 rounded-full hover:text-destructive"
+                aria-label={`Remove ${entity.label}`}
               >
-                <Icon />
-                {entity.label}
-                <button
-                  type="button"
-                  onClick={() => removeEntity(entity)}
-                  className="ml-0.5 rounded-full hover:text-destructive"
-                  aria-label={`Remove ${entity.label}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            );
-          })}
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          );
+        })}
+
+        {!adding && !atCapacity && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+          >
+            <Plus className="size-3" />
+            Add entity
+          </button>
+        )}
+
+        {atCapacity && (
+          <span className="text-xs text-muted-foreground">
+            Limit of {RADAR_LIMITS.entities} reached
+          </span>
+        )}
+      </div>
+
+      {adding && !atCapacity && (
+        <div className="flex gap-2">
+          <Select
+            value={entityType}
+            onValueChange={(type) => {
+              setEntityType(type as RadarEntityType);
+              setSearch('');
+            }}
+          >
+            <SelectTrigger className="w-32 shrink-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ENTITY_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {radarEntityTypeLabel(type)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Combobox
+            value=""
+            onValueChange={(selected) => {
+              if (typeof selected !== 'string' || !selected) return;
+              const option = available.find(
+                (candidate) => String(candidate.entity_id) === selected
+              );
+              if (option) addEntity(option);
+            }}
+          >
+            <ComboboxInput
+              autoFocus
+              className="flex-1"
+              placeholder={`Search ${radarEntityTypeLabel(entityType).toLowerCase()}s…`}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setSearch('');
+                  setAdding(false);
+                }
+              }}
+            />
+            <ComboboxContent>
+              <ComboboxList>
+                {available.map((option) => (
+                  <ComboboxItem
+                    key={option.entity_id}
+                    value={String(option.entity_id)}
+                  >
+                    <span className="truncate">{option.label}</span>
+                    {option.sublabel && (
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {option.sublabel}
+                      </span>
+                    )}
+                  </ComboboxItem>
+                ))}
+                {available.length === 0 && (
+                  <ComboboxEmpty>
+                    {debouncedSearch.length < MIN_SEARCH_LENGTH
+                      ? 'Type at least 2 characters to search'
+                      : isFetching
+                        ? 'Searching…'
+                        : `No ${radarEntityTypeLabel(entityType).toLowerCase()}s found`}
+                  </ComboboxEmpty>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
         </div>
       )}
-
-      <div className="flex gap-2">
-        <Select
-          value={entityType}
-          onValueChange={(type) => {
-            setEntityType(type as RadarEntityType);
-            setSearch('');
-          }}
-        >
-          <SelectTrigger className="w-32 shrink-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ENTITY_TYPES.map((type) => (
-              <SelectItem key={type} value={type}>
-                {radarEntityTypeLabel(type)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Combobox
-          value=""
-          onValueChange={(selected) => {
-            if (typeof selected !== 'string' || !selected) return;
-            const option = available.find(
-              (candidate) => String(candidate.entity_id) === selected
-            );
-            if (option) addEntity(option);
-          }}
-        >
-          <ComboboxInput
-            className="flex-1"
-            placeholder={
-              atCapacity
-                ? `Limit of ${RADAR_LIMITS.entities} reached`
-                : `Search ${radarEntityTypeLabel(entityType).toLowerCase()}s…`
-            }
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            disabled={atCapacity}
-          />
-          <ComboboxContent>
-            <ComboboxList>
-              {available.map((option) => (
-                <ComboboxItem
-                  key={option.entity_id}
-                  value={String(option.entity_id)}
-                >
-                  <span className="truncate">{option.label}</span>
-                  {option.sublabel && (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {option.sublabel}
-                    </span>
-                  )}
-                </ComboboxItem>
-              ))}
-              {available.length === 0 && (
-                <ComboboxEmpty>
-                  {debouncedSearch.length < MIN_SEARCH_LENGTH
-                    ? 'Type at least 2 characters to search'
-                    : isFetching
-                      ? 'Searching…'
-                      : `No ${radarEntityTypeLabel(entityType).toLowerCase()}s found`}
-                </ComboboxEmpty>
-              )}
-            </ComboboxList>
-          </ComboboxContent>
-        </Combobox>
-      </div>
     </div>
   );
 }
