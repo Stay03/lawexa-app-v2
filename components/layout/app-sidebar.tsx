@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   ClipboardList,
   Users,
+  Radar,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/nav-main"
@@ -43,6 +44,11 @@ const navMain = [
     icon: MessageSquare,
   },
   {
+    title: "Radar",
+    url: "/radars",
+    icon: Radar,
+  },
+  {
     title: "Library",
     url: "#",
     icon: Library,
@@ -67,6 +73,7 @@ const GUEST_RESTRICTED_URLS = new Set([
   '/files',
   '/content-requests',
   '/bookmarks',
+  '/radars',
 ])
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
