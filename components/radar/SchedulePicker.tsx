@@ -35,6 +35,35 @@ interface SchedulePickerProps {
 
 const TIMEZONES = Intl.supportedValuesOf('timeZone');
 
+/**
+ * Billing copy for the schedule's firing rate. Sparse schedules (fewer than
+ * one scan a month) are stated per year rather than rounded up to 1/month.
+ */
+function formatScanRate(scansPerMonth: number | null): React.ReactNode {
+  if (scansPerMonth === null) {
+    return <>Each scan uses 1 AI message — exactly like a chat turn</>;
+  }
+  if (scansPerMonth === 0) {
+    return <>This schedule never runs — check the day and month combination</>;
+  }
+  if (scansPerMonth < 1) {
+    const perYear = Math.round(scansPerMonth * 12);
+    return (
+      <>
+        ≈ <span className="font-medium text-foreground">{perYear}</span>{' '}
+        {perYear === 1 ? 'scan' : 'scans'}/year · each scan uses 1 AI message
+      </>
+    );
+  }
+  const perMonth = Math.round(scansPerMonth);
+  return (
+    <>
+      ≈ <span className="font-medium text-foreground">{perMonth}</span>{' '}
+      {perMonth === 1 ? 'scan' : 'scans'}/month · each scan uses 1 AI message
+    </>
+  );
+}
+
 function OptionCard({
   selected,
   onSelect,
@@ -195,15 +224,7 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
       <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 px-3.5 py-3 text-sm">
         <Coins className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <p className="text-muted-foreground">
-          {scansPerMonth !== null ? (
-            <>
-              ≈ <span className="font-medium text-foreground">{scansPerMonth}</span>{' '}
-              {scansPerMonth === 1 ? 'scan' : 'scans'}/month · each scan uses 1 AI
-              message
-            </>
-          ) : (
-            <>Each scan uses 1 AI message — exactly like a chat turn</>
-          )}
+          {formatScanRate(scansPerMonth)}
           {messagesRemaining !== null && (
             <> · you have {messagesRemaining} messages remaining</>
           )}

@@ -45,6 +45,7 @@ import { ScanRunningIndicator } from './ScanRunningIndicator';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 import {
   hasInFlightScan,
+  useFirstScanDispatched,
   usePauseRadar,
   useRadar,
   useRadarScans,
@@ -99,33 +100,45 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
   const radarQuery = useRadar(radarUuid);
   const radar = radarQuery.data?.data;
 
-  // Within ~5 minutes of creating an unscanned active radar, keep polling
-  // even while the scan list is empty — the dispatched first scan's queued
-  // row can take up to a minute to land. The query's fetch timestamp stands
-  // in for the current time, keeping render pure.
+  // Show "First scan running…" and poll the empty list only when this
+  // session actually dispatched a first scan (created with the switch on and
+  // not blocked for balance), the radar is fresh (~5 min — the queued row
+  // lands within ~60s), and nothing has completed yet. The query's fetch
+  // timestamp stands in for the current time, keeping render pure.
+  const firstScanDispatched = useFirstScanDispatched(radarUuid);
   const awaitingFirstScan =
+    firstScanDispatched &&
     radar !== undefined &&
     radar.status === 'active' &&
     radar.last_scan_at === null &&
     radarQuery.dataUpdatedAt - new Date(radar.created_at).getTime() <
       FIRST_SCAN_WINDOW_MS;
 
-  // The inbox is the scan list filtered client-side to completed scans, per
-  // the API contract — in-flight rows stay visible to the polling logic.
-  const scansQuery = useRadarScans(
+  // The inbox ('active') list stays mounted on every tab: it's where queued/
+  // running rows live, so it drives the in-flight indicator, the Scan now
+  // guard, and the polling that refreshes radar data when a scan finishes.
+  const inboxScansQuery = useRadarScans(
     radarUuid,
-    { workflow_status: workflowTab },
+    { workflow_status: 'active' },
     { awaitingFirstScan }
   );
+  const triagedScansQuery = useRadarScans(
+    radarUuid,
+    { workflow_status: workflowTab },
+    { enabled: workflowTab !== 'active' }
+  );
+  const scansQuery =
+    workflowTab === 'active' ? inboxScansQuery : triagedScansQuery;
 
   const allScans = scansQuery.data?.pages.flatMap((page) => page.data) ?? [];
-  // Re-apply the workflow filter client-side so optimistically triaged rows
-  // (marked complete/archived) leave the current tab immediately instead of
+  // The inbox is the scan list filtered client-side to completed scans, per
+  // the API contract. Re-applying the workflow filter also makes
+  // optimistically triaged rows leave the current tab immediately instead of
   // lingering until the server-filtered list refetches.
   const completedScans = allScans.filter(
     (scan) => scan.status === 'completed' && scan.workflow_status === workflowTab
   );
-  const scanInFlight = hasInFlightScan(scansQuery.data);
+  const scanInFlight = hasInFlightScan(inboxScansQuery.data);
 
   const scanNow = useScanNow();
   const pauseRadar = usePauseRadar();

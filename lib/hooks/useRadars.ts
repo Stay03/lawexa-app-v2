@@ -38,6 +38,8 @@ export const radarKeys = {
     [...radarKeys.scanLists(radarUuid), params] as const,
   scanDetail: (radarUuid: string, scanUuid: string) =>
     [...radarKeys.scans(radarUuid), 'detail', scanUuid] as const,
+  firstScanDispatched: (radarUuid: string) =>
+    [...radarKeys.all, 'first-scan-dispatched', radarUuid] as const,
 };
 
 export const notificationChannelKeys = {
@@ -91,6 +93,7 @@ interface UseRadarScansOptions {
   // Keep polling while the list has no in-flight rows yet — covers the
   // ~60s window between dispatching a first scan and its queued row landing.
   awaitingFirstScan?: boolean;
+  enabled?: boolean;
 }
 
 /**
@@ -104,9 +107,9 @@ export function useRadarScans(
   params: Omit<RadarScanListParams, 'page'> = {},
   options: UseRadarScansOptions = {}
 ) {
-  const enabled = useIsRadarQueryEnabled();
+  const authEnabled = useIsRadarQueryEnabled();
   const queryClient = useQueryClient();
-  const { awaitingFirstScan = false } = options;
+  const { awaitingFirstScan = false, enabled = true } = options;
 
   const query = useInfiniteQuery({
     queryKey: [...radarKeys.scanList(radarUuid, params), 'infinite'] as const,
@@ -117,7 +120,7 @@ export function useRadarScans(
       return current_page < last_page ? current_page + 1 : undefined;
     },
     initialPageParam: 1,
-    enabled: enabled && !!radarUuid,
+    enabled: authEnabled && enabled && !!radarUuid,
     staleTime: 15 * 1000,
     refetchInterval: (activeQuery) => {
       const pages = activeQuery.state.data?.pages;
@@ -131,8 +134,12 @@ export function useRadarScans(
     refetchIntervalInBackground: false,
   });
 
-  const inFlightUuidsRef = useRef<ReadonlySet<string>>(new Set());
+  const trackedRef = useRef<{ key: string; inFlight: ReadonlySet<string> }>({
+    key: '',
+    inFlight: new Set(),
+  });
   const { data } = query;
+  const trackingKey = `${radarUuid}|${JSON.stringify(params)}`;
 
   useEffect(() => {
     if (!data) return;
@@ -143,17 +150,44 @@ export function useRadarScans(
         .filter((scan) => IN_FLIGHT_SCAN_STATUSES.has(scan.status))
         .map((scan) => scan.uuid)
     );
-    const someScanFinished = [...inFlightUuidsRef.current].some((uuid) => {
+
+    // A key change (e.g. switching triage tabs) means previously tracked
+    // in-flight scans can no longer be observed here — refresh the radar
+    // data once instead of silently dropping them.
+    if (trackedRef.current.key !== trackingKey) {
+      const lostInFlight = trackedRef.current.inFlight.size > 0;
+      trackedRef.current = { key: trackingKey, inFlight: nowInFlight };
+      if (lostInFlight) {
+        queryClient.invalidateQueries({ queryKey: radarKeys.detail(radarUuid) });
+        queryClient.invalidateQueries({ queryKey: radarKeys.lists() });
+      }
+      return;
+    }
+
+    const someScanFinished = [...trackedRef.current.inFlight].some((uuid) => {
       const scan = scans.find((candidate) => candidate.uuid === uuid);
       return scan !== undefined && !IN_FLIGHT_SCAN_STATUSES.has(scan.status);
     });
-    inFlightUuidsRef.current = nowInFlight;
+    trackedRef.current = { key: trackingKey, inFlight: nowInFlight };
 
     if (someScanFinished) {
       queryClient.invalidateQueries({ queryKey: radarKeys.detail(radarUuid) });
       queryClient.invalidateQueries({ queryKey: radarKeys.lists() });
     }
-  }, [data, queryClient, radarUuid]);
+  }, [data, trackingKey, queryClient, radarUuid]);
+
+  // Leaving the page mid-scan would otherwise lose the completion signal —
+  // mark the radar data stale so the next mount refetches it. The ref is
+  // read inside the cleanup on purpose: it must see the state at unmount,
+  // not at effect setup.
+  useEffect(() => {
+    return () => {
+      if (trackedRef.current.inFlight.size > 0) {
+        queryClient.invalidateQueries({ queryKey: radarKeys.detail(radarUuid) });
+        queryClient.invalidateQueries({ queryKey: radarKeys.lists() });
+      }
+    };
+  }, [queryClient, radarUuid]);
 
   return query;
 }
@@ -204,15 +238,36 @@ export function useCreateRadar() {
   return useMutation({
     mutationFn: radarsApi.create,
     onSuccess: (response) => {
-      const { radar } = response.data;
+      const { radar, first_scan } = response.data;
       queryClient.setQueryData<RadarDetailResponse>(radarKeys.detail(radar.uuid), {
         success: response.success,
         message: response.message,
         data: radar,
       });
+      if (first_scan.dispatched) {
+        // Lets the inbox show "First scan running…" only when a scan was
+        // actually dispatched (not when first_scan was off or blocked).
+        queryClient.setQueryData(
+          radarKeys.firstScanDispatched(radar.uuid),
+          true
+        );
+      }
       queryClient.invalidateQueries({ queryKey: radarKeys.lists() });
     },
   });
+}
+
+/**
+ * Whether this session dispatched an immediate first scan for the radar —
+ * a cache-only flag seeded by useCreateRadar, never fetched.
+ */
+export function useFirstScanDispatched(radarUuid: string): boolean {
+  const { data } = useQuery({
+    queryKey: radarKeys.firstScanDispatched(radarUuid),
+    queryFn: () => false,
+    enabled: false,
+  });
+  return data ?? false;
 }
 
 export function useUpdateRadar() {
@@ -345,7 +400,9 @@ export function useTriageScan() {
           .find((scan) => scan.uuid === scanUuid);
         if (!target) continue;
 
-        previousReadAt ??= target.read_at;
+        // First cache that contains the scan wins — null is a meaningful
+        // "unread" value here, so only assign while still undefined.
+        if (previousReadAt === undefined) previousReadAt = target.read_at;
         snapshots.push({ queryKey, data });
         queryClient.setQueryData<InfiniteData<RadarScanListResponse>>(queryKey, {
           ...data,
@@ -362,7 +419,7 @@ export function useTriageScan() {
       const scanDetail =
         queryClient.getQueryData<RadarScanDetailResponse>(scanDetailKey);
       if (scanDetail) {
-        previousReadAt ??= scanDetail.data.read_at;
+        if (previousReadAt === undefined) previousReadAt = scanDetail.data.read_at;
         snapshots.push({ queryKey: scanDetailKey, data: scanDetail });
         queryClient.setQueryData<RadarScanDetailResponse>(scanDetailKey, {
           ...scanDetail,

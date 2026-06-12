@@ -168,6 +168,11 @@ export function describeCron(expression: string): string | null {
   if (isFullRange(hour, FIELD_SPECS[1])) {
     if (isFullRange(minute, FIELD_SPECS[0])) return 'Every minute';
     const minutes = [...minute].sort((a, b) => a - b);
+    if (minutes.length === 1) {
+      return minutes[0] === 0
+        ? 'Every hour'
+        : `Every hour at :${minutes[0].toString().padStart(2, '0')}`;
+    }
     if (minutes.length > 1) {
       const interval = minutes[1] - minutes[0];
       const evenlySpaced =
@@ -200,7 +205,8 @@ const ESTIMATE_FIRST_WEEKDAY = 4;
 /**
  * Average number of times a cron fires per month, computed exactly over a
  * reference year — the number that matters for "each scan uses 1 AI message"
- * billing copy. Rounded to the nearest whole scan. Null when invalid.
+ * billing copy. May be fractional (sparse schedules) or 0 (a valid cron that
+ * never fires, e.g. Feb 30). Null when invalid.
  */
 export function estimateScansPerMonth(expression: string): number | null {
   const fields = parseCronExpression(expression);
@@ -229,7 +235,7 @@ export function estimateScansPerMonth(expression: string): number | null {
       weekday = (weekday + 1) % 7;
     }
   }
-  return total === 0 ? 0 : Math.max(1, Math.round(total / 12));
+  return total / 12;
 }
 
 export type SchedulePresetId =
