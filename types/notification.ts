@@ -10,7 +10,8 @@ export interface Notification {
   id: string;
   type: string;
   title: string;
-  message: string;
+  // Null on RadarReportNotification until the backend deep-link follow-up ships.
+  message: string | null;
   action_url: string | null;
   icon: string | null;
   read_at: string | null;

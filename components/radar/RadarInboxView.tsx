@@ -101,12 +101,14 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
 
   // Within ~5 minutes of creating an unscanned active radar, keep polling
   // even while the scan list is empty — the dispatched first scan's queued
-  // row can take up to a minute to land.
+  // row can take up to a minute to land. The query's fetch timestamp stands
+  // in for the current time, keeping render pure.
   const awaitingFirstScan =
     radar !== undefined &&
     radar.status === 'active' &&
     radar.last_scan_at === null &&
-    Date.now() - new Date(radar.created_at).getTime() < FIRST_SCAN_WINDOW_MS;
+    radarQuery.dataUpdatedAt - new Date(radar.created_at).getTime() <
+      FIRST_SCAN_WINDOW_MS;
 
   // The inbox is the scan list filtered client-side to completed scans, per
   // the API contract — in-flight rows stay visible to the polling logic.

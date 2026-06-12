@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -8,6 +9,7 @@ import {
   Bell,
   Calendar,
   ExternalLink,
+  Radar,
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -126,9 +128,11 @@ function NotificationDetailPage({ params }: NotificationDetailPageProps) {
         </div>
 
         {/* Message */}
-        <div className="rounded-lg border bg-muted/30 px-4 py-3">
-          <p className="text-sm whitespace-pre-line">{notification.message}</p>
-        </div>
+        {notification.message && (
+          <div className="rounded-lg border bg-muted/30 px-4 py-3">
+            <p className="text-sm whitespace-pre-line">{notification.message}</p>
+          </div>
+        )}
 
         {/* Action URL */}
         {notification.action_url && (
@@ -142,6 +146,19 @@ function NotificationDetailPage({ params }: NotificationDetailPageProps) {
             Open link
           </a>
         )}
+
+        {/* Radar reports can't deep-link yet (action_url is null until the
+            backend follow-up ships) — point at the radar list instead. */}
+        {notification.type === 'RadarReportNotification' &&
+          !notification.action_url && (
+            <Link
+              href="/radars"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              <Radar className="h-4 w-4" />
+              View your radars
+            </Link>
+          )}
 
         {/* Metadata */}
         <div className="flex items-start gap-3 text-sm">
