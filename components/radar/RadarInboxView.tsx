@@ -119,7 +119,12 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
   );
 
   const allScans = scansQuery.data?.pages.flatMap((page) => page.data) ?? [];
-  const completedScans = allScans.filter((scan) => scan.status === 'completed');
+  // Re-apply the workflow filter client-side so optimistically triaged rows
+  // (marked complete/archived) leave the current tab immediately instead of
+  // lingering until the server-filtered list refetches.
+  const completedScans = allScans.filter(
+    (scan) => scan.status === 'completed' && scan.workflow_status === workflowTab
+  );
   const scanInFlight = hasInFlightScan(scansQuery.data);
 
   const scanNow = useScanNow();
