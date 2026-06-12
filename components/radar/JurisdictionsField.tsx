@@ -1,17 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import {
   Combobox,
+  ComboboxChipsInput,
   ComboboxContent,
   ComboboxEmpty,
-  ComboboxInput,
   ComboboxItem,
   ComboboxList,
+  useComboboxAnchor,
 } from '@/components/ui/combobox';
+import { ChipZone, ChipZoneAddButton } from './ChipZone';
 import { useJurisdictions } from '@/lib/hooks/useJurisdictions';
 import { RADAR_LIMITS } from '@/lib/utils/radar-validation';
 
@@ -22,14 +24,15 @@ interface JurisdictionsFieldProps {
 }
 
 /**
- * Compact jurisdiction multi-select: selected countries render as chips
- * (the user's own jurisdiction is pre-filled by the form) and a dashed
- * "+ Add country" button reveals the search on demand.
+ * Jurisdiction chips inside a bounded zone — the user's own jurisdiction is
+ * pre-filled by the form; clicking the zone (or the dashed pill) reveals an
+ * inline country search.
  */
 function JurisdictionsField({ value, onChange }: JurisdictionsFieldProps) {
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
   const { data: jurisdictions, isLoading } = useJurisdictions();
+  const anchorRef = useComboboxAnchor();
 
   const atCapacity = value.length >= RADAR_LIMITS.jurisdictions;
   const nameForSlug = (slug: string) =>
@@ -56,14 +59,28 @@ function JurisdictionsField({ value, onChange }: JurisdictionsFieldProps) {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <Combobox
+      value=""
+      onValueChange={(slug) => {
+        if (typeof slug === 'string' && slug) addJurisdiction(slug);
+      }}
+    >
+      <ChipZone
+        ref={anchorRef}
+        aria-label="Jurisdictions"
+        onClick={() => {
+          if (!atCapacity) setAdding(true);
+        }}
+      >
         {value.map((slug) => (
           <Badge key={slug} variant="secondary" className="gap-1">
             {nameForSlug(slug)}
             <button
               type="button"
-              onClick={() => removeJurisdiction(slug)}
+              onClick={(event) => {
+                event.stopPropagation();
+                removeJurisdiction(slug);
+              }}
               className="ml-0.5 rounded-full hover:text-destructive"
               aria-label={`Remove ${nameForSlug(slug)}`}
             >
@@ -72,32 +89,8 @@ function JurisdictionsField({ value, onChange }: JurisdictionsFieldProps) {
           </Badge>
         ))}
 
-        {!adding && !atCapacity && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-          >
-            <Plus className="size-3" />
-            Add country
-          </button>
-        )}
-
-        {atCapacity && (
-          <span className="text-xs text-muted-foreground">
-            Limit of {RADAR_LIMITS.jurisdictions} reached
-          </span>
-        )}
-      </div>
-
-      {adding && !atCapacity && (
-        <Combobox
-          value=""
-          onValueChange={(slug) => {
-            if (typeof slug === 'string' && slug) addJurisdiction(slug);
-          }}
-        >
-          <ComboboxInput
+        {adding && !atCapacity ? (
+          <ComboboxChipsInput
             autoFocus
             placeholder="Search countries…"
             value={search}
@@ -108,28 +101,35 @@ function JurisdictionsField({ value, onChange }: JurisdictionsFieldProps) {
                 setAdding(false);
               }
             }}
-            className="w-64"
+            className="h-6 min-w-36 text-sm"
           />
-          <ComboboxContent>
-            <ComboboxList>
-              {available.map((jurisdiction) => (
-                <ComboboxItem key={jurisdiction.slug} value={jurisdiction.slug}>
-                  {jurisdiction.name}
-                  <span className="text-xs text-muted-foreground">
-                    {jurisdiction.code}
-                  </span>
-                </ComboboxItem>
-              ))}
-              {available.length === 0 && (
-                <ComboboxEmpty>
-                  {isLoading ? 'Loading countries…' : 'No countries found'}
-                </ComboboxEmpty>
-              )}
-            </ComboboxList>
-          </ComboboxContent>
-        </Combobox>
-      )}
-    </div>
+        ) : atCapacity ? (
+          <span className="text-xs text-muted-foreground">
+            Limit of {RADAR_LIMITS.jurisdictions} reached
+          </span>
+        ) : (
+          <ChipZoneAddButton label="Add country" onClick={() => setAdding(true)} />
+        )}
+      </ChipZone>
+
+      <ComboboxContent anchor={anchorRef}>
+        <ComboboxList>
+          {available.map((jurisdiction) => (
+            <ComboboxItem key={jurisdiction.slug} value={jurisdiction.slug}>
+              {jurisdiction.name}
+              <span className="text-xs text-muted-foreground">
+                {jurisdiction.code}
+              </span>
+            </ComboboxItem>
+          ))}
+          {available.length === 0 && (
+            <ComboboxEmpty>
+              {isLoading ? 'Loading countries…' : 'No countries found'}
+            </ComboboxEmpty>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }
 

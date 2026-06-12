@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useSyncExternalStore } from 'react';
-import { Clock, Coins } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import {
   Combobox,
   ComboboxContent,
@@ -115,17 +114,17 @@ function formatTimeIn(nowMs: number, timeZone: string): string | null {
  */
 function formatScanRate(scansPerMonth: number | null): React.ReactNode {
   if (scansPerMonth === null) {
-    return <>Each scan uses 1 AI message — exactly like a chat turn</>;
+    return <>1 AI message per scan</>;
   }
   if (scansPerMonth === 0) {
-    return <>This schedule never runs — check the day and month combination</>;
+    return <>never runs — check the day and month combination</>;
   }
   if (scansPerMonth < 1) {
     const perYear = Math.round(scansPerMonth * 12);
     return (
       <>
         ≈ <span className="font-medium text-foreground">{perYear}</span>{' '}
-        {perYear === 1 ? 'scan' : 'scans'}/year · each scan uses 1 AI message
+        {perYear === 1 ? 'scan' : 'scans'}/year · 1 message each
       </>
     );
   }
@@ -133,9 +132,13 @@ function formatScanRate(scansPerMonth: number | null): React.ReactNode {
   return (
     <>
       ≈ <span className="font-medium text-foreground">{perMonth}</span>{' '}
-      {perMonth === 1 ? 'scan' : 'scans'}/month · each scan uses 1 AI message
+      {perMonth === 1 ? 'scan' : 'scans'}/month · 1 message each
     </>
   );
+}
+
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 /**
@@ -307,77 +310,72 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
         {advanced ? 'Switch to simple schedule' : 'Use a cron expression instead'}
       </button>
 
-      <div className="space-y-2 rounded-lg border px-3.5 py-3">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          <Clock className="size-4 shrink-0 text-muted-foreground" />
-          <span className="text-muted-foreground">
-            Your current time:{' '}
-            <span className="font-medium text-foreground">
-              {localTime ?? '—'}
-            </span>{' '}
-            · {value.timezone.replace(/_/g, ' ')}
-          </span>
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto p-0 text-xs"
-            onClick={() => {
-              setEditingTimezone((editing) => !editing);
-              setTimezoneSearch('');
-            }}
-          >
-            {editingTimezone ? 'Done' : 'Wrong? Change it'}
-          </Button>
-        </div>
-
-        {editingTimezone && (
-          <Combobox
-            value={value.timezone}
-            onValueChange={(timezone) => {
-              if (typeof timezone === 'string' && timezone) {
-                onChange({ ...value, timezone });
-                setEditingTimezone(false);
-              }
-              setTimezoneSearch('');
-            }}
-          >
-            <ComboboxInput
-              placeholder="Search timezones…"
-              value={timezoneSearch}
-              onChange={(event) => setTimezoneSearch(event.target.value)}
-              autoFocus
-            />
-            <ComboboxContent>
-              <ComboboxList>
-                {filteredTimezones.slice(0, 50).map((timezone) => (
-                  <ComboboxItem key={timezone} value={timezone}>
-                    {timezone.replace(/_/g, ' ')}
-                  </ComboboxItem>
-                ))}
-                {filteredTimezones.length === 0 && (
-                  <ComboboxEmpty>No timezones found</ComboboxEmpty>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+        <Clock className="size-3.5 shrink-0" />
+        <span>
+          {cronIsValid
+            ? cronSummary
+              ? `Runs ${lowerFirst(cronSummary)}`
+              : 'Custom schedule'
+            : 'Schedule not set'}
+        </span>
+        <span aria-hidden>·</span>
+        <span>
+          <span className="font-medium text-foreground">{localTime ?? '—'}</span>{' '}
+          now in {value.timezone.replace(/_/g, ' ')}
+        </span>
+        <button
+          type="button"
+          className="font-medium text-primary underline-offset-2 hover:underline"
+          onClick={() => {
+            setEditingTimezone((editing) => !editing);
+            setTimezoneSearch('');
+          }}
+        >
+          {editingTimezone ? 'Done' : 'Change'}
+        </button>
+        <span aria-hidden>·</span>
+        <span>{formatScanRate(scansPerMonth)}</span>
+        {messagesRemaining !== null && (
+          <>
+            <span aria-hidden>·</span>
+            <span>{messagesRemaining} messages left</span>
+          </>
         )}
-
-        <p className="text-xs text-muted-foreground">
-          Scans run on this clock — if the time above looks right, you&apos;re
-          set.
-        </p>
       </div>
 
-      <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 px-3.5 py-3 text-sm">
-        <Coins className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-        <p className="text-muted-foreground">
-          {formatScanRate(scansPerMonth)}
-          {messagesRemaining !== null && (
-            <> · you have {messagesRemaining} messages remaining</>
-          )}
-        </p>
-      </div>
+      {editingTimezone && (
+        <Combobox
+          value={value.timezone}
+          onValueChange={(timezone) => {
+            if (typeof timezone === 'string' && timezone) {
+              onChange({ ...value, timezone });
+              setEditingTimezone(false);
+            }
+            setTimezoneSearch('');
+          }}
+        >
+          <ComboboxInput
+            placeholder="Search timezones…"
+            value={timezoneSearch}
+            onChange={(event) => setTimezoneSearch(event.target.value)}
+            autoFocus
+            className="w-72"
+          />
+          <ComboboxContent>
+            <ComboboxList>
+              {filteredTimezones.slice(0, 50).map((timezone) => (
+                <ComboboxItem key={timezone} value={timezone}>
+                  {timezone.replace(/_/g, ' ')}
+                </ComboboxItem>
+              ))}
+              {filteredTimezones.length === 0 && (
+                <ComboboxEmpty>No timezones found</ComboboxEmpty>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      )}
     </div>
   );
 }

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { ChipZone, ChipZoneAddButton } from './ChipZone';
 
 interface FreeTextChipsFieldProps {
   value: string[];
@@ -14,13 +14,14 @@ interface FreeTextChipsFieldProps {
   placeholder: string;
   maxItems: number;
   maxItemLength: number;
+  'aria-label'?: string;
 }
 
 /**
- * Compact free-text tags: existing values render as chips and a dashed
- * "+ Add" button reveals a small input on demand. Enter or comma commits and
- * keeps the input open for rapid entry; blur commits and closes; Escape
- * discards. Comma-separated pastes split into chips.
+ * Compact free-text tags inside a bounded chip zone. Clicking the zone (or
+ * the dashed add pill) reveals an inline input: Enter or comma commits and
+ * stays open for rapid entry, blur commits and closes, Escape discards.
+ * Comma-separated pastes split into chips.
  */
 function FreeTextChipsField({
   value,
@@ -29,6 +30,7 @@ function FreeTextChipsField({
   placeholder,
   maxItems,
   maxItemLength,
+  'aria-label': ariaLabel,
 }: FreeTextChipsFieldProps) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState('');
@@ -73,13 +75,21 @@ function FreeTextChipsField({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <ChipZone
+      aria-label={ariaLabel}
+      onClick={() => {
+        if (!atCapacity) setAdding(true);
+      }}
+    >
       {value.map((item) => (
         <Badge key={item} variant="secondary" className="gap-1">
           {item}
           <button
             type="button"
-            onClick={() => removeItem(item)}
+            onClick={(event) => {
+              event.stopPropagation();
+              removeItem(item);
+            }}
             className="ml-0.5 rounded-full hover:text-destructive"
             aria-label={`Remove ${item}`}
           >
@@ -89,7 +99,7 @@ function FreeTextChipsField({
       ))}
 
       {adding && !atCapacity ? (
-        <Input
+        <input
           autoFocus
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -100,27 +110,19 @@ function FreeTextChipsField({
             closeInput();
           }}
           placeholder={placeholder}
-          className="h-8 w-52 text-sm"
+          className="h-6 min-w-36 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
-      ) : (
-        !atCapacity && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-          >
-            <Plus className="size-3" />
-            Add {itemNoun}
-          </button>
-        )
-      )}
-
-      {atCapacity && (
+      ) : atCapacity ? (
         <span className="text-xs text-muted-foreground">
           Limit of {maxItems} reached
         </span>
+      ) : (
+        <ChipZoneAddButton
+          label={`Add ${itemNoun}`}
+          onClick={() => setAdding(true)}
+        />
       )}
-    </div>
+    </ChipZone>
   );
 }
 

@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Form,
   FormControl,
@@ -16,7 +21,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { EntityPicker } from './EntityPicker';
@@ -24,6 +28,7 @@ import { FreeTextChipsField } from './FreeTextChipsField';
 import { JurisdictionsField } from './JurisdictionsField';
 import { SchedulePicker } from './SchedulePicker';
 import { SourcesField } from './SourcesField';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
   findDefaultJurisdiction,
@@ -56,44 +61,32 @@ interface RadarFormProps {
   onSubmit: (payload: CreateRadarPayload, helpers: RadarFormHelpers) => void;
 }
 
-function OptionalTag() {
-  return (
-    <span className="font-normal text-muted-foreground"> (optional)</span>
-  );
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm font-medium">{children}</p>;
 }
 
-function FormSection({
-  title,
-  description,
-  optional = false,
-  children,
-}: {
-  title: string;
-  description?: string;
-  optional?: boolean;
-  children: React.ReactNode;
-}) {
+function SubLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-muted-foreground">{children}</p>;
+}
+
+function hasAdvancedValues(values: RadarFormValues): boolean {
   return (
-    <section className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold">
-          {title}
-          {optional && <OptionalTag />}
-        </h3>
-        {description && (
-          <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-        )}
-      </div>
-      {children}
-    </section>
+    values.description.trim().length > 0 ||
+    values.instructions.trim().length > 0 ||
+    values.keywords.length > 0 ||
+    values.sources.length > 0 ||
+    values.entities.length > 0 ||
+    values.email_channel
   );
 }
 
 /**
- * Shared create/edit radar form, ordered by importance: what to call it,
- * what to watch, when to scan, then the optional extras. The payload builder
- * always emits every perimeter array in full so PATCH wholesale-replace
- * semantics can never silently wipe data.
+ * The radar form, built around the 80% path: name it, say what to watch,
+ * pick a schedule, create. Everything else — description, keywords, pinned
+ * sources, watched entities, agent instructions, email delivery — lives in
+ * a single collapsed "More options" group with a configured-count badge.
+ * The payload builder always emits every perimeter array in full so PATCH
+ * wholesale-replace semantics can never silently wipe data.
  */
 function RadarForm({
   mode,
@@ -113,6 +106,11 @@ function RadarForm({
       : emptyRadarFormValues(Intl.DateTimeFormat().resolvedOptions().timeZone),
   });
 
+  // Editing a radar that already uses advanced fields starts expanded.
+  const [moreOpen, setMoreOpen] = useState(
+    () => radar !== undefined && hasAdvancedValues(radarFormValuesFromRadar(radar))
+  );
+
   // Pre-fill the user's own jurisdiction on create, once the list is
   // available — applied a single time so removing it deliberately sticks.
   const jurisdictionPrefilled = useRef(mode === 'edit');
@@ -131,7 +129,23 @@ function RadarForm({
     }
   }, [jurisdictions, profileCountry, form]);
 
-  const instructionsLength = form.watch('instructions').length;
+  const [description, instructions, keywords, sources, entities, emailChannel] =
+    form.watch([
+      'description',
+      'instructions',
+      'keywords',
+      'sources',
+      'entities',
+      'email_channel',
+    ]);
+
+  const configuredCount =
+    (description.trim() ? 1 : 0) +
+    (instructions.trim() ? 1 : 0) +
+    (keywords.length > 0 ? 1 : 0) +
+    (sources.length > 0 ? 1 : 0) +
+    (entities.length > 0 ? 1 : 0) +
+    (emailChannel ? 1 : 0);
 
   const handleSubmit = (values: RadarFormValues) => {
     onSubmit(buildRadarPayload(values, { includeFirstScan: mode === 'create' }), {
@@ -141,125 +155,69 @@ function RadarForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        <FormSection
-          title="Basics"
-          description="What this radar is called and what it watches for."
-        >
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="e.g. NDPA Enforcement Updates — Nigeria"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Description
-                  <OptionalTag />
-                </FormLabel>
-                <FormControl>
-                  <Textarea
-                    rows={2}
-                    placeholder="A short note on what this radar monitors"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </FormSection>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-7">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="e.g. NDPA Enforcement Updates — Nigeria"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        <Separator />
+        <div className="space-y-2">
+          <GroupLabel>What to watch</GroupLabel>
+          <div className="grid items-start gap-3 sm:grid-cols-[2fr_3fr]">
+            <FormField
+              control={form.control}
+              name="jurisdictions"
+              render={({ field }) => (
+                <FormItem className="space-y-1.5">
+                  <SubLabel>Jurisdictions</SubLabel>
+                  <FormControl>
+                    <JurisdictionsField
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="topics"
+              render={({ field }) => (
+                <FormItem className="space-y-1.5">
+                  <SubLabel>Topics</SubLabel>
+                  <FormControl>
+                    <FreeTextChipsField
+                      value={field.value}
+                      onChange={field.onChange}
+                      itemNoun="topic"
+                      placeholder="e.g. NDPA enforcement"
+                      maxItems={RADAR_LIMITS.topics}
+                      maxItemLength={RADAR_LIMITS.topicLength}
+                      aria-label="Topics"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
-        <FormSection
-          title="Watch scope"
-          description="Where to look and what to look for."
-        >
-          <FormField
-            control={form.control}
-            name="jurisdictions"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Jurisdictions</FormLabel>
-                <FormControl>
-                  <JurisdictionsField
-                    value={field.value}
-                    onChange={field.onChange}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="topics"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Topics
-                  <OptionalTag />
-                </FormLabel>
-                <FormControl>
-                  <FreeTextChipsField
-                    value={field.value}
-                    onChange={field.onChange}
-                    itemNoun="topic"
-                    placeholder="e.g. NDPA enforcement"
-                    maxItems={RADAR_LIMITS.topics}
-                    maxItemLength={RADAR_LIMITS.topicLength}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="keywords"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Keywords
-                  <OptionalTag />
-                </FormLabel>
-                <FormControl>
-                  <FreeTextChipsField
-                    value={field.value}
-                    onChange={field.onChange}
-                    itemNoun="keyword"
-                    placeholder="e.g. NDPC, data protection fine"
-                    maxItems={RADAR_LIMITS.keywords}
-                    maxItemLength={RADAR_LIMITS.keywordLength}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </FormSection>
-
-        <Separator />
-
-        <FormSection
-          title="Schedule"
-          description="How often the agent investigates."
-        >
+        <div className="space-y-2">
+          <GroupLabel>Schedule</GroupLabel>
           <FormField
             control={form.control}
             name="schedule_cron"
@@ -283,125 +241,126 @@ function RadarForm({
               </FormItem>
             )}
           />
-        </FormSection>
+        </div>
 
-        <Separator />
-
-        <FormSection
-          title="Pinned sources"
-          description="URLs the agent must check on every scan."
-          optional
+        <Collapsible
+          open={moreOpen}
+          onOpenChange={setMoreOpen}
+          className="rounded-xl border"
         >
-          <FormField
-            control={form.control}
-            name="sources"
-            render={() => (
-              <FormItem>
-                <SourcesField control={form.control} />
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </FormSection>
-
-        <Separator />
-
-        <FormSection
-          title="Watched entities"
-          description="Lawexa cases, statutes, courts, judges, or notes to keep an eye on."
-          optional
-        >
-          <FormField
-            control={form.control}
-            name="entities"
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <EntityPicker value={field.value} onChange={field.onChange} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </FormSection>
-
-        <Separator />
-
-        <FormSection
-          title="Agent instructions"
-          description="Free-form guidance for the investigator — scopes, priorities, what to ignore."
-          optional
-        >
-          <FormField
-            control={form.control}
-            name="instructions"
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <Textarea
-                    rows={6}
-                    placeholder="e.g. Prioritise enforcement actions and fines over policy commentary. Flag anything involving cross-border data transfers."
-                    {...field}
-                  />
-                </FormControl>
-                <div className="flex justify-end">
-                  <span className="text-xs text-muted-foreground">
-                    {instructionsLength}/{RADAR_LIMITS.instructions}
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </FormSection>
-
-        <Separator />
-
-        <FormSection
-          title="Notifications"
-          description="Where reports are delivered."
-        >
-          <div className="flex items-start gap-3">
-            <Checkbox checked disabled className="mt-0.5" />
-            <div>
-              <p className="text-sm font-medium">In-app</p>
-              <p className="text-sm text-muted-foreground">
-                Always on — reports appear in your notifications and the radar
-                inbox.
-              </p>
-            </div>
-          </div>
-          <FormField
-            control={form.control}
-            name="email_channel"
-            render={({ field }) => (
-              <FormItem className="flex items-start gap-3 space-y-0">
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    className="mt-0.5"
-                  />
-                </FormControl>
-                <div>
-                  <FormLabel className="text-sm font-medium">Email</FormLabel>
-                  <p className="text-sm text-muted-foreground">
-                    {userEmail
-                      ? `Sent to ${userEmail}`
-                      : 'Sent to your account email address'}
-                  </p>
-                </div>
-              </FormItem>
-            )}
-          />
-        </FormSection>
-
-        {mode === 'create' && (
-          <>
-            <Separator />
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium transition-colors hover:bg-muted/40"
+            >
+              <span className="flex items-center gap-2">
+                More options
+                {configuredCount > 0 && (
+                  <Badge variant="secondary">{configuredCount} set</Badge>
+                )}
+              </span>
+              <ChevronDown
+                className={cn(
+                  'size-4 text-muted-foreground transition-transform',
+                  moreOpen && 'rotate-180'
+                )}
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-5 border-t px-4 py-4">
             <FormField
               control={form.control}
-              name="first_scan"
+              name="description"
+              render={({ field }) => (
+                <FormItem className="space-y-1.5">
+                  <SubLabel>Description</SubLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={2}
+                      placeholder="A short note on what this radar monitors"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="keywords"
+              render={({ field }) => (
+                <FormItem className="space-y-1.5">
+                  <SubLabel>Keywords — exact phrases the agent searches for</SubLabel>
+                  <FormControl>
+                    <FreeTextChipsField
+                      value={field.value}
+                      onChange={field.onChange}
+                      itemNoun="keyword"
+                      placeholder="e.g. NDPC, data protection fine"
+                      maxItems={RADAR_LIMITS.keywords}
+                      maxItemLength={RADAR_LIMITS.keywordLength}
+                      aria-label="Keywords"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="sources"
+              render={() => (
+                <FormItem className="space-y-1.5">
+                  <SubLabel>Pinned sources — URLs checked on every scan</SubLabel>
+                  <SourcesField control={form.control} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="entities"
+              render={({ field }) => (
+                <FormItem className="space-y-1.5">
+                  <SubLabel>
+                    Watched entities — Lawexa cases, statutes, courts, judges, or
+                    notes
+                  </SubLabel>
+                  <FormControl>
+                    <EntityPicker value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="instructions"
+              render={({ field }) => (
+                <FormItem className="space-y-1.5">
+                  <SubLabel>
+                    Agent instructions — scopes, priorities, what to ignore
+                  </SubLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={4}
+                      placeholder="e.g. Prioritise enforcement actions and fines over policy commentary."
+                      maxLength={RADAR_LIMITS.instructions}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="email_channel"
               render={({ field }) => (
                 <FormItem className="flex items-start gap-3 space-y-0">
                   <FormControl>
@@ -413,20 +372,42 @@ function RadarForm({
                   </FormControl>
                   <div>
                     <FormLabel className="text-sm font-medium">
-                      Run the first scan immediately
+                      Email reports
                     </FormLabel>
-                    <p className="text-sm text-muted-foreground">
-                      Uses 1 AI message. Otherwise the first report arrives on
-                      schedule.
+                    <p className="text-xs text-muted-foreground">
+                      {userEmail ? `Sent to ${userEmail}. ` : ''}
+                      Reports always appear in-app and in your notifications.
                     </p>
                   </div>
                 </FormItem>
               )}
             />
-          </>
-        )}
+          </CollapsibleContent>
+        </Collapsible>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {mode === 'create' ? (
+            <FormField
+              control={form.control}
+              name="first_scan"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2.5 space-y-0">
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormLabel className="text-sm font-normal text-muted-foreground">
+                    Run first scan now{' '}
+                    <span className="text-xs">· uses 1 message</span>
+                  </FormLabel>
+                </FormItem>
+              )}
+            />
+          ) : (
+            <span />
+          )}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="animate-spin" />}
             {submitLabel}

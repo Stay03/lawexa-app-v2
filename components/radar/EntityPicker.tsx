@@ -2,15 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  BookOpen,
-  Gavel,
-  Landmark,
-  Plus,
-  Scale,
-  StickyNote,
-  X,
-} from 'lucide-react';
+import { BookOpen, Gavel, Landmark, Scale, StickyNote, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ChipZone, ChipZoneAddButton } from './ChipZone';
 import { searchRadarEntities } from '@/lib/api/radar-entities';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import {
@@ -108,7 +101,12 @@ function EntityPicker({ value, onChange }: EntityPickerProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+      <ChipZone
+        aria-label="Watched entities"
+        onClick={() => {
+          if (!atCapacity) setAdding(true);
+        }}
+      >
         {value.map((entity) => {
           const Icon = ENTITY_TYPE_ICONS[entity.entity_type];
           return (
@@ -121,7 +119,10 @@ function EntityPicker({ value, onChange }: EntityPickerProps) {
               {entity.label}
               <button
                 type="button"
-                onClick={() => removeEntity(entity)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  removeEntity(entity);
+                }}
                 className="ml-0.5 rounded-full hover:text-destructive"
                 aria-label={`Remove ${entity.label}`}
               >
@@ -132,14 +133,7 @@ function EntityPicker({ value, onChange }: EntityPickerProps) {
         })}
 
         {!adding && !atCapacity && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-          >
-            <Plus className="size-3" />
-            Add entity
-          </button>
+          <ChipZoneAddButton label="Add entity" onClick={() => setAdding(true)} />
         )}
 
         {atCapacity && (
@@ -147,7 +141,7 @@ function EntityPicker({ value, onChange }: EntityPickerProps) {
             Limit of {RADAR_LIMITS.entities} reached
           </span>
         )}
-      </div>
+      </ChipZone>
 
       {adding && !atCapacity && (
         <div className="flex gap-2">
