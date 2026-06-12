@@ -75,8 +75,7 @@ function hasAdvancedValues(values: RadarFormValues): boolean {
     values.instructions.trim().length > 0 ||
     values.keywords.length > 0 ||
     values.sources.length > 0 ||
-    values.entities.length > 0 ||
-    values.email_channel
+    values.entities.length > 0
   );
 }
 
@@ -129,23 +128,20 @@ function RadarForm({
     }
   }, [jurisdictions, profileCountry, form]);
 
-  const [description, instructions, keywords, sources, entities, emailChannel] =
-    form.watch([
-      'description',
-      'instructions',
-      'keywords',
-      'sources',
-      'entities',
-      'email_channel',
-    ]);
+  const [description, instructions, keywords, sources, entities] = form.watch([
+    'description',
+    'instructions',
+    'keywords',
+    'sources',
+    'entities',
+  ]);
 
   const configuredCount =
     (description.trim() ? 1 : 0) +
     (instructions.trim() ? 1 : 0) +
     (keywords.length > 0 ? 1 : 0) +
     (sources.length > 0 ? 1 : 0) +
-    (entities.length > 0 ? 1 : 0) +
-    (emailChannel ? 1 : 0);
+    (entities.length > 0 ? 1 : 0);
 
   const handleSubmit = (values: RadarFormValues) => {
     onSubmit(buildRadarPayload(values, { includeFirstScan: mode === 'create' }), {
@@ -358,56 +354,62 @@ function RadarForm({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="email_channel"
-              render={({ field }) => (
-                <FormItem className="flex items-start gap-3 space-y-0">
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      className="mt-0.5"
-                    />
-                  </FormControl>
-                  <div>
-                    <FormLabel className="text-sm font-medium">
-                      Email reports
-                    </FormLabel>
-                    <p className="text-xs text-muted-foreground">
-                      {userEmail ? `Sent to ${userEmail}. ` : ''}
-                      Reports always appear in-app and in your notifications.
-                    </p>
-                  </div>
-                </FormItem>
-              )}
-            />
           </CollapsibleContent>
         </Collapsible>
 
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {mode === 'create' ? (
+        <div className="divide-y rounded-xl border">
+          <FormField
+            control={form.control}
+            name="email_channel"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between gap-4 space-y-0 px-4 py-3">
+                <div>
+                  <FormLabel className="text-sm font-medium">
+                    Email reports
+                  </FormLabel>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {userEmail ? `Sent to ${userEmail} — reports` : 'Reports'}{' '}
+                    always appear in-app and in your notifications.
+                  </p>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          {mode === 'create' && (
             <FormField
               control={form.control}
               name="first_scan"
               render={({ field }) => (
-                <FormItem className="flex items-center gap-2.5 space-y-0">
+                <FormItem className="flex items-center justify-between gap-4 space-y-0 px-4 py-3">
+                  <div>
+                    <FormLabel className="text-sm font-medium">
+                      Run first scan now
+                    </FormLabel>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Uses 1 AI message — otherwise the first report arrives on
+                      schedule.
+                    </p>
+                  </div>
                   <FormControl>
                     <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
-                  <FormLabel className="text-sm font-normal text-muted-foreground">
-                    Run first scan now{' '}
-                    <span className="text-xs">· uses 1 message</span>
-                  </FormLabel>
                 </FormItem>
               )}
             />
-          ) : (
-            <span />
           )}
+        </div>
+
+        <div className="flex justify-end">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="animate-spin" />}
             {submitLabel}

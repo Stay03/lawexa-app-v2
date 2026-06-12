@@ -68,7 +68,7 @@ export default function NewRadarPage() {
 
   if (blockedResult) {
     return (
-      <PageContainer variant="detail">
+      <PageContainer>
         <PageHeader title="New radar" />
         <MessageBlockBanner
           message={blockedResult.blockReason.message}
@@ -101,7 +101,7 @@ export default function NewRadarPage() {
   }
 
   return (
-    <PageContainer variant="detail">
+    <PageContainer>
       <PageHeader
         title="New radar"
         description="A saved watch the AI agent investigates on a schedule, delivering one report per scan."

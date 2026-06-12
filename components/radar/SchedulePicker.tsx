@@ -180,38 +180,36 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
   return (
     <div className="space-y-4">
       {!advanced && builder && (
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="radar-frequency">How often</Label>
-            <Select
-              value={builder.frequency}
-              onValueChange={(frequency) =>
-                updateBuilder({ frequency: frequency as ScheduleFrequency })
-              }
-            >
-              <SelectTrigger id="radar-frequency" className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FREQUENCY_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-muted-foreground">
+          <span>Run</span>
+          <Select
+            value={builder.frequency}
+            onValueChange={(frequency) =>
+              updateBuilder({ frequency: frequency as ScheduleFrequency })
+            }
+          >
+            <SelectTrigger aria-label="How often" className="w-44 shrink-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FREQUENCY_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {builder.frequency === 'weekly' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="radar-weekday">On</Label>
+            <>
+              <span>on</span>
               <Select
                 value={String(builder.weekday)}
                 onValueChange={(weekday) =>
                   updateBuilder({ weekday: Number(weekday) })
                 }
               >
-                <SelectTrigger id="radar-weekday" className="w-36">
+                <SelectTrigger aria-label="Day of the week" className="w-36 shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -222,19 +220,19 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </>
           )}
 
           {builder.frequency === 'monthly' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="radar-month-day">On the</Label>
+            <>
+              <span>on the</span>
               <Select
                 value={String(builder.monthDay)}
                 onValueChange={(monthDay) =>
                   updateBuilder({ monthDay: Number(monthDay) })
                 }
               >
-                <SelectTrigger id="radar-month-day" className="w-28">
+                <SelectTrigger aria-label="Day of the month" className="w-24 shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -245,21 +243,19 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </>
           )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="radar-time">At</Label>
-            <Input
-              id="radar-time"
-              type="time"
-              value={builder.time}
-              onChange={(event) => {
-                if (event.target.value) updateBuilder({ time: event.target.value });
-              }}
-              className="w-32"
-            />
-          </div>
+          <span>at</span>
+          <Input
+            aria-label="Time of day"
+            type="time"
+            value={builder.time}
+            onChange={(event) => {
+              if (event.target.value) updateBuilder({ time: event.target.value });
+            }}
+            className="w-32 shrink-0"
+          />
         </div>
       )}
 
