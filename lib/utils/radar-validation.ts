@@ -22,9 +22,10 @@ export const RADAR_LIMITS = {
 } as const;
 
 export const radarFormSchema = z.object({
+  // Optional: a blank name is omitted from the payload so the backend names
+  // the radar (instant fallback, then an async AI-generated title).
   name: z
     .string()
-    .min(1, 'Give this radar a name')
     .max(RADAR_LIMITS.name, `Name cannot exceed ${RADAR_LIMITS.name} characters`),
   description: z
     .string()
@@ -154,8 +155,11 @@ export function buildRadarPayload(
   values: RadarFormValues,
   options: { includeFirstScan: boolean }
 ): CreateRadarPayload {
+  const name = values.name.trim();
   return {
-    name: values.name.trim(),
+    // Omit when blank: on create the backend auto-names the radar; on update
+    // a missing key leaves the existing name untouched (PATCH is partial).
+    ...(name ? { name } : {}),
     schedule_cron: values.schedule_cron.trim(),
     timezone: values.timezone,
     description: values.description.trim(),

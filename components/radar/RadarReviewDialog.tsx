@@ -95,7 +95,13 @@ function RadarReviewDialog({
         {values && (
           <div className="divide-y rounded-xl border px-4">
             <SummaryRow label="Name">
-              <p className="font-medium">{values.name}</p>
+              {values.name.trim() ? (
+                <p className="font-medium">{values.name}</p>
+              ) : (
+                <p className="text-muted-foreground">
+                  Lawexa will name this radar from your topics
+                </p>
+              )}
             </SummaryRow>
             <SummaryRow label="Jurisdictions">
               {jurisdictionNames.length > 0 ? (

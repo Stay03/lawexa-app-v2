@@ -40,6 +40,8 @@ export const radarKeys = {
     [...radarKeys.scans(radarUuid), 'detail', scanUuid] as const,
   firstScanDispatched: (radarUuid: string) =>
     [...radarKeys.all, 'first-scan-dispatched', radarUuid] as const,
+  namePending: (radarUuid: string) =>
+    [...radarKeys.all, 'name-pending', radarUuid] as const,
 };
 
 export const notificationChannelKeys = {
@@ -54,6 +56,17 @@ export const IN_FLIGHT_SCAN_STATUSES: ReadonlySet<ScanStatus> = new Set([
 // Scans stay queued ≤60s, then run for 30s–3min — poll while one is in flight.
 const SCAN_LIST_POLL_MS = 15_000;
 const SCAN_DETAIL_POLL_MS = 10_000;
+
+// After a nameless create the backend upgrades the instant placeholder name
+// via a queue job — poll the detail briefly until the AI title lands.
+const NAME_POLL_MS = 3_000;
+const NAME_POLL_WINDOW_MS = 45_000;
+
+/** Cache-only marker seeded at create time, read by useRadar's poll. */
+interface PendingName {
+  fallback: string;
+  since: number;
+}
 
 function useIsRadarQueryEnabled(): boolean {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -80,12 +93,36 @@ export function useRadars(params: RadarListParams = {}) {
  */
 export function useRadar(uuid: string) {
   const enabled = useIsRadarQueryEnabled();
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: radarKeys.detail(uuid),
     queryFn: () => radarsApi.getByUuid(uuid),
     enabled: enabled && !!uuid,
     staleTime: 30 * 1000,
+    // Poll only while a freshly created radar still shows its placeholder
+    // name, until the async AI title replaces it (or the window elapses).
+    refetchInterval: (query) => {
+      const pending = queryClient.getQueryData<PendingName>(
+        radarKeys.namePending(uuid)
+      );
+      if (!pending) return false;
+
+      const currentName = query.state.data?.data.name;
+      const upgraded = !!currentName && currentName !== pending.fallback;
+      const expired = Date.now() - pending.since > NAME_POLL_WINDOW_MS;
+
+      if (upgraded || expired) {
+        queryClient.removeQueries({ queryKey: radarKeys.namePending(uuid) });
+        // Reflect the new name wherever the radar is also listed.
+        if (upgraded) {
+          queryClient.invalidateQueries({ queryKey: radarKeys.lists() });
+        }
+        return false;
+      }
+      return NAME_POLL_MS;
+    },
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -237,13 +274,21 @@ export function useCreateRadar() {
 
   return useMutation({
     mutationFn: radarsApi.create,
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       const { radar, first_scan } = response.data;
       queryClient.setQueryData<RadarDetailResponse>(radarKeys.detail(radar.uuid), {
         success: response.success,
         message: response.message,
         data: radar,
       });
+      // No name was sent → the backend gave us an instant fallback and will
+      // upgrade it asynchronously. Mark it so useRadar polls until it lands.
+      if (!variables.name) {
+        queryClient.setQueryData<PendingName>(radarKeys.namePending(radar.uuid), {
+          fallback: radar.name,
+          since: Date.now(),
+        });
+      }
       if (first_scan.dispatched) {
         // Lets the inbox show "First scan running…" only when a scan was
         // actually dispatched (not when first_scan was off or blocked).

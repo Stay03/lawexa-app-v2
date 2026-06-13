@@ -124,7 +124,9 @@ export interface RadarEntityOption extends RadarEntityInput {
 }
 
 export interface CreateRadarPayload {
-  name: string;
+  // Omitted when blank — the backend sets an instant fallback name and
+  // upgrades it asynchronously via the name-generation job.
+  name?: string;
   schedule_cron: string;
   timezone?: string;
   description?: string;
