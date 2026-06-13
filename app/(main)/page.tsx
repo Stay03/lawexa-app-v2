@@ -713,7 +713,7 @@ export default function HomePage() {
 
             {/* Pasted content previews */}
             {pastedItems.length > 0 && (
-              <div className="mx-3 mt-2 flex flex-wrap gap-2">
+              <div className="mx-3 mt-2 flex gap-2 overflow-x-auto pb-1">
                 {pastedItems.map((item) => (
                   <PastedContentCard
                     key={item.id}

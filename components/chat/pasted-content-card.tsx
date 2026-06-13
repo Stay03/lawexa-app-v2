@@ -29,7 +29,7 @@ export function PastedContentCard({ content, onRemove }: PastedContentCardProps)
   return (
     <>
       <div
-        className="max-w-[160px] cursor-pointer rounded-lg border bg-muted/50 p-2.5 transition-colors hover:bg-muted/80"
+        className="w-40 shrink-0 cursor-pointer rounded-lg border bg-muted/50 p-2.5 transition-colors hover:bg-muted/80"
         onClick={() => setOpen(true)}
       >
         <p className="text-muted-foreground line-clamp-3 break-words text-[11px] leading-tight">
