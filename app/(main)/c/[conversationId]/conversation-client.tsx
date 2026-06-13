@@ -45,7 +45,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn, stripPastedTags } from '@/lib/utils';
+import { cn, stripPastedTags, parsePastedContent, serializePastedContent } from '@/lib/utils';
+import { usePastedContent } from '@/lib/hooks/usePastedContent';
 import { formatMessageTimestamp } from '@/lib/utils/date';
 import { isToolMessage, isHandoverMessage, isErrorMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
@@ -378,13 +379,13 @@ function UserMessageContent({ content }: { content: string }) {
 function UserMessageBlock({
   message,
   displayContent,
-  pastedText,
+  pastedTexts,
   remainingText,
 }: {
   message: ChatMessage;
   displayContent: string;
-  pastedText: string | null;
-  remainingText: string | null;
+  pastedTexts: string[];
+  remainingText: string;
 }) {
   const [showTime, setShowTime] = useState(false);
 
@@ -393,9 +394,13 @@ function UserMessageBlock({
       onClick={() => setShowTime((v) => !v)}
       className="flex flex-col items-end"
     >
-      {pastedText ? (
+      {pastedTexts.length > 0 ? (
         <>
-          <PastedContentCard content={pastedText} />
+          <div className="flex flex-col items-end gap-1.5">
+            {pastedTexts.map((text, index) => (
+              <PastedContentCard key={index} content={text} />
+            ))}
+          </div>
           {remainingText && (
             <MessageContent className="bg-muted rounded-3xl px-5 py-2.5 mt-1.5">
               {remainingText}
@@ -453,10 +458,9 @@ function ConversationPageContent() {
     if (typeof window === 'undefined') return '';
     return localStorage.getItem(`conversation_draft_${conversationId}`) ?? '';
   });
-  const [pastedContent, setPastedContent] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(`conversation_draft_pasted_${conversationId}`) || null;
-  });
+  const { pastedItems, addPasted, removePasted, clearPasted } = usePastedContent(
+    `conversation_draft_pasted_${conversationId}`
+  );
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
   const uploadedFiles = uploads.filter((u) => u.status === 'uploaded');
   const isUploading = uploads.some((u) => u.status === 'uploading');
@@ -496,15 +500,6 @@ function ConversationPageContent() {
       localStorage.removeItem(`conversation_draft_${conversationId}`);
     }
   }, [input, conversationId]);
-
-  // Sync pasted content to localStorage
-  useEffect(() => {
-    if (pastedContent) {
-      localStorage.setItem(`conversation_draft_pasted_${conversationId}`, pastedContent);
-    } else {
-      localStorage.removeItem(`conversation_draft_pasted_${conversationId}`);
-    }
-  }, [pastedContent, conversationId]);
 
   // Get current user for ownership check
   const user = useAuthStore((state) => state.user);
@@ -712,12 +707,12 @@ function ConversationPageContent() {
   }, [conversationId, searchParams, connectToStream, setConversationId, loadConversationHistory, loadConversationHistoryFromIDB, recoverPendingState, user?.id, isGuestReady, markConfidential]);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && uploadedFiles.length === 0 && !pastedContent) || isStreaming || isSubmitting || isUploading) return;
+    if ((!input.trim() && uploadedFiles.length === 0 && pastedItems.length === 0) || isStreaming || isSubmitting || isUploading) return;
 
-    const typedText = input.trim();
-    const fullMessage = pastedContent
-      ? `<pasted_content>${pastedContent}</pasted_content>${typedText ? '\n\n' + typedText : ''}`
-      : typedText;
+    const fullMessage = serializePastedContent(
+      pastedItems.map((item) => item.text),
+      input
+    );
     if (!fullMessage) return;
 
     const attachmentsSnapshot = uploadedFiles.map((u) => ({
@@ -726,9 +721,8 @@ function ConversationPageContent() {
       file_size: u.file_size,
     }));
     setInput('');
-    setPastedContent(null);
+    clearPasted();
     localStorage.removeItem(`conversation_draft_${conversationId}`);
-    localStorage.removeItem(`conversation_draft_pasted_${conversationId}`);
     setUploads([]);
     setIsSubmitting(true);
 
@@ -931,14 +925,11 @@ function ConversationPageContent() {
       displayContent = message.content.replace(/<(case_slug|note_slug|statute_slug)>[^<]+<\/\1>\n\n/g, '');
     }
 
-    // Parse pasted content from user messages
-    const pastedMatch = message.role === 'user'
-      ? displayContent.match(/<pasted_content>([\s\S]*?)<\/pasted_content>/)
-      : null;
-    const messagePastedText = pastedMatch ? pastedMatch[1].trim() : null;
-    const messageRemainingText = pastedMatch
-      ? displayContent.replace(/<pasted_content>[\s\S]*?<\/pasted_content>\s*/, '').trim()
-      : null;
+    // Parse pasted content (one or more blocks) from user messages.
+    const { pastedTexts: messagePastedTexts, remainingText: messageRemainingText } =
+      message.role === 'user'
+        ? parsePastedContent(displayContent)
+        : { pastedTexts: [], remainingText: '' };
 
     return (
       <Message key={message.id} role={role} className="group">
@@ -995,7 +986,7 @@ function ConversationPageContent() {
           <UserMessageBlock
             message={message as ChatMessage}
             displayContent={displayContent}
-            pastedText={messagePastedText}
+            pastedTexts={messagePastedTexts}
             remainingText={messageRemainingText}
           />
         )}
@@ -1306,18 +1297,24 @@ function ConversationPageContent() {
                   </div>
                 )}
 
-                {/* Pasted content preview */}
-                {pastedContent && (
-                  <div className="mx-3 mt-2">
-                    <PastedContentCard content={pastedContent} onRemove={() => setPastedContent(null)} />
+                {/* Pasted content previews */}
+                {pastedItems.length > 0 && (
+                  <div className="mx-3 mt-2 flex flex-wrap gap-2">
+                    {pastedItems.map((item) => (
+                      <PastedContentCard
+                        key={item.id}
+                        content={item.text}
+                        onRemove={() => removePasted(item.id)}
+                      />
+                    ))}
                   </div>
                 )}
 
                 {/* Textarea - full width */}
                 <PromptInputTextarea
-                  placeholder={pastedContent ? 'Add a message...' : 'Ask me anything'}
+                  placeholder={pastedItems.length > 0 ? 'Add a message...' : 'Ask me anything'}
                   className="text-foreground min-h-[36px] py-2 px-3"
-                  onLargePaste={setPastedContent}
+                  onLargePaste={addPasted}
                 />
 
                 {/* Bottom bar: + menu left, send right */}
@@ -1351,7 +1348,7 @@ function ConversationPageContent() {
                       size="icon"
                       className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
                       onClick={handleSubmit}
-                      disabled={(!input.trim() && uploadedFiles.length === 0 && !pastedContent) || isUploading || isSubmitting}
+                      disabled={(!input.trim() && uploadedFiles.length === 0 && pastedItems.length === 0) || isUploading || isSubmitting}
                     >
                       <ArrowUp className="h-4 w-4" />
                     </Button>

@@ -20,7 +20,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { chatApi } from '@/lib/api/chat';
-import { cn } from '@/lib/utils';
+import { cn, serializePastedContent } from '@/lib/utils';
+import { usePastedContent } from '@/lib/hooks/usePastedContent';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -88,7 +89,7 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
 
 export function FloatingPromptInput({ className, contextSlug, contextType, contextTitle }: FloatingPromptInputProps) {
   const [input, setInput] = useState('');
-  const [pastedContent, setPastedContent] = useState<string | null>(null);
+  const { pastedItems, addPasted, removePasted, clearPasted } = usePastedContent();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
@@ -337,13 +338,14 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
   const handleSubmit = async () => {
     const typedText = input.trim();
-    const fullMessage = pastedContent
-      ? `<pasted_content>${pastedContent}</pasted_content>${typedText ? '\n\n' + typedText : ''}`
-      : typedText;
+    const fullMessage = serializePastedContent(
+      pastedItems.map((item) => item.text),
+      typedText
+    );
     if (!fullMessage || isSubmitting || isStreaming) return;
 
     setInput('');
-    setPastedContent(null);
+    clearPasted();
     setIsSubmitting(true);
 
     let messageToSend = fullMessage;
@@ -405,7 +407,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     }
   };
 
-  const canSend = !!(input.trim() || pastedContent);
+  const canSend = input.trim().length > 0 || pastedItems.length > 0;
 
   return (
     <>
@@ -559,18 +561,24 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               disabled={isSubmitting}
               maxHeight={150}
             >
-              {/* Pasted content preview */}
-              {pastedContent && (
-                <div className="mx-3 mt-2">
-                  <PastedContentCard content={pastedContent} onRemove={() => setPastedContent(null)} />
+              {/* Pasted content previews */}
+              {pastedItems.length > 0 && (
+                <div className="mx-3 mt-2 flex flex-wrap gap-2">
+                  {pastedItems.map((item) => (
+                    <PastedContentCard
+                      key={item.id}
+                      content={item.text}
+                      onRemove={() => removePasted(item.id)}
+                    />
+                  ))}
                 </div>
               )}
 
               {/* Textarea */}
               <PromptInputTextarea
-                placeholder={pastedContent ? 'Add a message...' : 'Ask a question...'}
+                placeholder={pastedItems.length > 0 ? 'Add a message...' : 'Ask a question...'}
                 className="text-foreground min-h-[36px] py-2 px-3"
-                onLargePaste={setPastedContent}
+                onLargePaste={addPasted}
               />
 
               {/* Send / Stop button — bottom right */}

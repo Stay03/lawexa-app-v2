@@ -45,7 +45,8 @@ import {
 } from '@/lib/hooks/useJurisdictionChoice';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
-import { cn } from '@/lib/utils';
+import { cn, serializePastedContent } from '@/lib/utils';
+import { usePastedContent } from '@/lib/hooks/usePastedContent';
 import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
 import { useRedactedModeStore } from '@/lib/stores/redactedModeStore';
 import {
@@ -88,10 +89,8 @@ export default function HomePage() {
     if (typeof window === 'undefined') return '';
     return localStorage.getItem('home_input_draft') ?? '';
   });
-  const [pastedContent, setPastedContent] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('home_input_pasted') || null;
-  });
+  const { pastedItems, addPasted, removePasted, clearPasted } =
+    usePastedContent('home_input_pasted');
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
   const uploadedFiles = uploads.filter((u) => u.status === 'uploaded');
   const isUploading = uploads.some((u) => u.status === 'uploading');
@@ -141,15 +140,6 @@ export default function HomePage() {
       localStorage.removeItem('home_input_draft');
     }
   }, [input]);
-
-  // Sync pasted content to localStorage
-  useEffect(() => {
-    if (pastedContent) {
-      localStorage.setItem('home_input_pasted', pastedContent);
-    } else {
-      localStorage.removeItem('home_input_pasted');
-    }
-  }, [pastedContent]);
 
   // Check if user is a student (profession === 'student')
   const isStudent = user?.profile?.profession === 'student';
@@ -212,12 +202,12 @@ export default function HomePage() {
   }, [isGuest, user]);
 
   const handleSubmit = async () => {
-    if ((!input.trim() && uploadedFiles.length === 0 && !pastedContent) || isSubmitting || isUploading) return;
+    if ((!input.trim() && uploadedFiles.length === 0 && pastedItems.length === 0) || isSubmitting || isUploading) return;
 
-    const typedText = input.trim();
-    const fullMessage = pastedContent
-      ? `<pasted_content>${pastedContent}</pasted_content>${typedText ? '\n\n' + typedText : ''}`
-      : typedText;
+    const fullMessage = serializePastedContent(
+      pastedItems.map((item) => item.text),
+      input
+    );
     if (!fullMessage) return;
 
     // Guest: save prompt and show auth modal instead of sending
@@ -229,8 +219,7 @@ export default function HomePage() {
 
     localStorage.removeItem('guest_pending_prompt');
     localStorage.removeItem('home_input_draft');
-    localStorage.removeItem('home_input_pasted');
-    setPastedContent(null);
+    clearPasted();
     setIsSubmitting(true);
 
     // Snapshot the toggles so we can clear them once the conversation exists.
@@ -722,17 +711,23 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Pasted content preview */}
-            {pastedContent && (
-              <div className="mx-3 mt-2">
-                <PastedContentCard content={pastedContent} onRemove={() => setPastedContent(null)} />
+            {/* Pasted content previews */}
+            {pastedItems.length > 0 && (
+              <div className="mx-3 mt-2 flex flex-wrap gap-2">
+                {pastedItems.map((item) => (
+                  <PastedContentCard
+                    key={item.id}
+                    content={item.text}
+                    onRemove={() => removePasted(item.id)}
+                  />
+                ))}
               </div>
             )}
 
             <PromptInputTextarea
-              placeholder={pastedContent ? 'Add a message...' : 'Ask a legal question'}
+              placeholder={pastedItems.length > 0 ? 'Add a message...' : 'Ask a legal question'}
               className="text-foreground"
-              onLargePaste={setPastedContent}
+              onLargePaste={addPasted}
             />
 
             <PromptInputActions className="flex items-center justify-between px-3 pb-3 gap-2">
@@ -803,7 +798,7 @@ export default function HomePage() {
                     size="icon"
                     className="bg-primary hover:bg-primary/90 h-8 w-8 rounded-full"
                     onClick={handleSubmit}
-                    disabled={(!input.trim() && uploadedFiles.length === 0 && !pastedContent) || isSubmitting || isUploading}
+                    disabled={(!input.trim() && uploadedFiles.length === 0 && pastedItems.length === 0) || isSubmitting || isUploading}
                   >
                     {isSubmitting ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
