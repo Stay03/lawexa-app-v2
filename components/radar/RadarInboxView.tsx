@@ -41,10 +41,11 @@ import { RadarSettingsSheet } from './RadarSettingsSheet';
 import { RadarStatusBadge } from './RadarStatusBadge';
 import { ScanRow } from './ScanRow';
 import { ScanRowSkeleton } from './RadarListSkeletons';
-import { ScanRunningIndicator } from './ScanRunningIndicator';
+import { ScanInProgressRow } from './ScanInProgressRow';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 import {
   hasInFlightScan,
+  IN_FLIGHT_SCAN_STATUSES,
   useFirstScanDispatched,
   usePauseRadar,
   useRadar,
@@ -138,7 +139,21 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
   const completedScans = allScans.filter(
     (scan) => scan.status === 'completed' && scan.workflow_status === workflowTab
   );
+  // Queued/running scans live under the active workflow — surface them as
+  // live rows in the Inbox tab so the in-flight state is always reflected by
+  // the list itself (never a stranded banner).
+  const inFlightScans =
+    workflowTab === 'active'
+      ? allScans.filter((scan) => IN_FLIGHT_SCAN_STATUSES.has(scan.status))
+      : [];
   const scanInFlight = hasInFlightScan(inboxScansQuery.data);
+  // Bridge the ~60s gap before the dispatched first scan's queued row lands:
+  // show a single placeholder row while the inbox is still empty.
+  const showFirstScanPlaceholder =
+    workflowTab === 'active' &&
+    awaitingFirstScan &&
+    inFlightScans.length === 0 &&
+    completedScans.length === 0;
 
   const scanNow = useScanNow();
   const pauseRadar = usePauseRadar();
@@ -275,7 +290,8 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
         />
       );
     }
-    if (completedScans.length === 0) {
+    const hasInFlightRows = inFlightScans.length > 0 || showFirstScanPlaceholder;
+    if (completedScans.length === 0 && !hasInFlightRows) {
       const copy = EMPTY_TAB_COPY[workflowTab];
       return (
         <EmptyState
@@ -292,6 +308,13 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
     }
     return (
       <div className="divide-y divide-border/50">
+        {inFlightScans.map((scan) => (
+          <ScanInProgressRow
+            key={scan.uuid}
+            firstScan={radar.last_scan_at === null}
+          />
+        ))}
+        {showFirstScanPlaceholder && <ScanInProgressRow firstScan />}
         {completedScans.map((scan) => (
           <ScanRow key={scan.uuid} radarUuid={radarUuid} scan={scan} />
         ))}
@@ -430,16 +453,6 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
           </DropdownMenu>
         </div>
       </div>
-
-      {(scanInFlight || awaitingFirstScan) && (
-        <ScanRunningIndicator
-          label={
-            radar.last_scan_at === null
-              ? 'First scan running — your report will appear here shortly'
-              : 'Scan in progress — report coming shortly'
-          }
-        />
-      )}
 
       <AnimatedTabs
         tabs={WORKFLOW_TABS}
