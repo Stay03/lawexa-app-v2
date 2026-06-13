@@ -23,9 +23,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { EntityPicker } from './EntityPicker';
 import { FreeTextChipsField } from './FreeTextChipsField';
 import { JurisdictionsField } from './JurisdictionsField';
+import { RadarReviewDialog } from './RadarReviewDialog';
 import { SchedulePicker } from './SchedulePicker';
 import { SourcesField } from './SourcesField';
 import { cn } from '@/lib/utils';
@@ -74,8 +74,7 @@ function hasAdvancedValues(values: RadarFormValues): boolean {
     values.description.trim().length > 0 ||
     values.instructions.trim().length > 0 ||
     values.keywords.length > 0 ||
-    values.sources.length > 0 ||
-    values.entities.length > 0
+    values.sources.length > 0
   );
 }
 
@@ -128,25 +127,47 @@ function RadarForm({
     }
   }, [jurisdictions, profileCountry, form]);
 
-  const [description, instructions, keywords, sources, entities] = form.watch([
+  const [description, instructions, keywords, sources] = form.watch([
     'description',
     'instructions',
     'keywords',
     'sources',
-    'entities',
   ]);
 
   const configuredCount =
     (description.trim() ? 1 : 0) +
     (instructions.trim() ? 1 : 0) +
     (keywords.length > 0 ? 1 : 0) +
-    (sources.length > 0 ? 1 : 0) +
-    (entities.length > 0 ? 1 : 0);
+    (sources.length > 0 ? 1 : 0);
 
-  const handleSubmit = (values: RadarFormValues) => {
+  // On create we confirm a summary before saving; edits save straight away.
+  // `pendingValues` doubles as the review dialog's open state. Note that
+  // `entities` is intentionally still carried in the form values (and the
+  // payload) so editing a radar never silently clears entities the backend
+  // holds — the field is simply no longer surfaced in the UI.
+  const [pendingValues, setPendingValues] = useState<RadarFormValues | null>(
+    null
+  );
+
+  const submit = (values: RadarFormValues) => {
     onSubmit(buildRadarPayload(values, { includeFirstScan: mode === 'create' }), {
       applyServerErrors: (errors) => applyRadarServerErrors(form.setError, errors),
     });
+  };
+
+  const handleSubmit = (values: RadarFormValues) => {
+    if (mode === 'create') {
+      setPendingValues(values);
+      return;
+    }
+    submit(values);
+  };
+
+  const handleConfirm = () => {
+    if (!pendingValues) return;
+    const values = pendingValues;
+    setPendingValues(null);
+    submit(values);
   };
 
   return (
@@ -170,7 +191,7 @@ function RadarForm({
         />
 
         <div className="space-y-2">
-          <GroupLabel>What to watch</GroupLabel>
+          <GroupLabel>What to track</GroupLabel>
           <div className="grid items-start gap-3 sm:grid-cols-[2fr_3fr]">
             <FormField
               control={form.control}
@@ -205,6 +226,10 @@ function RadarForm({
                       aria-label="Topics"
                     />
                   </FormControl>
+                  <SubLabel>
+                    Examples: data protection enforcement, fintech licensing,
+                    tax appeals, mergers &amp; acquisitions
+                  </SubLabel>
                   <FormMessage />
                 </FormItem>
               )}
@@ -273,7 +298,7 @@ function RadarForm({
                   <FormControl>
                     <Textarea
                       rows={2}
-                      placeholder="A short note on what this radar monitors"
+                      placeholder="A short note on what this radar tracks"
                       {...field}
                     />
                   </FormControl>
@@ -287,7 +312,7 @@ function RadarForm({
               name="keywords"
               render={({ field }) => (
                 <FormItem className="space-y-1.5">
-                  <SubLabel>Keywords — exact phrases the agent searches for</SubLabel>
+                  <SubLabel>Keywords — exact phrases the radar should detect</SubLabel>
                   <FormControl>
                     <FreeTextChipsField
                       value={field.value}
@@ -318,29 +343,10 @@ function RadarForm({
 
             <FormField
               control={form.control}
-              name="entities"
-              render={({ field }) => (
-                <FormItem className="space-y-1.5">
-                  <SubLabel>
-                    Watched entities — Lawexa cases, statutes, courts, judges, or
-                    notes
-                  </SubLabel>
-                  <FormControl>
-                    <EntityPicker value={field.value} onChange={field.onChange} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="instructions"
               render={({ field }) => (
                 <FormItem className="space-y-1.5">
-                  <SubLabel>
-                    Agent instructions — scopes, priorities, what to ignore
-                  </SubLabel>
+                  <SubLabel>Custom instructions</SubLabel>
                   <FormControl>
                     <Textarea
                       rows={4}
@@ -393,8 +399,7 @@ function RadarForm({
                       Run first scan now
                     </FormLabel>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Uses 1 AI message — otherwise the first report arrives on
-                      schedule.
+                      Generate a radar report now
                     </p>
                   </div>
                   <FormControl>
@@ -416,6 +421,14 @@ function RadarForm({
           </Button>
         </div>
       </form>
+
+      <RadarReviewDialog
+        values={pendingValues}
+        jurisdictions={jurisdictions}
+        isSubmitting={isSubmitting}
+        onConfirm={handleConfirm}
+        onCancel={() => setPendingValues(null)}
+      />
     </Form>
   );
 }

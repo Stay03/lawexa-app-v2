@@ -104,7 +104,7 @@ export default function NewRadarPage() {
     <PageContainer>
       <PageHeader
         title="New radar"
-        description="A saved watch the AI agent investigates on a schedule, delivering one report per scan."
+        description="Choose what should be on your Radar. Receive reports when new developments are detected."
       />
       <RadarForm
         mode="create"

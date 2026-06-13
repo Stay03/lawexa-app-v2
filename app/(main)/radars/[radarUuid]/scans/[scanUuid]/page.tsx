@@ -26,6 +26,7 @@ import {
 } from '@/lib/hooks/useRadars';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { extractApiError } from '@/lib/utils/api-error';
+import { formatScanDuration } from '@/lib/utils/duration';
 
 interface ReportPageProps {
   params: Promise<{ radarUuid: string; scanUuid: string }>;
@@ -157,7 +158,7 @@ export default function ReportPage({ params }: ReportPageProps) {
           {scan.duration_ms !== null && (
             <>
               <span aria-hidden>·</span>
-              <span>{Math.round(scan.duration_ms / 1000)}s scan</span>
+              <span>{formatScanDuration(scan.duration_ms)} scan</span>
             </>
           )}
           {scan.triggered_by === 'manual' && <Badge variant="outline">Manual</Badge>}
@@ -172,7 +173,7 @@ export default function ReportPage({ params }: ReportPageProps) {
           <Button asChild size="sm">
             <Link href={`/c/${radar.conversation_uuid}`}>
               <MessageSquare />
-              Open in chat
+              Chat Lawexa
             </Link>
           </Button>
         )}

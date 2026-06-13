@@ -25,7 +25,7 @@ const EMPTY_COPY: Record<RadarStatus, { title: string; description: string }> = 
   active: {
     title: 'No radars yet',
     description:
-      'Create a radar to get scheduled AI reports on the legal topics, jurisdictions, and sources you care about.',
+      'Create a Radar to start tracking legal and regulatory developments',
   },
   paused: {
     title: 'No paused radars',
@@ -69,7 +69,7 @@ export default function RadarsPage() {
           action={
             status === 'active'
               ? {
-                  label: 'Create your first radar',
+                  label: 'Create radar',
                   onClick: () => router.push('/radars/new'),
                 }
               : undefined
@@ -91,7 +91,7 @@ export default function RadarsPage() {
     <PageContainer>
       <PageHeader
         title="Radar"
-        description="Saved watches that scan the web and Lawexa for you on a schedule"
+        description="Track legal and regulatory developments and keep them on your Radar"
       >
         <Button asChild>
           <Link href="/radars/new">

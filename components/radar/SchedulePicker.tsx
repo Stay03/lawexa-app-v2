@@ -26,7 +26,6 @@ import {
   builderToCron,
   cronToBuilder,
   describeCron,
-  estimateScansPerMonth,
   parseCronExpression,
   type ScheduleBuilderState,
   type ScheduleFrequency,
@@ -109,50 +108,15 @@ function formatTimeIn(nowMs: number, timeZone: string): string | null {
 }
 
 /**
- * Billing copy for the schedule's firing rate. Sparse schedules (fewer than
- * one scan a month) are stated per year rather than rounded up to 1/month.
- */
-function formatScanRate(scansPerMonth: number | null): React.ReactNode {
-  if (scansPerMonth === null) {
-    return <>1 AI message per scan</>;
-  }
-  if (scansPerMonth === 0) {
-    return <>never runs — check the day and month combination</>;
-  }
-  if (scansPerMonth < 1) {
-    const perYear = Math.round(scansPerMonth * 12);
-    return (
-      <>
-        ≈ <span className="font-medium text-foreground">{perYear}</span>{' '}
-        {perYear === 1 ? 'scan' : 'scans'}/year · 1 message each
-      </>
-    );
-  }
-  const perMonth = Math.round(scansPerMonth);
-  return (
-    <>
-      ≈ <span className="font-medium text-foreground">{perMonth}</span>{' '}
-      {perMonth === 1 ? 'scan' : 'scans'}/month · 1 message each
-    </>
-  );
-}
-
-function lowerFirst(text: string): string {
-  return text.charAt(0).toLowerCase() + text.slice(1);
-}
-
-/**
  * Schedule selection without cron literacy: a frequency + day + time builder
- * that writes the cron expression behind the scenes, a current-time line so
- * the user confirms (rather than hunts for) their timezone, and an
- * always-visible billing estimate. A raw cron input remains available as a
- * discreet advanced option and is forced on for expressions the builder
- * can't represent.
+ * that writes the cron expression behind the scenes and a current-time line
+ * so the user confirms (rather than hunts for) their timezone. A raw cron
+ * input is shown only as an automatic fallback for an existing expression the
+ * builder can't represent — there's no manual switch into it.
  */
 function SchedulePicker({ value, onChange }: SchedulePickerProps) {
   const builder = cronToBuilder(value.cron);
-  const [advancedToggled, setAdvancedToggled] = useState(false);
-  const advanced = advancedToggled || builder === null;
+  const advanced = builder === null;
 
   const [editingTimezone, setEditingTimezone] = useState(false);
   const [timezoneSearch, setTimezoneSearch] = useState('');
@@ -163,7 +127,6 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
 
   const cronIsValid = parseCronExpression(value.cron) !== null;
   const cronSummary = describeCron(value.cron);
-  const scansPerMonth = estimateScansPerMonth(value.cron);
   const messagesRemaining = limitsData?.data?.ai_messages.total_remaining ?? null;
 
   const updateBuilder = (patch: Partial<ScheduleBuilderState>) => {
@@ -287,38 +250,12 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
         </div>
       )}
 
-      <button
-        type="button"
-        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-        onClick={() => {
-          if (advanced) {
-            // Returning to the builder from an unrepresentable expression
-            // deliberately resets to the default daily schedule.
-            if (builder === null) {
-              onChange({ ...value, cron: builderToCron(DEFAULT_BUILDER_STATE) });
-            }
-            setAdvancedToggled(false);
-          } else {
-            setAdvancedToggled(true);
-          }
-        }}
-      >
-        {advanced ? 'Switch to simple schedule' : 'Use a cron expression instead'}
-      </button>
-
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
         <Clock className="size-3.5 shrink-0" />
         <span>
-          {cronIsValid
-            ? cronSummary
-              ? `Runs ${lowerFirst(cronSummary)}`
-              : 'Custom schedule'
-            : 'Schedule not set'}
-        </span>
-        <span aria-hidden>·</span>
-        <span>
+          Your current time —{' '}
           <span className="font-medium text-foreground">{localTime ?? '—'}</span>{' '}
-          now in {value.timezone.replace(/_/g, ' ')}
+          ({value.timezone.replace(/_/g, ' ')})
         </span>
         <button
           type="button"
@@ -330,8 +267,6 @@ function SchedulePicker({ value, onChange }: SchedulePickerProps) {
         >
           {editingTimezone ? 'Done' : 'Change'}
         </button>
-        <span aria-hidden>·</span>
-        <span>{formatScanRate(scansPerMonth)}</span>
         {messagesRemaining !== null && (
           <>
             <span aria-hidden>·</span>

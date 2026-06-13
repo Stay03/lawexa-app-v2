@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ScanTriageActions } from './ScanTriageActions';
 import { cn } from '@/lib/utils';
+import { formatScanDuration } from '@/lib/utils/duration';
 import type { RadarScan } from '@/types/radar';
 
 interface ScanRowProps {
@@ -66,7 +67,7 @@ function ScanRow({ radarUuid, scan }: ScanRowProps) {
             <Badge variant="outline">Manual</Badge>
           )}
           {scan.duration_ms !== null && (
-            <span>{Math.round(scan.duration_ms / 1000)}s</span>
+            <span>{formatScanDuration(scan.duration_ms)}</span>
           )}
         </div>
       </Link>

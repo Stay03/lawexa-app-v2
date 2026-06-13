@@ -371,7 +371,7 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
           <Button variant="outline" asChild>
             <Link href={`/c/${radar.conversation_uuid}`}>
               <MessageSquare />
-              Open in chat
+              Chat Lawexa
             </Link>
           </Button>
           {radar.status === 'paused' ? (
