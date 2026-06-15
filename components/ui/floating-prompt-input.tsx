@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { AxiosError } from 'axios';
-import { ArrowUp, ArrowDown, Loader2, ExternalLink, X, Square, SquarePen } from 'lucide-react';
+import { ArrowUp, ArrowDown, Loader2, ExternalLink, X, Square, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -499,28 +499,18 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
           )}
           style={isMobile ? { height: '70vh' } : undefined}
         >
-          {/* Header — title / new chat / external link / close */}
+          {/* Header — actions (left) / title (right) */}
           <SheetHeader className="shrink-0 border-b border-border px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <SheetTitle className="min-w-0 truncate text-sm font-medium">
-                {contextTitle ? (
-                  <span className="truncate">
-                    <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span>{' '}
-                    <span className="text-foreground">{contextTitle}</span>
-                  </span>
-                ) : (
-                  'Assistant'
-                )}
-              </SheetTitle>
+            <div className="flex items-center gap-2">
               <div className="flex shrink-0 items-center gap-1">
                 {messages.length > 0 && (
                   <button
                     onClick={resetToList}
                     disabled={isStreaming}
                     className="rounded-md p-1.5 transition-colors hover:bg-muted disabled:opacity-40"
-                    aria-label="New chat"
+                    aria-label="Back to chats"
                   >
-                    <SquarePen className="h-4 w-4 text-muted-foreground" />
+                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                   </button>
                 )}
                 {conversationId && (
@@ -544,6 +534,16 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                   </button>
                 </SheetClose>
               </div>
+              <SheetTitle className="min-w-0 flex-1 truncate text-right text-sm font-medium">
+                {contextTitle ? (
+                  <span className="truncate">
+                    <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span>{' '}
+                    <span className="text-foreground">{contextTitle}</span>
+                  </span>
+                ) : (
+                  'Assistant'
+                )}
+              </SheetTitle>
             </div>
             <SheetDescription className="sr-only">
               Chat assistant for this {contextType || 'page'}
