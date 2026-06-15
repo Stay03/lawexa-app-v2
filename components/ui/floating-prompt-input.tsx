@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { AxiosError } from 'axios';
-import { ArrowUp, ArrowDown, Loader2, ExternalLink, X, Square, ArrowLeft, MessagesSquare } from 'lucide-react';
+import { ArrowUp, ArrowDown, Loader2, ExternalLink, X, Square, SquarePen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -103,9 +103,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
-  // 'list' shows prior conversations about this content; 'chat' shows a thread.
-  // Falls back to 'chat' when there's no content context (see effectiveView).
-  const [view, setView] = useState<'list' | 'chat'>('list');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const router = useRouter();
@@ -122,10 +119,9 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
   const sidebarWidth = isMobile ? '0px' : state === 'expanded' ? '16rem' : '3rem';
 
-  // The list view only makes sense when bound to a piece of content; without
-  // context we keep the original chat-only behavior.
+  // The conversation list is only shown when bound to a piece of content;
+  // without context the panel is a plain new-chat composer.
   const hasContext = !!(contextSlug && contextType);
-  const effectiveView: 'list' | 'chat' = hasContext ? view : 'chat';
 
   const promptSuggestions = [
     'Explain this',
@@ -183,14 +179,16 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
   // Focus textarea inside sheet when it opens
   useEffect(() => {
-    if (isOpen && effectiveView === 'chat') {
+    // On desktop, focus the composer when the panel opens. On mobile we skip
+    // this so the on-screen keyboard doesn't immediately cover the list.
+    if (isOpen && !isMobile) {
       const timer = setTimeout(() => {
         const textarea = sheetRef.current?.querySelector('textarea');
         textarea?.focus();
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, effectiveView]);
+  }, [isOpen, isMobile]);
 
   // Cleanup SSE connection on unmount
   useEffect(() => {
@@ -335,20 +333,33 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     [token, addToolMessage, updateToolMessage, addAssistantMessage]
   );
 
-  // ─── Conversation list ↔ thread navigation ───
+  // ─── List ↔ thread navigation ───
 
-  const handleNewChat = useCallback(() => {
+  // Clear the active thread so the body falls back to the conversation list
+  // (or suggestions). Also refreshes the list so a just-created/continued
+  // thread appears in the right order.
+  const resetToList = useCallback(() => {
     setError(null);
     setConversationId(null);
     setMessages([]);
-    setView('chat');
-  }, []);
+    if (contextType && contextSlug) {
+      queryClient.invalidateQueries({
+        queryKey: [...conversationKeys.lists(), 'content', contextType, contextSlug],
+      });
+    }
+  }, [contextType, contextSlug, queryClient]);
+
+  // Open the panel. When not mid-stream, reset to the list so opening always
+  // starts from the conversation list (the requested behavior).
+  const handleOpen = useCallback(() => {
+    if (!isStreaming) resetToList();
+    setIsOpen(true);
+  }, [isStreaming, resetToList]);
 
   const handleSelectConversation = useCallback(async (id: string) => {
     setError(null);
     setConversationId(id);
     setMessages([]);
-    setView('chat');
     setIsLoadingHistory(true);
     try {
       const response = await chatApi.getConversation(id);
@@ -363,17 +374,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
       setIsLoadingHistory(false);
     }
   }, []);
-
-  const handleBackToList = useCallback(() => {
-    if (isStreaming) return;
-    if (contextType && contextSlug) {
-      // Refresh so a just-created/continued thread shows in the right order.
-      queryClient.invalidateQueries({
-        queryKey: [...conversationKeys.lists(), 'content', contextType, contextSlug],
-      });
-    }
-    setView('list');
-  }, [isStreaming, contextType, contextSlug, queryClient]);
 
   const handleSuggestionClick = (suggestion: string) => {
     setInput(suggestion);
@@ -463,6 +463,25 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
   const canSend = input.trim().length > 0 || pastedItems.length > 0;
 
+  // Preprompt suggestions — shown in the body when there's no active thread and
+  // no prior conversations (or when there's no content context at all).
+  const suggestionsBlock = (
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
+      <p className="text-xs text-muted-foreground">Suggested prompts</p>
+      <div className="flex w-full max-w-sm flex-col gap-2">
+        {promptSuggestions.map((suggestion, index) => (
+          <button
+            key={index}
+            onClick={() => handleSuggestionClick(suggestion)}
+            className="rounded-xl border border-border px-4 py-3 text-left text-sm transition-all duration-200 hover:border-primary/50 hover:bg-primary/5"
+          >
+            {suggestion}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <>
       {/* Sheet — bottom on mobile, right sidebar on desktop */}
@@ -480,42 +499,31 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
           )}
           style={isMobile ? { height: '70vh' } : undefined}
         >
-          {/* Header — back / title / external link / close */}
+          {/* Header — title / new chat / external link / close */}
           <SheetHeader className="shrink-0 border-b border-border px-4 py-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1.5">
-                {effectiveView === 'chat' && hasContext && (
+              <SheetTitle className="min-w-0 truncate text-sm font-medium">
+                {contextTitle ? (
+                  <span className="truncate">
+                    <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span>{' '}
+                    <span className="text-foreground">{contextTitle}</span>
+                  </span>
+                ) : (
+                  'Assistant'
+                )}
+              </SheetTitle>
+              <div className="flex shrink-0 items-center gap-1">
+                {messages.length > 0 && (
                   <button
-                    onClick={handleBackToList}
+                    onClick={resetToList}
                     disabled={isStreaming}
-                    className="-ml-1 shrink-0 rounded-md p-1.5 transition-colors hover:bg-muted disabled:opacity-40"
-                    aria-label="Back to chats"
+                    className="rounded-md p-1.5 transition-colors hover:bg-muted disabled:opacity-40"
+                    aria-label="New chat"
                   >
-                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+                    <SquarePen className="h-4 w-4 text-muted-foreground" />
                   </button>
                 )}
-                <SheetTitle className="min-w-0 truncate text-sm font-medium">
-                  {effectiveView === 'list' ? (
-                    contextTitle ? (
-                      <span className="truncate">
-                        <span className="text-yellow-600 dark:text-yellow-500">CHATS ABOUT:</span>{' '}
-                        <span className="text-foreground">{contextTitle}</span>
-                      </span>
-                    ) : (
-                      'Chats'
-                    )
-                  ) : contextTitle ? (
-                    <span className="truncate">
-                      <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span>{' '}
-                      <span className="text-foreground">{contextTitle}</span>
-                    </span>
-                  ) : (
-                    'Assistant'
-                  )}
-                </SheetTitle>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                {effectiveView === 'chat' && conversationId && (
+                {conversationId && (
                   <button
                     onClick={() => {
                       setIsOpen(false);
@@ -538,56 +546,27 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               </div>
             </div>
             <SheetDescription className="sr-only">
-              {effectiveView === 'list'
-                ? `Your conversations about this ${contextType || 'page'}`
-                : `Chat assistant for this ${contextType || 'page'}`}
+              Chat assistant for this {contextType || 'page'}
             </SheetDescription>
-            {effectiveView === 'chat' && (
-              <div className="mt-2 flex items-center">
-                <JurisdictionStatus
-                  value={jurisdictionChoice}
-                  onChange={setJurisdictionChoice}
-                  disabled={isStreaming}
-                />
-              </div>
-            )}
+            <div className="mt-2 flex items-center">
+              <JurisdictionStatus
+                value={jurisdictionChoice}
+                onChange={setJurisdictionChoice}
+                disabled={isStreaming}
+              />
+            </div>
           </SheetHeader>
 
-          {effectiveView === 'list' && contextType && contextSlug ? (
-            <FloatingConversationList
-              contentType={contextType}
-              slug={contextSlug}
-              enabled={isOpen}
-              onSelect={handleSelectConversation}
-              onNewChat={handleNewChat}
-            />
-          ) : (
-            <>
-          {/* Chat messages — scrollable */}
-          <div
-            ref={chatContainerRef}
-            className="min-h-0 flex-1 overflow-y-auto p-4"
-          >
-            {isLoadingHistory ? (
-              <div className="flex h-full items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3">
-                <p className="text-xs text-muted-foreground">Suggested prompts</p>
-                <div className="flex w-full max-w-sm flex-col gap-2">
-                  {promptSuggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="rounded-xl border border-border px-4 py-3 text-left text-sm transition-all duration-200 hover:border-primary/50 hover:bg-primary/5"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
+          {/* Body — loading thread / messages / conversation list / suggestions */}
+          {isLoadingHistory ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : messages.length > 0 ? (
+            <div
+              ref={chatContainerRef}
+              className="min-h-0 flex-1 overflow-y-auto p-4"
+            >
               <div className="flex flex-col gap-4">
                 {messageGroups.map((group, groupIndex) => {
                   if (group.type === 'tool-chain') {
@@ -618,18 +597,24 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                     </div>
                   </Message>
                 )}
-
-                {error && (
-                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                    {error}
-                  </div>
-                )}
               </div>
-            )}
-          </div>
+            </div>
+          ) : hasContext && contextType && contextSlug ? (
+            <FloatingConversationList
+              contentType={contextType}
+              slug={contextSlug}
+              enabled={isOpen}
+              onSelect={handleSelectConversation}
+              emptyFallback={suggestionsBlock}
+            />
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {suggestionsBlock}
+            </div>
+          )}
 
-          {/* Scroll to bottom button */}
-          {showScrollDown && (
+          {/* Scroll to bottom button — only meaningful with messages */}
+          {messages.length > 0 && showScrollDown && (
             <div className="flex justify-center pb-2">
               <Button
                 size="icon"
@@ -642,7 +627,16 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             </div>
           )}
 
-          {/* Input at bottom of sheet — matches conversation page */}
+          {/* Error banner — always visible above the composer */}
+          {error && (
+            <div className="shrink-0 px-3 pt-1">
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            </div>
+          )}
+
+          {/* Composer — always pinned at the bottom */}
           <div className="shrink-0 border-t border-border p-3">
             <PromptInput
               value={input}
@@ -716,8 +710,6 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               </div>
             </PromptInput>
           </div>
-            </>
-          )}
         </SheetContent>
       </Sheet>
 
@@ -740,63 +732,44 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         aria-hidden={isOpen}
       >
         <div className="mx-auto max-w-xs sm:max-w-md">
-          {hasContext ? (
-            <button
-              type="button"
-              onClick={() => {
-                setView('list');
-                setIsOpen(true);
-              }}
+          {/* Collapsed composer — gold-shimmer border (PromptInput default
+              variant). Focusing it opens the panel onto the conversation list. */}
+          <PromptInput
+            value={input}
+            onValueChange={setInput}
+            onSubmit={handleSubmit}
+            disabled={isSubmitting}
+            maxHeight={36}
+          >
+            {/* Textarea — single line tap target */}
+            <PromptInputTextarea
+              placeholder={hasContext ? `Ask Lawexa about this ${contextType}` : 'Ask a question...'}
+              className="text-foreground min-h-[36px] py-2 px-3"
+              disableAutosize
+              onFocus={handleOpen}
               tabIndex={isOpen ? -1 : 0}
-              className={cn(
-                'flex w-full items-center gap-2.5 rounded-full border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur',
-                'transition-colors hover:bg-muted',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-              )}
-            >
-              <MessagesSquare className="h-4 w-4 shrink-0 text-primary" />
-              <span className="truncate text-sm text-muted-foreground">
-                Chats about this {contextType}
-              </span>
-            </button>
-          ) : (
-            <PromptInput
-              value={input}
-              onValueChange={setInput}
-              onSubmit={handleSubmit}
-              disabled={isSubmitting}
-              maxHeight={36}
-            >
-              {/* Textarea — single line tap target */}
-              <PromptInputTextarea
-                placeholder="Ask a question..."
-                className="text-foreground min-h-[36px] py-2 px-3"
-                disableAutosize
-                onFocus={() => setIsOpen(true)}
-                tabIndex={isOpen ? -1 : 0}
-              />
+            />
 
-              {/* Send button — bottom right */}
-              <div className="flex items-center justify-end px-2 pb-1">
-                <PromptInputAction tooltip="Send message">
-                  <Button
-                    size="icon"
-                    className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
-                    onClick={handleSubmit}
-                    onMouseDown={(e) => e.preventDefault()}
-                    disabled={!input.trim() || isSubmitting}
-                    tabIndex={isOpen ? -1 : 0}
-                  >
-                    {isSubmitting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <ArrowUp className="h-4 w-4" />
-                    )}
-                  </Button>
-                </PromptInputAction>
-              </div>
-            </PromptInput>
-          )}
+            {/* Send button — bottom right */}
+            <div className="flex items-center justify-end px-2 pb-1">
+              <PromptInputAction tooltip="Send message">
+                <Button
+                  size="icon"
+                  className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
+                  onClick={handleSubmit}
+                  onMouseDown={(e) => e.preventDefault()}
+                  disabled={!input.trim() || isSubmitting}
+                  tabIndex={isOpen ? -1 : 0}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className="h-4 w-4" />
+                  )}
+                </Button>
+              </PromptInputAction>
+            </div>
+          </PromptInput>
         </div>
       </div>
     </>

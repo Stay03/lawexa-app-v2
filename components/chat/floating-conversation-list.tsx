@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { MessageSquarePlus, MessageSquare, Loader2, ChevronRight } from 'lucide-react';
+import { useEffect, type ReactNode } from 'react';
+import { MessageSquare, Loader2, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,8 @@ interface FloatingConversationListProps {
   /** Only fetch while the panel is open and showing this view. */
   enabled: boolean;
   onSelect: (conversationId: string) => void;
-  onNewChat: () => void;
+  /** Rendered in the body when the user has no conversations yet (preprompts). */
+  emptyFallback?: ReactNode;
 }
 
 const CONTENT_NOUN: Record<FloatingConversationListProps['contentType'], string> = {
@@ -86,7 +87,7 @@ export function FloatingConversationList({
   slug,
   enabled,
   onSelect,
-  onNewChat,
+  emptyFallback,
 }: FloatingConversationListProps) {
   const query = useInfiniteContentConversations(
     contentType,
@@ -110,18 +111,8 @@ export function FloatingConversationList({
   const noun = CONTENT_NOUN[contentType];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* New chat — always available at the top */}
-      <div className="shrink-0 border-b border-border p-3">
-        <Button onClick={onNewChat} className="w-full justify-center gap-2">
-          <MessageSquarePlus className="h-4 w-4" />
-          New chat
-        </Button>
-      </div>
-
-      {/* List */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {query.isLoading ? (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      {query.isLoading ? (
           <div className="divide-y divide-border">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex flex-col gap-2 px-4 py-3">
@@ -139,13 +130,15 @@ export function FloatingConversationList({
             />
           </div>
         ) : items.length === 0 ? (
-          <div className="p-4">
-            <EmptyState
-              icon={MessageSquare}
-              title="No chats yet"
-              description={`Start a new chat to ask questions about this ${noun}.`}
-            />
-          </div>
+          emptyFallback ?? (
+            <div className="p-4">
+              <EmptyState
+                icon={MessageSquare}
+                title="No chats yet"
+                description={`Start a new chat to ask questions about this ${noun}.`}
+              />
+            </div>
+          )
         ) : (
           <>
             <div className="divide-y divide-border">
@@ -177,7 +170,6 @@ export function FloatingConversationList({
             </div>
           </>
         )}
-      </div>
     </div>
   );
 }
