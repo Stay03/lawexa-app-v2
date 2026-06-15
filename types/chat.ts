@@ -453,6 +453,77 @@ export interface DocumentUploadResponse {
   message: string;
 }
 
+// ─── Conversation references ───────────────────────────────
+// Each conversation can be "about" one or more pieces of content (the case /
+// note / statute it was started from, or a radar + its scans). The backend
+// returns these on the list, per-content-page, and single-conversation
+// endpoints. `content` is a compact summary, or null when the target was deleted.
+
+export interface CaseReferenceContent {
+  id: number;
+  title: string;
+  slug: string;
+  judgment_date: string | null;
+  citation: string | null;
+  is_bookmarked: boolean;
+  bookmarks_count: number;
+  views_count: number;
+}
+
+export interface StatuteReferenceContent {
+  id: number;
+  title: string;
+  short_title: string | null;
+  slug: string;
+  year: string | null;
+  status: string | null;
+  is_bookmarked: boolean;
+  bookmarks_count: number;
+}
+
+export interface NoteReferenceContent {
+  id: number;
+  title: string;
+  slug: string;
+  content_preview: string | null;
+  content_preview_html: string | null;
+  user: { id: number; name: string; avatar_url: string | null } | null;
+  tags: string[] | null;
+  price_ngn: number | null;
+  price_usd: number | null;
+  is_free: boolean;
+  thumbnail_url: string | null;
+  is_bookmarked: boolean;
+  bookmarks_count: number;
+  views_count: number;
+  created_at: string;
+}
+
+export interface RadarReferenceContent {
+  uuid: string;
+  name: string;
+  status: string;
+  last_scan_at: string | null;
+  created_at: string;
+}
+
+export interface RadarScanReferenceContent {
+  uuid: string;
+  title: string;
+  status: string;
+  has_findings: boolean;
+  priority: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export type ConversationReference =
+  | { type: 'case'; content: CaseReferenceContent | null }
+  | { type: 'statute'; content: StatuteReferenceContent | null }
+  | { type: 'note'; content: NoteReferenceContent | null }
+  | { type: 'radar'; content: RadarReferenceContent | null }
+  | { type: 'radar_scan'; content: RadarScanReferenceContent | null };
+
 export interface ConversationData {
   id: string;
   user_id: number;
@@ -467,6 +538,7 @@ export interface ConversationData {
   views_count?: number;
   author?: ConversationAuthor;
   agent?: ConversationAgentSummary;
+  references?: ConversationReference[];
   created_at: string;
   updated_at: string;
 }
@@ -493,6 +565,7 @@ export interface ConversationListItem {
     slug: string;
     description: string | null;
   };
+  references?: ConversationReference[];
   messages_count: number;
   created_at: string;
   updated_at: string;

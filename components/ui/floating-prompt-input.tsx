@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { AxiosError } from 'axios';
-import { ArrowUp, ArrowDown, Loader2, ExternalLink, X, Square } from 'lucide-react';
+import { ArrowUp, ArrowDown, Loader2, ExternalLink, X, Square, ArrowLeft, MessagesSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   PromptInput,
   PromptInputTextarea,
@@ -20,6 +21,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { chatApi } from '@/lib/api/chat';
+import { transformApiMessages } from '@/lib/utils/transform-api-messages';
+import { conversationKeys } from '@/lib/hooks/useConversations';
+import { FloatingConversationList } from '@/components/chat/floating-conversation-list';
 import { cn, serializePastedContent } from '@/lib/utils';
 import { usePastedContent } from '@/lib/hooks/usePastedContent';
 import { extractApiError } from '@/lib/utils/api-error';
@@ -99,11 +103,16 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  // 'list' shows prior conversations about this content; 'chat' shows a thread.
+  // Falls back to 'chat' when there's no content context (see effectiveView).
+  const [view, setView] = useState<'list' | 'chat'>('list');
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const router = useRouter();
   const { state } = useSidebar();
   const isMobile = useIsMobile();
   const token = useAuthStore((state) => state.token);
+  const queryClient = useQueryClient();
   const eventSourceRef = useRef<EventSource | null>(null);
   const executionIdRef = useRef<string | null>(null);
   const hasReconnectedRef = useRef<boolean>(false);
@@ -112,6 +121,11 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
   const isNearBottomRef = useRef(true);
 
   const sidebarWidth = isMobile ? '0px' : state === 'expanded' ? '16rem' : '3rem';
+
+  // The list view only makes sense when bound to a piece of content; without
+  // context we keep the original chat-only behavior.
+  const hasContext = !!(contextSlug && contextType);
+  const effectiveView: 'list' | 'chat' = hasContext ? view : 'chat';
 
   const promptSuggestions = [
     'Explain this',
@@ -169,14 +183,14 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
   // Focus textarea inside sheet when it opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && effectiveView === 'chat') {
       const timer = setTimeout(() => {
         const textarea = sheetRef.current?.querySelector('textarea');
         textarea?.focus();
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, effectiveView]);
 
   // Cleanup SSE connection on unmount
   useEffect(() => {
@@ -321,6 +335,46 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     [token, addToolMessage, updateToolMessage, addAssistantMessage]
   );
 
+  // ─── Conversation list ↔ thread navigation ───
+
+  const handleNewChat = useCallback(() => {
+    setError(null);
+    setConversationId(null);
+    setMessages([]);
+    setView('chat');
+  }, []);
+
+  const handleSelectConversation = useCallback(async (id: string) => {
+    setError(null);
+    setConversationId(id);
+    setMessages([]);
+    setView('chat');
+    setIsLoadingHistory(true);
+    try {
+      const response = await chatApi.getConversation(id);
+      if (response.success && response.data.messages) {
+        setMessages(transformApiMessages(response.data.messages));
+      } else {
+        setError(response.message || 'Failed to load conversation');
+      }
+    } catch (err) {
+      setError(extractApiError(err).message);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
+
+  const handleBackToList = useCallback(() => {
+    if (isStreaming) return;
+    if (contextType && contextSlug) {
+      // Refresh so a just-created/continued thread shows in the right order.
+      queryClient.invalidateQueries({
+        queryKey: [...conversationKeys.lists(), 'content', contextType, contextSlug],
+      });
+    }
+    setView('list');
+  }, [isStreaming, contextType, contextSlug, queryClient]);
+
   const handleSuggestionClick = (suggestion: string) => {
     setInput(suggestion);
     const textarea = sheetRef.current?.querySelector('textarea');
@@ -426,21 +480,42 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
           )}
           style={isMobile ? { height: '70vh' } : undefined}
         >
-          {/* Header — custom close + external link buttons */}
+          {/* Header — back / title / external link / close */}
           <SheetHeader className="shrink-0 border-b border-border px-4 py-3">
-            <div className="flex items-center justify-between">
-              <SheetTitle className="text-sm font-medium">
-                {contextTitle ? (
-                  <span>
-                    <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span>{' '}
-                    <span className="text-foreground">{contextTitle}</span>
-                  </span>
-                ) : (
-                  'Assistant'
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
+                {effectiveView === 'chat' && hasContext && (
+                  <button
+                    onClick={handleBackToList}
+                    disabled={isStreaming}
+                    className="-ml-1 shrink-0 rounded-md p-1.5 transition-colors hover:bg-muted disabled:opacity-40"
+                    aria-label="Back to chats"
+                  >
+                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+                  </button>
                 )}
-              </SheetTitle>
-              <div className="flex items-center gap-1">
-                {conversationId && (
+                <SheetTitle className="min-w-0 truncate text-sm font-medium">
+                  {effectiveView === 'list' ? (
+                    contextTitle ? (
+                      <span className="truncate">
+                        <span className="text-yellow-600 dark:text-yellow-500">CHATS ABOUT:</span>{' '}
+                        <span className="text-foreground">{contextTitle}</span>
+                      </span>
+                    ) : (
+                      'Chats'
+                    )
+                  ) : contextTitle ? (
+                    <span className="truncate">
+                      <span className="text-yellow-600 dark:text-yellow-500">CHAT ABOUT:</span>{' '}
+                      <span className="text-foreground">{contextTitle}</span>
+                    </span>
+                  ) : (
+                    'Assistant'
+                  )}
+                </SheetTitle>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {effectiveView === 'chat' && conversationId && (
                   <button
                     onClick={() => {
                       setIsOpen(false);
@@ -463,23 +538,41 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               </div>
             </div>
             <SheetDescription className="sr-only">
-              Chat assistant for this {contextType || 'page'}
+              {effectiveView === 'list'
+                ? `Your conversations about this ${contextType || 'page'}`
+                : `Chat assistant for this ${contextType || 'page'}`}
             </SheetDescription>
-            <div className="mt-2 flex items-center">
-              <JurisdictionStatus
-                value={jurisdictionChoice}
-                onChange={setJurisdictionChoice}
-                disabled={isStreaming}
-              />
-            </div>
+            {effectiveView === 'chat' && (
+              <div className="mt-2 flex items-center">
+                <JurisdictionStatus
+                  value={jurisdictionChoice}
+                  onChange={setJurisdictionChoice}
+                  disabled={isStreaming}
+                />
+              </div>
+            )}
           </SheetHeader>
 
+          {effectiveView === 'list' && contextType && contextSlug ? (
+            <FloatingConversationList
+              contentType={contextType}
+              slug={contextSlug}
+              enabled={isOpen}
+              onSelect={handleSelectConversation}
+              onNewChat={handleNewChat}
+            />
+          ) : (
+            <>
           {/* Chat messages — scrollable */}
           <div
             ref={chatContainerRef}
             className="min-h-0 flex-1 overflow-y-auto p-4"
           >
-            {messages.length === 0 ? (
+            {isLoadingHistory ? (
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-3">
                 <p className="text-xs text-muted-foreground">Suggested prompts</p>
                 <div className="flex w-full max-w-sm flex-col gap-2">
@@ -623,6 +716,8 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
               </div>
             </PromptInput>
           </div>
+            </>
+          )}
         </SheetContent>
       </Sheet>
 
@@ -645,42 +740,63 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
         aria-hidden={isOpen}
       >
         <div className="mx-auto max-w-xs sm:max-w-md">
-          <PromptInput
-            value={input}
-            onValueChange={setInput}
-            onSubmit={handleSubmit}
-            disabled={isSubmitting}
-            maxHeight={36}
-          >
-            {/* Textarea — single line tap target */}
-            <PromptInputTextarea
-              placeholder="Ask a question..."
-              className="text-foreground min-h-[36px] py-2 px-3"
-              disableAutosize
-              onFocus={() => setIsOpen(true)}
+          {hasContext ? (
+            <button
+              type="button"
+              onClick={() => {
+                setView('list');
+                setIsOpen(true);
+              }}
               tabIndex={isOpen ? -1 : 0}
-            />
+              className={cn(
+                'flex w-full items-center gap-2.5 rounded-full border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur',
+                'transition-colors hover:bg-muted',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+              )}
+            >
+              <MessagesSquare className="h-4 w-4 shrink-0 text-primary" />
+              <span className="truncate text-sm text-muted-foreground">
+                Chats about this {contextType}
+              </span>
+            </button>
+          ) : (
+            <PromptInput
+              value={input}
+              onValueChange={setInput}
+              onSubmit={handleSubmit}
+              disabled={isSubmitting}
+              maxHeight={36}
+            >
+              {/* Textarea — single line tap target */}
+              <PromptInputTextarea
+                placeholder="Ask a question..."
+                className="text-foreground min-h-[36px] py-2 px-3"
+                disableAutosize
+                onFocus={() => setIsOpen(true)}
+                tabIndex={isOpen ? -1 : 0}
+              />
 
-            {/* Send button — bottom right */}
-            <div className="flex items-center justify-end px-2 pb-1">
-              <PromptInputAction tooltip="Send message">
-                <Button
-                  size="icon"
-                  className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
-                  onClick={handleSubmit}
-                  onMouseDown={(e) => e.preventDefault()}
-                  disabled={!input.trim() || isSubmitting}
-                  tabIndex={isOpen ? -1 : 0}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowUp className="h-4 w-4" />
-                  )}
-                </Button>
-              </PromptInputAction>
-            </div>
-          </PromptInput>
+              {/* Send button — bottom right */}
+              <div className="flex items-center justify-end px-2 pb-1">
+                <PromptInputAction tooltip="Send message">
+                  <Button
+                    size="icon"
+                    className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
+                    onClick={handleSubmit}
+                    onMouseDown={(e) => e.preventDefault()}
+                    disabled={!input.trim() || isSubmitting}
+                    tabIndex={isOpen ? -1 : 0}
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ArrowUp className="h-4 w-4" />
+                    )}
+                  </Button>
+                </PromptInputAction>
+              </div>
+            </PromptInput>
+          )}
         </div>
       </div>
     </>

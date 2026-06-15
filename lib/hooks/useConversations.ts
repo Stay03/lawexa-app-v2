@@ -4,12 +4,19 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { chatApi } from '@/lib/api/chat';
 import type { ListConversationsParams } from '@/types/chat';
 
+type ContentConversationType = 'case' | 'note' | 'statute';
+
 // Query keys factory
 export const conversationKeys = {
   all: ['conversations'] as const,
   lists: () => [...conversationKeys.all, 'list'] as const,
   list: (params: Omit<ListConversationsParams, 'page'>) =>
     [...conversationKeys.lists(), params] as const,
+  content: (
+    contentType: ContentConversationType,
+    slug: string,
+    params: Omit<ListConversationsParams, 'page'>,
+  ) => [...conversationKeys.lists(), 'content', contentType, slug, params] as const,
 };
 
 /**
@@ -28,5 +35,32 @@ export function useInfiniteConversations(
     },
     initialPageParam: 1,
     staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+/**
+ * Hook for the infinite-scrolling list of the user's conversations about a
+ * single piece of content (case / note / statute). Backs the "Related
+ * conversations" view in the floating chat panel.
+ *
+ * Pass `enabled: false` to keep it idle until the panel is opened.
+ */
+export function useInfiniteContentConversations(
+  contentType: ContentConversationType,
+  slug: string,
+  params: Omit<ListConversationsParams, 'page'> = {},
+  options: { enabled?: boolean } = {},
+) {
+  return useInfiniteQuery({
+    queryKey: conversationKeys.content(contentType, slug, params),
+    queryFn: ({ pageParam }) =>
+      chatApi.listContentConversations(contentType, slug, { ...params, page: pageParam }),
+    getNextPageParam: (lastPage) => {
+      const { current_page, last_page } = lastPage.pagination;
+      return current_page < last_page ? current_page + 1 : undefined;
+    },
+    initialPageParam: 1,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled: (options.enabled ?? true) && Boolean(slug),
   });
 }

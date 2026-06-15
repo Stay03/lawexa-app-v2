@@ -64,6 +64,25 @@ export const chatApi = {
   },
 
   /**
+   * List the authenticated user's conversations about a single piece of content
+   * (case / note / statute). Owner-scoped and paginated, same envelope as
+   * `listConversations`. Powers the "Related conversations" list in the floating
+   * chat panel. Confidential conversations are never returned by these routes.
+   */
+  listContentConversations: async (
+    contentType: 'case' | 'note' | 'statute',
+    slug: string,
+    params?: ListConversationsParams,
+  ): Promise<ConversationsListResponse> => {
+    const pathMap = { case: 'cases', note: 'notes', statute: 'statutes' } as const;
+    const response = await apiClient.get<ConversationsListResponse>(
+      `/${pathMap[contentType]}/${slug}/conversations`,
+      { params },
+    );
+    return response.data;
+  },
+
+  /**
    * List the authenticated user's messages across all conversations.
    * Each item includes its parent conversation (uuid + title).
    */
