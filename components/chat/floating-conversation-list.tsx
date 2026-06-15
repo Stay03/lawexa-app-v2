@@ -44,7 +44,11 @@ function ConversationRow({
   conversation: ConversationListItem;
   onSelect: (id: string) => void;
 }) {
-  const { id, title, status, last_message, updated_at } = conversation;
+  const { id, title, status, first_message, last_message, updated_at } = conversation;
+  // Row identity: the user's first question (backend already strips it). Falls
+  // back to the conversation title when absent or a slug-only empty preview.
+  const firstPreview = first_message?.preview?.trim() ?? '';
+  const titleText = firstPreview || stripContextTags(stripPastedTags(title));
   const preview = last_message
     ? stripContextTags(stripPastedTags(last_message.preview))
     : '';
@@ -60,7 +64,7 @@ function ConversationRow({
     >
       <div className="flex items-center gap-2">
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground group-hover:text-primary">
-          {stripContextTags(stripPastedTags(title))}
+          {titleText}
         </h3>
         {status === 'archived' && (
           <Badge variant="secondary" className="shrink-0 text-[10px]">

@@ -549,11 +549,12 @@ export interface ConversationResponse {
   data: ConversationData;
 }
 
-// Latest substantive message preview on a list row. The backend skips
-// machinery rows (tool calls/results, handovers, narration, errors) so this is
-// always real user/assistant text, HTML-stripped and capped at ~140 chars.
-// `null` when the conversation has no substantive message yet.
-export interface ConversationLastMessage {
+// A substantive-message preview on a list row. The backend skips machinery
+// rows (tool calls/results, handovers, narration, errors), strips HTML +
+// context slug tags + attachment blocks, and caps at ~140 chars. Used for both
+// `last_message` (latest, user|assistant) and `first_message` (earliest user
+// message — `role` is always 'user'; `preview` may be '' for a slug-only open).
+export interface ConversationMessagePreview {
   role: 'user' | 'assistant';
   preview: string;
   created_at: string;
@@ -576,7 +577,9 @@ export interface ConversationListItem {
     description: string | null;
   };
   references?: ConversationReference[];
-  last_message?: ConversationLastMessage | null;
+  // Earliest user message — used as the row's identity in content-scoped lists.
+  first_message?: ConversationMessagePreview | null;
+  last_message?: ConversationMessagePreview | null;
   messages_count: number;
   created_at: string;
   updated_at: string;
