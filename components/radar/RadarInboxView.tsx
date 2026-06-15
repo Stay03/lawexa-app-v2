@@ -38,7 +38,8 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { PageContainer } from '@/components/layout';
 import { ArchiveRadarDialog } from './ArchiveRadarDialog';
 import { RadarSettingsSheet } from './RadarSettingsSheet';
-import { RadarStatusBadge } from './RadarStatusBadge';
+import { RadarMetaRow } from './RadarMetaRow';
+import { RadarStatusDot } from './RadarStatusDot';
 import { ScanRow } from './ScanRow';
 import { ScanRowSkeleton } from './RadarListSkeletons';
 import { ScanInProgressRow } from './ScanInProgressRow';
@@ -324,58 +325,55 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
 
   return (
     <PageContainer>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-bold tracking-tight">
+          <div className="flex items-center gap-2">
+            <RadarStatusDot status={radar.status} />
+            <h1 className="min-w-0 flex-1 truncate text-2xl font-bold tracking-tight">
               {radar.name}
             </h1>
-            <RadarStatusBadge status={radar.status} />
           </div>
           {radar.description && (
             <p className="mt-1 text-muted-foreground">{radar.description}</p>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <RadarMetaRow className="mt-2">
             <span className="inline-flex items-center gap-1.5">
               <CalendarClock className="size-3.5" />
               {describeCron(radar.schedule_cron) ??
                 `Custom — ${radar.schedule_cron}`}
             </span>
-            <span aria-hidden>·</span>
             <span>
               {radar.last_scan_at
                 ? `Last scan ${formatDistanceToNow(new Date(radar.last_scan_at), { addSuffix: true })}`
                 : 'Never scanned'}
             </span>
             {radar.status === 'active' && radar.next_scan_at && (
-              <>
-                <span aria-hidden>·</span>
-                <span>
-                  Next scan{' '}
-                  {formatDistanceToNow(new Date(radar.next_scan_at), {
-                    addSuffix: true,
-                  })}
-                </span>
-              </>
+              <span>
+                Next scan{' '}
+                {formatDistanceToNow(new Date(radar.next_scan_at), {
+                  addSuffix: true,
+                })}
+              </span>
             )}
             {radar.status === 'paused' && (
-              <>
-                <span aria-hidden>·</span>
-                <span>Paused — no scans scheduled</span>
-              </>
+              <span>Paused — no scans scheduled</span>
             )}
-          </div>
+          </RadarMetaRow>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+          <Button variant="outline" asChild className="flex-1 sm:flex-none">
             <Link href={`/c/${radar.conversation_uuid}`}>
               <MessageSquare />
               Chat Lawexa
             </Link>
           </Button>
           {radar.status === 'paused' ? (
-            <Button onClick={handleResume} disabled={resumeRadar.isPending}>
+            <Button
+              onClick={handleResume}
+              disabled={resumeRadar.isPending}
+              className="flex-1 sm:flex-none"
+            >
               {resumeRadar.isPending ? (
                 <Loader2 className="animate-spin" />
               ) : (
@@ -387,8 +385,12 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
             radar.status === 'active' && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span>
-                    <Button onClick={handleScanNow} disabled={scanNowDisabled}>
+                  <span className="flex-1 sm:flex-none">
+                    <Button
+                      onClick={handleScanNow}
+                      disabled={scanNowDisabled}
+                      className="w-full sm:w-auto"
+                    >
                       {scanNow.isPending ? (
                         <Loader2 className="animate-spin" />
                       ) : (

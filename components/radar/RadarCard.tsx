@@ -25,7 +25,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ArchiveRadarDialog } from './ArchiveRadarDialog';
-import { RadarStatusBadge } from './RadarStatusBadge';
+import { RadarMetaRow } from './RadarMetaRow';
+import { RadarStatusDot } from './RadarStatusDot';
 import { usePauseRadar, useResumeRadar, useScanNow } from '@/lib/hooks/useRadars';
 import { extractApiError } from '@/lib/utils/api-error';
 import { describeCron } from '@/lib/utils/cron';
@@ -95,13 +96,11 @@ function RadarCard({ radar }: RadarCardProps) {
 
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate font-semibold">{radar.name}</h3>
-            <RadarStatusBadge status={radar.status} />
+          <div className="flex items-center gap-2">
+            <RadarStatusDot status={radar.status} className="relative z-10" />
+            <h3 className="min-w-0 flex-1 truncate font-semibold">{radar.name}</h3>
             {radar.unread_reports_count > 0 && (
-              <Badge>
-                {radar.unread_reports_count} new
-              </Badge>
+              <Badge className="shrink-0">{radar.unread_reports_count} new</Badge>
             )}
           </div>
           {radar.description && (
@@ -169,35 +168,28 @@ function RadarCard({ radar }: RadarCardProps) {
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <RadarMetaRow className="mt-4">
         <span className="inline-flex items-center gap-1.5">
           <CalendarClock className="size-3.5" />
           {scheduleSummary(radar)}
         </span>
-        <span aria-hidden>·</span>
         <span>
           {radar.last_scan_at
             ? `Last scan ${formatDistanceToNow(new Date(radar.last_scan_at), { addSuffix: true })}`
             : 'Never scanned'}
         </span>
         {radar.status === 'active' && radar.next_scan_at && (
-          <>
-            <span aria-hidden>·</span>
-            <span>
-              Next scan{' '}
-              {formatDistanceToNow(new Date(radar.next_scan_at), {
-                addSuffix: true,
-              })}
-            </span>
-          </>
+          <span>
+            Next scan{' '}
+            {formatDistanceToNow(new Date(radar.next_scan_at), {
+              addSuffix: true,
+            })}
+          </span>
         )}
         {radar.status === 'paused' && (
-          <>
-            <span aria-hidden>·</span>
-            <span>Paused — no scans scheduled</span>
-          </>
+          <span>Paused — no scans scheduled</span>
         )}
-      </div>
+      </RadarMetaRow>
 
       <ArchiveRadarDialog
         open={archiveOpen}
