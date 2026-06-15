@@ -44,7 +44,10 @@ function ConversationRow({
   conversation: ConversationListItem;
   onSelect: (id: string) => void;
 }) {
-  const { id, title, status, messages_count, updated_at } = conversation;
+  const { id, title, status, last_message, updated_at } = conversation;
+  const preview = last_message
+    ? stripContextTags(stripPastedTags(last_message.preview))
+    : '';
   return (
     <button
       type="button"
@@ -67,11 +70,20 @@ function ConversationRow({
         <ChevronRight className="h-4 w-4 shrink-0 opacity-40 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
       </div>
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <span>
-          {messages_count} {messages_count === 1 ? 'message' : 'messages'}
-        </span>
+        {preview ? (
+          <span className="min-w-0 flex-1 truncate">
+            {last_message?.role === 'user' && (
+              <span className="text-foreground/70">You: </span>
+            )}
+            {preview}
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate italic opacity-70">No messages yet</span>
+        )}
         <span aria-hidden>·</span>
-        <span className="tabular-nums">{formatRelativeTime(updated_at)}</span>
+        <span className="shrink-0 tabular-nums">
+          {formatRelativeTime(last_message?.created_at ?? updated_at)}
+        </span>
       </div>
     </button>
   );

@@ -549,6 +549,16 @@ export interface ConversationResponse {
   data: ConversationData;
 }
 
+// Latest substantive message preview on a list row. The backend skips
+// machinery rows (tool calls/results, handovers, narration, errors) so this is
+// always real user/assistant text, HTML-stripped and capped at ~140 chars.
+// `null` when the conversation has no substantive message yet.
+export interface ConversationLastMessage {
+  role: 'user' | 'assistant';
+  preview: string;
+  created_at: string;
+}
+
 // Conversation list item (without full messages)
 export interface ConversationListItem {
   id: string;
@@ -566,6 +576,7 @@ export interface ConversationListItem {
     description: string | null;
   };
   references?: ConversationReference[];
+  last_message?: ConversationLastMessage | null;
   messages_count: number;
   created_at: string;
   updated_at: string;
