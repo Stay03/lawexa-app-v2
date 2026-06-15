@@ -22,7 +22,7 @@ function ScanInProgressRow({ firstScan = false }: ScanInProgressRowProps) {
           {firstScan ? 'Running the first scan…' : 'Scanning…'}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Investigating the web and Lawexa — your report lands here shortly
+          Checking updates from verified sources. Your report will be ready shortly.
         </p>
       </div>
       <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
