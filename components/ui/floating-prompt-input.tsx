@@ -24,7 +24,7 @@ import { chatApi } from '@/lib/api/chat';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import { conversationKeys } from '@/lib/hooks/useConversations';
 import { FloatingConversationList } from '@/components/chat/floating-conversation-list';
-import { cn, serializePastedContent } from '@/lib/utils';
+import { cn, serializePastedContent, stripContextTags } from '@/lib/utils';
 import { usePastedContent } from '@/lib/hooks/usePastedContent';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -582,7 +582,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                   return (
                     <Message key={message.id} role={message.role as 'user' | 'assistant'}>
                       <MessageContent markdown={message.role === 'assistant'}>
-                        {message.content}
+                        {stripContextTags(message.content)}
                       </MessageContent>
                     </Message>
                   );
