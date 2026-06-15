@@ -741,21 +741,19 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             disabled={isSubmitting}
             maxHeight={36}
           >
-            {/* Textarea — single line tap target */}
-            <PromptInputTextarea
-              placeholder={hasContext ? `Ask Lawexa about this ${contextType}` : 'Ask a question...'}
-              className="text-foreground min-h-[36px] py-2 px-3"
-              disableAutosize
-              onFocus={handleOpen}
-              tabIndex={isOpen ? -1 : 0}
-            />
-
-            {/* Send button — bottom right */}
-            <div className="flex items-center justify-end px-2 pb-1">
+            {/* Single row — textarea + send button on one line */}
+            <div className="flex items-center gap-1">
+              <PromptInputTextarea
+                placeholder={hasContext ? `Ask Lawexa about this ${contextType}` : 'Ask a question...'}
+                className="text-foreground min-h-[36px] min-w-0 flex-1 py-2 px-3"
+                disableAutosize
+                onFocus={handleOpen}
+                tabIndex={isOpen ? -1 : 0}
+              />
               <PromptInputAction tooltip="Send message">
                 <Button
                   size="icon"
-                  className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full shrink-0"
+                  className="bg-primary hover:bg-primary/90 h-7 w-7 shrink-0 rounded-full"
                   onClick={handleSubmit}
                   onMouseDown={(e) => e.preventDefault()}
                   disabled={!input.trim() || isSubmitting}

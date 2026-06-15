@@ -10,6 +10,18 @@ export function stripPastedTags(text: string): string {
 }
 
 /**
+ * Remove the inline content-context tags (e.g. <case_slug>…</case_slug>) that
+ * get embedded in the first message of a content-started chat. Used so titles
+ * and previews show the human text rather than the machinery tag. Also eats any
+ * whitespace/newlines left immediately after the tag.
+ */
+export function stripContextTags(text: string): string {
+  return text
+    .replace(/<(case_slug|note_slug|statute_slug)>[^<]*<\/\1>\s*/g, '')
+    .trim()
+}
+
+/**
  * Wrap each staged paste in a <pasted_content> tag and prepend them, in
  * order, to the typed text. With no pasted blocks this is just the trimmed
  * text, so callers can use it unconditionally.

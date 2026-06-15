@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
-import { cn, stripPastedTags } from '@/lib/utils';
+import { cn, stripPastedTags, stripContextTags } from '@/lib/utils';
 import { useInfiniteContentConversations } from '@/lib/hooks/useConversations';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 import type { ConversationListItem } from '@/types/chat';
@@ -57,7 +57,7 @@ function ConversationRow({
     >
       <div className="flex items-center gap-2">
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground group-hover:text-primary">
-          {stripPastedTags(title)}
+          {stripContextTags(stripPastedTags(title))}
         </h3>
         {status === 'archived' && (
           <Badge variant="secondary" className="shrink-0 text-[10px]">
