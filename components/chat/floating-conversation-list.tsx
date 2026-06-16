@@ -11,11 +11,12 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { cn, stripPastedTags, stripContextTags } from '@/lib/utils';
 import { useInfiniteContentConversations } from '@/lib/hooks/useConversations';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
-import type { ConversationListItem } from '@/types/chat';
+import type { ChatReferenceType, ConversationListItem } from '@/types/chat';
 
 interface FloatingConversationListProps {
-  contentType: 'case' | 'note' | 'statute';
-  slug: string;
+  contentType: ChatReferenceType;
+  /** Slug (case/note/statute) or uuid (radar/radar_scan). */
+  id: string;
   /** Only fetch while the panel is open and showing this view. */
   enabled: boolean;
   onSelect: (conversationId: string) => void;
@@ -23,10 +24,12 @@ interface FloatingConversationListProps {
   emptyFallback?: ReactNode;
 }
 
-const CONTENT_NOUN: Record<FloatingConversationListProps['contentType'], string> = {
+const CONTENT_NOUN: Record<ChatReferenceType, string> = {
   case: 'case',
   note: 'note',
   statute: 'statute',
+  radar: 'radar',
+  radar_scan: 'report',
 };
 
 function formatRelativeTime(dateString: string): string {
@@ -100,14 +103,14 @@ function ConversationRow({
  */
 export function FloatingConversationList({
   contentType,
-  slug,
+  id,
   enabled,
   onSelect,
   emptyFallback,
 }: FloatingConversationListProps) {
   const query = useInfiniteContentConversations(
     contentType,
-    slug,
+    id,
     { per_page: 15 },
     { enabled },
   );

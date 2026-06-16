@@ -49,14 +49,31 @@ import type {
   ToolCompleteEvent,
   CompletedEvent,
   PendingResponseData,
+  ChatReference,
+  ChatReferenceType,
 } from '@/types/chat';
 
 interface FloatingPromptInputProps {
   className?: string;
-  contextSlug?: string;
-  contextType?: 'case' | 'note' | 'statute';
+  // Primary content this chat is about — drives the conversation list + the new
+  // chat's reference. `contextId` is a slug (case/note/statute) or uuid (radar/
+  // radar_scan).
+  contextId?: string;
+  contextType?: ChatReferenceType;
   contextTitle?: string;
+  // Extra ties recorded alongside the primary content (e.g. the parent radar
+  // for a radar_scan), so the chat surfaces under both.
+  extraReferences?: ChatReference[];
 }
+
+// Display noun for the collapsed-pill placeholder ("Ask Lawexa about this …").
+const CONTEXT_NOUN: Record<ChatReferenceType, string> = {
+  case: 'case',
+  note: 'note',
+  statute: 'statute',
+  radar: 'radar',
+  radar_scan: 'report',
+};
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -91,7 +108,7 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
   return groups;
 }
 
-export function FloatingPromptInput({ className, contextSlug, contextType, contextTitle }: FloatingPromptInputProps) {
+export function FloatingPromptInput({ className, contextId, contextType, contextTitle, extraReferences }: FloatingPromptInputProps) {
   const [input, setInput] = useState('');
   const { pastedItems, addPasted, removePasted, clearPasted } = usePastedContent();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -121,7 +138,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
 
   // The conversation list is only shown when bound to a piece of content;
   // without context the panel is a plain new-chat composer.
-  const hasContext = !!(contextSlug && contextType);
+  const hasContext = !!(contextId && contextType);
 
   const promptSuggestions = [
     'Explain this',
@@ -342,12 +359,12 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     setError(null);
     setConversationId(null);
     setMessages([]);
-    if (contextType && contextSlug) {
+    if (contextType && contextId) {
       queryClient.invalidateQueries({
-        queryKey: [...conversationKeys.lists(), 'content', contextType, contextSlug],
+        queryKey: [...conversationKeys.lists(), 'content', contextType, contextId],
       });
     }
-  }, [contextType, contextSlug, queryClient]);
+  }, [contextType, contextId, queryClient]);
 
   // Open the panel. When not mid-stream, reset to the list so opening always
   // starts from the conversation list (the requested behavior).
@@ -402,20 +419,21 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
     clearPasted();
     setIsSubmitting(true);
 
-    let messageToSend = fullMessage;
-    if (!conversationId && contextSlug && contextType) {
-      const slugTagMap = { case: 'case_slug', note: 'note_slug', statute: 'statute_slug' } as const;
-      const slugTag = slugTagMap[contextType];
-      messageToSend = `<${slugTag}>${contextSlug}</${slugTag}>\n\n${fullMessage}`;
-    }
+    // Tie a NEW chat to its content by id (sticky after the first turn). For a
+    // radar_scan we also tag the parent radar via extraReferences.
+    const references: ChatReference[] =
+      !conversationId && contextType && contextId
+        ? [{ type: contextType, id: contextId }, ...(extraReferences ?? [])]
+        : [];
 
     const optimisticMsg = addUserMessage(typedText || '(pasted content)');
 
     try {
       const baseBody = {
-        message: messageToSend,
+        message: fullMessage,
         stream: true as const,
         ...(conversationId ? { conversation_id: conversationId } : {}),
+        ...(references.length > 0 ? { references } : {}),
       };
       const response = await chatApi.start(
         applyJurisdiction(baseBody, jurisdictionChoice),
@@ -599,10 +617,10 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
                 )}
               </div>
             </div>
-          ) : hasContext && contextType && contextSlug ? (
+          ) : hasContext && contextType && contextId ? (
             <FloatingConversationList
               contentType={contextType}
-              slug={contextSlug}
+              id={contextId}
               enabled={isOpen}
               onSelect={handleSelectConversation}
               emptyFallback={suggestionsBlock}
@@ -744,7 +762,7 @@ export function FloatingPromptInput({ className, contextSlug, contextType, conte
             {/* Single row — textarea + send button on one line */}
             <div className="flex items-center gap-1">
               <PromptInputTextarea
-                placeholder={hasContext ? `Ask Lawexa about this ${contextType}` : 'Ask a question...'}
+                placeholder={hasContext && contextType ? `Ask Lawexa about this ${CONTEXT_NOUN[contextType]}` : 'Ask a question...'}
                 className="text-foreground min-h-[36px] min-w-0 flex-1 py-2 px-3"
                 disableAutosize
                 onFocus={handleOpen}

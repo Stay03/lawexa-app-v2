@@ -10,7 +10,6 @@ import {
   FileSearch,
   ListChecks,
   Loader2,
-  MessageSquare,
   MoreHorizontal,
   Pause,
   Play,
@@ -36,6 +35,7 @@ import {
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { PageContainer } from '@/components/layout';
+import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
 import { ArchiveRadarDialog } from './ArchiveRadarDialog';
 import { RadarSettingsSheet } from './RadarSettingsSheet';
 import { RadarMetaRow } from './RadarMetaRow';
@@ -362,12 +362,6 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
         </div>
 
         <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-          <Button variant="outline" asChild className="flex-1 sm:flex-none">
-            <Link href={`/c/${radar.conversation_uuid}`}>
-              <MessageSquare />
-              Chat Lawexa
-            </Link>
-          </Button>
           {radar.status === 'paused' ? (
             <Button
               onClick={handleResume}
@@ -489,6 +483,12 @@ function RadarInboxView({ radarUuid, initialSettingsOpen = false }: RadarInboxVi
         onOpenChange={setArchiveOpen}
         radar={radar}
         onArchived={() => router.push('/radars')}
+      />
+
+      <FloatingPromptInput
+        contextType="radar"
+        contextId={radar.uuid}
+        contextTitle={radar.name}
       />
     </PageContainer>
   );

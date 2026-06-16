@@ -168,7 +168,7 @@ function StatuteViewPage({ params, searchParams }: StatuteViewPageProps) {
         )}
       </PageContainer>
       <FloatingPromptInput
-        contextSlug={slug}
+        contextId={slug}
         contextType="statute"
         contextTitle={statute.title}
       />

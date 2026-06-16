@@ -179,7 +179,7 @@ function NoteViewPage({ params, searchParams }: NoteViewPageProps) {
         </PageContainer>
       </div>
       <FloatingPromptInput
-        contextSlug={slug}
+        contextId={slug}
         contextType="note"
         contextTitle={note.title}
       />

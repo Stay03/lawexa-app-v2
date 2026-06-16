@@ -298,6 +298,17 @@ export interface ConfidentialHistoryEntry {
   content: string;
 }
 
+// Id-native way to tie a new chat to the content it's about (case/statute/note
+// via slug, radar/radar_scan via uuid). Replaces the legacy <case_slug> message
+// tags and is the only way to tie radar / radar_scan. Validated server-side
+// before the turn runs; sticky & idempotent.
+export type ChatReferenceType = 'case' | 'statute' | 'note' | 'radar' | 'radar_scan';
+
+export interface ChatReference {
+  type: ChatReferenceType;
+  id: string;
+}
+
 // Chat API request/response types
 export interface ChatStartRequest {
   message: string;
@@ -328,6 +339,9 @@ export interface ChatStartRequest {
   // Prior transcript for confidential chats. Required (even as []) on every
   // confidential turn. Forbidden for non-confidential — server returns 422.
   messages?: ConfidentialHistoryEntry[];
+  // Tie this new conversation to the content it's about. Sent on the first
+  // turn only (the link is sticky); merged + deduped server-side.
+  references?: ChatReference[];
 }
 
 export interface ChatStartResponse {

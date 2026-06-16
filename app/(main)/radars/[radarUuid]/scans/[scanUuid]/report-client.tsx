@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquare } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ import { ScanRunningIndicator } from '@/components/radar/ScanRunningIndicator';
 import { ScanTriageActions } from '@/components/radar/ScanTriageActions';
 import { ScanShareButton } from '@/components/radar/ScanShareButton';
 import { ReportView } from '@/components/radar/ReportView';
+import { FloatingPromptInput } from '@/components/ui/floating-prompt-input';
 import {
   IN_FLIGHT_SCAN_STATUSES,
   useRadar,
@@ -222,18 +222,19 @@ export default function ReportClient() {
           <ScanTriageActions radarUuid={radarUuid} scan={ownerScan!} variant="toolbar" />
           <div className="flex-1" />
           <ScanShareButton radarUuid={radarUuid} scan={ownerScan!} />
-          {radar && (
-            <Button asChild size="sm">
-              <Link href={`/c/${radar.conversation_uuid}`}>
-                <MessageSquare />
-                Chat Lawexa
-              </Link>
-            </Button>
-          )}
         </div>
       )}
 
       <ReportView scan={view} />
+
+      {isOwner && (
+        <FloatingPromptInput
+          contextType="radar_scan"
+          contextId={scanUuid}
+          extraReferences={[{ type: 'radar', id: radarUuid }]}
+          contextTitle={view.title ?? 'this report'}
+        />
+      )}
     </PageContainer>
   );
 }

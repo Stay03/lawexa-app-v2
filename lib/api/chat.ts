@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import type {
   ChatStartRequest,
   ChatStartResponse,
+  ChatReferenceType,
   ConversationResponse,
   ConversationsListResponse,
   ConversationStatusResponse,
@@ -64,19 +65,33 @@ export const chatApi = {
   },
 
   /**
-   * List the authenticated user's conversations about a single piece of content
-   * (case / note / statute). Owner-scoped and paginated, same envelope as
-   * `listConversations`. Powers the "Related conversations" list in the floating
-   * chat panel. Confidential conversations are never returned by these routes.
+   * List the authenticated user's conversations about a single piece of content.
+   * Owner-scoped and paginated, same envelope as `listConversations`. Powers the
+   * "Related conversations" list in the floating chat panel.
+   *
+   * case/note/statute/radar use the nested per-content route; radar_scan has no
+   * nested route, so it goes through the `?reference_type=` filter on the flat
+   * conversations endpoint.
    */
   listContentConversations: async (
-    contentType: 'case' | 'note' | 'statute',
-    slug: string,
+    contentType: ChatReferenceType,
+    id: string,
     params?: ListConversationsParams,
   ): Promise<ConversationsListResponse> => {
-    const pathMap = { case: 'cases', note: 'notes', statute: 'statutes' } as const;
+    if (contentType === 'radar_scan') {
+      const response = await apiClient.get<ConversationsListResponse>('/conversations', {
+        params: { ...params, reference_type: 'radar_scan', reference: id },
+      });
+      return response.data;
+    }
+    const pathMap = {
+      case: 'cases',
+      note: 'notes',
+      statute: 'statutes',
+      radar: 'radars',
+    } as const;
     const response = await apiClient.get<ConversationsListResponse>(
-      `/${pathMap[contentType]}/${slug}/conversations`,
+      `/${pathMap[contentType]}/${id}/conversations`,
       { params },
     );
     return response.data;

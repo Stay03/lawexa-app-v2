@@ -2,9 +2,9 @@
 
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { chatApi } from '@/lib/api/chat';
-import type { ListConversationsParams } from '@/types/chat';
+import type { ChatReferenceType, ListConversationsParams } from '@/types/chat';
 
-type ContentConversationType = 'case' | 'note' | 'statute';
+type ContentConversationType = ChatReferenceType;
 
 // Query keys factory
 export const conversationKeys = {
@@ -14,9 +14,9 @@ export const conversationKeys = {
     [...conversationKeys.lists(), params] as const,
   content: (
     contentType: ContentConversationType,
-    slug: string,
+    id: string,
     params: Omit<ListConversationsParams, 'page'>,
-  ) => [...conversationKeys.lists(), 'content', contentType, slug, params] as const,
+  ) => [...conversationKeys.lists(), 'content', contentType, id, params] as const,
 };
 
 /**
@@ -40,27 +40,28 @@ export function useInfiniteConversations(
 
 /**
  * Hook for the infinite-scrolling list of the user's conversations about a
- * single piece of content (case / note / statute). Backs the "Related
- * conversations" view in the floating chat panel.
+ * single piece of content (case / note / statute / radar / radar_scan). Backs
+ * the "Related conversations" view in the floating chat panel.
  *
- * Pass `enabled: false` to keep it idle until the panel is opened.
+ * `id` is a slug (case/note/statute) or uuid (radar/radar_scan). Pass
+ * `enabled: false` to keep it idle until the panel is opened.
  */
 export function useInfiniteContentConversations(
   contentType: ContentConversationType,
-  slug: string,
+  id: string,
   params: Omit<ListConversationsParams, 'page'> = {},
   options: { enabled?: boolean } = {},
 ) {
   return useInfiniteQuery({
-    queryKey: conversationKeys.content(contentType, slug, params),
+    queryKey: conversationKeys.content(contentType, id, params),
     queryFn: ({ pageParam }) =>
-      chatApi.listContentConversations(contentType, slug, { ...params, page: pageParam }),
+      chatApi.listContentConversations(contentType, id, { ...params, page: pageParam }),
     getNextPageParam: (lastPage) => {
       const { current_page, last_page } = lastPage.pagination;
       return current_page < last_page ? current_page + 1 : undefined;
     },
     initialPageParam: 1,
     staleTime: 2 * 60 * 1000, // 2 minutes
-    enabled: (options.enabled ?? true) && Boolean(slug),
+    enabled: (options.enabled ?? true) && Boolean(id),
   });
 }
