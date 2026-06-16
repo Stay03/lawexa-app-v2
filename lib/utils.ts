@@ -10,14 +10,19 @@ export function stripPastedTags(text: string): string {
 }
 
 /**
- * Remove the inline content-context tags (e.g. <case_slug>…</case_slug>) that
- * get embedded in the first message of a content-started chat. Used so titles
- * and previews show the human text rather than the machinery tag. Also eats any
- * whitespace/newlines left immediately after the tag.
+ * Remove the inline content-context tags that get embedded in the first message
+ * of a content-started chat — `<case_slug>`, `<note_slug>`, `<statute_slug>`,
+ * and the radar id tags `<radar_uuid>` / `<radar_scan_uuid>`. The backend may
+ * place these at the start or end of the message, so this matches them in any
+ * position and trims leftover whitespace. Used so titles, previews, and message
+ * bubbles show the human text rather than the machinery tag.
  */
 export function stripContextTags(text: string): string {
   return text
-    .replace(/<(case_slug|note_slug|statute_slug)>[^<]*<\/\1>\s*/g, '')
+    .replace(
+      /<(case_slug|note_slug|statute_slug|radar_uuid|radar_scan_uuid)>[^<]*<\/\1>\s*/g,
+      '',
+    )
     .trim()
 }
 

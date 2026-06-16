@@ -37,7 +37,7 @@ import {
   FileUp,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, stripContextTags } from '@/lib/utils';
 import type { AdminMessage } from '@/types/admin';
 import type { ConversationMessage, ToolMessage, HandoverMessage, MessageAttachment, ChatMessage } from '@/types/chat';
 import { isHandoverMessage } from '@/types/chat';
@@ -414,13 +414,10 @@ export default function AdminConversationDetailPage({
   const renderMessage = (message: ConversationMessage) => {
     const role = message.role as 'user' | 'assistant';
 
-    // Strip XML tags from user message content if present
+    // Strip the inline content-context tags from user messages.
     let displayContent = message.content;
     if (message.role === 'user') {
-      displayContent = message.content.replace(
-        /<(case_slug|note_slug|statute_slug)>[^<]+<\/\1>\n\n/g,
-        ''
-      );
+      displayContent = stripContextTags(message.content);
     }
 
     return (

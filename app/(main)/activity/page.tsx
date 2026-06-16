@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { useMessages } from '@/lib/hooks/useMessages';
 import { formatMessageTimestamp } from '@/lib/utils/date';
+import { stripContextTags } from '@/lib/utils';
 import type { ActivityMessage } from '@/types/chat';
 
 /******************************************************************************
@@ -32,8 +33,7 @@ const PER_PAGE = 20;
 ******************************************************************************/
 
 function cleanUserContent(content: string): string {
-  return content
-    .replace(/<(case_slug|note_slug|statute_slug)>[^<]+<\/\1>\n\n/g, '')
+  return stripContextTags(content)
     .replace(/<pasted_content>[\s\S]*?<\/pasted_content>\s*/g, '[pasted content] ')
     .trim();
 }

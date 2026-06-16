@@ -45,10 +45,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn, stripPastedTags, parsePastedContent, serializePastedContent } from '@/lib/utils';
+import { cn, stripPastedTags, stripContextTags, parsePastedContent, serializePastedContent } from '@/lib/utils';
 import { usePastedContent } from '@/lib/hooks/usePastedContent';
 import { formatMessageTimestamp } from '@/lib/utils/date';
-import { isToolMessage, isHandoverMessage, isErrorMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type ConversationMessage, type ChatMessage } from '@/types/chat';
+import { isToolMessage, isHandoverMessage, isErrorMessage, type ToolMessage, type HandoverMessage, type ErrorMessage, type ConversationMessage, type ChatMessage, type ConversationReference } from '@/types/chat';
 import { chatApi } from '@/lib/api/chat';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -75,7 +75,55 @@ import { hasTranscript } from '@/lib/storage/confidentialTranscriptStore';
 import { ConfidentialEmptyState } from '@/components/chat/confidential-empty-state';
 import { ConfidentialFileNotice } from '@/components/chat/confidential-file-notice';
 import { ComposerPlusMenu } from '@/components/chat/composer-plus-menu';
-import { VenetianMask } from 'lucide-react';
+import Link from 'next/link';
+import { VenetianMask, Scale, Landmark, NotebookPen, Radar, FileText, type LucideIcon } from 'lucide-react';
+
+// "About" chip for the content a conversation references.
+type RefChip = { key: string; label: string; href: string | null; Icon: LucideIcon };
+
+// Map a conversation's references to display chips (real titles + links).
+// radar_scan links through its sibling radar reference; deleted content (null)
+// is dropped.
+function buildReferenceChips(references: ConversationReference[]): RefChip[] {
+  return references
+    .map((ref): RefChip | null => {
+      switch (ref.type) {
+        case 'case': {
+          const c = ref.content;
+          return c ? { key: `case-${c.id}`, label: c.title, href: `/cases/${c.slug}`, Icon: Scale } : null;
+        }
+        case 'statute': {
+          const c = ref.content;
+          return c
+            ? { key: `statute-${c.id}`, label: c.short_title ?? c.title, href: `/statutes/${c.slug}`, Icon: Landmark }
+            : null;
+        }
+        case 'note': {
+          const c = ref.content;
+          return c ? { key: `note-${c.id}`, label: c.title, href: `/notes/${c.slug}`, Icon: NotebookPen } : null;
+        }
+        case 'radar': {
+          const c = ref.content;
+          return c ? { key: `radar-${c.uuid}`, label: c.name, href: `/radars/${c.uuid}`, Icon: Radar } : null;
+        }
+        case 'radar_scan': {
+          const c = ref.content;
+          if (!c) return null;
+          const parent = references.find((r) => r.type === 'radar' && r.content);
+          const parentUuid = parent?.type === 'radar' ? parent.content?.uuid : undefined;
+          return {
+            key: `scan-${c.uuid}`,
+            label: c.title,
+            href: parentUuid ? `/radars/${parentUuid}/scans/${c.uuid}` : null,
+            Icon: FileText,
+          };
+        }
+        default:
+          return null;
+      }
+    })
+    .filter((c): c is RefChip => c !== null);
+}
 
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES_PER_TURN = 10;
@@ -480,6 +528,10 @@ function ConversationPageContent() {
   // Conversation owner for read-only mode check
   const [conversationOwnerId, setConversationOwnerId] = useState<number | null>(null);
 
+  // Content this conversation is about (case/statute/note/radar/radar_scan),
+  // for the "About" chips. Populated from the loaded conversation's references.
+  const [references, setReferences] = useState<ConversationReference[]>([]);
+
   // Confidential mode: the session-store tracks UUIDs known to be confidential.
   // We populate it on init (IDB lookup) and on first send from the home page.
   const isConfidentialId = useConfidentialModeStore((s) => s.isConfidential);
@@ -545,6 +597,7 @@ function ConversationPageContent() {
     onError: (err) => console.error('Chat error:', err),
     onHistoryLoaded: (data) => {
       setConversationOwnerId(data.user_id);
+      setReferences(data.references ?? []);
       // Mirror the server-side stickiness into the local session store so the
       // composer reflects the conversation's mode without re-fetching.
       if (data.is_redacted) markRedacted(data.id);
@@ -919,10 +972,11 @@ function ConversationPageContent() {
     // User or assistant message (role is guaranteed to be 'user' | 'assistant' here)
     const role = message.role as 'user' | 'assistant';
 
-    // Strip XML tags from user message content if present
+    // Strip the inline content-context tags from user messages (case/statute/
+    // note slugs + radar/scan uuids), wherever the backend placed them.
     let displayContent = message.content;
     if (message.role === 'user') {
-      displayContent = message.content.replace(/<(case_slug|note_slug|statute_slug)>[^<]+<\/\1>\n\n/g, '');
+      displayContent = stripContextTags(message.content);
     }
 
     // Parse pasted content (one or more blocks) from user messages.
@@ -1051,12 +1105,9 @@ function ConversationPageContent() {
     return () => clearInterval(interval);
   }, [streamStartTime, isStreaming, messages]);
 
-  // Extract context from first user message if it contains XML tags
-  const firstUserMessage = messages.find(m => m.role === 'user');
-  const contextMatch = firstUserMessage?.content.match(/<(case_slug|note_slug|statute_slug)>([^<]+)<\/\1>/);
-  const contextType = contextMatch ? contextMatch[1].replace('_slug', '') : null;
-  // Extract just the slug text, removing any XML-like formatting
-  const contextSlug = contextMatch ? contextMatch[2].trim() : null;
+  // "About" chips for the content this conversation references (real titles +
+  // links), built from the conversation's references field.
+  const referenceChips = buildReferenceChips(references);
 
   // Guest auth loading state
   if (isGuestLoading) {
@@ -1092,17 +1143,34 @@ function ConversationPageContent() {
       {/* Chat messages */}
       <ChatContainerRoot ref={chatContainerRef} className="h-[calc(100vh-120px)] overflow-y-auto pb-28 max-md:no-scrollbar" onScrollStateChange={setShowScrollDown}>
           <ChatContainerContent ref={chatContentRef}>
-            {/* Context display and folder action */}
-            {(contextSlug || (isOwner && messages.length > 0)) && (
+            {/* "About" chips (referenced content) + folder action */}
+            {(referenceChips.length > 0 || (isOwner && messages.length > 0)) && (
               <div className="px-4 pb-4">
                 <div className="mx-auto max-w-2xl flex items-center justify-between gap-2">
-                  {contextSlug && contextType ? (
-                    <p className="text-xs">
-                      <span className="text-yellow-600 dark:text-yellow-500">
-                        {contextType.toUpperCase()} CONTEXT:
-                      </span>{' '}
-                      <span className="font-medium text-foreground">{contextSlug}</span>
-                    </p>
+                  {referenceChips.length > 0 ? (
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="shrink-0 text-xs text-muted-foreground">About:</span>
+                      {referenceChips.map((chip) =>
+                        chip.href ? (
+                          <Link
+                            key={chip.key}
+                            href={chip.href}
+                            className="inline-flex max-w-[220px] items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
+                          >
+                            <chip.Icon className="h-3 w-3 shrink-0 text-primary" />
+                            <span className="truncate">{chip.label}</span>
+                          </Link>
+                        ) : (
+                          <span
+                            key={chip.key}
+                            className="inline-flex max-w-[220px] items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground"
+                          >
+                            <chip.Icon className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{chip.label}</span>
+                          </span>
+                        )
+                      )}
+                    </div>
                   ) : (
                     <div />
                   )}
