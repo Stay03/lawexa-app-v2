@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { Flag, MoreHorizontal } from 'lucide-react';
+import { Flag, Globe, MoreHorizontal } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,12 @@ function ScanRow({ radarUuid, scan }: ScanRowProps) {
           {!scan.has_findings && (
             <Badge variant="ghost" className="shrink-0">
               No change
+            </Badge>
+          )}
+          {!scan.is_private && (
+            <Badge variant="outline" className="shrink-0 gap-1">
+              <Globe className="h-3 w-3" />
+              Shared
             </Badge>
           )}
         </div>

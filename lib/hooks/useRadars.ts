@@ -20,6 +20,7 @@ import type {
   RadarScanDetailResponse,
   RadarScanListParams,
   RadarScanListResponse,
+  RadarScanResponse,
   ScanStatus,
   TriageScanPayload,
   UpdateRadarPayload,
@@ -38,6 +39,8 @@ export const radarKeys = {
     [...radarKeys.scanLists(radarUuid), params] as const,
   scanDetail: (radarUuid: string, scanUuid: string) =>
     [...radarKeys.scans(radarUuid), 'detail', scanUuid] as const,
+  publicScan: (radarUuid: string, scanUuid: string) =>
+    [...radarKeys.scans(radarUuid), 'public-detail', scanUuid] as const,
   firstScanDispatched: (radarUuid: string) =>
     [...radarKeys.all, 'first-scan-dispatched', radarUuid] as const,
   namePending: (radarUuid: string) =>
@@ -91,14 +94,14 @@ export function useRadars(params: RadarListParams = {}) {
 /**
  * Full radar detail (perimeter, channels, conversation_uuid).
  */
-export function useRadar(uuid: string) {
-  const enabled = useIsRadarQueryEnabled();
+export function useRadar(uuid: string, options: { enabled?: boolean } = {}) {
+  const authEnabled = useIsRadarQueryEnabled();
   const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: radarKeys.detail(uuid),
     queryFn: () => radarsApi.getByUuid(uuid),
-    enabled: enabled && !!uuid,
+    enabled: authEnabled && !!uuid && (options.enabled ?? true),
     staleTime: 30 * 1000,
     // Poll only while a freshly created radar still shows its placeholder
     // name, until the async AI title replaces it (or the window elapses).
@@ -250,6 +253,24 @@ export function useRadarScan(radarUuid: string, scanUuid: string) {
   });
 }
 
+/**
+ * Public (no-auth) read of a published scan — the trimmed reader shape served
+ * to signed-in non-owners and logged-out/guest visitors. Gate `enabled` on a
+ * ready guest token (see useGuestAuth).
+ */
+export function usePublicRadarScan(
+  radarUuid: string,
+  scanUuid: string,
+  options: { enabled?: boolean } = {}
+) {
+  return useQuery({
+    queryKey: radarKeys.publicScan(radarUuid, scanUuid),
+    queryFn: () => radarsApi.getPublicScan(radarUuid, scanUuid),
+    enabled: (options.enabled ?? true) && !!radarUuid && !!scanUuid,
+    staleTime: 60 * 1000,
+  });
+}
+
 export function useNotificationChannels() {
   const enabled = useIsRadarQueryEnabled();
 
@@ -326,6 +347,43 @@ export function useUpdateRadar() {
       queryClient.invalidateQueries({ queryKey: radarKeys.lists() });
     },
   });
+}
+
+/**
+ * Scan report sharing — publish / unpublish / toggle visibility. On success we
+ * refresh the scan detail (state + view count) and the inbox lists (the
+ * "Shared" badge), mirroring the conversation-sharing hooks.
+ */
+function useScanVisibilityMutation(
+  mutationFn: (vars: { radarUuid: string; scanUuid: string }) => Promise<RadarScanResponse>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn,
+    onSuccess: (_data, { radarUuid, scanUuid }) => {
+      queryClient.invalidateQueries({ queryKey: radarKeys.scanDetail(radarUuid, scanUuid) });
+      queryClient.invalidateQueries({ queryKey: radarKeys.scanLists(radarUuid) });
+    },
+  });
+}
+
+export function usePublishScan() {
+  return useScanVisibilityMutation(({ radarUuid, scanUuid }) =>
+    radarsApi.publishScan(radarUuid, scanUuid)
+  );
+}
+
+export function useUnpublishScan() {
+  return useScanVisibilityMutation(({ radarUuid, scanUuid }) =>
+    radarsApi.unpublishScan(radarUuid, scanUuid)
+  );
+}
+
+export function useToggleScanVisibility() {
+  return useScanVisibilityMutation(({ radarUuid, scanUuid }) =>
+    radarsApi.toggleScanVisibility(radarUuid, scanUuid)
+  );
 }
 
 export function usePauseRadar() {

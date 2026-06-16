@@ -56,7 +56,10 @@ apiClient.interceptors.response.use(
       const isGuestPage =
         typeof window !== 'undefined' && (
           window.location.pathname.startsWith('/c/') ||
-          window.location.pathname.startsWith('/shared')
+          window.location.pathname.startsWith('/shared') ||
+          // Shared radar scan reports — /radars/{uuid}/scans/{uuid} (not the
+          // inbox or /scan-log) are publicly readable when published.
+          /\/radars\/[^/]+\/scans\/[^/]+/.test(window.location.pathname)
         );
 
       // Guest token refresh: re-acquire and retry the original request once

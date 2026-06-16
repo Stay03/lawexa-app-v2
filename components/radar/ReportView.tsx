@@ -3,7 +3,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 
 import { ReportSources } from './ReportSources';
-import type { RadarScanDetail } from '@/types/radar';
+import type { ReportSource } from '@/types/radar';
 
 const SOURCES_HEADING = '\n## Sources';
 
@@ -17,8 +17,10 @@ function splitReport(report: string): string {
   return index === -1 ? report : report.slice(0, index);
 }
 
+// Accepts both the owner (RadarScanDetail) and trimmed (SharedRadarScanDetail)
+// shapes — only the report body + sources are needed to render.
 interface ReportViewProps {
-  scan: RadarScanDetail;
+  scan: { report: string | null; sources: ReportSource[] };
 }
 
 function ReportView({ scan }: ReportViewProps) {

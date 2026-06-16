@@ -53,3 +53,50 @@ export async function fetchConversationForMetadata(
     return null;
   }
 }
+
+/**
+ * Lightweight shared-scan data for metadata generation — only the fields the
+ * OG/SEO tags need. The public endpoint returns the trimmed reader shape.
+ */
+export interface ScanMetadata {
+  title: string | null;
+  report: string | null;
+  radar: { uuid: string; name: string } | null;
+}
+
+/**
+ * Server-side scan fetcher for metadata generation.
+ * Uses the public (no-auth) endpoint — returns null for private / unknown
+ * scans (404), so private reports fall back to the default site card.
+ */
+export async function fetchScanForMetadata(
+  radarUuid: string,
+  scanUuid: string
+): Promise<ScanMetadata | null> {
+  const apiUrl = getApiUrl();
+
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/public/radars/${radarUuid}/scans/${scanUuid}`,
+      {
+        headers: { Accept: 'application/json' },
+        next: { revalidate: 60 },
+      }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const json = await response.json();
+
+    if (!json.success || !json.data) {
+      return null;
+    }
+
+    const { title, report, radar } = json.data;
+    return { title: title ?? null, report: report ?? null, radar: radar ?? null };
+  } catch {
+    return null;
+  }
+}

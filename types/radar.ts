@@ -87,6 +87,9 @@ export interface RadarScan {
   read_at: string | null;
   priority: boolean;
   dismissed_at: string | null;
+  // Sharing state: false = a shared link is live (see ScanShareButton). Present
+  // on owner reads + list rows; withheld from the trimmed non-owner shape.
+  is_private: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -105,6 +108,30 @@ export interface RadarScanDetail extends RadarScan {
   // Markdown; ends with a "## Sources" section mirroring the structured list.
   report: string | null;
   sources: ReportSource[];
+  // Non-bot reads of the published report (signed-in users + crawlers).
+  views_count: number;
+}
+
+/**
+ * Trimmed reader shape returned to signed-in non-owners and logged-out/public
+ * visitors when a scan is published. Owner-only triage fields
+ * (workflow_status, read_at, dismissed_at, priority, error, is_private) are
+ * withheld; carries the radar context for display instead.
+ */
+export interface SharedRadarScanDetail {
+  uuid: string;
+  title: string | null;
+  status: ScanStatus;
+  has_findings: boolean;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  report: string | null;
+  sources: ReportSource[];
+  radar: { uuid: string; name: string };
+  views_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RadarSourceInput {
@@ -208,6 +235,12 @@ export interface RadarScanResponse {
   success: boolean;
   message: string;
   data: RadarScan;
+}
+
+export interface SharedRadarScanResponse {
+  success: boolean;
+  message: string;
+  data: SharedRadarScanDetail;
 }
 
 export interface NotificationChannelListResponse {

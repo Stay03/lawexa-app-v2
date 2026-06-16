@@ -12,6 +12,7 @@ import type {
   RadarScanListParams,
   RadarScanListResponse,
   RadarScanResponse,
+  SharedRadarScanResponse,
   CreateRadarResponse,
   TriageScanPayload,
   UpdateRadarPayload,
@@ -120,6 +121,42 @@ export const radarsApi = {
     const response = await apiClient.patch<RadarScanResponse>(
       `/radars/${radarUuid}/scans/${scanUuid}`,
       payload
+    );
+    return response.data;
+  },
+
+  // ── Scan report sharing ──────────────────────────────────────────────
+  // Owner-only. 422 unless the scan is completed with a report. Each returns
+  // the owner scan payload with the updated `is_private`.
+  publishScan: async (radarUuid: string, scanUuid: string): Promise<RadarScanResponse> => {
+    const response = await apiClient.post<RadarScanResponse>(
+      `/radars/${radarUuid}/scans/${scanUuid}/publish`
+    );
+    return response.data;
+  },
+
+  unpublishScan: async (radarUuid: string, scanUuid: string): Promise<RadarScanResponse> => {
+    const response = await apiClient.post<RadarScanResponse>(
+      `/radars/${radarUuid}/scans/${scanUuid}/unpublish`
+    );
+    return response.data;
+  },
+
+  toggleScanVisibility: async (radarUuid: string, scanUuid: string): Promise<RadarScanResponse> => {
+    const response = await apiClient.post<RadarScanResponse>(
+      `/radars/${radarUuid}/scans/${scanUuid}/toggle-visibility`
+    );
+    return response.data;
+  },
+
+  // Public (no-auth) read of a published scan — trimmed reader shape, 404 if
+  // still private. Used for logged-out / guest viewers and link previews.
+  getPublicScan: async (
+    radarUuid: string,
+    scanUuid: string
+  ): Promise<SharedRadarScanResponse> => {
+    const response = await apiClient.get<SharedRadarScanResponse>(
+      `/public/radars/${radarUuid}/scans/${scanUuid}`
     );
     return response.data;
   },
