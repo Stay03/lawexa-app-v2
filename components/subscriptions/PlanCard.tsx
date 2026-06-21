@@ -90,7 +90,7 @@ const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> =
   },
   pro: {
     highlighted: [
-      'Unlimited AI Messages',
+      '200 AI Messages',
       'Unlimited Library Access',
       '50 Deep Legal Research',
       'Chat with Document (25MB limit)',
