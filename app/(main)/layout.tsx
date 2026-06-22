@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button"
 import { MoreHorizontal } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { InstallAppCard } from "@/components/pwa/InstallAppCard"
 
 function getBreadcrumbs(pathname: string, getOverrideLabel: (segment: string) => string | undefined) {
   const segments = pathname.split('/').filter(Boolean)
@@ -211,6 +212,7 @@ export default function MainLayout({
         >
           {children}
         </div>
+        <InstallAppCard />
         </SidebarInset>
       </SidebarProvider>
     </OnboardingGuard>

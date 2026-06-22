@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Comfortaa, Fraunces } from "next/font/google";
 import "./globals.css";
 
@@ -6,6 +6,7 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { AttributionBootstrap } from "@/components/AttributionBootstrap";
+import { PwaInstallProvider } from "@/components/pwa/PwaInstallProvider";
 
 const comfortaa = Comfortaa({ subsets: ["latin"], variable: "--font-comfortaa" });
 const fraunces = Fraunces({
@@ -22,7 +23,6 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description: "Access Nigerian law cases, notes, and legal research materials",
-  manifest: "/site.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -30,7 +30,11 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-icon.png",
   },
-  themeColor: "#C9A227",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Lawexa",
+  },
   openGraph: {
     type: "website",
     siteName: "Lawexa",
@@ -40,6 +44,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@LawexaAi",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#C9A227",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -53,6 +63,7 @@ export default function RootLayout({
         <ThemeProvider>
           <QueryProvider>
             <AttributionBootstrap />
+            <PwaInstallProvider />
             {children}
             <Toaster position="top-right" />
           </QueryProvider>
