@@ -14,6 +14,7 @@ import {
   Handshake,
   BookOpen,
   Upload,
+  GraduationCap,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -34,6 +35,7 @@ import {
 
 const contentNavItems = [
   { title: 'Content Requests', url: '/admin/content-requests', icon: MessageSquareQuote },
+  { title: 'Ambassadors', url: '/admin/ambassadors', icon: GraduationCap },
   { title: 'Cases', url: '/admin/cases', icon: Scale },
   { title: 'Statutes', url: '/admin/statutes', icon: BookOpen, excludePaths: ['/admin/statutes/import'] },
   { title: 'Import Statute', url: '/admin/statutes/import', icon: Upload },
@@ -49,7 +51,7 @@ export function AdminNavContentSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/statutes') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views') || pathname.startsWith('/admin/lawyer-connect');
+  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/ambassadors') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/statutes') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views') || pathname.startsWith('/admin/lawyer-connect');
 
   return (
     <SidebarGroup>
