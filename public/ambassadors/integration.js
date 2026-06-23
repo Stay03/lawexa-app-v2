@@ -1,11 +1,17 @@
 /*
  * Lawexa Ambassadors — thin same-origin integration layer.
  *
- * This page is served statically at lawexa.com/ambassadors. Because it shares
- * the origin with the main app, it can read the logged-in session directly.
- * This layer: gates the form to verified, full-account users; prefills from the
- * user's profile; surfaces an existing application's status; and submits to the
- * real API. The marketing page and the multi-step wizard UI are untouched.
+ * This page is served statically at lawexa.com/ambassadors. Sharing the origin
+ * with the main app lets it read the logged-in session directly. Flow:
+ *   1. Logged out / guest  -> "Sign in / Create account" gate.
+ *   2. Logged in           -> a "Continue with Lawexa" account card showing the
+ *                             user's profile, with Continue / Change account.
+ *   3. Continue            -> a slim form that only asks for what the account
+ *                             doesn't already have; submit fills the rest from
+ *                             the account. Existing application -> status card.
+ *
+ * The marketing page and the wizard UI are untouched; we just hide the fields
+ * we already know and orchestrate the gating.
  */
 (function () {
   'use strict';
@@ -19,6 +25,7 @@
   }
   var API = apiBase();
   var RETURN_TO = '/ambassadors';
+  var cachedUser = null; // populated from /auth/me, used to fill the submit body
 
   // The app persists auth via zustand under localStorage["lawexa-auth"]:
   //   { state: { user, token, isAuthenticated, isGuest, ... }, version }
@@ -46,24 +53,35 @@
   }
 
   // ---- DOM helpers ----
-  function setVal(id, v) {
-    var el = document.getElementById(id);
-    if (el && v != null && v !== '') {
-      el.value = v;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
+  function esc(s) {
+    return ('' + (s == null ? '' : s)).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function hideField(inputId) {
+    var el = document.getElementById(inputId);
+    if (!el) return;
+    var field = el.closest('.field') || el.closest('.chips-field');
+    if (field) {
+      field.style.display = 'none';
+      field.removeAttribute('data-required'); // so the wizard won't validate a hidden field
     }
   }
-  function setRadio(name, v) {
-    if (!v) return;
-    var all = document.querySelectorAll('input[name="' + name + '"]');
-    for (var i = 0; i < all.length; i++) {
-      if (all[i].value === v) {
-        all[i].checked = true;
-        all[i].dispatchEvent(new Event('change', { bubbles: true }));
-        break;
-      }
-    }
+  function initials(name) {
+    var parts = ('' + (name || '')).trim().split(/\s+/).slice(0, 2);
+    return parts.map(function (p) { return p.charAt(0).toUpperCase(); }).join('') || 'L';
+  }
+
+  // ---- Cards rendered into the form card ----
+  function formCard() {
+    var form = document.getElementById('ambForm');
+    return (form && form.parentElement) || document.querySelector('.formcard');
+  }
+  function clearInjected() {
+    ['ambGate', 'ambAccount'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
   }
 
   function showGate(title, msg, primary, secondary) {
@@ -71,65 +89,117 @@
     var success = document.getElementById('success');
     if (form) form.style.display = 'none';
     if (success) success.classList.remove('show');
-    var card = (form && form.parentElement) || document.querySelector('.formcard');
+    var card = formCard();
     if (!card) return;
-    var prev = document.getElementById('ambGate');
-    if (prev) prev.remove();
+    clearInjected();
     var btns = '';
-    if (primary) btns += '<a href="' + primary.href + '" class="btn btn-gold btn-lg" style="margin:6px">' + primary.label + '</a>';
-    if (secondary) btns += '<a href="' + secondary.href + '" class="btn btn-ghost btn-lg" style="margin:6px">' + secondary.label + '</a>';
+    if (primary) btns += '<a href="' + primary.href + '" class="btn btn-gold btn-lg" style="margin:6px">' + esc(primary.label) + '</a>';
+    if (secondary) btns += '<a href="' + secondary.href + '" class="btn btn-ghost btn-lg" style="margin:6px">' + esc(secondary.label) + '</a>';
     var box = document.createElement('div');
     box.id = 'ambGate';
     box.style.cssText = 'text-align:center;padding:34px 8px;';
     box.innerHTML =
-      '<h3 style="font-family:var(--font-display);font-weight:700;color:var(--ink-black);font-size:28px;margin:0 0 10px">' + title + '</h3>' +
-      '<p style="font-size:16px;color:var(--ink-700);max-width:430px;margin:0 auto 20px;line-height:1.6">' + msg + '</p>' +
+      '<h3 style="font-family:var(--font-display);font-weight:700;color:var(--ink-black);font-size:28px;margin:0 0 10px">' + esc(title) + '</h3>' +
+      '<p style="font-size:16px;color:var(--ink-700);max-width:440px;margin:0 auto 20px;line-height:1.6">' + msg + '</p>' +
       '<div style="display:flex;flex-wrap:wrap;justify-content:center">' + btns + '</div>';
     card.appendChild(box);
   }
 
-  // Returns true if the existing application gates the form (hides it).
+  // Returns true if an existing application gates the form (hides it).
   function showStatus(app) {
     if (app.status === 'rejected') return false; // allow a fresh application
     var title = app.status === 'approved' ? 'You’re in!' : 'Application received';
     var msg = app.status === 'approved'
       ? 'Your ambassador application has been <b>approved</b>. Our team will reach out with next steps — keep an eye on your inbox.'
-      : 'Your application is <b>' + (app.status_label || 'pending') + '</b> and under review. We review weekly, so you’ll hear from us by email soon.';
+      : 'Your application is <b>' + esc(app.status_label || 'pending') + '</b> and under review. We review weekly, so you’ll hear from us by email soon.';
     showGate(title, msg, null, null);
     return true;
   }
 
-  function verifyBanner() {
+  // The "Continue with Lawexa" account card.
+  function renderAccountCard(user) {
+    var card = formCard();
+    if (!card) return;
     var form = document.getElementById('ambForm');
-    if (!form || document.getElementById('ambVerify')) return;
-    var b = document.createElement('div');
-    b.id = 'ambVerify';
-    b.style.cssText = 'background:#fff6e0;border:1px solid var(--gold);border-radius:12px;padding:13px 16px;margin:0 0 22px;font-size:14px;color:var(--ink-700);';
-    b.innerHTML = 'Please <b>verify your email</b> before submitting. <a href="/check-email" style="color:var(--gold-deep);font-weight:700">Verify now</a>.';
-    form.insertBefore(b, form.firstChild);
-  }
+    if (form) form.style.display = 'none';
+    clearInjected();
 
-  function prefill(user) {
-    if (!user) return;
-    setVal('fname', user.name);
-    setVal('email', user.email);
     var p = user.profile || {};
-    setVal('uni', p.university);
-    setVal('country', p.country); // <select>; option text equals the country name
-    setRadio('level', p.level);
+    var details = [];
+    if (p.country) details.push(esc(p.country));
+    if (p.university) details.push(esc(p.university));
+    var detailLine = details.length
+      ? '<p style="font-size:13.5px;color:var(--ink-500);margin:14px 0 0">We’ll use these from your Lawexa account: <b style="color:var(--ink-700)">' + details.join(' · ') + '</b></p>'
+      : '';
+
+    var unverified = user.auth_provider === 'email' && user.is_verified === false;
+
+    var avatar = user.avatar_url
+      ? '<img src="' + esc(user.avatar_url) + '" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex:none">'
+      : '<div style="width:56px;height:56px;border-radius:50%;background:var(--gold);color:var(--ink-black);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:22px;flex:none">' + esc(initials(user.name)) + '</div>';
+
+    var action = unverified
+      ? '<a href="/check-email" class="btn btn-gold btn-lg" style="width:100%;margin-top:22px">Verify your email to apply</a>' +
+        '<p style="font-size:13px;color:var(--ink-500);margin:12px 0 0;text-align:center">Your email isn’t verified yet — verify it, then come back to apply.</p>'
+      : '<button type="button" id="ambContinue" class="btn btn-gold btn-lg" style="width:100%;margin-top:22px">Continue as ' + esc((user.name || '').split(' ')[0] || 'me') + '</button>';
+
+    var box = document.createElement('div');
+    box.id = 'ambAccount';
+    box.innerHTML =
+      '<p style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-deep);margin:0 0 14px">Applying with Lawexa</p>' +
+      '<div style="display:flex;align-items:center;gap:14px">' +
+        avatar +
+        '<div style="min-width:0">' +
+          '<div style="font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--ink-black);line-height:1.2">' + esc(user.name || 'Your account') + '</div>' +
+          '<div style="font-size:14px;color:var(--ink-500);overflow:hidden;text-overflow:ellipsis">' + esc(user.email || '') + '</div>' +
+        '</div>' +
+      '</div>' +
+      detailLine +
+      action +
+      '<p style="text-align:center;margin:16px 0 0;font-size:14px;color:var(--ink-500)">Not you? ' +
+        '<button type="button" id="ambSwitch" style="background:none;border:none;padding:0;color:var(--gold-deep);font-weight:700;cursor:pointer;font-size:14px">Change account</button></p>';
+    card.appendChild(box);
+
+    var cont = document.getElementById('ambContinue');
+    if (cont) cont.addEventListener('click', onContinue);
+    var sw = document.getElementById('ambSwitch');
+    if (sw) sw.addEventListener('click', changeAccount);
   }
 
-  // ---- Submit: map form fields -> API payload ----
+  function onContinue() {
+    var acc = document.getElementById('ambAccount');
+    if (acc) acc.remove();
+    var form = document.getElementById('ambForm');
+    if (form) {
+      form.style.display = '';
+      var first = form.querySelector('.fpanel.show input,.fpanel.show select,.fpanel.show textarea');
+      if (first) try { first.focus({ preventScroll: true }); } catch (e) {}
+    }
+  }
+
+  function changeAccount() {
+    // Full sign-out of Lawexa, then back to login to choose another account.
+    var done = function () {
+      try { localStorage.removeItem('lawexa-auth'); } catch (e) {}
+      window.location.href = loginUrl();
+    };
+    authedFetch('/auth/logout', { method: 'POST' }).then(done, done);
+  }
+
+  // ---- Submit: collected fields + account values -> API payload ----
   function submit(formData) {
     var get = function (k) { var v = formData.get(k); return v == null ? '' : ('' + v).trim(); };
+    var u = cachedUser || {};
+    var p = u.profile || {};
     var payload = {
-      name: get('fname'),
-      email: get('email'),
+      name: u.name,                                   // from the account
+      email: u.email,                                 // from the account
       phone: get('phone'),
-      country: get('country') || undefined,
-      university: get('university') || undefined,
+      country: get('country') || p.country || undefined,       // asked only if profile lacks it
+      university: get('university') || p.university || undefined,
+      law_school: p.law_school || undefined,
       faculty: get('faculty') || undefined,
-      level: get('level') || undefined,
+      level: get('level') || undefined,               // always collected
       motivation: get('why'),
       growth_plan: get('grow'),
       leadership_experience: get('experience') || undefined,
@@ -165,13 +235,23 @@
     }
   }
 
-  // ---- Init: gate + prefill + existing-application check ----
+  // Hide the fields we already know so the slim form only asks for the rest.
+  function trimForm(user) {
+    var p = user.profile || {};
+    hideField('fname');                 // name -> from account
+    hideField('email');                 // email -> from account
+    if (p.country) hideField('country');     // only ask if the profile lacks it
+    if (p.university) hideField('uni');
+    // phone, faculty, level, motivation, growth_plan (+ optionals) stay.
+  }
+
+  // ---- Init: gate -> account card -> slim form ----
   function init() {
     var s = getSession();
     if (!s) {
       showGate(
         'Sign in to apply',
-        'The ambassador program is open to Lawexa users. Sign in or create your free account to continue — we’ll prefill what we already know.',
+        'The ambassador program is open to Lawexa users. Sign in or create your free account to continue — we’ll use the details we already have.',
         { href: loginUrl(), label: 'Sign in to apply' },
         { href: registerUrl(), label: 'Create account' }
       );
@@ -197,19 +277,21 @@
       })
       .then(function (me) {
         if (!me) return;
-        var user = (me.data && me.data.user) || me.data || s.user || {};
+        cachedUser = (me.data && me.data.user) || me.data || s.user || {};
         authedFetch('/ambassadors/my-application')
           .then(function (r) { return r.json().catch(function () { return {}; }); })
           .then(function (body) {
             var app = body && body.data;
             if (app && showStatus(app)) return;
-            prefill(user);
-            if (user.is_verified === false) verifyBanner();
+            trimForm(cachedUser);
+            renderAccountCard(cachedUser);
           });
       })
       .catch(function () {
-        // Network hiccup: keep the form usable; submit will surface any error.
-        prefill(s.user);
+        // Network hiccup: fall back to the stored user so the page still works.
+        cachedUser = s.user || {};
+        trimForm(cachedUser);
+        renderAccountCard(cachedUser);
       });
   }
 
