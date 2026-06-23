@@ -242,7 +242,10 @@
     hideField('email');                 // email -> from account
     if (p.country) hideField('country');     // only ask if the profile lacks it
     if (p.university) hideField('uni');
-    // phone, faculty, level, motivation, growth_plan (+ optionals) stay.
+    // Lawexa is a legal platform: law students/lawyers don't need to state a
+    // faculty (it's law), so skip the question for them.
+    if (p.user_type === 'lawyer' || p.user_type === 'law_student') hideField('faculty');
+    // phone, level, motivation, growth_plan (+ optionals) stay.
   }
 
   // ---- Init: gate -> account card -> slim form ----
