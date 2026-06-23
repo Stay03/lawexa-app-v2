@@ -8,6 +8,21 @@ const nextConfig: NextConfig = {
         destination: '/statutes/:slug',
         permanent: true,
       },
+      {
+        // Typo alias: /ambassador (singular) -> /ambassadors
+        source: '/ambassador',
+        destination: '/ambassadors',
+        permanent: false,
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      {
+        // Serve the static ambassador landing page at the clean /ambassadors URL.
+        source: '/ambassadors',
+        destination: '/ambassadors/index.html',
+      },
     ];
   },
 };

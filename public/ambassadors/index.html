@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Become a Lawexa Campus Ambassador | Apply</title>
+<meta name="description" content="Lead the future of legal education on your campus. Join the Lawexa Campus Ambassador Program and become the official student representative of Africa's leading legal learning platform.">
+<meta property="og:title" content="Become a Lawexa Campus Ambassador">
+<meta property="og:description" content="Lead the future of legal education on your campus. Apply to the Lawexa Campus Ambassador Program.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ===== Embedded brand display face: Ginóra Sans ===== */
+@font-face{font-family:'Ginora Sans';src:url(/ambassadors/fonts/ginora-1.woff2) format('woff2');font-weight:300;font-style:normal;font-display:swap;}
+@font-face{font-family:'Ginora Sans';src:url(/ambassadors/fonts/ginora-2.woff2) format('woff2');font-weight:400;font-style:normal;font-display:swap;}
+@font-face{font-family:'Ginora Sans';src:url(/ambassadors/fonts/ginora-3.woff2) format('woff2');font-weight:400;font-style:italic;font-display:swap;}
+@font-face{font-family:'Ginora Sans';src:url(/ambassadors/fonts/ginora-4.woff2) format('woff2');font-weight:600;font-style:normal;font-display:swap;}
+@font-face{font-family:'Ginora Sans';src:url(/ambassadors/fonts/ginora-5.woff2) format('woff2');font-weight:700;font-style:normal;font-display:swap;}
+@font-face{font-family:'Ginora Sans';src:url(/ambassadors/fonts/ginora-6.woff2) format('woff2');font-weight:700;font-style:italic;font-display:swap;}
+
+:root{
+  --gold:#D4AF37; --gold-deep:#B8942A; --gold-soft:#E6C866;
+  --cream:#F5EFE0; --cream-deep:#EDE4CE; --cream-soft:#FAF6EC;
+  --ink-black:#000; --ink-900:#0F0F0F; --ink-700:#2A2A2A; --ink-500:#5C5C5C; --ink-300:#8F8A80; --ink-200:#B8B2A5;
+  --bronze:#8B7355; --bronze-deep:#6B5740; --white:#FFF;
+  --success:#2E7D4F; --danger:#B3261E;
+  --font-display:'Ginora Sans','Urbanist',system-ui,sans-serif;
+  --font-sans:'Inter','Ginora Sans',system-ui,-apple-system,sans-serif;
+  --radius-sm:10px; --radius-md:16px; --radius-lg:24px; --radius-xl:32px; --radius-pill:999px;
+  --shadow-sm:0 2px 8px rgba(0,0,0,.05);
+  --shadow-md:0 8px 24px rgba(0,0,0,.08);
+  --shadow-lg:0 16px 48px rgba(0,0,0,.10);
+  --shadow-xl:0 28px 72px rgba(0,0,0,.14);
+  --shadow-gold:0 14px 40px rgba(212,175,55,.34);
+  --ease:cubic-bezier(.4,0,.2,1);
+  --maxw:1160px;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;background:var(--cream);color:var(--ink-900);
+  font-family:var(--font-sans);font-size:16px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none;}
+img{display:block;max-width:100%;}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px;border-radius:6px;}
+
+/* faint concentric-ring watermark, fixed atmosphere */
+.bg-rings{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.bg-rings::before,.bg-rings::after{
+  content:"";position:absolute;border-radius:50%;
+  background:repeating-radial-gradient(circle at center,transparent 0 46px,rgba(139,115,85,.05) 46px 48px);
+}
+.bg-rings::before{width:1500px;height:1500px;left:-360px;top:-420px;}
+.bg-rings::after{width:1300px;height:1300px;right:-420px;bottom:-540px;
+  background:repeating-radial-gradient(circle at center,transparent 0 42px,rgba(212,175,55,.06) 42px 44px);}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px;position:relative;z-index:2;}
+
+/* ===================== NAV ===================== */
+.nav{position:sticky;top:0;z-index:50;backdrop-filter:saturate(140%) blur(10px);
+  background:rgba(245,239,224,.78);border-bottom:1px solid rgba(0,0,0,.06);transition:box-shadow .3s var(--ease),background .3s var(--ease);}
+.nav.scrolled{box-shadow:0 6px 24px rgba(0,0,0,.06);background:rgba(245,239,224,.92);}
+.nav .row{display:flex;align-items:center;justify-content:space-between;height:74px;}
+.nav .brand{display:flex;align-items:center;gap:0;}
+.nav .brand img{height:38px;width:auto;}
+.nav .right{display:flex;align-items:center;gap:22px;}
+.nav .links{display:flex;align-items:center;gap:26px;}
+.nav .links a{font-weight:600;font-size:14.5px;color:var(--ink-700);letter-spacing:.01em;transition:color .2s var(--ease);}
+.nav .links a:hover{color:var(--gold-deep);}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;border:none;
+  font-family:var(--font-sans);font-weight:700;font-size:15.5px;letter-spacing:.01em;
+  padding:13px 26px;border-radius:var(--radius-pill);transition:transform .18s var(--ease),box-shadow .25s var(--ease),background .2s var(--ease);}
+.btn svg{width:18px;height:18px;}
+.btn-gold{background:var(--gold);color:var(--ink-black);box-shadow:var(--shadow-gold);}
+.btn-gold:hover{background:var(--gold-soft);transform:translateY(-2px);box-shadow:0 18px 48px rgba(212,175,55,.42);}
+.btn-gold:active{transform:translateY(0);background:var(--gold-deep);}
+.btn-ink{background:var(--ink-black);color:var(--gold-soft);}
+.btn-ink:hover{background:var(--ink-700);transform:translateY(-2px);}
+.btn-ghost{background:transparent;color:var(--ink-900);box-shadow:inset 0 0 0 1.6px rgba(0,0,0,.18);}
+.btn-ghost:hover{box-shadow:inset 0 0 0 1.6px var(--gold);color:var(--gold-deep);transform:translateY(-2px);}
+.btn-lg{padding:17px 34px;font-size:17px;}
+
+.eyebrow{display:inline-flex;align-items:center;gap:10px;background:var(--white);
+  border:1.5px solid var(--gold);color:var(--ink-900);font-weight:700;font-size:12.5px;
+  letter-spacing:.14em;text-transform:uppercase;padding:9px 18px;border-radius:var(--radius-pill);box-shadow:var(--shadow-sm);}
+.eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);}
+.eyebrow .dot.pulse{animation:pulse 2.4s var(--ease) infinite;}
+
+/* ===================== HERO ===================== */
+.hero{position:relative;padding:64px 0 78px;}
+.hero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:46px;align-items:center;}
+.hero h1{font-family:var(--font-display);font-weight:700;color:var(--ink-black);
+  font-size:clamp(44px,6.1vw,84px);line-height:.96;letter-spacing:.004em;margin:20px 0 0;}
+.hero h1 em{font-style:italic;color:var(--gold-deep);}
+.hero .sub{font-family:var(--font-display);font-weight:600;font-style:italic;color:var(--ink-700);
+  font-size:clamp(20px,2.5vw,29px);line-height:1.25;margin:18px 0 0;}
+.hero .lede{font-size:17.5px;line-height:1.6;color:var(--ink-700);max-width:520px;margin:20px 0 0;}
+.hero .cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:32px;}
+.hero .trust{display:flex;align-items:center;gap:11px;margin-top:26px;color:var(--ink-500);font-size:14.5px;font-weight:500;}
+.hero .trust .ava{display:flex;}
+.hero .trust .ava span{width:34px;height:34px;border-radius:50%;border:2.5px solid var(--cream);margin-left:-10px;background-size:cover;background-position:center;box-shadow:0 2px 6px rgba(0,0,0,.15);}
+.hero .trust .ava span:first-child{margin-left:0;}
+.hero .trust b{color:var(--ink-900);font-weight:800;}
+
+/* hero portrait composition */
+.composition{position:relative;height:520px;}
+.comp-wave{position:absolute;left:-6%;right:-6%;bottom:8%;height:230px;z-index:1;filter:drop-shadow(0 18px 30px rgba(212,175,55,.28));}
+.comp-block{position:absolute;left:6%;right:6%;bottom:0;height:48%;background:var(--gold);border-radius:var(--radius-xl);z-index:0;
+  box-shadow:0 30px 70px rgba(212,175,55,.30);overflow:hidden;}
+.comp-block::before{content:"";position:absolute;left:50%;bottom:-46%;width:150%;padding-bottom:150%;transform:translateX(-50%);
+  background:repeating-radial-gradient(circle at center,transparent 0 30px,rgba(0,0,0,.035) 30px 32px);}
+.portrait{position:absolute;border-radius:50%;overflow:hidden;background:var(--cream-soft);z-index:4;
+  box-shadow:0 0 0 6px var(--white),0 0 0 12px var(--gold),0 22px 46px rgba(0,0,0,.22);}
+.portrait img{width:100%;height:100%;object-fit:cover;}
+.p-center{width:46%;left:27%;top:6%;z-index:6;}
+.p-left{width:31%;left:1%;top:40%;}
+.p-right{width:31%;right:1%;top:40%;}
+.cf{position:absolute;z-index:7;will-change:transform;}
+.cf.tile{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#4a3a0c;
+  background:linear-gradient(135deg,var(--gold-soft),var(--gold));border:1.5px solid rgba(0,0,0,.12);box-shadow:0 8px 18px rgba(0,0,0,.16);}
+.cf.tile svg{width:27px;height:27px;}
+.cf.chip{width:50px;height:50px;border-radius:50%;background:var(--white);display:flex;align-items:center;justify-content:center;
+  color:var(--gold-deep);box-shadow:0 8px 18px rgba(0,0,0,.14);}
+.cf.chip svg{width:25px;height:25px;}
+
+/* ===================== HOOK ===================== */
+.hook{padding:30px 0 4px;text-align:center;}
+.hook .q{font-family:var(--font-display);font-weight:700;color:var(--ink-black);
+  font-size:clamp(26px,3.6vw,42px);line-height:1.14;letter-spacing:.003em;max-width:880px;margin:0 auto;}
+.hook .q em{font-style:italic;color:var(--gold-deep);}
+.hook p{font-size:17.5px;line-height:1.65;color:var(--ink-700);max-width:680px;margin:22px auto 0;}
+.hook p b{color:var(--ink-900);font-weight:700;}
+
+/* ===================== STATS ===================== */
+.stats{margin:54px 0;}
+.stats .band{background:var(--ink-black);border-radius:var(--radius-xl);padding:42px 38px;position:relative;overflow:hidden;
+  box-shadow:var(--shadow-xl);}
+.stats .band::before{content:"";position:absolute;right:-160px;top:-160px;width:520px;height:520px;border-radius:50%;
+  background:repeating-radial-gradient(circle at center,transparent 0 34px,rgba(212,175,55,.10) 34px 36px);}
+.stats .row{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;position:relative;z-index:2;}
+.stat{text-align:center;padding:6px 8px;}
+.stat .n{font-family:var(--font-display);font-weight:700;color:var(--gold);font-size:clamp(34px,4.4vw,52px);line-height:1;letter-spacing:.004em;}
+.stat .l{color:#cfc6b2;font-size:13.5px;font-weight:600;letter-spacing:.04em;margin-top:10px;text-transform:uppercase;}
+.stat + .stat{border-left:1px solid rgba(255,255,255,.10);}
+
+/* ===================== SECTION HEAD ===================== */
+.shead{text-align:center;margin-bottom:40px;}
+.shead h2{font-family:var(--font-display);font-weight:700;color:var(--ink-black);
+  font-size:clamp(32px,4.4vw,54px);line-height:1.02;letter-spacing:.004em;margin:16px 0 0;}
+.shead h2 em{font-style:italic;color:var(--gold-deep);}
+.shead .lede{color:var(--ink-500);font-size:17px;margin:14px auto 0;max-width:600px;}
+
+/* ===================== DEAL CARDS ===================== */
+.deal{padding:34px 0 8px;}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start;}
+.card{background:var(--white);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:38px 36px 34px;
+  border:1px solid rgba(0,0,0,.04);transition:transform .3s var(--ease),box-shadow .3s var(--ease);}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);}
+.card .chead{display:flex;align-items:center;gap:14px;margin:0 0 24px;}
+.card .chead .hi{width:50px;height:50px;border-radius:15px;background:var(--gold);display:flex;align-items:center;justify-content:center;flex:none;
+  box-shadow:0 8px 20px rgba(212,175,55,.35);}
+.card .chead .hi svg{width:26px;height:26px;color:var(--ink-black);}
+.card .chead h3{font-family:var(--font-display);font-weight:700;color:var(--ink-black);font-size:26px;line-height:1.05;margin:0;}
+.ilist{display:flex;flex-direction:column;gap:16px;}
+.irow{display:flex;align-items:flex-start;gap:14px;}
+.irow .ic{width:40px;height:40px;border-radius:50%;background:var(--cream);border:1.5px solid var(--gold);
+  display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px;}
+.irow .ic svg{width:20px;height:20px;color:var(--gold-deep);}
+.irow span:not(.ic){font-size:16.5px;line-height:1.4;color:var(--ink-700);font-weight:500;padding-top:8px;}
+.card.dark{background:var(--ink-black);border-color:transparent;}
+.card.dark h3{color:var(--white);}
+.card.dark .chead .hi{background:var(--gold);}
+.card.dark .irow .ic{background:rgba(255,255,255,.06);border-color:rgba(212,175,55,.55);}
+.card.dark .irow .ic svg{color:var(--gold);}
+.card.dark .irow span:not(.ic){color:#e6ddca;}
+
+/* ===================== ABOUT ===================== */
+.about{padding:52px 0 28px;}
+.about-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;}
+.about-copy h2{font-family:var(--font-display);font-weight:700;color:var(--ink-black);font-size:clamp(30px,4vw,50px);line-height:1.02;letter-spacing:.004em;margin:16px 0 0;}
+.about-copy h2 em{font-style:italic;color:var(--gold-deep);}
+.about-copy .lede{font-size:18px;line-height:1.6;color:var(--ink-700);margin:18px 0 0;}
+.about-copy p.body{font-size:16px;line-height:1.65;color:var(--ink-500);margin:16px 0 0;max-width:520px;}
+.about-copy p.body b{color:var(--ink-900);font-weight:700;}
+.about-feats{display:flex;flex-direction:column;gap:14px;}
+.feat{display:flex;align-items:flex-start;gap:16px;background:var(--white);border:1px solid rgba(0,0,0,.04);
+  border-radius:var(--radius-md);padding:20px 22px;box-shadow:var(--shadow-sm);transition:transform .25s var(--ease),box-shadow .25s var(--ease);}
+.feat:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);}
+.feat .fi{width:48px;height:48px;border-radius:14px;background:var(--cream);border:1.5px solid var(--gold);flex:none;
+  display:flex;align-items:center;justify-content:center;}
+.feat .fi svg{width:24px;height:24px;color:var(--gold-deep);}
+.feat .ftx h4{font-family:var(--font-display);font-weight:700;font-size:19px;color:var(--ink-900);margin:2px 0 5px;}
+.feat .ftx p{font-size:14.5px;color:var(--ink-500);margin:0;line-height:1.5;}
+
+/* ===================== REACH ===================== */
+.reach{padding:54px 0 24px;text-align:center;}
+.reach .cap{display:inline-flex;align-items:center;gap:11px;font-weight:700;font-size:13px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--gold-deep);margin:0 0 22px;}
+.reach .cap svg{width:18px;height:18px;}
+.reach .cap::before,.reach .cap::after{content:"";width:34px;height:2px;border-radius:2px;background:var(--gold);opacity:.5;}
+.pills{display:flex;flex-wrap:wrap;gap:11px;justify-content:center;max-width:840px;margin:0 auto;}
+.pills.countries{margin-top:16px;}
+.upill{font-weight:600;font-size:15.5px;color:var(--ink-900);background:var(--white);
+  border:1.5px solid rgba(139,115,85,.22);padding:9px 19px;border-radius:var(--radius-pill);box-shadow:0 4px 12px rgba(0,0,0,.06);
+  transition:transform .2s var(--ease),border-color .2s var(--ease);}
+.upill:hover{transform:translateY(-2px);border-color:var(--gold);}
+.upill.more{background:var(--ink-black);border-color:var(--ink-black);color:var(--gold-soft);}
+.cpill{display:inline-flex;align-items:center;gap:10px;font-weight:600;font-size:15px;color:var(--ink-black);
+  background:var(--gold-soft);border:1.5px solid var(--gold);padding:8px 18px 8px 9px;border-radius:var(--radius-pill);box-shadow:0 4px 12px rgba(0,0,0,.06);
+  transition:transform .2s var(--ease),box-shadow .2s var(--ease);}
+.cpill:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.10);}
+.cpill .flag{width:24px;height:24px;border-radius:50%;overflow:hidden;flex:none;
+  box-shadow:0 0 0 1.5px var(--white),0 1px 3px rgba(0,0,0,.25);}
+.cpill .flag svg{width:100%;height:100%;display:block;object-fit:cover;}
+
+/* ===================== APPLY ===================== */
+.apply{padding:64px 0 30px;}
+.apply .grid{display:grid;grid-template-columns:.82fr 1.18fr;gap:40px;align-items:start;}
+.aside{position:sticky;top:100px;}
+.aside h2{font-family:var(--font-display);font-weight:700;color:var(--ink-black);font-size:clamp(30px,3.6vw,46px);line-height:1.02;margin:16px 0 0;}
+.aside h2 em{font-style:italic;color:var(--gold-deep);}
+.aside .lede{color:var(--ink-500);font-size:16.5px;margin:14px 0 0;line-height:1.6;}
+.steps{margin:30px 0 0;display:flex;flex-direction:column;gap:0;}
+.step{display:flex;gap:16px;position:relative;padding-bottom:24px;}
+.step:last-child{padding-bottom:0;}
+.step::before{content:"";position:absolute;left:18px;top:40px;bottom:-2px;width:2px;background:linear-gradient(var(--gold),rgba(212,175,55,.15));}
+.step:last-child::before{display:none;}
+.step .num{width:38px;height:38px;border-radius:50%;background:var(--white);border:1.6px solid var(--gold);flex:none;
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;color:var(--gold-deep);font-size:16px;z-index:2;box-shadow:var(--shadow-sm);}
+.step .stx h4{font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--ink-900);margin:6px 0 4px;}
+.step .stx p{font-size:14.5px;color:var(--ink-500);margin:0;line-height:1.5;}
+.aside .support{margin-top:28px;background:var(--cream-soft);border:1px solid var(--cream-deep);border-radius:var(--radius-md);padding:18px 20px;
+  display:flex;align-items:center;gap:13px;font-size:14.5px;color:var(--ink-700);}
+.aside .support svg{width:22px;height:22px;color:var(--gold-deep);flex:none;}
+.aside .support a{color:var(--gold-deep);font-weight:700;}
+
+/* form card */
+.formcard{background:var(--white);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);border:1px solid rgba(0,0,0,.04);
+  padding:42px 42px 38px;position:relative;overflow:hidden;}
+.formcard::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;background:linear-gradient(90deg,var(--gold-soft),var(--gold),var(--gold-deep));}
+.fgroup{margin-bottom:30px;}
+.gl{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--ink-900);margin:0 0 22px;}
+.gl .n{width:26px;height:26px;border-radius:50%;background:var(--gold);color:var(--ink-black);font-size:13px;font-weight:700;
+  font-family:var(--font-sans);display:flex;align-items:center;justify-content:center;flex:none;}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.field{margin-bottom:18px;}
+.field.full{grid-column:1 / -1;}
+.field label{display:block;font-size:13.5px;font-weight:600;color:var(--ink-700);margin:0 0 7px;letter-spacing:.005em;}
+.field label .req{color:var(--gold-deep);margin-left:2px;}
+.field .hint{font-size:12.5px;color:var(--ink-300);font-weight:500;}
+.field input,.field select,.field textarea{
+  width:100%;font-family:var(--font-sans);font-size:15.5px;color:var(--ink-900);background:var(--cream-soft);
+  border:1.6px solid var(--cream-deep);border-radius:var(--radius-sm);padding:13px 15px;transition:border-color .18s var(--ease),background .18s var(--ease),box-shadow .18s var(--ease);}
+.field textarea{resize:vertical;min-height:96px;line-height:1.5;}
+.field input::placeholder,.field textarea::placeholder{color:var(--ink-200);}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--gold);background:var(--white);box-shadow:0 0 0 4px rgba(212,175,55,.15);}
+.field select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23B8942A' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:42px;cursor:pointer;}
+.field.err input,.field.err select,.field.err textarea{border-color:var(--danger);background:#fbf0ef;}
+.field .emsg{display:none;color:var(--danger);font-size:12.5px;font-weight:600;margin-top:6px;}
+.field.err .emsg{display:block;}
+.ccount{font-size:11.5px;color:var(--ink-300);text-align:right;margin-top:5px;font-weight:500;}
+
+.consent{display:flex;align-items:flex-start;gap:13px;background:var(--cream-soft);border:1px solid var(--cream-deep);
+  border-radius:var(--radius-md);padding:16px 18px;margin:4px 0 26px;}
+.consent input{appearance:none;-webkit-appearance:none;width:24px;height:24px;border:1.8px solid var(--bronze);border-radius:7px;flex:none;
+  cursor:pointer;position:relative;transition:background .15s var(--ease),border-color .15s var(--ease);margin-top:1px;background:var(--white);}
+.consent input:checked{background:var(--gold);border-color:var(--gold-deep);}
+.consent input:checked::after{content:"";position:absolute;left:8px;top:3px;width:6px;height:12px;border:solid var(--ink-black);border-width:0 2.6px 2.6px 0;transform:rotate(45deg);}
+.consent.err input{border-color:var(--danger);}
+.consent label{font-size:14px;color:var(--ink-700);line-height:1.5;cursor:pointer;}
+.consent a{color:var(--gold-deep);font-weight:700;}
+
+.submit-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+.submit-row .note{font-size:13px;color:var(--ink-300);font-weight:500;}
+.formcard .btn-gold:disabled{opacity:.65;cursor:not-allowed;transform:none;box-shadow:none;}
+.spinner{width:18px;height:18px;border:2.4px solid rgba(0,0,0,.25);border-top-color:var(--ink-black);border-radius:50%;animation:spin .7s linear infinite;}
+
+/* ---- multi-step wizard ---- */
+.fprogress{margin-bottom:32px;}
+.fsteps{display:flex;align-items:flex-start;justify-content:space-between;position:relative;margin-bottom:14px;}
+.fsteps .track{position:absolute;left:19px;right:19px;top:19px;height:3px;background:var(--cream-deep);border-radius:3px;z-index:0;}
+.fsteps .track .fill{position:absolute;left:0;top:0;height:100%;width:0;background:linear-gradient(90deg,var(--gold-soft),var(--gold),var(--gold-deep));border-radius:3px;transition:width .55s var(--ease);}
+.fstep{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:9px;flex:1;cursor:default;}
+.fstep[data-clickable]{cursor:pointer;}
+.fstep .node{width:40px;height:40px;border-radius:50%;background:var(--white);border:2px solid var(--cream-deep);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;color:var(--ink-300);font-size:16px;
+  transition:transform .35s var(--ease),background .35s var(--ease),border-color .35s var(--ease),box-shadow .35s var(--ease);box-shadow:var(--shadow-sm);}
+.fstep .node svg{width:19px;height:19px;display:none;color:var(--ink-black);}
+.fstep .lab{font-size:12.5px;font-weight:600;color:var(--ink-300);letter-spacing:.01em;transition:color .3s var(--ease);text-align:center;line-height:1.2;}
+.fstep.active .node{border-color:var(--gold);background:var(--gold);color:var(--ink-black);transform:scale(1.1);box-shadow:var(--shadow-gold);}
+.fstep.active .lab{color:var(--ink-900);}
+.fstep.done .node{border-color:var(--gold-deep);background:var(--gold-deep);color:var(--ink-black);}
+.fstep.done .node .num{display:none;}
+.fstep.done .node svg{display:block;}
+.fstep.done .lab{color:var(--ink-700);}
+.fcount{font-size:12px;font-weight:700;color:var(--gold-deep);letter-spacing:.1em;text-transform:uppercase;text-align:center;}
+
+.fpanel{display:none;}
+.fpanel.show{display:block;animation:stepIn .45s var(--ease) both;}
+.fpanel.back.show{animation:stepInBack .45s var(--ease) both;}
+@keyframes stepIn{from{opacity:0;transform:translateX(22px);}to{opacity:1;transform:none;}}
+@keyframes stepInBack{from{opacity:0;transform:translateX(-22px);}to{opacity:1;transform:none;}}
+
+.ctl{position:relative;}
+.field .ok-check{position:absolute;right:13px;top:50%;transform:translateY(-50%) scale(.4);width:22px;height:22px;border-radius:50%;
+  background:var(--success);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s var(--ease),transform .25s var(--ease);pointer-events:none;}
+.field .ok-check svg{width:13px;height:13px;color:#fff;}
+.field.ok .ok-check{opacity:1;transform:translateY(-50%) scale(1);}
+.field.ok input,.field.ok select{border-color:#9bc6ad;}
+.field[data-check].has-select .ok-check{right:42px;}
+.grad-field{max-width:300px;}
+
+/* chip selector (radio) */
+.chips-field{margin-bottom:26px;}
+.chips-field > label{display:block;font-size:13.5px;font-weight:600;color:var(--ink-700);margin:0 0 12px;}
+.chips-field > label .req{color:var(--gold-deep);margin-left:2px;}
+.chips-field > label .hint{font-size:12.5px;color:var(--ink-300);font-weight:500;}
+.chips{display:flex;flex-wrap:wrap;gap:10px;}
+.chip{position:relative;display:inline-flex;}
+.chip input{position:absolute;opacity:0;width:0;height:0;}
+.chip span{display:inline-flex;align-items:center;gap:7px;font-size:14.5px;font-weight:600;color:var(--ink-700);cursor:pointer;
+  background:var(--cream-soft);border:1.6px solid var(--cream-deep);padding:10px 17px;border-radius:var(--radius-pill);
+  transition:transform .18s var(--ease),background .18s var(--ease),border-color .18s var(--ease),box-shadow .18s var(--ease);}
+.chip:hover span{border-color:var(--gold-soft);transform:translateY(-2px);}
+.chip input:checked + span{background:var(--gold);border-color:var(--gold-deep);color:var(--ink-black);box-shadow:var(--shadow-gold);}
+.chip input:focus-visible + span{outline:3px solid var(--gold);outline-offset:2px;}
+.chips-field.err > label{color:var(--danger);}
+.chips-field.err .chips{padding:10px;margin:-10px;border-radius:var(--radius-md);background:#fbf0ef;}
+.chips-field .emsg{display:none;color:var(--danger);font-size:12.5px;font-weight:600;margin-top:8px;}
+.chips-field.err .emsg{display:block;}
+
+/* wizard nav */
+.fnav{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:6px;}
+.btn-back{background:transparent;color:var(--ink-500);box-shadow:none;padding-left:6px;}
+.btn-back:hover{color:var(--ink-900);transform:translateX(-3px);background:transparent;box-shadow:none;}
+.fnote{text-align:center;font-size:13px;color:var(--ink-300);font-weight:500;margin:18px 0 0;}
+#advBtn:disabled{opacity:.7;cursor:not-allowed;transform:none;box-shadow:none;}
+
+@keyframes shake{10%,90%{transform:translateX(-1px);}20%,80%{transform:translateX(2px);}30%,50%,70%{transform:translateX(-5px);}40%,60%{transform:translateX(5px);}}
+.shake{animation:shake .42s var(--ease);}
+
+/* success state */
+.success{display:none;text-align:center;padding:30px 10px 14px;}
+.success.show{display:block;animation:rise .5s var(--ease) both;}
+.success .ring{width:96px;height:96px;border-radius:50%;background:var(--cream);border:2px solid var(--gold);margin:0 auto 22px;
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-gold);}
+.success .ring svg{width:48px;height:48px;color:var(--gold-deep);}
+.success h3{font-family:var(--font-display);font-weight:700;color:var(--ink-black);font-size:34px;margin:0 0 12px;}
+.success h3 em{font-style:italic;color:var(--gold-deep);}
+.success p{font-size:16.5px;color:var(--ink-700);max-width:460px;margin:0 auto 8px;line-height:1.6;}
+.success .ref{display:inline-block;margin-top:18px;font-family:var(--font-sans);font-weight:700;font-size:13px;letter-spacing:.04em;
+  background:var(--cream-soft);border:1px solid var(--cream-deep);color:var(--ink-700);padding:9px 16px;border-radius:var(--radius-pill);}
+
+/* ===================== FOOTER ===================== */
+footer{background:var(--ink-black);color:#cfc6b2;margin-top:64px;position:relative;z-index:2;overflow:hidden;}
+footer::before{content:"";position:absolute;left:-180px;bottom:-220px;width:560px;height:560px;border-radius:50%;
+  background:repeating-radial-gradient(circle at center,transparent 0 34px,rgba(212,175,55,.08) 34px 36px);}
+footer .inner{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:flex-start;gap:30px;padding:52px 0 30px;flex-wrap:wrap;}
+footer .brandcol{max-width:360px;}
+footer .brandcol img{height:36px;margin-bottom:16px;}
+footer .brandcol p{font-family:var(--font-display);font-style:italic;font-size:18px;color:#e6ddca;line-height:1.4;margin:0;}
+footer .urlpill{display:inline-flex;align-items:center;gap:11px;background:rgba(255,255,255,.06);color:var(--gold-soft);
+  font-weight:700;font-size:17px;padding:13px 24px;border-radius:var(--radius-pill);border:1px solid rgba(212,175,55,.3);margin-top:20px;}
+footer .urlpill svg{width:19px;height:19px;color:var(--gold);}
+footer .flinks{display:flex;flex-direction:column;gap:13px;}
+footer .flinks .h{color:var(--white);font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+footer .flinks a{font-size:14.5px;color:#cfc6b2;transition:color .2s var(--ease);}
+footer .flinks a:hover{color:var(--gold);}
+footer .legal{position:relative;z-index:2;border-top:1px solid rgba(255,255,255,.1);padding:20px 0;font-size:13px;color:#8f876f;
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+
+/* ===================== MOTION ===================== */
+@keyframes pulse{0%,100%{opacity:.7;}50%{opacity:1;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes rise{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:translateY(0);}}
+@keyframes floatA{0%,100%{transform:translateY(0) rotate(var(--rot,0deg));}50%{transform:translateY(-18px) rotate(calc(var(--rot,0deg) + 4deg));}}
+@keyframes floatB{0%,100%{transform:translateY(0) rotate(var(--rot,0deg));}50%{transform:translateY(14px) rotate(calc(var(--rot,0deg) - 5deg));}}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-9px);}}
+@keyframes pop{0%{transform:scale(0) rotate(0);opacity:0;}60%{transform:scale(1.15) rotate(8deg);}100%{transform:scale(1) rotate(0);opacity:1;}}
+
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s var(--ease),transform .7s var(--ease);}
+.reveal.in{opacity:1;transform:none;}
+.reveal.d1{transition-delay:.08s;} .reveal.d2{transition-delay:.16s;} .reveal.d3{transition-delay:.24s;} .reveal.d4{transition-delay:.32s;}
+
+@media (prefers-reduced-motion: no-preference){
+  .cf{animation:floatA var(--spd,6s) var(--ease) infinite;animation-delay:var(--dly,0s);}
+  .cf.b{animation-name:floatB;}
+  .portrait{animation:bob 5.6s var(--ease) infinite;}
+  .p-center{animation-delay:.4s;} .p-right{animation-delay:.9s;}
+}
+@media (prefers-reduced-motion: reduce){
+  .reveal{opacity:1;transform:none;transition:none;}
+  .fpanel.show{animation:none;}
+  .shake{animation:none;}
+  html{scroll-behavior:auto;}
+}
+
+/* confetti burst on success */
+.burst{position:fixed;inset:0;pointer-events:none;z-index:100;overflow:hidden;}
+.burst i{position:absolute;width:12px;height:12px;border-radius:3px;opacity:0;}
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width:980px){
+  .hero .grid{grid-template-columns:1fr;gap:10px;}
+  .composition{height:430px;order:-1;margin-bottom:6px;}
+  .apply .grid{grid-template-columns:1fr;gap:30px;}
+  .about-grid{grid-template-columns:1fr;gap:30px;}
+  .aside{position:static;}
+  .stats .row{grid-template-columns:repeat(2,1fr);gap:24px 0;}
+  .stat:nth-child(3){border-left:none;}
+  .stat + .stat{border-left:1px solid rgba(255,255,255,.1);}
+  .stat:nth-child(odd){border-left:none;}
+}
+@media (max-width:720px){
+  .wrap{padding:0 20px;}
+  .nav .links{display:none;}
+  .cols{grid-template-columns:1fr;}
+  .frow{grid-template-columns:1fr;gap:0;}
+  .formcard{padding:30px 22px 28px;}
+  .hero{padding:38px 0 50px;}
+  .composition{height:360px;}
+  .stats .band{padding:32px 22px;}
+  footer .inner{flex-direction:column;gap:34px;}
+}
+@media (max-width:430px){
+  .composition{height:320px;}
+  .stat .l{font-size:11.5px;}
+}
+</style>
+</head>
+<body>
+<div class="bg-rings" aria-hidden="true"></div>
+
+<!-- ===== NAV ===== -->
+<header class="nav" id="nav">
+  <div class="wrap row">
+    <a class="brand" href="#top" aria-label="Lawexa AI home"><img src="/ambassadors/logo.png" alt="Lawexa Ai"></a>
+    <div class="right">
+      <nav class="links">
+        <a href="#about">About</a>
+        <a href="#deal">The deal</a>
+        <a href="#reach">Campuses</a>
+        <a href="#apply">How it works</a>
+      </nav>
+      <a href="#apply" class="btn btn-gold"><span>Apply now</span><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-arrow-right"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M5 12h14" />  <path d="m12 5 7 7-7 7" /></svg></a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="wrap grid">
+    <div class="hcopy">
+      <span class="eyebrow reveal"><span class="dot pulse"></span>Campus Ambassador Program</span>
+      <h1 class="reveal d1">Become a Lawexa<br>campus <em>ambassador</em></h1>
+      <p class="sub reveal d2">Lead the future of legal education on your campus.</p>
+      <p class="lede reveal d2">Are you passionate about law, technology, leadership, and helping fellow students succeed? Become the official representative of Africa's leading legal learning platform at your university.</p>
+      <div class="cta reveal d3">
+        <a href="#apply" class="btn btn-gold btn-lg"><span>Apply to the program</span><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-arrow-right"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M5 12h14" />  <path d="m12 5 7 7-7 7" /></svg></a>
+        <a href="#deal" class="btn btn-ghost btn-lg"><span>What you'll get</span></a>
+      </div>
+      <div class="trust reveal d4">
+        <span class="ava" aria-hidden="true">
+          <span style="background-image:url(/ambassadors/hero-1.jpg)"></span>
+          <span style="background-image:url(/ambassadors/hero-2.jpg)"></span>
+          <span style="background-image:url(/ambassadors/hero-3.jpg)"></span>
+        </span>
+        <span>Join <b>5,000+ students</b> already learning with Lawexa AI</span>
+      </div>
+    </div>
+
+    <div class="composition reveal d2" aria-hidden="false">
+      <div class="comp-block"></div>
+      <svg class="comp-wave" viewBox="0 0 1080 230" preserveAspectRatio="none">
+        <path fill="#D4AF37" d="M0,118 C 90,52 210,46 322,104 C 410,150 470,168 540,150 C 612,131 690,58 800,72 C 900,84 1000,150 1080,96 L1080,230 L0,230 Z"></path>
+      </svg>
+      <div class="portrait p-left"><img src="/ambassadors/hero-1.jpg" alt="Lawexa campus ambassador"></div>
+      <div class="portrait p-center"><img src="/ambassadors/hero-2.jpg" alt="Lawexa campus ambassador"></div>
+      <div class="portrait p-right"><img src="/ambassadors/hero-3.jpg" alt="Lawexa campus ambassador"></div>
+
+      <div class="cf tile"  style="left:-2%;top:30%;--rot:-14deg;--spd:6.4s;"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-gavel"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381" />  <path d="m16 16 6-6" />  <path d="m21.5 10.5-8-8" />  <path d="m8 8 6-6" />  <path d="m8.5 7.5 8 8" /></svg></div>
+      <div class="cf b tile" style="right:-3%;top:6%;--rot:13deg;--spd:7.1s;--dly:.6s;"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-scale"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M12 3v18" />  <path d="m19 8 3 8a5 5 0 0 1-6 0zV7" />  <path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1" />  <path d="m5 8 3 8a5 5 0 0 1-6 0zV7" />  <path d="M7 21h10" /></svg></div>
+      <div class="cf chip"  style="left:18%;top:-3%;--spd:5.6s;--dly:.3s;"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-scroll-text"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M15 12h-5" />  <path d="M15 8h-5" />  <path d="M19 17V5a2 2 0 0 0-2-2H4" />  <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" /></svg></div>
+      <div class="cf b chip" style="right:9%;top:36%;--spd:6.8s;--dly:.9s;"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-graduation-cap"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" />  <path d="M22 10v6" />  <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" /></svg></div>
+      <div class="cf chip"  style="left:6%;top:62%;--spd:6.1s;--dly:.5s;"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-book-open"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M12 7v14" />  <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== HOOK ===== -->
+<section class="hook">
+  <div class="wrap">
+    <p class="q reveal">This is more than a title. It's your seat at the table <em>shaping how the next generation of lawyers learn.</em></p>
+    <p class="reveal d1">As a Lawexa Campus Ambassador you'll build real experience in marketing, community and legal tech, grow a movement in your faculty, and work directly with the team behind <b>Africa's leading legal learning platform.</b></p>
+  </div>
+</section>
+
+<!-- ===== STATS ===== -->
+<section class="stats">
+  <div class="wrap">
+    <div class="band reveal">
+      <div class="row">
+        <div class="stat"><div class="n">5,000+</div><div class="l">Students onboard</div></div>
+        <div class="stat"><div class="n">132</div><div class="l">Universities</div></div>
+        <div class="stat"><div class="n">76</div><div class="l">Countries reached</div></div>
+        <div class="stat"><div class="n">7</div><div class="l">AI legal agents</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ABOUT LAWEXA ===== -->
+<section class="about" id="about">
+  <div class="wrap about-grid">
+    <div class="about-copy reveal">
+      <span class="eyebrow"><span class="dot"></span>About Lawexa</span>
+      <h2>The platform you'll <em>represent</em></h2>
+      <p class="lede">Lawexa is an AI-powered legal learning platform built for African and Commonwealth jurisdictions. It's the tool helping the next generation of lawyers research, draft and study smarter.</p>
+      <p class="body">From intelligent search across thousands of cases and statutes, in the jurisdictions you study, to flashcards and quizzes that make exam prep faster, Lawexa puts a legal research team in every student's pocket. As an ambassador, <b>you bring it to your campus.</b></p>
+    </div>
+    <div class="about-feats reveal d1">
+      <div class="feat">
+        <span class="fi"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-search"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="m21 21-4.34-4.34" />  <circle cx="11" cy="11" r="8" /></svg></span>
+        <div class="ftx"><h4>Research, instantly</h4><p>Case and statute search across multiple jurisdictions, with citations you can trust.</p></div>
+      </div>
+      <div class="feat">
+        <span class="fi"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-file-pen-line"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M14.364 13.634a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506l4.013-4.009a1 1 0 0 0-3.004-3.004z" />  <path d="M14.487 7.858A1 1 0 0 1 14 7V2" />  <path d="M20 19.645V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l2.516 2.516" />  <path d="M8 18h1" /></svg></span>
+        <div class="ftx"><h4>Draft &amp; review</h4><p>Generate and refine legal documents, from briefs to agreements, in a fraction of the time.</p></div>
+      </div>
+      <div class="feat">
+        <span class="fi"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-graduation-cap"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" />  <path d="M22 10v6" />  <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" /></svg></span>
+        <div class="ftx"><h4>Study smarter</h4><p>Flashcards, quizzes and specialised AI agents built to help law students learn and pass.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== THE DEAL ===== -->
+<section class="deal" id="deal">
+  <div class="wrap">
+    <div class="shead reveal">
+      <span class="eyebrow"><span class="dot"></span>The opportunity</span>
+      <h2>Here's the <em>deal</em></h2>
+      <p class="lede">What you'll take on as an ambassador, and everything you get back.</p>
+    </div>
+    <div class="cols">
+      <div class="card reveal d1">
+        <div class="chead"><span class="hi"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-flag"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" /></svg></span><h3>What you'll do</h3></div>
+        <div class="ilist">
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-megaphone"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />  <path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14" />  <path d="M8 6v8" /></svg></span><span>Introduce students to Lawexa</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-handshake"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="m11 17 2 2a1 1 0 1 0 3-3" />  <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" />  <path d="m21 3 1 11h-2" />  <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" />  <path d="M3 4h8" /></svg></span><span>Facilitate partnership conversations in your faculty</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-trending-up"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M16 7h6v6" />  <path d="m22 7-8.5 8.5-5-5L2 17" /></svg></span><span>Grow the Lawexa community in your faculty</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-message-square"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /></svg></span><span>Gather feedback and insights from students</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-users"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />  <path d="M16 3.128a4 4 0 0 1 0 7.744" />  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />  <circle cx="9" cy="7" r="4" /></svg></span><span>Represent Lawexa at campus events and initiatives</span></div>
+        </div>
+      </div>
+      <div class="card dark reveal d2">
+        <div class="chead"><span class="hi"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-gift"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M12 7v14" />  <path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8" />  <path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5" />  <rect x="3" y="7" rx="1" /></svg></span><h3>What's in it for you</h3></div>
+        <div class="ilist">
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-medal"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15" />  <path d="M11 12 5.12 2.2" />  <path d="m13 12 5.88-9.8" />  <path d="M8 7h8" />  <circle cx="12" cy="17" r="5" />  <path d="M12 18v-2h-.5" /></svg></span><span>Exclusive leadership experience</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-key-round"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" />  <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" /></svg></span><span>Free monthly access to Lawexa AI</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-briefcase"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />  <rect x="2" y="6" rx="2" /></svg></span><span>Hands-on experience in a fast growing legal tech company</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-trophy"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978" />  <path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978" />  <path d="M18 9h1.5a1 1 0 0 0 0-5H18" />  <path d="M4 22h16" />  <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" />  <path d="M6 9H4.5a1 1 0 0 1 0-5H6" /></svg></span><span>Performance-based incentives</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-handshake"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="m11 17 2 2a1 1 0 1 0 3-3" />  <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" />  <path d="m21 3 1 11h-2" />  <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" />  <path d="M3 4h8" /></svg></span><span>Direct access to the Lawexa team</span></div>
+          <div class="irow"><span class="ic"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-users-round"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M18 21a8 8 0 0 0-16 0" />  <circle cx="10" cy="8" r="5" />  <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg></span><span>Build your professional network</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== REACH ===== -->
+<section class="reach" id="reach">
+  <div class="wrap">
+    <p class="cap reveal"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-globe"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <circle cx="12" cy="12" r="10" />  <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />  <path d="M2 12h20" /></svg>Now recruiting across Africa &amp; beyond</p>
+    <div class="pills reveal d1">
+      <span class="upill">UNILAG</span>
+      <span class="upill">University of Ibadan</span>
+      <span class="upill">University of Ghana</span>
+      <span class="upill">University of Nairobi</span>
+      <span class="upill">Makerere University</span>
+      <span class="upill">University of Delhi</span>
+      <span class="upill more">+ your campus</span>
+    </div>
+    <div class="pills countries reveal d2">
+      <span class="cpill"><span class="flag"><svg preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" id="flag-icons-ng" viewBox="0 0 512 512">  <g fill-rule="evenodd" stroke-width="1pt">    <path fill="#fff" d="M0 0h512v512H0z"/>    <path fill="#008753" d="M341.3 0H512v512H341.3zM0 0h170.7v512H0z"/>  </g></svg></span>Nigeria</span>
+      <span class="cpill"><span class="flag"><svg preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" id="flag-icons-gh" viewBox="0 0 512 512">  <path fill="#006b3f" d="M0 0h512v512H0z"/>  <path fill="#fcd116" d="M0 0h512v341.3H0z"/>  <path fill="#ce1126" d="M0 0h512v170.7H0z"/>  <path fill="#000001" d="m256 170.7 55.5 170.6L166.3 236h179.4L200.6 341.3z"/></svg></span>Ghana</span>
+      <span class="cpill"><span class="flag"><svg preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="flag-icons-ke" viewBox="0 0 512 512">  <defs>    <path id="ke-a" stroke-miterlimit="10" d="m-28.6 47.5 1.8 1 46.7-81c2.7-.6 4.2-3.2 5.7-5.8 1-1.8 5-8.7 6.7-17.7a58 58 0 0 0-11.9 14.7c-1.5 2.6-3 5.2-2.3 7.9z"/>  </defs>  <path fill="#fff" d="M0 0h512v512H0z"/>  <path fill="#000001" d="M0 0h512v153.6H0z"/>  <path fill="#060" d="M0 358.4h512V512H0z"/>  <g id="ke-b" transform="matrix(3.2 0 0 3.2 255.8 256)">    <use xlink:href="#ke-a" stroke="#000"/>    <use xlink:href="#ke-a" fill="#fff"/>  </g>  <use xlink:href="#ke-b" transform="matrix(-1 0 0 1 511.7 0)"/>  <path fill="#b00" d="M255.8 102.4c-19.2 0-51.2 51.2-60.8 76.8H0v153.6h195c9.7 25.6 41.7 76.8 60.9 76.8s51.2-51.2 60.8-76.8H512V179.2H316.6c-9.6-25.6-41.6-76.8-60.8-76.8"/>  <path id="ke-c" d="M316.6 332.8a220 220 0 0 0 16-76.8 220 220 0 0 0-16-76.8 220 220 0 0 0-16 76.8 220 220 0 0 0 16 76.8"/>  <use xlink:href="#ke-c" transform="matrix(-1 0 0 1 511.7 0)"/>  <g fill="#fff" transform="matrix(3.2 0 0 3.2 255.8 256)">    <ellipse rx="4" ry="6"/>    <path id="ke-d" d="M1 5.8s4 8 4 21-4 21-4 21z"/>    <use xlink:href="#ke-d" transform="scale(-1)"/>    <use xlink:href="#ke-d" transform="scale(-1 1)"/>    <use xlink:href="#ke-d" transform="scale(1 -1)"/>  </g></svg></span>Kenya</span>
+      <span class="cpill"><span class="flag"><svg preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" id="flag-icons-ug" viewBox="0 0 512 512">  <defs>    <clipPath id="ug-a">      <path fill-opacity=".7" d="M124 0h496v496H124z"/>    </clipPath>  </defs>  <g clip-path="url(#ug-a)" transform="translate(-128)scale(1.0321)">    <path fill="#ffe700" fill-rule="evenodd" d="M0 330.7h744v82.7H0z"/>    <path fill="#000001" fill-rule="evenodd" d="M0 248h744v82.7H0z"/>    <path fill="#de3908" fill-rule="evenodd" d="M0 165.4h744V248H0z"/>    <path fill="#ffe700" fill-rule="evenodd" d="M0 82.7h744v82.7H0z"/>    <path fill="#000001" fill-rule="evenodd" d="M0 0h744v82.7H0z"/>    <path fill="#fffdff" fill-rule="evenodd" stroke="#000" stroke-width=".9" d="M449.3 248a77.2 77.2 0 1 1-154.5 0 77.2 77.2 0 0 1 154.5 0z"/>    <path fill="#de3108" fill-rule="evenodd" stroke="#000" stroke-width=".9" d="m358.4 188.8-5-9.2c2-2 5.2-3.4 10.4-3.4l-.5 10z"/>    <path fill="#ffe700" fill-rule="evenodd" stroke="#000" stroke-width=".9" d="m363.3 186.4.6-10.2s10.4-.6 16 6.1l-5.5 8z"/>    <path fill="#de3108" fill-rule="evenodd" stroke="#000" stroke-width=".9" d="m374.6 190.2 5.1-8c3.4 3.6 4.8 6.2 5.4 10 0 .2-8.1 2-8.1 2z"/>    <path fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width=".8" d="M361 320.9s9.6-11 28.2-8.7c-2.8-4.5-11.9-4-11.9-4s-2.8-21.4-.6-22.4 11.5 0 11.5 0c1.3 0 3.4-3.3 1.7-5.4s-6.6-10.2-4.6-11.8 13 .9 13 .9l-31-39.8s-3.2-15 3.2-22.1c7.6-6.4 6.8-13.2 6.6-13.1-1-7-11.6-12-18.8-5.6-4.2 5.1-1.4 9-1.4 9s-11 3-11.5 5c-.4 1.8 12.5-.4 12.5-.4l-1.2 8.8s-25.2 23-6 42.7c.3 0 .7-.9.7-.9s6.8 8.4 13.9 10.2c6.7 6.9 6 5.8 6 5.8s1.4 10.8.1 13a93 93 0 0 0-21.2-.2c-2.3.7-11.1.3-9 14.6l3.2-7.3s-.2 5.2 1.9 7c-.4-5.4 2-9.1 2-9.1s.4 6 1.8 6.8c1.3 1 1.3-9.6 8.6-8.8 7.3 1 12.6.7 12.6.7s2.4 20.6 1.6 22.6c-5.2-1.3-17.8.5-18.6 3.7 7.4-.5 10.8.4 10.8.4s-6 5.3-4.1 8.4"/>    <path fill="#9ca69c" fill-rule="evenodd" stroke="#9ca69c" stroke-linecap="round" stroke-linejoin="round" stroke-width=".8" d="M364 208s-18.4 20.2-10.5 35.7c.5-2.2.3-3.5.5-3.4-.4-.3 2.3 1.8 2 1.4.2-1.1-.7-3.5-.7-3.5l2.4.6-1.4-2.7 3.5.5s-1.2-3.4-.8-3.4l2.9.2c-5.2-9.3-.3-17 2-25.3z"/>    <path fill="#9ca69c" fill-rule="evenodd" stroke="#9ca69c" stroke-width=".9" d="M370.3 190.8s1 7-2.8 9c-.6.4-3 1.2-2.7 2.6.5 1.9 1.5 1.5 3 1.2 4-.7 8.6-9.2 2.5-12.8z"/>    <path fill="#fff" fill-rule="evenodd" d="M363.5 196.7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/>    <path fill="#de3108" fill-rule="evenodd" stroke="#000" stroke-width=".9" d="M357.6 202.5c-1 .8-6 6.1-1 8 5.2-1.4 3.7-2.3 4.9-3.5 0-2.3-2.6-3-3.9-4.5z"/>    <path fill="#9ca69c" fill-rule="evenodd" stroke="#9ca69c" stroke-linecap="round" stroke-linejoin="round" stroke-width=".8" d="M368.7 252.4c-.3 1.2-1.4 5.4.2 8.6 4.4-1.8 6.4-1.3 7.9-.3-3.6-3-5-4.1-8.1-8.3"/>    <path fill="#fff" fill-rule="evenodd" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width=".8" d="m376.3 272.4.2 9.8s3.5.7 5 0c1.6-.6 0-6.8-5.2-9.8"/>    <path fill="#9ca69c" fill-rule="evenodd" stroke="#000" stroke-width=".9" d="M401.2 273.6s-6.4-15.3-22.5-19.2-14.1-21-12.8-22.1c.7-1.5 1.2-3.8 5.9-1.6s26.1 13 29.2 13.5.4 29.8.2 29.4z"/>    <path fill="#de3108" fill-rule="evenodd" stroke="#000" stroke-linejoin="round" stroke-width=".8" d="M385.8 254.4c-.3.1 21.6 12.9 15 23.9 6.3-4.1 4.2-11.4 4.2-11.4s5.1 13.3-7.3 19.8c1.4 1.2 2.2.9 2.2.9l-2 2.1s-1 1.6 7.3-2.4c-2.3 1.8-2.5 3.1-2.5 3.1s.7 1.8 6.1-3a30 30 0 0 0-5.4 7.2c12-1.1 37.8-39.7-8.1-51.1l2 2.2z"/>    <path fill="#fff" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width=".8" d="M386.7 250.6c3 2 4 2.8 4.4 3.8-2.7-.6-5.2-.4-5.2-.4s-5.8-5.6-6.9-6c-.8 0-5.4-3-5.4-3-2.3-1.1-4.4-9 4-6.7 8.8 4.1 10 4.4 10 4.4L398 246l6 6.7s-10.7-5.3-12-5.4c3 2.4 4.6 5.6 4.6 5.6-3.4-1-6.3-1.8-9.9-2.3"/>    <path fill="none" stroke="#fff" stroke-linecap="round" stroke-width=".8" d="M345.3 203.3s10.2-2.4 11.4-2"/>    <path fill="#de3908" fill-rule="evenodd" d="M0 413.4h744v82.7H0z"/>  </g></svg></span>Uganda</span>
+      <span class="cpill"><span class="flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path fill="#1eb53a" d="M0 0h512v170.7H0z"/><path fill="#fff" d="M0 170.7h512v170.6H0z"/><path fill="#0072c6" d="M0 341.3h512V512H0z"/></svg></span>Sierra Leone</span>
+      <span class="cpill"><span class="flag"><svg preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" id="flag-icons-tz" viewBox="0 0 512 512">  <defs>    <clipPath id="tz-a">      <path fill-opacity=".7" d="M102.9 0h496v496H103z"/>    </clipPath>  </defs>  <g clip-path="url(#tz-a)" transform="translate(-106.2)scale(1.0321)">    <g fill-rule="evenodd" stroke-width="1pt">      <path fill="#09f" d="M0 0h744.1v496H0z"/>      <path fill="#090" d="M0 0h744.1L0 496z"/>      <path fill="#000001" d="M0 496h165.4L744 103.4V0H578.7L0 392.7v103.4z"/>      <path fill="#ff0" d="M0 378 567 0h56L0 415.3v-37.2zm121.1 118 623-415.3V118L177 496z"/>    </g>  </g></svg></span>Tanzania</span>
+      <span class="cpill"><span class="flag"><svg preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="flag-icons-in" viewBox="0 0 512 512">  <path fill="#f93" d="M0 0h512v170.7H0z"/>  <path fill="#fff" d="M0 170.7h512v170.6H0z"/>  <path fill="#128807" d="M0 341.3h512V512H0z"/>  <g transform="translate(256 256)scale(3.41333)">    <circle r="20" fill="#008"/>    <circle r="17.5" fill="#fff"/>    <circle r="3.5" fill="#008"/>    <g id="in-d">      <g id="in-c">        <g id="in-b">          <g id="in-a" fill="#008">            <circle r=".9" transform="rotate(7.5 -8.8 133.5)"/>            <path d="M0 17.5.6 7 0 2l-.6 5z"/>          </g>          <use xlink:href="#in-a" transform="rotate(15)"/>        </g>        <use xlink:href="#in-b" transform="rotate(30)"/>      </g>      <use xlink:href="#in-c" transform="rotate(60)"/>    </g>    <use xlink:href="#in-d" transform="rotate(120)"/>    <use xlink:href="#in-d" transform="rotate(-120)"/>  </g></svg></span>India</span>
+      <span class="cpill"><span class="flag"><svg preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" id="flag-icons-gb" viewBox="0 0 512 512">  <path fill="#012169" d="M0 0h512v512H0z"/>  <path fill="#FFF" d="M512 0v64L322 256l190 187v69h-67L254 324 68 512H0v-68l186-187L0 74V0h62l192 188L440 0z"/>  <path fill="#C8102E" d="m184 324 11 34L42 512H0v-3zm124-12 54 8 150 147v45zM512 0 320 196l-4-44L466 0zM0 1l193 189-59-8L0 49z"/>  <path fill="#FFF" d="M176 0v512h160V0zM0 176v160h512V176z"/>  <path fill="#C8102E" d="M0 208v96h512v-96zM208 0v512h96V0z"/></svg></span>United Kingdom</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== APPLY ===== -->
+<section class="apply" id="apply">
+  <div class="wrap grid">
+    <aside class="aside reveal">
+      <span class="eyebrow"><span class="dot"></span>Apply now</span>
+      <h2>Lead it on <em>your campus</em></h2>
+      <p class="lede">Takes about 3 minutes. Open to current students and recent graduates who are passionate about law, technology and leadership.</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div class="stx"><h4>Apply</h4><p>Tell us about you and your campus (about 3 minutes).</p></div></div>
+        <div class="step"><span class="num">2</span><div class="stx"><h4>We review</h4><p>Applications are reviewed on a rolling, weekly basis.</p></div></div>
+        <div class="step"><span class="num">3</span><div class="stx"><h4>Quick chat</h4><p>Shortlisted candidates have a short conversation with our team.</p></div></div>
+        <div class="step"><span class="num">4</span><div class="stx"><h4>Onboard</h4><p>Get your ambassador kit and free monthly Lawexa AI access.</p></div></div>
+      </div>
+      <div class="support">
+        <!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-mail"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />  <rect x="2" y="4" rx="2" /></svg>
+        <span>Questions? Email <a href="mailto:ambassadors@lawexa.com">ambassadors@lawexa.com</a></span>
+      </div>
+    </aside>
+
+    <div class="formcard reveal d1">
+      <form id="ambForm" novalidate>
+        <!-- progress -->
+        <div class="fprogress">
+          <div class="fsteps">
+            <div class="track"><div class="fill"></div></div>
+            <div class="fstep active" data-i="0"><div class="node"><span class="num">1</span><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></div><div class="lab">About you</div></div>
+            <div class="fstep" data-i="1"><div class="node"><span class="num">2</span><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></div><div class="lab">Your campus</div></div>
+            <div class="fstep" data-i="2"><div class="node"><span class="num">3</span><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></div><div class="lab">Tell us more</div></div>
+          </div>
+          <div class="fcount" id="fcount">Step 1 of 3</div>
+        </div>
+
+        <!-- STEP 1 -->
+        <div class="fpanel show" data-step="0">
+          <p class="gl"><span class="n">1</span>About you</p>
+          <div class="frow">
+            <div class="field" data-required data-check>
+              <label for="fname">Full name<span class="req">*</span></label>
+              <div class="ctl"><input id="fname" name="fname" type="text" autocomplete="name" placeholder="Your full name"><span class="ok-check"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></span></div>
+              <div class="emsg">Please enter your full name.</div>
+            </div>
+            <div class="field" data-required data-check>
+              <label for="email">Email address<span class="req">*</span></label>
+              <div class="ctl"><input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com"><span class="ok-check"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></span></div>
+              <div class="emsg">Please enter a valid email address.</div>
+            </div>
+          </div>
+          <div class="frow">
+            <div class="field" data-required data-check>
+              <label for="phone">Phone / WhatsApp<span class="req">*</span></label>
+              <div class="ctl"><input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="With country code, e.g. +234, +44, +91"><span class="ok-check"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></span></div>
+              <div class="emsg">Please enter your phone number.</div>
+            </div>
+            <div class="field has-select" data-required data-check>
+              <label for="country">Country<span class="req">*</span></label>
+              <div class="ctl"><select id="country" name="country">
+                <option value="" selected disabled>Select your country</option>
+                <option>Nigeria</option><option>Ghana</option><option>Kenya</option><option>Uganda</option>
+                <option>Sierra Leone</option><option>Tanzania</option><option>India</option><option>United Kingdom</option>
+                <option>Other</option>
+              </select><span class="ok-check"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></span></div>
+              <div class="emsg">Please select your country.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="fpanel" data-step="1">
+          <p class="gl"><span class="n">2</span>Your campus</p>
+          <div class="frow">
+            <div class="field" data-required data-check>
+              <label for="uni">University / Institution<span class="req">*</span></label>
+              <div class="ctl"><input id="uni" name="university" type="text" placeholder="e.g. University of Lagos, Legon, Nairobi"><span class="ok-check"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></span></div>
+              <div class="emsg">Please enter your institution.</div>
+            </div>
+            <div class="field" data-required data-check>
+              <label for="faculty">Faculty / Department<span class="req">*</span></label>
+              <div class="ctl"><input id="faculty" name="faculty" type="text" placeholder="e.g. Faculty of Law"><span class="ok-check"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></span></div>
+              <div class="emsg">Please enter your faculty or department.</div>
+            </div>
+          </div>
+          <div class="chips-field" data-required>
+            <label>Level / Year of study<span class="req">*</span></label>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="level" value="Year 1"><span>Year 1</span></label>
+              <label class="chip"><input type="radio" name="level" value="Year 2"><span>Year 2</span></label>
+              <label class="chip"><input type="radio" name="level" value="Year 3"><span>Year 3</span></label>
+              <label class="chip"><input type="radio" name="level" value="Year 4"><span>Year 4</span></label>
+              <label class="chip"><input type="radio" name="level" value="Year 5"><span>Year 5</span></label>
+              <label class="chip"><input type="radio" name="level" value="Law School / Bar"><span>Law School / Bar</span></label>
+              <label class="chip"><input type="radio" name="level" value="Postgraduate"><span>Postgraduate</span></label>
+              <label class="chip"><input type="radio" name="level" value="Recent graduate"><span>Recent graduate</span></label>
+            </div>
+            <div class="emsg">Please select your level.</div>
+          </div>
+          <div class="field grad-field">
+            <label for="grad">Expected graduation <span class="hint">(optional)</span></label>
+            <input id="grad" name="graduation" type="text" placeholder="e.g. 2027">
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="fpanel" data-step="2">
+          <p class="gl"><span class="n">3</span>Tell us more</p>
+          <div class="field full" data-required>
+            <label for="why">Why do you want to be a Lawexa ambassador?<span class="req">*</span></label>
+            <textarea id="why" name="why" maxlength="600" placeholder="What draws you to law, tech and leadership, and to Lawexa?"></textarea>
+            <div class="ccount"><span data-count="why">0</span>/600</div>
+            <div class="emsg">Tell us a little about your motivation.</div>
+          </div>
+          <div class="field full" data-required>
+            <label for="grow">How would you grow Lawexa on your campus?<span class="req">*</span></label>
+            <textarea id="grow" name="grow" maxlength="600" placeholder="Your ideas for awareness activities, demos, communities or events."></textarea>
+            <div class="ccount"><span data-count="grow">0</span>/600</div>
+            <div class="emsg">Share at least one idea for growing Lawexa.</div>
+          </div>
+          <div class="field full">
+            <label for="exp">Leadership / community experience <span class="hint">(optional)</span></label>
+            <textarea id="exp" name="experience" maxlength="500" placeholder="Clubs, societies, volunteering, projects, anything relevant."></textarea>
+            <div class="ccount"><span data-count="exp">0</span>/500</div>
+          </div>
+          <div class="field full">
+            <label for="social">Top social handle <span class="hint">(optional)</span></label>
+            <input id="social" name="social" type="text" placeholder="@yourhandle">
+          </div>
+          <div class="chips-field">
+            <label>How did you hear about us? <span class="hint">(optional)</span></label>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="hear" value="Instagram"><span>Instagram</span></label>
+              <label class="chip"><input type="radio" name="hear" value="WhatsApp"><span>WhatsApp</span></label>
+              <label class="chip"><input type="radio" name="hear" value="X (Twitter)"><span>X (Twitter)</span></label>
+              <label class="chip"><input type="radio" name="hear" value="LinkedIn"><span>LinkedIn</span></label>
+              <label class="chip"><input type="radio" name="hear" value="TikTok"><span>TikTok</span></label>
+              <label class="chip"><input type="radio" name="hear" value="A friend / coursemate"><span>A friend</span></label>
+              <label class="chip"><input type="radio" name="hear" value="On campus"><span>On campus</span></label>
+              <label class="chip"><input type="radio" name="hear" value="Other"><span>Other</span></label>
+            </div>
+          </div>
+          <div class="consent" data-required id="consentBox">
+            <input id="consent" name="consent" type="checkbox" aria-label="Consent to be contacted">
+            <label for="consent">I confirm the information above is accurate and agree to be contacted by the Lawexa team about my application. See our <a href="https://lawexa.com" target="_blank" rel="noopener">privacy notice</a>.</label>
+          </div>
+        </div>
+
+        <!-- nav -->
+        <div class="fnav">
+          <button type="button" class="btn btn-back" id="backBtn"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-arrow-left"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="m12 19-7-7 7-7" />  <path d="M19 12H5" /></svg><span>Back</span></button>
+          <button type="button" class="btn btn-gold btn-lg" id="advBtn"><span id="advLabel">Continue</span><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true" id="advIcon"  class="lucide lucide-arrow-right"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M5 12h14" />  <path d="m12 5 7 7-7 7" /></svg></button>
+        </div>
+        <p class="fnote">We review applications weekly. You'll hear from us by email.</p>
+      </form>
+
+      <!-- success -->
+      <div class="success" id="success" role="status" aria-live="polite">
+        <div class="ring"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-check"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M20 6 9 17l-5-5" /></svg></div>
+        <h3>Application <em>received!</em></h3>
+        <p>Thank you for stepping up to lead Lawexa on your campus. Our team reviews applications every week, so keep an eye on your inbox.</p>
+        <p>A confirmation is on its way to the email you provided.</p>
+        <div class="ref" id="refTag">REF:</div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="wrap inner">
+    <div class="brandcol">
+      <img src="/ambassadors/logo.png" alt="Lawexa Ai">
+      <p>Shaping how the next generation of lawyers learn.</p>
+      <a class="urlpill" href="#apply"><!-- @license lucide-static v1.17.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-arrow-right"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M5 12h14" />  <path d="m12 5 7 7-7 7" /></svg>ambassador.lawexa.com</a>
+    </div>
+    <div class="flinks">
+      <span class="h">Program</span>
+      <a href="#deal">What you'll do</a>
+      <a href="#deal">What you'll get</a>
+      <a href="#reach">Campuses</a>
+      <a href="#apply">Apply</a>
+    </div>
+    <div class="flinks">
+      <span class="h">Lawexa</span>
+      <a href="https://lawexa.com" target="_blank" rel="noopener">lawexa.com</a>
+      <a href="mailto:ambassadors@lawexa.com">Contact us</a>
+      <a href="https://lawexa.com" target="_blank" rel="noopener">Privacy</a>
+    </div>
+  </div>
+  <div class="wrap legal">
+    <span>© 2026 Law Guide Technology Limited. All rights reserved.</span>
+    <span>Lawexa · Africa's leading legal learning platform.</span>
+  </div>
+</footer>
+<script src="/ambassadors/integration.js"></script>
+<script>
+/* Submission + auth/prefill are handled by integration.js (window.LawexaAmb). */
+
+(function(){
+  function icons(){ if(window.lucide && window.lucide.createIcons) window.lucide.createIcons(); }
+  icons();
+
+  // nav shadow on scroll
+  const nav=document.getElementById('nav');
+  const onScroll=()=>nav.classList.toggle('scrolled', window.scrollY>8);
+  window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+
+  // in-page navigation: scroll to the section instead of following a link
+  const NAV_OFFSET=84;
+  document.querySelectorAll('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click', e=>{
+      const id=a.getAttribute('href').slice(1);
+      if(!id) return;
+      const target=document.getElementById(id);
+      if(!target) return;
+      e.preventDefault();
+      const y=target.getBoundingClientRect().top + window.pageYOffset - NAV_OFFSET;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    });
+  });
+
+  // scroll reveals
+  const reveals=[...document.querySelectorAll('.reveal')];
+  if('IntersectionObserver' in window){
+    const io=new IntersectionObserver((es)=>{
+      es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+    },{threshold:.12, rootMargin:'0px 0px -8% 0px'});
+    reveals.forEach(r=>io.observe(r));
+  } else { reveals.forEach(r=>r.classList.add('in')); }
+
+  // char counters
+  document.querySelectorAll('[data-count]').forEach(c=>{
+    const ta=document.getElementById(c.getAttribute('data-count'));
+    if(ta){ const upd=()=>c.textContent=ta.value.length; ta.addEventListener('input',upd); upd(); }
+  });
+
+  // confetti burst
+  function burst(){
+    if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const colors=['#D4AF37','#E6C866','#B8942A','#8B7355','#FAF6EC'];
+    const box=document.createElement('div'); box.className='burst'; document.body.appendChild(box);
+    for(let i=0;i<70;i++){
+      const p=document.createElement('i');
+      const x=50+(Math.random()*30-15), c=colors[i%colors.length];
+      p.style.left=x+'vw'; p.style.top='42vh'; p.style.background=c;
+      if(i%3===0) p.style.borderRadius='50%';
+      box.appendChild(p);
+      const dx=(Math.random()*2-1)*60, dy=Math.random()*60+30, rot=Math.random()*720-360, dur=900+Math.random()*900;
+      p.animate([
+        {transform:'translate(0,0) rotate(0)',opacity:1},
+        {transform:`translate(${dx}vw, ${dy}vh) rotate(${rot}deg)`,opacity:0}
+      ],{duration:dur,easing:'cubic-bezier(.2,.6,.3,1)',fill:'forwards'});
+    }
+    setTimeout(()=>box.remove(),2200);
+  }
+
+  /* ============ MULTI-STEP WIZARD ============ */
+  const form=document.getElementById('ambForm');
+  const emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const panels=[...form.querySelectorAll('.fpanel')];
+  const fsteps=[...document.querySelectorAll('.fstep')];
+  const fill=document.querySelector('.fsteps .fill');
+  const fcount=document.getElementById('fcount');
+  const backBtn=document.getElementById('backBtn');
+  const advBtn=document.getElementById('advBtn');
+  const advLabel=document.getElementById('advLabel');
+  const advIcon=document.getElementById('advIcon');
+  const N=panels.length;
+  let cur=0, furthest=0;
+
+  const ctrlOf=f=>f.querySelector('input,select,textarea');
+  function isGood(field){
+    if(field.classList.contains('chips-field')) return !!field.querySelector('input:checked');
+    const el=ctrlOf(field); if(!el) return true;
+    if(el.type==='checkbox') return el.checked;
+    if(el.type==='email')    return emailRe.test(el.value.trim());
+    if(el.tagName==='SELECT') return !!el.value;
+    return !!el.value.trim();
+  }
+  function flagErr(field){ field.classList.add('err'); field.classList.remove('shake'); void field.offsetWidth; field.classList.add('shake'); }
+  function liveOk(field){
+    const good=isGood(field);
+    if(field.hasAttribute('data-check')) field.classList.toggle('ok', good);
+    if(good) field.classList.remove('err');
+  }
+  function validateStep(i){
+    let ok=true, first=null;
+    panels[i].querySelectorAll('[data-required]').forEach(f=>{
+      if(isGood(f)){ f.classList.remove('err'); }
+      else { flagErr(f); ok=false; if(!first) first=f; }
+    });
+    if(first){ const c=first.querySelector('input,select,textarea,.chip input'); try{(c||first).focus({preventScroll:true});}catch(e){} first.scrollIntoView({behavior:'smooth',block:'center'}); }
+    return ok;
+  }
+
+  function render(dir, focus){
+    panels.forEach((p,i)=>{ p.classList.toggle('back', dir==='back'); p.classList.toggle('show', i===cur); });
+    fsteps.forEach((s,i)=>{
+      s.classList.toggle('active', i===cur);
+      s.classList.toggle('done', i<cur);
+      if(i<=furthest && i!==cur) s.setAttribute('data-clickable',''); else s.removeAttribute('data-clickable');
+    });
+    fill.style.width=(cur/(N-1))*100+'%';
+    fcount.textContent='Step '+(cur+1)+' of '+N;
+    backBtn.style.visibility = cur===0 ? 'hidden' : 'visible';
+    advLabel.textContent = cur===N-1 ? 'Submit application' : 'Continue';
+    if(focus){
+      const f=panels[cur].querySelector('input:not([type=radio]),select,textarea');
+      if(f) setTimeout(()=>{ try{ f.focus({preventScroll:true}); }catch(e){} }, 120);
+      const card=document.querySelector('.formcard');
+      const top=card.getBoundingClientRect().top;
+      if(top<70 || top>window.innerHeight*0.5) card.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  }
+
+  function goNext(){
+    if(cur<N-1){ if(validateStep(cur)){ cur++; if(cur>furthest) furthest=cur; render('fwd',true); } }
+    else { doSubmit(); }
+  }
+  function goBack(){ if(cur>0){ cur--; render('back',true); } }
+
+  advBtn.addEventListener('click', goNext);
+  backBtn.addEventListener('click', goBack);
+  fsteps.forEach(s=>s.addEventListener('click',()=>{
+    const i=+s.dataset.i;
+    if(i<=furthest && i!==cur){ const dir=i<cur?'back':'fwd'; cur=i; render(dir,true); }
+  }));
+
+  // live feedback + clear errors as the user types/selects
+  form.addEventListener('input', e=>{ const f=e.target.closest('[data-required]'); if(f) liveOk(f); });
+  form.addEventListener('change', e=>{ const f=e.target.closest('[data-required]'); if(f) liveOk(f); });
+  // Enter advances (except inside textareas)
+  form.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.tagName!=='TEXTAREA'){ e.preventDefault(); goNext(); } });
+  form.addEventListener('submit', e=>e.preventDefault());
+
+  render('fwd', false);
+
+  async function doSubmit(){
+    if(!validateStep(N-1)) return;
+    advBtn.disabled=true; if(advIcon) advIcon.style.display='none';
+    advLabel.textContent='Submitting';
+    const sp=document.createElement('span'); sp.className='spinner'; advBtn.appendChild(sp);
+    backBtn.style.visibility='hidden';
+
+    try{
+      const app = await window.LawexaAmb.submit(new FormData(form));
+      const ref = app && app.uuid ? app.uuid.slice(0,8).toUpperCase() : (app && app.id ? '#'+app.id : '');
+      document.getElementById('refTag').textContent = ref ? ('REF: '+ref) : 'Submitted';
+      form.style.display='none';
+      const ok=document.getElementById('success'); ok.classList.add('show');
+      burst();
+      ok.scrollIntoView({behavior:'smooth',block:'center'});
+    }catch(err){
+      advBtn.disabled=false; sp.remove(); if(advIcon) advIcon.style.display='';
+      advLabel.textContent='Try again';
+      window.LawexaAmb.handleSubmitError(err);
+    }
+  }
+})();
+</script>
+</body>
+</html>

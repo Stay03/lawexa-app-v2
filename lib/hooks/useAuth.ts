@@ -10,6 +10,14 @@ import { extractApiError, type ApiError } from '@/lib/utils/api-error';
 import { clearAttribution } from '@/lib/utils/attribution';
 import type { LoginFormData, RegisterFormData } from '@/types/auth';
 
+// Honor a ?redirect= return URL (safe internal paths only) set by pages that
+// gate on auth — e.g. the /ambassadors landing. Falls back to the home page.
+function getSafeRedirect(): string {
+  if (typeof window === 'undefined') return '/';
+  const target = new URLSearchParams(window.location.search).get('redirect');
+  return target && target.startsWith('/') && !target.startsWith('//') ? target : '/';
+}
+
 export function useAuth() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -39,7 +47,7 @@ export function useAuth() {
 
         // Check if user needs onboarding (profession is set after completing onboarding)
         const needsOnboarding = !(response.data.user.profile?.onboarding_completed_at || response.data.user.profile?.profession);
-        router.push(needsOnboarding ? '/onboarding' : '/');
+        router.push(needsOnboarding ? '/onboarding' : getSafeRedirect());
       }
     },
   });
@@ -60,7 +68,7 @@ export function useAuth() {
 
         // For OAuth users or verified users, continue to onboarding
         const needsOnboarding = !(response.data.user.profile?.onboarding_completed_at || response.data.user.profile?.profession);
-        router.push(needsOnboarding ? '/onboarding' : '/');
+        router.push(needsOnboarding ? '/onboarding' : getSafeRedirect());
       }
     },
   });
