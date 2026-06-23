@@ -27,6 +27,7 @@ export { AdminSubscriptionDetailView } from './subscriptions/AdminSubscriptionDe
 export { AdminSubscriptionInvoicesTable } from './subscriptions/AdminSubscriptionInvoicesTable';
 export { AdminUsersTable } from './AdminUsersTable';
 export { AdminUserFilters } from './AdminUserFilters';
+export { AdminPlanPeriodsView } from './plan-periods/AdminPlanPeriodsView';
 export { AdminMessagePackFilters } from './message-packs/AdminMessagePackFilters';
 export { AdminMessagePacksTable } from './message-packs/AdminMessagePacksTable';
 export { AdminMessagePackDetailView } from './message-packs/AdminMessagePackDetail';

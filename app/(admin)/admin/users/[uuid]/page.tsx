@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminUser, useAdminUserConversations } from '@/lib/hooks/useAdmin';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import { ArrowLeft, Activity, Webhook } from 'lucide-react';
+import { ArrowLeft, Activity, Webhook, CalendarClock } from 'lucide-react';
 import {
   UserIdentityCard,
   UserAttributionCard,
@@ -166,6 +166,12 @@ export default function AdminUserDetailPage({
             <p className="text-sm text-muted-foreground font-mono">{uuid}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link href={`/admin/users/${user.uuid}/plan-periods`}>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <CalendarClock className="h-3.5 w-3.5" />
+                Plan periods
+              </Button>
+            </Link>
             <Link href={`/admin/activity-feed?user_id=${user.id}`}>
               <Button variant="outline" size="sm" className="gap-1.5">
                 <Activity className="h-3.5 w-3.5" />

@@ -24,6 +24,7 @@ import type {
   AdminPlanUpdatePayload,
   AdminPlanLimitsPayload,
 } from '@/types/admin-plans';
+import type { AdminPlanPeriodConversationsParams } from '@/types/admin-plan-periods';
 
 // Query key factory for organized caching
 export const adminKeys = {
@@ -41,6 +42,13 @@ export const adminKeys = {
     [...adminKeys.users(), uuid, 'conversations', params] as const,
   userTokenUsage: (uuid: string, params: AdminUserTokenUsageParams) =>
     [...adminKeys.users(), uuid, 'token-usage', params] as const,
+  userPlanPeriods: (uuid: string) =>
+    [...adminKeys.users(), uuid, 'plan-periods'] as const,
+  userPlanPeriodConversations: (
+    uuid: string,
+    key: string,
+    params: AdminPlanPeriodConversationsParams
+  ) => [...adminKeys.users(), uuid, 'plan-periods', key, params] as const,
   conversationAnalytics: (params: ConversationAnalyticsParams) =>
     [...adminKeys.conversations(), 'analytics', params] as const,
   userAnalytics: (params: UserAnalyticsParams) =>
@@ -169,6 +177,36 @@ export function useAdminUserTokenUsage(
     queryKey: adminKeys.userTokenUsage(uuid, params),
     queryFn: () => adminApi.getUserTokenUsage(uuid, params),
     enabled: !!uuid,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching a user's plan periods, buckets, totals, and reconciliation.
+ * Not paginated.
+ */
+export function useAdminUserPlanPeriods(uuid: string) {
+  return useQuery({
+    queryKey: adminKeys.userPlanPeriods(uuid),
+    queryFn: () => adminApi.getUserPlanPeriods(uuid),
+    enabled: !!uuid,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching the conversations within a single plan-period or bucket.
+ * Pass an empty `key` (or `uuid`) to keep the query disabled until a slot is selected.
+ */
+export function useAdminUserPlanPeriodConversations(
+  uuid: string,
+  key: string,
+  params: AdminPlanPeriodConversationsParams = {}
+) {
+  return useQuery({
+    queryKey: adminKeys.userPlanPeriodConversations(uuid, key, params),
+    queryFn: () => adminApi.getUserPlanPeriodConversations(uuid, key, params),
+    enabled: !!uuid && !!key,
     staleTime: 30 * 1000, // 30 seconds
   });
 }

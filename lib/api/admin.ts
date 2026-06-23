@@ -43,6 +43,11 @@ import type {
   AdminPlanLimitsResponse,
   AdminPlanSyncResponse,
 } from '@/types/admin-plans';
+import type {
+  AdminUserPlanPeriodsResponse,
+  AdminPlanPeriodConversationsParams,
+  AdminPlanPeriodConversationsResponse,
+} from '@/types/admin-plan-periods';
 
 export const adminApi = {
   /**
@@ -173,6 +178,42 @@ export const adminApi = {
           group_by: params.group_by ?? 'none',
           sort_by: params.sort_by ?? 'created_at',
           sort_order: params.sort_order ?? 'desc',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get a user's subscription/billing plan periods, side-buckets, totals, and
+   * reconciliation block. Not paginated — a user has a bounded number of periods.
+   * Requires admin role
+   */
+  getUserPlanPeriods: async (
+    uuid: string
+  ): Promise<AdminUserPlanPeriodsResponse> => {
+    const response = await apiClient.get<AdminUserPlanPeriodsResponse>(
+      `/admin/users/${uuid}/plan-periods`
+    );
+    return response.data;
+  },
+
+  /**
+   * List the conversations whose usage falls in a single plan-period or bucket
+   * (identified by its `key`), paginated, with per-slot usage counts.
+   * Requires admin role
+   */
+  getUserPlanPeriodConversations: async (
+    uuid: string,
+    key: string,
+    params: AdminPlanPeriodConversationsParams = {}
+  ): Promise<AdminPlanPeriodConversationsResponse> => {
+    const response = await apiClient.get<AdminPlanPeriodConversationsResponse>(
+      `/admin/users/${uuid}/plan-periods/${key}/conversations`,
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
         },
       }
     );
