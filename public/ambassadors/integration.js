@@ -242,9 +242,11 @@
     hideField('email');                 // email -> from account
     if (p.country) hideField('country');     // only ask if the profile lacks it
     if (p.university) hideField('uni');
-    // Lawexa is a legal platform: law students/lawyers don't need to state a
-    // faculty (it's law), so skip the question for them.
-    if (p.user_type === 'lawyer' || p.user_type === 'law_student') hideField('faculty');
+    // Faculty/department only makes sense for non-law students. Law students
+    // have area_of_study === 'Law' (set at onboarding); anyone without a real
+    // non-law area of study has it hidden (faculty is law / N/A for them).
+    var aos = (p.area_of_study || '').trim().toLowerCase();
+    if (aos === '' || aos === 'law') hideField('faculty');
     // phone, level, motivation, growth_plan (+ optionals) stay.
   }
 
