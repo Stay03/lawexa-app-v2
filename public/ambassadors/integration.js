@@ -40,8 +40,20 @@
     }
   }
 
-  function loginUrl() { return '/login?redirect=' + encodeURIComponent(RETURN_TO); }
-  function registerUrl() { return '/register?redirect=' + encodeURIComponent(RETURN_TO); }
+  // Forward any incoming referral/utm params into the signup flow so the
+  // 10-free-messages reward can be attributed when a friend signs up.
+  function forwardedParams() {
+    var inc = new URLSearchParams(location.search);
+    var keep = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'ref', 'referral_code'];
+    var out = '';
+    keep.forEach(function (k) {
+      var v = inc.get(k);
+      if (v) out += '&' + k + '=' + encodeURIComponent(v);
+    });
+    return out;
+  }
+  function loginUrl() { return '/login?redirect=' + encodeURIComponent(RETURN_TO) + forwardedParams(); }
+  function registerUrl() { return '/register?redirect=' + encodeURIComponent(RETURN_TO) + forwardedParams(); }
 
   function authedFetch(path, opts) {
     opts = opts || {};
@@ -300,8 +312,44 @@
       });
   }
 
+  // ---- Share / invite ----
+  var SHARE_TEXT = 'Join me as a Lawexa Campus Ambassador. Sign up here and get 10 free messages to start:';
+  function shareUrl() {
+    return location.origin + '/ambassadors?utm_source=ambassador&utm_medium=referral&utm_campaign=ambassador-10-free';
+  }
+  function showShareFallback(url, copied) {
+    var note = document.getElementById('shareNote');
+    if (note && copied) note.innerHTML = 'Link copied! Paste it anywhere, or share via:';
+    var box = document.getElementById('shareFallback');
+    if (!box) return;
+    var full = encodeURIComponent(SHARE_TEXT + ' ' + url);
+    box.innerHTML =
+      '<a class="btn btn-ghost" target="_blank" rel="noopener" href="https://wa.me/?text=' + full + '" style="margin:4px">WhatsApp</a>' +
+      '<a class="btn btn-ghost" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=' + encodeURIComponent(SHARE_TEXT) + '&url=' + encodeURIComponent(url) + '" style="margin:4px">X</a>';
+    box.style.display = 'block';
+  }
+  function wireShare() {
+    var btn = document.getElementById('shareBtn');
+    if (!btn || btn.dataset.wired) return;
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', function () {
+      var url = shareUrl();
+      if (navigator.share) {
+        navigator.share({ title: 'Lawexa Campus Ambassador', text: SHARE_TEXT + ' ', url: url }).catch(function () {});
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(SHARE_TEXT + ' ' + url).then(
+          function () { showShareFallback(url, true); },
+          function () { showShareFallback(url, false); }
+        );
+      } else {
+        showShareFallback(url, false);
+      }
+    });
+  }
+
   window.LawexaAmb = { init: init, submit: submit, handleSubmitError: handleSubmitError };
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else setTimeout(init, 0);
+  function boot() { wireShare(); init(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else setTimeout(boot, 0);
 })();
