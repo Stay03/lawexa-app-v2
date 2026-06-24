@@ -25,6 +25,7 @@ import {
   Infinity,
   BadgeCheck,
   Sparkles,
+  Ban,
   Smartphone,
   Monitor,
   Tablet,
@@ -208,6 +209,16 @@ function AdminUsersTable({
                           )}
                           {user.is_creator && (
                             <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          )}
+                          {user.free_messages_blocked && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Ban className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Free messages blocked</p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                         <span className="block truncate text-xs text-muted-foreground">

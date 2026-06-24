@@ -1,15 +1,23 @@
 'use client';
 
-import { use, useCallback, useMemo } from 'react';
+import { use, useCallback, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminUser, useAdminUserConversations } from '@/lib/hooks/useAdmin';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import { ArrowLeft, Activity, Webhook, CalendarClock } from 'lucide-react';
+import {
+  ArrowLeft,
+  Activity,
+  Webhook,
+  CalendarClock,
+  Ban,
+  ShieldCheck,
+} from 'lucide-react';
 import {
   UserIdentityCard,
+  UserFreeMessagesBlockDialog,
   UserAttributionCard,
   QuickStatsRow,
   AdminConversationsTable,
@@ -31,6 +39,7 @@ export default function AdminUserDetailPage({
   const searchParams = useSearchParams();
   const { data: userData, isLoading: userLoading, error } = useAdminUser(uuid);
   const { exchangeRate, showNGN } = useCurrencyStore();
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
 
   // Read params from URL for conversations
   const conversationParams = useMemo<AdminUserConversationsParams>(() => {
@@ -184,9 +193,36 @@ export default function AdminUserDetailPage({
                 Paystack webhooks
               </Button>
             </Link>
+            {user.free_messages_blocked ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-emerald-600 hover:text-emerald-600"
+                onClick={() => setBlockDialogOpen(true)}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Unblock messages
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-destructive hover:text-destructive"
+                onClick={() => setBlockDialogOpen(true)}
+              >
+                <Ban className="h-3.5 w-3.5" />
+                Block messages
+              </Button>
+            )}
           </div>
         </div>
       </div>
+
+      <UserFreeMessagesBlockDialog
+        open={blockDialogOpen}
+        onOpenChange={setBlockDialogOpen}
+        user={user}
+      />
 
       {/* Main Layout: Sidebar + Content */}
       <div className="flex flex-col lg:flex-row gap-6">

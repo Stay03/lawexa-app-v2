@@ -214,6 +214,11 @@ export interface AdminUserDetail {
   role: string;
   is_creator: boolean;
   is_verified: boolean;
+  // True when the user's free AI messages are blocked — set by BOTH the
+  // automatic device-abuse detection and the admin manual block. The flag is
+  // source-neutral (it says blocked, not why); the manual-vs-auto distinction
+  // only lives in the device abuse-logs.
+  free_messages_blocked: boolean;
   auth_provider: string;
   avatar_url: string | null;
   profile: AdminUserProfile | null;
@@ -229,6 +234,41 @@ export interface AdminUserDetailResponse {
   success: boolean;
   message: string;
   data: AdminUserDetail;
+}
+
+/**
+ * Request body for PUT /api/users/{uuid}/free-messages-block (admin-only).
+ *
+ * Note the path: admin *write* actions on a user live under /api/users/{uuid}/...
+ * (next to /role and /creator), not under the read-only /api/admin/users/ prefix.
+ */
+export interface AdminFreeMessagesBlockPayload {
+  /** true → block, false → unblock. Required (422 if omitted). */
+  blocked: boolean;
+  /** Optional audit note stored on the block record. Max 500 chars (422 if longer). */
+  reason?: string;
+}
+
+/** Lean user object returned by the free-messages-block endpoint. */
+export interface AdminFreeMessagesBlockUser {
+  id: number;
+  uuid: string;
+  name: string;
+  email: string | null;
+  role: string;
+  is_creator: boolean;
+  free_messages_blocked: boolean;
+  is_verified: boolean;
+  auth_provider: string;
+  avatar_url: string | null;
+  profile: AdminUserProfile | null;
+  created_at: string;
+}
+
+export interface AdminFreeMessagesBlockResponse {
+  success: boolean;
+  message: string;
+  data: AdminFreeMessagesBlockUser;
 }
 
 // ============================================
@@ -280,6 +320,8 @@ export interface IAdminUserListItem {
   platform: string | null;
   is_creator: boolean;
   is_verified: boolean;
+  // See AdminUserDetail.free_messages_blocked — source-neutral block flag.
+  free_messages_blocked: boolean;
   source: string;
   attribution: IAdminUserListAttribution | null;
   created_at: string;

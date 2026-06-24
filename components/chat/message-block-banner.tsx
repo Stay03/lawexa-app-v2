@@ -88,14 +88,16 @@ function formatResetTimestamp(iso: string): string {
 
 function blockedHeading(reason: TBlockedReasonCode): string {
   switch (reason) {
-    case 'account_flagged':
-      return 'Your account needs attention';
     case 'hard_limit':
       return 'You’ve hit your usage limit';
     case 'cancelled_grace_exhausted':
       return 'Your plan access has ended';
+    // 'account_flagged' is intentionally treated like a plain exhausted state —
+    // flagged users get the same experience as anyone out of messages, with no
+    // special "contact support" messaging.
     case 'free_no_subscription':
     case 'plan_exhausted':
+    case 'account_flagged':
     default:
       return 'You’ve used your messages for now';
   }
@@ -113,8 +115,11 @@ const UPGRADE_CTA: BlockedCta = {
 
 function blockedCtas(reason: TBlockedReasonCode): BlockedCta[] {
   switch (reason) {
+    // 'account_flagged' shares the exhausted CTAs — a paid subscription also
+    // overrides the block, so Upgrade / Buy a pack is a valid path for them too.
     case 'free_no_subscription':
     case 'plan_exhausted':
+    case 'account_flagged':
       return [UPGRADE_CTA, BUY_PACK_CTA];
     case 'cancelled_grace_exhausted':
       return [
@@ -123,14 +128,6 @@ function blockedCtas(reason: TBlockedReasonCode): BlockedCta[] {
       ];
     case 'hard_limit':
       return [];
-    case 'account_flagged':
-      return [
-        {
-          label: 'Contact support',
-          href: 'mailto:support@lawexa.com',
-          variant: 'outline',
-        },
-      ];
     default:
       return [];
   }

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
 import type {
   AdminConversationsParams,
+  AdminFreeMessagesBlockPayload,
   IAdminUserListParams,
   AdminUserConversationsParams,
   AdminUserTokenUsageParams,
@@ -313,6 +314,31 @@ export function useMessagePackAnalytics(params: MessagePackAnalyticsParams = {})
     queryKey: adminKeys.messagePackAnalytics(params),
     queryFn: () => adminApi.getMessagePackAnalytics(params),
     staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook for blocking/unblocking a user's free AI messages (admin-only).
+ *
+ * Invalidates all user queries so the badge, the list row, and the detail
+ * view reflect the new flag. The endpoint sets the same source-neutral flag
+ * the automatic device-abuse detection uses, so unblocking lifts an auto-flag
+ * too. PUT /api/users/{uuid}/free-messages-block.
+ */
+export function useSetUserFreeMessagesBlock() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      uuid,
+      payload,
+    }: {
+      uuid: string;
+      payload: AdminFreeMessagesBlockPayload;
+    }) => adminApi.setUserFreeMessagesBlock(uuid, payload),
+    onSuccess: () => {
+      // adminKeys.users() is the parent of both the list and detail keys.
+      queryClient.invalidateQueries({ queryKey: adminKeys.users() });
+    },
   });
 }
 

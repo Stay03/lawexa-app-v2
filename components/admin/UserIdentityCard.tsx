@@ -11,6 +11,7 @@ import {
 import {
   CheckCircle2,
   XCircle,
+  Ban,
   Shield,
   Calendar,
   Copy,
@@ -114,6 +115,14 @@ export function UserIdentityCard({ user, className }: UserIdentityCardProps) {
           {user.is_creator && (
             <Badge variant="outline" className="gap-1">
               Creator
+            </Badge>
+          )}
+          {user.free_messages_blocked && (
+            <Badge
+              variant="outline"
+              className="gap-1 text-red-600 border-red-600"
+            >
+              <Ban className="h-3 w-3" /> Free messages blocked
             </Badge>
           )}
         </div>

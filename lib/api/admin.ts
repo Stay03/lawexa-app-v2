@@ -4,6 +4,8 @@ import type {
   AdminConversationsListResponse,
   AdminConversationDetailResponse,
   AdminUserDetailResponse,
+  AdminFreeMessagesBlockPayload,
+  AdminFreeMessagesBlockResponse,
   IAdminUserListParams,
   IAdminUserListResponse,
   AdminUserConversationsParams,
@@ -131,6 +133,26 @@ export const adminApi = {
   getUser: async (uuid: string): Promise<AdminUserDetailResponse> => {
     const response = await apiClient.get<AdminUserDetailResponse>(
       `/admin/users/${uuid}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Block or unblock a user's free AI messages. Admin-only.
+   *
+   * Path is /users/{uuid}/... (NOT /admin/users/) by design — this app keeps
+   * read-only admin endpoints under /admin/users/ but admin write actions on a
+   * user (role, creator, this) under /users/{uuid}/..., all admin-role gated.
+   * Sets the same source-neutral flag the automatic device-abuse detection uses,
+   * so unblocking here also lifts an automatic flag. Returns the updated user.
+   */
+  setUserFreeMessagesBlock: async (
+    uuid: string,
+    payload: AdminFreeMessagesBlockPayload
+  ): Promise<AdminFreeMessagesBlockResponse> => {
+    const response = await apiClient.put<AdminFreeMessagesBlockResponse>(
+      `/users/${uuid}/free-messages-block`,
+      payload
     );
     return response.data;
   },
