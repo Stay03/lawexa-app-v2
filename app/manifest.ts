@@ -11,6 +11,14 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Access Nigerian law cases, notes, and legal research materials',
     start_url: '/',
     display: 'standalone',
+    // With an origin-wide scope, Android's installed app (WebAPK) captures every
+    // in-scope link — a shared case/note/radar/conversation/ambassador URL tapped
+    // on a device that has Lawexa installed opens here instead of the browser.
+    // `navigate-existing` makes that deterministic: an already-running app window
+    // is focused AND navigated to the launched URL, so deep links always land on
+    // the shared page rather than whatever screen the app was last showing.
+    // (Chromium 110+; ignored by browsers that don't support it.)
+    launch_handler: { client_mode: 'navigate-existing' },
     background_color: '#ffffff',
     theme_color: '#C9A227',
     icons: [
