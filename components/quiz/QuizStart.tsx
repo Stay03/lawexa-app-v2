@@ -19,8 +19,11 @@ export function QuizStart() {
   const sessionsQuery = useQuizSessions({ per_page: 1 });
   const [topic, setTopic] = useState<string | null>(null);
 
-  // Treat unknown (still loading) as verified — don't block prematurely.
-  const emailUnverified = user?.is_verified === false;
+  // Only email/password signups need to verify; OAuth logins (e.g. Google) are
+  // already verified. Mirrors the check-email gate in useAuth. Unknown role/loading
+  // is treated as not-blocked so we never flash the notice prematurely.
+  const emailUnverified =
+    user?.auth_provider === 'email' && user?.is_verified === false;
   const activeSession =
     sessionsQuery.data?.data?.find((s) => s.status === 'active') ?? null;
 
