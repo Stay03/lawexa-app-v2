@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -11,28 +12,44 @@ interface QuizGuardProps {
 }
 
 /**
+ * Tracks whether the persisted auth store has finished rehydrating. On a cold
+ * page load (e.g. opening /quiz directly) the session is restored from storage
+ * asynchronously; deciding access before that finishes would wrongly bounce a
+ * logged-in user. `useSyncExternalStore` keeps this SSR-safe and React-Compiler
+ * clean (no setState-in-effect).
+ */
+function useAuthHydrated(): boolean {
+  return useSyncExternalStore(
+    useAuthStore.persist.onFinishHydration,
+    () => useAuthStore.persist.hasHydrated(),
+    () => false
+  );
+}
+
+/**
  * Route guard for the Quiz player. Allows only the soft-launch audience
- * (researcher / admin / superadmin) through; everyone else is redirected home —
- * they should never have seen a link here anyway (the sidebar hides it).
+ * (researcher / admin / superadmin); everyone else is redirected home.
  *
- * Mirrors AdminGuard. Note this gates on **role only**: verified-email is a
- * backend requirement surfaced as a friendly notice on the player screens (a
- * `403`), not a reason to bounce an allowed-role user off the route.
+ * Gates on role only — verified-email is surfaced as a notice on the player
+ * screens, not a reason to bounce. The decision waits until auth has settled
+ * (store hydrated + the profile query done) so a direct hard-load to /quiz
+ * can't redirect during the brief window before the session is restored.
  */
 export function QuizGuard({ children }: QuizGuardProps) {
   const router = useRouter();
-  const { user, isAuthenticated, isGuest, isLoading } = useAuth();
+  const { user, isGuest, isLoading } = useAuth();
+  const hydrated = useAuthHydrated();
 
-  const canAccess =
-    isAuthenticated && !isGuest && canAccessQuizPlayer(user?.role);
+  const canAccess = !isGuest && canAccessQuizPlayer(user?.role);
+  const settled = hydrated && !isLoading;
 
   useEffect(() => {
-    if (!isLoading && !canAccess) {
+    if (settled && !canAccess) {
       router.replace('/');
     }
-  }, [isLoading, canAccess, router]);
+  }, [settled, canAccess, router]);
 
-  if (isLoading) {
+  if (!settled) {
     return (
       <div className="space-y-4 p-6">
         <Skeleton className="h-8 w-48" />

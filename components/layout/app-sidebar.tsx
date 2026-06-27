@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Users,
   Radar,
+  GraduationCap,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/nav-main"
@@ -27,6 +28,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { useAuthStore } from "@/lib/stores/authStore"
+import { canAccessQuizPlayer } from "@/lib/utils/quiz-access"
 import { AuthModal } from "@/components/auth/AuthModal"
 import Link from "next/link"
 import Image from "next/image"
@@ -79,10 +81,21 @@ const GUEST_RESTRICTED_URLS = new Set([
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, isGuest } = useAuthStore();
   const isLawyer = user?.profile?.user_type === 'lawyer';
+  // Quiz is in soft launch — only researcher/admin/superadmin see the link.
+  const canQuiz = canAccessQuizPlayer(user?.role);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const navItems = [
     ...navMain,
+    ...(canQuiz
+      ? [
+          {
+            title: 'Quiz',
+            url: '/quiz',
+            icon: GraduationCap,
+          },
+        ]
+      : []),
     ...(isLawyer
       ? [
           {
