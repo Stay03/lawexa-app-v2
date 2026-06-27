@@ -20,8 +20,11 @@ interface QuizGuardProps {
  */
 function useAuthHydrated(): boolean {
   return useSyncExternalStore(
-    useAuthStore.persist.onFinishHydration,
-    () => useAuthStore.persist.hasHydrated(),
+    // Access `.persist` lazily inside the callbacks — these run on the client
+    // only, never during the server prerender (which uses the server snapshot).
+    (onStoreChange) =>
+      useAuthStore.persist?.onFinishHydration(onStoreChange) ?? (() => {}),
+    () => useAuthStore.persist?.hasHydrated() ?? false,
     () => false
   );
 }
