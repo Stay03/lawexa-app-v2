@@ -18,17 +18,6 @@ function countryFlagCode(c: Country): string | undefined {
   return getCountryCode(c.name) ?? undefined;
 }
 
-function TabLabel({ name, count }: { name: string; count: number }) {
-  return (
-    <>
-      {name}
-      <span className="ml-1.5 text-xs tabular-nums text-muted-foreground/80">
-        {count.toLocaleString()}
-      </span>
-    </>
-  );
-}
-
 interface StatuteCountryTabsProps {
   // Active tab — ALL_COUNTRIES or a String(country.id).
   value: string;
@@ -48,12 +37,12 @@ export function StatuteCountryTabs({
     {
       value: ALL_COUNTRIES,
       icon: <Globe className="h-4 w-4" />,
-      label: <TabLabel name="All" count={data?.total ?? 0} />,
+      label: 'All',
     },
     ...countries.map((facet) => ({
       value: String(facet.country.id),
       icon: <JurisdictionFlag code={countryFlagCode(facet.country)} />,
-      label: <TabLabel name={facet.country.name} count={facet.statute_count} />,
+      label: facet.country.name,
     })),
   ];
 
