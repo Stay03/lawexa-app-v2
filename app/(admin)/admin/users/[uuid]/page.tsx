@@ -21,6 +21,7 @@ import {
 } from '@/components/admin';
 import { UserActivitySection } from '@/components/admin/activity/UserActivitySection';
 import { AdminUserQuizSection } from '@/components/admin/quiz/AdminUserQuizSection';
+import { AdminUserQuizSessions } from '@/components/admin/quiz/AdminUserQuizSessions';
 import {
   ADMIN_USER_TABS,
   ADMIN_USER_TAB_LABELS,
@@ -167,7 +168,10 @@ export default function AdminUserDetailPage({
         </TabsContent>
 
         <TabsContent value="quiz">
-          <AdminUserQuizSection uuid={uuid} />
+          <div className="space-y-5">
+            <AdminUserQuizSection uuid={uuid} />
+            <AdminUserQuizSessions uuid={uuid} />
+          </div>
         </TabsContent>
 
         <TabsContent value="conversations">
