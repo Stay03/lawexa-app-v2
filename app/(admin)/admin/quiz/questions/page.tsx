@@ -2,9 +2,17 @@
 
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AdminPagination } from '@/components/admin/AdminPagination';
 import { AdminQuizQuestionFilters } from '@/components/admin/quiz/AdminQuizQuestionFilters';
 import { AdminQuizQuestionsTable } from '@/components/admin/quiz/AdminQuizQuestionsTable';
@@ -24,6 +32,15 @@ const QUESTION_SORTS: AdminQuizQuestionSort[] = [
   'created_at',
   'reviewed_at',
 ];
+
+const SORT_LABELS: Record<AdminQuizQuestionSort, string> = {
+  served: 'Served',
+  answered: 'Answered',
+  correct: 'Correct',
+  difficulty: 'Difficulty',
+  created_at: 'Created',
+  reviewed_at: 'Reviewed',
+};
 
 export default function AdminQuizQuestionsPage() {
   return (
@@ -123,6 +140,54 @@ function AdminQuizQuestionsContent() {
 
           <AdminQuizQuestionFilters params={params} onChange={handleFilterChange} />
 
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Sort</span>
+              <Select
+                value={params.sort ?? 'newest'}
+                onValueChange={(v) =>
+                  v === 'newest'
+                    ? updateParams({ sort: undefined, direction: undefined })
+                    : updateParams({
+                        sort: v,
+                        direction: params.direction ?? 'desc',
+                      })
+                }
+              >
+                <SelectTrigger className="h-9 w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  {QUESTION_SORTS.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {SORT_LABELS[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {params.sort && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    updateParams({
+                      sort: params.sort,
+                      direction: params.direction === 'asc' ? 'desc' : 'asc',
+                    })
+                  }
+                  aria-label={`Sort ${params.direction === 'asc' ? 'descending' : 'ascending'}`}
+                >
+                  {params.direction === 'asc' ? (
+                    <ArrowUp className="h-4 w-4" />
+                  ) : (
+                    <ArrowDown className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+
           <AdminQuizQuestionsTable
             questions={query.data?.data ?? []}
             isLoading={query.isLoading}
@@ -135,7 +200,9 @@ function AdminQuizQuestionsContent() {
             <AdminPagination
               pagination={query.data.pagination}
               itemLabel="questions"
+              perPage={params.per_page}
               onPageChange={(page) => updateParams({ page }, false)}
+              onPerPageChange={(perPage) => updateParams({ per_page: perPage })}
             />
           )}
         </CardContent>

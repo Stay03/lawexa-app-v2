@@ -12,10 +12,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { formatPeriodWindow } from '@/lib/utils/quiz-format';
 import { useAdminQuizMatchingHealth } from '@/lib/hooks/useAdminQuiz';
 import type {
   AdminQuizMatchingHealth,
-  AdminQuizPeriod,
+  AdminQuizPeriodParams,
 } from '@/types/admin-quiz';
 
 /** Format a possibly-null rate (no serves in period → "—"). */
@@ -36,14 +37,24 @@ const TIERS: {
 ];
 
 /** Matching-health: serve-tier stats + tier breakdown + all-time topic coverage. */
-export function AdminQuizMatchingSection({ period }: { period: AdminQuizPeriod }) {
-  const query = useAdminQuizMatchingHealth({ period });
+export function AdminQuizMatchingSection({
+  params,
+}: {
+  params: AdminQuizPeriodParams;
+}) {
+  const query = useAdminQuizMatchingHealth(params);
   const health = query.data?.data;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Matching health</CardTitle>
+        {health && (
+          <p className="text-xs text-muted-foreground">
+            {formatPeriodWindow(health.period.start, health.period.end)} · coverage
+            is all-time
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         {query.isLoading ? (

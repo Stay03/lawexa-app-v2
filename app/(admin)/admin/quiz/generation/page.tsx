@@ -96,7 +96,9 @@ function AdminQuizGenerationContent() {
             <AdminPagination
               pagination={query.data.pagination}
               itemLabel="batches"
+              perPage={params.per_page}
               onPageChange={(page) => updateParams({ page }, false)}
+              onPerPageChange={(perPage) => updateParams({ per_page: perPage })}
             />
           )}
         </CardContent>

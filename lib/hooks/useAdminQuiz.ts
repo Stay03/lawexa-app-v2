@@ -112,12 +112,13 @@ export function useRestoreAdminQuizQuestion() {
   });
 }
 
-/** Soft-delete a question. */
+/** Soft-delete a question (optionally with a moderation note). */
 export function useDeleteAdminQuizQuestion() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (uuid: string) => adminQuizApi.deleteQuestion(uuid),
-    onSuccess: (_response, uuid) => {
+    mutationFn: ({ uuid, moderation_notes }: ModerationVars) =>
+      adminQuizApi.deleteQuestion(uuid, { moderation_notes }),
+    onSuccess: (_response, { uuid }) => {
       queryClient.invalidateQueries({ queryKey: adminQuizKeys.question(uuid) });
       queryClient.invalidateQueries({ queryKey: adminQuizKeys.questions() });
     },

@@ -23,6 +23,11 @@ export function formatSessionDate(iso: string): string {
   return format(new Date(iso), 'd MMM yyyy');
 }
 
+/** Format a resolved period window for a dashboard caption, e.g. "1 Jun 2026 – 28 Jun 2026". */
+export function formatPeriodWindow(start: string, end: string): string {
+  return `${formatSessionDate(start)} – ${formatSessionDate(end)}`;
+}
+
 const DIFFICULTY_LABELS = ['Very Easy', 'Easy', 'Medium', 'Hard', 'Very Hard'];
 
 /** Human label for a difficulty level (for payloads that omit `difficulty_label`). */

@@ -147,7 +147,30 @@ export function AdminQuizQuestionDetail({ uuid }: AdminQuizQuestionDetailProps) 
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {q.generation_batch && (
-              <Row label="Source" value={q.generation_batch.source_mode} />
+              <Row
+                label="Batch"
+                value={
+                  <Link
+                    href={`/admin/quiz/generation/${q.generation_batch.uuid}`}
+                    className="text-primary hover:underline"
+                  >
+                    {q.generation_batch.source_mode} · {q.generation_batch.status}
+                  </Link>
+                }
+              />
+            )}
+            {q.source_conversation && (
+              <Row
+                label="Conversation"
+                value={
+                  <Link
+                    href={`/admin/conversations/${q.source_conversation.id}`}
+                    className="text-primary hover:underline"
+                  >
+                    View source
+                  </Link>
+                }
+              />
             )}
             {q.generated_for_user && (
               <Row
@@ -159,9 +182,18 @@ export function AdminQuizQuestionDetail({ uuid }: AdminQuizQuestionDetailProps) 
             )}
             {q.course && <Row label="Course" value={q.course} />}
             <Row label="Created" value={formatSessionDate(q.created_at)} />
+            <Row label="Updated" value={formatSessionDate(q.updated_at)} />
             <Row
-              label="Reviewed by"
-              value={q.moderation.reviewed_by ? q.moderation.reviewed_by.name : '—'}
+              label="Reviewed"
+              value={
+                q.moderation.reviewed_by
+                  ? `${q.moderation.reviewed_by.name}${
+                      q.moderation.reviewed_at
+                        ? ` · ${formatSessionDate(q.moderation.reviewed_at)}`
+                        : ''
+                    }`
+                  : '—'
+              }
             />
             {q.moderation.notes && <Row label="Notes" value={q.moderation.notes} />}
           </CardContent>
@@ -205,7 +237,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>

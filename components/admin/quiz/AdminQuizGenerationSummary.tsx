@@ -10,22 +10,36 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminQuizPeriodSelect } from './AdminQuizPeriodSelect';
 import { useAdminQuizBatchSummary } from '@/lib/hooks/useAdminQuiz';
-import { formatDurationMs, formatTokenCost } from '@/lib/utils/quiz-format';
+import {
+  formatDurationMs,
+  formatPeriodWindow,
+  formatTokenCost,
+} from '@/lib/utils/quiz-format';
 import { cn } from '@/lib/utils';
-import type { AdminQuizPeriod } from '@/types/admin-quiz';
+import type { AdminQuizPeriodParams } from '@/types/admin-quiz';
 
 /** Period-aware generation health: stat cards + content/transcript coverage. */
 export function AdminQuizGenerationSummary() {
-  const [period, setPeriod] = useState<AdminQuizPeriod>('last_30_days');
-  const query = useAdminQuizBatchSummary({ period });
+  const [period, setPeriod] = useState<AdminQuizPeriodParams>({
+    period: 'last_30_days',
+  });
+  const query = useAdminQuizBatchSummary(period);
 
   const totals = query.data?.data.totals;
   const coverage = query.data?.data.coverage;
+  const periodWindow = query.data?.data.period;
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
-        <CardTitle>Generation</CardTitle>
+      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+        <div className="space-y-0.5">
+          <CardTitle>Generation</CardTitle>
+          {periodWindow && (
+            <p className="text-xs text-muted-foreground">
+              {formatPeriodWindow(periodWindow.start, periodWindow.end)}
+            </p>
+          )}
+        </div>
         <AdminQuizPeriodSelect value={period} onChange={setPeriod} />
       </CardHeader>
       <CardContent className="space-y-4">

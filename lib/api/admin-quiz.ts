@@ -84,9 +84,13 @@ export const adminQuizApi = {
     return response.data;
   },
 
-  deleteQuestion: async (uuid: string): Promise<AdminQuizDeleteResponse> => {
+  deleteQuestion: async (
+    uuid: string,
+    body: AdminQuizModerationBody = {}
+  ): Promise<AdminQuizDeleteResponse> => {
     const response = await apiClient.delete<AdminQuizDeleteResponse>(
-      `/admin/quiz/questions/${uuid}`
+      `/admin/quiz/questions/${uuid}`,
+      { data: body }
     );
     return response.data;
   },

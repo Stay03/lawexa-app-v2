@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, MoreHorizontal } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -21,6 +21,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DifficultyBadge } from '@/components/quiz/DifficultyBadge';
 import { AdminQuizStatusBadge } from './AdminQuizStatusBadge';
@@ -54,6 +66,8 @@ export function AdminQuizQuestionsTable({
     action: AdminQuizAction;
     question: AdminQuizQuestionListItem;
   } | null>(null);
+  const [bulkAction, setBulkAction] = useState<'approve' | 'archive' | null>(null);
+  const [bulkNotes, setBulkNotes] = useState('');
   const bulk = useBulkAdminQuizQuestions();
 
   const pageUuids = questions.map((q) => q.uuid);
@@ -79,11 +93,11 @@ export function AdminQuizQuestionsTable({
     });
   };
 
-  const runBulk = (action: 'approve' | 'archive') => {
+  const runBulk = (action: 'approve' | 'archive', notes: string) => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     bulk.mutate(
-      { action, ids },
+      { action, ids, moderation_notes: notes.trim() || undefined },
       {
         onSuccess: (res) => {
           toast.success(
@@ -92,6 +106,8 @@ export function AdminQuizQuestionsTable({
             }.`
           );
           setSelected(new Set());
+          setBulkAction(null);
+          setBulkNotes('');
         },
         onError: (error) =>
           toast.error('Bulk action failed', {
@@ -251,10 +267,60 @@ export function AdminQuizQuestionsTable({
       <AdminQuizBulkBar
         count={selected.size}
         pending={bulk.isPending}
-        onApprove={() => runBulk('approve')}
-        onArchive={() => runBulk('archive')}
+        onApprove={() => setBulkAction('approve')}
+        onArchive={() => setBulkAction('archive')}
         onClear={() => setSelected(new Set())}
       />
+
+      <AlertDialog
+        open={!!bulkAction}
+        onOpenChange={(o) => {
+          if (bulk.isPending) return;
+          if (!o) {
+            setBulkAction(null);
+            setBulkNotes('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkAction === 'approve' ? 'Approve' : 'Archive'} {selected.size}{' '}
+              question{selected.size === 1 ? '' : 's'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkAction === 'approve'
+                ? 'They become servable in quizzes.'
+                : 'They will be hidden from quizzes. You can approve them again later.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5 text-left">
+            <Label htmlFor="bulk-notes" className="text-xs text-muted-foreground">
+              Moderation note (optional)
+            </Label>
+            <Textarea
+              id="bulk-notes"
+              value={bulkNotes}
+              onChange={(e) => setBulkNotes(e.target.value)}
+              rows={2}
+              placeholder="Why are you making this change?"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulk.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (bulkAction) runBulk(bulkAction, bulkNotes);
+              }}
+              disabled={bulk.isPending}
+            >
+              {bulk.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {bulkAction === 'approve' ? 'Approve' : 'Archive'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AdminQuizActionDialog
         action={pendingAction?.action ?? null}

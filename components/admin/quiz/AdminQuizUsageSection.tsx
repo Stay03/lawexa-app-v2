@@ -18,10 +18,10 @@ import { AdminQuizAvgScoreChart } from './AdminQuizAvgScoreChart';
 import { AdminQuizTopTopicsTable } from './AdminQuizTopTopicsTable';
 import { AdminQuizScoreDistribution } from './AdminQuizScoreDistribution';
 import { useAdminQuizAnalytics } from '@/lib/hooks/useAdminQuiz';
-import { formatDurationMs } from '@/lib/utils/quiz-format';
+import { formatDurationMs, formatPeriodWindow } from '@/lib/utils/quiz-format';
 import type {
   AdminQuizAnalytics,
-  AdminQuizPeriod,
+  AdminQuizPeriodParams,
 } from '@/types/admin-quiz';
 
 interface StatCardDescriptor {
@@ -42,14 +42,28 @@ const STAT_CARDS: StatCardDescriptor[] = [
 ];
 
 /** Usage dashboard: stat cards (with deltas) + two charts + two tables. */
-export function AdminQuizUsageSection({ period }: { period: AdminQuizPeriod }) {
-  const query = useAdminQuizAnalytics({ period });
+export function AdminQuizUsageSection({
+  params,
+}: {
+  params: AdminQuizPeriodParams;
+}) {
+  const query = useAdminQuizAnalytics(params);
   const analytics = query.data?.data;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Usage</CardTitle>
+        {analytics && (
+          <p className="text-xs text-muted-foreground">
+            {formatPeriodWindow(analytics.period.start, analytics.period.end)} ·
+            vs{' '}
+            {formatPeriodWindow(
+              analytics.period.comparison_start,
+              analytics.period.comparison_end
+            )}
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         {query.isLoading ? (

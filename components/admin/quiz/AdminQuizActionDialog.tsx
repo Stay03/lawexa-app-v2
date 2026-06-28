@@ -85,7 +85,6 @@ export function AdminQuizActionDialog({
   if (!action || !question) return null;
 
   const copy = COPY[action];
-  const showNotes = action !== 'delete';
 
   const finish = () => {
     toast.success(`Question ${copy.verb}.`);
@@ -104,7 +103,7 @@ export function AdminQuizActionDialog({
       archive.mutate({ uuid: question.uuid, moderation_notes }, { onSuccess: finish, onError: fail });
     else if (action === 'restore')
       restore.mutate({ uuid: question.uuid, moderation_notes }, { onSuccess: finish, onError: fail });
-    else del.mutate(question.uuid, { onSuccess: finish, onError: fail });
+    else del.mutate({ uuid: question.uuid, moderation_notes }, { onSuccess: finish, onError: fail });
   };
 
   return (
@@ -121,20 +120,18 @@ export function AdminQuizActionDialog({
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           <AlertDialogDescription>{copy.description}</AlertDialogDescription>
         </AlertDialogHeader>
-        {showNotes && (
-          <div className="space-y-1.5 text-left">
-            <Label htmlFor="moderation-notes" className="text-xs text-muted-foreground">
-              Moderation note (optional)
-            </Label>
-            <Textarea
-              id="moderation-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Why are you making this change?"
-            />
-          </div>
-        )}
+        <div className="space-y-1.5 text-left">
+          <Label htmlFor="moderation-notes" className="text-xs text-muted-foreground">
+            Moderation note (optional)
+          </Label>
+          <Textarea
+            id="moderation-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            placeholder="Why are you making this change?"
+          />
+        </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
