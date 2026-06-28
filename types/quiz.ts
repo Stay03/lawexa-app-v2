@@ -178,11 +178,8 @@ export interface QuizSessionResponse {
 
 /**
  * POST /api/quizzes/{uuid}/end — the finalized session, no question.
- *
- * The doc says "returns the final session object" but does not show the exact
- * envelope; every other session-bearing response nests under `session`, so we
- * mirror that. Verify against the live API in Phase 1 and adjust if it returns
- * a bare session — a one-line change.
+ * Confirmed by backend (2026-06-28): the session is wrapped under `data.session`,
+ * same shape as start/answer but with no `question` key.
  */
 export interface QuizEndResponse {
   success: boolean;
@@ -202,4 +199,59 @@ export interface QuizTopicsResponse {
   success: boolean;
   message: string;
   data: QuizTopic[];
+}
+
+// ----------------------------------------------------------------------------
+// My stats (GET /api/quizzes/stats) — the student's own progress
+// ----------------------------------------------------------------------------
+//
+// Unlike the rest of the student API, these aggregates are PLAIN NUMBERS (not
+// string-decimals), and the rate fields may be null (and score_trend []) before
+// there is enough data.
+
+/** One point on the score-trend chart (last 10 ended sessions, oldest→newest). */
+export interface QuizScoreTrendPoint {
+  completed_at: string;
+  score_percentage: number;
+}
+
+export interface QuizStatsSessions {
+  total: number;
+  active: number;
+  completed: number;
+  abandoned: number;
+  last_active_at: string | null;
+  served: number;
+  answered: number;
+  correct: number;
+}
+
+export interface QuizStatsPerformance {
+  /** Mean of finalized session scores; null before any are completed. */
+  avg_score: number | null;
+  /** correct ÷ answered, as a %; null if nothing answered yet. */
+  accuracy: number | null;
+  /** Mean think-time over answered questions, in ms; null if none. */
+  avg_time_per_question_ms: number | null;
+  score_trend: QuizScoreTrendPoint[];
+}
+
+export interface QuizStatsEngagement {
+  completed: number;
+  auto_abandoned: number;
+  /** completed ÷ (completed + abandoned), as a %; null if neither. */
+  completion_rate: number | null;
+}
+
+export interface QuizStatsData {
+  sessions: QuizStatsSessions;
+  performance: QuizStatsPerformance;
+  engagement: QuizStatsEngagement;
+}
+
+/** GET /api/quizzes/stats. */
+export interface QuizStatsResponse {
+  success: boolean;
+  message: string;
+  data: QuizStatsData;
 }

@@ -8,6 +8,7 @@ import type {
   QuizEndResponse,
   QuizResultsResponse,
   QuizTopicsResponse,
+  QuizStatsResponse,
 } from '@/types/quiz';
 
 /**
@@ -84,6 +85,12 @@ export const quizApi = {
   /** Recent distinct topics for the optional topic picker. */
   getTopics: async (): Promise<QuizTopicsResponse> => {
     const response = await apiClient.get<QuizTopicsResponse>('/quizzes/topics');
+    return response.data;
+  },
+
+  /** The authenticated student's own progress stats (for the reports view). */
+  getStats: async (): Promise<QuizStatsResponse> => {
+    const response = await apiClient.get<QuizStatsResponse>('/quizzes/stats');
     return response.data;
   },
 };

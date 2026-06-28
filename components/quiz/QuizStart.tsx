@@ -121,12 +121,20 @@ export function QuizStart() {
       )}
 
       {!emailUnverified && hasHistory && (
-        <Link
-          href="/quiz/history"
-          className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-        >
-          View past sessions →
-        </Link>
+        <div className="flex items-center gap-4 text-sm">
+          <Link
+            href="/quiz/history"
+            className="text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            Past sessions
+          </Link>
+          <Link
+            href="/quiz/stats"
+            className="text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            Your stats
+          </Link>
+        </div>
       )}
     </div>
   );

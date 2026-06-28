@@ -24,6 +24,7 @@ export const quizKeys = {
   session: (uuid: string) => [...quizKeys.all, 'session', uuid] as const,
   results: (uuid: string) => [...quizKeys.all, 'results', uuid] as const,
   topics: () => [...quizKeys.all, 'topics'] as const,
+  stats: () => [...quizKeys.all, 'stats'] as const,
 };
 
 /**
@@ -90,6 +91,17 @@ export function useQuizTopics() {
     queryKey: quizKeys.topics(),
     queryFn: () => quizApi.getTopics(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * The student's own progress stats (reports view).
+ */
+export function useQuizStats() {
+  return useQuery({
+    queryKey: quizKeys.stats(),
+    queryFn: () => quizApi.getStats(),
+    staleTime: 60 * 1000, // 1 minute
   });
 }
 

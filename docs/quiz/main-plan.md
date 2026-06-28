@@ -190,6 +190,7 @@ Phase 2 are **deferrable** for the dev soft-launch — see the "Defer?" column.
 | 0 | [`phase-0-foundation`](./phases/phase-0-foundation) | Types, API services, hooks, `QuizGuard`, role helper. No UI. The plumbing everything else stands on. | No |
 | 1 | [`phase-1-player-core`](./phases/phase-1-player-core) | The demo-able core: start/resume → play (answer loop, live score, end) → results. | No |
 | 2 | [`phase-2-player-polish`](./phases/phase-2-player-polish) | History page, optional topic picker, edge cases (cold start, 409/422, verify-email), nav-link wiring. | History: optional |
+| 2b | [`phase-2b-student-reports`](./phases/phase-2b-student-reports) | Player "My stats" view (`GET /quizzes/stats`) — score/accuracy/completion cards + score-trend chart. Added after backend shipped the endpoint. | No |
 | 3 | [`phase-3-admin-moderation`](./phases/phase-3-admin-moderation) | Question bank: list/filter/show/edit/approve/archive/delete/restore/bulk + admin nav section. | No (if admins moderate) |
 | 4 | [`phase-4-admin-generation`](./phases/phase-4-admin-generation) | Generation observability: batches list/detail/summary. | Yes |
 | 5 | [`phase-5-admin-analytics`](./phases/phase-5-admin-analytics) | Usage analytics, matching-health, per-user quiz tab. | Yes |

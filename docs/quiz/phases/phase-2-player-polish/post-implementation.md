@@ -63,7 +63,7 @@ No other deviations.
 ### Still to do (runtime — needs live data)
 - [ ] Click-through: play a session → end → results (see time chips + avg) → "View
       history" → resume an in-progress one.
-- [ ] Confirm the `POST /end` envelope (carried over from Phase 0).
+- [x] `POST /end` envelope confirmed by backend (2026-06-28): `{ data: { session } }`.
 
 ## 5. Follow-ups
 

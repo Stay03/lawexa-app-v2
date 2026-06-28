@@ -42,14 +42,11 @@ No other deviations. Patterns match Notes 1:1.
 Runtime behaviour is not exercised yet — these are consumed by real screens in
 Phase 1, which is where the assumption below gets confirmed.
 
-## 4. Assumptions to confirm in Phase 1
+## 4. Assumptions — resolved
 
-1. **`POST /api/quizzes/{uuid}/end` envelope.** Typed as
-   `{ data: { session: QuizSession } }` for consistency with every other
-   session-bearing response. The doc says "returns the final session object" but
-   doesn't show the shape. When Phase 1 first calls `endSession`, confirm the
-   real payload and adjust `QuizEndResponse` if it returns a bare session
-   (one-line change). Tracked here so it isn't forgotten.
+1. **`POST /api/quizzes/{uuid}/end` envelope.** ✅ Confirmed by backend
+   (2026-06-28): it's `{ data: { session: QuizSession } }` (no `question` key) —
+   exactly as typed. No change needed.
 
 ## 5. Follow-ups / tech debt
 

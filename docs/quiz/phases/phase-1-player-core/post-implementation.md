@@ -69,10 +69,8 @@ No other deviations. All three screens match the mockups.
 
 ### Still to do (runtime — needs a researcher login + a non-empty bank)
 - [ ] Click-through in the running app: start → answer a few → end → review.
-- [ ] **Confirm the `POST /end` response envelope** (the Phase 0 assumption). If
-      the live API returns a bare session instead of `{ data: { session } }`,
-      update `QuizEndResponse` in `types/quiz.ts` — a one-line change. The play
-      screen routes on success regardless, so this only affects typing.
+- [x] **`POST /end` response envelope confirmed** by backend (2026-06-28):
+      `{ data: { session } }`, exactly as typed — no change needed.
 
 ## 5. Follow-ups
 

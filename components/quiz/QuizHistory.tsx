@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { History, Loader2, Play } from 'lucide-react';
+import { BarChart3, History, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useInfiniteQuizSessions } from '@/lib/hooks/useQuiz';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
@@ -35,12 +35,20 @@ export function QuizHistory() {
             Your past practice sessions.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/quiz">
-            <Play className="h-4 w-4" />
-            Practice
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/quiz/stats">
+              <BarChart3 className="h-4 w-4" />
+              Stats
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/quiz">
+              <Play className="h-4 w-4" />
+              Practice
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {query.isLoading ? (
