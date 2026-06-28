@@ -1,7 +1,8 @@
 'use client';
 
-import { AlertTriangle, Check, Info, X } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Info, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatDurationMs } from '@/lib/utils/quiz-format';
 import type { QuizResultItem } from '@/types/quiz';
 
 interface QuizResultItemCardProps {
@@ -31,17 +32,23 @@ export function QuizResultItemCard({ item, index }: QuizResultItemCardProps) {
           <span className="text-muted-foreground">{index + 1}.</span>{' '}
           {question.question_text}
         </h3>
-        <span
-          className={cn(
-            'mt-0.5 inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium',
-            item.was_correct
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-              : 'bg-destructive/10 text-destructive'
-          )}
-        >
-          {item.was_correct ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-          {item.was_correct ? 'Correct' : 'Incorrect'}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span
+            className={cn(
+              'inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-medium',
+              item.was_correct
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                : 'bg-destructive/10 text-destructive'
+            )}
+          >
+            {item.was_correct ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+            {item.was_correct ? 'Correct' : 'Incorrect'}
+          </span>
+          <span className="inline-flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            {formatDurationMs(item.time_spent_ms)}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 space-y-2">

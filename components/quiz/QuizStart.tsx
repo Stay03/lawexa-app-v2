@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { GraduationCap, Loader2, MailWarning, Play, RotateCcw } from 'lucide-react';
@@ -26,6 +27,7 @@ export function QuizStart() {
     user?.auth_provider === 'email' && user?.is_verified === false;
   const activeSession =
     sessionsQuery.data?.data?.find((s) => s.status === 'active') ?? null;
+  const hasHistory = (sessionsQuery.data?.data?.length ?? 0) > 0;
 
   const handleStart = () => {
     startSession.mutate(
@@ -116,6 +118,15 @@ export function QuizStart() {
             <QuizTopicChips selected={topic} onSelect={setTopic} />
           </div>
         </div>
+      )}
+
+      {!emailUnverified && hasHistory && (
+        <Link
+          href="/quiz/history"
+          className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        >
+          View past sessions →
+        </Link>
       )}
     </div>
   );

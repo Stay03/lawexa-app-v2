@@ -50,10 +50,15 @@ export function QuizResults({ sessionUuid }: QuizResultsProps) {
   }
 
   const { session, questions } = resultsQuery.data.data;
+  const avgTimeMs =
+    questions.length > 0
+      ? questions.reduce((sum, q) => sum + (q.time_spent_ms || 0), 0) /
+        questions.length
+      : 0;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8 pb-8">
-      <QuizResultsSummary session={session} />
+      <QuizResultsSummary session={session} avgTimeMs={avgTimeMs} />
       <div className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Review

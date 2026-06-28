@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import type { QuizDifficulty } from '@/types/quiz';
+import type { QuizDifficulty, QuizSessionStatus } from '@/types/quiz';
 
 /**
  * Formatting helpers for Quiz Mode. Decimal scores arrive as strings from the
@@ -35,4 +35,42 @@ export function scoreBandClasses(percent: number): string {
   if (percent >= 70) return 'text-emerald-600 dark:text-emerald-400';
   if (percent >= 40) return 'text-amber-600 dark:text-amber-400';
   return 'text-foreground';
+}
+
+/** Format a duration in milliseconds as a compact label: "37s", "1m 5s", "2m". */
+export function formatDurationMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
+
+/** Wall-clock duration of a session in ms, or null if it isn't finished. */
+export function sessionDurationMs(
+  startedAt: string,
+  completedAt: string | null
+): number | null {
+  if (!completedAt) return null;
+  const diff = new Date(completedAt).getTime() - new Date(startedAt).getTime();
+  return Number.isFinite(diff) && diff >= 0 ? diff : null;
+}
+
+/** Display label + badge colour classes for a session status. */
+export function sessionStatusMeta(status: QuizSessionStatus): {
+  label: string;
+  classes: string;
+} {
+  switch (status) {
+    case 'active':
+      return { label: 'In progress', classes: 'bg-primary/10 text-primary' };
+    case 'completed':
+      return {
+        label: 'Completed',
+        classes: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      };
+    case 'abandoned':
+      return { label: 'Abandoned', classes: 'bg-muted text-muted-foreground' };
+  }
 }
