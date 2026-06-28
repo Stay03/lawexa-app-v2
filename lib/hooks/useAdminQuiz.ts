@@ -8,6 +8,7 @@ import type {
   UpdateAdminQuizQuestionData,
   AdminQuizBatchListParams,
   AdminQuizPeriodParams,
+  AdminQuizSessionListParams,
 } from '@/types/admin-quiz';
 
 // Query key factory
@@ -29,6 +30,11 @@ export const adminQuizKeys = {
     [...adminQuizKeys.all, 'matching-health', params] as const,
   userQuizProfile: (uuid: string) =>
     [...adminQuizKeys.all, 'user-profile', uuid] as const,
+  sessions: (params: AdminQuizSessionListParams) =>
+    [...adminQuizKeys.all, 'sessions', 'list', params] as const,
+  userSessions: (uuid: string, params: AdminQuizSessionListParams) =>
+    [...adminQuizKeys.all, 'sessions', 'user', uuid, params] as const,
+  session: (uuid: string) => [...adminQuizKeys.all, 'session', uuid] as const,
 };
 
 /** Paginated, filterable list of bank questions. */
@@ -191,6 +197,40 @@ export function useAdminUserQuizProfile(uuid: string | undefined) {
   return useQuery({
     queryKey: adminQuizKeys.userQuizProfile(uuid ?? ''),
     queryFn: () => adminQuizApi.getUserQuizProfile(uuid as string),
+    enabled: !!uuid,
+    staleTime: 60 * 1000,
+  });
+}
+
+// ---- Sessions ----
+
+/** Every user's sessions, filterable (global). */
+export function useAdminQuizSessions(params: AdminQuizSessionListParams = {}) {
+  return useQuery({
+    queryKey: adminQuizKeys.sessions(params),
+    queryFn: () => adminQuizApi.listSessions(params),
+    staleTime: 60 * 1000,
+  });
+}
+
+/** One user's sessions. Pass `undefined` uuid to disable. */
+export function useAdminUserQuizSessions(
+  uuid: string | undefined,
+  params: AdminQuizSessionListParams = {}
+) {
+  return useQuery({
+    queryKey: adminQuizKeys.userSessions(uuid ?? '', params),
+    queryFn: () => adminQuizApi.listUserSessions(uuid as string, params),
+    enabled: !!uuid,
+    staleTime: 60 * 1000,
+  });
+}
+
+/** One session's answer-by-answer detail. */
+export function useAdminQuizSession(uuid: string | undefined) {
+  return useQuery({
+    queryKey: adminQuizKeys.session(uuid ?? ''),
+    queryFn: () => adminQuizApi.getSession(uuid as string),
     enabled: !!uuid,
     staleTime: 60 * 1000,
   });

@@ -5,7 +5,12 @@
  */
 
 import type { PaginationMeta, PaginationLinks } from './case';
-import type { QuizDifficulty } from './quiz';
+import type {
+  QuizDifficulty,
+  QuizResultItem,
+  QuizSession,
+  QuizSessionStatus,
+} from './quiz';
 
 /** Servable vs hidden-from-quizzes. */
 export type QuizQuestionStatus = 'approved' | 'archived';
@@ -437,4 +442,60 @@ export interface AdminUserQuizProfileResponse {
   success: boolean;
   message: string;
   data: AdminUserQuizProfile;
+}
+
+// ----------------------------------------------------------------------------
+// Quiz sessions — admin read access to individual play sessions
+// ----------------------------------------------------------------------------
+
+/**
+ * A row in an admin session list. `user` is present on the global list
+ * (`/admin/quiz/sessions`) and omitted from a per-user list (the user is the route).
+ * `score_percentage` is a decimal string (or null for a session with no answers yet).
+ */
+export interface AdminQuizSessionListItem {
+  uuid: string;
+  user?: AdminQuizUserRef;
+  status: QuizSessionStatus;
+  served_count: number;
+  answered_count: number;
+  correct_count: number;
+  score_percentage: string | null;
+  started_at: string;
+  last_activity_at: string;
+  completed_at: string | null;
+}
+
+/**
+ * One session's answer-by-answer detail. The admin-readable equivalent of the
+ * student results payload — identical per-question items (so the student results
+ * UI is reused) plus `session.user`, and readable for an active (un-ended) session.
+ */
+export interface AdminQuizSessionDetail {
+  session: QuizSession & { user: AdminQuizUserRef };
+  questions: QuizResultItem[];
+}
+
+/** Filters for the session lists (the per-user list ignores `user_id` — it's the route). */
+export interface AdminQuizSessionListParams {
+  user_id?: number;
+  status?: QuizSessionStatus;
+  date_from?: string;
+  date_to?: string;
+  per_page?: number;
+  page?: number;
+}
+
+export interface AdminQuizSessionListResponse {
+  success: boolean;
+  message: string;
+  data: AdminQuizSessionListItem[];
+  pagination: PaginationMeta;
+  links: PaginationLinks;
+}
+
+export interface AdminQuizSessionResponse {
+  success: boolean;
+  message: string;
+  data: AdminQuizSessionDetail;
 }

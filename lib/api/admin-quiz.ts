@@ -16,6 +16,9 @@ import type {
   AdminQuizAnalyticsResponse,
   AdminQuizMatchingHealthResponse,
   AdminUserQuizProfileResponse,
+  AdminQuizSessionListParams,
+  AdminQuizSessionListResponse,
+  AdminQuizSessionResponse,
 } from '@/types/admin-quiz';
 
 /**
@@ -164,6 +167,41 @@ export const adminQuizApi = {
   ): Promise<AdminUserQuizProfileResponse> => {
     const response = await apiClient.get<AdminUserQuizProfileResponse>(
       `/admin/users/${userUuid}/quiz`
+    );
+    return response.data;
+  },
+
+  // ---- Sessions (admin read access) ----
+
+  /** Every user's sessions, filterable by user/status/date (rows include `user`). */
+  listSessions: async (
+    params: AdminQuizSessionListParams = {}
+  ): Promise<AdminQuizSessionListResponse> => {
+    const response = await apiClient.get<AdminQuizSessionListResponse>(
+      '/admin/quiz/sessions',
+      { params }
+    );
+    return response.data;
+  },
+
+  /** One user's sessions (rows omit `user`). `404` for an unknown user. */
+  listUserSessions: async (
+    userUuid: string,
+    params: AdminQuizSessionListParams = {}
+  ): Promise<AdminQuizSessionListResponse> => {
+    const response = await apiClient.get<AdminQuizSessionListResponse>(
+      `/admin/users/${userUuid}/quiz/sessions`,
+      { params }
+    );
+    return response.data;
+  },
+
+  /** One session's answer-by-answer detail (any user, even an active session). */
+  getSession: async (
+    sessionUuid: string
+  ): Promise<AdminQuizSessionResponse> => {
+    const response = await apiClient.get<AdminQuizSessionResponse>(
+      `/admin/quiz/sessions/${sessionUuid}`
     );
     return response.data;
   },

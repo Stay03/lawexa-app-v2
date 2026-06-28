@@ -7,6 +7,7 @@ import {
   BarChart3,
   ChevronRight,
   GraduationCap,
+  History,
   ListChecks,
 } from 'lucide-react';
 import {
@@ -29,6 +30,7 @@ import {
 const quizNavItems = [
   { title: 'Questions', url: '/admin/quiz/questions', icon: ListChecks },
   { title: 'Generation', url: '/admin/quiz/generation', icon: Activity },
+  { title: 'Sessions', url: '/admin/quiz/sessions', icon: History },
   { title: 'Analytics', url: '/admin/quiz/analytics', icon: BarChart3 },
 ];
 
