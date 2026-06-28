@@ -11,6 +11,7 @@ import { usePathname } from 'next/navigation';
 import { AdminNavConversationsSection } from '@/components/admin/admin-nav-conversations';
 import { AdminNavUsersSection } from '@/components/admin/admin-nav-users';
 import { AdminNavContentSection } from '@/components/admin/admin-nav-content';
+import { AdminNavQuizSection } from '@/components/admin/admin-nav-quiz';
 import { AdminNavBillingSection } from '@/components/admin/admin-nav-billing';
 import { AdminNavAiSection } from '@/components/admin/admin-nav-ai';
 import { AdminNavFilesSection } from '@/components/admin/admin-nav-files';
@@ -72,6 +73,7 @@ export function AdminSidebar({
         <AdminNavConversationsSection />
         <AdminNavUsersSection />
         <AdminNavContentSection />
+        <AdminNavQuizSection />
         <AdminNavFilesSection />
         <AdminNavBillingSection />
         <AdminNavAiSection />
