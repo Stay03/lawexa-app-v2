@@ -44,6 +44,19 @@ export function scoreBandClasses(percent: number): string {
   return 'text-foreground';
 }
 
+/**
+ * Format an integer hour-index (0–23) as a 12-hour label, e.g. 13 → "1 PM".
+ * Used for the `hour` granularity x-axis on the admin analytics charts, where the
+ * chart `date` field is an hour index rather than a timestamp.
+ */
+export function formatHourIndex(hour: string | number): string {
+  const h = parseInt(String(hour), 10);
+  if (!Number.isFinite(h)) return String(hour);
+  if (h === 0) return '12 AM';
+  if (h === 12) return '12 PM';
+  return h < 12 ? `${h} AM` : `${h - 12} PM`;
+}
+
 /** Format a duration in milliseconds as a compact label: "37s", "1m 5s", "2m". */
 export function formatDurationMs(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return '—';

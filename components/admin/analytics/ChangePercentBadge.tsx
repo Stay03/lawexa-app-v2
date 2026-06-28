@@ -6,16 +6,18 @@ import { cn } from '@/lib/utils';
 
 interface ChangePercentBadgeProps {
   value: number | null;
+  /** Text shown when there's no baseline (`value === null`). Defaults to "N/A". */
+  nullLabel?: string;
 }
 
 /**
  * Badge showing percentage change with color-coded positive/negative indicator.
  */
-function ChangePercentBadge({ value }: ChangePercentBadgeProps) {
+function ChangePercentBadge({ value, nullLabel = 'N/A' }: ChangePercentBadgeProps) {
   if (value === null) {
     return (
       <Badge variant="outline" className="text-xs">
-        N/A
+        {nullLabel}
       </Badge>
     );
   }

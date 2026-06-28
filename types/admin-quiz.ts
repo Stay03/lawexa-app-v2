@@ -276,3 +276,165 @@ export interface AdminQuizBatchSummaryResponse {
   message: string;
   data: AdminQuizBatchSummary;
 }
+
+// ----------------------------------------------------------------------------
+// Usage analytics + matching-health + per-user profile (Phase 5)
+// ----------------------------------------------------------------------------
+
+/** Server-derived chart granularity (echoed only by the analytics endpoint). */
+export type AdminQuizGranularity = 'hour' | 'day';
+
+/**
+ * A usage stat card: a value plus its prior-period delta. `change_percent` is
+ * **null** when there's no baseline to compare against (render as "—").
+ */
+export interface AdminQuizStatCardData {
+  value: number;
+  change_percent: number | null;
+}
+
+/**
+ * A point on a usage time-series. `date` is a `YYYY-MM-DD` string for `day`
+ * granularity, or an **integer hour index** (e.g. `1`) for `hour` granularity —
+ * format it off the echoed `granularity`, never assume a timestamp.
+ */
+export interface AdminQuizSessionsPoint {
+  date: string | number;
+  count: number;
+}
+
+export interface AdminQuizAvgScorePoint {
+  date: string | number;
+  avg_score: number;
+}
+
+export interface AdminQuizTopTopic {
+  topic_key: string;
+  topic: string;
+  serves: number;
+}
+
+export interface AdminQuizScoreBucket {
+  bucket: string;
+  count: number;
+}
+
+/** `GET /api/admin/quiz/analytics` — period-aware usage dashboard. */
+export interface AdminQuizAnalytics {
+  period: {
+    start: string;
+    end: string;
+    comparison_start: string;
+    comparison_end: string;
+  };
+  granularity: AdminQuizGranularity;
+  stat_cards: {
+    sessions_started: AdminQuizStatCardData;
+    active_users: AdminQuizStatCardData;
+    completed_sessions: AdminQuizStatCardData;
+    abandoned_sessions: AdminQuizStatCardData;
+    completion_rate: AdminQuizStatCardData;
+    avg_score: AdminQuizStatCardData;
+    avg_time_per_question_ms: AdminQuizStatCardData;
+  };
+  charts: {
+    sessions_over_time: AdminQuizSessionsPoint[];
+    avg_score_over_time: AdminQuizAvgScorePoint[];
+  };
+  tables: {
+    top_topics: AdminQuizTopTopic[];
+    score_distribution: AdminQuizScoreBucket[];
+  };
+}
+
+/** A row in the matching-health topic-coverage table (all-time, not period-bound). */
+export interface AdminQuizTopicCoverageRow {
+  topic_key: string;
+  topic: string;
+  questions: number;
+  contributors: number;
+  cross_user: boolean;
+}
+
+/**
+ * `GET /api/admin/quiz/matching-health`. Serve stats are period-aware; bank/topic
+ * coverage is all-time. The three rates are **null** when there are no serves.
+ */
+export interface AdminQuizMatchingHealth {
+  period: { start: string; end: string };
+  stat_cards: {
+    total_serves: number;
+    tier2_cross_user_rate: number | null;
+    recycle_rate: number | null;
+    own_rate: number | null;
+    bank_size: number;
+    topic_coverage: number;
+    cross_user_topics: number;
+  };
+  tier_breakdown: {
+    own: number;
+    same_topic_other: number;
+    widened_own: number;
+    widened_other: number;
+    recycled: number;
+  };
+  topic_coverage: AdminQuizTopicCoverageRow[];
+}
+
+/** `GET /api/admin/users/{user_uuid}/quiz` — one student's quiz profile. */
+export interface AdminUserQuizProfile {
+  sessions: {
+    total: number;
+    active: number;
+    completed: number;
+    abandoned: number;
+    last_active_at: string | null;
+    served: number;
+    answered: number;
+    correct: number;
+  };
+  performance: {
+    avg_score: number | null;
+    avg_time_per_question_ms: number | null;
+    /** Oldest→newest session scores (plain numbers) for a sparkline. */
+    score_trend: number[];
+  };
+  engagement: {
+    completed: number;
+    auto_abandoned: number;
+    completion_rate: number | null;
+  };
+  generation: {
+    questions: number;
+    batches: number;
+    completed_batches: number;
+    failed_batches: number;
+    /** Decimal string (admin-only cost) — parse with `formatTokenCost`. */
+    total_cost: string;
+    topics: string[];
+  };
+  topics_quizzed: {
+    distinct: number;
+    reached_via_cross_user: boolean;
+  };
+}
+
+// ---- Response envelopes ----
+
+export interface AdminQuizAnalyticsResponse {
+  success: boolean;
+  message: string;
+  data: AdminQuizAnalytics;
+}
+
+export interface AdminQuizMatchingHealthResponse {
+  success: boolean;
+  message: string;
+  data: AdminQuizMatchingHealth;
+}
+
+export interface AdminUserQuizProfileResponse {
+  success: boolean;
+  message: string;
+  data: AdminUserQuizProfile;
+}

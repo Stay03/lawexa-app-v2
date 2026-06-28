@@ -25,6 +25,7 @@ import {
 } from '@/components/admin';
 import { AdminUserConversationFilters } from '@/components/admin/AdminUserConversationFilters';
 import { UserActivitySection } from '@/components/admin/activity/UserActivitySection';
+import { AdminUserQuizSection } from '@/components/admin/quiz/AdminUserQuizSection';
 import type { AdminUserConversationsParams } from '@/types/admin';
 
 interface AdminUserDetailPageProps {
@@ -247,6 +248,9 @@ export default function AdminUserDetailPage({
 
           {/* Activity */}
           <UserActivitySection userUuid={user.uuid} userId={user.id} />
+
+          {/* Quiz activity */}
+          <AdminUserQuizSection uuid={uuid} />
 
           {/* Conversations */}
           <div className="space-y-4">

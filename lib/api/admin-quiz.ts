@@ -13,6 +13,9 @@ import type {
   AdminQuizBatchResponse,
   AdminQuizBatchSummaryResponse,
   AdminQuizPeriodParams,
+  AdminQuizAnalyticsResponse,
+  AdminQuizMatchingHealthResponse,
+  AdminUserQuizProfileResponse,
 } from '@/types/admin-quiz';
 
 /**
@@ -123,6 +126,40 @@ export const adminQuizApi = {
     const response = await apiClient.get<AdminQuizBatchSummaryResponse>(
       '/admin/quiz/batches/summary',
       { params }
+    );
+    return response.data;
+  },
+
+  // ---- Analytics, matching-health, per-user (Phase 5) ----
+
+  /** Period-aware usage dashboard (stat cards + charts + tables). */
+  getAnalytics: async (
+    params: AdminQuizPeriodParams = {}
+  ): Promise<AdminQuizAnalyticsResponse> => {
+    const response = await apiClient.get<AdminQuizAnalyticsResponse>(
+      '/admin/quiz/analytics',
+      { params }
+    );
+    return response.data;
+  },
+
+  /** Period-aware serve stats + all-time bank/topic coverage. */
+  getMatchingHealth: async (
+    params: AdminQuizPeriodParams = {}
+  ): Promise<AdminQuizMatchingHealthResponse> => {
+    const response = await apiClient.get<AdminQuizMatchingHealthResponse>(
+      '/admin/quiz/matching-health',
+      { params }
+    );
+    return response.data;
+  },
+
+  /** One student's quiz profile by user uuid (`404` if unknown). */
+  getUserQuizProfile: async (
+    userUuid: string
+  ): Promise<AdminUserQuizProfileResponse> => {
+    const response = await apiClient.get<AdminUserQuizProfileResponse>(
+      `/admin/users/${userUuid}/quiz`
     );
     return response.data;
   },

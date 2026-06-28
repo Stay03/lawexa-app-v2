@@ -23,6 +23,12 @@ export const adminQuizKeys = {
   batchSummary: (params: AdminQuizPeriodParams) =>
     [...adminQuizKeys.batches(), 'summary', params] as const,
   batch: (uuid: string) => [...adminQuizKeys.all, 'batch', uuid] as const,
+  analytics: (params: AdminQuizPeriodParams) =>
+    [...adminQuizKeys.all, 'analytics', params] as const,
+  matchingHealth: (params: AdminQuizPeriodParams) =>
+    [...adminQuizKeys.all, 'matching-health', params] as const,
+  userQuizProfile: (uuid: string) =>
+    [...adminQuizKeys.all, 'user-profile', uuid] as const,
 };
 
 /** Paginated, filterable list of bank questions. */
@@ -155,6 +161,36 @@ export function useAdminQuizBatchSummary(params: AdminQuizPeriodParams = {}) {
   return useQuery({
     queryKey: adminQuizKeys.batchSummary(params),
     queryFn: () => adminQuizApi.getBatchSummary(params),
+    staleTime: 60 * 1000,
+  });
+}
+
+// ---- Analytics, matching-health, per-user ----
+
+/** Period-aware usage analytics dashboard. */
+export function useAdminQuizAnalytics(params: AdminQuizPeriodParams = {}) {
+  return useQuery({
+    queryKey: adminQuizKeys.analytics(params),
+    queryFn: () => adminQuizApi.getAnalytics(params),
+    staleTime: 60 * 1000,
+  });
+}
+
+/** Period-aware cross-user matching-health monitor. */
+export function useAdminQuizMatchingHealth(params: AdminQuizPeriodParams = {}) {
+  return useQuery({
+    queryKey: adminQuizKeys.matchingHealth(params),
+    queryFn: () => adminQuizApi.getMatchingHealth(params),
+    staleTime: 60 * 1000,
+  });
+}
+
+/** One student's quiz profile (admin). Pass `undefined` to disable. */
+export function useAdminUserQuizProfile(uuid: string | undefined) {
+  return useQuery({
+    queryKey: adminQuizKeys.userQuizProfile(uuid ?? ''),
+    queryFn: () => adminQuizApi.getUserQuizProfile(uuid as string),
+    enabled: !!uuid,
     staleTime: 60 * 1000,
   });
 }
