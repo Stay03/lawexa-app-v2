@@ -1,17 +1,16 @@
 'use client';
 
 import {
-  Activity,
   BarChart3,
   BookOpen,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Coins,
   GraduationCap,
   Layers,
   Sparkles,
   Target,
-  XCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -68,48 +67,37 @@ function QuizProfile({ profile }: { profile: AdminUserQuizProfile }) {
     sessions.answered > 0
       ? Math.round((sessions.correct / sessions.answered) * 100)
       : null;
+  const completion =
+    sessions.total > 0
+      ? Math.round((sessions.completed / sessions.total) * 100)
+      : null;
 
   return (
-    <div className="space-y-6">
-      {/* Sessions */}
+    <div className="space-y-5">
+      {/* Performance headline — zero-value session counts fold into the caption */}
       <section className="space-y-3">
-        <h3 className="text-sm font-medium">Sessions</h3>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <h3 className="text-sm font-medium">Performance</h3>
+          <p className="text-xs text-muted-foreground">
+            {sessions.completed} completed · {sessions.abandoned} abandoned ·{' '}
+            {sessions.active} active
+            {sessions.last_active_at
+              ? ` · last active ${formatSessionDate(sessions.last_active_at)}`
+              : ''}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           <QuizStatCard
             icon={<Layers className="h-4 w-4" />}
-            label="Total"
+            label="Sessions"
             value={sessions.total.toLocaleString()}
           />
           <QuizStatCard
-            icon={<CheckCircle2 className="h-4 w-4" />}
-            label="Completed"
-            value={sessions.completed.toLocaleString()}
+            icon={<Target className="h-4 w-4" />}
+            label="Accuracy"
+            value={accuracy == null ? '—' : `${accuracy}%`}
+            sub={`${sessions.correct}/${sessions.answered} correct`}
           />
-          <QuizStatCard
-            icon={<XCircle className="h-4 w-4" />}
-            label="Abandoned"
-            value={sessions.abandoned.toLocaleString()}
-          />
-          <QuizStatCard
-            icon={<Activity className="h-4 w-4" />}
-            label="Active"
-            value={sessions.active.toLocaleString()}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {sessions.last_active_at
-            ? `Last active ${formatSessionDate(sessions.last_active_at)} · `
-            : ''}
-          {sessions.served.toLocaleString()} served ·{' '}
-          {sessions.answered.toLocaleString()} answered ·{' '}
-          {sessions.correct.toLocaleString()} correct
-        </p>
-      </section>
-
-      {/* Performance */}
-      <section className="space-y-3">
-        <h3 className="text-sm font-medium">Performance</h3>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <QuizStatCard
             icon={<BarChart3 className="h-4 w-4" />}
             label="Avg score"
@@ -117,12 +105,6 @@ function QuizProfile({ profile }: { profile: AdminUserQuizProfile }) {
             valueClassName={
               avgScore == null ? undefined : scoreBandClasses(avgScore)
             }
-          />
-          <QuizStatCard
-            icon={<Target className="h-4 w-4" />}
-            label="Accuracy"
-            value={accuracy == null ? '—' : `${accuracy}%`}
-            sub={`${sessions.correct}/${sessions.answered} correct`}
           />
           <QuizStatCard
             icon={<Clock className="h-4 w-4" />}
@@ -133,75 +115,85 @@ function QuizProfile({ profile }: { profile: AdminUserQuizProfile }) {
                 : formatDurationMs(performance.avg_time_per_question_ms)
             }
           />
+          <QuizStatCard
+            icon={<CheckCircle2 className="h-4 w-4" />}
+            label="Completion"
+            value={completion == null ? '—' : `${completion}%`}
+          />
         </div>
-        <div className="rounded-2xl border bg-card p-4 sm:p-5">
-          <p className="text-xs font-medium text-muted-foreground">Score over time</p>
-          {performance.score_trend.length >= 2 ? (
-            <div className="mt-2">
-              <UserScoreSparkline data={performance.score_trend} />
+      </section>
+
+      {/* Score over time */}
+      <div className="rounded-2xl border bg-card p-4 sm:p-5">
+        <p className="text-xs font-medium text-muted-foreground">Score over time</p>
+        {performance.score_trend.length >= 2 ? (
+          <div className="mt-2">
+            <UserScoreSparkline data={performance.score_trend} />
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Not enough completed sessions for a trend.
+          </p>
+        )}
+      </div>
+
+      {/* Generation details — collapsed by default (admin cost detail, not engagement) */}
+      <details className="group rounded-2xl border bg-card">
+        <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-medium sm:p-5 [&::-webkit-details-marker]:hidden">
+          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+          Generation details
+          <span className="ml-1 font-normal text-muted-foreground">
+            {generation.questions.toLocaleString()} questions · {generation.batches}{' '}
+            batches · {formatTokenCost(generation.total_cost)}
+          </span>
+        </summary>
+        <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <QuizStatCard
+              icon={<Sparkles className="h-4 w-4" />}
+              label="Questions"
+              value={generation.questions.toLocaleString()}
+            />
+            <QuizStatCard
+              icon={<Layers className="h-4 w-4" />}
+              label="Batches"
+              value={generation.batches.toLocaleString()}
+              sub={`${generation.completed_batches} completed · ${generation.failed_batches} failed`}
+            />
+            <QuizStatCard
+              icon={<Coins className="h-4 w-4" />}
+              label="Total cost"
+              value={formatTokenCost(generation.total_cost)}
+              valueClassName="font-mono"
+            />
+            <QuizStatCard
+              icon={<BookOpen className="h-4 w-4" />}
+              label="Topics"
+              value={topics_quizzed.distinct.toLocaleString()}
+            />
+          </div>
+          {generation.topics.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {generation.topics.map((topic) => (
+                <Badge key={topic} variant="secondary" className="font-normal">
+                  {topic}
+                </Badge>
+              ))}
+              {topics_quizzed.reached_via_cross_user && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'border-transparent',
+                    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  )}
+                >
+                  Reached via cross-user
+                </Badge>
+              )}
             </div>
-          ) : (
-            <p className="mt-2 text-sm text-muted-foreground">
-              Not enough completed sessions for a trend.
-            </p>
           )}
         </div>
-      </section>
-
-      {/* Generation */}
-      <section className="space-y-3">
-        <h3 className="text-sm font-medium">Generation</h3>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <QuizStatCard
-            icon={<Sparkles className="h-4 w-4" />}
-            label="Questions"
-            value={generation.questions.toLocaleString()}
-          />
-          <QuizStatCard
-            icon={<Layers className="h-4 w-4" />}
-            label="Batches"
-            value={generation.batches.toLocaleString()}
-            sub={`${generation.completed_batches} completed · ${generation.failed_batches} failed`}
-          />
-          <QuizStatCard
-            icon={<Coins className="h-4 w-4" />}
-            label="Total cost"
-            value={formatTokenCost(generation.total_cost)}
-            valueClassName="font-mono"
-          />
-          <QuizStatCard
-            icon={<BookOpen className="h-4 w-4" />}
-            label="Topics"
-            value={topics_quizzed.distinct.toLocaleString()}
-          />
-        </div>
-        {generation.topics.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {generation.topics.map((topic) => (
-              <Badge key={topic} variant="secondary" className="font-normal">
-                {topic}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Topics quizzed */}
-      <section className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-        <span className="text-muted-foreground">Topics quizzed:</span>
-        <span className="font-medium tabular-nums">{topics_quizzed.distinct}</span>
-        {topics_quizzed.reached_via_cross_user && (
-          <Badge
-            variant="outline"
-            className={cn(
-              'border-transparent',
-              'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-            )}
-          >
-            Reached via cross-user
-          </Badge>
-        )}
-      </section>
+      </details>
     </div>
   );
 }

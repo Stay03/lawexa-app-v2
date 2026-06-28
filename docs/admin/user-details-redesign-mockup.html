@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin · User Details — redesign mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          bg:        'var(--bg)',
+          card:      'var(--card)',
+          fg:        'var(--fg)',
+          muted:     'var(--muted)',
+          'muted-fg':'var(--muted-fg)',
+          primary:   'var(--primary)',
+          'primary-fg':'var(--primary-fg)',
+          destructive:'var(--destructive)',
+          line:      'var(--border)',
+        },
+        borderRadius: { xl: '0.75rem', '2xl': '0.95rem' },
+      },
+    },
+  }
+</script>
+<style>
+  :root{
+    --bg: oklch(0.145 0 0);
+    --card: oklch(0.205 0 0);
+    --card-2: oklch(0.235 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-fg: oklch(0.708 0 0);
+    --primary: oklch(0.78 0.13 82);
+    --primary-fg: oklch(0.20 0.06 82);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --emerald: #34d399;
+    --emerald-dim: color-mix(in oklch, #34d399 18%, transparent);
+    --amber: #fbbf24;
+  }
+  *{ font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body{ background:var(--bg); color:var(--fg); }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .ring1{ box-shadow: inset 0 0 0 1px var(--border); }
+  .badge{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:2px 9px; border-radius:9999px; line-height:1.5; white-space:nowrap; }
+  .kpi:hover{ background:var(--card-2); }
+  .rowi{ transition:background .12s ease; }
+  .rowi:hover{ background:var(--card-2); }
+  .tabbtn{ position:relative; padding:10px 2px; font-size:14px; font-weight:500; color:var(--muted-fg); cursor:pointer; background:none; border:none; }
+  .tabbtn:hover{ color:var(--fg); }
+  .tabbtn[data-active="true"]{ color:var(--fg); }
+  .tabbtn[data-active="true"]::after{ content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--primary); border-radius:2px; }
+  .panel{ display:none; }
+  .panel[data-active="true"]{ display:block; animation: fade .18s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(3px)} to{opacity:1; transform:none} }
+  .icn{ width:16px; height:16px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  .icn-sm{ width:14px; height:14px; }
+  summary::-webkit-details-marker{ display:none; }
+  details[open] .chev{ transform:rotate(90deg); }
+  .chev{ transition:transform .15s ease; }
+  .scrollbox{ max-height:430px; overflow-y:auto; }
+  .scrollbox::-webkit-scrollbar{ width:8px; }
+  .scrollbox::-webkit-scrollbar-thumb{ background:var(--muted); border-radius:8px; }
+  .menu{ display:none; }
+  .menu[data-open="true"]{ display:block; animation: fade .12s ease; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- top breadcrumb bar -->
+<header class="h-14 border-b border-line flex items-center px-5 gap-3 sticky top-0 z-30" style="background:color-mix(in oklch, var(--bg) 88%, transparent); backdrop-filter:blur(8px)">
+  <div class="text-sm text-muted-fg flex items-center gap-2">
+    <span>Admin</span><span class="opacity-40">›</span>
+    <a class="hover:text-fg">Users</a><span class="opacity-40">›</span>
+    <span class="text-fg font-medium">Stay Njokede</span>
+  </div>
+  <div class="ml-auto flex items-center gap-2">
+    <button class="badge ring1 text-muted-fg hover:text-fg" style="padding:5px 10px">☾ Theme</button>
+  </div>
+</header>
+
+<div class="max-w-6xl mx-auto px-5 py-6 space-y-5">
+
+  <!-- mockup note -->
+  <div class="text-xs text-muted-fg flex items-center gap-2 -mb-1">
+    <span class="badge" style="background:var(--primary); color:var(--primary-fg)">Redesign mockup</span>
+    Click the tabs and the “View all →” links. Toggle currency, top-right.
+  </div>
+
+  <!-- ===================== IDENTITY HEADER ===================== -->
+  <section class="bg-card rounded-2xl ring1 p-5">
+    <div class="flex flex-wrap items-start gap-4">
+      <!-- avatar -->
+      <div class="h-14 w-14 shrink-0 rounded-2xl flex items-center justify-center text-lg font-semibold"
+           style="background:linear-gradient(135deg, color-mix(in oklch, var(--primary) 35%, var(--card)), var(--card)); color:var(--primary)">SN</div>
+
+      <!-- name + facts -->
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-xl font-semibold tracking-tight">Stay Njokede</h1>
+          <span class="badge" style="background:var(--primary); color:var(--primary-fg)">superadmin</span>
+          <span class="badge ring1" style="color:var(--amber)">
+            <svg viewBox="0 0 24 24" class="icn icn-sm"><circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/></svg>
+            Unverified
+          </span>
+        </div>
+
+        <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-fg">
+          <span class="flex items-center gap-1.5">
+            <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M4 4h16v16H4z" opacity=".0"/><path d="M22 6 12 13 2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
+            lawexa28@gmail.com
+          </span>
+          <button onclick="copyUuid(this)" class="flex items-center gap-1.5 hover:text-fg mono text-xs" title="Click to copy">
+            <svg viewBox="0 0 24 24" class="icn icn-sm"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            4505e79e…b3e59608
+          </button>
+        </div>
+
+        <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <span>Lawyer</span><span class="text-muted-fg opacity-50">·</span>
+          <span>Kumasi, Ghana</span><span class="text-muted-fg opacity-50">·</span>
+          <span class="text-muted-fg">Google</span><span class="text-muted-fg opacity-50">·</span>
+          <span class="text-muted-fg">Member since 28 Jan 2026</span>
+        </div>
+      </div>
+
+      <!-- primary action only; secondary nav lives on the tab bar -->
+      <div class="flex items-center gap-2">
+        <button class="badge ring1 hover:bg-muted" style="color:var(--destructive); padding:7px 12px; font-size:13px">
+          <svg viewBox="0 0 24 24" class="icn icn-sm"><circle cx="12" cy="12" r="9"/><path d="m5 5 14 14"/></svg>
+          Block messages
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== KPI STRIP ===================== -->
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="kpi bg-card rounded-xl ring1 p-4 transition">
+      <div class="flex items-center gap-2 text-muted-fg mb-1.5 text-xs font-medium">
+        <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Conversations</div>
+      <div class="text-2xl font-bold tabular-nums">1,088</div>
+    </div>
+    <div class="kpi bg-card rounded-xl ring1 p-4 transition">
+      <div class="flex items-center gap-2 text-muted-fg mb-1.5 text-xs font-medium">
+        <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg> Total tokens</div>
+      <div class="text-2xl font-bold tabular-nums">625.7M</div>
+      <div class="text-xs text-muted-fg mt-1">617.7M in · 8.1M out</div>
+    </div>
+    <div class="kpi bg-card rounded-xl ring1 p-4 transition">
+      <div class="flex items-center gap-2 text-muted-fg mb-1.5 text-xs font-medium">
+        <svg viewBox="0 0 24 24" class="icn icn-sm"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4M16.71 13.88l.7.71-2.82 2.82"/></svg> Total cost</div>
+      <div class="text-2xl font-bold tabular-nums mono cost" data-usd="197.6828">₦296,524.20</div>
+    </div>
+    <div class="kpi bg-card rounded-xl ring1 p-4 transition">
+      <div class="flex items-center gap-2 text-muted-fg mb-1.5 text-xs font-medium">
+        <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg> AI requests</div>
+      <div class="text-2xl font-bold tabular-nums">2,476</div>
+    </div>
+  </section>
+
+  <!-- ===================== TABS ===================== -->
+  <div class="border-b border-line">
+    <div class="flex items-end justify-between gap-x-6 gap-y-2 flex-wrap">
+      <nav class="flex items-center gap-7 flex-wrap">
+        <button class="tabbtn" data-tab="overview"      data-active="true"  onclick="showTab('overview')">Overview</button>
+        <button class="tabbtn" data-tab="activity"      onclick="showTab('activity')">Activity</button>
+        <button class="tabbtn" data-tab="quiz"          onclick="showTab('quiz')">Quiz</button>
+        <button class="tabbtn" data-tab="conversations" onclick="showTab('conversations')">Conversations</button>
+        <button class="tabbtn" data-tab="profile"       onclick="showTab('profile')">Profile &amp; attribution</button>
+      </nav>
+      <!-- contextual actions: opposite the tabs, always visible -->
+      <div class="flex items-center gap-2 pb-2">
+        <a class="badge ring1 hover:bg-muted cursor-pointer text-muted-fg hover:text-fg" style="padding:6px 11px; font-size:13px">
+          <svg viewBox="0 0 24 24" class="icn icn-sm"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Plan periods</a>
+        <a class="badge ring1 hover:bg-muted cursor-pointer text-muted-fg hover:text-fg" style="padding:6px 11px; font-size:13px">
+          <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M18 8a6 6 0 0 0-9.3-5"/><path d="M6 16a6 6 0 0 0 9.3 5"/><circle cx="12" cy="12" r="3"/></svg> Paystack webhooks</a>
+        <div class="relative">
+          <button onclick="toggleCur(event)" title="Currency &amp; display" class="badge ring1 hover:bg-muted text-muted-fg hover:text-fg" style="padding:6px 9px; font-size:13px">
+            <svg viewBox="0 0 24 24" class="icn icn-sm"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <div id="curMenu" class="menu absolute right-0 mt-2 w-60 bg-card ring1 rounded-xl p-3 z-30 shadow-2xl space-y-3" onclick="event.stopPropagation()">
+            <div class="text-xs font-medium text-muted-fg">Currency &amp; display</div>
+            <label class="flex items-center justify-between text-sm cursor-pointer">Show in NGN
+              <input id="ngnSwitch" type="checkbox" checked onchange="setNgn(this.checked)" class="h-4 w-4 accent-[color:var(--primary)]" />
+            </label>
+            <div class="space-y-1">
+              <label class="text-xs text-muted-fg">USD → NGN rate</label>
+              <input type="number" value="1500" class="w-full bg-bg ring1 rounded-lg text-sm px-2 py-1.5" />
+              <div class="text-xs text-muted-fg">$1 = ₦1,500</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PANEL: OVERVIEW ===================== -->
+  <section class="panel" data-tab="overview" data-active="true">
+    <!-- quiz summary strip -->
+    <div class="bg-card rounded-2xl ring1 p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2 text-sm font-medium text-muted-fg">
+          <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"/></svg> Quiz summary
+        </div>
+        <a onclick="showTab('quiz')" class="text-xs text-primary hover:underline cursor-pointer">View quiz →</a>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div><div class="text-xl font-bold tabular-nums">7</div><div class="text-xs text-muted-fg">sessions</div></div>
+        <div><div class="text-xl font-bold tabular-nums" style="color:var(--amber)">42%</div><div class="text-xs text-muted-fg">accuracy · 33/79</div></div>
+        <div><div class="text-xl font-bold tabular-nums">9s</div><div class="text-xs text-muted-fg">avg / question</div></div>
+        <div><div class="text-xl font-bold tabular-nums">30</div><div class="text-xs text-muted-fg">questions generated</div></div>
+        <div class="ml-auto">
+          <svg width="160" height="44" viewBox="0 0 160 44" class="overflow-visible">
+            <polyline id="spark2" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-4">
+      <!-- recent activity -->
+      <div class="bg-card rounded-2xl ring1 overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+          <div class="flex items-center gap-2 text-sm font-medium text-muted-fg">
+            <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Recent activity
+          </div>
+          <a onclick="showTab('activity')" class="text-xs text-primary hover:underline cursor-pointer">View all →</a>
+        </div>
+        <div id="ovActivity" class="divide-y divide-[color:var(--border)]"></div>
+      </div>
+
+      <!-- recent conversations -->
+      <div class="bg-card rounded-2xl ring1 overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+          <div class="flex items-center gap-2 text-sm font-medium text-muted-fg">
+            <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Recent conversations
+          </div>
+          <a onclick="showTab('conversations')" class="text-xs text-primary hover:underline cursor-pointer">View all →</a>
+        </div>
+        <div id="ovConvos" class="divide-y divide-[color:var(--border)]"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PANEL: ACTIVITY ===================== -->
+  <section class="panel" data-tab="activity">
+    <div class="bg-card rounded-2xl ring1 overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+        <div class="flex items-center gap-2 text-sm font-medium">
+          <svg viewBox="0 0 24 24" class="icn icn-sm text-primary"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Activity feed
+          <span class="text-xs text-muted-fg font-normal">· lazy-loaded when tab opens</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <select class="bg-bg ring1 rounded-lg text-xs px-2 py-1.5 text-muted-fg">
+            <option>All types</option><option>AI messages</option><option>Views</option><option>Quiz</option>
+          </select>
+        </div>
+      </div>
+      <div id="fullActivity" class="scrollbox divide-y divide-[color:var(--border)]"></div>
+      <div class="px-4 py-3 border-t border-line flex justify-center">
+        <button class="badge ring1 hover:bg-muted text-muted-fg" style="padding:6px 14px">Load more</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PANEL: QUIZ ===================== -->
+  <section class="panel" data-tab="quiz">
+    <div class="bg-card rounded-2xl ring1 p-5 space-y-5">
+      <!-- headline metrics (deduped) -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-medium">Performance</h3>
+          <span class="text-xs text-muted-fg">7 completed · 0 abandoned · 0 active &nbsp;·&nbsp; last active 28 Jun 2026</span>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div class="bg-bg rounded-xl ring1 p-4"><div class="text-xs text-muted-fg mb-1">Sessions</div><div class="text-2xl font-bold tabular-nums">7</div></div>
+          <div class="bg-bg rounded-xl ring1 p-4"><div class="text-xs text-muted-fg mb-1">Accuracy</div><div class="text-2xl font-bold tabular-nums" style="color:var(--amber)">42%</div><div class="text-xs text-muted-fg mt-0.5">33 / 79 correct</div></div>
+          <div class="bg-bg rounded-xl ring1 p-4"><div class="text-xs text-muted-fg mb-1">Avg score</div><div class="text-2xl font-bold tabular-nums" style="color:var(--amber)">42%</div></div>
+          <div class="bg-bg rounded-xl ring1 p-4"><div class="text-xs text-muted-fg mb-1">Avg time / q</div><div class="text-2xl font-bold tabular-nums">9s</div></div>
+          <div class="bg-bg rounded-xl ring1 p-4"><div class="text-xs text-muted-fg mb-1">Completion</div><div class="text-2xl font-bold tabular-nums">100%</div></div>
+        </div>
+      </div>
+
+      <!-- sparkline -->
+      <div class="bg-bg rounded-xl ring1 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs text-muted-fg">Score over time</div>
+          <div class="text-xs text-muted-fg">86 served · 79 answered</div>
+        </div>
+        <svg width="100%" height="56" viewBox="0 0 600 56" preserveAspectRatio="none">
+          <polyline id="spark1" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <!-- generation details (collapsed) -->
+      <details class="bg-bg rounded-xl ring1 overflow-hidden">
+        <summary class="flex items-center gap-2 px-4 py-3 cursor-pointer text-sm font-medium select-none">
+          <svg viewBox="0 0 24 24" class="icn icn-sm chev text-muted-fg"><path d="m9 18 6-6-6-6"/></svg>
+          Generation details
+          <span class="text-xs text-muted-fg font-normal ml-1">30 questions · 4 batches · $0.0028</span>
+        </summary>
+        <div class="px-4 pb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="bg-card rounded-lg ring1 p-3"><div class="text-xs text-muted-fg mb-1">Questions</div><div class="text-lg font-bold tabular-nums">30</div></div>
+          <div class="bg-card rounded-lg ring1 p-3"><div class="text-xs text-muted-fg mb-1">Batches</div><div class="text-lg font-bold tabular-nums">4</div><div class="text-xs text-muted-fg mt-0.5">3 ✓ · 1 ✗</div></div>
+          <div class="bg-card rounded-lg ring1 p-3"><div class="text-xs text-muted-fg mb-1">Total cost</div><div class="text-lg font-bold tabular-nums mono cost" data-usd="0.0028">$0.0028</div></div>
+          <div class="bg-card rounded-lg ring1 p-3"><div class="text-xs text-muted-fg mb-1">Topics</div><div class="text-lg font-bold tabular-nums">6</div></div>
+          <div class="col-span-2 md:col-span-4 flex flex-wrap items-center gap-2 pt-1">
+            <span class="badge ring1 text-muted-fg">Constitutional Law</span>
+            <span class="badge ring1 text-muted-fg">Criminal Law</span>
+            <span class="badge ring1 text-muted-fg">Criminal Procedure</span>
+            <span class="badge ring1 text-muted-fg">Law of Evidence</span>
+            <span class="badge ring1 text-muted-fg">Legal Ethics &amp; Prof. Responsibility</span>
+            <span class="badge ring1 text-muted-fg">Succession &amp; Wills</span>
+            <span class="badge" style="background:var(--emerald-dim); color:var(--emerald)">Reached via cross-user</span>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ===================== PANEL: CONVERSATIONS ===================== -->
+  <section class="panel" data-tab="conversations">
+    <!-- filter bar -->
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <div class="relative flex-1 min-w-[220px]">
+        <svg viewBox="0 0 24 24" class="icn icn-sm absolute left-3 top-1/2 -translate-y-1/2 text-muted-fg"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input placeholder="Search conversations…" class="w-full bg-card ring1 rounded-lg text-sm pl-9 pr-3 py-2 placeholder:text-muted-fg"/>
+      </div>
+      <select class="bg-card ring1 rounded-lg text-sm px-3 py-2 text-muted-fg"><option>Any status</option><option>Active</option><option>Archived</option></select>
+      <select class="bg-card ring1 rounded-lg text-sm px-3 py-2 text-muted-fg"><option>Any agent</option><option>Lawexa Single Agent</option><option>v3.1 Orchestrator</option></select>
+      <select class="bg-card ring1 rounded-lg text-sm px-3 py-2 text-muted-fg"><option>Newest first</option><option>Oldest first</option><option>Most messages</option></select>
+    </div>
+
+    <div class="bg-card rounded-2xl ring1 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-muted-fg text-xs uppercase tracking-wide border-b border-line">
+            <th class="font-medium px-4 py-2.5">Title</th>
+            <th class="font-medium px-4 py-2.5">Agent</th>
+            <th class="font-medium px-4 py-2.5 text-right">Messages</th>
+            <th class="font-medium px-4 py-2.5 text-right">Created</th>
+            <th class="font-medium px-4 py-2.5 w-10"></th>
+          </tr>
+        </thead>
+        <tbody id="convTable" class="divide-y divide-[color:var(--border)]"></tbody>
+      </table>
+      <!-- numbered pagination -->
+      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-line text-sm">
+        <span class="text-muted-fg text-xs">Showing 1–15 of 1,088 conversations</span>
+        <div class="flex items-center gap-1">
+          <button class="badge ring1 text-muted-fg" style="padding:5px 9px">‹ Prev</button>
+          <button class="badge" style="background:var(--primary); color:var(--primary-fg); padding:5px 11px">1</button>
+          <button class="badge ring1 text-muted-fg hover:bg-muted" style="padding:5px 11px">2</button>
+          <button class="badge ring1 text-muted-fg hover:bg-muted" style="padding:5px 11px">3</button>
+          <span class="text-muted-fg px-1">…</span>
+          <button class="badge ring1 text-muted-fg hover:bg-muted" style="padding:5px 11px">73</button>
+          <button class="badge ring1 text-muted-fg hover:bg-muted" style="padding:5px 9px">Next ›</button>
+        </div>
+      </div>
+    </div>
+    <p class="text-xs text-muted-fg mt-2">Dropped the all-zero <span class="text-fg">Files / Tokens / Cost</span> columns — per-conversation token &amp; cost breakdowns move into the row detail (click a row).</p>
+  </section>
+
+  <!-- ===================== PANEL: PROFILE & ATTRIBUTION ===================== -->
+  <section class="panel" data-tab="profile">
+    <div class="grid lg:grid-cols-2 gap-4">
+      <!-- profile -->
+      <div class="bg-card rounded-2xl ring1 p-5">
+        <h3 class="text-sm font-medium mb-4 flex items-center gap-2 text-muted-fg">
+          <svg viewBox="0 0 24 24" class="icn icn-sm"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 12 0v1"/></svg> Profile
+        </h3>
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-3.5 text-sm">
+          <div><dt class="text-xs text-muted-fg">Profession</dt><dd class="font-medium mt-0.5">Lawyer</dd></div>
+          <div><dt class="text-xs text-muted-fg">Auth provider</dt><dd class="font-medium mt-0.5">Google</dd></div>
+          <div><dt class="text-xs text-muted-fg">Location</dt><dd class="font-medium mt-0.5">Kumasi, Ghana</dd></div>
+          <div><dt class="text-xs text-muted-fg">Member since</dt><dd class="font-medium mt-0.5">28 Jan 2026</dd></div>
+          <div class="col-span-2">
+            <dt class="text-xs text-muted-fg mb-1.5">Areas of expertise</dt>
+            <dd class="flex flex-wrap gap-2"><span class="badge ring1 text-muted-fg">Contract Law</span></dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- attribution (compact empty state) -->
+      <div class="bg-card rounded-2xl ring1 p-5">
+        <h3 class="text-sm font-medium mb-4 flex items-center gap-2 text-muted-fg">
+          <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/><path d="M12 3a9 9 0 0 0 0 18M3 12h18"/></svg> Attribution &amp; referrals
+        </h3>
+        <div class="flex items-center justify-between rounded-xl bg-bg ring1 px-4 py-3">
+          <p class="text-sm text-muted-fg">No attribution data captured for this user.</p>
+          <a class="text-xs text-primary hover:underline cursor-pointer whitespace-nowrap">View referred users →</a>
+        </div>
+        <p class="text-xs text-muted-fg mt-3">When present, UTM source/medium/campaign, referrer &amp; landing URLs, and “referred by” render here as a compact group — not a full-height card on the default view.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="text-xs text-muted-fg pt-2 pb-8 text-center">
+    Mockup for <span class="mono">docs/admin/user-details-page-audit.md</span> · dark theme &amp; tokens mirror <span class="mono">app/globals.css</span>
+  </footer>
+</div>
+
+<script>
+  /* ---------- data (from the screenshots) ---------- */
+  const ACTIVITY = [
+    ['quiz','quiz session completed','quizsession #11 (deleted)','16h ago',''],
+    ['quiz','quiz session started','quizsession #11 (deleted)','16h ago',''],
+    ['view','Viewed statute','Act 847','17h ago','GH · Accra · Chrome / Windows'],
+    ['view','Viewed conversation','Legal Systems Exam Question…','17h ago','GH · Accra · Chrome / AndroidOS'],
+    ['note','Viewed note','CLIENT INTERVIEWING AND COUNSELLING…','17h ago','GH · Accra · Chrome / AndroidOS'],
+    ['ai','AI message sent','what do i need to know about this','18h ago','GH · Accra · Chrome / AndroidOS'],
+    ['view','Viewed conversation','Radar: Nigeria National Assembly Monitor','18h ago','GH · Accra · Chrome / AndroidOS'],
+    ['note','Viewed note','CHAPTER 2: HISTORICAL DEVELOPMENT OF THE…','1d ago','GH · Accra · Chrome / Windows'],
+    ['quiz','quiz session completed','quizsession #6 (deleted)','1d ago',''],
+    ['view','Viewed conversation','Quiz me 5 questions on criminal law','1d ago','GH · Accra · Chrome / AndroidOS'],
+  ];
+  const TONE = {
+    quiz:['var(--primary)','color-mix(in oklch, var(--primary) 16%, transparent)'],
+    ai:['#60a5fa','color-mix(in oklch, #60a5fa 16%, transparent)'],
+    view:['var(--muted-fg)','var(--muted)'],
+    note:['var(--muted-fg)','var(--muted)'],
+  };
+  const ICON = {
+    quiz:'<path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"/>',
+    ai:'<path d="m22 2-7 20-4-9-9-4z"/>',
+    view:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+    note:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  };
+  function actRow(a, compact){
+    const [type,action,subject,time,meta] = a;
+    const [c,bg] = TONE[type];
+    return `<div class="rowi flex gap-3 px-4 py-2.5">
+      <span class="shrink-0 mt-0.5 h-8 w-8 rounded-full flex items-center justify-center" style="background:${bg}; color:${c}">
+        <svg viewBox="0 0 24 24" class="icn icn-sm">${ICON[type]}</svg></span>
+      <div class="min-w-0 flex-1">
+        <div class="text-sm truncate"><span class="text-muted-fg">${action}</span> · <span class="font-medium">${subject}</span></div>
+        <div class="text-xs text-muted-fg mt-0.5 truncate">${time}${meta && !compact ? ' · '+meta : ''}</div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('ovActivity').innerHTML = ACTIVITY.slice(0,5).map(a=>actRow(a,true)).join('');
+  document.getElementById('fullActivity').innerHTML = ACTIVITY.concat(ACTIVITY).map(a=>actRow(a,false)).join('');
+
+  const CONVOS = [
+    ['what do i need to know about this','Lawexa Single Agent',6,'1 day ago',true],
+    ['illegitimate relations and illegitimate chil…','Lawexa Single Agent',16,'1 day ago',true],
+    ['illegitimate relations and illegitimate chil…','Lawexa Single Agent',26,'1 day ago',true],
+    ['hi\\','Lawexa Single Agent',2,'2 days ago',true],
+    ['Quiz me 5 questions on criminal law','Lawexa Single Agent',12,'2 days ago',true],
+    ['https://www.medianama.com/wp-conte…','Lawexa Single Agent',9,'4 days ago',true],
+    ['Can you create notes ?','v3.1 Orchestrator',22,'4 days ago',false],
+    ['Can I use a solar system to generate and…','Lawexa Single Agent',33,'5 days ago',true],
+    ['can you show me the 10 most recent ca…','Lawexa Single Agent',186,'6 days ago',true],
+    ['how does the memory tool work?','Lawexa Single Agent',11,'6 days ago',true],
+  ];
+  const lock = '<svg viewBox="0 0 24 24" class="icn icn-sm text-muted-fg"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+  const globe = '<svg viewBox="0 0 24 24" class="icn icn-sm" style="color:var(--emerald)"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a9 9 0 0 0 0 18 9 9 0 0 0 0-18z"/></svg>';
+  document.getElementById('convTable').innerHTML = CONVOS.map(c=>{
+    const [title,agent,msgs,created,priv]=c;
+    return `<tr class="rowi cursor-pointer">
+      <td class="px-4 py-3"><div class="flex items-center gap-2 min-w-0">${priv?lock:globe}<span class="truncate">${title}</span></div></td>
+      <td class="px-4 py-3 text-muted-fg"><span class="truncate inline-block max-w-[160px] align-bottom">${agent}</span></td>
+      <td class="px-4 py-3 text-right tabular-nums">${msgs}</td>
+      <td class="px-4 py-3 text-right text-muted-fg whitespace-nowrap">${created}</td>
+      <td class="px-4 py-3 text-right text-muted-fg">›</td>
+    </tr>`;
+  }).join('');
+  // overview: recent 5 convos (compact)
+  document.getElementById('ovConvos').innerHTML = CONVOS.slice(0,5).map(c=>{
+    const [title,agent,msgs,created,priv]=c;
+    return `<div class="rowi flex items-center gap-3 px-4 py-2.5">
+      ${priv?lock:globe}
+      <div class="min-w-0 flex-1"><div class="text-sm truncate">${title}</div>
+        <div class="text-xs text-muted-fg mt-0.5">${agent} · ${created}</div></div>
+      <div class="text-sm tabular-nums text-muted-fg">${msgs} msg</div></div>`;
+  }).join('');
+
+  /* ---------- sparklines ---------- */
+  function drawSpark(id, vals, w, h){
+    const min=Math.min(...vals), max=Math.max(...vals), pad=4;
+    const pts=vals.map((v,i)=>{
+      const x = pad + i*((w-2*pad)/(vals.length-1));
+      const y = (max===min)? h/2 : pad + (h-2*pad)*(1-(v-min)/(max-min));
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    const el=document.getElementById(id); if(el) el.setAttribute('points',pts);
+  }
+  const TREND=[38,44,41,40,46,42,39,43,42];
+  drawSpark('spark1', TREND, 600, 56);
+  drawSpark('spark2', TREND, 160, 44);
+
+  /* ---------- tabs ---------- */
+  function showTab(name){
+    document.querySelectorAll('.tabbtn').forEach(b=>b.dataset.active = (b.dataset.tab===name));
+    document.querySelectorAll('.panel').forEach(p=>p.dataset.active = (p.dataset.tab===name));
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  /* ---------- currency (gear popover on the tab bar) ---------- */
+  let showNGN=true; const RATE=1500;
+  function fmt(usd){ return showNGN ? '₦'+(usd*RATE).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
+                                    : '$'+usd.toLocaleString(undefined,{minimumFractionDigits:4,maximumFractionDigits:4}); }
+  function refreshCosts(){ document.querySelectorAll('.cost').forEach(el=>{ const usd=parseFloat(el.dataset.usd); if(!isNaN(usd)) el.textContent=fmt(usd); }); }
+  function setNgn(v){ showNGN=v; refreshCosts(); }
+  refreshCosts();
+
+  /* ---------- misc ---------- */
+  function toggleCur(e){ e.stopPropagation(); const m=document.getElementById('curMenu'); m.dataset.open = m.dataset.open!=='true'; }
+  document.addEventListener('click',()=>{ const m=document.getElementById('curMenu'); if(m) m.dataset.open=false; });
+  function copyUuid(btn){ navigator.clipboard?.writeText('4505e79e-97fc-4da3-9de2-9b2eb3e59608'); const t=btn.innerHTML; btn.innerHTML='✓ copied'; setTimeout(()=>btn.innerHTML=t,1200); }
+</script>
+</body>
+</html>

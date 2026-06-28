@@ -28,12 +28,41 @@ import type {
   AdminConversationsParams,
 } from '@/types/admin';
 
+function SortButton({
+  field,
+  activeField,
+  onSort,
+  children,
+}: {
+  field: 'created_at' | 'updated_at' | 'title';
+  activeField: AdminConversationsParams['sort_by'];
+  onSort: (sortBy: 'created_at' | 'updated_at' | 'title') => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-ml-3 h-8"
+      onClick={() => onSort(field)}
+    >
+      {children}
+      <ArrowUpDown
+        className={cn('ml-2 h-4 w-4', activeField === field && 'text-primary')}
+      />
+    </Button>
+  );
+}
+
 interface AdminConversationsTableProps {
   conversations: AdminConversationListItem[];
   isLoading: boolean;
   params: AdminConversationsParams;
   onSort: (sortBy: 'created_at' | 'updated_at' | 'title') => void;
   hideUserColumn?: boolean;
+  /** Hide the Files / Tokens / Cost columns (e.g. on the per-user detail page
+   *  where user-level totals already live in the KPI strip). */
+  hideUsageColumns?: boolean;
 }
 
 export function AdminConversationsTable({
@@ -42,6 +71,7 @@ export function AdminConversationsTable({
   params,
   onSort,
   hideUserColumn = false,
+  hideUsageColumns = false,
 }: AdminConversationsTableProps) {
   const router = useRouter();
   const { exchangeRate, showNGN } = useCurrencyStore();
@@ -55,26 +85,6 @@ export function AdminConversationsTable({
     e.stopPropagation();
     router.push(`/admin/users/${userUuid}`);
   };
-
-  const SortButton = ({
-    field,
-    children,
-  }: {
-    field: 'created_at' | 'updated_at' | 'title';
-    children: React.ReactNode;
-  }) => (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="-ml-3 h-8"
-      onClick={() => onSort(field)}
-    >
-      {children}
-      <ArrowUpDown
-        className={cn('ml-2 h-4 w-4', params.sort_by === field && 'text-primary')}
-      />
-    </Button>
-  );
 
   if (isLoading) {
     return (
@@ -107,7 +117,9 @@ export function AdminConversationsTable({
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead className="w-[280px] font-semibold">
-              <SortButton field="title">Title</SortButton>
+              <SortButton field="title" activeField={params.sort_by} onSort={onSort}>
+                Title
+              </SortButton>
             </TableHead>
             {!hideUserColumn && (
               <TableHead className="w-[120px] font-semibold">User</TableHead>
@@ -117,23 +129,29 @@ export function AdminConversationsTable({
             </TableHead>
             <TableHead className="w-[120px] font-semibold">Agent</TableHead>
             <TableHead className="w-[80px] text-right font-semibold">Messages</TableHead>
-            <TableHead className="w-[80px] text-right font-semibold">
-              <span className="flex items-center justify-end gap-1.5">
-                <Paperclip className="h-3.5 w-3.5" /> Files
-              </span>
-            </TableHead>
-            <TableHead className="w-[100px] text-right font-semibold">
-              <span className="flex items-center justify-end gap-1.5">
-                <Hash className="h-3.5 w-3.5" /> Tokens
-              </span>
-            </TableHead>
-            <TableHead className="w-[110px] text-right font-semibold">
-              <span className="flex items-center justify-end gap-1.5">
-                <Coins className="h-3.5 w-3.5" /> Cost ({getCurrencySymbol(showNGN)})
-              </span>
-            </TableHead>
+            {!hideUsageColumns && (
+              <>
+                <TableHead className="w-[80px] text-right font-semibold">
+                  <span className="flex items-center justify-end gap-1.5">
+                    <Paperclip className="h-3.5 w-3.5" /> Files
+                  </span>
+                </TableHead>
+                <TableHead className="w-[100px] text-right font-semibold">
+                  <span className="flex items-center justify-end gap-1.5">
+                    <Hash className="h-3.5 w-3.5" /> Tokens
+                  </span>
+                </TableHead>
+                <TableHead className="w-[110px] text-right font-semibold">
+                  <span className="flex items-center justify-end gap-1.5">
+                    <Coins className="h-3.5 w-3.5" /> Cost ({getCurrencySymbol(showNGN)})
+                  </span>
+                </TableHead>
+              </>
+            )}
             <TableHead className="w-[140px] font-semibold">
-              <SortButton field="created_at">Created</SortButton>
+              <SortButton field="created_at" activeField={params.sort_by} onSort={onSort}>
+                Created
+              </SortButton>
             </TableHead>
             <TableHead className="w-[50px] font-semibold" />
           </TableRow>
@@ -194,6 +212,8 @@ export function AdminConversationsTable({
               <TableCell className="text-right tabular-nums">
                 {conversation.messages_count}
               </TableCell>
+              {!hideUsageColumns && (
+              <>
               <TableCell className="text-right tabular-nums">
                 {conversation.attachments_count > 0 ? (
                   <span className="inline-flex items-center gap-1 text-sm">
@@ -262,6 +282,8 @@ export function AdminConversationsTable({
                   <span className="text-muted-foreground">{formatCost(0, { showNGN, exchangeRate, decimals: 4 })}</span>
                 )}
               </TableCell>
+              </>
+              )}
               <TableCell>
                 <Tooltip>
                   <TooltipTrigger asChild>

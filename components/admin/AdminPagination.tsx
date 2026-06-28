@@ -19,6 +19,19 @@ interface AdminPaginationProps {
   onPerPageChange?: (perPage: number) => void;
 }
 
+/** Windowed page list with ellipses, e.g. [1, '…', 4, 5, 6, '…', 73]. */
+function getPageRange(current: number, last: number): (number | 'gap')[] {
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+  const pages: (number | 'gap')[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(last - 1, current + 1);
+  if (start > 2) pages.push('gap');
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < last - 1) pages.push('gap');
+  pages.push(last);
+  return pages;
+}
+
 export function AdminPagination({
   pagination,
   onPageChange,
@@ -29,6 +42,7 @@ export function AdminPagination({
   const { current_page, last_page, total, from, to } = pagination;
   const hasPrevious = current_page > 1;
   const hasNext = current_page < last_page;
+  const pages = getPageRange(current_page, last_page);
 
   return (
     <div className="flex items-center justify-between border-t border-border pt-4">
@@ -66,7 +80,33 @@ export function AdminPagination({
           Previous
         </Button>
 
-        <span className="px-2 text-sm text-muted-foreground">
+        {/* Numbered pages (sm+) */}
+        <div className="hidden items-center gap-1 sm:flex">
+          {pages.map((p, i) =>
+            p === 'gap' ? (
+              <span
+                key={`gap-${i}`}
+                className="px-1.5 text-sm text-muted-foreground"
+              >
+                …
+              </span>
+            ) : (
+              <Button
+                key={p}
+                variant={p === current_page ? 'default' : 'outline'}
+                size="sm"
+                className="h-8 min-w-8 px-2 tabular-nums"
+                onClick={() => onPageChange(p)}
+                aria-current={p === current_page ? 'page' : undefined}
+              >
+                {p}
+              </Button>
+            )
+          )}
+        </div>
+
+        {/* Compact indicator (mobile) */}
+        <span className="px-2 text-sm text-muted-foreground sm:hidden">
           Page {current_page} of {last_page}
         </span>
 
