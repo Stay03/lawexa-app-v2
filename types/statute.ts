@@ -115,6 +115,28 @@ export interface StatuteListResponse {
   links: PaginationLinks;
 }
 
+// A country that has at least one statute, with its statute count.
+export interface StatuteCountryFacet {
+  country: Country;
+  statute_count: number;
+}
+
+// Aggregated country facets that drive the statute library country tabs.
+export interface StatuteCountriesData {
+  // Total statutes across all countries, including uncategorised
+  // (country-less) statutes. Shown on the "All" tab.
+  total: number;
+  // Only countries that have at least one statute.
+  countries: StatuteCountryFacet[];
+}
+
+// Response envelope for GET /api/statutes/countries
+export interface StatuteFacetsResponse {
+  success: boolean;
+  message: string;
+  data: StatuteCountriesData;
+}
+
 // Single statute response
 export interface StatuteDetailResponse {
   success: boolean;

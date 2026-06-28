@@ -2,13 +2,15 @@
 
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { statutesApi } from '@/lib/api/statutes';
-import type { StatuteListParams } from '@/types/statute';
+import { STATUTE_COUNTRIES_FALLBACK } from '@/lib/constants/statute-countries';
+import type { StatuteCountriesData, StatuteListParams } from '@/types/statute';
 
 // Query keys factory
 export const statuteKeys = {
   all: ['statutes'] as const,
   lists: () => [...statuteKeys.all, 'list'] as const,
   list: (params: StatuteListParams) => [...statuteKeys.lists(), params] as const,
+  countries: () => [...statuteKeys.all, 'countries'] as const,
   details: () => [...statuteKeys.all, 'detail'] as const,
   detail: (slug: string) => [...statuteKeys.details(), slug] as const,
   nodes: (slug: string) => [...statuteKeys.all, 'nodes', slug] as const,
@@ -28,6 +30,30 @@ export function useInfiniteStatutes(params: Omit<StatuteListParams, 'page'> = {}
     },
     initialPageParam: 1,
     staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+/**
+ * Hook for the country facets that drive the statute country tabs.
+ *
+ * Tries the backend facets endpoint and falls back to a static seed
+ * (STATUTE_COUNTRIES_FALLBACK) until that endpoint is live, so the tabs render
+ * either way. `placeholderData` keeps the tabs populated on first paint with no
+ * flash. Remove the fallback once GET /api/statutes/countries ships.
+ */
+export function useStatuteCountries() {
+  return useQuery({
+    queryKey: statuteKeys.countries(),
+    queryFn: async (): Promise<StatuteCountriesData> => {
+      try {
+        const res = await statutesApi.getCountryFacets();
+        return res.data;
+      } catch {
+        return STATUTE_COUNTRIES_FALLBACK;
+      }
+    },
+    placeholderData: STATUTE_COUNTRIES_FALLBACK,
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 

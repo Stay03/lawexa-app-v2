@@ -5,6 +5,7 @@ import type {
   StatuteNodesResponse,
   StatuteNavigateResponse,
   StatuteListParams,
+  StatuteFacetsResponse,
 } from '@/types/statute';
 
 /**
@@ -27,6 +28,15 @@ export const statutesApi = {
         order: params.order || undefined,
       },
     });
+    return response.data;
+  },
+
+  /**
+   * Get the countries that have statutes, with per-country counts.
+   * Drives the country tabs on the statute library.
+   */
+  getCountryFacets: async (): Promise<StatuteFacetsResponse> => {
+    const response = await apiClient.get<StatuteFacetsResponse>('/statutes/countries');
     return response.data;
   },
 

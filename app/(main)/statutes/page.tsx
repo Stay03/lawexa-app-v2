@@ -6,7 +6,9 @@ import { BookOpen, Loader2 } from 'lucide-react';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
+  ALL_COUNTRIES,
   StatuteCard,
+  StatuteCountryTabs,
   StatuteListGroup,
   StatuteListSkeleton,
 } from '@/components/statutes';
@@ -25,6 +27,10 @@ function StatutesPageContent() {
 
   // Read URL state
   const search = searchParams.get('search') || '';
+  const countryParam = searchParams.get('country');
+  const countryId =
+    countryParam && !Number.isNaN(Number(countryParam)) ? Number(countryParam) : undefined;
+  const countryValue = countryId != null ? String(countryId) : ALL_COUNTRIES;
 
   // Intersection observer for infinite scroll
   const { ref: loadMoreRef, isIntersecting } = useIntersectionObserver();
@@ -32,6 +38,7 @@ function StatutesPageContent() {
   // Fetch statutes with infinite scroll
   const statutesQuery = useInfiniteStatutes({
     search: search || undefined,
+    country: countryId,
     per_page: 15,
   });
 
@@ -66,6 +73,14 @@ function StatutesPageContent() {
   const handleSearchChange = useCallback(
     (value: string) => {
       updateParams({ search: value || null });
+    },
+    [updateParams]
+  );
+
+  // Handle country tab change
+  const handleCountryChange = useCallback(
+    (value: string) => {
+      updateParams({ country: value === ALL_COUNTRIES ? null : value });
     },
     [updateParams]
   );
@@ -135,6 +150,13 @@ function StatutesPageContent() {
         description="Browse and search statutes, acts, and constitutions."
       />
 
+      {/* Country tabs */}
+      <StatuteCountryTabs
+        value={countryValue}
+        onValueChange={handleCountryChange}
+        className="animate-in slide-in-from-top-2 duration-300"
+      />
+
       {/* Search bar */}
       <CaseSearchBar
         value={search}
@@ -167,6 +189,7 @@ function StatutesPage() {
             title="Statutes"
             description="Browse and search statutes, acts, and constitutions."
           />
+          <Skeleton className="h-9 w-72 rounded-4xl" />
           <Skeleton className="h-10 max-w-md" />
           <StatuteListSkeleton />
         </PageContainer>
