@@ -144,3 +144,121 @@ export interface AdminQuizDeleteResponse {
   message: string;
   data: null;
 }
+
+// ----------------------------------------------------------------------------
+// Generation observability (Phase 4) — batches + summary
+// ----------------------------------------------------------------------------
+
+export type QuizBatchStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'skipped';
+
+/**
+ * Shared period contract for the period-aware admin endpoints (batch summary,
+ * analytics, matching-health). Named ranges only — no `30d` shorthand. `date`
+ * is required for `period=date`; `start_date`+`end_date` for `period=date_range`.
+ */
+export type AdminQuizPeriod =
+  | 'today'
+  | 'last_24_hours'
+  | 'date'
+  | 'this_week'
+  | 'last_7_days'
+  | 'this_month'
+  | 'last_30_days'
+  | 'date_range';
+
+export interface AdminQuizPeriodParams {
+  period?: AdminQuizPeriod;
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+/** A row in the generation-batches list. */
+export interface AdminQuizBatchListItem {
+  uuid: string;
+  user: AdminQuizUserRef | null;
+  source_mode: QuizSourceMode;
+  status: QuizBatchStatus;
+  questions_generated: number;
+  total_tokens: number;
+  /** Decimal string, e.g. "0.012345" — parseFloat to use. */
+  token_cost: string;
+  duration_ms: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  error: string | null;
+}
+
+/** A question produced by a batch (compact). */
+export interface AdminQuizBatchQuestionRef {
+  uuid: string;
+  question_text: string;
+  difficulty: QuizDifficulty;
+  topic: string;
+  status: QuizQuestionStatus;
+}
+
+/** Full batch detail — adds the token breakdown, provenance, and its questions. */
+export interface AdminQuizBatchDetail extends AdminQuizBatchListItem {
+  source_conversation: { id: number; uuid: string } | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  classifier_request_id: string | null;
+  questions: AdminQuizBatchQuestionRef[];
+}
+
+export interface AdminQuizBatchSummary {
+  period: { start: string; end: string };
+  totals: {
+    batches: number;
+    completed: number;
+    failed: number;
+    running: number;
+    skipped: number;
+    /** Batches stuck `running` past the stale threshold right now. */
+    stuck_now: number;
+    success_rate: number;
+    questions_generated: number;
+    total_tokens: number;
+    /** Decimal string. */
+    total_cost: string;
+    avg_duration_ms: number;
+  };
+  coverage: { content: number; transcript: number; content_ratio: number };
+}
+
+export interface AdminQuizBatchListParams {
+  user_id?: number;
+  status?: QuizBatchStatus;
+  source_mode?: QuizSourceMode;
+  date_from?: string;
+  date_to?: string;
+  per_page?: number;
+  page?: number;
+}
+
+export interface AdminQuizBatchListResponse {
+  success: boolean;
+  message: string;
+  data: AdminQuizBatchListItem[];
+  pagination: PaginationMeta;
+  links: PaginationLinks;
+}
+
+export interface AdminQuizBatchResponse {
+  success: boolean;
+  message: string;
+  data: AdminQuizBatchDetail;
+}
+
+export interface AdminQuizBatchSummaryResponse {
+  success: boolean;
+  message: string;
+  data: AdminQuizBatchSummary;
+}

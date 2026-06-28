@@ -8,6 +8,11 @@ import type {
   AdminQuizBulkData,
   AdminQuizBulkResponse,
   AdminQuizDeleteResponse,
+  AdminQuizBatchListParams,
+  AdminQuizBatchListResponse,
+  AdminQuizBatchResponse,
+  AdminQuizBatchSummaryResponse,
+  AdminQuizPeriodParams,
 } from '@/types/admin-quiz';
 
 /**
@@ -88,6 +93,36 @@ export const adminQuizApi = {
     const response = await apiClient.post<AdminQuizBulkResponse>(
       '/admin/quiz/questions/bulk',
       data
+    );
+    return response.data;
+  },
+
+  // ---- Generation observability ----
+
+  listBatches: async (
+    params: AdminQuizBatchListParams = {}
+  ): Promise<AdminQuizBatchListResponse> => {
+    const response = await apiClient.get<AdminQuizBatchListResponse>(
+      '/admin/quiz/batches',
+      { params }
+    );
+    return response.data;
+  },
+
+  getBatch: async (uuid: string): Promise<AdminQuizBatchResponse> => {
+    const response = await apiClient.get<AdminQuizBatchResponse>(
+      `/admin/quiz/batches/${uuid}`
+    );
+    return response.data;
+  },
+
+  /** Period-aware generation totals + coverage. */
+  getBatchSummary: async (
+    params: AdminQuizPeriodParams = {}
+  ): Promise<AdminQuizBatchSummaryResponse> => {
+    const response = await apiClient.get<AdminQuizBatchSummaryResponse>(
+      '/admin/quiz/batches/summary',
+      { params }
     );
     return response.data;
   },

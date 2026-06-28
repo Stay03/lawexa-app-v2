@@ -6,6 +6,8 @@ import type {
   AdminQuizQuestionListParams,
   AdminQuizBulkData,
   UpdateAdminQuizQuestionData,
+  AdminQuizBatchListParams,
+  AdminQuizPeriodParams,
 } from '@/types/admin-quiz';
 
 // Query key factory
@@ -15,6 +17,12 @@ export const adminQuizKeys = {
   questionList: (params: AdminQuizQuestionListParams) =>
     [...adminQuizKeys.questions(), 'list', params] as const,
   question: (uuid: string) => [...adminQuizKeys.all, 'question', uuid] as const,
+  batches: () => [...adminQuizKeys.all, 'batches'] as const,
+  batchList: (params: AdminQuizBatchListParams) =>
+    [...adminQuizKeys.batches(), 'list', params] as const,
+  batchSummary: (params: AdminQuizPeriodParams) =>
+    [...adminQuizKeys.batches(), 'summary', params] as const,
+  batch: (uuid: string) => [...adminQuizKeys.all, 'batch', uuid] as const,
 };
 
 /** Paginated, filterable list of bank questions. */
@@ -118,5 +126,35 @@ export function useBulkAdminQuizQuestions() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminQuizKeys.questions() });
     },
+  });
+}
+
+// ---- Generation observability ----
+
+/** Paginated, filterable list of generation batches. */
+export function useAdminQuizBatches(params: AdminQuizBatchListParams = {}) {
+  return useQuery({
+    queryKey: adminQuizKeys.batchList(params),
+    queryFn: () => adminQuizApi.listBatches(params),
+    staleTime: 60 * 1000,
+  });
+}
+
+/** One batch + its token breakdown + questions. */
+export function useAdminQuizBatch(uuid: string | undefined) {
+  return useQuery({
+    queryKey: adminQuizKeys.batch(uuid ?? ''),
+    queryFn: () => adminQuizApi.getBatch(uuid as string),
+    enabled: !!uuid,
+    staleTime: 60 * 1000,
+  });
+}
+
+/** Period-aware generation summary (totals + coverage). */
+export function useAdminQuizBatchSummary(params: AdminQuizPeriodParams = {}) {
+  return useQuery({
+    queryKey: adminQuizKeys.batchSummary(params),
+    queryFn: () => adminQuizApi.getBatchSummary(params),
+    staleTime: 60 * 1000,
   });
 }

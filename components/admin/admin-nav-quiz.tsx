@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronRight, GraduationCap, ListChecks } from 'lucide-react';
+import { Activity, ChevronRight, GraduationCap, ListChecks } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
@@ -22,6 +22,7 @@ import {
 
 const quizNavItems = [
   { title: 'Questions', url: '/admin/quiz/questions', icon: ListChecks },
+  { title: 'Generation', url: '/admin/quiz/generation', icon: Activity },
 ];
 
 export function AdminNavQuizSection() {

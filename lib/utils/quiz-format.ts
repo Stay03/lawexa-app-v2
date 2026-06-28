@@ -23,6 +23,13 @@ export function formatSessionDate(iso: string): string {
   return format(new Date(iso), 'd MMM yyyy');
 }
 
+const DIFFICULTY_LABELS = ['Very Easy', 'Easy', 'Medium', 'Hard', 'Very Hard'];
+
+/** Human label for a difficulty level (for payloads that omit `difficulty_label`). */
+export function difficultyLabel(difficulty: QuizDifficulty): string {
+  return DIFFICULTY_LABELS[difficulty - 1] ?? `Level ${difficulty}`;
+}
+
 /** Tailwind classes for a difficulty badge, colour-coded by level (low-saturation). */
 export function difficultyBadgeClasses(difficulty: QuizDifficulty): string {
   if (difficulty <= 2) return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
@@ -55,6 +62,15 @@ export function sessionDurationMs(
   if (!completedAt) return null;
   const diff = new Date(completedAt).getTime() - new Date(startedAt).getTime();
   return Number.isFinite(diff) && diff >= 0 ? diff : null;
+}
+
+/** Parse a decimal-string cost and format it for display, e.g. "0.012345" → "$0.0123". */
+export function formatTokenCost(cost: string | null | undefined): string {
+  if (cost == null) return '$0';
+  const n = parseFloat(cost);
+  if (!Number.isFinite(n) || n === 0) return '$0';
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  return `$${n.toFixed(2)}`;
 }
 
 /** Display label + badge colour classes for a session status. */
