@@ -13,6 +13,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminQuizBatchStatusBadge } from './AdminQuizBatchStatusBadge';
 import {
+  formatCount,
   formatDurationMs,
   formatSessionDate,
   formatTokenCost,
@@ -79,10 +80,10 @@ export function AdminQuizBatchesTable({
                 </span>
               </TableCell>
               <TableCell className="text-right text-sm tabular-nums">
-                {b.questions_generated}
+                {formatCount(b.questions_generated)}
               </TableCell>
               <TableCell className="hidden text-right text-sm tabular-nums text-muted-foreground md:table-cell">
-                {b.total_tokens.toLocaleString()}
+                {formatCount(b.total_tokens)}
               </TableCell>
               <TableCell className="hidden text-right text-sm tabular-nums text-muted-foreground md:table-cell">
                 {formatTokenCost(b.token_cost)}

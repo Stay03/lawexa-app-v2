@@ -63,6 +63,14 @@ Usage analytics, matching-health, and the per-user quiz tab (the remaining
 period-aware dashboards). The shared `AdminQuizPeriodSelect` / period types are
 ready for them.
 
+## 7. Follow-up fix (2026-06-28)
+
+Live `/admin/quiz/generation` crashed (`Cannot read properties of null (reading
+'toLocaleString')`) — a queued/running/failed batch returns `null` for
+`total_tokens` / `questions_generated` / `token_cost`, but the type marked them
+non-null. Fixed: those fields (+ detail's `prompt_tokens`/`completion_tokens`) are
+now `| null`, rendered through a new `formatCount` helper (null → "—").
+
 ## 6. Definition of Done status
 
 All static-quality DoD items met (period-aware summary + coverage; filterable,

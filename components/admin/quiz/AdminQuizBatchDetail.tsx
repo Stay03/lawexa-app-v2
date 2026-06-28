@@ -12,6 +12,7 @@ import { useAdminQuizBatch } from '@/lib/hooks/useAdminQuiz';
 import { extractApiError } from '@/lib/utils/api-error';
 import {
   difficultyLabel,
+  formatCount,
   formatDurationMs,
   formatSessionDate,
   formatTokenCost,
@@ -59,11 +60,11 @@ export function AdminQuizBatchDetail({ uuid }: AdminQuizBatchDetailProps) {
           <CardTitle className="mt-2 text-base">Generation batch</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Stat label="Questions" value={String(b.questions_generated)} />
-          <Stat label="Total tokens" value={b.total_tokens.toLocaleString()} />
+          <Stat label="Questions" value={formatCount(b.questions_generated)} />
+          <Stat label="Total tokens" value={formatCount(b.total_tokens)} />
           <Stat label="Cost" value={formatTokenCost(b.token_cost)} />
-          <Stat label="Prompt tokens" value={b.prompt_tokens.toLocaleString()} />
-          <Stat label="Completion tokens" value={b.completion_tokens.toLocaleString()} />
+          <Stat label="Prompt tokens" value={formatCount(b.prompt_tokens)} />
+          <Stat label="Completion tokens" value={formatCount(b.completion_tokens)} />
           <Stat
             label="Duration"
             value={b.duration_ms == null ? '—' : formatDurationMs(b.duration_ms)}

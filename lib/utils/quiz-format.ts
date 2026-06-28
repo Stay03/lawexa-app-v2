@@ -64,6 +64,11 @@ export function sessionDurationMs(
   return Number.isFinite(diff) && diff >= 0 ? diff : null;
 }
 
+/** Format a possibly-null count with thousands separators; null → "—". */
+export function formatCount(n: number | null | undefined): string {
+  return n == null ? '—' : n.toLocaleString();
+}
+
 /** Parse a decimal-string cost and format it for display, e.g. "0.012345" → "$0.0123". */
 export function formatTokenCost(cost: string | null | undefined): string {
   if (cost == null) return '$0';

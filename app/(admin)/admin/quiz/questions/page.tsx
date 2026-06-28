@@ -10,8 +10,20 @@ import { AdminQuizQuestionFilters } from '@/components/admin/quiz/AdminQuizQuest
 import { AdminQuizQuestionsTable } from '@/components/admin/quiz/AdminQuizQuestionsTable';
 import { useAdminQuizQuestions } from '@/lib/hooks/useAdminQuiz';
 import { useDebounce } from '@/lib/hooks/useDebounce';
-import type { AdminQuizQuestionListParams } from '@/types/admin-quiz';
+import type {
+  AdminQuizQuestionListParams,
+  AdminQuizQuestionSort,
+} from '@/types/admin-quiz';
 import type { QuizDifficulty } from '@/types/quiz';
+
+const QUESTION_SORTS: AdminQuizQuestionSort[] = [
+  'served',
+  'answered',
+  'correct',
+  'difficulty',
+  'created_at',
+  'reviewed_at',
+];
 
 export default function AdminQuizQuestionsPage() {
   return (
@@ -32,6 +44,8 @@ function AdminQuizQuestionsContent() {
     const status = searchParams.get('status');
     const difficulty = searchParams.get('difficulty');
     const sourceMode = searchParams.get('source_mode');
+    const sortParam = searchParams.get('sort');
+    const directionParam = searchParams.get('direction');
     return {
       page: Number(searchParams.get('page')) || 1,
       per_page: Number(searchParams.get('per_page')) || 15,
@@ -42,6 +56,14 @@ function AdminQuizQuestionsContent() {
       with_trashed: searchParams.get('with_trashed') === 'true' ? true : undefined,
       date_from: searchParams.get('date_from') || undefined,
       date_to: searchParams.get('date_to') || undefined,
+      sort:
+        sortParam && (QUESTION_SORTS as string[]).includes(sortParam)
+          ? (sortParam as AdminQuizQuestionSort)
+          : undefined,
+      direction:
+        directionParam === 'asc' || directionParam === 'desc'
+          ? directionParam
+          : undefined,
       topic_key: debouncedSearch || undefined,
     };
   }, [searchParams, debouncedSearch]);
@@ -72,6 +94,16 @@ function AdminQuizQuestionsContent() {
     [updateParams]
   );
 
+  const handleSort = useCallback(
+    (column: AdminQuizQuestionSort) => {
+      const currentDir = params.direction ?? 'desc';
+      const nextDir =
+        params.sort === column ? (currentDir === 'desc' ? 'asc' : 'desc') : 'desc';
+      updateParams({ sort: column, direction: nextDir });
+    },
+    [params.sort, params.direction, updateParams]
+  );
+
   return (
     <div className="space-y-6">
       <Card>
@@ -94,6 +126,9 @@ function AdminQuizQuestionsContent() {
           <AdminQuizQuestionsTable
             questions={query.data?.data ?? []}
             isLoading={query.isLoading}
+            sort={params.sort}
+            direction={params.direction}
+            onSort={handleSort}
           />
 
           {query.data && query.data.data.length > 0 && (

@@ -81,6 +81,15 @@ export interface AdminQuizQuestionDetail {
   deleted_at: string | null;
 }
 
+/** Sortable columns for the questions list (omit for newest-first default). */
+export type AdminQuizQuestionSort =
+  | 'served'
+  | 'answered'
+  | 'correct'
+  | 'difficulty'
+  | 'created_at'
+  | 'reviewed_at';
+
 export interface AdminQuizQuestionListParams {
   status?: QuizQuestionStatus;
   topic_key?: string;
@@ -90,6 +99,8 @@ export interface AdminQuizQuestionListParams {
   with_trashed?: boolean;
   date_from?: string;
   date_to?: string;
+  sort?: AdminQuizQuestionSort;
+  direction?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
 }
@@ -178,16 +189,19 @@ export interface AdminQuizPeriodParams {
   end_date?: string;
 }
 
-/** A row in the generation-batches list. */
+/**
+ * A row in the generation-batches list. Numeric/cost fields are nullable —
+ * queued / running / skipped / failed batches may not have generated anything yet.
+ */
 export interface AdminQuizBatchListItem {
   uuid: string;
   user: AdminQuizUserRef | null;
   source_mode: QuizSourceMode;
   status: QuizBatchStatus;
-  questions_generated: number;
-  total_tokens: number;
+  questions_generated: number | null;
+  total_tokens: number | null;
   /** Decimal string, e.g. "0.012345" — parseFloat to use. */
-  token_cost: string;
+  token_cost: string | null;
   duration_ms: number | null;
   started_at: string | null;
   completed_at: string | null;
@@ -207,8 +221,8 @@ export interface AdminQuizBatchQuestionRef {
 /** Full batch detail — adds the token breakdown, provenance, and its questions. */
 export interface AdminQuizBatchDetail extends AdminQuizBatchListItem {
   source_conversation: { id: number; uuid: string } | null;
-  prompt_tokens: number;
-  completion_tokens: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
   classifier_request_id: string | null;
   questions: AdminQuizBatchQuestionRef[];
 }

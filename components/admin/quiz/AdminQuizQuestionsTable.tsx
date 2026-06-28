@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { MoreHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -28,16 +28,26 @@ import { AdminQuizBulkBar } from './AdminQuizBulkBar';
 import { AdminQuizActionDialog, type AdminQuizAction } from './AdminQuizActionDialog';
 import { useBulkAdminQuizQuestions } from '@/lib/hooks/useAdminQuiz';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { AdminQuizQuestionListItem } from '@/types/admin-quiz';
+import { cn } from '@/lib/utils';
+import type {
+  AdminQuizQuestionListItem,
+  AdminQuizQuestionSort,
+} from '@/types/admin-quiz';
 
 interface AdminQuizQuestionsTableProps {
   questions: AdminQuizQuestionListItem[];
   isLoading: boolean;
+  sort?: AdminQuizQuestionSort;
+  direction?: 'asc' | 'desc';
+  onSort?: (column: AdminQuizQuestionSort) => void;
 }
 
 export function AdminQuizQuestionsTable({
   questions,
   isLoading,
+  sort,
+  direction,
+  onSort,
 }: AdminQuizQuestionsTableProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingAction, setPendingAction] = useState<{
@@ -116,10 +126,31 @@ export function AdminQuizQuestionsTable({
               </TableHead>
               <TableHead>Question</TableHead>
               <TableHead className="hidden md:table-cell">Topic</TableHead>
-              <TableHead className="hidden sm:table-cell">Difficulty</TableHead>
+              <SortHead
+                column="difficulty"
+                label="Difficulty"
+                sort={sort}
+                direction={direction}
+                onSort={onSort}
+                className="hidden sm:table-cell"
+              />
               <TableHead>Status</TableHead>
-              <TableHead className="hidden text-right lg:table-cell">Correct</TableHead>
-              <TableHead className="hidden text-right lg:table-cell">Served</TableHead>
+              <SortHead
+                column="correct"
+                label="Correct"
+                sort={sort}
+                direction={direction}
+                onSort={onSort}
+                className="hidden text-right lg:table-cell"
+              />
+              <SortHead
+                column="served"
+                label="Served"
+                sort={sort}
+                direction={direction}
+                onSort={onSort}
+                className="hidden text-right lg:table-cell"
+              />
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -241,6 +272,43 @@ export function AdminQuizQuestionsTable({
         }}
       />
     </>
+  );
+}
+
+function SortHead({
+  column,
+  label,
+  sort,
+  direction,
+  onSort,
+  className,
+}: {
+  column: AdminQuizQuestionSort;
+  label: string;
+  sort?: AdminQuizQuestionSort;
+  direction?: 'asc' | 'desc';
+  onSort?: (column: AdminQuizQuestionSort) => void;
+  className?: string;
+}) {
+  if (!onSort) {
+    return <TableHead className={className}>{label}</TableHead>;
+  }
+  const active = sort === column;
+  const Icon = active ? (direction === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn(
+          'inline-flex items-center gap-1 transition-colors hover:text-foreground',
+          active && 'text-foreground'
+        )}
+      >
+        {label}
+        <Icon className={cn('h-3.5 w-3.5', !active && 'opacity-40')} />
+      </button>
+    </TableHead>
   );
 }
 

@@ -68,6 +68,14 @@ plus the nav section `components/admin/admin-nav-quiz.tsx`.
 - **Generation observability** (batches) → Phase 4.
 - **Usage analytics, matching-health, per-user quiz tab** → Phase 5.
 
+## 7. Follow-up (2026-06-28) — sortable columns
+
+Backend added sorting to `GET /admin/quiz/questions` (`?sort=&direction=`;
+columns: served / answered / correct / difficulty / created_at / reviewed_at;
+default newest-first; bad value → 422). Wired the **Difficulty / Correct / Served**
+table headers as click-to-toggle sort controls (first click → `desc`, again →
+`asc`), URL-driven and combining with all existing filters.
+
 ## 6. Definition of Done status
 
 All static-quality DoD items met (filters + pagination + selection + bulk; detail
