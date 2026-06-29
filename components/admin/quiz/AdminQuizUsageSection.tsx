@@ -74,7 +74,7 @@ export function AdminQuizUsageSection({
           </p>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               {STAT_CARDS.map((card) => {
                 const stat = analytics.stat_cards[card.key];
                 return (
@@ -137,7 +137,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function UsageSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 7 }).map((_, i) => (
           <Skeleton key={i} className="h-[88px] rounded-lg" />
         ))}

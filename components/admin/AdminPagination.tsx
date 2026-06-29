@@ -45,10 +45,11 @@ export function AdminPagination({
   const pages = getPageRange(current_page, last_page);
 
   return (
-    <div className="flex items-center justify-between border-t border-border pt-4">
-      <div className="flex items-center gap-4">
-        <p className="text-sm text-muted-foreground">
-          Showing {from || 0} - {to || 0} of {total} {itemLabel}
+    <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Count + per-page (one row on mobile) */}
+      <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
+        <p className="text-xs text-muted-foreground sm:text-sm">
+          Showing {from || 0}–{to || 0} of {total} {itemLabel}
         </p>
 
         {perPage !== undefined && onPerPageChange && (
@@ -56,7 +57,7 @@ export function AdminPagination({
             value={String(perPage)}
             onValueChange={(value) => onPerPageChange(parseInt(value))}
           >
-            <SelectTrigger className="h-8 w-[100px]">
+            <SelectTrigger className="h-8 w-[92px] shrink-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -69,7 +70,8 @@ export function AdminPagination({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Navigation (own row on mobile, spread edge-to-edge) */}
+      <div className="flex items-center justify-between gap-2 sm:justify-end">
         <Button
           variant="outline"
           size="sm"
@@ -106,7 +108,7 @@ export function AdminPagination({
         </div>
 
         {/* Compact indicator (mobile) */}
-        <span className="px-2 text-sm text-muted-foreground sm:hidden">
+        <span className="text-sm text-muted-foreground tabular-nums sm:hidden">
           Page {current_page} of {last_page}
         </span>
 

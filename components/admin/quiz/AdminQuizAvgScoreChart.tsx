@@ -39,7 +39,7 @@ export function AdminQuizAvgScoreChart({
 
   return (
     <ChartContainer config={chartConfig} className="h-[220px] w-full sm:h-[260px]">
-      <LineChart data={data} accessibilityLayer margin={{ left: 4, right: 12, top: 8 }}>
+      <LineChart data={data} accessibilityLayer margin={{ left: 4, right: 16, top: 8 }}>
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"

@@ -27,7 +27,7 @@ export function AdminQuizStatCard({
       </div>
       <div className="flex flex-wrap items-baseline gap-2">
         <p className="text-2xl font-bold tabular-nums">{value}</p>
-        <ChangePercentBadge value={changePercent} nullLabel="—" />
+        {changePercent != null && <ChangePercentBadge value={changePercent} />}
       </div>
     </div>
   );
