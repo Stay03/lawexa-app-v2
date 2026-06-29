@@ -1,19 +1,20 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
-/** Loading placeholder for the results screen (score ring + review list). */
+/** Loading placeholder for the results screen (hero + answer sheet + stepper). */
 export function QuizResultsSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8">
-      <div className="flex flex-col items-center gap-4">
-        <Skeleton className="h-32 w-32 rounded-full" />
-        <Skeleton className="h-6 w-40" />
-        <Skeleton className="h-4 w-48" />
+    <div className="mx-auto w-full max-w-2xl space-y-5">
+      {/* hero summary */}
+      <Skeleton className="h-40 w-full rounded-2xl" />
+      {/* breakdown / answer sheet */}
+      <Skeleton className="h-28 w-full rounded-2xl" />
+      {/* review controls */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-8 w-44 rounded-full" />
       </div>
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-40 w-full rounded-2xl" />
-        ))}
-      </div>
+      {/* current question card */}
+      <Skeleton className="h-72 w-full rounded-2xl" />
     </div>
   );
 }

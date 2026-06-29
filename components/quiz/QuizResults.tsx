@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { useQuizResults } from '@/lib/hooks/useQuiz';
 import { extractApiError } from '@/lib/utils/api-error';
 import { QuizResultsSummary } from './QuizResultsSummary';
-import { QuizResultItemCard } from './QuizResultItemCard';
+import { QuizResultsBreakdown } from './QuizResultsBreakdown';
+import { QuizResultsReview } from './QuizResultsReview';
 import { QuizResultsSkeleton } from './QuizResultsSkeleton';
 import { QuizMessage } from './QuizMessage';
 
@@ -57,20 +58,18 @@ export function QuizResults({ sessionUuid }: QuizResultsProps) {
       : 0;
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8 pb-8">
+    <div className="mx-auto w-full max-w-2xl space-y-5 pb-10">
       <QuizResultsSummary session={session} avgTimeMs={avgTimeMs} />
-      <div className="space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Review
-        </h2>
-        {questions.map((item, index) => (
-          <QuizResultItemCard
-            key={`${item.sequence}-${index}`}
-            item={item}
-            index={index}
-          />
-        ))}
-      </div>
+      {questions.length > 0 ? (
+        <>
+          <QuizResultsBreakdown questions={questions} />
+          <QuizResultsReview questions={questions} />
+        </>
+      ) : (
+        <p className="text-center text-sm text-muted-foreground">
+          No questions were answered in this session.
+        </p>
+      )}
     </div>
   );
 }

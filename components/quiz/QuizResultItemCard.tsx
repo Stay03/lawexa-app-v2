@@ -3,6 +3,7 @@
 import { AlertTriangle, Check, Clock, Info, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDurationMs } from '@/lib/utils/quiz-format';
+import { DifficultyBadge } from './DifficultyBadge';
 import type { QuizResultItem } from '@/types/quiz';
 
 interface QuizResultItemCardProps {
@@ -44,6 +45,10 @@ export function QuizResultItemCard({ item, index }: QuizResultItemCardProps) {
             {item.was_correct ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
             {item.was_correct ? 'Correct' : 'Incorrect'}
           </span>
+          <DifficultyBadge
+            difficulty={question.difficulty}
+            label={question.difficulty_label}
+          />
           <span className="inline-flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
             <Clock className="h-3 w-3" />
             {formatDurationMs(item.time_spent_ms)}

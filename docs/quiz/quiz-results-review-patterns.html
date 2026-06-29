@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quiz results — review pattern explorer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode:'class', theme:{ extend:{ colors:{
+    bg:'var(--bg)', card:'var(--card)', fg:'var(--fg)', muted:'var(--muted)',
+    'muted-fg':'var(--muted-fg)', primary:'var(--primary)', 'primary-fg':'var(--primary-fg)',
+    destructive:'var(--destructive)', line:'var(--border)',
+  }}}}
+</script>
+<style>
+  :root{
+    --bg:oklch(0.145 0 0); --card:oklch(0.205 0 0); --fg:oklch(0.985 0 0);
+    --muted:oklch(0.269 0 0); --muted-fg:oklch(0.708 0 0);
+    --primary:oklch(0.80 0.13 82); --primary-fg:oklch(0.20 0.06 82);
+    --destructive:oklch(0.70 0.19 22); --border:oklch(1 0 0 / 10%);
+    --emerald:#34d399; --emerald-dim:color-mix(in oklch,#34d399 14%,transparent);
+    --rose-dim:color-mix(in oklch,oklch(0.70 0.19 22) 14%,transparent);
+  }
+  *{ font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  body{ background:var(--bg); color:var(--fg); }
+  .ring1{ box-shadow:inset 0 0 0 1px var(--border); }
+  .badge{ display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:9999px;line-height:1.5;white-space:nowrap; }
+  .icn{ width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round; }
+  .icn-sm{ width:13px;height:13px; }
+  .pill{ font-size:13px;font-weight:500;padding:5px 12px;border-radius:9999px;color:var(--muted-fg);cursor:pointer;transition:all .12s ease;background:transparent;border:none; }
+  .pill[data-active="true"]{ background:var(--card);color:var(--fg);box-shadow:inset 0 0 0 1px var(--border); }
+  .modebtn{ font-size:13px;font-weight:600;padding:6px 12px;border-radius:9999px;cursor:pointer;color:var(--muted-fg);background:transparent;border:none; }
+  .modebtn[data-active="true"]{ background:var(--primary);color:var(--primary-fg); }
+  .sizebtn{ font-size:12px;font-weight:600;padding:4px 10px;border-radius:9999px;cursor:pointer;color:var(--muted-fg);background:transparent;border:none; }
+  .sizebtn[data-active="true"]{ background:var(--card);color:var(--fg);box-shadow:inset 0 0 0 1px var(--border); }
+  .cell{ display:flex;align-items:center;justify-content:center;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:transform .08s ease;outline:2px solid transparent;outline-offset:1px; }
+  .cell:hover{ transform:translateY(-2px); }
+  .cell.cur{ outline-color:var(--fg); }
+  .btn{ display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:9999px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer; }
+  .btn-ghost{ color:var(--fg);background:transparent;box-shadow:inset 0 0 0 1px var(--border); }
+  .btn-ghost:disabled{ opacity:.4;cursor:not-allowed; }
+  .item-detail{ display:none; } .item[data-open="true"] .item-detail{ display:block; }
+  .item[data-open="true"] .chev{ transform:rotate(90deg); } .chev{ transition:transform .15s ease; }
+  .item.hide{ display:none; }
+  #overlay{ transition:opacity .2s ease; } #drawer{ transition:transform .25s ease; }
+  .splitrow.sel{ background:color-mix(in oklch,var(--primary) 12%,transparent);box-shadow:inset 2px 0 0 var(--primary); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="border-b border-line sticky top-0 z-30" style="background:color-mix(in oklch,var(--bg) 88%,transparent);backdrop-filter:blur(8px)">
+  <div class="mx-auto flex h-auto max-w-3xl flex-wrap items-center gap-3 px-4 py-2.5">
+    <div class="text-sm text-muted-fg flex items-center gap-2">
+      <span>Quiz</span><span class="opacity-40">›</span><span>Session</span><span class="opacity-40">›</span><span class="text-fg font-medium">Results</span>
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="text-xs text-muted-fg">Size</span>
+      <div class="inline-flex items-center gap-1 rounded-full bg-muted/40 p-1">
+        <button class="sizebtn" data-size="6" onclick="setSize(6)">6</button>
+        <button class="sizebtn" data-size="60" data-active="true" onclick="setSize(60)">60</button>
+        <button class="sizebtn" data-size="200" onclick="setSize(200)">200</button>
+      </div>
+    </div>
+  </div>
+  <div class="mx-auto max-w-3xl px-4 pb-2.5">
+    <div class="inline-flex flex-wrap items-center gap-1 rounded-full bg-muted/40 p-1">
+      <button class="modebtn" data-mode="stepper" data-active="true" onclick="setMode('stepper')">① Stepper</button>
+      <button class="modebtn" data-mode="drawer" onclick="setMode('drawer')">② Heatmap + drawer</button>
+      <button class="modebtn" data-mode="split" onclick="setMode('split')">③ Master–detail</button>
+      <button class="modebtn" data-mode="list" onclick="setMode('list')">④ Scrolling list</button>
+    </div>
+    <p id="modeNote" class="mt-2 text-xs text-muted-fg"></p>
+  </div>
+</header>
+
+<div class="mx-auto w-full max-w-3xl px-4 py-6 space-y-5">
+
+  <!-- HERO -->
+  <section class="rounded-2xl border border-line bg-card p-6">
+    <div class="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:text-left">
+      <div class="relative h-24 w-24 shrink-0">
+        <svg class="h-full w-full -rotate-90" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="52" fill="none" stroke-width="9" style="stroke:var(--muted)"/>
+          <circle id="ring" cx="60" cy="60" r="52" fill="none" stroke-width="9" stroke-linecap="round" style="stroke:var(--primary)"/>
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center"><span id="ringPct" class="text-2xl font-bold tabular-nums" style="color:var(--primary)">—</span></div>
+      </div>
+      <div class="flex-1 text-center sm:text-left">
+        <h1 class="text-xl font-semibold">Session complete</h1>
+        <p id="subline" class="mt-0.5 text-sm text-muted-fg">—</p>
+        <div id="heroChips" class="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start"></div>
+      </div>
+      <div class="flex w-full shrink-0 gap-2 sm:w-auto sm:flex-col">
+        <button class="btn" style="background:var(--primary);color:var(--primary-fg)">Practice again</button>
+        <button class="btn btn-ghost">View history</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIFFICULTY BREAKDOWN -->
+  <section class="rounded-2xl border border-line bg-card p-5">
+    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-fg">Accuracy by difficulty</p>
+    <div id="breakdown" class="space-y-3"></div>
+  </section>
+
+  <!-- REVIEW REGION (swaps per mode) -->
+  <section id="reviewRegion" class="space-y-3"></section>
+</div>
+
+<!-- DRAWER (mode ②) -->
+<div id="overlay" class="fixed inset-0 z-40 bg-black/40 opacity-0 pointer-events-none" onclick="closeDrawer()"></div>
+<aside id="drawer" class="fixed right-0 top-0 z-50 flex h-full w-full max-w-md translate-x-full flex-col bg-card shadow-2xl">
+  <div class="flex items-center justify-between border-b border-line p-4">
+    <div class="flex items-center gap-2">
+      <button class="btn btn-ghost" style="padding:6px 10px" onclick="drawerStep(-1)">‹</button>
+      <button class="btn btn-ghost" style="padding:6px 10px" onclick="drawerStep(1)">›</button>
+    </div>
+    <span id="drawerPos" class="text-sm text-muted-fg"></span>
+    <button class="btn btn-ghost" style="padding:6px 12px" onclick="closeDrawer()">✕ Close</button>
+  </div>
+  <div id="drawerBody" class="flex-1 overflow-y-auto p-5"></div>
+</aside>
+
+<script>
+  /* ---------- content pool (real questions) ---------- */
+  const POOL = [
+    { diff:'Medium', q:'In the context of the defence of insanity in Ghana, what is the legal significance of an accused person merely exhibiting strange behaviour?',
+      opts:[{t:'It automatically establishes the defence of insanity.'},{t:'It is irrelevant to the defence of insanity.'},{t:'It does not automatically establish insanity; the mental disturbance must significantly affect the accused’s capacity to understand the nature or wrongfulness of the act.',correct:true},{t:'It shifts the burden of proof to the prosecution to disprove insanity.'}],
+      exp:'As clarified in R v Grumah (1959), strange behaviour alone does not establish insanity — the disturbance must significantly affect the accused’s capacity to understand the act or its wrongfulness.' },
+    { diff:'Easy', q:'Why does the material identify the initial interview as critical for the lawyer-client relationship?',
+      opts:[{t:'Because it is the only opportunity for the lawyer to gather facts.'},{t:'Because first sessions are difficult to change and influence subsequent interactions.',correct:true},{t:'Because it determines the lawyer’s fee for the entire case.'},{t:'Because it is where the lawyer must decide whether to report the client.'}],
+      exp:'First sessions are difficult to change and shape later interactions.' },
+    { diff:'Medium', q:'What ethical duty does the material identify regarding client communications under the Rules of Professional Conduct for Legal Practitioners 2023?',
+      opts:[{t:'Lawyers must disclose confidential client information to the court upon request.'},{t:'Lawyers are required to maintain confidentiality of client communications.',correct:true},{t:'Lawyers may share client information with other lawyers without consent.'},{t:'Confidentiality only applies to communications made outside the law office.'}],
+      exp:'The 2023 Rules require confidentiality of client communications.' },
+    { diff:'Hard', q:'Under Nigerian law, which of the following is true regarding the capacity to make a will?',
+      opts:[{t:'Only lawyers can draft wills.'},{t:'The testator must have a sound disposing mind at the time of execution.',correct:true},{t:'A will must be made voluntarily, but coercion does not affect validity.'},{t:'The testator must be at least 21 years old.'}],
+      exp:'A will requires a testator of sound disposing mind; non-lawyers may draft wills under s.22(4)(e) LPA, and undue influence affects validity.' },
+    { diff:'Easy', q:'According to the material, which best describes the ‘directive’ and ‘client-centered’ aspects of effective counselling?',
+      opts:[{t:'They are contradictory, forcing a choice between lawyer control and client control.'},{t:'They are complementary, with the lawyer directing legal strategy while the client retains ultimate decision-making authority.',correct:true},{t:'The directive aspect is used only when the client is incompetent to decide.'},{t:'The client-centered aspect means following the client even if illegal.'}],
+      exp:'Complementary: directive legal expertise plus respect for client autonomy over the ultimate decision.' },
+    { diff:'Medium', q:'Which body is primarily responsible for the regulation and discipline of legal practitioners in Nigeria?',
+      opts:[{t:'The Federal High Court.'},{t:'The Legal Practitioners Disciplinary Committee (LPDC).',correct:true},{t:'The Nigerian Law School.'},{t:'The Ministry of Justice alone.'}],
+      exp:'Discipline is handled by the LPDC; courts hear appeals from its decisions.' },
+  ];
+  const TONE={Easy:'emerald',Medium:'amber',Hard:'rose'};
+  const diffStyle={ emerald:'background:var(--emerald-dim);color:var(--emerald)', amber:'background:color-mix(in oklch,var(--primary) 16%,transparent);color:var(--primary)', rose:'background:var(--rose-dim);color:var(--destructive)' };
+  const barColor={ emerald:'var(--emerald)', amber:'var(--primary)', rose:'var(--destructive)' };
+  const PATTERN=[true,false,true,true,false,true,false,true,false,true,true,false,false,true,true,false,true,false];
+
+  const MODE_NOTE={
+    stepper:'① One question at a time. Prev/Next or ← →, jump via the answer sheet, filter to a subset. No long scroll — identical from 6 to 200.',
+    drawer:'② The page stays ~1 screen: summary + difficulty + the full answer sheet. Tap any cell to open detail in a slide-over with its own Prev/Next.',
+    split:'③ Compact list on the left, detail on the right (desktop). On narrow screens it stacks. The detail never scrolls the whole page.',
+    list:'④ Collapsed accordion rows, windowed with “Load more”, navigated by the answer sheet + filter. Simplest, but still a scroll.',
+  };
+
+  function esc(s){ return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  const CHECK='<svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M20 6 9 17l-5-5"/></svg>';
+  const CROSS='<svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  const CLOCK='<svg viewBox="0 0 24 24" class="icn icn-sm"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+  const INFO='<svg viewBox="0 0 24 24" class="icn icn-sm mt-0.5 shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>';
+  const EDITED='<p class="mt-1 flex items-center gap-1.5 text-xs" style="color:var(--primary)"><svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M10.3 3.6 1.8 18a1 1 0 0 0 .9 1.5h18.6a1 1 0 0 0 .9-1.5L13.7 3.6a1 1 0 0 0-1.7 0z"/><path d="M12 9v4M12 17h.01"/></svg>This question was updated after you answered it.</p>';
+
+  let DATA=[], SIZE=60, MODE='stepper', filter='all', cur=0, visible=15, PAGE=15, drawerN=1, selectedN=1;
+
+  function buildData(n){
+    const out=[];
+    for(let i=0;i<n;i++){
+      const base=POOL[i%POOL.length], correct=PATTERN[i%PATTERN.length];
+      const ci=base.opts.findIndex(o=>o.correct);
+      out.push({ n:i+1, correct, chosenIdx: correct?ci:(ci+1)%base.opts.length, diff:base.diff, tone:TONE[base.diff], time:(4+(i*7)%17)+'s', q:base.q, opts:base.opts, exp:base.exp, edited:i%17===5 });
+    }
+    return out;
+  }
+  const counts=()=>{ const cor=DATA.filter(d=>d.correct).length; return {total:DATA.length,cor,inc:DATA.length-cor}; };
+  const filtered=()=> filter==='incorrect'?DATA.filter(d=>!d.correct):filter==='correct'?DATA.filter(d=>d.correct):DATA;
+
+  function optionRow(o,chosen){
+    const isC=!!o.correct, isW=chosen&&!o.correct;
+    let icon='<span class="h-5 w-5 shrink-0"></span>', tag='', tx='text-muted-fg', box='border:1px solid transparent;background:var(--muted)';
+    if(isC){ tx='text-fg font-medium'; tag=`<span class="shrink-0 text-xs" style="color:var(--emerald)">Correct answer</span>`; icon=`<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style="background:var(--emerald-dim);color:var(--emerald)">${CHECK}</span>`; box='border:1px solid color-mix(in oklch,var(--emerald) 30%,transparent);background:var(--emerald-dim)'; }
+    else if(isW){ tx='text-fg font-medium'; tag=`<span class="shrink-0 text-xs" style="color:var(--destructive)">Your answer</span>`; icon=`<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style="background:var(--rose-dim);color:var(--destructive)">${CROSS}</span>`; box='border:1px solid color-mix(in oklch,var(--destructive) 30%,transparent);background:var(--rose-dim)'; }
+    return `<div class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm" style="${box}">${icon}<span class="flex-1 ${tx}">${esc(o.t)}</span>${tag}</div>`;
+  }
+  function cardDetail(d){
+    if(!d) return '<p class="text-sm text-muted-fg">No questions in this filter.</p>';
+    const st=d.correct?'background:var(--emerald-dim);color:var(--emerald)':'background:var(--rose-dim);color:var(--destructive)';
+    return `<div class="flex items-start justify-between gap-3">
+        <h3 class="text-base font-medium leading-relaxed">${d.n}. ${esc(d.q)}</h3>
+        <div class="flex shrink-0 flex-col items-end gap-1">
+          <span class="badge" style="${st}">${d.correct?CHECK+' Correct':CROSS+' Incorrect'}</span>
+          <span class="badge" style="${diffStyle[d.tone]}">${d.diff}</span>
+          <span class="inline-flex items-center gap-1 text-xs tabular-nums text-muted-fg">${CLOCK}${d.time}</span>
+        </div></div>
+      <div class="mt-4 space-y-2">${d.opts.map((o,i)=>optionRow(o,i===d.chosenIdx)).join('')}</div>
+      <div class="mt-4 flex gap-2.5 rounded-xl p-3 text-sm text-muted-fg" style="background:color-mix(in oklch,var(--muted) 60%,transparent)">${INFO}<p class="leading-relaxed">${esc(d.exp)}</p></div>
+      ${d.edited?EDITED:''}`;
+  }
+  function gridHtml(curN){
+    const showNum=DATA.length<=100, size=DATA.length>120?20:26;
+    return `<div class="flex flex-wrap gap-1.5">`+DATA.map(d=>{
+      const s=d.correct?'background:var(--emerald-dim);color:var(--emerald);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--emerald) 30%,transparent)':'background:var(--rose-dim);color:var(--destructive);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--destructive) 30%,transparent)';
+      return `<button class="cell ${d.n===curN?'cur':''}" style="${s};width:${size}px;height:${size}px" title="Q${d.n} — ${d.correct?'correct':'incorrect'}" onclick="jump(${d.n})">${showNum?d.n:''}</button>`;
+    }).join('')+`</div>`;
+  }
+  function filterChips(){
+    const {cor,inc,total}=counts();
+    const c=(f,l,n)=>`<button class="pill" data-active="${filter===f}" onclick="setReviewFilter('${f}')">${l} <span class="opacity-60">${n}</span></button>`;
+    return `<div class="inline-flex items-center gap-1 rounded-full bg-muted/40 p-1">${c('all','All',total)}${c('incorrect','Incorrect',inc)}${c('correct','Correct',cor)}</div>`;
+  }
+  function answerSheetCard(curN){
+    return `<div class="rounded-2xl border border-line bg-card p-5">
+      <div class="mb-3 flex items-center justify-between">
+        <p class="text-xs font-semibold uppercase tracking-wide text-muted-fg">Answer sheet</p>
+        <div class="flex items-center gap-3 text-xs text-muted-fg">
+          <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded" style="background:var(--emerald-dim);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--emerald) 40%,transparent)"></span>Correct</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded" style="background:var(--rose-dim);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--destructive) 40%,transparent)"></span>Incorrect</span>
+        </div>
+      </div>${gridHtml(curN)}</div>`;
+  }
+
+  /* ---------- review renderers ---------- */
+  function renderReview(){
+    const R=document.getElementById('reviewRegion');
+    if(MODE==='stepper') R.innerHTML=reviewStepper();
+    else if(MODE==='drawer') R.innerHTML=reviewDrawer();
+    else if(MODE==='split') R.innerHTML=reviewSplit();
+    else R.innerHTML=reviewList();
+  }
+
+  function reviewStepper(){
+    const set=filtered(); if(cur>=set.length) cur=0; const d=set[cur];
+    return `${answerSheetCard(d?d.n:null)}
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-xs font-semibold uppercase tracking-wide text-muted-fg">Review</h2>${filterChips()}
+      </div>
+      <div class="flex items-center justify-between gap-3">
+        <button class="btn btn-ghost" onclick="step(-1)" ${cur<=0?'disabled':''}>‹ Prev</button>
+        <span class="text-sm text-muted-fg tabular-nums">Question ${set.length?cur+1:0} of ${set.length}${filter!=='all'?' · '+filter:''}</span>
+        <button class="btn btn-ghost" onclick="step(1)" ${cur>=set.length-1?'disabled':''}>Next ›</button>
+      </div>
+      <div class="rounded-2xl border border-line bg-card p-5">${cardDetail(d)}</div>`;
+  }
+  function step(dir){ const set=filtered(); cur=Math.min(set.length-1,Math.max(0,cur+dir)); renderReview(); }
+
+  function reviewDrawer(){
+    return `${answerSheetCard(null)}
+      <p class="text-center text-xs text-muted-fg">Tap any cell above to open that question.</p>`;
+  }
+
+  function reviewSplit(){
+    if(!DATA.find(d=>d.n===selectedN)) selectedN=DATA[0].n;
+    const rows=DATA.map(d=>{
+      const st=d.correct?'color:var(--emerald)':'color:var(--destructive)';
+      const ic=d.correct?CHECK:CROSS;
+      return `<button class="splitrow flex w-full items-center gap-2 px-3 py-2.5 text-left ${d.n===selectedN?'sel':''}" onclick="selectSplit(${d.n})">
+        <span class="shrink-0" style="${st}">${ic}</span>
+        <span class="w-6 shrink-0 text-xs tabular-nums text-muted-fg">${d.n}</span>
+        <span class="line-clamp-1 flex-1 text-sm">${esc(d.q)}</span></button>`;
+    }).join('');
+    const d=DATA.find(x=>x.n===selectedN);
+    return `<div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-xs font-semibold uppercase tracking-wide text-muted-fg">Review</h2>${filterChips()}</div>
+      <div class="grid gap-4 md:grid-cols-[300px_1fr]">
+        <div class="overflow-hidden rounded-2xl border border-line bg-card">
+          <div class="max-h-[70vh] divide-y divide-[color:var(--border)] overflow-y-auto">${rows}</div>
+        </div>
+        <div class="rounded-2xl border border-line bg-card p-5 md:sticky md:top-32 md:self-start">${cardDetail(d)}</div>
+      </div>`;
+  }
+  function selectSplit(n){ selectedN=n; renderReview(); }
+
+  function reviewList(){
+    const set=filtered(); visible=Math.min(visible||PAGE,set.length);
+    const items=set.slice(0,visible).map(d=>{
+      const st=d.correct?'background:var(--emerald-dim);color:var(--emerald)':'background:var(--rose-dim);color:var(--destructive)';
+      return `<div class="item rounded-2xl border border-line bg-card" data-id="${d.n}">
+        <button class="flex w-full items-center gap-3 p-4 text-left" onclick="toggleItem(${d.n})">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style="${st}">${d.correct?CHECK:CROSS}</span>
+          <span class="min-w-0 flex-1"><span class="line-clamp-2 text-sm font-medium">${d.n}. ${esc(d.q)}</span></span>
+          <span class="badge" style="${diffStyle[d.tone]}">${d.diff}</span>
+          <svg viewBox="0 0 24 24" class="icn chev shrink-0 text-muted-fg"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="item-detail space-y-2 px-4 pb-4">${d.opts.map((o,i)=>optionRow(o,i===d.chosenIdx)).join('')}
+          <div class="mt-3 flex gap-2.5 rounded-xl p-3 text-sm text-muted-fg" style="background:color-mix(in oklch,var(--muted) 60%,transparent)">${INFO}<p class="leading-relaxed">${esc(d.exp)}</p></div>${d.edited?EDITED:''}</div>
+      </div>`;
+    }).join('');
+    const more=visible<set.length?`<div class="pt-1 text-center"><button class="btn btn-ghost" onclick="loadMore()">Load more — showing ${visible} of ${set.length}</button></div>`:'';
+    return `${answerSheetCard(null)}
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-xs font-semibold uppercase tracking-wide text-muted-fg">Review</h2>${filterChips()}</div>
+      <div class="space-y-2.5">${items}</div>${more}`;
+  }
+  function toggleItem(n){ const el=document.querySelector(`.item[data-id="${n}"]`); if(el) el.dataset.open=el.dataset.open!=='true'; }
+  function loadMore(){ visible+=PAGE; renderReview(); }
+
+  /* ---------- shared nav ---------- */
+  function jump(n){
+    const d=DATA.find(x=>x.n===n);
+    if(MODE==='drawer'){ openDrawer(n); return; }
+    if((filter==='incorrect'&&d.correct)||(filter==='correct'&&!d.correct)){ filter='all'; }
+    if(MODE==='stepper'){ cur=filtered().findIndex(x=>x.n===n); renderReview(); document.getElementById('reviewRegion').scrollIntoView({behavior:'smooth',block:'start'}); }
+    else if(MODE==='split'){ selectedN=n; renderReview(); }
+    else { const idx=filtered().findIndex(x=>x.n===n); if(idx>=visible) visible=idx+1; renderReview(); requestAnimationFrame(()=>{ const el=document.querySelector(`.item[data-id="${n}"]`); if(el){ el.dataset.open='true'; el.scrollIntoView({behavior:'smooth',block:'center'}); } }); }
+  }
+  function setReviewFilter(f){ filter=f; cur=0; visible=PAGE; renderReview(); }
+
+  /* ---------- drawer ---------- */
+  function openDrawer(n){ drawerN=n; renderDrawer(); document.getElementById('overlay').classList.remove('opacity-0','pointer-events-none'); document.getElementById('drawer').classList.remove('translate-x-full'); }
+  function closeDrawer(){ document.getElementById('overlay').classList.add('opacity-0','pointer-events-none'); document.getElementById('drawer').classList.add('translate-x-full'); }
+  function drawerStep(dir){ drawerN=Math.min(DATA.length,Math.max(1,drawerN+dir)); renderDrawer(); }
+  function renderDrawer(){ const d=DATA.find(x=>x.n===drawerN); document.getElementById('drawerPos').textContent=`Question ${drawerN} of ${DATA.length}`; document.getElementById('drawerBody').innerHTML=cardDetail(d); }
+
+  /* ---------- top-level ---------- */
+  function renderHero(){
+    const {total,cor,inc}=counts(), pct=total?Math.round(cor/total*100):0, r=52,c=2*Math.PI*r, ring=document.getElementById('ring');
+    ring.style.strokeDasharray=c; ring.style.strokeDashoffset=c-(pct/100)*c;
+    document.getElementById('ringPct').textContent=pct+'%';
+    document.getElementById('subline').textContent=`${cor} of ${total} correct · 28 Jun 2026`;
+    document.getElementById('heroChips').innerHTML=`<span class="badge" style="background:var(--emerald-dim);color:var(--emerald)">${CHECK} ${cor} correct</span><span class="badge" style="background:var(--rose-dim);color:var(--destructive)">${CROSS} ${inc} incorrect</span><span class="badge ring1 text-muted-fg">${CLOCK} ~9s/question</span>`;
+  }
+  function renderBreakdown(){
+    const g=['Easy','Medium','Hard'].map(d=>{ const it=DATA.filter(x=>x.diff===d), cor=it.filter(x=>x.correct).length; return {d,tone:TONE[d],total:it.length,cor,pct:it.length?Math.round(cor/it.length*100):0}; }).filter(x=>x.total);
+    document.getElementById('breakdown').innerHTML=g.map(x=>`<div class="flex items-center gap-3"><span class="badge w-20 justify-center" style="${diffStyle[x.tone]}">${x.d}</span><div class="h-2 flex-1 overflow-hidden rounded-full" style="background:var(--muted)"><div class="h-full rounded-full" style="width:${x.pct}%;background:${barColor[x.tone]}"></div></div><span class="w-20 text-right text-xs tabular-nums text-muted-fg">${x.cor}/${x.total} · ${x.pct}%</span></div>`).join('');
+  }
+  function setMode(m){ MODE=m; closeDrawer(); document.querySelectorAll('.modebtn').forEach(b=>b.dataset.active=(b.dataset.mode===m)); document.getElementById('modeNote').textContent=MODE_NOTE[m]; cur=0; visible=PAGE; renderReview(); }
+  function setSize(n){ SIZE=n; document.querySelectorAll('.sizebtn').forEach(b=>b.dataset.active=(+b.dataset.size===n)); DATA=buildData(n); filter=n>25?'incorrect':'all'; cur=0; visible=PAGE; selectedN=DATA[0].n; drawerN=1; renderHero(); renderBreakdown(); renderReview(); }
+
+  document.addEventListener('keydown',e=>{
+    if(MODE==='stepper'){ if(e.key==='ArrowRight') step(1); if(e.key==='ArrowLeft') step(-1); }
+    if(e.key==='Escape') closeDrawer();
+  });
+
+  setMode('stepper'); setSize(60);
+</script>
+</body>
+</html>
