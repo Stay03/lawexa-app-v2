@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin mobile redesign — mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --bg:oklch(0.145 0 0); --card:oklch(0.205 0 0); --card2:oklch(0.235 0 0);
+    --fg:oklch(0.985 0 0); --muted:oklch(0.269 0 0); --muted-fg:oklch(0.708 0 0);
+    --primary:oklch(0.80 0.13 82); --primary-fg:oklch(0.20 0.06 82);
+    --destructive:oklch(0.70 0.19 22); --border:oklch(1 0 0 / 10%);
+    --emerald:#34d399; --emerald-dim:color-mix(in oklch,#34d399 14%,transparent);
+    --rose-dim:color-mix(in oklch,oklch(0.70 0.19 22) 14%,transparent);
+  }
+  *{ font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; box-sizing:border-box; }
+  body{ background:#0a0a0a; color:var(--fg); margin:0; padding:24px 0 60px; }
+  .ring1{ box-shadow:inset 0 0 0 1px var(--border); }
+  .badge{ display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:9999px;line-height:1.5;white-space:nowrap; }
+  .icn{ width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round; }
+  .icn-sm{ width:13px;height:13px; } .icn-xs{ width:11px;height:11px; }
+  .phone{ width:390px; max-width:100%; margin:0 auto; background:var(--bg); border-radius:28px; padding:14px; box-shadow:0 0 0 10px #1c1c1c, 0 30px 60px rgba(0,0,0,.5); }
+  .seg{ font-size:13px;font-weight:600;padding:6px 14px;border-radius:9999px;color:var(--muted-fg);cursor:pointer;background:transparent;border:none; }
+  .seg[data-active="true"]{ background:var(--primary);color:var(--primary-fg); }
+  .cell{ display:flex;align-items:center;justify-content:center;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer; width:28px;height:28px; }
+  .cell.cur{ outline:2px solid var(--fg); outline-offset:1px; }
+  .btn{ display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:9px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer;border:none; }
+  .btn-primary{ background:var(--primary);color:var(--primary-fg); }
+  .btn-out{ background:transparent;color:var(--fg);box-shadow:inset 0 0 0 1px var(--border); }
+  .tabwrap::-webkit-scrollbar{ display:none; } .tabwrap{ scrollbar-width:none; }
+  section.screen{ display:none; } section.screen.active{ display:block; }
+  .lbl{ font-size:11px; color:var(--muted-fg); }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;margin-bottom:18px">
+  <div style="display:inline-flex;gap:6px;background:var(--card);padding:6px;border-radius:9999px" class="ring1">
+    <button class="seg" data-active="true" onclick="show('user',this)">User details</button>
+    <button class="seg" onclick="show('session',this)">Session detail</button>
+    <button class="seg" onclick="show('analytics',this)">Analytics</button>
+  </div>
+  <p style="color:var(--muted-fg);font-size:12px;margin-top:10px">Mobile-first redesign · 390px frame</p>
+</div>
+
+<!-- ===================== USER DETAILS ===================== -->
+<section id="user" class="screen active">
+<div class="phone">
+  <!-- topbar -->
+  <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 4px">
+    <svg viewBox="0 0 24 24" class="icn" style="color:var(--muted-fg)"><path d="m15 18-6-6 6-6"/></svg>
+    <span style="font-size:13px;color:var(--muted-fg)">Users</span>
+  </div>
+
+  <!-- HEADER (redesigned) -->
+  <div style="background:var(--card);border-radius:18px;padding:18px;position:relative" class="ring1">
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      <!-- real avatar with initials fallback -->
+      <div style="position:relative;height:60px;width:60px;flex:none">
+        <img src="https://i.pravatar.cc/120?img=12" alt="" style="height:60px;width:60px;border-radius:16px;object-fit:cover;display:block"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div style="display:none;height:60px;width:60px;border-radius:16px;background:color-mix(in oklch,var(--primary) 18%,transparent);color:var(--primary);align-items:center;justify-content:center;font-weight:700;font-size:20px">GA</div>
+      </div>
+
+      <div style="min-width:0;flex:1">
+        <h1 style="font-size:18px;font-weight:600;margin:0;line-height:1.25">Gbadebo Adedapo</h1>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+          <span class="badge" style="background:var(--muted);color:var(--fg)">User</span>
+          <span class="badge" style="background:var(--emerald-dim);color:var(--emerald)">
+            <svg viewBox="0 0 24 24" class="icn icn-xs"><path d="M20 6 9 17l-5-5"/></svg>Verified</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- meta: clean labelled rows -->
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:9px;font-size:13px">
+      <div style="display:flex;align-items:center;gap:8px;color:var(--muted-fg)">
+        <svg viewBox="0 0 24 24" class="icn icn-sm" style="flex:none"><path d="M4 4h16v16H4z" opacity="0"/><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">gbadeboadedapo@gmail.com</span>
+      </div>
+      <button style="display:flex;align-items:center;gap:8px;color:var(--muted-fg);background:none;border:none;font-family:ui-monospace,monospace;font-size:12px;cursor:pointer;padding:0;text-align:left">
+        <svg viewBox="0 0 24 24" class="icn icn-sm" style="flex:none"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        ac235a37…830286bc
+      </button>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--muted-fg);padding-top:2px">
+        <span style="display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>Student</span>
+        <span style="display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>Lagos, Nigeria</span>
+        <span style="display:flex;align-items:center;gap:6px;opacity:.8">Email · Member since Jun 29 2026</span>
+      </div>
+    </div>
+
+    <!-- primary action: full-width on mobile -->
+    <button class="btn btn-out" style="width:100%;margin-top:16px;color:var(--destructive)">
+      <svg viewBox="0 0 24 24" class="icn icn-sm"><circle cx="12" cy="12" r="9"/><path d="m5 5 14 14"/></svg>
+      Block messages
+    </button>
+  </div>
+
+  <!-- KPI grid (kept 2-col — reads fine) -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+    <div style="background:var(--card);border-radius:14px;padding:14px" class="ring1">
+      <div class="lbl" style="display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversations</div>
+      <div style="font-size:22px;font-weight:700;margin-top:6px">1</div>
+    </div>
+    <div style="background:var(--card);border-radius:14px;padding:14px" class="ring1">
+      <div class="lbl">Total Tokens</div>
+      <div style="font-size:22px;font-weight:700;margin-top:6px">122,523</div>
+      <div class="lbl" style="margin-top:2px">120,102 in · 2,421 out</div>
+    </div>
+    <div style="background:var(--card);border-radius:14px;padding:14px" class="ring1">
+      <div class="lbl">Total Cost</div>
+      <div style="font-size:22px;font-weight:700;margin-top:6px">₦26.24</div>
+    </div>
+    <div style="background:var(--card);border-radius:14px;padding:14px" class="ring1">
+      <div class="lbl">AI Requests</div>
+      <div style="font-size:22px;font-weight:700;margin-top:6px">3</div>
+    </div>
+  </div>
+
+  <!-- tabs: scrollable strip + actions wrap (already shipped) -->
+  <div style="margin-top:18px;border-bottom:1px solid var(--border)">
+    <div class="tabwrap" style="display:flex;gap:18px;overflow-x:auto">
+      <span style="padding:8px 2px 10px;font-size:14px;font-weight:600;border-bottom:2px solid var(--primary);white-space:nowrap">Overview</span>
+      <span style="padding:8px 2px 10px;font-size:14px;font-weight:500;color:var(--muted-fg);white-space:nowrap">Activity</span>
+      <span style="padding:8px 2px 10px;font-size:14px;font-weight:500;color:var(--muted-fg);white-space:nowrap">Quiz</span>
+      <span style="padding:8px 2px 10px;font-size:14px;font-weight:500;color:var(--muted-fg);white-space:nowrap">Conversations</span>
+      <span style="padding:8px 2px 10px;font-size:14px;font-weight:500;color:var(--muted-fg);white-space:nowrap">Profile</span>
+    </div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+    <button class="btn btn-out" style="font-size:13px;padding:7px 12px">📅 Plan periods</button>
+    <button class="btn btn-out" style="font-size:13px;padding:7px 12px">🪝 Paystack webhooks</button>
+    <button class="btn btn-out" style="font-size:13px;padding:7px 10px">⚙</button>
+  </div>
+
+  <div style="background:var(--card);border-radius:16px;padding:18px;margin-top:14px" class="ring1">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:600;font-size:14px">Quiz summary</span>
+      <span class="lbl">View all ›</span>
+    </div>
+    <p style="color:var(--muted-fg);font-size:13px;margin:14px 0 0">No quiz activity yet.</p>
+  </div>
+</div>
+<p style="text-align:center;color:var(--muted-fg);font-size:12px;margin-top:14px">Header: real avatar (initials fallback) · vertical flow · full-width action · labelled meta rows</p>
+</section>
+
+<!-- ===================== SESSION DETAIL ===================== -->
+<section id="session" class="screen">
+<div class="phone">
+  <div style="display:flex;align-items:center;gap:8px;height:40px;padding:0 4px;color:var(--muted-fg);font-size:13px">
+    <svg viewBox="0 0 24 24" class="icn"><path d="m15 18-6-6 6-6"/></svg> Back to sessions
+  </div>
+
+  <!-- summary: ring + meta grid -->
+  <div style="background:var(--card);border-radius:18px;padding:18px" class="ring1">
+    <div style="display:flex;gap:16px;align-items:center">
+      <div style="position:relative;height:84px;width:84px;flex:none">
+        <svg viewBox="0 0 120 120" style="height:84px;width:84px;transform:rotate(-90deg)">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="var(--muted)" stroke-width="10"/>
+          <circle cx="60" cy="60" r="52" fill="none" stroke="var(--primary)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="163.3"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--primary)">50%</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:15px">Stay Njokede</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+          <span class="badge" style="background:var(--emerald-dim);color:var(--emerald)">Completed</span>
+          <span class="badge ring1" style="color:var(--muted-fg)">1/2 correct</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <div><div class="lbl">Served</div><div style="font-weight:600;margin-top:2px">3</div></div>
+      <div><div class="lbl">Started</div><div style="font-weight:600;margin-top:2px">28 Jun</div></div>
+      <div><div class="lbl">Duration</div><div style="font-weight:600;margin-top:2px">19s</div></div>
+    </div>
+  </div>
+
+  <!-- answer sheet -->
+  <div style="background:var(--card);border-radius:16px;padding:14px;margin-top:14px" class="ring1">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span class="lbl" style="text-transform:uppercase;letter-spacing:.04em;font-weight:600">Answer sheet</span>
+      <span class="lbl">2 questions</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px" id="sheet"></div>
+  </div>
+
+  <!-- stepper -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px">
+    <span class="lbl" style="text-transform:uppercase;letter-spacing:.04em;font-weight:600">Review</span>
+    <div style="display:inline-flex;gap:4px;background:color-mix(in oklch,var(--muted) 50%,transparent);padding:4px;border-radius:9999px">
+      <span class="badge" style="background:var(--card);color:var(--fg)">All 2</span>
+      <span class="badge" style="color:var(--muted-fg)">Incorrect 1</span>
+      <span class="badge" style="color:var(--muted-fg)">Correct 1</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px">
+    <button class="btn btn-out" id="prev" onclick="step(-1)">‹ Prev</button>
+    <span class="lbl" id="pos">Question 1 of 2</span>
+    <button class="btn btn-out" id="next" onclick="step(1)">Next ›</button>
+  </div>
+  <div id="card" style="margin-top:12px"></div>
+</div>
+<p style="text-align:center;color:var(--muted-fg);font-size:12px;margin-top:14px">Same stepper you approved for student results — reused for admin review</p>
+</section>
+
+<!-- ===================== ANALYTICS ===================== -->
+<section id="analytics" class="screen">
+<div class="phone">
+  <div style="padding:6px 4px 0">
+    <h1 style="font-size:20px;font-weight:600;margin:0">Quiz analytics</h1>
+    <p class="lbl" style="margin:4px 0 0">How Quiz Mode is used, and whether cross-user matching is firing.</p>
+    <!-- period select full-width on mobile -->
+    <div style="margin-top:12px"><button class="btn btn-out" style="width:100%;justify-content:space-between">Last 30 days <svg viewBox="0 0 24 24" class="icn icn-sm"><path d="m6 9 6 6 6-6"/></svg></button></div>
+  </div>
+
+  <!-- usage stat cards 2-col -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+    <div style="background:var(--card);border-radius:14px;padding:13px" class="ring1"><div class="lbl">Sessions</div><div style="font-size:20px;font-weight:700;margin-top:4px">128</div></div>
+    <div style="background:var(--card);border-radius:14px;padding:13px" class="ring1"><div class="lbl">Avg score</div><div style="font-size:20px;font-weight:700;margin-top:4px">61%</div></div>
+    <div style="background:var(--card);border-radius:14px;padding:13px" class="ring1"><div class="lbl">Avg duration</div><div style="font-size:20px;font-weight:700;margin-top:4px">4m 22s</div></div>
+    <div style="background:var(--card);border-radius:14px;padding:13px" class="ring1"><div class="lbl">Completion</div><div style="font-size:20px;font-weight:700;margin-top:4px">78%</div></div>
+  </div>
+
+  <!-- chart with proper left gutter (no clipped axis) -->
+  <div style="background:var(--card);border-radius:16px;padding:16px;margin-top:14px" class="ring1">
+    <div style="font-weight:600;font-size:14px;margin-bottom:10px">Average score over time</div>
+    <div style="display:flex;gap:8px">
+      <div style="display:flex;flex-direction:column;justify-content:space-between;font-size:10px;color:var(--muted-fg);height:120px;text-align:right;width:32px">
+        <span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span>
+      </div>
+      <div style="flex:1;height:120px;border-left:1px solid var(--border);border-bottom:1px solid var(--border);position:relative">
+        <div style="position:absolute;left:0;right:0;bottom:40%;height:2px;background:var(--primary);border-radius:2px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted-fg);margin-top:6px;padding-left:40px">
+      <span>Jun 1</span><span>Jun 10</span><span>Jun 20</span><span>Jun 29</span>
+    </div>
+    <p class="lbl" style="margin-top:8px">↑ axis labels get a real gutter — no more “00%”, “'5%” clipping</p>
+  </div>
+
+  <!-- serve tiers -->
+  <div style="background:var(--card);border-radius:16px;padding:16px;margin-top:14px" class="ring1">
+    <div style="font-weight:600;font-size:14px;margin-bottom:10px">Serve tiers</div>
+    <div style="display:flex;height:10px;border-radius:9999px;overflow:hidden;background:var(--muted)">
+      <div style="width:18%;background:#64748b"></div><div style="width:14%;background:#22c55e"></div>
+      <div style="width:52%;background:#3b82f6"></div><div style="width:8%;background:#a855f7"></div><div style="width:8%;background:#f97316"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:12px;color:var(--muted-fg)">
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:9999px;background:#64748b"></span>Own <b style="color:var(--fg)">28</b></span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:9999px;background:#22c55e"></span>Same-topic <b style="color:var(--fg)">21</b></span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:9999px;background:#3b82f6"></span>Widened own <b style="color:var(--fg)">91</b></span>
+    </div>
+  </div>
+
+  <!-- topic coverage as MOBILE LIST (no overflow table) -->
+  <div style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <span style="font-weight:600;font-size:14px">Topic coverage</span><span class="lbl">All-time</span>
+    </div>
+    <div style="background:var(--card);border-radius:16px;overflow:hidden" class="ring1" id="topics"></div>
+  </div>
+</div>
+<p style="text-align:center;color:var(--muted-fg);font-size:12px;margin-top:14px">Tables that overflow on phones become clean stacked lists</p>
+</section>
+
+<script>
+  function show(id, el){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active', s.id===id));
+    document.querySelectorAll('.seg').forEach(b=>b.dataset.active='false'); el.dataset.active='true';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  // session stepper data
+  const Q = [
+    { correct:false, diff:'Easy', time:'10s', q:'Under Nigerian law, which of the following is true regarding the capacity to make a will?',
+      opts:[{t:'Only lawyers can draft wills.',chosen:true},{t:'The testator must have a sound disposing mind at the time of execution.',correct:true},{t:'A will must be made voluntarily, but coercion does not affect validity.'},{t:'The testator must be at least 21 years old.'}],
+      exp:'A will requires a testator of sound disposing mind; non-lawyers may draft wills under s.22(4)(e) LPA.' },
+    { correct:true, diff:'Medium', time:'9s', q:'Which body is primarily responsible for the discipline of legal practitioners in Nigeria?',
+      opts:[{t:'The Federal High Court.'},{t:'The Legal Practitioners Disciplinary Committee (LPDC).',correct:true,chosen:true},{t:'The Nigerian Law School.'},{t:'The Ministry of Justice alone.'}],
+      exp:'Discipline is handled by the LPDC; courts hear appeals from its decisions.' },
+  ];
+  let cur = 0;
+  const CHECK='<svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M20 6 9 17l-5-5"/></svg>';
+  const CROSS='<svg viewBox="0 0 24 24" class="icn icn-sm"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+
+  function renderSheet(){
+    document.getElementById('sheet').innerHTML = Q.map((q,i)=>{
+      const s = q.correct?'background:var(--emerald-dim);color:var(--emerald)':'background:var(--rose-dim);color:var(--destructive)';
+      return `<button class="cell ${i===cur?'cur':''}" style="${s}" onclick="cur=${i};renderCard();renderSheet()">${i+1}</button>`;
+    }).join('');
+  }
+  function renderCard(){
+    const d=Q[cur];
+    const opts=d.opts.map(o=>{
+      let box='border:1px solid transparent;background:var(--muted)',tag='',ic='<span style="width:18px"></span>',tx='color:var(--muted-fg)';
+      if(o.correct){box='border:1px solid color-mix(in oklch,var(--emerald) 30%,transparent);background:var(--emerald-dim)';tag=`<span style="font-size:11px;color:var(--emerald)">Correct answer</span>`;ic=`<span style="color:var(--emerald)">${CHECK}</span>`;tx='color:var(--fg);font-weight:500';}
+      else if(o.chosen){box='border:1px solid color-mix(in oklch,var(--destructive) 30%,transparent);background:var(--rose-dim)';tag=`<span style="font-size:11px;color:var(--destructive)">Your answer</span>`;ic=`<span style="color:var(--destructive)">${CROSS}</span>`;tx='color:var(--fg);font-weight:500';}
+      return `<div style="display:flex;align-items:center;gap:10px;border-radius:11px;padding:10px 12px;font-size:13px;${box}">${ic}<span style="flex:1;${tx}">${o.t}</span>${tag}</div>`;
+    }).join('');
+    document.getElementById('card').innerHTML = `
+      <div style="background:var(--card);border-radius:16px;padding:16px" class="ring1">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+          <h3 style="font-size:14px;font-weight:600;margin:0;line-height:1.4">${cur+1}. ${d.q}</h3>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none">
+            <span class="badge" style="${d.correct?'background:var(--emerald-dim);color:var(--emerald)':'background:var(--rose-dim);color:var(--destructive)'}">${d.correct?'Correct':'Incorrect'}</span>
+            <span class="badge" style="background:color-mix(in oklch,var(--primary) 16%,transparent);color:var(--primary)">${d.diff}</span>
+            <span class="lbl">⏱ ${d.time}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">${opts}</div>
+        <div style="display:flex;gap:10px;border-radius:11px;padding:12px;font-size:13px;color:var(--muted-fg);background:color-mix(in oklch,var(--muted) 60%,transparent);margin-top:14px">
+          <span>ⓘ</span><span>${d.exp}</span>
+        </div>
+      </div>`;
+    document.getElementById('pos').textContent = `Question ${cur+1} of ${Q.length}`;
+    document.getElementById('prev').style.opacity = cur===0?'.4':'1';
+    document.getElementById('next').style.opacity = cur===Q.length-1?'.4':'1';
+  }
+  function step(d){ cur=Math.min(Q.length-1,Math.max(0,cur+d)); renderCard(); renderSheet(); }
+
+  // topic coverage list
+  const TOPICS=[
+    {t:'Constitutional Law',q:142,x:true},{t:'Law of Contract',q:121,x:true},{t:'Law of Torts',q:98,x:true},
+    {t:'Civil Procedure',q:87,x:false},{t:'Criminal Law',q:76,x:true},{t:'Land Law',q:64,x:false},
+    {t:'Legal Ethics and Professional Responsibility',q:41,x:false},
+  ];
+  document.getElementById('topics').innerHTML = TOPICS.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;${i>0?'border-top:1px solid var(--border)':''}">
+      <span style="flex:1;min-width:0;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.t}</span>
+      <span class="lbl" style="flex:none;font-variant-numeric:tabular-nums">${r.q} Qs</span>
+      <span style="flex:none;color:${r.x?'var(--emerald)':'var(--muted-fg)'}">${r.x?CHECK:'—'}</span>
+    </div>`).join('');
+
+  renderSheet(); renderCard();
+</script>
+</body>
+</html>

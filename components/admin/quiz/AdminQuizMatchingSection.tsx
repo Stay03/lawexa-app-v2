@@ -198,45 +198,76 @@ function TopicCoverageTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Topic</TableHead>
-            <TableHead className="text-right">Questions</TableHead>
-            <TableHead className="hidden text-right sm:table-cell">
-              Contributors
-            </TableHead>
-            <TableHead className="text-right">Cross-user</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.topic_key}>
-              <TableCell className="font-medium">{r.topic}</TableCell>
-              <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                {r.questions.toLocaleString()}
-              </TableCell>
-              <TableCell className="hidden text-right text-sm tabular-nums text-muted-foreground sm:table-cell">
-                {r.contributors.toLocaleString()}
-              </TableCell>
-              <TableCell className="text-right">
-                {r.cross_user ? (
-                  <CheckCircle2
-                    className="ml-auto h-4 w-4 text-emerald-600 dark:text-emerald-400"
-                    aria-label="Cross-user matching active"
-                  />
-                ) : (
-                  <span className="text-sm text-muted-foreground" aria-label="Single contributor">
-                    —
-                  </span>
-                )}
-              </TableCell>
+    <>
+      {/* Mobile: a stacked list — long topic names never overflow a table */}
+      <div className="divide-y rounded-xl border sm:hidden">
+        {rows.map((r) => (
+          <div key={r.topic_key} className="flex items-center gap-3 px-4 py-3">
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {r.topic}
+            </span>
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {r.questions.toLocaleString()} Qs
+            </span>
+            {r.cross_user ? (
+              <CheckCircle2
+                className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                aria-label="Cross-user matching active"
+              />
+            ) : (
+              <span
+                className="shrink-0 text-sm text-muted-foreground"
+                aria-label="Single contributor"
+              >
+                —
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* sm+: the full table with the Contributors column */}
+      <div className="hidden overflow-x-auto rounded-xl border sm:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Topic</TableHead>
+              <TableHead className="text-right">Questions</TableHead>
+              <TableHead className="text-right">Contributors</TableHead>
+              <TableHead className="text-right">Cross-user</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.topic_key}>
+                <TableCell className="font-medium">{r.topic}</TableCell>
+                <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                  {r.questions.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                  {r.contributors.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right">
+                  {r.cross_user ? (
+                    <CheckCircle2
+                      className="ml-auto h-4 w-4 text-emerald-600 dark:text-emerald-400"
+                      aria-label="Cross-user matching active"
+                    />
+                  ) : (
+                    <span
+                      className="text-sm text-muted-foreground"
+                      aria-label="Single contributor"
+                    >
+                      —
+                    </span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 

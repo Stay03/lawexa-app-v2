@@ -38,14 +38,15 @@ export function AdminQuizAvgScoreChart({
   const isHourly = granularity === 'hour';
 
   return (
-    <ChartContainer config={chartConfig} className="h-[260px] w-full">
-      <LineChart data={data} accessibilityLayer margin={{ left: -8, right: 8, top: 8 }}>
+    <ChartContainer config={chartConfig} className="h-[220px] w-full sm:h-[260px]">
+      <LineChart data={data} accessibilityLayer margin={{ left: 4, right: 12, top: 8 }}>
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
           tickLine={false}
           axisLine={false}
           tickMargin={8}
+          minTickGap={24}
           tickFormatter={(v) =>
             isHourly
               ? formatHourIndex(v)
