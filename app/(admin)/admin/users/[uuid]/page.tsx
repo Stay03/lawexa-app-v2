@@ -134,13 +134,16 @@ export default function AdminUserDetailPage({
         className="gap-5"
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-x-6 sm:border-b">
-          <TabsList className="h-auto w-full justify-start gap-4 overflow-x-auto rounded-none border-b bg-transparent p-0 sm:w-auto sm:gap-6 sm:border-0">
-            {ADMIN_USER_TABS.map((t) => (
-              <TabsTrigger key={t} value={t} className={TAB_TRIGGER_CLASS}>
-                {ADMIN_USER_TAB_LABELS[t]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="relative w-full min-w-0 sm:w-auto">
+            <TabsList className="h-auto w-full justify-start gap-4 overflow-x-auto rounded-none border-b bg-transparent p-0 [scrollbar-width:none] sm:w-auto sm:gap-6 sm:border-0 [&::-webkit-scrollbar]:hidden">
+              {ADMIN_USER_TABS.map((t) => (
+                <TabsTrigger key={t} value={t} className={TAB_TRIGGER_CLASS}>
+                  {ADMIN_USER_TAB_LABELS[t]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent sm:hidden" />
+          </div>
 
           <div className="flex flex-wrap items-center gap-2 pb-2">
             <Button asChild variant="outline" size="sm" className="gap-1.5">

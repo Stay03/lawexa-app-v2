@@ -15,7 +15,7 @@ export const ADMIN_USER_TAB_LABELS: Record<AdminUserTab, string> = {
   activity: 'Activity',
   quiz: 'Quiz',
   conversations: 'Conversations',
-  profile: 'Profile & attribution',
+  profile: 'Profile',
 };
 
 export function isAdminUserTab(value: string | null): value is AdminUserTab {
