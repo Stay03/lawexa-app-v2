@@ -76,12 +76,12 @@ export function AdminQuizPeriodSelect({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
       <Select
         value={period}
         onValueChange={(v) => selectPeriod(v as AdminQuizPeriod)}
       >
-        <SelectTrigger className="h-9 w-[150px]">
+        <SelectTrigger className="h-9 w-full sm:w-[150px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -99,7 +99,7 @@ export function AdminQuizPeriodSelect({
           aria-label="Day"
           value={date}
           onChange={(e) => changeDate(e.target.value)}
-          className="h-9 w-[150px]"
+          className="h-9 w-full sm:w-[150px]"
         />
       )}
 
@@ -111,7 +111,7 @@ export function AdminQuizPeriodSelect({
             value={start}
             max={end || undefined}
             onChange={(e) => changeStart(e.target.value)}
-            className="h-9 w-[150px]"
+            className="h-9 w-full sm:w-[150px]"
           />
           <span className="text-sm text-muted-foreground">to</span>
           <Input
@@ -120,7 +120,7 @@ export function AdminQuizPeriodSelect({
             value={end}
             min={start || undefined}
             onChange={(e) => changeEnd(e.target.value)}
-            className="h-9 w-[150px]"
+            className="h-9 w-full sm:w-[150px]"
           />
         </>
       )}

@@ -55,7 +55,7 @@ export function AdminUserProfilePanel({ user }: AdminUserProfilePanelProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5 text-sm">
+        <dl className="grid grid-cols-1 gap-x-3 gap-y-3.5 text-sm sm:grid-cols-2 sm:gap-x-6">
           {fields.map((f) => (
             <div key={f.label} className="min-w-0">
               <dt className="text-xs text-muted-foreground">{f.label}</dt>

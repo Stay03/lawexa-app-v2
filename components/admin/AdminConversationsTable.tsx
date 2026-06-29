@@ -112,7 +112,7 @@ export function AdminConversationsTable({
   }
 
   return (
-    <div className="rounded-lg border overflow-hidden">
+    <div className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">

@@ -73,13 +73,13 @@ function AdminQuizSessionsContent() {
           <CardTitle>Quiz sessions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Input
               type="number"
               inputMode="numeric"
               placeholder="User ID"
               aria-label="Filter by user ID"
-              className="h-9 w-[140px]"
+              className="h-9 w-full sm:w-[140px]"
               value={params.user_id ?? ''}
               onChange={(e) =>
                 updateParams({ user_id: e.target.value || undefined })
@@ -91,7 +91,7 @@ function AdminQuizSessionsContent() {
                 updateParams({ status: v === 'all' ? undefined : v })
               }
             >
-              <SelectTrigger className="h-9 w-[150px]">
+              <SelectTrigger className="h-9 w-full sm:w-[150px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -106,7 +106,7 @@ function AdminQuizSessionsContent() {
             <Input
               type="date"
               aria-label="Started from"
-              className="h-9 w-[150px]"
+              className="h-9 w-full sm:w-[150px]"
               value={params.date_from ?? ''}
               onChange={(e) =>
                 updateParams({ date_from: e.target.value || undefined })
@@ -115,7 +115,7 @@ function AdminQuizSessionsContent() {
             <Input
               type="date"
               aria-label="Started to"
-              className="h-9 w-[150px]"
+              className="h-9 w-full sm:w-[150px]"
               value={params.date_to ?? ''}
               onChange={(e) =>
                 updateParams({ date_to: e.target.value || undefined })

@@ -32,7 +32,7 @@ export function AdminUserQuizSessions({ uuid }: { uuid: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+      <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-base">Sessions</CardTitle>
         <Select
           value={status}
@@ -41,7 +41,7 @@ export function AdminUserQuizSessions({ uuid }: { uuid: string }) {
             setPage(1);
           }}
         >
-          <SelectTrigger className="h-9 w-[150px]">
+          <SelectTrigger className="h-9 w-full sm:w-[150px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -133,8 +133,8 @@ export default function AdminUserDetailPage({
         onValueChange={(value) => setTab(value as AdminUserTab)}
         className="gap-5"
       >
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b">
-          <TabsList className="h-auto gap-6 rounded-none bg-transparent p-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-x-6 sm:border-b">
+          <TabsList className="h-auto w-full justify-start gap-4 overflow-x-auto rounded-none border-b bg-transparent p-0 sm:w-auto sm:gap-6 sm:border-0">
             {ADMIN_USER_TABS.map((t) => (
               <TabsTrigger key={t} value={t} className={TAB_TRIGGER_CLASS}>
                 {ADMIN_USER_TAB_LABELS[t]}
@@ -142,7 +142,7 @@ export default function AdminUserDetailPage({
             ))}
           </TabsList>
 
-          <div className="flex items-center gap-2 pb-2">
+          <div className="flex flex-wrap items-center gap-2 pb-2">
             <Button asChild variant="outline" size="sm" className="gap-1.5">
               <Link href={`/admin/users/${user.uuid}/plan-periods`}>
                 <CalendarClock className="h-3.5 w-3.5" />

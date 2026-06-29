@@ -22,7 +22,7 @@ export function UserActivitySection({ userUuid, userId }: UserActivitySectionPro
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
           <Activity className="h-4 w-4" />
           Activity

@@ -39,7 +39,7 @@ export function AdminQuizQuestionFilters({
   );
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
       <FilterSelect
         label="Status"
         value={params.status ?? ALL}
@@ -81,7 +81,7 @@ export function AdminQuizQuestionFilters({
         <Label className="text-xs text-muted-foreground">From</Label>
         <Input
           type="date"
-          className="h-9 w-[150px]"
+          className="h-9 w-full sm:w-[150px]"
           value={params.date_from ?? ''}
           onChange={(e) => onChange({ date_from: e.target.value || undefined })}
         />
@@ -90,7 +90,7 @@ export function AdminQuizQuestionFilters({
         <Label className="text-xs text-muted-foreground">To</Label>
         <Input
           type="date"
-          className="h-9 w-[150px]"
+          className="h-9 w-full sm:w-[150px]"
           value={params.date_to ?? ''}
           onChange={(e) => onChange({ date_to: e.target.value || undefined })}
         />
@@ -141,7 +141,7 @@ function FilterSelect({
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger className="h-9 w-[150px]">
+        <SelectTrigger className="h-9 w-full sm:w-[150px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
