@@ -353,6 +353,21 @@ async function restoreCourse(id: number): Promise<ApiResponse<Course>> {
   return response.data;
 }
 
+/**
+ * Get paginated list of cases scoped to a course (by slug).
+ * Same item shape and filters as getCases, pre-scoped to the course.
+ */
+async function getCourseCases(
+  slug: string,
+  params: AdminCasesParams = {}
+): Promise<PaginatedResponse<CaseSummary>> {
+  const response = await apiClient.get<PaginatedResponse<CaseSummary>>(
+    `/courses/${slug}/cases`,
+    { params }
+  );
+  return response.data;
+}
+
 /******************************************************************************
                                 Judges
 ******************************************************************************/
@@ -443,6 +458,7 @@ export const adminCasesApi = {
   updateCourse,
   deleteCourse,
   restoreCourse,
+  getCourseCases,
 
   // Judges
   getJudges,

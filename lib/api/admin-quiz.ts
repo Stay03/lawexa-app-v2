@@ -36,6 +36,22 @@ export const adminQuizApi = {
     return response.data;
   },
 
+  /**
+   * Quiz questions generated for a specific course (by slug). Same shape and
+   * filters as listQuestions, pre-scoped to the course. Note: this endpoint
+   * validates `per_page` (1–100) and rejects out-of-range values with 422.
+   */
+  listCourseQuestions: async (
+    slug: string,
+    params: AdminQuizQuestionListParams = {}
+  ): Promise<AdminQuizQuestionListResponse> => {
+    const response = await apiClient.get<AdminQuizQuestionListResponse>(
+      `/admin/courses/${slug}/quiz-questions`,
+      { params }
+    );
+    return response.data;
+  },
+
   getQuestion: async (uuid: string): Promise<AdminQuizQuestionResponse> => {
     const response = await apiClient.get<AdminQuizQuestionResponse>(
       `/admin/quiz/questions/${uuid}`

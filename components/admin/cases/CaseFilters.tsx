@@ -20,6 +20,8 @@ import type { AdminCasesParams } from '@/types/admin-cases';
 interface CaseFiltersProps {
   params: AdminCasesParams;
   onParamsChange: (params: Partial<AdminCasesParams>) => void;
+  /** Hide the course selector when the list is already scoped to one course. */
+  hideCourseFilter?: boolean;
 }
 
 /******************************************************************************
@@ -30,7 +32,11 @@ interface CaseFiltersProps {
  * Filter controls for cases list
  * Filters by course, court, country, date range, and per-page
  */
-export function CaseFilters({ params, onParamsChange }: CaseFiltersProps) {
+export function CaseFilters({
+  params,
+  onParamsChange,
+  hideCourseFilter = false,
+}: CaseFiltersProps) {
   // Fetch filter options
   const { data: coursesData } = useCourses({ per_page: 100 });
   const { data: courtsData } = useCourts({ per_page: 100 });
@@ -43,27 +49,29 @@ export function CaseFilters({ params, onParamsChange }: CaseFiltersProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
       {/* Course Filter */}
-      <Select
-        value={params.course ? String(params.course) : 'all'}
-        onValueChange={(value) =>
-          onParamsChange({
-            course: value === 'all' ? undefined : parseInt(value),
-            page: 1,
-          })
-        }
-      >
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="All Courses" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Courses</SelectItem>
-          {courses.map((course) => (
-            <SelectItem key={course.id} value={String(course.id)}>
-              {course.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {!hideCourseFilter && (
+        <Select
+          value={params.course ? String(params.course) : 'all'}
+          onValueChange={(value) =>
+            onParamsChange({
+              course: value === 'all' ? undefined : parseInt(value),
+              page: 1,
+            })
+          }
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Courses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Courses</SelectItem>
+            {courses.map((course) => (
+              <SelectItem key={course.id} value={String(course.id)}>
+                {course.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       {/* Country Filter */}
       <Select

@@ -18,6 +18,10 @@ export const adminQuizKeys = {
   questionList: (params: AdminQuizQuestionListParams) =>
     [...adminQuizKeys.questions(), 'list', params] as const,
   question: (uuid: string) => [...adminQuizKeys.all, 'question', uuid] as const,
+  courseQuestions: (slug: string) =>
+    [...adminQuizKeys.all, 'course', slug, 'questions'] as const,
+  courseQuestionList: (slug: string, params: AdminQuizQuestionListParams) =>
+    [...adminQuizKeys.courseQuestions(slug), 'list', params] as const,
   batches: () => [...adminQuizKeys.all, 'batches'] as const,
   batchList: (params: AdminQuizBatchListParams) =>
     [...adminQuizKeys.batches(), 'list', params] as const,
@@ -42,6 +46,21 @@ export function useAdminQuizQuestions(params: AdminQuizQuestionListParams = {}) 
   return useQuery({
     queryKey: adminQuizKeys.questionList(params),
     queryFn: () => adminQuizApi.listQuestions(params),
+    staleTime: 60 * 1000,
+  });
+}
+
+/** Paginated, filterable list of quiz questions scoped to a course (by slug). */
+export function useCourseQuizQuestions(
+  slug: string | undefined,
+  params: AdminQuizQuestionListParams = {}
+) {
+  return useQuery({
+    queryKey: slug
+      ? adminQuizKeys.courseQuestionList(slug, params)
+      : (['admin', 'quiz', 'course', 'undefined', 'questions', 'list', params] as const),
+    queryFn: () => adminQuizApi.listCourseQuestions(slug!, params),
+    enabled: !!slug,
     staleTime: 60 * 1000,
   });
 }

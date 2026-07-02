@@ -50,6 +50,12 @@ export const adminCasesKeys = {
   courses: () => [...adminCasesKeys.all, 'courses'] as const,
   coursesList: (params: CoursesParams) =>
     [...adminCasesKeys.courses(), 'list', params] as const,
+  courseDetail: (slug: string) =>
+    [...adminCasesKeys.courses(), 'detail', slug] as const,
+  courseCases: (slug: string) =>
+    [...adminCasesKeys.courses(), slug, 'cases'] as const,
+  courseCasesList: (slug: string, params: AdminCasesParams) =>
+    [...adminCasesKeys.courseCases(slug), 'list', params] as const,
 
   judges: () => [...adminCasesKeys.all, 'judges'] as const,
   judgesList: (params: JudgesParams) =>
@@ -376,6 +382,40 @@ export function useCourses(params: CoursesParams = {}) {
     queryKey: adminCasesKeys.coursesList(params),
     queryFn: () => adminCasesApi.getCourses(params),
     staleTime: 10 * 60 * 1000, // 10 minutes (courses rarely change)
+  });
+}
+
+/**
+ * Get a single course by slug
+ */
+export function useCourse(
+  slug: string | undefined,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: slug
+      ? adminCasesKeys.courseDetail(slug)
+      : (['admin', 'cases', 'courses', 'detail', 'undefined'] as const),
+    queryFn: () => adminCasesApi.getCourse(slug!),
+    enabled: !!slug && options?.enabled !== false,
+    staleTime: 60 * 1000, // 1 minute
+  });
+}
+
+/**
+ * Get paginated list of cases scoped to a course (by slug)
+ */
+export function useCourseCases(
+  slug: string | undefined,
+  params: AdminCasesParams = {}
+) {
+  return useQuery({
+    queryKey: slug
+      ? adminCasesKeys.courseCasesList(slug, params)
+      : (['admin', 'cases', 'courses', 'cases', 'undefined', params] as const),
+    queryFn: () => adminCasesApi.getCourseCases(slug!, params),
+    enabled: !!slug,
+    staleTime: 60 * 1000, // 1 minute
   });
 }
 

@@ -31,6 +31,8 @@ export interface Course {
   slug: string;
   created_at: string;
   updated_at: string;
+  /** Present (non-null) when the course is soft-deleted; returned with `with_trashed`. */
+  deleted_at?: string | null;
 }
 
 export interface Judge {

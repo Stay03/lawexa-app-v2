@@ -86,14 +86,27 @@ export interface AdminMessage {
   created_at: string;
 }
 
+/**
+ * A topic linking a conversation to a course. Only present on the
+ * course-scoped conversations listing, ordered by `rank` (rank 1 = primary).
+ */
+export interface ConversationTopic {
+  topic: string;
+  rank: number;
+}
+
 export interface AdminConversationListItem {
   id: string;
   user_uuid: string;
   title: string | null;
   status: 'active' | 'archived';
   is_private: boolean;
+  /** Present on the course-scoped listing; optional elsewhere. */
+  is_confidential?: boolean;
   agent: AdminAgent | null;
   workflow: AdminWorkflow | null;
+  /** Present only on the course-scoped listing (topics tying this conversation to the course). */
+  topics?: ConversationTopic[];
   messages_count: number;
   attachments_count: number;
   usage?: ConversationUsage;
@@ -114,6 +127,11 @@ export interface AdminConversationsParams {
   sort_order?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
+}
+
+/** Params for the course-scoped conversations listing (adds the confidential filter). */
+export interface AdminCourseConversationsParams extends AdminConversationsParams {
+  is_confidential?: boolean;
 }
 
 // Pagination

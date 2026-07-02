@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 import type {
   AdminConversationsParams,
+  AdminCourseConversationsParams,
   AdminConversationsListResponse,
   AdminConversationDetailResponse,
   AdminUserDetailResponse,
@@ -67,6 +68,33 @@ export const adminApi = {
           per_page: params.per_page ?? 15,
           status: params.status,
           is_private: params.is_private,
+          user_uuid: params.user_uuid,
+          sort_by: params.sort_by ?? 'created_at',
+          sort_order: params.sort_order ?? 'desc',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * List the conversations linked to a course (via conversation_topics.course_id).
+   * Each conversation appears once and carries a `topics` array (ordered by rank)
+   * showing the topic(s) tying it to this course. Requires admin role.
+   */
+  getCourseConversations: async (
+    slug: string,
+    params: AdminCourseConversationsParams = {}
+  ): Promise<AdminConversationsListResponse> => {
+    const response = await apiClient.get<AdminConversationsListResponse>(
+      `/admin/courses/${slug}/conversations`,
+      {
+        params: {
+          page: params.page ?? 1,
+          per_page: params.per_page ?? 15,
+          status: params.status,
+          is_private: params.is_private,
+          is_confidential: params.is_confidential,
           user_uuid: params.user_uuid,
           sort_by: params.sort_by ?? 'created_at',
           sort_order: params.sort_order ?? 'desc',

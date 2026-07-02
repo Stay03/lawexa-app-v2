@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
 import type {
   AdminConversationsParams,
+  AdminCourseConversationsParams,
   AdminFreeMessagesBlockPayload,
   IAdminUserListParams,
   AdminUserConversationsParams,
@@ -35,6 +36,8 @@ export const adminKeys = {
     [...adminKeys.conversations(), 'list', params] as const,
   conversationDetail: (uuid: string) =>
     [...adminKeys.conversations(), 'detail', uuid] as const,
+  courseConversations: (slug: string, params: AdminCourseConversationsParams) =>
+    [...adminKeys.all, 'courses', slug, 'conversations', params] as const,
   users: () => [...adminKeys.all, 'users'] as const,
   usersList: (params: IAdminUserListParams) =>
     [...adminKeys.users(), 'list', params] as const,
@@ -148,6 +151,22 @@ export function useAdminUser(uuid: string) {
     queryKey: adminKeys.userDetail(uuid),
     queryFn: () => adminApi.getUser(uuid),
     enabled: !!uuid,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook for fetching the conversations linked to a course (by slug).
+ * Each item carries a `topics` array tying it to the course.
+ */
+export function useAdminCourseConversations(
+  slug: string | undefined,
+  params: AdminCourseConversationsParams = {}
+) {
+  return useQuery({
+    queryKey: adminKeys.courseConversations(slug ?? '', params),
+    queryFn: () => adminApi.getCourseConversations(slug as string, params),
+    enabled: !!slug,
     staleTime: 30 * 1000, // 30 seconds
   });
 }

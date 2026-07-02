@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useState } from 'react';
 import { ArrowUpDown, Lock, Globe, Coins, Hash, Paperclip, FolderPlus } from 'lucide-react';
@@ -63,6 +64,9 @@ interface AdminConversationsTableProps {
   /** Hide the Files / Tokens / Cost columns (e.g. on the per-user detail page
    *  where user-level totals already live in the KPI strip). */
   hideUsageColumns?: boolean;
+  /** Show each conversation's course topics (inline under the title, rank 1 first).
+   *  Only populated on the course-scoped listing. */
+  showTopics?: boolean;
 }
 
 export function AdminConversationsTable({
@@ -72,6 +76,7 @@ export function AdminConversationsTable({
   onSort,
   hideUserColumn = false,
   hideUsageColumns = false,
+  showTopics = false,
 }: AdminConversationsTableProps) {
   const router = useRouter();
   const { exchangeRate, showNGN } = useCurrencyStore();
@@ -170,6 +175,21 @@ export function AdminConversationsTable({
                 <span className="block truncate">
                   {stripPastedTags(conversation.title || 'Untitled')}
                 </span>
+                {showTopics && conversation.topics && conversation.topics.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {[...conversation.topics]
+                      .sort((a, b) => a.rank - b.rank)
+                      .map((t) => (
+                        <Badge
+                          key={`${t.topic}-${t.rank}`}
+                          variant={t.rank === 1 ? 'secondary' : 'outline'}
+                          className="text-[10px] font-normal"
+                        >
+                          {t.topic}
+                        </Badge>
+                      ))}
+                  </div>
+                )}
               </TableCell>
               {!hideUserColumn && (
                 <TableCell>
