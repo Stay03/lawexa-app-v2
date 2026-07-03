@@ -387,7 +387,60 @@ function splitTrailingIncomplete(text: string): {
   return { before: text, element: null, raw: '' };
 }
 
+// Grouping wrappers that batch several inner items into a single rendered card.
+// While one of these is still open, its inner items must not render one-by-one.
+const CONTAINER_TAGS: Array<{ tag: string; element: GeneratingElement }> = [
+  { tag: 'quizzes', element: 'quiz' },
+  { tag: 'lawyers', element: 'lawyers' },
+];
+
+/**
+ * The earliest grouping wrapper (`<quizzes>`/`<lawyers>`) that has opened but not
+ * yet closed, or null. A complete wrapper earlier in the content is skipped.
+ */
+function findUnclosedContainer(
+  content: string
+): { index: number; element: GeneratingElement } | null {
+  let best: { index: number; element: GeneratingElement } | null = null;
+
+  for (const { tag, element } of CONTAINER_TAGS) {
+    const openRegex = new RegExp(`<${tag}(?:\\s[^>]*)?>`, 'gi');
+    let openMatch: RegExpExecArray | null;
+    while ((openMatch = openRegex.exec(content)) !== null) {
+      const afterOpen = content.slice(openMatch.index + openMatch[0].length);
+      if (!new RegExp(`</${tag}>`, 'i').test(afterOpen)) {
+        if (!best || openMatch.index < best.index) {
+          best = { index: openMatch.index, element };
+        }
+        break;
+      }
+    }
+  }
+
+  return best;
+}
+
 export function parseContent(content: string): ParsedContent {
+  // A grouping wrapper (<quizzes>/<lawyers>) that hasn't closed yet means the
+  // whole batch is still being generated — its inner items reflow into one card
+  // once it closes. Render whatever cleanly precedes it, then a single
+  // "generating" segment, instead of popping inner items in one at a time.
+  const openContainer = findUnclosedContainer(content);
+  if (openContainer) {
+    const head = content.slice(0, openContainer.index);
+    const headSegments = head.trim() ? parseContent(head).segments : [];
+    return {
+      segments: [
+        ...headSegments,
+        {
+          type: 'generating',
+          element: openContainer.element,
+          raw: content.slice(openContainer.index),
+        },
+      ],
+    };
+  }
+
   const segments: ContentSegment[] = [];
   const matches: MatchInfo[] = [];
 
