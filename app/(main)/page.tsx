@@ -30,6 +30,7 @@ import {
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
+import { AmbassadorProgramPopup } from '@/components/ambassador/AmbassadorProgramPopup';
 import { useQuery } from '@tanstack/react-query';
 import { adminAiApi } from '@/lib/api/admin-ai';
 import { adminAiKeys } from '@/lib/hooks/useAdminAi';
@@ -855,6 +856,9 @@ export default function HomePage() {
 
       {/* Auth modal for guests */}
       {isGuest && <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />}
+
+      {/* Ambassador program popup — self-gates to students who haven't applied */}
+      <AmbassadorProgramPopup />
     </div>
   );
 }

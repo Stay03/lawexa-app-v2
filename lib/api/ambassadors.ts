@@ -43,3 +43,17 @@ export const adminAmbassadorsApi = {
     return response.data;
   },
 };
+
+/**
+ * Public (signed-in user) Ambassador API. Backs the same endpoints the static
+ * /ambassadors apply page uses.
+ */
+export const ambassadorsApi = {
+  // The signed-in user's own application, or `data: null` if they haven't applied.
+  getMyApplication: async (): Promise<ApiResponse<AmbassadorApplication>> => {
+    const response = await apiClient.get<ApiResponse<AmbassadorApplication>>(
+      '/ambassadors/my-application'
+    );
+    return response.data;
+  },
+};
