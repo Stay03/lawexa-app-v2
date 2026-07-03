@@ -14,8 +14,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-const PERKS = ['Free monthly access', 'Leadership experience', 'Ambassador kit'] as const;
-
 /**
  * Tracks whether the persisted auth store has finished rehydrating. On a cold
  * load the session is restored from storage asynchronously; deciding student
@@ -111,18 +109,6 @@ export function AmbassadorProgramPopup() {
               leadership, community and legal tech.
             </DialogDescription>
           </div>
-
-          {/* Perks */}
-          <ul className="flex flex-wrap gap-2">
-            {PERKS.map((perk) => (
-              <li
-                key={perk}
-                className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
-              >
-                {perk}
-              </li>
-            ))}
-          </ul>
 
           {/* Actions */}
           <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
