@@ -341,6 +341,7 @@ function HandoverDisplay({
               <MessageContent
                 className="prose prose-sm dark:prose-invert"
                 markdown
+                isStreaming={isAgentStreaming}
               >
                 {handover.streamingContent}
               </MessageContent>
@@ -995,6 +996,7 @@ function ConversationPageContent() {
                 className="prose prose-sm dark:prose-invert"
                 markdown
                 isInteracted={isInteracted}
+                isStreaming={(message as ChatMessage).isStreaming ?? false}
               >
                 {displayContent}
               </MessageContent>

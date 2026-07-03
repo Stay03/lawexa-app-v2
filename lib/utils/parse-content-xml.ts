@@ -71,6 +71,15 @@ export interface NoteLinkInfo {
   downloadUrl?: string;
 }
 
+/** Element being streamed but not yet closed — drives the "generating…" pill. */
+export type GeneratingElement =
+  | 'quiz'
+  | 'lawyers'
+  | 'deep_research'
+  | 'execution_plan'
+  | 'multi_question'
+  | 'note_link';
+
 export type ContentSegment =
   | { type: 'text'; content: string }
   | { type: 'lawyers'; lawyers: LawyerInfo[] }
@@ -82,7 +91,8 @@ export type ContentSegment =
   | { type: 'multi_question_progress'; progress: MultiQuestionProgressInfo }
   | { type: 'execution_plan'; plan: ExecutionPlanInfo }
   | { type: 'multi_question_complete'; info: MultiQuestionCompleteInfo }
-  | { type: 'note_link'; note: NoteLinkInfo };
+  | { type: 'note_link'; note: NoteLinkInfo }
+  | { type: 'generating'; element: GeneratingElement; raw: string };
 
 export interface ParsedContent {
   segments: ContentSegment[];
@@ -320,6 +330,63 @@ interface MatchInfo {
   segment: ContentSegment;
 }
 
+// Known special tags whose in-progress (opened but not yet closed) form should
+// render as a lightweight "generating…" pill during streaming, mapped to the
+// indicator's element key. Order longest/container-first so an outer <quizzes>
+// wins over its inner <quiz> when both are still open.
+const INCOMPLETE_TAGS: Array<{ tag: string; element: GeneratingElement }> = [
+  { tag: 'lawyers', element: 'lawyers' },
+  { tag: 'lawyer', element: 'lawyers' },
+  { tag: 'quizzes', element: 'quiz' },
+  { tag: 'quiz', element: 'quiz' },
+  { tag: 'deep_research_prompt', element: 'deep_research' },
+  { tag: 'multi_question_prompt', element: 'multi_question' },
+  { tag: 'next_question_prompt', element: 'multi_question' },
+  { tag: 'multi_question_plan', element: 'multi_question' },
+  { tag: 'multi_question_progress', element: 'multi_question' },
+  { tag: 'multi_question_complete', element: 'multi_question' },
+  { tag: 'execution_plan', element: 'execution_plan' },
+  { tag: 'note_link', element: 'note_link' },
+];
+
+/**
+ * If `text` holds an opening special tag with no matching closing tag (a block
+ * still being streamed), return the clean text before it plus the element key.
+ * Otherwise the whole string comes back as `before` with a null element.
+ */
+function splitTrailingIncomplete(text: string): {
+  before: string;
+  element: GeneratingElement | null;
+  raw: string;
+} {
+  let best: { index: number; element: GeneratingElement } | null = null;
+
+  for (const { tag, element } of INCOMPLETE_TAGS) {
+    // `<tag>` or `<tag attr="…">` — the trailing `>` guards against matching a
+    // longer sibling (e.g. the `quiz` pattern will not match `<quizzes>`).
+    const openRegex = new RegExp(`<${tag}(?:\\s[^>]*)?>`, 'gi');
+    let openMatch: RegExpExecArray | null;
+    while ((openMatch = openRegex.exec(text)) !== null) {
+      const afterOpen = text.slice(openMatch.index + openMatch[0].length);
+      if (!new RegExp(`</${tag}>`, 'i').test(afterOpen)) {
+        if (!best || openMatch.index < best.index) {
+          best = { index: openMatch.index, element };
+        }
+        break; // earliest unclosed occurrence for this tag is enough
+      }
+    }
+  }
+
+  if (best) {
+    return {
+      before: text.slice(0, best.index),
+      element: best.element,
+      raw: text.slice(best.index),
+    };
+  }
+  return { before: text, element: null, raw: '' };
+}
+
 export function parseContent(content: string): ParsedContent {
   const segments: ContentSegment[] = [];
   const matches: MatchInfo[] = [];
@@ -535,15 +602,23 @@ export function parseContent(content: string): ParsedContent {
     lastEnd = m.end;
   }
 
-  // Add remaining text after last match
+  // Add remaining text after the last complete match. During streaming this tail
+  // may hold an in-progress (unclosed) special block — surface it as a lightweight
+  // "generating" segment instead of leaking the raw XML into the markdown.
   if (lastEnd < content.length) {
-    const textContent = content.slice(lastEnd).trim();
-    if (textContent) {
-      segments.push({ type: 'text', content: textContent });
+    const tail = content.slice(lastEnd);
+    const { before, element, raw } = splitTrailingIncomplete(tail);
+    const beforeContent = before.trim();
+    if (beforeContent) {
+      segments.push({ type: 'text', content: beforeContent });
+    }
+    if (element) {
+      segments.push({ type: 'generating', element, raw });
     }
   }
 
-  // If no matches found, return content as single text segment
+  // If nothing matched and there was no in-progress block, keep the raw content
+  // as a single text segment (unchanged fallback).
   if (segments.length === 0 && content.trim()) {
     segments.push({ type: 'text', content: content });
   }

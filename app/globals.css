@@ -357,6 +357,36 @@
   color: transparent;
 }
 
+/* Neutral text shimmer — streaming "generating…" labels (chat). A soft bright
+   band sweeps across muted-foreground text, theme-aware in light and dark. */
+@keyframes text-shimmer-sweep {
+  0% { background-position: 150% center; }
+  100% { background-position: -50% center; }
+}
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 40%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 60%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 250% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: text-shimmer-sweep 2.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .text-shimmer {
+    animation: none;
+    color: var(--muted-foreground);
+    -webkit-text-fill-color: var(--muted-foreground);
+  }
+}
+
 /* =============================================================================
    Valentine's Day Heartbeat Animation
    ============================================================================= */

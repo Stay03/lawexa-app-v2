@@ -15,10 +15,17 @@ import { MultiQuestionProgressCard } from '@/components/chat/multi-question-prog
 import { ExecutionPlanCard } from '@/components/chat/execution-plan-card';
 import { MultiQuestionCompleteCard } from '@/components/chat/multi-question-complete-card';
 import { NoteLinkCard } from '@/components/chat/note-link-card';
+import { GeneratingIndicator } from '@/components/chat/generating-indicator';
 import {
   parseContent,
   hasSpecialContent,
 } from '@/lib/utils/parse-content-xml';
+
+// Shared prose styling for markdown-rendered chat text (assistant messages).
+const MARKDOWN_PROSE_CLASS =
+  'prose prose-sm dark:prose-invert max-w-none overflow-x-hidden break-words ' +
+  '[&_a]:text-primary [&_a.case-mention]:no-underline ' +
+  '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:overflow-x-auto';
 
 // Message - wrapper with role-based alignment
 export interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -55,10 +62,12 @@ export interface MessageContentProps
   markdown?: boolean;
   /** When true, interactive prompt cards (buttons) inside this message will be disabled */
   isInteracted?: boolean;
+  /** When true, an in-progress (unclosed) special block renders as a "generating…" pill. */
+  isStreaming?: boolean;
 }
 
 export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
-  ({ children, className, markdown = false, isInteracted = false, ...props }, ref) => {
+  ({ children, className, markdown = false, isInteracted = false, isStreaming = false, ...props }, ref) => {
     if (markdown && typeof children === 'string') {
       // Check if content has special XML tags (lawyers or quizzes)
       if (hasSpecialContent(children)) {
@@ -147,15 +156,28 @@ export const MessageContent = forwardRef<HTMLDivElement, MessageContentProps>(
                 );
               }
 
+              if (segment.type === 'generating') {
+                // Live stream: show the lightweight pill in place of the raw
+                // partial. Finalized/truncated message: render the raw partial as
+                // text so no content is ever lost (a superset of prior behaviour).
+                if (isStreaming) {
+                  return (
+                    <div key={`generating-${index}`} className="not-prose">
+                      <GeneratingIndicator element={segment.element} />
+                    </div>
+                  );
+                }
+                return (
+                  <div key={`generating-${index}`} className={MARKDOWN_PROSE_CLASS}>
+                    <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>
+                      {segment.raw}
+                    </ReactMarkdown>
+                  </div>
+                );
+              }
+
               return (
-                <div
-                  key={`text-${index}`}
-                  className={cn(
-                    'prose prose-sm dark:prose-invert max-w-none overflow-x-hidden break-words',
-                    '[&_a]:text-primary [&_a.case-mention]:no-underline',
-                    '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:overflow-x-auto'
-                  )}
-                >
+                <div key={`text-${index}`} className={MARKDOWN_PROSE_CLASS}>
                   <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>
                     {segment.content}
                   </ReactMarkdown>
