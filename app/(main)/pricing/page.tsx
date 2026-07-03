@@ -56,7 +56,7 @@ interface ITierGroup {
 
 const INTERVAL_ORDER: TInterval[] = ['daily', 'monthly', 'annually'];
 
-const TIER_ORDER = ['basic', 'pro', 'ai-counsel'];
+const TIER_ORDER = ['basic', 'pro', 'plus', 'ai-counsel'];
 
 const TIER_DISPLAY_NAMES: Record<string, string> = {
   basic: 'Basic',
