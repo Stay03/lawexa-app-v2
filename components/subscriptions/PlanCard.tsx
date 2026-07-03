@@ -68,6 +68,31 @@ const INTERVAL_LABELS: Record<TInterval, string> = {
   annually: 'Annually',
 };
 
+// AI Counsel's feature set — shared with the Plus tier, which mirrors it.
+const AI_COUNSEL_FEATURES = {
+  highlighted: [
+    'Unlimited AI Messages',
+    'Unlimited Library Access',
+    'Chat with Document (No size limit)',
+    'Chat with Statute',
+    'Legal Drafting',
+    'Deep Legal Research',
+    'Deep Contract Review',
+  ],
+  more: [
+    'Access to Case, Statute & Notes Library',
+    'Foreign & Local Cases',
+    'Multi-Jurisdiction Access',
+    'Natural Language Search',
+    'AI Tutor',
+    'Study Mode',
+    'Flashcards',
+    'Quizzes',
+    'Connect to a Lawyer',
+    'Twitter Bot for legal updates',
+  ],
+};
+
 const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> = {
   basic: {
     highlighted: [
@@ -108,29 +133,9 @@ const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> =
       'Connect to a Lawyer',
     ],
   },
-  'ai-counsel': {
-    highlighted: [
-      'Unlimited AI Messages',
-      'Unlimited Library Access',
-      'Chat with Document (No size limit)',
-      'Chat with Statute',
-      'Legal Drafting',
-      'Deep Legal Research',
-      'Deep Contract Review',
-    ],
-    more: [
-      'Access to Case, Statute & Notes Library',
-      'Foreign & Local Cases',
-      'Multi-Jurisdiction Access',
-      'Natural Language Search',
-      'AI Tutor',
-      'Study Mode',
-      'Flashcards',
-      'Quizzes',
-      'Connect to a Lawyer',
-      'Twitter Bot for legal updates',
-    ],
-  },
+  'ai-counsel': AI_COUNSEL_FEATURES,
+  // Plus mirrors AI Counsel's feature set (per product).
+  plus: AI_COUNSEL_FEATURES,
 };
 
 /******************************************************************************
