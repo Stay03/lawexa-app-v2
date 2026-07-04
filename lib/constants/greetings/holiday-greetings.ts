@@ -151,26 +151,6 @@ const HOLIDAY_CONFIGS: Record<THoliday, IHolidayConfig> = {
       ],
     },
   },
-  independenceDay: {
-    startMonth: 7,
-    startDay: 4,
-    endMonth: 7,
-    endDay: 4,
-    greetings: {
-      withName: [
-        'Happy July 4th,',
-        'Freedom celebration,',
-        'Independence Day,',
-        'Happy 4th,',
-      ],
-      withoutName: [
-        'Happy July 4th!',
-        'Freedom celebration!',
-        'Independence Day!',
-        'Happy 4th!',
-      ],
-    },
-  },
 };
 
 /******************************************************************************

@@ -24,8 +24,7 @@ type THoliday =
   | 'halloween'
   | 'thanksgiving'
   | 'valentines'
-  | 'easter'
-  | 'independenceDay';
+  | 'easter';
 
 type TSpecialGreeting = '__PULSING_HEART__';
 
