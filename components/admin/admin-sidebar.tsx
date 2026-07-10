@@ -15,6 +15,7 @@ import { AdminNavQuizSection } from '@/components/admin/admin-nav-quiz';
 import { AdminNavBillingSection } from '@/components/admin/admin-nav-billing';
 import { AdminNavAiSection } from '@/components/admin/admin-nav-ai';
 import { AdminNavFilesSection } from '@/components/admin/admin-nav-files';
+import { AdminNavOperationsSection } from '@/components/admin/admin-nav-operations';
 import { NavUser } from '@/components/layout/nav-user';
 import {
   Sidebar,
@@ -77,6 +78,7 @@ export function AdminSidebar({
         <AdminNavFilesSection />
         <AdminNavBillingSection />
         <AdminNavAiSection />
+        <AdminNavOperationsSection />
         <AdminNavSystemSection />
       </SidebarContent>
       <SidebarFooter>
