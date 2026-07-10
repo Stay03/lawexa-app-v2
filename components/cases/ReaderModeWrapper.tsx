@@ -6,7 +6,7 @@ import { useCaseViewThemeStore } from '@/lib/stores/caseViewThemeStore';
 import { cn } from '@/lib/utils';
 import { CaseDocumentView } from './CaseDocumentView';
 import { CaseBlogView } from './CaseBlogView';
-import type { CaseDetail, RelatedCase } from '@/types/case';
+import type { CaseDetail, RelatedCase, CitedCaseEdge, CitedByCase } from '@/types/case';
 
 interface ReaderModeWrapperProps {
   children: React.ReactNode;
@@ -17,10 +17,10 @@ interface ReaderModeWrapperProps {
   slug?: string;
   /** Similar cases for document view */
   similarCases?: RelatedCase[] | null;
-  /** Cases cited by this case */
-  citedCases?: RelatedCase[] | null;
+  /** Outgoing citation edges from this case */
+  citedCases?: CitedCaseEdge[] | null;
   /** Cases that cite this case */
-  citedBy?: RelatedCase[] | null;
+  citedBy?: CitedByCase[] | null;
 }
 
 /**

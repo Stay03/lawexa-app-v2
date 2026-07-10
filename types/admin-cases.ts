@@ -1,6 +1,8 @@
 // Admin Cases - TypeScript Type Definitions
 // Based on API documentation: docs/apiDocs/case-from-api-reference.md
 
+import type { CaseTreatment, CitedCaseEdge } from '@/types/case';
+
 /******************************************************************************
                                 API Response Types
 ******************************************************************************/
@@ -81,6 +83,14 @@ export interface CaseSummary {
 }
 
 /**
+ * A reverse citation (cited_by) in admin responses: a case summary plus how the
+ * citing case treated this one.
+ */
+export interface CitedByCaseSummary extends CaseSummary {
+  treatment: CaseTreatment | null;
+}
+
+/**
  * Full case detail including all relationships
  */
 export interface CaseDetail {
@@ -97,10 +107,9 @@ export interface CaseDetail {
   country: Country | null;
   citation: string | null;
   judges: Judge[];
-  judicial_precedent: string | null;
   similar_cases: CaseSummary[];
-  cited_cases: CaseSummary[];
-  cited_by: CaseSummary[];
+  cited_cases: CitedCaseEdge[];
+  cited_by: CitedByCaseSummary[];
   cited_by_count: number;
   creator: Creator | null;
   has_full_report: boolean;
@@ -134,7 +143,6 @@ export interface CaseFormData {
 
   // Legal Information
   principles: string | null;
-  judicial_precedent: string | null;
 
   // Court Information
   country_id: number | null;
@@ -161,7 +169,6 @@ export interface CreateCaseData {
   tags?: string[];
   level?: string;
   principles?: string;
-  judicial_precedent?: string;
   country_id?: number;
   court_id?: number;
   judgment_date?: string;

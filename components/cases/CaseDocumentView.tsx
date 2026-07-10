@@ -4,14 +4,20 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { ViewFullReportButton } from './ViewFullReportButton';
 import { CaseViewLimitBanner } from './CaseViewLimitBanner';
-import type { CaseDetail, RelatedCase } from '@/types/case';
+import { TreatmentBadge } from './TreatmentBadge';
+import {
+  relatedToDisplay,
+  citedEdgeToDisplay,
+  type RelatedCaseDisplay,
+} from '@/lib/utils/related-cases';
+import type { CaseDetail, RelatedCase, CitedCaseEdge, CitedByCase } from '@/types/case';
 
 interface CaseDocumentViewProps {
   caseData: CaseDetail;
   slug: string;
   similarCases?: RelatedCase[] | null;
-  citedCases?: RelatedCase[] | null;
-  citedBy?: RelatedCase[] | null;
+  citedCases?: CitedCaseEdge[] | null;
+  citedBy?: CitedByCase[] | null;
 }
 
 /**
@@ -50,29 +56,40 @@ function formatBodyText(text: string): string {
 }
 
 /**
- * Related case item for document view - minimal styling
+ * Related case item for document view - minimal styling.
+ * Non-linkable rows (external citations) render as plain text.
  */
-function DocumentRelatedCaseItem({ caseItem }: { caseItem: RelatedCase }) {
-  const { title, slug, citation, judgment_date, court } = caseItem;
+function DocumentRelatedCaseItem({ caseItem }: { caseItem: RelatedCaseDisplay }) {
+  const { title, href, citation, judgmentDate, court, treatment } = caseItem;
 
-  const formattedDate = judgment_date
-    ? new Date(judgment_date).toLocaleDateString('en-GB', {
+  const formattedDate = judgmentDate
+    ? new Date(judgmentDate).toLocaleDateString('en-GB', {
         year: 'numeric',
       })
     : null;
 
+  const meta = (citation || court || formattedDate || treatment) && (
+    <span className="related-case-meta">
+      {citation && <span>{citation}</span>}
+      {court && !citation && <span>{court.name}</span>}
+      {formattedDate && <span>({formattedDate})</span>}
+      {treatment && <TreatmentBadge treatment={treatment} className="ml-1.5" />}
+    </span>
+  );
+
   return (
     <li className="related-case-item">
-      <Link href={`/cases/${slug}`} className="related-case-link">
-        <span className="related-case-title">{title}</span>
-        {(citation || court || formattedDate) && (
-          <span className="related-case-meta">
-            {citation && <span>{citation}</span>}
-            {court && !citation && <span>{court.name}</span>}
-            {formattedDate && <span>({formattedDate})</span>}
-          </span>
-        )}
-      </Link>
+      {href ? (
+        <Link href={href} className="related-case-link">
+          <span className="related-case-title">{title}</span>
+          {meta}
+        </Link>
+      ) : (
+        <span className="related-case-link related-case-link--static">
+          <span className="related-case-title">{title}</span>
+          {meta}
+        </span>
+      )}
     </li>
   );
 }
@@ -98,16 +115,17 @@ function CaseDocumentView({
     body,
     judges,
     topic,
-    judicial_precedent,
     has_full_report,
   } = caseData;
 
   const isLimitExceeded = caseData.limit_exceeded === true;
 
+  const similarDisplay = (similarCases ?? []).map(relatedToDisplay);
+  const citedDisplay = (citedCases ?? []).map(citedEdgeToDisplay);
+  const citedByDisplay = (citedBy ?? []).map(relatedToDisplay);
+
   const hasRelatedCases =
-    (similarCases && similarCases.length > 0) ||
-    (citedCases && citedCases.length > 0) ||
-    (citedBy && citedBy.length > 0);
+    similarDisplay.length > 0 || citedDisplay.length > 0 || citedByDisplay.length > 0;
 
   // Format date
   const formattedDate = judgment_date
@@ -206,50 +224,41 @@ function CaseDocumentView({
         ) : null}
       </section>
 
-      {/* Additional Information */}
-      {judicial_precedent && (
-        <section className="document-section additional-section">
-          <p className="info-line">
-            <strong>Judicial Precedent:</strong> {judicial_precedent}
-          </p>
-        </section>
-      )}
-
       {/* Related Cases */}
       {hasRelatedCases && (
         <section className="document-section related-cases-section">
           <h2 className="section-heading">Related Cases</h2>
           <div className="related-cases-content">
             {/* Similar Cases */}
-            {similarCases && similarCases.length > 0 && (
+            {similarDisplay.length > 0 && (
               <div className="related-cases-group">
                 <ul className="related-cases-list">
-                  {similarCases.map((c) => (
-                    <DocumentRelatedCaseItem key={c.id} caseItem={c} />
+                  {similarDisplay.map((c) => (
+                    <DocumentRelatedCaseItem key={c.key} caseItem={c} />
                   ))}
                 </ul>
               </div>
             )}
 
             {/* Cases Cited */}
-            {citedCases && citedCases.length > 0 && (
+            {citedDisplay.length > 0 && (
               <div className="related-cases-group">
                 <h3 className="related-cases-subheading">Cases Cited</h3>
                 <ul className="related-cases-list">
-                  {citedCases.map((c) => (
-                    <DocumentRelatedCaseItem key={c.id} caseItem={c} />
+                  {citedDisplay.map((c) => (
+                    <DocumentRelatedCaseItem key={c.key} caseItem={c} />
                   ))}
                 </ul>
               </div>
             )}
 
             {/* Cited By */}
-            {citedBy && citedBy.length > 0 && (
+            {citedByDisplay.length > 0 && (
               <div className="related-cases-group">
                 <h3 className="related-cases-subheading">Cited By</h3>
                 <ul className="related-cases-list">
-                  {citedBy.map((c) => (
-                    <DocumentRelatedCaseItem key={c.id} caseItem={c} />
+                  {citedByDisplay.map((c) => (
+                    <DocumentRelatedCaseItem key={c.key} caseItem={c} />
                   ))}
                 </ul>
               </div>

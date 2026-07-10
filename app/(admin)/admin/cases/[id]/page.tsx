@@ -23,7 +23,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
@@ -320,7 +319,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
       )}
 
       {/* Legal Information */}
-      {(caseData.principles || caseData.judicial_precedent) && (
+      {caseData.principles && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -329,31 +328,16 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {caseData.principles && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">
-                  Legal Principles
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-2">
+                Legal Principles
+              </p>
+              <div className="prose prose-sm max-w-none">
+                <p className="whitespace-pre-wrap text-sm">
+                  {caseData.principles}
                 </p>
-                <div className="prose prose-sm max-w-none">
-                  <p className="whitespace-pre-wrap text-sm">
-                    {caseData.principles}
-                  </p>
-                </div>
               </div>
-            )}
-
-            {caseData.judicial_precedent && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">
-                  Judicial Precedent
-                </p>
-                <div className="prose prose-sm max-w-none">
-                  <p className="whitespace-pre-wrap text-sm">
-                    {caseData.judicial_precedent}
-                  </p>
-                </div>
-              </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -392,27 +376,47 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
               </div>
             )}
 
-            {/* Cited Cases */}
+            {/* Cited Cases (outgoing citation edges) */}
             {caseData.cited_cases && caseData.cited_cases.length > 0 && (
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-3">
                   Cases Cited
                 </p>
                 <div className="space-y-2">
-                  {caseData.cited_cases.map((relatedCase) => (
-                    <Link
-                      key={relatedCase.id}
-                      href={`/admin/cases/${relatedCase.slug}`}
-                      className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <p className="font-medium text-sm">{relatedCase.title}</p>
-                      {relatedCase.citation && (
-                        <p className="text-xs font-mono text-muted-foreground mt-1">
-                          {relatedCase.citation}
-                        </p>
-                      )}
-                    </Link>
-                  ))}
+                  {caseData.cited_cases.map((edge) => {
+                    const linked = edge.cited_case_id !== null && !!edge.slug;
+                    const label = edge.title ?? edge.raw ?? edge.citation ?? 'Unlinked citation';
+                    const inner = (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{label}</p>
+                          {edge.treatment && (
+                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] capitalize">
+                              {edge.treatment.replace(/_/g, ' ')}
+                            </Badge>
+                          )}
+                        </div>
+                        {edge.citation && (
+                          <p className="text-xs font-mono text-muted-foreground mt-1">
+                            {edge.citation}
+                          </p>
+                        )}
+                      </>
+                    );
+                    return linked ? (
+                      <Link
+                        key={edge.id}
+                        href={`/admin/cases/${edge.slug}`}
+                        className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                      >
+                        {inner}
+                      </Link>
+                    ) : (
+                      <div key={edge.id} className="block p-3 rounded-lg border bg-muted/20">
+                        {inner}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

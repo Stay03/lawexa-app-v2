@@ -18,6 +18,7 @@ export { FullReportDocumentView } from './FullReportDocumentView';
 export { ViewFullReportButton } from './ViewFullReportButton';
 export { RelatedCaseCard } from './RelatedCaseCard';
 export { RelatedCasesSection } from './RelatedCasesSection';
+export { TreatmentBadge } from './TreatmentBadge';
 export { CaseBlogView } from './CaseBlogView';
 export { CaseViewThemeSwitcher } from './CaseViewThemeSwitcher';
 export { CaseViewLimitBanner } from './CaseViewLimitBanner';

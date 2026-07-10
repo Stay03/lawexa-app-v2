@@ -7,9 +7,15 @@ import { ShareButton } from '@/components/common/ShareButton';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 import { ViewFullReportButton } from './ViewFullReportButton';
 import { CaseViewLimitBanner } from './CaseViewLimitBanner';
+import { TreatmentBadge } from './TreatmentBadge';
 import { AddToFolderButton } from '@/components/folders';
 import { cn } from '@/lib/utils';
-import type { CaseDetail, RelatedCase } from '@/types/case';
+import {
+  relatedToDisplay,
+  citedEdgeToDisplay,
+  type RelatedCaseDisplay,
+} from '@/lib/utils/related-cases';
+import type { CaseDetail, RelatedCase, CitedCaseEdge, CitedByCase } from '@/types/case';
 
 /******************************************************************************
                                Types
@@ -19,8 +25,8 @@ interface CaseBlogViewProps {
   caseData: CaseDetail;
   slug: string;
   similarCases?: RelatedCase[] | null;
-  citedCases?: RelatedCase[] | null;
-  citedBy?: RelatedCase[] | null;
+  citedCases?: CitedCaseEdge[] | null;
+  citedBy?: CitedByCase[] | null;
 }
 
 /******************************************************************************
@@ -38,38 +44,60 @@ function BlogMetadataRow({ label, value }: { label: string; value: React.ReactNo
   );
 }
 
-function BlogRelatedCaseItem({ caseItem }: { caseItem: RelatedCase }) {
-  const { title, slug, citation, judgment_date, court, country } = caseItem;
+function BlogRelatedCaseItem({ caseItem }: { caseItem: RelatedCaseDisplay }) {
+  const { title, href, citation, judgmentDate, court, country, treatment } = caseItem;
 
-  const formattedDate = judgment_date
-    ? new Date(judgment_date).toLocaleDateString('en-US', {
+  const formattedDate = judgmentDate
+    ? new Date(judgmentDate).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
       })
     : null;
 
-  return (
-    <li className="border-b border-border/30 last:border-b-0">
-      <Link
-        href={`/cases/${slug}`}
-        className="group flex items-center justify-between gap-3 py-3 -mx-2 px-2 rounded-md transition-colors hover:bg-muted/30"
-      >
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <h4 className="text-sm font-medium text-foreground group-hover:text-primary line-clamp-1 transition-colors">
+  const content = (
+    <>
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="flex items-center gap-2">
+          <h4
+            className={cn(
+              'text-sm font-medium text-foreground line-clamp-1 transition-colors',
+              href && 'group-hover:text-primary'
+            )}
+          >
             {title}
           </h4>
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            {citation && <span className="font-medium">{citation}</span>}
-            {(court || country || formattedDate) && citation && (
-              <span className="text-muted-foreground/40">|</span>
-            )}
-            {court && <span>{court.name}</span>}
-            {country && !court && <span>{country.name}</span>}
-            {formattedDate && <span className="tabular-nums">{formattedDate}</span>}
-          </div>
+          <TreatmentBadge treatment={treatment} className="shrink-0" />
         </div>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          {citation && <span className="font-medium">{citation}</span>}
+          {(court || country || formattedDate) && citation && (
+            <span className="text-muted-foreground/40">|</span>
+          )}
+          {court && <span>{court.name}</span>}
+          {country && !court && <span>{country.name}</span>}
+          {formattedDate && <span className="tabular-nums">{formattedDate}</span>}
+        </div>
+      </div>
+      {href && (
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-0.5" />
-      </Link>
+      )}
+    </>
+  );
+
+  return (
+    <li className="border-b border-border/30 last:border-b-0">
+      {href ? (
+        <Link
+          href={href}
+          className="group flex items-center justify-between gap-3 py-3 -mx-2 px-2 rounded-md transition-colors hover:bg-muted/30"
+        >
+          {content}
+        </Link>
+      ) : (
+        <div className="group flex items-center justify-between gap-3 py-3 -mx-2 px-2">
+          {content}
+        </div>
+      )}
     </li>
   );
 }
@@ -79,7 +107,7 @@ function BlogRelatedGroup({
   cases,
 }: {
   title: string;
-  cases: RelatedCase[];
+  cases: RelatedCaseDisplay[];
 }) {
   return (
     <div className="mb-8 last:mb-0">
@@ -91,7 +119,7 @@ function BlogRelatedGroup({
       </h3>
       <ul>
         {cases.map((c) => (
-          <BlogRelatedCaseItem key={c.id} caseItem={c} />
+          <BlogRelatedCaseItem key={c.key} caseItem={c} />
         ))}
       </ul>
     </div>
@@ -145,7 +173,6 @@ function CaseBlogView({
     judges,
     topic,
     course,
-    judicial_precedent,
     has_full_report,
     is_bookmarked,
     bookmarks_count,
@@ -218,15 +245,12 @@ function CaseBlogView({
     metadataItems.push({ key: 'course', label: 'Course', value: safeCourse });
   }
 
-  const safePrecedent = safeStringValue(judicial_precedent);
-  if (safePrecedent) {
-    metadataItems.push({ key: 'precedent', label: 'Judicial Precedent', value: safePrecedent });
-  }
+  const similarDisplay = (similarCases ?? []).map(relatedToDisplay);
+  const citedDisplay = (citedCases ?? []).map(citedEdgeToDisplay);
+  const citedByDisplay = (citedBy ?? []).map(relatedToDisplay);
 
   const hasRelatedCases =
-    (similarCases && similarCases.length > 0) ||
-    (citedCases && citedCases.length > 0) ||
-    (citedBy && citedBy.length > 0);
+    similarDisplay.length > 0 || citedDisplay.length > 0 || citedByDisplay.length > 0;
 
   // Build inline metadata items for header row
   const headerMeta: string[] = [];
@@ -360,14 +384,14 @@ function CaseBlogView({
           <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
             Related Cases
           </p>
-          {similarCases && similarCases.length > 0 && (
-            <BlogRelatedGroup title="Similar Cases" cases={similarCases} />
+          {similarDisplay.length > 0 && (
+            <BlogRelatedGroup title="Similar Cases" cases={similarDisplay} />
           )}
-          {citedCases && citedCases.length > 0 && (
-            <BlogRelatedGroup title="Cases Cited" cases={citedCases} />
+          {citedDisplay.length > 0 && (
+            <BlogRelatedGroup title="Cases Cited" cases={citedDisplay} />
           )}
-          {citedBy && citedBy.length > 0 && (
-            <BlogRelatedGroup title="Cited By" cases={citedBy} />
+          {citedByDisplay.length > 0 && (
+            <BlogRelatedGroup title="Cited By" cases={citedByDisplay} />
           )}
         </section>
       )}

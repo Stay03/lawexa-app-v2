@@ -16,6 +16,8 @@ import {
   Upload,
   GraduationCap,
   Library,
+  Sparkles,
+  ClipboardCheck,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -37,7 +39,9 @@ import {
 const contentNavItems = [
   { title: 'Content Requests', url: '/admin/content-requests', icon: MessageSquareQuote },
   { title: 'Ambassadors', url: '/admin/ambassadors', icon: GraduationCap },
-  { title: 'Cases', url: '/admin/cases', icon: Scale },
+  { title: 'Cases', url: '/admin/cases', icon: Scale, excludePaths: ['/admin/cases/enrichments', '/admin/cases/principle-review'] },
+  { title: 'Case Enrichment', url: '/admin/cases/enrichments', icon: Sparkles },
+  { title: 'Principle Review', url: '/admin/cases/principle-review', icon: ClipboardCheck },
   { title: 'Courses', url: '/admin/courses', icon: Library },
   { title: 'Statutes', url: '/admin/statutes', icon: BookOpen, excludePaths: ['/admin/statutes/import'] },
   { title: 'Import Statute', url: '/admin/statutes/import', icon: Upload },

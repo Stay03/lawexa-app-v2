@@ -4,7 +4,7 @@ import { Scale, BookOpen, Quote } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RelatedCaseCard } from './RelatedCaseCard';
 import { cn } from '@/lib/utils';
-import type { RelatedCase } from '@/types/case';
+import type { RelatedCaseDisplay } from '@/lib/utils/related-cases';
 
 /******************************************************************************
                                Types
@@ -14,7 +14,7 @@ type RelationType = 'similar' | 'cited' | 'cited_by';
 
 interface IRelatedCasesSectionProps {
   type: RelationType;
-  cases: RelatedCase[];
+  cases: RelatedCaseDisplay[];
   className?: string;
   animationDelay?: number;
 }
@@ -86,7 +86,7 @@ function RelatedCasesSection({
       <CardContent className="pt-0">
         <div className="space-y-2">
           {cases.map((relatedCase) => (
-            <RelatedCaseCard key={relatedCase.id} caseItem={relatedCase} />
+            <RelatedCaseCard key={relatedCase.key} caseItem={relatedCase} />
           ))}
         </div>
       </CardContent>

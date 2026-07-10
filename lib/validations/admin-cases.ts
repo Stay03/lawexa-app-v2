@@ -44,8 +44,6 @@ export const caseFormSchema = z.object({
   // Legal Information
   principles: z.string().nullable().optional(),
 
-  judicial_precedent: z.string().nullable().optional(),
-
   // Court Information
   country_id: z.number().int().positive().nullable().optional(),
 

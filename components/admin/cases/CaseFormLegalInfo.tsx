@@ -28,7 +28,7 @@ interface CaseFormLegalInfoProps {
 
 /**
  * Legal Information section of the case form
- * Contains: principles, judicial_precedent
+ * Contains: principles
  */
 export function CaseFormLegalInfo({ form }: CaseFormLegalInfoProps) {
   return (
@@ -50,29 +50,6 @@ export function CaseFormLegalInfo({ form }: CaseFormLegalInfoProps) {
             </FormControl>
             <FormDescription>
               Key legal principles, doctrines, or rules established by this case
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      {/* Judicial Precedent */}
-      <FormField
-        control={form.control}
-        name="judicial_precedent"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Judicial Precedent</FormLabel>
-            <FormControl>
-              <Textarea
-                placeholder="Describe the precedent set by this case..."
-                className="min-h-[100px] resize-y"
-                value={field.value || ''}
-                onChange={field.onChange}
-              />
-            </FormControl>
-            <FormDescription>
-              How this case follows or establishes precedent in the legal system
             </FormDescription>
             <FormMessage />
           </FormItem>

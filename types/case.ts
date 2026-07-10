@@ -36,7 +36,7 @@ export interface FullReport {
   updated_at: string;
 }
 
-// Related case type (for similar_cases, cited_cases, cited_by)
+// Related case type (for similar_cases, and the base shape of cited_by)
 export interface RelatedCase {
   id: number;
   title: string;
@@ -46,6 +46,52 @@ export interface RelatedCase {
   judgment_date: string | null;
   court: Court | null;
   country: Country | null;
+}
+
+// How a citing case treated the authority it cited.
+// See docs/api/case-structures-and-enrichment.md (backend repo).
+export type CaseTreatment =
+  | 'followed'
+  | 'applied'
+  | 'approved'
+  | 'considered'
+  | 'referred_to'
+  | 'distinguished'
+  | 'doubted'
+  | 'not_followed'
+  | 'overruled';
+
+// Disposition of a case. `null` = the document's disposition didn't map cleanly.
+export type CaseOutcome =
+  | 'appeal_allowed'
+  | 'appeal_dismissed'
+  | 'appeal_allowed_in_part'
+  | 'retrial_ordered'
+  | 'convicted'
+  | 'acquitted'
+  | 'judgment_for_plaintiff'
+  | 'judgment_for_defendant'
+  | 'dismissed'
+  | 'struck_out'
+  | 'application_granted'
+  | 'application_refused';
+
+// An outgoing citation edge (cited_cases). `id` is the EDGE id, NOT a case id.
+// When `cited_case_id` is null the citation points at a case not in our DB —
+// render `raw` as the name and do not link. Linked rows carry title/slug/citation.
+export interface CitedCaseEdge {
+  id: number;
+  cited_case_id: number | null;
+  raw: string | null;
+  title: string | null;
+  slug: string | null;
+  citation: string | null;
+  treatment: CaseTreatment | null;
+}
+
+// A reverse citation (cited_by): the old related-case shape plus a treatment label.
+export interface CitedByCase extends RelatedCase {
+  treatment: CaseTreatment | null;
 }
 
 // Meta information for SEO
@@ -90,12 +136,11 @@ export interface CaseViewLimitError {
 export interface CaseDetail extends Case {
   body: string | null;
   judges: Judge[];
-  judicial_precedent: string | null;
   has_full_report?: boolean;
   full_report?: FullReport | null;
   similar_cases?: RelatedCase[] | null;
-  cited_cases?: RelatedCase[] | null;
-  cited_by?: RelatedCase[] | null;
+  cited_cases?: CitedCaseEdge[] | null;
+  cited_by?: CitedByCase[] | null;
   cited_by_count?: number;
   creator: {
     id: number;

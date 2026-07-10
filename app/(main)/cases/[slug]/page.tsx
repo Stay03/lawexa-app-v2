@@ -28,6 +28,7 @@ import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 import { AddToFolderButton } from '@/components/folders';
 import { useCaseWithRelated } from '@/lib/hooks/useCases';
 import { extractViewLimitError } from '@/lib/utils/api-error';
+import { relatedToDisplay, citedEdgeToDisplay } from '@/lib/utils/related-cases';
 
 /******************************************************************************
                                Constants
@@ -203,7 +204,6 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
           citation={caseDetail.citation}
           topic={caseDetail.topic}
           course={caseDetail.course}
-          judicialPrecedent={caseDetail.judicial_precedent}
           animationStartDelay={ANIMATION_DELAYS.metadataStart}
         />
 
@@ -217,7 +217,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
         {caseDetail.similar_cases && caseDetail.similar_cases.length > 0 && (
           <RelatedCasesSection
             type="similar"
-            cases={caseDetail.similar_cases}
+            cases={caseDetail.similar_cases.map(relatedToDisplay)}
             animationDelay={ANIMATION_DELAYS.similarCases}
           />
         )}
@@ -226,7 +226,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
         {caseDetail.cited_cases && caseDetail.cited_cases.length > 0 && (
           <RelatedCasesSection
             type="cited"
-            cases={caseDetail.cited_cases}
+            cases={caseDetail.cited_cases.map(citedEdgeToDisplay)}
             animationDelay={ANIMATION_DELAYS.citedCases}
           />
         )}
@@ -235,7 +235,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
         {caseDetail.cited_by && caseDetail.cited_by.length > 0 && (
           <RelatedCasesSection
             type="cited_by"
-            cases={caseDetail.cited_by}
+            cases={caseDetail.cited_by.map(relatedToDisplay)}
             animationDelay={ANIMATION_DELAYS.citedBy}
           />
         )}

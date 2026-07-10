@@ -4,7 +4,6 @@ import {
   FileText,
   BookMarked,
   GraduationCap,
-  Gavel,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CaseMetadataItem } from './CaseMetadataItem';
@@ -16,7 +15,6 @@ interface CaseMetadataGridProps {
   citation: string | null;
   topic: string | null;
   course: string | null;
-  judicialPrecedent: string | null;
   className?: string;
   animationStartDelay?: number;
 }
@@ -43,7 +41,6 @@ function CaseMetadataGrid({
   citation,
   topic,
   course,
-  judicialPrecedent,
   className,
   animationStartDelay = 400,
 }: CaseMetadataGridProps) {
@@ -118,16 +115,6 @@ function CaseMetadataGrid({
       icon: GraduationCap,
       label: 'Course',
       value: safeCourse,
-    });
-  }
-
-  const safePrecedent = safeStringValue(judicialPrecedent);
-  if (safePrecedent) {
-    items.push({
-      key: 'precedent',
-      icon: Gavel,
-      label: 'Judicial Precedent',
-      value: safePrecedent,
     });
   }
 

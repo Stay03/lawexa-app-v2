@@ -81,7 +81,6 @@ export function CaseForm({ caseSlug, mode }: CaseFormProps) {
       tags: [],
       level: null,
       principles: null,
-      judicial_precedent: null,
       country_id: null,
       court_id: null,
       judgment_date: null,
@@ -104,13 +103,17 @@ export function CaseForm({ caseSlug, mode }: CaseFormProps) {
         tags: caseDetail.tags || [],
         level: caseDetail.level || null,
         principles: caseDetail.principles || null,
-        judicial_precedent: caseDetail.judicial_precedent || null,
         country_id: caseDetail.country?.id || null,
         court_id: caseDetail.court?.id || null,
         judgment_date: caseDetail.judgment_date || null,
         judge_ids: caseDetail.judges?.map((j) => j.id) || [],
         similar_case_ids: caseDetail.similar_cases?.map((c) => c.id) || [],
-        cited_case_ids: caseDetail.cited_cases?.map((c) => c.id) || [],
+        // cited_cases are now citation edges — `id` is the edge id. Map the
+        // target case id and drop external citations (cited_case_id === null).
+        cited_case_ids:
+          caseDetail.cited_cases
+            ?.map((c) => c.cited_case_id)
+            .filter((id): id is number => id != null) || [],
         full_report: caseDetail.full_report?.full_text || null,
       });
     }
@@ -127,7 +130,6 @@ export function CaseForm({ caseSlug, mode }: CaseFormProps) {
       tags: data.tags?.length ? data.tags : undefined,
       level: data.level || undefined,
       principles: data.principles || undefined,
-      judicial_precedent: data.judicial_precedent || undefined,
       country_id: data.country_id || undefined,
       court_id: data.court_id || undefined,
       judgment_date: data.judgment_date || undefined,
