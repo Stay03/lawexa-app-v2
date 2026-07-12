@@ -15,6 +15,8 @@ import {
   Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/lib/stores/authStore';
+import { canAccessSpaces } from '@/lib/utils/spaces-access';
 
 const navItems = [
   {
@@ -81,10 +83,15 @@ const navItems = [
 
 export function SettingsSidebarNav() {
   const pathname = usePathname();
+  // Organization is part of the soft-launched Spaces feature.
+  const canSpaces = canAccessSpaces(useAuthStore((s) => s.user?.role));
+  const items = navItems.filter(
+    (item) => item.href !== '/settings/organization' || canSpaces
+  );
 
   return (
     <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 md:w-60 md:shrink-0">
-      {navItems.map((item) => {
+      {items.map((item) => {
         const isActive = pathname.startsWith(item.href);
         const Icon = item.icon;
 

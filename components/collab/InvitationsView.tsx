@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { SpacesGuard } from '@/components/auth/SpacesGuard';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { PageContainer, PageHeader } from '@/components/layout';
@@ -202,12 +203,14 @@ export function InvitationsView() {
   };
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Invitations"
-        description="Respond to invitations to organizations, spaces and channels."
-      />
-      {renderContent()}
-    </PageContainer>
+    <SpacesGuard>
+      <PageContainer>
+        <PageHeader
+          title="Invitations"
+          description="Respond to invitations to organizations, spaces and channels."
+        />
+        {renderContent()}
+      </PageContainer>
+    </SpacesGuard>
   );
 }

@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useAuthStore } from "@/lib/stores/authStore"
 import { canAccessQuizPlayer } from "@/lib/utils/quiz-access"
+import { canAccessSpaces } from "@/lib/utils/spaces-access"
 import { AuthModal } from "@/components/auth/AuthModal"
 import Link from "next/link"
 import Image from "next/image"
@@ -50,11 +51,6 @@ const navMain = [
     title: "Radar",
     url: "/radars",
     icon: Radar,
-  },
-  {
-    title: "Spaces",
-    url: "/spaces",
-    icon: Boxes,
   },
   {
     title: "Library",
@@ -82,18 +78,28 @@ const GUEST_RESTRICTED_URLS = new Set([
   '/content-requests',
   '/bookmarks',
   '/radars',
-  '/spaces',
 ])
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, isGuest } = useAuthStore();
   const isLawyer = user?.profile?.user_type === 'lawyer';
-  // Quiz is in soft launch — only researcher/admin/superadmin see the link.
+  // Quiz and Spaces are in soft launch — only researcher/admin/superadmin
+  // see the links.
   const canQuiz = canAccessQuizPlayer(user?.role);
+  const canSpaces = canAccessSpaces(user?.role);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const navItems = [
     ...navMain,
+    ...(canSpaces
+      ? [
+          {
+            title: 'Spaces',
+            url: '/spaces',
+            icon: Boxes,
+          },
+        ]
+      : []),
     ...(canQuiz
       ? [
           {
