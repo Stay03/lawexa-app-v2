@@ -232,7 +232,7 @@ export function ChannelConversation({
       );
     }
     return (
-      <div className="mx-auto mt-auto w-full max-w-3xl px-4 py-4">
+      <div className="mx-auto mt-auto w-full max-w-3xl px-4 pt-4 pb-28">
         {hasNextPage ? (
           <div className="flex justify-center pb-4">
             <Button
@@ -276,7 +276,7 @@ export function ChannelConversation({
   };
 
   return (
-    <div className={cn('flex flex-col', className)}>
+    <div className={cn('relative flex flex-col', className)}>
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -285,27 +285,39 @@ export function ChannelConversation({
         {renderMessageArea()}
       </div>
 
-      {(() => {
-        const label = typingLabel(realtime.typingUsers);
-        return (
-          <div className="mx-auto h-5 w-full max-w-3xl px-4 text-xs text-muted-foreground">
-            {label && <span className="animate-pulse">{label}</span>}
-          </div>
-        );
-      })()}
+      {/* Floating footer — overlaid on the scroll area (not stacked below it) so
+          the scrollbar runs the full height and messages stay visible above and
+          around the composer. Only the pill captures pointer events; the gutters
+          fall through to the messages behind. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0">
+        {(() => {
+          const label = typingLabel(realtime.typingUsers);
+          return (
+            <div className="mx-auto h-5 w-full max-w-2xl px-4 text-xs text-muted-foreground">
+              {label && (
+                <span className="rounded bg-background/80 px-1 backdrop-blur animate-pulse">
+                  {label}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
-      {channel.is_member ? (
-        <MessageComposer
-          channelUuid={channel.uuid}
-          channelName={channel.name}
-          onSent={scrollToBottom}
-          onTyping={realtime.notifyTyping}
-        />
-      ) : (
-        <div className="shrink-0 border-t px-4 py-3 text-center text-sm text-muted-foreground">
-          You&apos;re not a member of this channel.
-        </div>
-      )}
+        {channel.is_member ? (
+          <MessageComposer
+            channelUuid={channel.uuid}
+            channelName={channel.name}
+            onSent={scrollToBottom}
+            onTyping={realtime.notifyTyping}
+          />
+        ) : (
+          <div className="pointer-events-auto mx-auto max-w-2xl px-4 pb-4">
+            <div className="rounded-2xl border bg-background/80 px-4 py-3 text-center text-sm text-muted-foreground backdrop-blur">
+              You&apos;re not a member of this channel.
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

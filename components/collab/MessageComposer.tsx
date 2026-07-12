@@ -196,8 +196,8 @@ export function MessageComposer({
   const canSend = value.trim().length > 0 && !send.isPending;
 
   return (
-    <div className="shrink-0 px-4 pb-4 pt-2">
-      <div className="relative mx-auto max-w-3xl">
+    <div className="pointer-events-none px-4 pb-4 pt-2">
+      <div className="pointer-events-auto relative mx-auto max-w-2xl">
         {mention && suggestions.length > 0 && (
           <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border bg-popover shadow-md">
             {suggestions.map((candidate, i) => (

@@ -121,8 +121,8 @@ export function ChannelViewSkeleton() {
         </div>
       </div>
       <div className="shrink-0 px-4 pb-4 pt-2">
-        <div className="mx-auto max-w-3xl">
-          <Skeleton className="h-[68px] w-full rounded-3xl" />
+        <div className="mx-auto max-w-2xl">
+          <Skeleton className="h-12 w-full rounded-3xl" />
         </div>
       </div>
     </div>
