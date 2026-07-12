@@ -37,6 +37,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
   useChannel,
+  useChannelMessages,
   useDeleteChannel,
   useJoinChannel,
 } from '@/lib/hooks/useCollab';
@@ -57,6 +58,12 @@ interface ChannelViewProps {
 export function ChannelView({ channelUuid }: ChannelViewProps) {
   const { data, isLoading, isError, error, refetch } = useChannel(channelUuid);
   const channel = data?.data;
+
+  // Messages load in parallel with the channel detail. Subscribe here (React
+  // Query shares the cache with ChannelConversation, so no extra request) to
+  // hold one skeleton until both are ready instead of showing a second
+  // message-area skeleton after the page skeleton.
+  const messagesQuery = useChannelMessages(channelUuid);
 
   const realtime = useChannelRealtime(channelUuid, {
     enabled: !!channel?.is_member,
@@ -127,6 +134,13 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
         />
       </div>
     );
+  }
+
+  // Members' history loads in parallel — keep the one skeleton until it lands so
+  // the reader doesn't flash a second message-area skeleton. Non-members skip
+  // this (their messages request 403s) and fall through to the conversation.
+  if (channel.is_member && messagesQuery.isLoading) {
+    return <ChannelViewSkeleton />;
   }
 
   const Icon = channel.visibility === 'private' ? Lock : Hash;
