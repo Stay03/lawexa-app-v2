@@ -26,7 +26,7 @@ export function MessageContent({ content, metadata }: MessageContentProps) {
             key={i}
             className="rounded bg-primary/10 px-1 font-medium text-primary"
           >
-            {segment.value}
+            @{segment.label}
           </span>
         ) : (
           <span key={i}>{segment.value}</span>

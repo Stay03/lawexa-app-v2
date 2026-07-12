@@ -37,6 +37,7 @@ import {
   useLeaveChannel,
   useRemoveChannelMember,
   useSetChannelNotifyLevel,
+  useSpaceMembers,
   useUpdateChannelMemberRole,
 } from '@/lib/hooks/useCollab';
 import { extractApiError } from '@/lib/utils/api-error';
@@ -79,6 +80,17 @@ export function ChannelMembersSheet({
   const members = membersQuery.data?.data ?? [];
   const myMember = members.find((m) => m.user.uuid === myUuid);
   const canManage = myMember?.role === 'owner' || myMember?.role === 'admin';
+
+  // Space members who aren't in this channel yet — added directly by uuid.
+  const spaceMembersQuery = useSpaceMembers(
+    channel.space.uuid,
+    {},
+    { enabled: open && inviteOpen }
+  );
+  const inChannel = new Set(members.map((m) => m.user.uuid));
+  const candidates = (spaceMembersQuery.data?.data ?? [])
+    .filter((m) => m.is_active && !inChannel.has(m.user.uuid))
+    .map((m) => ({ user: m.user }));
   const notifyLevel: NotifyLevel =
     channel.my_notify_level ?? myMember?.notify_level ?? 'all';
 
@@ -225,8 +237,10 @@ export function ChannelMembersSheet({
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         title={`Invite to #${channel.name}`}
-        description="They must already be a member of this space."
+        description="Add someone from this space, or invite a new person by email."
         onInvite={handleInvite}
+        candidates={candidates}
+        candidatesLoading={spaceMembersQuery.isLoading}
       />
 
       <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>

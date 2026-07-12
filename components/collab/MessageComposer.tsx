@@ -1,11 +1,16 @@
 'use client';
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, SendHorizontal } from 'lucide-react';
+import { ArrowUp, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import {
+  PromptInput,
+  PromptInputAction,
+} from '@/components/ui/prompt-input';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useChannelMembers, useSendMessage } from '@/lib/hooks/useCollab';
 import type { SlimUser } from '@/types/collab';
@@ -44,6 +49,7 @@ export function MessageComposer({
   );
   const [activeIndex, setActiveIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isMobile = useIsMobile();
 
   const send = useSendMessage(channelUuid);
   const membersQuery = useChannelMembers(channelUuid);
@@ -114,6 +120,27 @@ export function MessageComposer({
     });
   };
 
+  // Plus action: drop an "@" at the caret (space-guarded) and open the picker.
+  const startMention = () => {
+    const el = textareaRef.current;
+    const caret = el?.selectionStart ?? value.length;
+    const before = value.slice(0, caret);
+    const needsSpace = before.length > 0 && !/\s$/.test(before);
+    const inserted = needsSpace ? ' @' : '@';
+    const nextValue = before + inserted + value.slice(caret);
+    const nextCaret = caret + inserted.length;
+
+    setValue(nextValue);
+    requestAnimationFrame(() => {
+      const node = textareaRef.current;
+      if (node) {
+        node.focus();
+        node.setSelectionRange(nextCaret, nextCaret);
+      }
+      detectMention(nextValue, nextCaret);
+    });
+  };
+
   const handleSend = () => {
     const content = value.trim();
     if (!content || send.isPending) return;
@@ -158,19 +185,21 @@ export function MessageComposer({
       }
     }
 
-    if (event.key === 'Enter' && !event.shiftKey) {
+    // On touch devices Enter inserts a newline; the Send button posts instead.
+    if (event.key === 'Enter' && !event.shiftKey && !isMobile) {
       event.preventDefault();
       handleSend();
     }
   };
 
   const remaining = MAX_LENGTH - value.length;
+  const canSend = value.trim().length > 0 && !send.isPending;
 
   return (
-    <div className="shrink-0 border-t px-4 pb-4 pt-3">
+    <div className="shrink-0 px-4 pb-4 pt-2">
       <div className="relative mx-auto max-w-3xl">
         {mention && suggestions.length > 0 && (
-          <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-lg border bg-popover shadow-md">
+          <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border bg-popover shadow-md">
             {suggestions.map((candidate, i) => (
               <button
                 key={candidate.key}
@@ -196,7 +225,14 @@ export function MessageComposer({
           </div>
         )}
 
-        <div className="flex items-end gap-2 rounded-xl border bg-background px-3 py-2 transition-shadow focus-within:ring-1 focus-within:ring-ring">
+        <PromptInput
+          value={value}
+          onValueChange={setValue}
+          onSubmit={handleSend}
+          maxHeight={200}
+          onClick={() => textareaRef.current?.focus()}
+          className="p-1.5"
+        >
           <textarea
             ref={textareaRef}
             value={value}
@@ -212,36 +248,53 @@ export function MessageComposer({
             rows={1}
             maxLength={MAX_LENGTH}
             placeholder={`Message #${channelName}`}
-            className="max-h-[200px] flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
+            className="max-h-[200px] w-full resize-none bg-transparent px-2 pt-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
-          <Button
-            type="button"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={handleSend}
-            disabled={!value.trim() || send.isPending}
-            aria-label="Send message"
-          >
-            {send.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <SendHorizontal className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
 
-        <div className="mt-1 flex justify-end px-1">
-          {remaining <= 500 && (
-            <span
-              className={cn(
-                'text-xs',
-                remaining < 0 ? 'text-destructive' : 'text-muted-foreground'
+          <div className="flex items-center justify-between gap-2 px-1 pt-1">
+            <PromptInputAction tooltip="Mention someone">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 shrink-0 rounded-full text-primary hover:bg-primary/10 hover:text-primary"
+                onClick={startMention}
+                aria-label="Mention someone"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </PromptInputAction>
+
+            <div className="flex items-center gap-2">
+              {remaining <= 500 && (
+                <span
+                  className={cn(
+                    'text-xs tabular-nums',
+                    remaining < 0 ? 'text-destructive' : 'text-muted-foreground'
+                  )}
+                >
+                  {remaining}
+                </span>
               )}
-            >
-              {remaining}
-            </span>
-          )}
-        </div>
+              <PromptInputAction tooltip="Send message">
+                <Button
+                  type="button"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 rounded-full"
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  aria-label="Send message"
+                >
+                  {send.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className="h-4 w-4" />
+                  )}
+                </Button>
+              </PromptInputAction>
+            </div>
+          </div>
+        </PromptInput>
       </div>
     </div>
   );

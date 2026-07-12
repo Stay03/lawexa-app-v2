@@ -1,4 +1,5 @@
 import { SpacesGuard } from '@/components/auth/SpacesGuard';
+import { RouteTransition } from '@/components/collab/RouteTransition';
 
 /**
  * Gates the Spaces feature to its soft-launch audience (researcher / admin /
@@ -9,5 +10,9 @@ export default function SpacesLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <SpacesGuard>{children}</SpacesGuard>;
+  return (
+    <SpacesGuard>
+      <RouteTransition>{children}</RouteTransition>
+    </SpacesGuard>
+  );
 }

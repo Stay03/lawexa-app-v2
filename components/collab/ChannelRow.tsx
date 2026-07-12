@@ -44,17 +44,17 @@ export function ChannelRow({ channel }: ChannelRowProps) {
       </div>
 
       <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
-        <span className="hidden items-center gap-1 sm:inline-flex">
+        <span className="inline-flex items-center gap-1">
           <Users className="h-3.5 w-3.5" />
           {channel.active_members_count}
         </span>
-        {channel.last_message_at && (
-          <span className="hidden md:inline">
-            {formatDistanceToNow(new Date(channel.last_message_at), {
-              addSuffix: true,
-            })}
-          </span>
-        )}
+        <span className="hidden sm:inline">
+          {channel.last_message_at
+            ? formatDistanceToNow(new Date(channel.last_message_at), {
+                addSuffix: true,
+              })
+            : 'No messages yet'}
+        </span>
         {hasUnread && (
           <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 tabular-nums">
             {channel.unread_count}

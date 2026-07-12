@@ -25,7 +25,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -106,9 +105,11 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
   if (isLoading) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 space-y-2 border-b px-4 pb-3 pt-4">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-3 w-28" />
+        <div className="shrink-0 border-b px-4 pb-3 pt-4">
+          <div className="mx-auto w-full max-w-3xl space-y-2">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-3 w-28" />
+          </div>
         </div>
         <div className="mx-auto w-full max-w-3xl px-4">
           <MessageListSkeleton />
@@ -148,52 +149,52 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b px-4 pb-3 pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <h1 className="truncate text-lg font-semibold">{channel.name}</h1>
-              <Badge variant="secondary" className="shrink-0">
-                {channel.visibility_label}
-              </Badge>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-              <Link
-                href={`/spaces/${channel.space.uuid}`}
-                className="hover:text-foreground hover:underline"
-              >
-                {channel.space.name}
-              </Link>
-              <span aria-hidden>·</span>
-              <span className="inline-flex items-center gap-1">
-                <Users className="h-3.5 w-3.5" />
-                {channel.active_members_count}{' '}
-                {channel.active_members_count === 1 ? 'member' : 'members'}
-              </span>
-              {realtime.onlineCount > 0 && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    {realtime.onlineCount} online
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <h1 className="truncate text-lg font-semibold">{channel.name}</h1>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                <Link
+                  href={`/spaces/${channel.space.uuid}`}
+                  className="hover:text-foreground hover:underline"
+                >
+                  {channel.space.name}
+                </Link>
+                <span aria-hidden>·</span>
+                {channel.is_member ? (
+                  <button
+                    type="button"
+                    onClick={() => setMembersOpen(true)}
+                    className="inline-flex items-center gap-1 rounded transition-colors hover:text-foreground hover:underline"
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    {channel.active_members_count}{' '}
+                    {channel.active_members_count === 1 ? 'member' : 'members'}
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5" />
+                    {channel.active_members_count}{' '}
+                    {channel.active_members_count === 1 ? 'member' : 'members'}
                   </span>
-                </>
-              )}
+                )}
+                {realtime.onlineCount > 0 && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      {realtime.onlineCount} online
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            {channel.is_member ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setMembersOpen(true)}
-              >
-                <Users className="h-4 w-4" />
-                <span className="hidden sm:inline">Members</span>
-              </Button>
-            ) : (
-              channel.visibility === 'space_public' && (
+            <div className="flex shrink-0 items-center gap-2">
+              {!channel.is_member && channel.visibility === 'space_public' && (
                 <Button
                   size="sm"
                   onClick={handleJoin}
@@ -206,43 +207,43 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
                   )}
                   Join
                 </Button>
-              )
-            )}
-            {canManage && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    aria-label="Channel settings"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                    <Pencil className="h-4 w-4" />
-                    Edit channel
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => setDeleteOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete channel
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+              )}
+              {canManage && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label="Channel settings"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                      <Pencil className="h-4 w-4" />
+                      Edit channel
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setDeleteOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete channel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
+          {channel.description && (
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+              {channel.description}
+            </p>
+          )}
         </div>
-        {channel.description && (
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-            {channel.description}
-          </p>
-        )}
       </header>
 
       <ChannelConversation

@@ -201,11 +201,15 @@ export function SpaceDetailView({ spaceUuid }: SpaceDetailViewProps) {
             <Badge variant="secondary">{space.type_label}</Badge>
             <span>{space.organization ? space.organization.name : 'Personal'}</span>
             <span aria-hidden>·</span>
-            <span className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setMembersOpen(true)}
+              className="inline-flex items-center gap-1 rounded transition-colors hover:text-foreground hover:underline"
+            >
               <Users className="h-3.5 w-3.5" />
               {space.active_members_count}{' '}
               {space.active_members_count === 1 ? 'member' : 'members'}
-            </span>
+            </button>
           </div>
           {space.description && (
             <p className="mt-2 text-sm text-muted-foreground">
@@ -214,16 +218,8 @@ export function SpaceDetailView({ spaceUuid }: SpaceDetailViewProps) {
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setMembersOpen(true)}
-          >
-            <Users className="h-4 w-4" />
-            Members
-          </Button>
-          {canManage && (
+        {canManage && (
+          <div className="flex shrink-0 items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -254,14 +250,19 @@ export function SpaceDetailView({ spaceUuid }: SpaceDetailViewProps) {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div>
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">
+          <h2 className="text-base font-semibold text-foreground">
             Channels
+            {!channelsQuery.isLoading && channels.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground tabular-nums">
+                {channels.length}
+              </span>
+            )}
           </h2>
           {canManage && (
             <Button

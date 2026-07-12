@@ -232,7 +232,7 @@ export function ChannelConversation({
       );
     }
     return (
-      <div className="mx-auto max-w-3xl px-4 py-4">
+      <div className="mx-auto mt-auto w-full max-w-3xl px-4 py-4">
         {hasNextPage ? (
           <div className="flex justify-center pb-4">
             <Button
@@ -280,7 +280,7 @@ export function ChannelConversation({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
       >
         {renderMessageArea()}
       </div>
