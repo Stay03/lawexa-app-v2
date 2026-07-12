@@ -212,19 +212,6 @@ export function useCurrentUserUuid(): string | null {
   return useAuthStore((s) => s.user?.uuid ?? null);
 }
 
-/** The signed-in user as a channel slim-user, for optimistic authorship. */
-function useCurrentSlimUser(): SlimUser | null {
-  return useAuthStore((s) =>
-    s.user
-      ? {
-          uuid: s.user.uuid ?? '',
-          name: s.user.name,
-          avatar_url: s.user.avatar_url,
-        }
-      : null
-  );
-}
-
 /******************************************************************************
                               Message mutations
 ******************************************************************************/
@@ -261,7 +248,6 @@ let optimisticCounter = 0;
 /** Post a message with an optimistic bubble that reconciles on success. */
 export function useSendMessage(channelUuid: string) {
   const queryClient = useQueryClient();
-  const author = useCurrentSlimUser();
 
   return useMutation({
     mutationFn: (payload: SendMessagePayload) =>
@@ -270,6 +256,13 @@ export function useSendMessage(channelUuid: string) {
     onMutate: async (payload) => {
       const key = collabKeys.channels.messagesPrefix(channelUuid);
       await queryClient.cancelQueries({ queryKey: key });
+
+      // Read the author at mutation time — never build an object in a store
+      // selector during render (that loops via useSyncExternalStore).
+      const me = useAuthStore.getState().user;
+      const author: SlimUser | null = me
+        ? { uuid: me.uuid ?? '', name: me.name, avatar_url: me.avatar_url }
+        : null;
 
       const tempUuid = `optimistic-${(optimisticCounter += 1)}`;
       const optimistic: Message = {
