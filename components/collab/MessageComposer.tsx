@@ -233,25 +233,9 @@ export function MessageComposer({
           onClick={() => textareaRef.current?.focus()}
           className="p-1.5"
         >
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(event) => {
-              setValue(event.target.value);
-              detectMention(
-                event.target.value,
-                event.target.selectionStart ?? event.target.value.length
-              );
-              if (event.target.value.trim()) onTyping?.();
-            }}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            maxLength={MAX_LENGTH}
-            placeholder={`Message #${channelName}`}
-            className="max-h-[200px] w-full resize-none bg-transparent px-2 pt-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-          />
-
-          <div className="flex items-center justify-between gap-2 px-1 pt-1">
+          {/* Single row: + on the left, textarea in the middle, send on the
+              right. Buttons pin to the bottom as the textarea grows. */}
+          <div className="flex items-end gap-1">
             <PromptInputAction tooltip="Mention someone">
               <Button
                 type="button"
@@ -265,34 +249,51 @@ export function MessageComposer({
               </Button>
             </PromptInputAction>
 
-            <div className="flex items-center gap-2">
-              {remaining <= 500 && (
-                <span
-                  className={cn(
-                    'text-xs tabular-nums',
-                    remaining < 0 ? 'text-destructive' : 'text-muted-foreground'
-                  )}
-                >
-                  {remaining}
-                </span>
-              )}
-              <PromptInputAction tooltip="Send message">
-                <Button
-                  type="button"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 rounded-full"
-                  onClick={handleSend}
-                  disabled={!canSend}
-                  aria-label="Send message"
-                >
-                  {send.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowUp className="h-4 w-4" />
-                  )}
-                </Button>
-              </PromptInputAction>
-            </div>
+            <textarea
+              ref={textareaRef}
+              value={value}
+              onChange={(event) => {
+                setValue(event.target.value);
+                detectMention(
+                  event.target.value,
+                  event.target.selectionStart ?? event.target.value.length
+                );
+                if (event.target.value.trim()) onTyping?.();
+              }}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              maxLength={MAX_LENGTH}
+              placeholder={`Message #${channelName}`}
+              className="max-h-[200px] min-h-8 flex-1 resize-none self-center bg-transparent py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+
+            {remaining <= 500 && (
+              <span
+                className={cn(
+                  'shrink-0 self-center text-xs tabular-nums',
+                  remaining < 0 ? 'text-destructive' : 'text-muted-foreground'
+                )}
+              >
+                {remaining}
+              </span>
+            )}
+
+            <PromptInputAction tooltip="Send message">
+              <Button
+                type="button"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-full"
+                onClick={handleSend}
+                disabled={!canSend}
+                aria-label="Send message"
+              >
+                {send.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
+              </Button>
+            </PromptInputAction>
           </div>
         </PromptInput>
       </div>
