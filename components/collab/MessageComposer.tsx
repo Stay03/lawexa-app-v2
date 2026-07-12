@@ -231,11 +231,10 @@ export function MessageComposer({
           onSubmit={handleSend}
           maxHeight={200}
           onClick={() => textareaRef.current?.focus()}
-          className="p-1.5"
         >
           {/* Single row: + on the left, textarea in the middle, send on the
-              right. Buttons pin to the bottom as the textarea grows. */}
-          <div className="flex items-end gap-1">
+              right — sized to match the notes/cases composer height. */}
+          <div className="flex items-center gap-1">
             <PromptInputAction tooltip="Mention someone">
               <Button
                 type="button"
@@ -264,7 +263,7 @@ export function MessageComposer({
               rows={1}
               maxLength={MAX_LENGTH}
               placeholder={`Message #${channelName}`}
-              className="max-h-[200px] min-h-8 flex-1 resize-none self-center bg-transparent py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              className="max-h-[200px] min-h-[36px] flex-1 resize-none bg-transparent px-1 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
 
             {remaining <= 500 && (
