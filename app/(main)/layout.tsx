@@ -35,6 +35,7 @@ import { MoreHorizontal } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { InstallAppCard } from "@/components/pwa/InstallAppCard"
+import { RealtimeNotifications } from "@/components/collab/RealtimeNotifications"
 
 function getBreadcrumbs(pathname: string, getOverrideLabel: (segment: string) => string | undefined) {
   const segments = pathname.split('/').filter(Boolean)
@@ -119,6 +120,7 @@ export default function MainLayout({
   return (
     <OnboardingGuard>
       <SidebarProvider>
+        <RealtimeNotifications />
         <AppSidebar />
         <SidebarInset className="max-h-svh overflow-hidden">
         <header className="relative flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
@@ -207,7 +209,10 @@ export default function MainLayout({
             // Chat manages its own horizontal breathing room (ChatContainerContent
             // has px-4); drop the layout's outer px on mobile so the message
             // column reclaims the gutter.
-            pathname.startsWith('/c/') && "max-md:px-0"
+            pathname.startsWith('/c/') && "max-md:px-0",
+            // Channel reader is a full-height chat surface that owns its own
+            // padding and internal scroll — drop the layout gutter entirely.
+            pathname.startsWith('/channels/') && "gap-0 p-0"
           )}
         >
           {children}

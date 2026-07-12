@@ -12,6 +12,7 @@ import {
   Lock,
   Link as LinkIcon,
   Gauge,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,12 @@ const navItems = [
     description: 'Basic account settings',
     href: '/settings/account',
     icon: Settings,
+  },
+  {
+    label: 'Organization',
+    description: 'Your organization & verification',
+    href: '/settings/organization',
+    icon: Building2,
   },
   {
     label: 'Usage',

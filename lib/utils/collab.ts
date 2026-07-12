@@ -1,0 +1,108 @@
+/**
+ * Presentation helpers for the Channels feature — avatar initials, message
+ * timestamps and mention parsing. Kept UI-agnostic so components stay lean.
+ */
+
+import { format, isSameYear, isToday, isYesterday } from 'date-fns';
+
+import type { MessageMetadata } from '@/types/collab';
+
+/** Up to two uppercase initials from a display name. */
+export function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+/** Short clock time for a message bubble, e.g. "10:32 AM". */
+export function formatMessageTime(iso: string): string {
+  return format(new Date(iso), 'h:mm a');
+}
+
+/** Full timestamp for tooltips, e.g. "Jul 12, 2026, 10:32 AM". */
+export function formatFullTimestamp(iso: string): string {
+  return format(new Date(iso), 'MMM d, yyyy, h:mm a');
+}
+
+/** Human day separator: "Today", "Yesterday", or a dated label. */
+export function formatDayLabel(iso: string): string {
+  const date = new Date(iso);
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  if (isSameYear(date, new Date())) return format(date, 'EEEE, MMMM d');
+  return format(date, 'MMMM d, yyyy');
+}
+
+/** Whether two ISO timestamps fall on the same calendar day. */
+export function isSameCalendarDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+/******************************************************************************
+                              Mentions
+******************************************************************************/
+
+/** A parsed message-content segment: plain text or a resolved @mention. */
+export type MessageSegment =
+  | { type: 'text'; value: string }
+  | { type: 'mention'; value: string; label: string };
+
+const MENTION_TOKEN = /@[a-z0-9._]+/gi;
+
+/** The valid handle forms for a member name (spaceless and dotted). */
+function handleForms(name: string): string[] {
+  const lower = name.toLowerCase().trim();
+  return [lower.replace(/\s+/g, ''), lower.replace(/\s+/g, '.')];
+}
+
+/**
+ * Split message content into text + mention segments. Only handles that the
+ * server actually resolved (`metadata.mentions`) — plus `@lawexa` when
+ * `lawexa_mentioned` — are highlighted; unresolved `@tokens` stay plain text,
+ * matching the server's "never guess" mention rule.
+ */
+export function parseMessageContent(
+  content: string,
+  metadata: MessageMetadata
+): MessageSegment[] {
+  const handles = new Map<string, string>();
+  for (const mention of metadata.mentions) {
+    for (const form of handleForms(mention.name)) {
+      handles.set(form, mention.name);
+    }
+  }
+  if (metadata.lawexa_mentioned) {
+    handles.set('lawexa', 'Lawexa');
+  }
+
+  if (handles.size === 0) {
+    return content ? [{ type: 'text', value: content }] : [];
+  }
+
+  const segments: MessageSegment[] = [];
+  let lastIndex = 0;
+  for (const match of content.matchAll(MENTION_TOKEN)) {
+    const token = match[0];
+    const index = match.index ?? 0;
+    const label = handles.get(token.slice(1).toLowerCase());
+    if (!label) continue;
+
+    if (index > lastIndex) {
+      segments.push({ type: 'text', value: content.slice(lastIndex, index) });
+    }
+    segments.push({ type: 'mention', value: token, label });
+    lastIndex = index + token.length;
+  }
+
+  if (lastIndex < content.length) {
+    segments.push({ type: 'text', value: content.slice(lastIndex) });
+  }
+  return segments;
+}

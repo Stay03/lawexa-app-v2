@@ -45,6 +45,12 @@ export interface AreaOfExpertise {
 
 export interface User {
   id: number;
+  /**
+   * Stable public identifier, matching the uuid used across Channels slim-user
+   * shapes. Optional because it is absent on sessions cached before the backend
+   * added it (and on locally-constructed partial users) — read defensively.
+   */
+  uuid?: string;
   name: string;
   email: string | null;
   role: UserRole;

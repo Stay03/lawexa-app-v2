@@ -12,6 +12,7 @@ import {
   Users,
   Radar,
   GraduationCap,
+  Boxes,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/nav-main"
@@ -51,6 +52,11 @@ const navMain = [
     icon: Radar,
   },
   {
+    title: "Spaces",
+    url: "/spaces",
+    icon: Boxes,
+  },
+  {
     title: "Library",
     url: "#",
     icon: Library,
@@ -76,6 +82,7 @@ const GUEST_RESTRICTED_URLS = new Set([
   '/content-requests',
   '/bookmarks',
   '/radars',
+  '/spaces',
 ])
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

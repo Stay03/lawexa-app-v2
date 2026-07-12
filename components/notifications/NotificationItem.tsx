@@ -3,7 +3,16 @@
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { ExternalLink, Trash2 } from 'lucide-react';
+import {
+  AtSign,
+  Bell,
+  Boxes,
+  Building2,
+  ExternalLink,
+  Hash,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -12,6 +21,23 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { Notification } from '@/types/notification';
+
+/**
+ * Type-aware display for the Channels notification types, whose `title` /
+ * `message` come back null (the client renders from `type` + `action_url`).
+ */
+const CHANNELS_NOTIFICATIONS: Record<
+  string,
+  { icon: LucideIcon; title: string }
+> = {
+  ChannelMentionNotification: { icon: AtSign, title: 'You were mentioned' },
+  ChannelInviteNotification: { icon: Hash, title: 'Channel invitation' },
+  SpaceInviteNotification: { icon: Boxes, title: 'Space invitation' },
+  OrganizationInviteNotification: {
+    icon: Building2,
+    title: 'Organization invitation',
+  },
+};
 
 /******************************************************************************
                                 Types
@@ -46,16 +72,23 @@ function NotificationItem({
   const router = useRouter();
   const isUnread = !notification.read_at;
 
+  const channelsMeta = CHANNELS_NOTIFICATIONS[notification.type];
+  const Icon = channelsMeta?.icon ?? Bell;
+  const displayTitle = notification.title || channelsMeta?.title || 'Notification';
+  // Channels notifications deep-link to an in-app route; follow it directly
+  // instead of the generic detail page.
+  const internalTarget =
+    channelsMeta && notification.action_url?.startsWith('/')
+      ? notification.action_url
+      : null;
+
   const handleClick = useCallback(() => {
-    // Mark as read
     if (isUnread) {
       onMarkAsRead(notification.id);
     }
-    // Close dropdown/sheet if open
     onClose?.();
-    // Navigate to notification detail page
-    router.push(`/notifications/${notification.id}`);
-  }, [isUnread, notification.id, onMarkAsRead, onClose, router]);
+    router.push(internalTarget ?? `/notifications/${notification.id}`);
+  }, [isUnread, notification.id, onMarkAsRead, onClose, router, internalTarget]);
 
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
@@ -82,20 +115,35 @@ function NotificationItem({
         <div className="absolute left-1.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-primary" />
       )}
 
+      {/* Type icon */}
+      <div
+        className={cn(
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+          isUnread
+            ? 'bg-primary/10 text-primary'
+            : 'bg-muted text-muted-foreground',
+          isUnread && 'ml-2'
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+
       {/* Content */}
-      <div className={cn('flex-1 min-w-0', isUnread && 'pl-2')}>
+      <div className="flex-1 min-w-0">
         <p className={cn(
           'text-sm truncate',
           isUnread ? 'font-semibold' : 'font-medium'
         )}>
-          {notification.title}
+          {displayTitle}
         </p>
-        <p className={cn(
-          'text-xs text-muted-foreground mt-0.5',
-          isCompact ? 'line-clamp-1' : 'line-clamp-2'
-        )}>
-          {notification.message}
-        </p>
+        {notification.message && (
+          <p className={cn(
+            'text-xs text-muted-foreground mt-0.5',
+            isCompact ? 'line-clamp-1' : 'line-clamp-2'
+          )}>
+            {notification.message}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground/70 mt-1">
           {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
         </p>
