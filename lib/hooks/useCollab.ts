@@ -663,15 +663,25 @@ export function useOrganizationInvitations() {
   });
 }
 
+/**
+ * Count from `pagination.total` when present, else the returned page length —
+ * tolerant of inboxes that come back without a pagination block.
+ */
+function invitationCount(
+  response: { data?: unknown[]; pagination?: { total?: number } } | undefined
+): number {
+  return response?.pagination?.total ?? response?.data?.length ?? 0;
+}
+
 /** Total pending invitations across all three inboxes, for the entry badge. */
 export function usePendingInvitationCount(): number {
   const channels = useChannelInvitations();
   const spaces = useSpaceInvitations();
   const organizations = useOrganizationInvitations();
   return (
-    (channels.data?.pagination.total ?? 0) +
-    (spaces.data?.pagination.total ?? 0) +
-    (organizations.data?.pagination.total ?? 0)
+    invitationCount(channels.data) +
+    invitationCount(spaces.data) +
+    invitationCount(organizations.data)
   );
 }
 
