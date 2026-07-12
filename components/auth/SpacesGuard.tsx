@@ -1,11 +1,15 @@
 'use client';
 
 import { useEffect, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { canAccessSpaces } from '@/lib/utils/spaces-access';
-import { Skeleton } from '@/components/ui/skeleton';
+import {
+  ChannelViewSkeleton,
+  SpaceDetailSkeleton,
+  SpacesPageSkeleton,
+} from '@/components/collab/skeletons';
 
 interface SpacesGuardProps {
   children: React.ReactNode;
@@ -34,6 +38,7 @@ function useAuthHydrated(): boolean {
  */
 export function SpacesGuard({ children }: SpacesGuardProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isGuest, isLoading } = useAuth();
   const hydrated = useAuthHydrated();
 
@@ -47,16 +52,11 @@ export function SpacesGuard({ children }: SpacesGuardProps) {
   }, [settled, canAccess, router]);
 
   if (!settled) {
-    return (
-      <div className="space-y-4 p-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-72" />
-        <div className="mt-6 flex gap-6">
-          <Skeleton className="h-64 w-60" />
-          <Skeleton className="h-64 flex-1" />
-        </div>
-      </div>
-    );
+    // Match the destination page's skeleton so a cold refresh shows one
+    // continuous placeholder instead of a generic one that then swaps.
+    if (pathname.startsWith('/channels/')) return <ChannelViewSkeleton />;
+    if (/^\/spaces\/[^/]+/.test(pathname)) return <SpaceDetailSkeleton />;
+    return <SpacesPageSkeleton />;
   }
 
   if (!canAccess) {

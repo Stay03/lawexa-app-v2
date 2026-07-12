@@ -33,7 +33,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
@@ -48,7 +47,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { ChannelConversation } from './ChannelConversation';
 import { ChannelFormDialog } from './ChannelFormDialog';
 import { ChannelMembersSheet } from './ChannelMembersSheet';
-import { MessageListSkeleton } from './skeletons';
+import { ChannelViewSkeleton } from './skeletons';
 
 interface ChannelViewProps {
   channelUuid: string;
@@ -103,19 +102,7 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
   }, [channelUuid, channel?.name, setOverride, clearOverride]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 border-b px-4 pb-3 pt-4">
-          <div className="mx-auto w-full max-w-3xl space-y-2">
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-3 w-28" />
-          </div>
-        </div>
-        <div className="mx-auto w-full max-w-3xl px-4">
-          <MessageListSkeleton />
-        </div>
-      </div>
-    );
+    return <ChannelViewSkeleton />;
   }
 
   if (isError || !channel) {

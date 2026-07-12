@@ -35,7 +35,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { PageContainer } from '@/components/layout';
@@ -53,7 +52,7 @@ import { ChannelFormDialog } from './ChannelFormDialog';
 import { ChannelRow } from './ChannelRow';
 import { SpaceFormDialog } from './SpaceFormDialog';
 import { SpaceMembersSheet } from './SpaceMembersSheet';
-import { ChannelListSkeleton } from './skeletons';
+import { ChannelListSkeleton, SpaceDetailSkeleton } from './skeletons';
 
 interface SpaceDetailViewProps {
   spaceUuid: string;
@@ -101,18 +100,7 @@ export function SpaceDetailView({ spaceUuid }: SpaceDetailViewProps) {
   }, [spaceUuid, space?.name, setOverride, clearOverride]);
 
   if (spaceQuery.isLoading) {
-    return (
-      <PageContainer>
-        <div className="flex items-start gap-4">
-          <Skeleton className="h-12 w-12 rounded-lg" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-6 w-56" />
-            <Skeleton className="h-4 w-40" />
-          </div>
-        </div>
-        <ChannelListSkeleton />
-      </PageContainer>
-    );
+    return <SpaceDetailSkeleton />;
   }
 
   if (spaceQuery.isError || !space) {

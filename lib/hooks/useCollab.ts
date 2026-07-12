@@ -532,6 +532,11 @@ function invalidateChannelMembership(
   queryClient.invalidateQueries({
     queryKey: collabKeys.channels.membersPrefix(channelUuid),
   });
+  // Message visibility follows membership — a non-member's messages request
+  // 403s, so refetch it on join/leave instead of stranding the error state.
+  queryClient.invalidateQueries({
+    queryKey: collabKeys.channels.messagesPrefix(channelUuid),
+  });
   const detail = queryClient.getQueryData<ChannelResponse>(
     collabKeys.channels.detail(channelUuid)
   );
