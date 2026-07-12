@@ -293,7 +293,7 @@ export function ChannelConversation({
         {(() => {
           const label = typingLabel(realtime.typingUsers);
           return (
-            <div className="mx-auto h-5 w-full max-w-2xl px-4 text-xs text-muted-foreground">
+            <div className="mx-auto h-5 w-full max-w-xs px-4 text-xs text-muted-foreground sm:max-w-md">
               {label && (
                 <span className="rounded bg-background/80 px-1 backdrop-blur animate-pulse">
                   {label}
@@ -311,7 +311,7 @@ export function ChannelConversation({
             onTyping={realtime.notifyTyping}
           />
         ) : (
-          <div className="pointer-events-auto mx-auto max-w-2xl px-4 pb-4">
+          <div className="pointer-events-auto mx-auto max-w-xs px-4 pb-4 sm:max-w-md">
             <div className="rounded-2xl border bg-background/80 px-4 py-3 text-center text-sm text-muted-foreground backdrop-blur">
               You&apos;re not a member of this channel.
             </div>
