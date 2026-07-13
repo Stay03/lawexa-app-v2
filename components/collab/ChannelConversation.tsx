@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Loader2, MessagesSquare, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -20,11 +21,17 @@ import {
 import type { ChannelRealtime } from '@/lib/hooks/useChannelRealtime';
 import type { Channel, Message } from '@/types/collab';
 
-import { LawexaGlancePanel } from './LawexaGlancePanel';
 import { LawexaRespondingPill } from './LawexaRespondingPill';
 import { MessageComposer } from './MessageComposer';
 import { MessageGroup, type MessageGroupData } from './MessageGroup';
 import { MessageListSkeleton } from './skeletons';
+
+// The glance panel loads the full chat-stream engine, so only pull it in when
+// the reader actually clicks Watch. ssr:false — it's a live, client-only stream.
+const LawexaGlancePanel = dynamic(
+  () => import('./LawexaGlancePanel').then((m) => m.LawexaGlancePanel),
+  { ssr: false }
+);
 
 /** Consecutive messages from one author within this window share an avatar. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
