@@ -36,6 +36,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { InstallAppCard } from "@/components/pwa/InstallAppCard"
 import { RealtimeNotifications } from "@/components/collab/RealtimeNotifications"
+import { PushRegistrar } from "@/components/collab/PushRegistrar"
 
 function getBreadcrumbs(pathname: string, getOverrideLabel: (segment: string) => string | undefined) {
   const segments = pathname.split('/').filter(Boolean)
@@ -121,6 +122,7 @@ export default function MainLayout({
     <OnboardingGuard>
       <SidebarProvider>
         <RealtimeNotifications />
+        <PushRegistrar />
         <AppSidebar />
         <SidebarInset className="max-h-svh overflow-hidden">
         <header className="relative flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">

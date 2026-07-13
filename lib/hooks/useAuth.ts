@@ -3,8 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/auth';
+import { pushApi } from '@/lib/api/push';
+import { deletePushToken } from '@/lib/firebase/messaging';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useConfidentialModeStore } from '@/lib/stores/confidentialModeStore';
+import { useNotificationPrefsStore } from '@/lib/stores/notificationPrefsStore';
 import { clearAllTranscripts } from '@/lib/storage/confidentialTranscriptStore';
 import { extractApiError, type ApiError } from '@/lib/utils/api-error';
 import { clearAttribution } from '@/lib/utils/attribution';
@@ -75,7 +78,22 @@ export function useAuth() {
 
   // Logout mutation
   const logoutMutation = useMutation({
-    mutationFn: () => authApi.logout(),
+    mutationFn: async () => {
+      // Deactivate this device's push token while the session bearer is still
+      // valid, so a shared device stops receiving this user's notifications.
+      // Best-effort — never block logout on push cleanup.
+      try {
+        const pushToken = useNotificationPrefsStore.getState().pushToken;
+        if (pushToken) {
+          await pushApi.deactivate(pushToken).catch(() => {});
+        }
+        await deletePushToken();
+        useNotificationPrefsStore.getState().setPushToken(null);
+      } catch {
+        // ignore
+      }
+      return authApi.logout();
+    },
     onSuccess: async () => {
       // Wipe confidential transcripts and reset session state — confidential
       // chats are device-only and must not survive a logout.

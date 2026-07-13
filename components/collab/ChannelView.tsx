@@ -46,6 +46,7 @@ import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { extractApiError } from '@/lib/utils/api-error';
 
 import { ChannelConversation } from './ChannelConversation';
+import { EnableChannelPushNudge } from './EnableChannelPushNudge';
 import { ChannelFormDialog } from './ChannelFormDialog';
 import { ChannelMembersSheet } from './ChannelMembersSheet';
 import { ChannelViewSkeleton } from './skeletons';
@@ -246,6 +247,8 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
           )}
         </div>
       </header>
+
+      {channel.is_member && <EnableChannelPushNudge />}
 
       <ChannelConversation
         channel={channel}

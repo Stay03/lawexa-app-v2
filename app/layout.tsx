@@ -23,6 +23,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description: "Access Nigerian law cases, notes, and legal research materials",
+  manifest: "/site.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
