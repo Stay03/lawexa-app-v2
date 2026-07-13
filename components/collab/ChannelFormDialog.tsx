@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useCreateChannel, useUpdateChannel } from '@/lib/hooks/useCollab';
 import { extractApiError } from '@/lib/utils/api-error';
@@ -53,6 +54,9 @@ export function ChannelFormDialog({
     channel?.visibility ?? 'space_public'
   );
   const [description, setDescription] = useState(channel?.description ?? '');
+  const [aiMentionsNotify, setAiMentionsNotify] = useState<boolean>(
+    Boolean(channel?.settings?.ai_mentions_notify)
+  );
   const [error, setError] = useState<string | null>(null);
   const submitting = createChannel.isPending || updateChannel.isPending;
 
@@ -66,6 +70,10 @@ export function ChannelFormDialog({
           name: trimmed,
           visibility,
           description: description.trim() || undefined,
+          settings: {
+            ...(channel?.settings ?? {}),
+            ai_mentions_notify: aiMentionsNotify,
+          },
         });
         toast.success('Channel updated');
         onOpenChange(false);
@@ -142,6 +150,25 @@ export function ChannelFormDialog({
               onChange={(event) => setDescription(event.target.value)}
             />
           </div>
+
+          {isEdit && (
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="channel-ai-mentions-notify">
+                  Notify members when Lawexa @mentions them
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Off by default, so Lawexa can&apos;t ping everyone. Human
+                  @mentions always notify.
+                </p>
+              </div>
+              <Switch
+                id="channel-ai-mentions-notify"
+                checked={aiMentionsNotify}
+                onCheckedChange={setAiMentionsNotify}
+              />
+            </div>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>

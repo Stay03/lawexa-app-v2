@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Hash,
+  History,
   Loader2,
   Lock,
   LogIn,
   MoreHorizontal,
   Pencil,
+  Sparkles,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -40,11 +42,13 @@ import {
   useChannelMessages,
   useDeleteChannel,
   useJoinChannel,
+  useResetChannelAi,
 } from '@/lib/hooks/useCollab';
 import { useChannelRealtime } from '@/lib/hooks/useChannelRealtime';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { extractApiError } from '@/lib/utils/api-error';
 
+import { ChannelAiSessionsSheet } from './ChannelAiSessionsSheet';
 import { ChannelConversation } from './ChannelConversation';
 import { EnableChannelPushNudge } from './EnableChannelPushNudge';
 import { ChannelFormDialog } from './ChannelFormDialog';
@@ -74,8 +78,11 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const joinChannel = useJoinChannel(channelUuid);
   const deleteChannel = useDeleteChannel(channelUuid);
+  const resetChannelAi = useResetChannelAi(channelUuid);
 
   const handleJoin = async () => {
     try {
@@ -96,6 +103,18 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
       router.push(spaceUuid ? `/spaces/${spaceUuid}` : '/spaces');
     } catch (err) {
       toast.error('Could not delete channel', {
+        description: extractApiError(err).message,
+      });
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      await resetChannelAi.mutateAsync();
+      setResetOpen(false);
+      toast.success('Started a fresh Lawexa conversation');
+    } catch (err) {
+      toast.error('Could not reset Lawexa', {
         description: extractApiError(err).message,
       });
     }
@@ -210,7 +229,7 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
                   Join
                 </Button>
               )}
-              {canManage && (
+              {channel.is_member && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -223,18 +242,30 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                      <Pencil className="h-4 w-4" />
-                      Edit channel
+                    <DropdownMenuItem onClick={() => setResetOpen(true)}>
+                      <Sparkles className="h-4 w-4" />
+                      Start fresh with Lawexa
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => setDeleteOpen(true)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete channel
+                    <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
+                      <History className="h-4 w-4" />
+                      Lawexa history
                     </DropdownMenuItem>
+                    {canManage && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                          <Pencil className="h-4 w-4" />
+                          Edit channel
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => setDeleteOpen(true)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete channel
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -260,6 +291,13 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
         channel={channel}
         open={membersOpen}
         onOpenChange={setMembersOpen}
+      />
+
+      <ChannelAiSessionsSheet
+        channelUuid={channel.uuid}
+        channelName={channel.name}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
       />
       {editOpen && (
         <ChannelFormDialog
@@ -295,6 +333,36 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start fresh with Lawexa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This ends Lawexa&apos;s current conversation in #{channel.name} for
+              everyone and starts a new one. Your messages stay — only Lawexa&apos;s
+              memory of the earlier discussion is cleared.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetChannelAi.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                handleReset();
+              }}
+              disabled={resetChannelAi.isPending}
+            >
+              {resetChannelAi.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Start fresh
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

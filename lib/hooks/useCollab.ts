@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-query';
 
 import {
+  channelAiApi,
   channelsApi,
   invitationsApi,
   messagesApi,
@@ -45,6 +46,18 @@ import type {
                               Query keys
 ******************************************************************************/
 
+/** Page-based params for the AI sessions list (length-aware pagination). */
+export interface AiSessionListParams {
+  per_page?: number;
+  page?: number;
+}
+
+/** Cursor-based params for an AI session transcript (mirrors messages). */
+export interface AiSessionTranscriptParams {
+  per_page?: number;
+  cursor?: string;
+}
+
 export const collabKeys = {
   all: ['collab'] as const,
   myOrganization: ['collab', 'my-organization'] as const,
@@ -73,6 +86,26 @@ export const collabKeys = {
       ['collab', 'channels', channelUuid, 'messages'] as const,
     messages: (channelUuid: string, params: MessageListParams) =>
       ['collab', 'channels', channelUuid, 'messages', params] as const,
+    aiSessionsPrefix: (uuid: string) =>
+      ['collab', 'channels', uuid, 'ai-sessions'] as const,
+    aiSessions: (uuid: string, params: AiSessionListParams) =>
+      ['collab', 'channels', uuid, 'ai-sessions', params] as const,
+    aiSessionTranscriptPrefix: (uuid: string, session: string) =>
+      ['collab', 'channels', uuid, 'ai-sessions', session, 'transcript'] as const,
+    aiSessionTranscript: (
+      uuid: string,
+      session: string,
+      params: AiSessionTranscriptParams
+    ) =>
+      [
+        'collab',
+        'channels',
+        uuid,
+        'ai-sessions',
+        session,
+        'transcript',
+        params,
+      ] as const,
   },
   invitations: {
     channels: ['collab', 'invitations', 'channels'] as const,
@@ -204,6 +237,61 @@ export function useChannelMembers(
 }
 
 /******************************************************************************
+                        Shared channel AI history (Phase 7)
+******************************************************************************/
+
+/**
+ * A channel's past Lawexa sessions, newest-first. Length-aware (page-based):
+ * each `fetchNextPage()` loads the NEXT page, and `getNextPageParam` stops once
+ * `current_page` reaches `last_page`. Read-only history — nothing streams here.
+ */
+export function useChannelAiSessions(
+  channelUuid: string,
+  options: { enabled?: boolean } = {}
+) {
+  const enabled = useIsCollabEnabled();
+
+  return useInfiniteQuery({
+    queryKey: collabKeys.channels.aiSessions(channelUuid, {}),
+    queryFn: ({ pageParam }) =>
+      channelAiApi.getSessions(channelUuid, { page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const { current_page, last_page } = lastPage.pagination;
+      return current_page < last_page ? current_page + 1 : undefined;
+    },
+    enabled: enabled && !!channelUuid && (options.enabled ?? true),
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * The transcript of one past Lawexa session. Cursor-paginated and newest-first
+ * (same envelope as channel messages), so each `fetchNextPage()` loads an OLDER
+ * page; render the flattened pages reversed for chronological order.
+ */
+export function useChannelAiSessionTranscript(
+  channelUuid: string,
+  sessionUuid: string,
+  options: { enabled?: boolean } = {}
+) {
+  const enabled = useIsCollabEnabled();
+
+  return useInfiniteQuery({
+    queryKey: collabKeys.channels.aiSessionTranscript(channelUuid, sessionUuid, {}),
+    queryFn: ({ pageParam }) =>
+      channelAiApi.getSession(channelUuid, sessionUuid, {
+        cursor: pageParam ?? undefined,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.pagination.next_cursor ?? undefined,
+    enabled:
+      enabled && !!channelUuid && !!sessionUuid && (options.enabled ?? true),
+    staleTime: 30 * 1000,
+  });
+}
+
+/******************************************************************************
                               Current user
 ******************************************************************************/
 
@@ -268,6 +356,7 @@ export function useSendMessage(channelUuid: string) {
       const optimistic: Message = {
         uuid: tempUuid,
         channel_uuid: channelUuid,
+        is_ai: false,
         author,
         content: payload.content,
         metadata: {
@@ -299,7 +388,10 @@ export function useSendMessage(channelUuid: string) {
     },
 
     onSuccess: (response, _payload, context) => {
-      const server = response.data;
+      // The `ai` dispatch is a send-time signal for the caller, not history —
+      // strip it so the cache holds a clean Message.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { ai: _ai, ...server } = response.data;
       const snapshots = queryClient.getQueriesData<MessagePages>({
         queryKey: collabKeys.channels.messagesPrefix(channelUuid),
       });
@@ -429,6 +521,23 @@ export function useMarkChannelRead(channelUuid: string) {
         });
       }
     },
+  });
+}
+
+/**
+ * Reset the channel's shared AI: close the active Lawexa session and post an
+ * `ai_divider`. Invalidate messages so the divider reconciles even if the
+ * realtime event is missed.
+ */
+export function useResetChannelAi(channelUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => channelAiApi.reset(channelUuid),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: collabKeys.channels.messagesPrefix(channelUuid),
+      }),
   });
 }
 

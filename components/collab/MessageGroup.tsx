@@ -1,13 +1,19 @@
+import { Sparkles } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
 import type { Message, SlimUser } from '@/types/collab';
 
+import { LawexaAvatar } from './LawexaAvatar';
 import { MemberAvatar } from './MemberAvatar';
 import { MessageRow } from './MessageRow';
 
 export interface MessageGroupData {
   key: string;
   author: SlimUser | null;
+  /** True for a run of Lawexa (`is_ai`) replies; never merges with humans. */
+  isAi: boolean;
   messages: Message[];
 }
 
@@ -26,22 +32,37 @@ export function MessageGroup({
   onSaveEdit,
   onDelete,
 }: MessageGroupProps) {
-  const authorName = group.author?.name ?? 'Deleted user';
+  const authorName = group.isAi
+    ? 'Lawexa'
+    : group.author?.name ?? 'Deleted user';
   const first = group.messages[0];
 
   return (
     <div className="flex gap-3 px-1">
-      <MemberAvatar user={group.author} className="mt-0.5 shrink-0" />
+      {group.isAi ? (
+        <LawexaAvatar className="mt-0.5 shrink-0" />
+      ) : (
+        <MemberAvatar user={group.author} className="mt-0.5 shrink-0" />
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <span
             className={cn(
               'text-sm font-semibold',
-              !group.author && 'text-muted-foreground'
+              !group.isAi && !group.author && 'text-muted-foreground'
             )}
           >
             {authorName}
           </span>
+          {group.isAi && (
+            <Badge
+              variant="secondary"
+              className="h-4 gap-0.5 px-1.5 text-[10px] font-medium [&>svg]:size-2.5!"
+            >
+              <Sparkles />
+              AI
+            </Badge>
+          )}
           <span
             className="text-xs text-muted-foreground"
             title={formatFullTimestamp(first.created_at)}

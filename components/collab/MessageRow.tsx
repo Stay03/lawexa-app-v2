@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { formatFullTimestamp } from '@/lib/utils/collab';
 import type { Message } from '@/types/collab';
 
+import { LawexaMessageContent } from './LawexaMessageContent';
 import { MessageContent } from './MessageContent';
 
 interface MessageRowProps {
@@ -105,7 +106,14 @@ export function MessageRow({
           Reply
         </span>
       )}
-      <MessageContent content={message.content} metadata={message.metadata} />
+      {message.is_ai ? (
+        <LawexaMessageContent
+          content={message.content}
+          metadata={message.metadata}
+        />
+      ) : (
+        <MessageContent content={message.content} metadata={message.metadata} />
+      )}
       {message.edited_at && (
         <span
           className="ml-1 text-[11px] text-muted-foreground"

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { Loader2, MessagesSquare } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, MessagesSquare, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,8 @@ import {
 import type { ChannelRealtime } from '@/lib/hooks/useChannelRealtime';
 import type { Channel, Message } from '@/types/collab';
 
+import { LawexaGlancePanel } from './LawexaGlancePanel';
+import { LawexaRespondingPill } from './LawexaRespondingPill';
 import { MessageComposer } from './MessageComposer';
 import { MessageGroup, type MessageGroupData } from './MessageGroup';
 import { MessageListSkeleton } from './skeletons';
@@ -29,6 +31,7 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 type RenderItem =
   | { kind: 'day'; key: string; label: string }
+  | { kind: 'ai_divider'; key: string; label: string }
   | { kind: 'group'; group: MessageGroupData };
 
 /** Collapse a chronological message list into day separators + author groups. */
@@ -49,9 +52,26 @@ function buildRenderItems(messages: Message[]): RenderItem[] {
       group = null;
     }
 
+    // A Lawexa session boundary renders as its own separator (not a bubble) and
+    // breaks grouping, like a new day does.
+    if (message.metadata.type === 'ai_divider') {
+      items.push({
+        kind: 'ai_divider',
+        key: `ai-divider-${message.uuid}`,
+        label: message.content,
+      });
+      group = null;
+      return;
+    }
+
     const last = group?.messages[group.messages.length - 1];
+    // Lawexa (`is_ai`, author:null) and a deleted human (author:null) both lack
+    // an author, so identity must also require a matching `is_ai` — otherwise a
+    // Lawexa reply would merge into a deleted human's run (and vice versa).
     const sameAuthor =
-      group && (group.author?.uuid ?? null) === (message.author?.uuid ?? null);
+      !!group &&
+      group.isAi === message.is_ai &&
+      (group.author?.uuid ?? null) === (message.author?.uuid ?? null);
     const withinWindow =
       last &&
       new Date(message.created_at).getTime() -
@@ -62,7 +82,12 @@ function buildRenderItems(messages: Message[]): RenderItem[] {
     if (group && sameAuthor && withinWindow && !isReply) {
       group.messages.push(message);
     } else {
-      group = { key: message.uuid, author: message.author, messages: [message] };
+      group = {
+        key: message.uuid,
+        author: message.author,
+        isAi: message.is_ai,
+        messages: [message],
+      };
       items.push({ kind: 'group', group });
     }
   });
@@ -120,6 +145,17 @@ export function ChannelConversation({
     }
     return null;
   }, [messages]);
+
+  // Glance (Phase 6): which summon's SSE stream the reader is watching, if any.
+  const [watchId, setWatchId] = useState<string | null>(null);
+  // Watch is offered only when exactly one turn is in flight. Both of these are
+  // pure derivations — `activeWatch` becomes null the instant its turn leaves
+  // `lawexaTurns`, auto-hiding the panel with no setState-in-effect.
+  const singleTurn =
+    realtime.lawexaTurns.length === 1 ? realtime.lawexaTurns[0] : null;
+  const activeWatch = watchId
+    ? realtime.lawexaTurns.find((t) => t.executionId === watchId) ?? null
+    : null;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const didInitialScroll = useRef(false);
@@ -252,15 +288,29 @@ export function ChannelConversation({
         )}
 
         <div className="space-y-5">
-          {renderItems.map((item) =>
-            item.kind === 'day' ? (
-              <div key={item.key} className="relative py-1 text-center">
-                <span className="absolute inset-x-0 top-1/2 -z-10 border-t" />
-                <span className="rounded-full border bg-background px-3 py-0.5 text-xs font-medium text-muted-foreground">
-                  {item.label}
-                </span>
-              </div>
-            ) : (
+          {renderItems.map((item) => {
+            if (item.kind === 'day') {
+              return (
+                <div key={item.key} className="relative py-1 text-center">
+                  <span className="absolute inset-x-0 top-1/2 -z-10 border-t" />
+                  <span className="rounded-full border bg-background px-3 py-0.5 text-xs font-medium text-muted-foreground">
+                    {item.label}
+                  </span>
+                </div>
+              );
+            }
+            if (item.kind === 'ai_divider') {
+              return (
+                <div key={item.key} className="relative py-1 text-center">
+                  <span className="absolute inset-x-0 top-1/2 -z-10 border-t border-primary/20" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background px-3 py-0.5 text-xs font-medium text-primary">
+                    <Sparkles className="size-3" />
+                    {item.label}
+                  </span>
+                </div>
+              );
+            }
+            return (
               <MessageGroup
                 key={item.group.key}
                 group={item.group}
@@ -268,8 +318,8 @@ export function ChannelConversation({
                 onSaveEdit={handleSaveEdit}
                 onDelete={handleDelete}
               />
-            )
-          )}
+            );
+          })}
         </div>
       </div>
     );
@@ -290,6 +340,39 @@ export function ChannelConversation({
           around the composer. Only the pill captures pointer events; the gutters
           fall through to the messages behind. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0">
+        {activeWatch && (
+          <div className="mx-auto flex w-full max-w-xs justify-center px-4 pb-1 sm:max-w-md">
+            <LawexaGlancePanel
+              key={activeWatch.executionId}
+              executionId={activeWatch.executionId}
+              summonerName={activeWatch.summoner.name}
+              onClose={() => setWatchId(null)}
+            />
+          </div>
+        )}
+
+        {realtime.lawexaTurns.length > 0 && (
+          <div
+            className={cn(
+              'mx-auto flex w-full max-w-xs justify-center px-4 pb-1 sm:max-w-md',
+              singleTurn && 'pointer-events-auto'
+            )}
+          >
+            <LawexaRespondingPill
+              turns={realtime.lawexaTurns}
+              watchable={!!singleTurn}
+              watching={!!activeWatch}
+              onToggleWatch={() =>
+                setWatchId((cur) =>
+                  singleTurn && cur === singleTurn.executionId
+                    ? null
+                    : singleTurn?.executionId ?? null
+                )
+              }
+            />
+          </div>
+        )}
+
         {(() => {
           const label = typingLabel(realtime.typingUsers);
           return (

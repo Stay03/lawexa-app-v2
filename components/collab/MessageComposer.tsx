@@ -148,6 +148,24 @@ export function MessageComposer({
     send.mutate(
       { content },
       {
+        onSuccess: (response) => {
+          // The human message always posts; the `ai` block only appears when
+          // `@lawexa` was mentioned. Surface a dispatch failure privately to the
+          // summoner — a running turn is signalled by the responding pill.
+          const ai = response.data.ai;
+          if (!ai) return;
+          if (ai.status === 'blocked') {
+            toast.error("Lawexa couldn't respond", {
+              description:
+                ai.reason?.message ?? 'You have reached your AI usage limit.',
+            });
+          } else if (ai.status === 'error') {
+            toast.error("Lawexa couldn't respond", {
+              description:
+                'Something went wrong starting the response. Please try again.',
+            });
+          }
+        },
         onError: (error) => {
           setValue(content);
           toast.error('Message not sent', {

@@ -10,6 +10,8 @@
 import { apiClient } from '@/lib/api/client';
 import type { ApiResponse } from '@/types/api';
 import type {
+  AiSessionListResponse,
+  AiSessionTranscriptResponse,
   ChannelInvitationListResponse,
   ChannelListParams,
   ChannelListResponse,
@@ -32,6 +34,7 @@ import type {
   OrganizationResponse,
   RequestVerificationPayload,
   SendMessagePayload,
+  SendMessageResponse,
   SpaceInvitationListResponse,
   SpaceListParams,
   SpaceListResponse,
@@ -528,8 +531,8 @@ export const messagesApi = {
   send: async (
     channelUuid: string,
     payload: SendMessagePayload
-  ): Promise<MessageResponse> => {
-    const response = await apiClient.post<MessageResponse>(
+  ): Promise<SendMessageResponse> => {
+    const response = await apiClient.post<SendMessageResponse>(
       `/channels/${channelUuid}/messages`,
       payload
     );
@@ -554,6 +557,53 @@ export const messagesApi = {
   ): Promise<ApiResponse<null>> => {
     const response = await apiClient.delete<ApiResponse<null>>(
       `/channels/${channelUuid}/messages/${messageUuid}`
+    );
+    return response.data;
+  },
+};
+
+/** Shared channel AI (Lawexa) — session control + history. All gate on membership. */
+export const channelAiApi = {
+  /** Close the active AI session and post an `ai_divider`. Idempotent (200 always). */
+  reset: async (channelUuid: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      `/channels/${channelUuid}/ai/reset`,
+      {}
+    );
+    return response.data;
+  },
+
+  /** Length-aware list of a channel's AI sessions, newest-first. */
+  getSessions: async (
+    channelUuid: string,
+    params: { per_page?: number; page?: number } = {}
+  ): Promise<AiSessionListResponse> => {
+    const response = await apiClient.get<AiSessionListResponse>(
+      `/channels/${channelUuid}/ai/sessions`,
+      {
+        params: {
+          per_page: params.per_page ?? 15,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /** Cursor-paginated transcript of one AI session (404 if not in this channel). */
+  getSession: async (
+    channelUuid: string,
+    sessionUuid: string,
+    params: { per_page?: number; cursor?: string } = {}
+  ): Promise<AiSessionTranscriptResponse> => {
+    const response = await apiClient.get<AiSessionTranscriptResponse>(
+      `/channels/${channelUuid}/ai/sessions/${sessionUuid}`,
+      {
+        params: {
+          per_page: params.per_page ?? 30,
+          cursor: params.cursor || undefined,
+        },
+      }
     );
     return response.data;
   },

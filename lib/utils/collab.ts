@@ -54,12 +54,40 @@ export type MessageSegment =
   | { type: 'text'; value: string }
   | { type: 'mention'; value: string; label: string };
 
-const MENTION_TOKEN = /@[a-z0-9._]+/gi;
+/**
+ * The mention-token shape (`@handle`). Callers that scan with `matchAll` should
+ * request a fresh instance via {@link mentionTokenRegex} — the global flag
+ * carries `lastIndex` state, so a shared instance is unsafe across scans.
+ */
+export function mentionTokenRegex(): RegExp {
+  return /@[a-z0-9._]+/gi;
+}
 
 /** The valid handle forms for a member name (spaceless and dotted). */
 function handleForms(name: string): string[] {
   const lower = name.toLowerCase().trim();
   return [lower.replace(/\s+/g, ''), lower.replace(/\s+/g, '.')];
+}
+
+/**
+ * Resolved `@handle` → display name, the single source of truth shared by the
+ * plain-text ({@link parseMessageContent}) and markdown (Lawexa) renderers. For
+ * every `metadata.mentions` name both {@link handleForms} (spaceless + dotted)
+ * are added; `@lawexa` is added when `metadata.lawexa_mentioned`.
+ */
+export function buildMentionHandleMap(
+  metadata: MessageMetadata
+): Map<string, string> {
+  const handles = new Map<string, string>();
+  for (const mention of metadata.mentions) {
+    for (const form of handleForms(mention.name)) {
+      handles.set(form, mention.name);
+    }
+  }
+  if (metadata.lawexa_mentioned) {
+    handles.set('lawexa', 'Lawexa');
+  }
+  return handles;
 }
 
 /**
@@ -72,15 +100,7 @@ export function parseMessageContent(
   content: string,
   metadata: MessageMetadata
 ): MessageSegment[] {
-  const handles = new Map<string, string>();
-  for (const mention of metadata.mentions) {
-    for (const form of handleForms(mention.name)) {
-      handles.set(form, mention.name);
-    }
-  }
-  if (metadata.lawexa_mentioned) {
-    handles.set('lawexa', 'Lawexa');
-  }
+  const handles = buildMentionHandleMap(metadata);
 
   if (handles.size === 0) {
     return content ? [{ type: 'text', value: content }] : [];
@@ -88,7 +108,7 @@ export function parseMessageContent(
 
   const segments: MessageSegment[] = [];
   let lastIndex = 0;
-  for (const match of content.matchAll(MENTION_TOKEN)) {
+  for (const match of content.matchAll(mentionTokenRegex())) {
     const token = match[0];
     const index = match.index ?? 0;
     const label = handles.get(token.slice(1).toLowerCase());

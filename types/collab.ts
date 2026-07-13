@@ -14,6 +14,7 @@
  */
 
 import type { PaginationLinks, PaginationMeta } from '@/types/case';
+import type { IBlockedReason } from '@/types/message-pack';
 
 /******************************************************************************
                               Shared primitives
@@ -214,21 +215,78 @@ export interface MessageMention {
   name: string;
 }
 
+/** A message's kind. Absent is treated as `'text'`. `ai_divider` is a Lawexa
+ *  session-boundary separator, rendered inline rather than as a chat bubble. */
+export type MessageType = 'text' | 'ai_divider';
+
 export interface MessageMetadata {
   mentions: MessageMention[];
   lawexa_mentioned: boolean;
+  /** Present on Lawexa-authored messages; absent (⇒ `'text'`) on human ones. */
+  type?: MessageType;
 }
 
 export interface Message {
   uuid: string;
   channel_uuid: string;
-  /** Null when the author account was hard-deleted (or reserved for Lawexa). */
+  /**
+   * Lawexa authorship is signalled by `is_ai`, NOT by `author`. The server
+   * derives it from the reply's conversation back-link + the `ai_divider`
+   * type, so a hard-deleted human (`is_ai: false`, `author: null`) is never
+   * mislabelled as Lawexa.
+   */
+  is_ai: boolean;
+  /** Null for Lawexa (`is_ai: true`) OR a hard-deleted human (`is_ai: false`). */
   author: SlimUser | null;
   content: string;
   metadata: MessageMetadata;
   parent_message_uuid: string | null;
   edited_at: string | null;
   created_at: string;
+}
+
+/******************************************************************************
+                              Shared channel AI (Lawexa)
+******************************************************************************/
+
+/**
+ * Outcome of the AI summon triggered by an `@lawexa` mention on message send.
+ * - `dispatched`: the run was queued; stream it from `stream_url`.
+ * - `blocked`: the summoner is over their AI quota — nothing runs, but the human
+ *   message still posts. `reason` carries the LimitService payload.
+ * - `error`: an internal failure; treated like `blocked` with no `reason`.
+ */
+export type AiDispatchStatus = 'dispatched' | 'blocked' | 'error';
+
+/**
+ * The `ai` object attached to a message-send response ONLY when the message
+ * mentioned `@lawexa`. `execution_id` / `stream_url` accompany `dispatched`
+ * (stream_url is always `"/api/chat/stream/" + execution_id`); `reason`
+ * accompanies `blocked`.
+ */
+export interface AiDispatch {
+  status: AiDispatchStatus;
+  execution_id?: string;
+  stream_url?: string;
+  reason?: IBlockedReason;
+}
+
+/** AI session lifecycle. `active` is the live session accepting replies. */
+export type AiSessionStatus = 'active' | 'expired' | 'closed';
+
+/** A shared-channel AI session (a bounded Lawexa conversation within a channel). */
+export interface AiSession {
+  uuid: string;
+  status: AiSessionStatus;
+  status_label: string;
+  /** Who summoned Lawexa first in this session; null if that user is gone. */
+  started_by: SlimUser | null;
+  /** The session this one succeeded (via an `ai_divider` reset), if any. */
+  previous_session_uuid: string | null;
+  message_count: number;
+  started_at: string;
+  last_activity_at: string;
+  ended_at: string | null;
 }
 
 /******************************************************************************
@@ -413,6 +471,11 @@ export type SpaceMemberListResponse = LengthAwareResponse<Member>;
 export type MemberResponse = ItemResponse<Member>;
 export type MessageListResponse = CursorResponse<Message>;
 export type MessageResponse = ItemResponse<Message>;
+/** `data` of a message-send response — a Message plus an optional AI dispatch. */
+export type SentMessage = Message & { ai?: AiDispatch };
+export type SendMessageResponse = ItemResponse<SentMessage>;
+export type AiSessionListResponse = LengthAwareResponse<AiSession>;
+export type AiSessionTranscriptResponse = CursorResponse<Message>;
 export type OrganizationResponse = ItemResponse<Organization>;
 export type OrganizationMemberListResponse = LengthAwareResponse<Member>;
 /** `GET /my-organization` returns null when the caller has no organization. */
