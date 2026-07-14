@@ -6,10 +6,13 @@ import {
   useQuery,
   useQueryClient,
   type InfiniteData,
+  type QueryClient,
 } from '@tanstack/react-query';
 
 import {
   channelAiApi,
+  channelFilesApi,
+  channelListsApi,
   channelsApi,
   invitationsApi,
   messagesApi,
@@ -18,10 +21,14 @@ import {
 } from '@/lib/api/collab';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type {
+  AddListItemPayload,
+  ChannelFile,
+  ChannelFileListResponse,
   ChannelListParams,
   ChannelListResponse,
   ChannelResponse,
   CreateChannelPayload,
+  CreateListPayload,
   CreateOrganizationPayload,
   CreateSpacePayload,
   InviteMemberPayload,
@@ -35,8 +42,14 @@ import type {
   SlimUser,
   SpaceListParams,
   SpaceResponse,
+  TaskList,
+  TaskListItem,
+  TaskListResponse,
+  TaskListSummary,
+  TaskListSummaryListResponse,
   TransferOwnershipPayload,
   UpdateChannelPayload,
+  UpdateListPayload,
   UpdateMemberRolePayload,
   UpdateOrganizationPayload,
   UpdateSpacePayload,
@@ -56,6 +69,18 @@ export interface AiSessionListParams {
 export interface AiSessionTranscriptParams {
   per_page?: number;
   cursor?: string;
+}
+
+/** Page-based params for a channel's task-list index. */
+export interface ChannelListsParams {
+  per_page?: number;
+  page?: number;
+}
+
+/** Page-based params for a channel's file library. */
+export interface ChannelFilesParams {
+  per_page?: number;
+  page?: number;
 }
 
 export const collabKeys = {
@@ -106,6 +131,20 @@ export const collabKeys = {
         'transcript',
         params,
       ] as const,
+    listsPrefix: (channelUuid: string) =>
+      ['collab', 'channels', channelUuid, 'lists'] as const,
+    lists: (channelUuid: string, params: ChannelListsParams) =>
+      ['collab', 'channels', channelUuid, 'lists', params] as const,
+    filesPrefix: (channelUuid: string) =>
+      ['collab', 'channels', channelUuid, 'files'] as const,
+    files: (channelUuid: string, params: ChannelFilesParams) =>
+      ['collab', 'channels', channelUuid, 'files', params] as const,
+  },
+  lists: {
+    // List detail is globally addressable by `listUuid` via `/lists/{uuid}`,
+    // so keep it channel-independent.
+    detail: (listUuid: string) =>
+      ['collab', 'lists', 'detail', listUuid] as const,
   },
   invitations: {
     channels: ['collab', 'invitations', 'channels'] as const,
@@ -538,6 +577,556 @@ export function useResetChannelAi(channelUuid: string) {
       queryClient.invalidateQueries({
         queryKey: collabKeys.channels.messagesPrefix(channelUuid),
       }),
+  });
+}
+
+/******************************************************************************
+                        Channel task lists & files
+
+  TWO LIST SHAPES — one reconciliation path.
+  The list INDEX cache holds `TaskListSummary` (counts, no items); the DETAIL
+  cache and every mutation/broadcast return a full `TaskList` (items, no
+  counts). Realtime `.list.changed` delivers a full `TaskList` snapshot. To
+  avoid drift, the pure `queryClient`-taking helpers below are the SINGLE way
+  both the mutation handlers and the realtime listeners write these caches:
+  derive the summary from the detail so counts and items never disagree.
+
+  Pagination is out of scope for v1 — the read hooks fetch a single page of 50.
+******************************************************************************/
+
+const LISTS_PER_PAGE = 50;
+const FILES_PER_PAGE = 50;
+
+let optimisticListCounter = 0;
+
+/** Build a `SlimUser` for the acting user, or `null` when unknown. */
+function actingUser(): SlimUser | null {
+  const me = useAuthStore.getState().user;
+  return me
+    ? { uuid: me.uuid ?? '', name: me.name, avatar_url: me.avatar_url }
+    : null;
+}
+
+/**
+ * Collapse a full `TaskList` into the index `TaskListSummary`: counts are
+ * derived from `items` so the index and detail can never disagree.
+ */
+export function taskListToSummary(list: TaskList): TaskListSummary {
+  return {
+    uuid: list.uuid,
+    channel_uuid: list.channel_uuid,
+    title: list.title,
+    description: list.description,
+    is_ai: list.is_ai,
+    creator: list.creator,
+    items_count: list.items.length,
+    checked_count: list.items.filter((item) => item.is_checked).length,
+    settings: list.settings,
+    created_at: list.created_at,
+    updated_at: list.updated_at,
+  };
+}
+
+/** Write a `TaskListSummary` into every cached index page for a channel. */
+function writeSummaryToIndexes(
+  queryClient: QueryClient,
+  channelUuid: string,
+  summary: TaskListSummary
+) {
+  const indexes = queryClient.getQueriesData<TaskListSummaryListResponse>({
+    queryKey: collabKeys.channels.listsPrefix(channelUuid),
+  });
+  for (const [qKey, data] of indexes) {
+    if (!data) continue;
+    const exists = data.data.some((row) => row.uuid === summary.uuid);
+    const nextData = exists
+      ? data.data.map((row) => (row.uuid === summary.uuid ? summary : row))
+      : [summary, ...data.data];
+    queryClient.setQueryData<TaskListSummaryListResponse>(qKey, {
+      ...data,
+      data: nextData,
+      pagination: exists
+        ? data.pagination
+        : { ...data.pagination, total: data.pagination.total + 1 },
+    });
+  }
+}
+
+/** Drop a summary row (by uuid) from every cached index page for a channel. */
+function dropSummaryFromIndexes(
+  queryClient: QueryClient,
+  channelUuid: string,
+  listUuid: string
+) {
+  const indexes = queryClient.getQueriesData<TaskListSummaryListResponse>({
+    queryKey: collabKeys.channels.listsPrefix(channelUuid),
+  });
+  for (const [qKey, data] of indexes) {
+    if (!data) continue;
+    const exists = data.data.some((row) => row.uuid === listUuid);
+    if (!exists) continue;
+    queryClient.setQueryData<TaskListSummaryListResponse>(qKey, {
+      ...data,
+      data: data.data.filter((row) => row.uuid !== listUuid),
+      pagination: {
+        ...data.pagination,
+        total: Math.max(0, data.pagination.total - 1),
+      },
+    });
+  }
+}
+
+/**
+ * Reconcile a full `TaskList`: write the detail cache and derive its summary
+ * into every channel index. The one path taken by mutation success handlers
+ * AND the `.list.changed` broadcast.
+ */
+export function upsertListCaches(
+  queryClient: QueryClient,
+  channelUuid: string,
+  list: TaskList
+) {
+  queryClient.setQueryData<TaskListResponse>(
+    collabKeys.lists.detail(list.uuid),
+    (old) => (old ? { ...old, data: list } : { success: true, message: '', data: list })
+  );
+  writeSummaryToIndexes(queryClient, channelUuid, taskListToSummary(list));
+}
+
+/** Drop a list from the index caches and evict its detail query. */
+export function removeListCaches(
+  queryClient: QueryClient,
+  channelUuid: string,
+  listUuid: string
+) {
+  dropSummaryFromIndexes(queryClient, channelUuid, listUuid);
+  queryClient.removeQueries({ queryKey: collabKeys.lists.detail(listUuid) });
+}
+
+/**
+ * Re-derive a list's index summary from its detail cache. Called after
+ * optimistic item ops so the index counts stay live without another fetch.
+ */
+export function syncListSummaryFromDetail(
+  queryClient: QueryClient,
+  channelUuid: string,
+  listUuid: string
+) {
+  const detail = queryClient.getQueryData<TaskListResponse>(
+    collabKeys.lists.detail(listUuid)
+  );
+  if (!detail) return;
+  writeSummaryToIndexes(queryClient, channelUuid, taskListToSummary(detail.data));
+}
+
+/** Prepend a `ChannelFile` into every cached file index page for a channel. */
+export function addFileCache(
+  queryClient: QueryClient,
+  channelUuid: string,
+  file: ChannelFile
+) {
+  const indexes = queryClient.getQueriesData<ChannelFileListResponse>({
+    queryKey: collabKeys.channels.filesPrefix(channelUuid),
+  });
+  for (const [qKey, data] of indexes) {
+    if (!data) continue;
+    if (data.data.some((row) => row.id === file.id)) continue;
+    queryClient.setQueryData<ChannelFileListResponse>(qKey, {
+      ...data,
+      data: [file, ...data.data],
+      pagination: { ...data.pagination, total: data.pagination.total + 1 },
+    });
+  }
+}
+
+/** Drop a file (by id) from every cached file index page for a channel. */
+export function removeFileCache(
+  queryClient: QueryClient,
+  channelUuid: string,
+  fileId: number
+) {
+  const indexes = queryClient.getQueriesData<ChannelFileListResponse>({
+    queryKey: collabKeys.channels.filesPrefix(channelUuid),
+  });
+  for (const [qKey, data] of indexes) {
+    if (!data) continue;
+    const exists = data.data.some((row) => row.id === fileId);
+    if (!exists) continue;
+    queryClient.setQueryData<ChannelFileListResponse>(qKey, {
+      ...data,
+      data: data.data.filter((row) => row.id !== fileId),
+      pagination: {
+        ...data.pagination,
+        total: Math.max(0, data.pagination.total - 1),
+      },
+    });
+  }
+}
+
+/* ---- Reads ---- */
+
+/**
+ * A channel's task lists (index shape — counts, no items). Single-page for v1
+ * (pagination out of scope); fetch `useList` for a list's items.
+ */
+export function useChannelLists(channelUuid: string) {
+  const enabled = useIsCollabEnabled();
+  const params: ChannelListsParams = { per_page: LISTS_PER_PAGE };
+
+  return useQuery({
+    queryKey: collabKeys.channels.lists(channelUuid, params),
+    queryFn: () => channelListsApi.getList(channelUuid, params),
+    enabled: enabled && !!channelUuid,
+    staleTime: 30 * 1000,
+  });
+}
+
+/** One list with its items (detail shape). Globally keyed by `listUuid`. */
+export function useList(listUuid: string, options: { enabled?: boolean } = {}) {
+  const enabled = useIsCollabEnabled();
+
+  return useQuery({
+    queryKey: collabKeys.lists.detail(listUuid),
+    queryFn: () => channelListsApi.show(listUuid),
+    enabled: enabled && !!listUuid && (options.enabled ?? true),
+    staleTime: 15 * 1000,
+  });
+}
+
+/** A channel's file library. Single-page for v1 (pagination out of scope). */
+export function useChannelFiles(channelUuid: string) {
+  const enabled = useIsCollabEnabled();
+  const params: ChannelFilesParams = { per_page: FILES_PER_PAGE };
+
+  return useQuery({
+    queryKey: collabKeys.channels.files(channelUuid, params),
+    queryFn: () => channelFilesApi.getList(channelUuid, params),
+    enabled: enabled && !!channelUuid,
+    staleTime: 30 * 1000,
+  });
+}
+
+/* ---- List mutations ---- */
+
+/** Create a list; the returned full list seeds the detail + index caches. */
+export function useCreateList(channelUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateListPayload) =>
+      channelListsApi.create(channelUuid, payload),
+    onSuccess: (response) =>
+      upsertListCaches(queryClient, channelUuid, response.data),
+  });
+}
+
+/** Rename / edit a list; title + description update optimistically. */
+export function useUpdateList(channelUuid: string, listUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateListPayload) =>
+      channelListsApi.update(listUuid, payload),
+
+    onMutate: async (payload) => {
+      const key = collabKeys.lists.detail(listUuid);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TaskListResponse>(key);
+      if (previous) {
+        const next: TaskList = {
+          ...previous.data,
+          ...(payload.title !== undefined ? { title: payload.title } : {}),
+          ...(payload.description !== undefined
+            ? { description: payload.description }
+            : {}),
+        };
+        upsertListCaches(queryClient, channelUuid, next);
+      }
+      return { previous };
+    },
+
+    onError: (_error, _payload, context) => {
+      if (context?.previous) {
+        upsertListCaches(queryClient, channelUuid, context.previous.data);
+      }
+    },
+
+    onSuccess: (response) =>
+      upsertListCaches(queryClient, channelUuid, response.data),
+  });
+}
+
+/** Delete a list; it drops from the index immediately (soft delete). */
+export function useDeleteList(channelUuid: string, listUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => channelListsApi.remove(listUuid),
+
+    onMutate: async () => {
+      const key = collabKeys.lists.detail(listUuid);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TaskListResponse>(key);
+      const previousIndexes =
+        queryClient.getQueriesData<TaskListSummaryListResponse>({
+          queryKey: collabKeys.channels.listsPrefix(channelUuid),
+        });
+      removeListCaches(queryClient, channelUuid, listUuid);
+      return { previous, previousIndexes };
+    },
+
+    onError: (_error, _vars, context) => {
+      for (const [qKey, data] of context?.previousIndexes ?? []) {
+        queryClient.setQueryData(qKey, data);
+      }
+      if (context?.previous) {
+        queryClient.setQueryData(
+          collabKeys.lists.detail(listUuid),
+          context.previous
+        );
+      }
+    },
+  });
+}
+
+/* ---- List-item mutations (optimistic; reconcile on the item response) ---- */
+
+/** Patch the detail cache's items through `map` and re-derive its summary. */
+function patchListItems(
+  queryClient: QueryClient,
+  channelUuid: string,
+  listUuid: string,
+  map: (items: TaskListItem[]) => TaskListItem[]
+) {
+  const key = collabKeys.lists.detail(listUuid);
+  const detail = queryClient.getQueryData<TaskListResponse>(key);
+  if (!detail) return;
+  queryClient.setQueryData<TaskListResponse>(key, {
+    ...detail,
+    data: { ...detail.data, items: map(detail.data.items) },
+  });
+  syncListSummaryFromDetail(queryClient, channelUuid, listUuid);
+}
+
+/** Append an item; an optimistic temp row reconciles on success. */
+export function useAddListItem(channelUuid: string, listUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: AddListItemPayload) =>
+      channelListsApi.addItem(listUuid, payload),
+
+    onMutate: async (payload) => {
+      const key = collabKeys.lists.detail(listUuid);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TaskListResponse>(key);
+      const tempUuid = `optimistic-item-${(optimisticListCounter += 1)}`;
+      patchListItems(queryClient, channelUuid, listUuid, (items) => [
+        ...items,
+        {
+          uuid: tempUuid,
+          content: payload.content,
+          position: items.length,
+          is_checked: false,
+          checked_at: null,
+          is_ai: false,
+          creator: actingUser(),
+          checked_by: null,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+      return { previous, tempUuid };
+    },
+
+    onError: (_error, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          collabKeys.lists.detail(listUuid),
+          context.previous
+        );
+        syncListSummaryFromDetail(queryClient, channelUuid, listUuid);
+      }
+    },
+
+    onSuccess: (response, _payload, context) => {
+      patchListItems(queryClient, channelUuid, listUuid, (items) =>
+        items.map((item) =>
+          item.uuid === context?.tempUuid ? response.data : item
+        )
+      );
+    },
+  });
+}
+
+interface UpdateListItemVariables {
+  itemUuid: string;
+  content?: string;
+  is_checked?: boolean;
+}
+
+/** Edit content / check-off an item; the row updates optimistically. */
+export function useUpdateListItem(channelUuid: string, listUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ itemUuid, content, is_checked }: UpdateListItemVariables) =>
+      channelListsApi.updateItem(listUuid, itemUuid, { content, is_checked }),
+
+    onMutate: async ({ itemUuid, content, is_checked }) => {
+      const key = collabKeys.lists.detail(listUuid);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TaskListResponse>(key);
+      const me = actingUser();
+      const checkedAt = new Date().toISOString();
+      patchListItems(queryClient, channelUuid, listUuid, (items) =>
+        items.map((item) => {
+          if (item.uuid !== itemUuid) return item;
+          const next: TaskListItem = { ...item };
+          if (content !== undefined) next.content = content;
+          if (is_checked === true) {
+            next.is_checked = true;
+            next.checked_at = checkedAt;
+            next.checked_by = me;
+          } else if (is_checked === false) {
+            next.is_checked = false;
+            next.checked_at = null;
+            next.checked_by = null;
+          }
+          return next;
+        })
+      );
+      return { previous };
+    },
+
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          collabKeys.lists.detail(listUuid),
+          context.previous
+        );
+        syncListSummaryFromDetail(queryClient, channelUuid, listUuid);
+      }
+    },
+
+    onSuccess: (response) => {
+      patchListItems(queryClient, channelUuid, listUuid, (items) =>
+        items.map((item) =>
+          item.uuid === response.data.uuid ? response.data : item
+        )
+      );
+    },
+  });
+}
+
+/** Remove an item; it drops from the list immediately (soft delete). */
+export function useDeleteListItem(channelUuid: string, listUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (itemUuid: string) =>
+      channelListsApi.removeItem(listUuid, itemUuid),
+
+    onMutate: async (itemUuid) => {
+      const key = collabKeys.lists.detail(listUuid);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TaskListResponse>(key);
+      patchListItems(queryClient, channelUuid, listUuid, (items) =>
+        items.filter((item) => item.uuid !== itemUuid)
+      );
+      return { previous };
+    },
+
+    onError: (_error, _itemUuid, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          collabKeys.lists.detail(listUuid),
+          context.previous
+        );
+        syncListSummaryFromDetail(queryClient, channelUuid, listUuid);
+      }
+    },
+  });
+}
+
+/**
+ * Reorder a list's items. `item_uuids` is the FULL ordered set; positions are
+ * rewritten `0..n-1` optimistically and reconciled with the server's array.
+ */
+export function useReorderListItems(channelUuid: string, listUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (item_uuids: string[]) =>
+      channelListsApi.reorderItems(listUuid, { item_uuids }),
+
+    onMutate: async (item_uuids) => {
+      const key = collabKeys.lists.detail(listUuid);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TaskListResponse>(key);
+      patchListItems(queryClient, channelUuid, listUuid, (items) => {
+        const byUuid = new Map(items.map((item) => [item.uuid, item]));
+        return item_uuids
+          .map((uuid) => byUuid.get(uuid))
+          .filter((item): item is TaskListItem => item !== undefined)
+          .map((item, index) => ({ ...item, position: index }));
+      });
+      return { previous };
+    },
+
+    onError: (_error, _item_uuids, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          collabKeys.lists.detail(listUuid),
+          context.previous
+        );
+        syncListSummaryFromDetail(queryClient, channelUuid, listUuid);
+      }
+    },
+
+    onSuccess: (response) => {
+      patchListItems(queryClient, channelUuid, listUuid, () => response.data);
+    },
+  });
+}
+
+/* ---- File mutations ---- */
+
+/**
+ * Upload a channel file (success-driven — the UI shows `isPending`). The new
+ * file prepends to the channel's file index on success.
+ */
+export function useUploadChannelFile(channelUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => channelFilesApi.upload(channelUuid, file),
+    onSuccess: (response) =>
+      addFileCache(queryClient, channelUuid, response.data),
+  });
+}
+
+/** Delete a channel file; it drops from the library immediately. */
+export function useDeleteChannelFile(channelUuid: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => channelFilesApi.remove(channelUuid, id),
+
+    onMutate: async (id) => {
+      const key = collabKeys.channels.filesPrefix(channelUuid);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueriesData<ChannelFileListResponse>({
+        queryKey: key,
+      });
+      removeFileCache(queryClient, channelUuid, id);
+      return { previous };
+    },
+
+    onError: (_error, _id, context) => {
+      for (const [qKey, data] of context?.previous ?? []) {
+        queryClient.setQueryData(qKey, data);
+      }
+    },
   });
 }
 

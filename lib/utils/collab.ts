@@ -3,7 +3,13 @@
  * timestamps and mention parsing. Kept UI-agnostic so components stay lean.
  */
 
-import { format, isSameYear, isToday, isYesterday } from 'date-fns';
+import {
+  format,
+  formatDistanceToNow,
+  isSameYear,
+  isToday,
+  isYesterday,
+} from 'date-fns';
 
 import type { MessageMetadata } from '@/types/collab';
 
@@ -32,6 +38,11 @@ export function formatDayLabel(iso: string): string {
   if (isYesterday(date)) return 'Yesterday';
   if (isSameYear(date, new Date())) return format(date, 'EEEE, MMMM d');
   return format(date, 'MMMM d, yyyy');
+}
+
+/** Compact relative age, e.g. "5 minutes ago". Used on list cards / detail. */
+export function formatRelativeTime(iso: string): string {
+  return formatDistanceToNow(new Date(iso), { addSuffix: true });
 }
 
 /** Whether two ISO timestamps fall on the same calendar day. */

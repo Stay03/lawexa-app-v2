@@ -459,6 +459,143 @@ export interface OrganizationInvitation {
 }
 
 /******************************************************************************
+                        Channel task lists & files
+
+  Two channel sub-features that ride the room's existing `channels.{uuid}`
+  presence socket. Shapes follow `docs/channel-lists-and-files/frontend-contract.md`.
+
+  TWO LIST SHAPES — the trickiest part of this feature:
+  - The INDEX (`GET /channels/{uuid}/lists`) returns `TaskListSummary`:
+    `items_count` / `checked_count`, NO `items` array.
+  - The DETAIL (`GET /lists/{uuid}`), create, update and the `.list.changed`
+    broadcast return `TaskList`: the full `items` array, NO counts.
+  Fetch the detail shape whenever you need the items.
+
+  IDENTIFIERS — lists and items are addressed by `uuid`; files by integer `id`.
+******************************************************************************/
+
+/**
+ * File uploader — an integer-id shape, NOT `SlimUser`. Channel files are keyed
+ * by integer `id` and expose only the uploader's `id` + `name` (no uuid /
+ * avatar_url).
+ */
+export interface FileUploader {
+  id: number;
+  name: string;
+}
+
+/**
+ * A file in a channel's document library. Keyed by integer `id`. `url` is a
+ * time-limited signed URL for private files (regenerated per response); reuse
+ * `filesApi.getDownloadUrl(id)` for the gated download endpoint.
+ */
+export interface ChannelFile {
+  id: number;
+  url: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  category: string;
+  upload_status: string;
+  uploader: FileUploader;
+  created_at: string;
+}
+
+/**
+ * A single task-list item. Items are collaborative — any active channel member
+ * may add / edit / check / reorder / remove them regardless of who created one.
+ *
+ * `creator` / `checked_by` are `null` for Lawexa (when `is_ai`) OR a deleted
+ * human account — render the Lawexa identity on `is_ai`, NEVER on
+ * `creator === null`. `checked_at` / `checked_by` are `null` while unchecked.
+ */
+export interface TaskListItem {
+  uuid: string;
+  content: string;
+  position: number;
+  is_checked: boolean;
+  checked_at: string | null;
+  is_ai: boolean;
+  creator: SlimUser | null;
+  checked_by: SlimUser | null;
+  created_at: string;
+}
+
+/**
+ * The INDEX shape for a channel's task lists — carries counts, NOT the items
+ * array. `is_ai: true` ⇒ created by Lawexa (`creator` is then `null`); render
+ * the Lawexa identity on `is_ai`, never on `creator === null`.
+ */
+export interface TaskListSummary {
+  uuid: string;
+  channel_uuid: string;
+  title: string;
+  description: string | null;
+  is_ai: boolean;
+  creator: SlimUser | null;
+  items_count: number;
+  checked_count: number;
+  settings: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * The DETAIL / create / update / broadcast shape — carries the `items` array,
+ * NOT the counts. Otherwise identical to `TaskListSummary`. Same Lawexa
+ * identity rule (`is_ai`, not `creator === null`).
+ */
+export interface TaskList {
+  uuid: string;
+  channel_uuid: string;
+  title: string;
+  description: string | null;
+  is_ai: boolean;
+  creator: SlimUser | null;
+  items: TaskListItem[];
+  settings: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A single pre-filled item when creating a list (`content` ≤ 1000 chars). */
+export interface CreateListItemInput {
+  content: string;
+}
+
+/** Body for `POST /channels/{uuid}/lists`. `items` ≤ 100 entries. */
+export interface CreateListPayload {
+  title: string;
+  description?: string;
+  items?: CreateListItemInput[];
+}
+
+/** Body for `PUT /lists/{uuid}` — rename / edit description. */
+export interface UpdateListPayload {
+  title?: string;
+  description?: string;
+}
+
+/** Body for `POST /lists/{uuid}/items` — appends to the end. */
+export interface AddListItemPayload {
+  content: string;
+}
+
+/** Body for `PATCH /lists/{uuid}/items/{itemUuid}` — at least one field. */
+export interface UpdateListItemPayload {
+  content?: string;
+  is_checked?: boolean;
+}
+
+/**
+ * Body for `POST /lists/{uuid}/items/reorder` — the FULL ordered uuid set
+ * (every current item exactly once); positions are rewritten `0..n-1`.
+ */
+export interface ReorderListItemsPayload {
+  item_uuids: string[];
+}
+
+/******************************************************************************
                               Named response aliases
 ******************************************************************************/
 
@@ -484,3 +621,16 @@ export type ChannelInvitationListResponse = LengthAwareResponse<ChannelInvitatio
 export type SpaceInvitationListResponse = LengthAwareResponse<SpaceInvitation>;
 export type OrganizationInvitationListResponse =
   LengthAwareResponse<OrganizationInvitation>;
+
+/** The channel's lists, index shape (counts, no items). */
+export type TaskListSummaryListResponse = LengthAwareResponse<TaskListSummary>;
+/** A single list with its items — show / create / update. */
+export type TaskListResponse = ItemResponse<TaskList>;
+/** A single item — add / edit. */
+export type TaskListItemResponse = ItemResponse<TaskListItem>;
+/** The reordered items array returned by `.../items/reorder`. */
+export type TaskListItemsResponse = ItemResponse<TaskListItem[]>;
+/** The channel's file library, paginated. */
+export type ChannelFileListResponse = LengthAwareResponse<ChannelFile>;
+/** A single channel file — upload result. */
+export type ChannelFileResponse = ItemResponse<ChannelFile>;

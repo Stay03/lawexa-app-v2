@@ -49,6 +49,7 @@ import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { extractApiError } from '@/lib/utils/api-error';
 
 import { ChannelAiSessionsSheet } from './ChannelAiSessionsSheet';
+import { ChannelBody } from './ChannelBody';
 import { ChannelConversation } from './ChannelConversation';
 import { EnableChannelPushNudge } from './EnableChannelPushNudge';
 import { ChannelFormDialog } from './ChannelFormDialog';
@@ -281,15 +282,27 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
 
       {channel.is_member && <EnableChannelPushNudge />}
 
-      {/* Key by channel so switching channels fully remounts the conversation:
-          the scroll baseline, animation bookkeeping and initial-scroll pin all
-          reset for the new channel instead of carrying over from the old one. */}
-      <ChannelConversation
-        key={channel.uuid}
-        channel={channel}
-        realtime={realtime}
-        className="min-h-0 flex-1"
-      />
+      {/* Members get the Chat / Lists / Files tab shell; non-members get the
+          conversation directly (Lists/Files are member-only, and their join
+          flow lives in the composer footer). Either way we key by channel.uuid
+          so switching channels fully remounts — the scroll baseline, animation
+          bookkeeping and initial-scroll pin reset for the new channel, and the
+          active tab resets to Chat — instead of carrying over from the old one. */}
+      {channel.is_member ? (
+        <ChannelBody
+          key={channel.uuid}
+          channel={channel}
+          realtime={realtime}
+          className="min-h-0 flex-1"
+        />
+      ) : (
+        <ChannelConversation
+          key={channel.uuid}
+          channel={channel}
+          realtime={realtime}
+          className="min-h-0 flex-1"
+        />
+      )}
 
       <ChannelMembersSheet
         channel={channel}

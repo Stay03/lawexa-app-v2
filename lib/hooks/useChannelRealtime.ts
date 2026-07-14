@@ -8,9 +8,22 @@ import {
 } from '@tanstack/react-query';
 
 import { getEcho } from '@/lib/realtime/echo';
-import { collabKeys, useCurrentUserUuid } from '@/lib/hooks/useCollab';
+import {
+  addFileCache,
+  collabKeys,
+  removeFileCache,
+  removeListCaches,
+  upsertListCaches,
+  useCurrentUserUuid,
+} from '@/lib/hooks/useCollab';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { Message, MessageListResponse, SlimUser } from '@/types/collab';
+import type {
+  ChannelFile,
+  Message,
+  MessageListResponse,
+  SlimUser,
+  TaskList,
+} from '@/types/collab';
 
 const TYPING_TTL_MS = 3000;
 const TYPING_THROTTLE_MS = 2000;
@@ -213,6 +226,33 @@ export function useChannelRealtime(
         const existing = aiTimers.get(executionId);
         if (existing) clearTimeout(existing);
         aiTimers.delete(executionId);
+      }
+    );
+
+    // Task lists & files ride this same presence room. `.list.changed` carries
+    // the full list snapshot (WITH items); reconcile the detail + derived index
+    // through the shared cache-writers so the two list shapes never drift.
+    channel.listen(
+      '.list.changed',
+      (payload: {
+        action: 'created' | 'updated' | 'deleted' | 'item_changed';
+        list: TaskList;
+      }) => {
+        if (payload.action === 'deleted') {
+          removeListCaches(queryClient, channelUuid, payload.list.uuid);
+        } else {
+          upsertListCaches(queryClient, channelUuid, payload.list);
+        }
+      }
+    );
+    channel.listen(
+      '.file.changed',
+      (payload: { action: 'added' | 'removed'; file: ChannelFile }) => {
+        if (payload.action === 'removed') {
+          removeFileCache(queryClient, channelUuid, payload.file.id);
+        } else {
+          addFileCache(queryClient, channelUuid, payload.file);
+        }
       }
     );
 

@@ -10,14 +10,18 @@
 import { apiClient } from '@/lib/api/client';
 import type { ApiResponse } from '@/types/api';
 import type {
+  AddListItemPayload,
   AiSessionListResponse,
   AiSessionTranscriptResponse,
+  ChannelFileListResponse,
+  ChannelFileResponse,
   ChannelInvitationListResponse,
   ChannelListParams,
   ChannelListResponse,
   ChannelMemberListResponse,
   ChannelResponse,
   CreateChannelPayload,
+  CreateListPayload,
   CreateOrganizationPayload,
   CreateSpacePayload,
   InviteMemberPayload,
@@ -32,6 +36,7 @@ import type {
   OrganizationInvitationListResponse,
   OrganizationMemberListResponse,
   OrganizationResponse,
+  ReorderListItemsPayload,
   RequestVerificationPayload,
   SendMessagePayload,
   SendMessageResponse,
@@ -40,8 +45,14 @@ import type {
   SpaceListResponse,
   SpaceMemberListResponse,
   SpaceResponse,
+  TaskListItemResponse,
+  TaskListItemsResponse,
+  TaskListResponse,
+  TaskListSummaryListResponse,
   TransferOwnershipPayload,
   UpdateChannelPayload,
+  UpdateListItemPayload,
+  UpdateListPayload,
   UpdateMemberRolePayload,
   UpdateMessagePayload,
   UpdateOrganizationPayload,
@@ -604,6 +615,157 @@ export const channelAiApi = {
           cursor: params.cursor || undefined,
         },
       }
+    );
+    return response.data;
+  },
+};
+
+/**
+ * Channel task lists — member-only content (space governors / platform admins
+ * get `403` on reads, Slack-style). Lists and their items are addressed by
+ * `uuid`. The index returns counts (`TaskListSummary`); show / create / update
+ * return the full `items` array (`TaskList`).
+ */
+export const channelListsApi = {
+  getList: async (
+    channelUuid: string,
+    params: { per_page?: number; page?: number } = {}
+  ): Promise<TaskListSummaryListResponse> => {
+    const response = await apiClient.get<TaskListSummaryListResponse>(
+      `/channels/${channelUuid}/lists`,
+      {
+        params: {
+          per_page: params.per_page ?? 30,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  create: async (
+    channelUuid: string,
+    payload: CreateListPayload
+  ): Promise<TaskListResponse> => {
+    const response = await apiClient.post<TaskListResponse>(
+      `/channels/${channelUuid}/lists`,
+      payload
+    );
+    return response.data;
+  },
+
+  show: async (listUuid: string): Promise<TaskListResponse> => {
+    const response = await apiClient.get<TaskListResponse>(`/lists/${listUuid}`);
+    return response.data;
+  },
+
+  update: async (
+    listUuid: string,
+    payload: UpdateListPayload
+  ): Promise<TaskListResponse> => {
+    const response = await apiClient.put<TaskListResponse>(
+      `/lists/${listUuid}`,
+      payload
+    );
+    return response.data;
+  },
+
+  remove: async (listUuid: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(
+      `/lists/${listUuid}`
+    );
+    return response.data;
+  },
+
+  addItem: async (
+    listUuid: string,
+    payload: AddListItemPayload
+  ): Promise<TaskListItemResponse> => {
+    const response = await apiClient.post<TaskListItemResponse>(
+      `/lists/${listUuid}/items`,
+      payload
+    );
+    return response.data;
+  },
+
+  updateItem: async (
+    listUuid: string,
+    itemUuid: string,
+    payload: UpdateListItemPayload
+  ): Promise<TaskListItemResponse> => {
+    const response = await apiClient.patch<TaskListItemResponse>(
+      `/lists/${listUuid}/items/${itemUuid}`,
+      payload
+    );
+    return response.data;
+  },
+
+  removeItem: async (
+    listUuid: string,
+    itemUuid: string
+  ): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(
+      `/lists/${listUuid}/items/${itemUuid}`
+    );
+    return response.data;
+  },
+
+  /** Send the FULL ordered uuid set; positions are rewritten `0..n-1`. */
+  reorderItems: async (
+    listUuid: string,
+    payload: ReorderListItemsPayload
+  ): Promise<TaskListItemsResponse> => {
+    const response = await apiClient.post<TaskListItemsResponse>(
+      `/lists/${listUuid}/items/reorder`,
+      payload
+    );
+    return response.data;
+  },
+};
+
+/**
+ * Channel file library — member-only content (space governors / platform admins
+ * get `403` on reads, same privacy rule as lists). Files are addressed by
+ * integer `id`, not uuid. Reuse `filesApi.getDownloadUrl(id)` for downloads.
+ */
+export const channelFilesApi = {
+  getList: async (
+    channelUuid: string,
+    params: { per_page?: number; page?: number } = {}
+  ): Promise<ChannelFileListResponse> => {
+    const response = await apiClient.get<ChannelFileListResponse>(
+      `/channels/${channelUuid}/files`,
+      {
+        params: {
+          per_page: params.per_page ?? 30,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /** Upload a single file (multipart, field `file`, max 15 MB). */
+  upload: async (
+    channelUuid: string,
+    file: File
+  ): Promise<ChannelFileResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<ChannelFileResponse>(
+      `/channels/${channelUuid}/files`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
+  remove: async (
+    channelUuid: string,
+    id: number
+  ): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(
+      `/channels/${channelUuid}/files/${id}`
     );
     return response.data;
   },
