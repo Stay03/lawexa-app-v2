@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 
+import { cn } from '@/lib/utils';
 import { buildMentionHandleMap } from '@/lib/utils/collab';
 import { rehypeLawexaMentions } from '@/lib/utils/lawexa-mentions';
 import type { MessageMetadata } from '@/types/collab';
@@ -12,6 +13,12 @@ import type { MessageMetadata } from '@/types/collab';
 interface LawexaMessageContentProps {
   content: string;
   metadata: MessageMetadata;
+  /**
+   * When true, the top-level markdown blocks fade in with a small stagger
+   * (`.reveal-blocks`) — used only for a Lawexa reply that has just arrived in
+   * the feed, never for history. See `.reveal-blocks` in `app/globals.css`.
+   */
+  animateReveal?: boolean;
 }
 
 /** `react-markdown` doesn't re-export `PluggableList`; derive it from the prop. */
@@ -40,6 +47,7 @@ const PROSE_CLASS =
 export function LawexaMessageContent({
   content,
   metadata,
+  animateReveal = false,
 }: LawexaMessageContentProps) {
   const rehypePlugins = useMemo<PluginList>(
     () => [rehypeLawexaMentions(buildMentionHandleMap(metadata))],
@@ -47,7 +55,7 @@ export function LawexaMessageContent({
   );
 
   return (
-    <div className={PROSE_CLASS}>
+    <div className={cn(PROSE_CLASS, animateReveal && 'reveal-blocks')}>
       <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={rehypePlugins}>
         {content}
       </ReactMarkdown>

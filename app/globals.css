@@ -388,6 +388,65 @@
 }
 
 /* =============================================================================
+   Lawexa reply — block-by-block reveal (Channels)
+   A freshly-arrived AI reply reveals its top-level markdown blocks
+   (paragraphs / list items / headings) with a small fade + rise stagger, so a
+   long answer reads "line by line" rather than snapping in all at once. Applied
+   only to newly-arrived AI messages via the `.reveal-blocks` class; history
+   renders instantly (no class). Blocks past the delay cap share the final
+   delay, which is fine — they simply arrive together at the tail.
+   ============================================================================= */
+
+@keyframes reveal-block {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal-blocks > * {
+  animation: reveal-block 0.4s ease-out both;
+}
+
+.reveal-blocks > *:nth-child(1) { animation-delay: 0ms; }
+.reveal-blocks > *:nth-child(2) { animation-delay: 70ms; }
+.reveal-blocks > *:nth-child(3) { animation-delay: 140ms; }
+.reveal-blocks > *:nth-child(4) { animation-delay: 210ms; }
+.reveal-blocks > *:nth-child(5) { animation-delay: 280ms; }
+.reveal-blocks > *:nth-child(6) { animation-delay: 350ms; }
+.reveal-blocks > *:nth-child(7) { animation-delay: 420ms; }
+.reveal-blocks > *:nth-child(8) { animation-delay: 490ms; }
+.reveal-blocks > *:nth-child(9) { animation-delay: 560ms; }
+.reveal-blocks > *:nth-child(10) { animation-delay: 630ms; }
+.reveal-blocks > *:nth-child(11) { animation-delay: 700ms; }
+.reveal-blocks > *:nth-child(12) { animation-delay: 770ms; }
+.reveal-blocks > *:nth-child(13) { animation-delay: 840ms; }
+.reveal-blocks > *:nth-child(14) { animation-delay: 910ms; }
+.reveal-blocks > *:nth-child(15) { animation-delay: 980ms; }
+.reveal-blocks > *:nth-child(16) { animation-delay: 1050ms; }
+.reveal-blocks > *:nth-child(17) { animation-delay: 1120ms; }
+.reveal-blocks > *:nth-child(18) { animation-delay: 1190ms; }
+.reveal-blocks > *:nth-child(19) { animation-delay: 1260ms; }
+.reveal-blocks > *:nth-child(n + 20) { animation-delay: 1330ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-blocks > * {
+    animation: none;
+  }
+  /* Honour the OS "reduce motion" setting for entrance animations too — the
+     message-entry fade/rise and the scroll-to-bottom button use tw-animate-css's
+     `animate-in`, which ships no reduced-motion guard of its own. Elements settle
+     at their natural visible state, so disabling the animation hides nothing. */
+  .animate-in {
+    animation: none !important;
+  }
+}
+
+/* =============================================================================
    Valentine's Day Heartbeat Animation
    ============================================================================= */
 

@@ -21,6 +21,14 @@ interface MessageGroupProps {
   group: MessageGroupData;
   /** Per-message permissions, resolved by the conversation. */
   permissionsFor: (message: Message) => { canEdit: boolean; canDelete: boolean };
+  /**
+   * Per-message entry/reveal animation flags, resolved by the conversation
+   * from its newest-message baseline (only genuinely-new tail messages animate).
+   */
+  animationFor: (message: Message) => {
+    animateEntry: boolean;
+    animateReveal: boolean;
+  };
   onSaveEdit: (messageUuid: string, content: string) => Promise<void>;
   onDelete: (messageUuid: string) => void;
 }
@@ -29,6 +37,7 @@ interface MessageGroupProps {
 export function MessageGroup({
   group,
   permissionsFor,
+  animationFor,
   onSaveEdit,
   onDelete,
 }: MessageGroupProps) {
@@ -73,12 +82,15 @@ export function MessageGroup({
         <div className="mt-0.5">
           {group.messages.map((message) => {
             const { canEdit, canDelete } = permissionsFor(message);
+            const { animateEntry, animateReveal } = animationFor(message);
             return (
               <MessageRow
                 key={message.uuid}
                 message={message}
                 canEdit={canEdit}
                 canDelete={canDelete}
+                animateEntry={animateEntry}
+                animateReveal={animateReveal}
                 onSaveEdit={onSaveEdit}
                 onDelete={onDelete}
               />

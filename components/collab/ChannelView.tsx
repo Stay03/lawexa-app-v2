@@ -281,7 +281,11 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
 
       {channel.is_member && <EnableChannelPushNudge />}
 
+      {/* Key by channel so switching channels fully remounts the conversation:
+          the scroll baseline, animation bookkeeping and initial-scroll pin all
+          reset for the new channel instead of carrying over from the old one. */}
       <ChannelConversation
+        key={channel.uuid}
         channel={channel}
         realtime={realtime}
         className="min-h-0 flex-1"

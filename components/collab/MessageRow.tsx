@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { formatFullTimestamp } from '@/lib/utils/collab';
 import type { Message } from '@/types/collab';
 
@@ -24,6 +25,17 @@ interface MessageRowProps {
   message: Message;
   canEdit: boolean;
   canDelete: boolean;
+  /**
+   * True only for a genuinely-new tail message (the user's own send or an
+   * incoming realtime message) — animates the row in with a subtle fade + rise.
+   * Never set for history or older prepended pages.
+   */
+  animateEntry?: boolean;
+  /**
+   * True only for a just-arrived Lawexa (`is_ai`) reply — reveals its markdown
+   * blocks block-by-block. Ignored for non-AI rows.
+   */
+  animateReveal?: boolean;
   /** Rejects on failure so the row can stay in edit mode. */
   onSaveEdit: (messageUuid: string, content: string) => Promise<void>;
   onDelete: (messageUuid: string) => void;
@@ -34,9 +46,18 @@ export function MessageRow({
   message,
   canEdit,
   canDelete,
+  animateEntry: animateEntryInitial = false,
+  animateReveal: animateRevealInitial = false,
   onSaveEdit,
   onDelete,
 }: MessageRowProps) {
+  // Freeze the entry/reveal decision at mount. The row is keyed by uuid, so it
+  // mounts once per message; the parent flips these props to false right after
+  // the first paint (its "already-animated" guard), which would otherwise strip
+  // the class and snap a still-running animation whenever any sibling re-renders
+  // (typing, presence, another message) within the ~300ms window.
+  const [animateEntry] = useState(animateEntryInitial);
+  const [animateReveal] = useState(animateRevealInitial);
   const [isEditing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const [isSaving, setSaving] = useState(false);
@@ -99,7 +120,12 @@ export function MessageRow({
   }
 
   return (
-    <div className="group/msg relative -mx-2 rounded px-2 py-0.5 hover:bg-muted/40">
+    <div
+      className={cn(
+        'group/msg relative -mx-2 rounded px-2 py-0.5 hover:bg-muted/40',
+        animateEntry && 'animate-in fade-in slide-in-from-bottom-2 duration-300'
+      )}
+    >
       {message.parent_message_uuid && (
         <span className="mb-0.5 flex items-center gap-1 text-xs text-muted-foreground">
           <CornerDownRight className="h-3 w-3" />
@@ -110,6 +136,7 @@ export function MessageRow({
         <LawexaMessageContent
           content={message.content}
           metadata={message.metadata}
+          animateReveal={animateReveal}
         />
       ) : (
         <MessageContent content={message.content} metadata={message.metadata} />

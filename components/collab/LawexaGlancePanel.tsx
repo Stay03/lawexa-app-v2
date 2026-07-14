@@ -23,6 +23,9 @@ interface LawexaGlancePanelProps {
   executionId: string;
   summonerName: string;
   onClose: () => void;
+  /** Render as a drop-down box inside the feed column (full-width, fixed-height
+   *  body) instead of the default floating card. */
+  inline?: boolean;
 }
 
 // Slug → readable agent name, e.g. "issue-spotter" → "Issue Spotter".
@@ -135,6 +138,7 @@ export function LawexaGlancePanel({
   executionId,
   summonerName,
   onClose,
+  inline = false,
 }: LawexaGlancePanelProps) {
   const { messages, isStreaming, connectToStream, disconnect } =
     useChatStream();
@@ -185,7 +189,13 @@ export function LawexaGlancePanel({
   }, [messages, showThinking, thinkingText]);
 
   return (
-    <div className="pointer-events-auto w-full max-w-xs rounded-2xl border bg-background/95 shadow-md backdrop-blur sm:max-w-md">
+    <div
+      className={cn(
+        inline
+          ? 'w-full rounded-xl border bg-muted/30 shadow-sm animate-in slide-in-from-top-2 fade-in duration-200'
+          : 'pointer-events-auto w-full max-w-xs rounded-2xl border bg-background/95 shadow-md backdrop-blur sm:max-w-md'
+      )}
+    >
       <div className="flex items-center gap-1.5 border-b px-3 py-2 text-xs text-muted-foreground">
         <Sparkles className="size-3 shrink-0 animate-pulse text-primary" />
         <span className="min-w-0 flex-1 truncate">
@@ -204,7 +214,10 @@ export function LawexaGlancePanel({
 
       <div
         ref={bodyRef}
-        className="max-h-[50vh] space-y-2.5 overflow-y-auto px-3 py-2.5"
+        className={cn(
+          'space-y-2.5 overflow-y-auto px-3 py-2.5',
+          inline ? 'h-[40vh]' : 'max-h-[50vh]'
+        )}
       >
         {groups.map((group) => {
           if (group.type === 'tool-chain') {

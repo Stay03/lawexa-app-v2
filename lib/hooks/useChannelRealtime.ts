@@ -86,6 +86,10 @@ export interface TypingUser {
 export interface LawexaTurn {
   executionId: string;
   summoner: SlimUser;
+  /** UUID of the channel message that mentioned @lawexa and started this turn.
+   *  Anchors the inline responding row + peek under that message. Empty string
+   *  when the backend hasn't attached it yet — the turn simply won't anchor. */
+  messageUuid: string;
 }
 
 export interface ChannelRealtime {
@@ -93,7 +97,8 @@ export interface ChannelRealtime {
   onlineUuids: Set<string>;
   onlineCount: number;
   typingUsers: TypingUser[];
-  /** Active Lawexa summons in this channel — drives the 'responding' pill. */
+  /** Active Lawexa summons in this channel — each drives an inline "responding"
+   *  row anchored under its triggering message (keyed by `messageUuid`). */
   lawexaTurns: LawexaTurn[];
   /** Throttled typing whisper for the composer to call on keystroke. */
   notifyTyping: () => void;
@@ -173,13 +178,15 @@ export function useChannelRealtime(
         channel_uuid: string;
         execution_id: string;
         summoner: SlimUser;
+        message_uuid?: string;
       }) => {
         if (!payload.execution_id) return;
         const executionId = payload.execution_id;
+        const messageUuid = payload.message_uuid ?? '';
         setLawexaTurns((prev) =>
           prev.some((t) => t.executionId === executionId)
             ? prev
-            : [...prev, { executionId, summoner: payload.summoner }]
+            : [...prev, { executionId, summoner: payload.summoner, messageUuid }]
         );
         // Backstop: drop the turn if no reply/failure arrives in time.
         const existing = aiTimers.get(executionId);

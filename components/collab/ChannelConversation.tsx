@@ -1,8 +1,15 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import dynamic from 'next/dynamic';
-import { Loader2, MessagesSquare, Sparkles } from 'lucide-react';
+import { ArrowDown, Loader2, MessagesSquare, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -18,10 +25,10 @@ import {
   useMarkChannelRead,
   useUpdateMessage,
 } from '@/lib/hooks/useCollab';
-import type { ChannelRealtime } from '@/lib/hooks/useChannelRealtime';
+import type { ChannelRealtime, LawexaTurn } from '@/lib/hooks/useChannelRealtime';
 import type { Channel, Message } from '@/types/collab';
 
-import { LawexaRespondingPill } from './LawexaRespondingPill';
+import { LawexaRespondingRow } from './LawexaRespondingRow';
 import { MessageComposer } from './MessageComposer';
 import { MessageGroup, type MessageGroupData } from './MessageGroup';
 import { MessageListSkeleton } from './skeletons';
@@ -39,10 +46,16 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 type RenderItem =
   | { kind: 'day'; key: string; label: string }
   | { kind: 'ai_divider'; key: string; label: string }
-  | { kind: 'group'; group: MessageGroupData };
+  | { kind: 'group'; group: MessageGroupData }
+  | { kind: 'responding'; key: string; turn: LawexaTurn };
 
-/** Collapse a chronological message list into day separators + author groups. */
-function buildRenderItems(messages: Message[]): RenderItem[] {
+/** Collapse a chronological message list into day separators + author groups,
+ *  splicing an inline "responding" row directly beneath any message that
+ *  summoned a still-active Lawexa turn (keyed by that message's uuid). */
+function buildRenderItems(
+  messages: Message[],
+  turnsByMessageUuid: Map<string, LawexaTurn>
+): RenderItem[] {
   const items: RenderItem[] = [];
   let group: MessageGroupData | null = null;
 
@@ -97,9 +110,41 @@ function buildRenderItems(messages: Message[]): RenderItem[] {
       };
       items.push({ kind: 'group', group });
     }
+
+    // If this message summoned a live Lawexa turn, drop the responding row right
+    // after it and close the group so the row sits directly under the trigger
+    // (and any later message from the same author starts a fresh group below).
+    const turn = turnsByMessageUuid.get(message.uuid);
+    if (turn) {
+      items.push({
+        kind: 'responding',
+        key: `responding-${turn.executionId}`,
+        turn,
+      });
+      group = null;
+    }
   });
 
   return items;
+}
+
+/**
+ * A content-based identity for a message, stable across the optimistic→real
+ * reconcile (the uuid changes then, but author + content do not). Used to record
+ * "already animated" so the entry animation doesn't replay on the swap.
+ */
+function messageIdentity(message: Message): string {
+  return `${message.author?.uuid ?? (message.is_ai ? 'ai' : 'none')}|${message.content}`;
+}
+
+/**
+ * A message is a genuinely-new tail iff a load-time baseline exists and its
+ * `created_at` is strictly newer than it — true for a fresh send (client
+ * `created_at` = now) or an incoming realtime message, false for the initial
+ * history load and older prepended pages (all at or before the baseline).
+ */
+function isNewerThanBaseline(message: Message, baseline: number | null): boolean {
+  return baseline !== null && new Date(message.created_at).getTime() > baseline;
 }
 
 function typingLabel(users: ChannelRealtime['typingUsers']): string | null {
@@ -144,7 +189,21 @@ export function ChannelConversation({
     () => (data ? data.pages.flatMap((page) => page.data).reverse() : []),
     [data]
   );
-  const renderItems = useMemo(() => buildRenderItems(messages), [messages]);
+  // Index the in-flight turns by the uuid of the message that summoned them, so
+  // buildRenderItems can anchor each responding row under its trigger. Turns
+  // without a message_uuid (backend not yet shipping it) simply don't anchor.
+  const turnsByMessageUuid = useMemo(() => {
+    const map = new Map<string, LawexaTurn>();
+    for (const turn of realtime.lawexaTurns) {
+      if (turn.messageUuid) map.set(turn.messageUuid, turn);
+    }
+    return map;
+  }, [realtime.lawexaTurns]);
+
+  const renderItems = useMemo(
+    () => buildRenderItems(messages, turnsByMessageUuid),
+    [messages, turnsByMessageUuid]
+  );
 
   const newestRealUuid = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -153,21 +212,40 @@ export function ChannelConversation({
     return null;
   }, [messages]);
 
-  // Glance (Phase 6): which summon's SSE stream the reader is watching, if any.
+  // The last message in the feed — used both for the no-yank-on-AI-reply check
+  // in the scroll layout-effect and for the entry/reveal animation baseline.
+  const newestMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+
+  // Glance: which summon's SSE stream the reader is watching, if any. A lingering
+  // watchId whose turn has ended renders nothing (no matching 'responding' item)
+  // — that IS the auto-hide, so no effect is needed to clear it.
   const [watchId, setWatchId] = useState<string | null>(null);
-  // Watch is offered only when exactly one turn is in flight. Both of these are
-  // pure derivations — `activeWatch` becomes null the instant its turn leaves
-  // `lawexaTurns`, auto-hiding the panel with no setState-in-effect.
-  const singleTurn =
-    realtime.lawexaTurns.length === 1 ? realtime.lawexaTurns[0] : null;
-  const activeWatch = watchId
-    ? realtime.lawexaTurns.find((t) => t.executionId === watchId) ?? null
-    : null;
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentObserverRef = useRef<ResizeObserver | null>(null);
   const didInitialScroll = useRef(false);
   const restoreFromHeight = useRef<number | null>(null);
   const atBottomRef = useRef(true);
+
+  // Reactive mirror of `atBottomRef`, so the floating scroll-to-bottom button's
+  // visibility is driven by state (updated only from event/observer callbacks,
+  // never from an effect body — no setState-in-effect).
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  // The `created_at` (epoch ms) of the newest message at first load. A message
+  // animates its entry/reveal iff it is strictly newer than this — so the
+  // initial history load and any older prepended pages never animate, while a
+  // fresh send (client `created_at` = now) or an incoming realtime message does.
+  // A DATA value captured in the initial-scroll effect (not `Date.now()`).
+  const baselineTimeRef = useRef<number | null>(null);
+  // Identities already animated once, to defeat the optimistic→real double
+  // animation: the optimistic bubble animates, then reconciles to the server
+  // message; both share this content-based identity, so the replacement is
+  // suppressed. (uuid changes on reconcile, so we can't key on uuid alone.)
+  const animatedIdsRef = useRef<Set<string>>(new Set());
+  // Execution ids whose inline peek has already been scrolled into view, so the
+  // gentle scroll fires once when the peek opens — not on every live re-render.
+  const peekScrolledRef = useRef<Set<string>>(new Set());
 
   // Advance the read pointer to the newest real message whenever it changes.
   useEffect(() => {
@@ -175,12 +253,18 @@ export function ChannelConversation({
   }, [channel.is_member, newestRealUuid, markReadMutate]);
 
   // Pin to newest on load; hold position when older pages prepend; follow new
-  // messages only when the reader is already at the bottom.
+  // messages only when the reader is already at the bottom — EXCEPT a just-
+  // arrived Lawexa reply, which we let fade in place (M2/M3) rather than yank to.
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     if (!didInitialScroll.current && messages.length > 0) {
+      // Baseline: the newest message at first load. Everything already present
+      // is history and must not animate; only strictly-newer messages will.
+      baselineTimeRef.current = newestMessage
+        ? new Date(newestMessage.created_at).getTime()
+        : null;
       el.scrollTop = el.scrollHeight;
       didInitialScroll.current = true;
       return;
@@ -190,23 +274,80 @@ export function ChannelConversation({
       restoreFromHeight.current = null;
       return;
     }
-    if (atBottomRef.current) {
+    // A newly-arrived Lawexa reply reveals block-by-block; don't chase it to the
+    // bottom even when the reader was there — surface the scroll button instead.
+    const newestIsFreshAi =
+      !!newestMessage &&
+      newestMessage.is_ai &&
+      baselineTimeRef.current !== null &&
+      new Date(newestMessage.created_at).getTime() > baselineTimeRef.current;
+    if (atBottomRef.current && !newestIsFreshAi) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages.length]);
+    // `messages.length` catches prepends (older pages) so position is restored;
+    // `newestMessage` catches a new/reconciled tail so the no-yank check is
+    // evaluated against the right message. Prepends don't change the tail ref.
+  }, [messages.length, newestMessage]);
 
-  const handleScroll = () => {
+  // Mark the identities we animated this render so the optimistic→real swap
+  // (which remounts the row under a new uuid) doesn't replay the animation.
+  // Ref writes only — never setState — so this stays clear of the compiler ban.
+  useLayoutEffect(() => {
+    for (const message of messages) {
+      if (isNewerThanBaseline(message, baselineTimeRef.current)) {
+        animatedIdsRef.current.add(messageIdentity(message));
+      }
+    }
+  }, [messages]);
+
+  // Stable across renders (uses only refs + the stable setState) so the
+  // ResizeObserver below and the scroll listener don't churn every render.
+  const syncAtBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-  };
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    atBottomRef.current = atBottom;
+    setIsAtBottom(atBottom);
+  }, []);
 
   const scrollToBottom = () => {
     const el = scrollRef.current;
     if (!el) return;
     atBottomRef.current = true;
+    setIsAtBottom(true);
     el.scrollTop = el.scrollHeight;
   };
+
+  // Stable ref callback for an opened inline peek: gently scroll it into view
+  // once when it mounts (reads its execution id from a data attribute so the
+  // callback identity stays stable across the turn's live re-renders — a fresh
+  // inline arrow would re-fire on every render). No setState — event-driven.
+  const peekRefCallback = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const executionId = node.dataset.executionId;
+    if (!executionId || peekScrolledRef.current.has(executionId)) return;
+    peekScrolledRef.current.add(executionId);
+    node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, []);
+
+  // The block-by-block reveal grows the AI reply's height below the fold without
+  // firing a scroll event, so the button wouldn't otherwise appear. A callback
+  // ref observes the content box and re-derives "at bottom" as its size changes.
+  // The setState runs inside the ResizeObserver callback (async), not an effect
+  // body — lint-clean — and the callback ref attaches whenever the content div
+  // (re)mounts, which a mount-time effect would miss during the loading phase.
+  const contentRefCallback = useCallback(
+    (node: HTMLDivElement | null) => {
+      contentObserverRef.current?.disconnect();
+      contentObserverRef.current = null;
+      if (node && typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver(() => syncAtBottom());
+        observer.observe(node);
+        contentObserverRef.current = observer;
+      }
+    },
+    [syncAtBottom]
+  );
 
   const handleLoadOlder = () => {
     const el = scrollRef.current;
@@ -222,6 +363,18 @@ export function ChannelConversation({
       !!currentUserUuid &&
       message.author.uuid === currentUserUuid;
     return { canEdit: isReal && isMine, canDelete: isReal && (isMine || isAdmin) };
+  };
+
+  // A message animates iff it's a genuinely-new tail (newer than the load-time
+  // baseline) that we haven't animated before — the `animatedIdsRef` guard makes
+  // the entry play exactly once across the optimistic→real reconcile. A fresh AI
+  // reply additionally reveals block-by-block (M2). Pure read; the "mark as
+  // animated" write happens in the layout-effect above, keeping render clean.
+  const animationFor = (message: Message) => {
+    const fresh =
+      isNewerThanBaseline(message, baselineTimeRef.current) &&
+      !animatedIdsRef.current.has(messageIdentity(message));
+    return { animateEntry: fresh, animateReveal: fresh && message.is_ai };
   };
 
   const handleSaveEdit = async (messageUuid: string, content: string) => {
@@ -275,7 +428,10 @@ export function ChannelConversation({
       );
     }
     return (
-      <div className="mx-auto mt-auto w-full max-w-3xl px-4 pt-4 pb-28">
+      <div
+        ref={contentRefCallback}
+        className="mx-auto mt-auto w-full max-w-3xl px-4 pt-4 pb-28"
+      >
         {hasNextPage ? (
           <div className="flex justify-center pb-4">
             <Button
@@ -317,11 +473,49 @@ export function ChannelConversation({
                 </div>
               );
             }
+            if (item.kind === 'responding') {
+              const { turn } = item;
+              const watching = watchId === turn.executionId;
+              return (
+                <div key={item.key} className="space-y-2">
+                  <LawexaRespondingRow
+                    summonerName={turn.summoner.name}
+                    watching={watching}
+                    onToggleWatch={() =>
+                      setWatchId((cur) => {
+                        // Reopening should scroll again: forget the prior open.
+                        peekScrolledRef.current.delete(turn.executionId);
+                        return cur === turn.executionId ? null : turn.executionId;
+                      })
+                    }
+                  />
+                  {watching && (
+                    <div
+                      ref={peekRefCallback}
+                      data-execution-id={turn.executionId}
+                      className="pl-11 pr-1"
+                    >
+                      <LawexaGlancePanel
+                        key={turn.executionId}
+                        executionId={turn.executionId}
+                        summonerName={turn.summoner.name}
+                        onClose={() => {
+                          peekScrolledRef.current.delete(turn.executionId);
+                          setWatchId(null);
+                        }}
+                        inline
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            }
             return (
               <MessageGroup
                 key={item.group.key}
                 group={item.group}
                 permissionsFor={permissionsFor}
+                animationFor={animationFor}
                 onSaveEdit={handleSaveEdit}
                 onDelete={handleDelete}
               />
@@ -336,7 +530,7 @@ export function ChannelConversation({
     <div className={cn('relative flex flex-col', className)}>
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
+        onScroll={syncAtBottom}
         className="flex min-h-0 flex-1 flex-col overflow-y-auto"
       >
         {renderMessageArea()}
@@ -344,39 +538,26 @@ export function ChannelConversation({
 
       {/* Floating footer — overlaid on the scroll area (not stacked below it) so
           the scrollbar runs the full height and messages stay visible above and
-          around the composer. Only the pill captures pointer events; the gutters
-          fall through to the messages behind. */}
+          around the composer. The gutters fall through to the messages behind;
+          only the typing label + composer capture pointer events. Lawexa's
+          "responding" affordance now lives inline in the feed, anchored under
+          the summoning message, not here. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0">
-        {activeWatch && (
-          <div className="mx-auto flex w-full max-w-xs justify-center px-4 pb-1 sm:max-w-md">
-            <LawexaGlancePanel
-              key={activeWatch.executionId}
-              executionId={activeWatch.executionId}
-              summonerName={activeWatch.summoner.name}
-              onClose={() => setWatchId(null)}
-            />
-          </div>
-        )}
-
-        {realtime.lawexaTurns.length > 0 && (
-          <div
-            className={cn(
-              'mx-auto flex w-full max-w-xs justify-center px-4 pb-1 sm:max-w-md',
-              singleTurn && 'pointer-events-auto'
-            )}
-          >
-            <LawexaRespondingPill
-              turns={realtime.lawexaTurns}
-              watchable={!!singleTurn}
-              watching={!!activeWatch}
-              onToggleWatch={() =>
-                setWatchId((cur) =>
-                  singleTurn && cur === singleTurn.executionId
-                    ? null
-                    : singleTurn?.executionId ?? null
-                )
-              }
-            />
+        {/* Scroll-to-bottom — appears only when the reader is scrolled up (or an
+            AI reply has grown below the fold). Sits just above the composer and
+            is the only interactive element in the non-typing gutter. */}
+        {!isAtBottom && !isLoading && !isError && messages.length > 0 && (
+          <div className="pointer-events-none mb-2 flex justify-center">
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              onClick={scrollToBottom}
+              aria-label="Scroll to latest messages"
+              className="pointer-events-auto size-9 rounded-full border shadow-md animate-in fade-in zoom-in-95 duration-200"
+            >
+              <ArrowDown className="size-4" />
+            </Button>
           </div>
         )}
 
