@@ -24,6 +24,7 @@ import { filesApi } from '@/lib/api/files';
 import { fileKeys } from '@/lib/hooks/useFiles';
 import { formatFileSize, getFileExtension, getFileIcon } from '@/lib/utils/file-display';
 import { extractApiError } from '@/lib/utils/api-error';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import type { UserFile } from '@/types/file';
 
 /******************************************************************************
@@ -255,12 +256,13 @@ function AddItemToFolderDialog({
                 }
                 return results.map((item) => {
                   const isAdding = addingId === item.id;
+                  const title = searchType === 'case' ? getCaseDisplayTitle(item) : item.title;
                   return (
                     <button
                       key={item.id}
                       type="button"
                       disabled={addingId !== null}
-                      onClick={() => handleSelectItem(item.id, item.title)}
+                      onClick={() => handleSelectItem(item.id, title)}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 disabled:opacity-50"
                     >
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -274,7 +276,7 @@ function AddItemToFolderDialog({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="whitespace-nowrap text-sm font-medium">
-                          {item.title}
+                          {title}
                         </p>
                         {'content_preview' in item && (
                           <p className="whitespace-nowrap text-xs text-muted-foreground">

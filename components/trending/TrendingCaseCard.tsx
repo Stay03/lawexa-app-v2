@@ -6,6 +6,7 @@ import { ChevronRight, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
 import type { TrendingCaseDetailItem } from '@/types/trending';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface TrendingCaseCardProps {
   item: TrendingCaseDetailItem;
@@ -19,7 +20,8 @@ interface TrendingCaseCardProps {
  */
 function TrendingCaseCard({ item, className, style }: TrendingCaseCardProps) {
   const router = useRouter();
-  const { title, slug, court, country, judgment_date, principles, tags, views_count } = item;
+  const { slug, court, country, judgment_date, principles, tags, views_count } = item;
+  const title = getCaseDisplayTitle(item);
 
   // Format date if available
   const formattedDate = judgment_date

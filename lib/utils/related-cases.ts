@@ -6,6 +6,7 @@ import type {
   Court,
   RelatedCase,
 } from '@/types/case';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 /**
  * Normalized view model every related-case renderer consumes, regardless of
@@ -31,7 +32,7 @@ export interface RelatedCaseDisplay {
 export function relatedToDisplay(c: RelatedCase | CitedByCase): RelatedCaseDisplay {
   return {
     key: `case-${c.id}`,
-    title: c.title,
+    title: getCaseDisplayTitle(c),
     href: `/cases/${c.slug}`,
     citation: c.citation,
     court: c.court,
@@ -50,7 +51,7 @@ export function citedEdgeToDisplay(edge: CitedCaseEdge): RelatedCaseDisplay {
   const linked = edge.cited_case_id !== null && !!edge.slug;
   return {
     key: `edge-${edge.id}`,
-    title: edge.title ?? edge.raw ?? edge.citation ?? 'Unlinked citation',
+    title: edge.display_title ?? edge.title ?? edge.raw ?? edge.citation ?? 'Unlinked citation',
     href: linked ? `/cases/${edge.slug}` : null,
     citation: edge.citation,
     court: null,

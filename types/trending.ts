@@ -22,6 +22,7 @@ interface TrendingItemBase {
 // --- Trending case from /api/trending (mixed endpoint, no court/country) ---
 export interface TrendingCaseItem extends TrendingItemBase {
   type: 'case';
+  display_title: string;
   judgment_date: string | null;
   citation: string | null;
   principles: string | null;

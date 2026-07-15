@@ -11,6 +11,7 @@ import {
   type RelatedCaseDisplay,
 } from '@/lib/utils/related-cases';
 import type { CaseDetail, RelatedCase, CitedCaseEdge, CitedByCase } from '@/types/case';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface CaseDocumentViewProps {
   caseData: CaseDetail;
@@ -106,7 +107,6 @@ function CaseDocumentView({
   citedBy,
 }: CaseDocumentViewProps) {
   const {
-    title,
     court,
     country,
     judgment_date,
@@ -117,6 +117,7 @@ function CaseDocumentView({
     topic,
     has_full_report,
   } = caseData;
+  const title = getCaseDisplayTitle(caseData);
 
   const isLimitExceeded = caseData.limit_exceeded === true;
 

@@ -9,10 +9,12 @@ import {
 } from '@/components/ui/collapsible';
 import type { ToolMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface CaseResult {
   id: number;
   title: string;
+  display_title?: string | null;
   slug: string;
   excerpt: string;
   topic?: string;
@@ -78,6 +80,7 @@ function CaseResultRow({
   onToggle: () => void;
 }) {
   const source = item.court?.abbreviation || item.court?.name || 'Case';
+  const title = getCaseDisplayTitle(item);
 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle}>
@@ -87,7 +90,7 @@ function CaseResultRow({
             <Scale className="h-2.5 w-2.5 text-primary" />
           </span>
           <span className="min-w-0 flex-1 truncate text-xs text-foreground">
-            {item.title}
+            {title}
           </span>
           <span className="shrink-0 text-[10px] text-muted-foreground">
             {source}

@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import {
   ArrowUpDown,
   MoreHorizontal,
@@ -213,11 +214,11 @@ export function CasesTable({
                       className="block truncate hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {caseData.title}
+                      {getCaseDisplayTitle(caseData)}
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[400px]">
-                    <p>{caseData.title}</p>
+                    <p>{getCaseDisplayTitle(caseData)}</p>
                   </TooltipContent>
                 </Tooltip>
               </TableCell>

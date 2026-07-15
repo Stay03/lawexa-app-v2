@@ -11,6 +11,7 @@ import type { SuggestionProps } from '@tiptap/suggestion';
 import { cn } from '@/lib/utils';
 import type { CaseMentionAttrs, CaseWithMeta } from './caseSuggestion';
 import { Scale, MapPin, Loader2 } from 'lucide-react';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 export interface CaseSuggestionListRef {
   onKeyDown: (props: { event: KeyboardEvent }) => boolean;
@@ -39,7 +40,7 @@ export const CaseSuggestionList = forwardRef<
         props.command({
           id: item.id,
           slug: item.slug,
-          label: item.title,
+          label: getCaseDisplayTitle(item),
         });
       }
     },
@@ -132,8 +133,8 @@ export const CaseSuggestionList = forwardRef<
                 : 'hover:bg-muted'
             )}
           >
-            <span className="font-medium truncate" title={item.title}>
-              {item.title}
+            <span className="font-medium truncate" title={getCaseDisplayTitle(item)}>
+              {getCaseDisplayTitle(item)}
             </span>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               {item.court && (

@@ -73,6 +73,7 @@ export interface Creator {
 export interface CaseSummary {
   id: number;
   title: string;
+  display_title: string;
   slug: string;
   court: string | Court | null; // Can be abbreviation string or Court object
   judgment_date: string | null;
@@ -96,6 +97,7 @@ export interface CitedByCaseSummary extends CaseSummary {
 export interface CaseDetail {
   id: number;
   title: string;
+  display_title: string;
   slug: string;
   course: Course | null;
   topic: string | null;

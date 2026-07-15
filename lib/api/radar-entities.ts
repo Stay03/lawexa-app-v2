@@ -5,6 +5,7 @@ import { statutesApi } from './statutes';
 import type { PaginatedResponse } from '@/types/api';
 import type { Court, Judge } from '@/types/admin-cases';
 import type { RadarEntityOption, RadarEntityType } from '@/types/radar';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 const SEARCH_PAGE_SIZE = 10;
 
@@ -13,7 +14,7 @@ async function searchCases(search: string): Promise<RadarEntityOption[]> {
   return response.data.map((item) => ({
     entity_type: 'case',
     entity_id: item.id,
-    label: item.title,
+    label: getCaseDisplayTitle(item),
     sublabel: item.citation ?? item.court?.name ?? undefined,
   }));
 }

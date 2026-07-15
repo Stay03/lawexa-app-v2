@@ -16,6 +16,7 @@ import {
   type RelatedCaseDisplay,
 } from '@/lib/utils/related-cases';
 import type { CaseDetail, RelatedCase, CitedCaseEdge, CitedByCase } from '@/types/case';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 /******************************************************************************
                                Types
@@ -160,7 +161,6 @@ function CaseBlogView({
   citedBy,
 }: CaseBlogViewProps) {
   const {
-    title,
     court,
     country,
     judgment_date,
@@ -178,6 +178,7 @@ function CaseBlogView({
     bookmarks_count,
     id,
   } = caseData;
+  const title = getCaseDisplayTitle(caseData);
 
   // Format date
   const formattedDate = judgment_date

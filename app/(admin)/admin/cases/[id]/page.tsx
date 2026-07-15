@@ -29,6 +29,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 import { CaseDeleteDialog } from '@/components/admin/cases/CaseDeleteDialog';
 import { useCase } from '@/lib/hooks/useAdminCases';
@@ -136,7 +137,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
       <Card>
         <CardHeader>
           <div className="space-y-2">
-            <CardTitle className="text-2xl">{caseData.title}</CardTitle>
+            <CardTitle className="text-2xl">{getCaseDisplayTitle(caseData)}</CardTitle>
             {caseData.citation && (
               <p className="font-mono text-sm text-muted-foreground">
                 {caseData.citation}
@@ -364,7 +365,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                       href={`/admin/cases/${relatedCase.slug}`}
                       className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
-                      <p className="font-medium text-sm">{relatedCase.title}</p>
+                      <p className="font-medium text-sm">{getCaseDisplayTitle(relatedCase)}</p>
                       {relatedCase.citation && (
                         <p className="text-xs font-mono text-muted-foreground mt-1">
                           {relatedCase.citation}
@@ -385,7 +386,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                 <div className="space-y-2">
                   {caseData.cited_cases.map((edge) => {
                     const linked = edge.cited_case_id !== null && !!edge.slug;
-                    const label = edge.title ?? edge.raw ?? edge.citation ?? 'Unlinked citation';
+                    const label = edge.display_title ?? edge.title ?? edge.raw ?? edge.citation ?? 'Unlinked citation';
                     const inner = (
                       <>
                         <div className="flex items-center gap-2">
@@ -434,7 +435,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                       href={`/admin/cases/${relatedCase.slug}`}
                       className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
-                      <p className="font-medium text-sm">{relatedCase.title}</p>
+                      <p className="font-medium text-sm">{getCaseDisplayTitle(relatedCase)}</p>
                       {relatedCase.citation && (
                         <p className="text-xs font-mono text-muted-foreground mt-1">
                           {relatedCase.citation}

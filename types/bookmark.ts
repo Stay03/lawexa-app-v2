@@ -11,6 +11,7 @@ export type BookmarkType = 'case' | 'note' | 'folder' | 'statute';
 export interface BookmarkCaseContent {
   id: number;
   title: string;
+  display_title: string;
   slug: string;
   judgment_date: string | null;
   citation: string | null;

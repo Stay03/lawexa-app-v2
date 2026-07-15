@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import { getFileIcon } from '@/lib/utils/file-display';
 import { Button } from '@/components/ui/button';
 import { useRemoveFolderItem } from '@/lib/hooks/useFolders';
@@ -198,6 +199,9 @@ function FolderItemCard({
 function _getItemTitle(item: FolderItem): string {
   if (item.type === 'file') return item.content.original_name;
   const content = item.content;
+  if (item.type === 'case') {
+    return getCaseDisplayTitle(content as { title?: string | null; display_title?: string | null });
+  }
   if (typeof content.title === 'string' && content.title) return content.title;
   if (typeof content.name === 'string' && content.name) return content.name;
   return `Untitled ${item.type}`;

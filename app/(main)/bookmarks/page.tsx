@@ -20,6 +20,7 @@ import type {
   BookmarkNoteContent,
   BookmarkFolderContent,
 } from '@/types/bookmark';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 /******************************************************************************
                                Constants
@@ -70,10 +71,11 @@ function BookmarkCard({ bookmark, index }: { bookmark: BookmarkItem; index: numb
   };
 
   // Resolve display title
-  const title =
-    type === 'folder'
-      ? (content as BookmarkFolderContent).name
-      : (content as BookmarkCaseContent | BookmarkNoteContent).title;
+  const title = type === 'folder'
+    ? (content as BookmarkFolderContent).name
+    : type === 'case'
+      ? getCaseDisplayTitle(content as BookmarkCaseContent)
+      : (content as BookmarkNoteContent).title;
 
   return (
     <Link

@@ -40,6 +40,7 @@ export interface FullReport {
 export interface RelatedCase {
   id: number;
   title: string;
+  display_title: string;
   slug: string;
   excerpt: string;
   citation: string | null;
@@ -84,6 +85,7 @@ export interface CitedCaseEdge {
   cited_case_id: number | null;
   raw: string | null;
   title: string | null;
+  display_title: string | null;
   slug: string | null;
   citation: string | null;
   treatment: CaseTreatment | null;
@@ -105,6 +107,7 @@ export interface CaseMeta {
 export interface Case {
   id: number;
   title: string;
+  display_title: string;
   slug: string;
   excerpt: string;
   topic: string | null;

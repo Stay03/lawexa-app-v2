@@ -15,6 +15,7 @@ import {
 import { useCases } from '@/lib/hooks/useAdminCases';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { cn } from '@/lib/utils';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 /******************************************************************************
                                 Component Props
@@ -96,7 +97,7 @@ export function CaseMultiSelect({
               <Icon className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium leading-tight">
-                  {caseItem.title}
+                  {getCaseDisplayTitle(caseItem)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {caseItem.court && `${typeof caseItem.court === 'string' ? caseItem.court : caseItem.court.abbreviation} • `}
@@ -108,7 +109,7 @@ export function CaseMultiSelect({
                 type="button"
                 onClick={() => handleRemoveCase(caseItem.id)}
                 className="shrink-0 hover:text-destructive rounded-full p-1"
-                aria-label={`Remove ${caseItem.title}`}
+                aria-label={`Remove ${getCaseDisplayTitle(caseItem)}`}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -152,7 +153,7 @@ export function CaseMultiSelect({
                 <FileText className="h-4 w-4 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium leading-tight">
-                    {caseItem.title}
+                    {getCaseDisplayTitle(caseItem)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {caseItem.court && `${typeof caseItem.court === 'string' ? caseItem.court : caseItem.court.abbreviation} • `}

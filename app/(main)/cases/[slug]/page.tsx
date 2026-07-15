@@ -29,6 +29,7 @@ import { AddToFolderButton } from '@/components/folders';
 import { useCaseWithRelated } from '@/lib/hooks/useCases';
 import { extractViewLimitError } from '@/lib/utils/api-error';
 import { relatedToDisplay, citedEdgeToDisplay } from '@/lib/utils/related-cases';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 /******************************************************************************
                                Constants
@@ -113,6 +114,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
   }
 
   const caseDetail = data.data;
+  const displayTitle = getCaseDisplayTitle(caseDetail);
   const isLimitExceeded = caseDetail.limit_exceeded === true;
 
   return (
@@ -131,7 +133,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
       >
         {/* Hero Header */}
         <CaseDetailHeader
-          title={caseDetail.title}
+          title={displayTitle}
           court={caseDetail.court}
           country={caseDetail.country}
           judgmentDate={caseDetail.judgment_date}
@@ -158,7 +160,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
             context={{
               contentType: 'case',
               contentId: caseDetail.id,
-              contentTitle: caseDetail.title,
+              contentTitle: displayTitle,
             }}
             variant="full"
           />
@@ -244,7 +246,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
       <FloatingPromptInput
         contextId={slug}
         contextType="case"
-        contextTitle={caseDetail.title}
+        contextTitle={displayTitle}
       />
     </>
   );

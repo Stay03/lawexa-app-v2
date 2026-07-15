@@ -77,6 +77,7 @@ import { ConfidentialFileNotice } from '@/components/chat/confidential-file-noti
 import { ComposerPlusMenu } from '@/components/chat/composer-plus-menu';
 import Link from 'next/link';
 import { VenetianMask, Scale, Landmark, NotebookPen, Radar, FileText, type LucideIcon } from 'lucide-react';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 // "About" chip for the content a conversation references.
 type RefChip = { key: string; label: string; href: string | null; Icon: LucideIcon };
@@ -90,7 +91,7 @@ function buildReferenceChips(references: ConversationReference[]): RefChip[] {
       switch (ref.type) {
         case 'case': {
           const c = ref.content;
-          return c ? { key: `case-${c.id}`, label: c.title, href: `/cases/${c.slug}`, Icon: Scale } : null;
+          return c ? { key: `case-${c.id}`, label: getCaseDisplayTitle(c), href: `/cases/${c.slug}`, Icon: Scale } : null;
         }
         case 'statute': {
           const c = ref.content;
