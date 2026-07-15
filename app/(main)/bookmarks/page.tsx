@@ -104,11 +104,6 @@ function BookmarkCard({ bookmark, index }: { bookmark: BookmarkItem; index: numb
             {(content as BookmarkNoteContent).content_preview}
           </p>
         )}
-        {type === 'case' && (content as BookmarkCaseContent).citation && (
-          <p className="text-xs text-muted-foreground">
-            {(content as BookmarkCaseContent).citation}
-          </p>
-        )}
         {type === 'folder' && (
           <p className="text-xs text-muted-foreground">
             {(content as BookmarkFolderContent).items_count} items · {(content as BookmarkFolderContent).children_count} subfolders

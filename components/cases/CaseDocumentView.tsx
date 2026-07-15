@@ -61,7 +61,7 @@ function formatBodyText(text: string): string {
  * Non-linkable rows (external citations) render as plain text.
  */
 function DocumentRelatedCaseItem({ caseItem }: { caseItem: RelatedCaseDisplay }) {
-  const { title, href, citation, judgmentDate, court, treatment } = caseItem;
+  const { title, href, judgmentDate, court, treatment } = caseItem;
 
   const formattedDate = judgmentDate
     ? new Date(judgmentDate).toLocaleDateString('en-GB', {
@@ -69,10 +69,9 @@ function DocumentRelatedCaseItem({ caseItem }: { caseItem: RelatedCaseDisplay })
       })
     : null;
 
-  const meta = (citation || court || formattedDate || treatment) && (
+  const meta = (court || formattedDate || treatment) && (
     <span className="related-case-meta">
-      {citation && <span>{citation}</span>}
-      {court && !citation && <span>{court.name}</span>}
+      {court && <span>{court.name}</span>}
       {formattedDate && <span>({formattedDate})</span>}
       {treatment && <TreatmentBadge treatment={treatment} className="ml-1.5" />}
     </span>

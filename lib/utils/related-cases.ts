@@ -51,7 +51,10 @@ export function citedEdgeToDisplay(edge: CitedCaseEdge): RelatedCaseDisplay {
   const linked = edge.cited_case_id !== null && !!edge.slug;
   return {
     key: `edge-${edge.id}`,
-    title: edge.display_title ?? edge.title ?? edge.raw ?? edge.citation ?? 'Unlinked citation',
+    title:
+      edge.display_title || edge.title
+        ? getCaseDisplayTitle(edge)
+        : edge.raw ?? edge.citation ?? 'Unlinked citation',
     href: linked ? `/cases/${edge.slug}` : null,
     citation: edge.citation,
     court: null,

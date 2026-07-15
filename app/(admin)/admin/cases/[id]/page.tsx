@@ -386,7 +386,9 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                 <div className="space-y-2">
                   {caseData.cited_cases.map((edge) => {
                     const linked = edge.cited_case_id !== null && !!edge.slug;
-                    const label = edge.display_title ?? edge.title ?? edge.raw ?? edge.citation ?? 'Unlinked citation';
+                    const label = edge.display_title || edge.title
+                      ? getCaseDisplayTitle(edge)
+                      : edge.raw ?? edge.citation ?? 'Unlinked citation';
                     const inner = (
                       <>
                         <div className="flex items-center gap-2">

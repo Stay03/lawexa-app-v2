@@ -15,7 +15,7 @@ async function searchCases(search: string): Promise<RadarEntityOption[]> {
     entity_type: 'case',
     entity_id: item.id,
     label: getCaseDisplayTitle(item),
-    sublabel: item.citation ?? item.court?.name ?? undefined,
+    sublabel: item.court?.name ?? undefined,
   }));
 }
 

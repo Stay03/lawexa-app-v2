@@ -137,7 +137,6 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
           court={caseDetail.court}
           country={caseDetail.country}
           judgmentDate={caseDetail.judgment_date}
-          citation={caseDetail.citation}
           tags={caseDetail.tags}
           viewsCount={caseDetail.views_count}
           animationDelay={ANIMATION_DELAYS.header}
@@ -203,7 +202,6 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
         <CaseMetadataGrid
           court={caseDetail.court}
           country={caseDetail.country}
-          citation={caseDetail.citation}
           topic={caseDetail.topic}
           course={caseDetail.course}
           animationStartDelay={ANIMATION_DELAYS.metadataStart}

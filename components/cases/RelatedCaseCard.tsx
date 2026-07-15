@@ -25,7 +25,7 @@ interface IRelatedCaseCardProps {
  * plain, non-interactive card.
  */
 function RelatedCaseCard({ caseItem, className }: IRelatedCaseCardProps) {
-  const { title, href, citation, judgmentDate, court, country, treatment } = caseItem;
+  const { title, href, judgmentDate, court, country, treatment } = caseItem;
 
   // Format date if available
   const formattedDate = judgmentDate
@@ -50,10 +50,6 @@ function RelatedCaseCard({ caseItem, className }: IRelatedCaseCardProps) {
           <TreatmentBadge treatment={treatment} className="shrink-0" />
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          {citation && <span className="font-medium">{citation}</span>}
-          {(court || country || formattedDate) && citation && (
-            <span className="text-muted-foreground/40">|</span>
-          )}
           {court && <span>{court.name}</span>}
           {country && !court && <span>{country.name}</span>}
           {formattedDate && <span className="tabular-nums">{formattedDate}</span>}

@@ -46,7 +46,7 @@ function BlogMetadataRow({ label, value }: { label: string; value: React.ReactNo
 }
 
 function BlogRelatedCaseItem({ caseItem }: { caseItem: RelatedCaseDisplay }) {
-  const { title, href, citation, judgmentDate, court, country, treatment } = caseItem;
+  const { title, href, judgmentDate, court, country, treatment } = caseItem;
 
   const formattedDate = judgmentDate
     ? new Date(judgmentDate).toLocaleDateString('en-US', {
@@ -70,10 +70,6 @@ function BlogRelatedCaseItem({ caseItem }: { caseItem: RelatedCaseDisplay }) {
           <TreatmentBadge treatment={treatment} className="shrink-0" />
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          {citation && <span className="font-medium">{citation}</span>}
-          {(court || country || formattedDate) && citation && (
-            <span className="text-muted-foreground/40">|</span>
-          )}
           {court && <span>{court.name}</span>}
           {country && !court && <span>{country.name}</span>}
           {formattedDate && <span className="tabular-nums">{formattedDate}</span>}
@@ -164,7 +160,6 @@ function CaseBlogView({
     court,
     country,
     judgment_date,
-    citation,
     tags,
     views_count,
     principles,
@@ -231,11 +226,6 @@ function CaseBlogView({
     });
   }
 
-  const safeCitation = safeStringValue(citation);
-  if (safeCitation) {
-    metadataItems.push({ key: 'citation', label: 'Citation', value: safeCitation });
-  }
-
   const safeTopic = safeStringValue(topic);
   if (safeTopic) {
     metadataItems.push({ key: 'topic', label: 'Topic', value: safeTopic });
@@ -258,7 +248,6 @@ function CaseBlogView({
   if (court?.name) headerMeta.push(court.name);
   if (country?.name) headerMeta.push(country.name);
   if (formattedDate) headerMeta.push(formattedDate);
-  if (safeCitation) headerMeta.push(safeCitation);
   if (views_count > 0) headerMeta.push(`${views_count} ${views_count === 1 ? 'view' : 'views'}`);
   headerMeta.push(`${readTime} min read`);
 

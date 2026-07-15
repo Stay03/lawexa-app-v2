@@ -109,12 +109,6 @@ function CaseResultRow({
             {/* Meta info */}
             <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
               {item.topic && <span>{item.topic}</span>}
-              {item.citation && (
-                <>
-                  <span className="text-border">·</span>
-                  <span>{item.citation}</span>
-                </>
-              )}
               {item.judgment_date && (
                 <>
                   <span className="text-border">·</span>

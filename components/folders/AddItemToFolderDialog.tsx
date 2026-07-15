@@ -283,11 +283,6 @@ function AddItemToFolderDialog({
                             {(item as { content_preview: string }).content_preview}
                           </p>
                         )}
-                        {'citation' in item && (item as { citation: string | null }).citation && (
-                          <p className="whitespace-nowrap text-xs text-muted-foreground">
-                            {(item as { citation: string | null }).citation}
-                          </p>
-                        )}
                       </div>
                     </button>
                   );

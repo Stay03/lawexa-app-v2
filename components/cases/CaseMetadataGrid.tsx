@@ -1,7 +1,6 @@
 import {
   Scale,
   Globe,
-  FileText,
   BookMarked,
   GraduationCap,
 } from 'lucide-react';
@@ -12,7 +11,6 @@ import type { Court, Country } from '@/types/case';
 interface CaseMetadataGridProps {
   court: Court | null;
   country: Country | null;
-  citation: string | null;
   topic: string | null;
   course: string | null;
   className?: string;
@@ -38,7 +36,6 @@ function safeStringValue(value: unknown): string | null {
 function CaseMetadataGrid({
   court,
   country,
-  citation,
   topic,
   course,
   className,
@@ -85,16 +82,6 @@ function CaseMetadataGrid({
           )}
         </div>
       ),
-    });
-  }
-
-  const safeCitation = safeStringValue(citation);
-  if (safeCitation) {
-    items.push({
-      key: 'citation',
-      icon: FileText,
-      label: 'Citation',
-      value: safeCitation,
     });
   }
 

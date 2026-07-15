@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Scale, Calendar, Globe, FileText, Eye } from 'lucide-react';
+import { Scale, Calendar, Globe, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Court, Country } from '@/types/case';
@@ -9,7 +9,6 @@ interface CaseDetailHeaderProps {
   court: Court | null;
   country: Country | null;
   judgmentDate: string | null;
-  citation: string | null;
   tags: string[] | null;
   viewsCount: number;
   className?: string;
@@ -24,7 +23,6 @@ function CaseDetailHeader({
   court,
   country,
   judgmentDate,
-  citation,
   tags,
   viewsCount,
   className,
@@ -39,7 +37,7 @@ function CaseDetailHeader({
       })
     : null;
 
-  const hasMetadata = court || country || formattedDate || citation || viewsCount > 0;
+  const hasMetadata = court || country || formattedDate || viewsCount > 0;
   const hasTags = tags && tags.length > 0;
 
   return (
@@ -74,12 +72,6 @@ function CaseDetailHeader({
             <Badge variant="secondary" className="gap-1.5">
               <Calendar className="h-3 w-3" />
               {formattedDate}
-            </Badge>
-          )}
-          {citation && (
-            <Badge variant="secondary" className="gap-1.5">
-              <FileText className="h-3 w-3" />
-              {citation}
             </Badge>
           )}
           {viewsCount > 0 && (
