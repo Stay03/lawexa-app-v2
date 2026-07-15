@@ -9,6 +9,7 @@ export type PrincipleLawType = 'procedural' | 'substantive';
 export interface PrincipleCaseRef {
   id: number;
   title: string;
+  display_title?: string | null;
   slug: string;
   court: string | null;
   country: string | null;

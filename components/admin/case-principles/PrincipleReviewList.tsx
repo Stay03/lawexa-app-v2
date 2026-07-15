@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CasePrincipleReviewItem } from '@/types/admin-case-principles';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface PrincipleReviewListProps {
   items: CasePrincipleReviewItem[];
@@ -214,7 +215,7 @@ export function PrincipleReviewList({
                       href={`/admin/cases/${group.caseRef.slug}`}
                       className="block truncate text-sm font-semibold hover:underline"
                     >
-                      {group.caseRef.title}
+                      {getCaseDisplayTitle(group.caseRef)}
                     </Link>
                   ) : (
                     <span className="text-sm font-semibold text-muted-foreground">

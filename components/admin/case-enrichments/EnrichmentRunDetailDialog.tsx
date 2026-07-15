@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { EnrichmentStatusBadge, EnrichmentTriggerBadge } from './EnrichmentBadges';
 import { summarizeStats } from './EnrichmentRunsTable';
 import type { CaseEnrichmentRun } from '@/types/admin-case-enrichments';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface EnrichmentRunDetailDialogProps {
   run: CaseEnrichmentRun | null;
@@ -53,7 +54,7 @@ export function EnrichmentRunDetailDialog({
                   href={`/admin/cases/${run.case.slug}`}
                   className="inline-flex items-center gap-1 font-medium hover:underline"
                 >
-                  {run.case.title}
+                  {getCaseDisplayTitle(run.case)}
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               ) : (

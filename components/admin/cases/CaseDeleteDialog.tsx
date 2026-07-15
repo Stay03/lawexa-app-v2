@@ -16,6 +16,7 @@ import {
 import { useDeleteCase } from '@/lib/hooks/useAdminCases';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { CaseDetail, CaseSummary } from '@/types/admin-cases';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 /******************************************************************************
                                 Component Props
@@ -80,7 +81,7 @@ export function CaseDeleteDialog({
               <p>
                 Are you sure you want to delete{' '}
                 <span className="font-semibold text-foreground">
-                  {caseData.title}
+                  {getCaseDisplayTitle(caseData)}
                 </span>
                 ?
               </p>

@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { EnrichmentStatusBadge, EnrichmentTriggerBadge } from './EnrichmentBadges';
 import type { CaseEnrichmentRun, EnrichmentStats } from '@/types/admin-case-enrichments';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface EnrichmentRunsTableProps {
   runs: CaseEnrichmentRun[];
@@ -113,7 +114,7 @@ export function EnrichmentRunsTable({ runs, isLoading, onView }: EnrichmentRunsT
                     href={`/admin/cases/${run.case.slug}`}
                     className="block truncate text-sm font-medium hover:underline"
                   >
-                    {run.case.title}
+                    {getCaseDisplayTitle(run.case)}
                   </Link>
                 ) : (
                   <span className="text-sm text-muted-foreground">Deleted case</span>

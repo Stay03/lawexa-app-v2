@@ -11,6 +11,7 @@ export type EnrichmentSkipReason = 'already_enriched' | 'no_full_report';
 export interface EnrichmentCaseRef {
   id: number;
   title: string;
+  display_title?: string | null;
   slug: string;
 }
 

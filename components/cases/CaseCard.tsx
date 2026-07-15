@@ -6,6 +6,7 @@ import { ChevronRight, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BookmarkButton } from '@/components/common/BookmarkButton';
 import type { Case } from '@/types/case';
+import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface CaseCardProps {
   caseItem: Case;
@@ -19,7 +20,8 @@ interface CaseCardProps {
  */
 function CaseCard({ caseItem, className, style, searchQuery }: CaseCardProps) {
   const router = useRouter();
-  const { title, slug, court, judgment_date, principles, tags, country, views_count } = caseItem;
+  const { slug, court, judgment_date, principles, tags, country, views_count } = caseItem;
+  const title = getCaseDisplayTitle(caseItem);
 
   // Format date if available
   const formattedDate = judgment_date
