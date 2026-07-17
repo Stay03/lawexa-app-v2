@@ -45,3 +45,4 @@ conv.json
 res.txt
 res-stream.txt
 *.stackdump
+!.env.example

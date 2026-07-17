@@ -13,10 +13,12 @@ import {
   Link as LinkIcon,
   Gauge,
   Building2,
+  FlaskConical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { canAccessSpaces } from '@/lib/utils/spaces-access';
+import { canAccessV2Preview } from '@/lib/utils/v2-access';
 
 const navItems = [
   {
@@ -79,15 +81,26 @@ const navItems = [
     href: '/settings/api',
     icon: LinkIcon,
   },
+  {
+    label: 'Developer',
+    description: 'Preview builds & flags',
+    href: '/settings/developer',
+    icon: FlaskConical,
+  },
 ];
 
 export function SettingsSidebarNav() {
   const pathname = usePathname();
-  // Organization is part of the soft-launched Spaces feature.
-  const canSpaces = canAccessSpaces(useAuthStore((s) => s.user?.role));
-  const items = navItems.filter(
-    (item) => item.href !== '/settings/organization' || canSpaces
-  );
+  const role = useAuthStore((s) => s.user?.role);
+  // Organization is part of the soft-launched Spaces feature; Developer is the
+  // v2-preview toggle — both are gated to privileged roles.
+  const canSpaces = canAccessSpaces(role);
+  const canV2Preview = canAccessV2Preview(role);
+  const items = navItems.filter((item) => {
+    if (item.href === '/settings/organization') return canSpaces;
+    if (item.href === '/settings/developer') return canV2Preview;
+    return true;
+  });
 
   return (
     <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 md:w-60 md:shrink-0">
