@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lawexa v2 — C · Chambers Slate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=Fraunces:ital,wght@1,500&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   C — CHAMBERS SLATE
+   dense professional instrument · Linear-for-law
+   tokens → primitives → shell → screens → responsive → motion
+   ============================================================ */
+
+/* ---------- 1. Tokens ---------- */
+:root{
+  --bg:#F7F7F8;
+  --surface:#FFFFFF;
+  --surface-2:#F1F1F3;
+  --ink:#1B1D21;
+  --ink-muted:#6B6F78;
+  --border:#E3E4E8;
+  --gold:#C9A227;
+  --gold-text:#846910;
+  --gold-tint:#F5EED8;
+  --gold-ink:var(--gold-text);          /* gold-as-text: dark gold on light */
+  --gold-on-gold:#1B1D21;               /* ink on gold fills */
+  --shadow-dock:0 -1px 2px rgba(20,22,26,.03), 0 2px 14px rgba(20,22,26,.08);
+
+  --r-control:6px;
+  --r-card:8px;
+  --r-composer:12px;
+  --r-chip:6px;
+
+  --duration-fast:100ms;
+  --duration-base:140ms;
+  --ease:cubic-bezier(0.2,0,0,1);
+
+  --font-ui:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --font-case:"Fraunces",Georgia,serif;
+  --font-mark:"Comfortaa",var(--font-ui);
+
+  color-scheme:light;
+}
+.dark{
+  --bg:#17181C;
+  --surface:#1E2025;
+  --surface-2:#24262C;
+  --ink:#E8E9EC;
+  --ink-muted:#8D919B;
+  --border:#2C2E35;
+  --gold:#D9B23B;
+  --gold-tint:#2E2A1D;
+  --gold-ink:var(--gold);               /* bright gold is safe as text on slate */
+  --shadow-dock:0 -1px 2px rgba(0,0,0,.2), 0 2px 18px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+
+/* ---------- 2. Base ---------- */
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-ui);
+  font-size:13px;
+  line-height:1.45;
+  font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+::selection{background:rgba(201,162,39,.25);}
+.dark ::selection{background:rgba(217,178,59,.25);}
+
+button{
+  appearance:none;
+  background:none;
+  border:0;
+  margin:0;
+  padding:0;
+  font:inherit;
+  color:inherit;
+  cursor:pointer;
+  text-align:left;
+}
+textarea{
+  font:inherit;
+  color:inherit;
+  background:none;
+  border:0;
+  padding:0;
+  margin:0;
+  resize:none;
+}
+textarea:focus{outline:none;}
+p{margin:0 0 10px;}
+strong{font-weight:600;}
+
+:focus-visible{
+  outline:2px solid var(--gold);
+  outline-offset:1px;
+}
+
+.icon{
+  width:16px;height:16px;
+  flex:none;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.75;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.icon-14{width:14px;height:14px;}
+.icon-20{width:20px;height:20px;stroke-width:1.75;}
+
+.scroll{
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:var(--border) transparent;
+}
+.scroll::-webkit-scrollbar{width:10px;}
+.scroll::-webkit-scrollbar-thumb{
+  background:var(--border);
+  border:3px solid transparent;
+  background-clip:padding-box;
+  border-radius:999px;
+}
+.scroll::-webkit-scrollbar-track{background:transparent;}
+
+/* ---------- 3. Primitives ---------- */
+.kbd{
+  font-family:var(--font-mono);
+  font-size:11px;
+  font-weight:500;
+  line-height:1;
+  color:var(--ink-muted);
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:3px 5px;
+  white-space:nowrap;
+}
+.mini{
+  font-family:var(--font-mono);
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--ink-muted);
+}
+.mono{font-family:var(--font-mono);}
+
+.btn-icon{
+  position:relative;
+  width:32px;height:32px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:var(--r-control);
+  color:var(--ink-muted);
+  transition:transform var(--duration-fast) var(--ease);
+}
+.btn-icon:active{transform:scale(.97);}
+
+.chip{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  height:26px;
+  padding:0 8px;
+  font-size:12px;
+  font-weight:500;
+  color:var(--ink-muted);
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:var(--r-chip);
+  white-space:nowrap;
+  transition:transform var(--duration-fast) var(--ease);
+}
+.chip:active{transform:scale(.97);}
+.chip::after{content:"";position:absolute;inset:-4px;}  /* padded hit area ≥32px */
+
+/* signature: mono citation chip with gold left tick */
+.cite{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  min-height:32px;
+  padding:6px 12px 6px 13px;
+  font-family:var(--font-mono);
+  font-size:12px;
+  color:var(--ink);
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-chip);
+  overflow:hidden;
+  width:fit-content;
+  max-width:100%;
+  transition:transform var(--duration-fast) var(--ease);
+}
+.cite::before{
+  content:"";
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:3px;
+  background:var(--gold);
+}
+.cite:active{transform:scale(.97);}
+
+.case{
+  font-family:var(--font-case);
+  font-style:italic;
+  font-weight:500;
+}
+
+.avatar{
+  width:24px;height:24px;
+  flex:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:var(--gold-tint);
+  color:var(--gold-ink);
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.02em;
+}
+
+.badge{
+  position:absolute;
+  top:2px;right:1px;
+  min-width:14px;height:14px;
+  padding:0 3px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--font-mono);
+  font-size:10px;
+  font-weight:600;
+  line-height:1;
+  color:var(--gold-on-gold);
+  background:var(--gold);
+  border-radius:4px;
+}
+
+/* ---------- 4. Liquid-gold shimmer composer ---------- */
+.shimmer{
+  position:relative;
+  padding:1px;
+  border-radius:var(--r-composer);
+  overflow:hidden;
+  isolation:isolate;
+}
+.shimmer::before{
+  content:"";
+  position:absolute;
+  left:50%;top:50%;
+  width:340%;               /* rotating square always covers the bar */
+  aspect-ratio:1;
+  transform:translate(-50%,-50%) rotate(0turn);
+  background:conic-gradient(from 0deg,#F7E7B4,#EAB308,#C9A227,#F5E28A,#FFF8E1,#A87F10,#EAB308,#F7E7B4);
+  animation:shimmer-rotate 12s linear infinite;
+  will-change:transform;
+}
+.shimmer:focus-within::before{animation-duration:24s;}
+.shimmer:focus-within{
+  box-shadow:0 0 0 3px rgba(201,162,39,.18);
+}
+.dark .shimmer:focus-within{box-shadow:0 0 0 3px rgba(217,178,59,.18);}
+@keyframes shimmer-rotate{
+  to{transform:translate(-50%,-50%) rotate(1turn);}
+}
+.shimmer-inner{
+  position:relative;
+  border-radius:11px;
+  background:var(--surface);
+}
+
+/* command-bar internals */
+.cmd-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px 12px 12px 14px;
+}
+.cmd-glyph{color:var(--gold);}
+.cmd-input{
+  flex:1;
+  min-width:0;
+  font-size:14px;
+  line-height:20px;
+  height:20px;
+  overflow:hidden;
+  color:var(--gold-ink);
+  caret-color:var(--gold);
+}
+.cmd-input::placeholder{color:var(--ink-muted);opacity:1;}
+.cmd-tools{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 10px 10px;
+}
+.cmd-tools .spacer{flex:1;}
+.btn-attach{
+  width:32px;height:32px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:var(--r-control);
+  color:var(--ink-muted);
+  transition:transform var(--duration-fast) var(--ease);
+}
+.btn-attach:active{transform:scale(.97);}
+.btn-send{
+  width:32px;height:32px;
+  flex:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:var(--r-control);
+  background:var(--gold);
+  color:var(--gold-on-gold);
+  transition:transform var(--duration-fast) var(--ease),opacity var(--duration-fast) var(--ease);
+}
+.btn-send:active{transform:scale(.97);}
+
+/* ---------- 5. Spec chrome (not part of the design language) ---------- */
+.specbar{
+  flex:none;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  height:40px;
+  padding:0 12px;
+  background:#ECECEE;
+  color:#55575E;
+  border-bottom:1px solid #DCDDE1;
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:12px;
+  z-index:10;
+}
+.dark .specbar{
+  background:#101114;
+  color:#9DA0A8;
+  border-bottom-color:#26272C;
+}
+.spec-name{font-weight:600;color:#33353B;white-space:nowrap;}
+.dark .spec-name{color:#C9CBD1;}
+.spec-tabs{display:flex;gap:2px;background:rgba(0,0,0,.05);border-radius:7px;padding:2px;}
+.dark .spec-tabs{background:rgba(255,255,255,.06);}
+.spec-tab{
+  height:26px;
+  padding:0 10px;
+  border-radius:5px;
+  display:inline-flex;
+  align-items:center;
+  font-size:12px;
+  color:inherit;
+}
+.spec-tab[aria-selected="true"]{
+  background:#FFFFFF;
+  color:#1B1D21;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+.dark .spec-tab[aria-selected="true"]{
+  background:#2A2C33;
+  color:#E8E9EC;
+}
+.spec-hint{margin-left:auto;opacity:.75;white-space:nowrap;}
+.spec-theme{
+  width:30px;height:26px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:5px;
+  color:inherit;
+}
+.specbar :focus-visible{outline:2px solid #8A8D95;outline-offset:1px;}
+
+/* theme toggle icon swap (used in spec bar + app headers) */
+.i-sun{display:none;}
+.i-moon{display:block;}
+.dark .i-sun{display:block;}
+.dark .i-moon{display:none;}
+
+/* ---------- 6. App shell ---------- */
+.app{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns:240px minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr) auto;
+}
+.screen{
+  display:none;
+  grid-column:2;
+  grid-row:1;
+  min-height:0;
+  grid-template-rows:48px minmax(0,1fr) auto;
+}
+.app[data-screen="home"] .screen-home{display:grid;}
+.app[data-screen="convo"] .screen-convo{display:grid;}
+
+/* ---------- 7. Sidebar ---------- */
+.sidebar{
+  grid-column:1;
+  grid-row:1 / -1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  background:var(--bg);
+  border-right:1px solid var(--border);
+}
+.side-top{padding:12px 12px 8px;}
+.brand{
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  padding:4px 4px 12px;
+}
+.wordmark{
+  font-family:var(--font-mark);
+  font-weight:700;
+  font-size:17px;
+  letter-spacing:-.02em;
+  color:var(--ink);
+}
+.vtag{
+  font-family:var(--font-mono);
+  font-size:10px;
+  font-weight:500;
+  color:var(--ink-muted);
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:1px 4px;
+}
+.newchat{
+  width:100%;
+  height:32px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 8px 0 10px;
+  background:var(--gold);
+  color:var(--gold-on-gold);
+  font-weight:500;
+  border-radius:var(--r-control);
+  transition:transform var(--duration-fast) var(--ease),opacity var(--duration-fast) var(--ease);
+}
+.newchat:active{transform:scale(.97);}
+.newchat .label{flex:1;}
+.newchat .kbd{
+  background:rgba(255,255,255,.28);
+  border-color:rgba(27,29,33,.22);
+  color:#3A3010;
+}
+.side-nav{
+  flex:1;
+  min-height:0;
+  padding:4px 12px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+}
+.navrow,.subrow,.recentrow{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  border-radius:var(--r-control);
+  color:var(--ink);
+}
+.navrow{height:34px;padding:0 10px;}
+.subrow{height:32px;padding:0 10px 0 36px;font-size:13px;color:var(--ink-muted);}
+.recentrow{height:32px;padding:0 10px;font-size:13px;color:var(--ink-muted);}
+.navrow .icon{color:var(--ink-muted);}
+.navrow .label{flex:1;font-size:13px;font-weight:500;}
+.navrow .kbd{opacity:0;}
+.navrow:focus-visible .kbd{opacity:1;}
+.navrow .chev{
+  color:var(--ink-muted);
+  transition:transform var(--duration-base) var(--ease);
+}
+.navrow[aria-expanded="false"] .chev{transform:rotate(-90deg);}
+.subgroup{display:flex;flex-direction:column;gap:1px;}
+.subgroup.hidden{display:none;}
+.navrow.active{
+  background:var(--gold-tint);
+  color:var(--gold-ink);
+}
+.navrow.active .icon{color:var(--gold-ink);}
+.navrow.active::before{
+  content:"";
+  position:absolute;
+  left:0;top:7px;bottom:7px;
+  width:2px;
+  border-radius:1px;
+  background:var(--gold);
+}
+.recentrow .txt{
+  flex:1;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.side-label{
+  padding:14px 10px 6px;
+  display:block;
+}
+.side-foot{
+  flex:none;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:12px;
+  border-top:1px solid var(--border);
+}
+.side-foot .name{
+  flex:1;
+  min-width:0;
+  font-size:13px;
+  font-weight:500;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.plan-tag{
+  font-family:var(--font-mono);
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  color:var(--gold-ink);
+  background:var(--gold-tint);
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:2px 5px;
+}
+
+/* ---------- 8. Header ---------- */
+.header{
+  grid-row:1;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 16px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg);
+}
+.header .title{
+  font-size:13px;
+  font-weight:500;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.header .title-strong{font-weight:600;}
+.header .title-meta{
+  font-family:var(--font-mono);
+  font-size:12px;
+  color:var(--ink-muted);
+  margin-left:6px;
+}
+.header .grow{flex:1;}
+.header-actions{display:flex;align-items:center;gap:2px;}
+
+/* ---------- 9. Screen 1 — Home ---------- */
+.home-main{
+  grid-row:2;
+  padding:0 16px;
+}
+.home-col{
+  max-width:680px;
+  margin:0 auto;
+  padding:clamp(28px,8vh,72px) 0 40px;
+}
+.greeting{
+  margin:0;
+  font-size:26px;
+  font-weight:600;
+  letter-spacing:-.01em;
+  line-height:1.2;
+}
+.greeting-sub{
+  margin:6px 0 0;
+  font-size:14px;
+  color:var(--ink-muted);
+}
+.home-composer{margin-top:24px;}
+
+.prompt-card{
+  margin-top:14px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-card);
+  overflow:hidden;
+}
+.prompt-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  height:40px;
+  padding:0 12px;
+}
+.prompt-row + .prompt-row{border-top:1px solid var(--border);}
+.prompt-row .icon{color:var(--ink-muted);}
+.prompt-row .label{
+  flex:1;
+  min-width:0;
+  font-size:13px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.prompt-row .enter{
+  font-family:var(--font-mono);
+  font-size:12px;
+  color:var(--ink-muted);
+  opacity:0;
+}
+.prompt-row:focus-visible{outline-offset:-2px;}
+.prompt-row:focus-visible .enter{opacity:1;}
+
+.tile-grid{
+  margin-top:10px;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+}
+.tile{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+  padding:12px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-card);
+  transition:transform var(--duration-fast) var(--ease);
+}
+.tile:active{transform:scale(.97);}
+.tile .icon{color:var(--ink-muted);}
+.tile-line{display:flex;align-items:baseline;gap:5px;min-width:0;}
+.tile-count{
+  font-family:var(--font-mono);
+  font-size:14px;
+  font-weight:600;
+  color:var(--ink);
+}
+.tile-noun{font-size:13px;color:var(--ink-muted);}
+
+/* ---------- 10. Screen 2 — Conversation ---------- */
+.convo-main{
+  grid-row:2;
+  padding:0 16px;
+}
+.convo-col{
+  max-width:720px;
+  margin:0 auto;
+  padding:20px 0 24px;
+  display:flex;
+  flex-direction:column;
+}
+.msg-user{
+  align-self:flex-end;
+  max-width:min(560px,88%);
+}
+.msg-user .bubble{
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:var(--r-card);
+  padding:10px 12px;
+  font-size:14px;
+  line-height:1.55;
+}
+.msg-user .bubble p{margin:0;}
+.msg-time{
+  display:block;
+  margin-top:4px;
+  text-align:right;
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--ink-muted);
+}
+.tool-row{
+  margin-top:16px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  min-height:40px;
+  padding:0 12px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-card);
+}
+.tool-row .icon-spark{color:var(--gold-ink);}
+.tool-row .tool-label{font-size:13px;font-weight:500;}
+.tool-row .tool-meta{
+  font-family:var(--font-mono);
+  font-size:12px;
+  color:var(--ink-muted);
+}
+.tool-row .grow{flex:1;}
+.tool-row .chev{color:var(--ink-muted);}
+
+.msg-ai{
+  margin-top:16px;
+  font-size:14px;
+  line-height:1.6;
+}
+.lead{font-weight:600;margin-bottom:8px;}
+.test-list{
+  list-style:none;
+  margin:0 0 12px;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.test-list li{position:relative;padding-left:26px;}
+.li-num{
+  position:absolute;
+  left:0;top:1px;
+  font-family:var(--font-mono);
+  font-size:13px;
+  font-weight:500;
+  color:var(--gold-ink);
+}
+.quote{
+  margin:14px 0;
+}
+.quote blockquote{
+  position:relative;
+  overflow:hidden;
+  margin:0;
+  padding:12px 14px 12px 17px;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:var(--r-card);
+  font-style:italic;
+  font-size:14px;
+  line-height:1.6;
+}
+.quote blockquote::before{
+  content:"";
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:3px;
+  background:var(--gold);
+}
+.quote blockquote p{margin:0 0 8px;}
+.quote .attr{
+  display:block;
+  font-style:normal;
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--ink-muted);
+}
+.authorities{margin:14px 0;}
+.authorities .mini{display:block;margin-bottom:8px;}
+.cite-stack{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
+}
+.tail{margin:0;}
+.caret{
+  display:inline-block;
+  width:8px;height:16px;
+  margin-left:2px;
+  vertical-align:text-bottom;
+  background:var(--gold);
+  animation:caret-blink 1.1s steps(1,end) infinite;
+}
+@keyframes caret-blink{50%{opacity:0;}}
+.stopped .caret{display:none;}
+
+.msg-actions{
+  margin-top:10px;
+  display:flex;
+  align-items:center;
+  gap:2px;
+  min-height:32px;
+}
+.actions-hover{
+  display:none;
+  align-items:center;
+  gap:2px;
+  opacity:0;
+  transition:opacity var(--duration-base) var(--ease);
+}
+.actions-hover:focus-within{opacity:1;}
+.actions-touch{display:flex;}
+
+/* ---------- 11. Dock (status strip + docked composer) ---------- */
+.dock{
+  grid-row:3;
+  border-top:1px solid var(--border);
+  background:var(--bg);
+  padding:8px 16px calc(12px + env(safe-area-inset-bottom));
+}
+.dock-inner{
+  max-width:720px;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.statusbar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:32px;
+}
+.stopped .statusbar{display:none;}
+.status-live{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  font-family:var(--font-mono);
+  font-size:12px;
+  color:var(--ink-muted);
+}
+.dot{
+  width:7px;height:7px;
+  flex:none;
+  border-radius:999px;
+  background:var(--gold);
+  animation:dot-pulse 1.4s var(--ease) infinite;
+}
+@keyframes dot-pulse{50%{opacity:.3;}}
+.statusbar .grow{flex:1;}
+.btn-stop{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  height:28px;
+  padding:0 6px 0 10px;
+  font-size:12px;
+  font-weight:500;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-control);
+  position:relative;
+  transition:transform var(--duration-fast) var(--ease);
+}
+.btn-stop::after{content:"";position:absolute;inset:-3px;} /* 32px+ hit */
+.btn-stop:active{transform:scale(.97);}
+.btn-stop .kbd{padding:2px 4px;}
+.dock .shimmer{box-shadow:var(--shadow-dock);}
+.dock .shimmer:focus-within{
+  box-shadow:var(--shadow-dock),0 0 0 3px rgba(201,162,39,.18);
+}
+.dark .dock .shimmer:focus-within{
+  box-shadow:var(--shadow-dock),0 0 0 3px rgba(217,178,59,.18);
+}
+.dock .cmd-row{padding:10px 10px 10px 14px;}
+.dock .kbd{background:var(--surface-2);}
+
+/* ---------- 12. Mobile tab bar ---------- */
+.tabbar{
+  grid-column:2;
+  grid-row:2;
+  display:none;
+  grid-template-columns:repeat(5,1fr);
+  border-top:1px solid var(--border);
+  background:var(--bg);
+  padding:0 4px env(safe-area-inset-bottom);
+}
+.tab{
+  height:56px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  color:var(--ink-muted);
+  border-radius:var(--r-control);
+}
+.tab .tab-label{
+  font-size:10px;
+  font-weight:500;
+  line-height:1;
+}
+.tab.active{color:var(--gold-ink);}
+.tab-iconwrap{position:relative;display:flex;}
+.tab .badge{top:-4px;right:-8px;}
+
+/* ---------- 13. Hover (pointer devices only) ---------- */
+@media (hover:hover){
+  .btn-icon:hover{background:var(--surface-2);color:var(--ink);}
+  .navrow:hover{background:var(--surface-2);}
+  .navrow:hover .kbd{opacity:1;}
+  .navrow.active:hover{background:var(--gold-tint);}
+  .subrow:hover{background:var(--surface-2);color:var(--ink);}
+  .recentrow:hover{background:var(--surface-2);color:var(--ink);}
+  .newchat:hover{opacity:.92;}
+  .btn-send:hover{opacity:.9;}
+  .btn-attach:hover{background:var(--surface-2);color:var(--ink);}
+  .chip:hover{color:var(--ink);border-color:var(--ink-muted);}
+  .cite:hover{background:var(--surface-2);}
+  .prompt-row:hover{background:var(--surface-2);}
+  .prompt-row:hover .enter{opacity:1;}
+  .tile:hover{background:var(--surface-2);}
+  .tool-row:hover{background:var(--surface-2);}
+  .btn-stop:hover{background:var(--surface-2);}
+  .tab:hover{color:var(--ink);}
+  .tab.active:hover{color:var(--gold-ink);}
+  .spec-tab:hover:not([aria-selected="true"]){background:rgba(0,0,0,.05);}
+  .dark .spec-tab:hover:not([aria-selected="true"]){background:rgba(255,255,255,.07);}
+  .spec-theme:hover{background:rgba(0,0,0,.06);}
+  .dark .spec-theme:hover{background:rgba(255,255,255,.08);}
+  /* desktop: hover-reveal ghost actions, hide the touch ⋯ */
+  .actions-hover{display:flex;}
+  .actions-touch{display:none;}
+  .msg-ai:hover .actions-hover{opacity:1;}
+}
+
+/* ---------- 14. Responsive shells ---------- */
+@media (max-width:1023.98px){
+  .app{grid-template-columns:minmax(0,1fr);}
+  .sidebar{display:none;}
+  .screen{grid-column:1;}
+  .tabbar{grid-column:1;}
+}
+@media (max-width:767.98px){
+  .app[data-screen="home"] .tabbar{display:grid;}
+  .header{padding:0 12px;}
+  .home-main,.convo-main{padding:0 12px;}
+  .home-col{padding-top:24px;}
+  .greeting{font-size:22px;}
+  .tile-grid{grid-template-columns:repeat(2,1fr);}
+  .spec-hint{display:none;}
+  .dock{padding-left:12px;padding-right:12px;}
+}
+
+/* ---------- 15. Reduced motion: static gold ring, no animation ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= icon sprite ======================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-message-square" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-library" viewBox="0 0 24 24"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2Z"/><path d="M15 21v-4a2 2 0 0 1 2-2h4"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.42 10.92a1 1 0 0 0-.02-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.94 15.5a2 2 0 0 0-1.44-1.44l-6.13-1.58a.5.5 0 0 1 0-.96l6.13-1.58a2 2 0 0 0 1.44-1.44l1.58-6.14a.5.5 0 0 1 .97 0l1.58 6.14a2 2 0 0 0 1.43 1.43l6.14 1.59a.5.5 0 0 1 0 .96l-6.14 1.59a2 2 0 0 0-1.43 1.43l-1.58 6.14a.5.5 0 0 1-.97 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-thumb-up" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></symbol>
+    <symbol id="i-thumb-down" viewBox="0 0 24 24"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></symbol>
+    <symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+  </defs>
+</svg>
+
+<!-- ======================= spec chrome ======================= -->
+<div class="specbar">
+  <span class="spec-name">C — Chambers Slate</span>
+  <div class="spec-tabs" role="tablist" aria-label="Screens">
+    <button class="spec-tab" role="tab" id="tabHome" aria-selected="true" data-goto="home">Home</button>
+    <button class="spec-tab" role="tab" id="tabConvo" aria-selected="false" data-goto="convo">Conversation</button>
+  </div>
+  <span class="spec-hint">resize for mobile</span>
+  <button class="spec-theme theme-toggle" aria-label="Toggle light or dark theme">
+    <svg class="icon icon-14 i-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+    <svg class="icon icon-14 i-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+  </button>
+</div>
+
+<!-- ======================= app ======================= -->
+<div class="app" id="app" data-screen="home">
+
+  <!-- ---------- sidebar ---------- -->
+  <aside class="sidebar">
+    <div class="side-top">
+      <div class="brand">
+        <span class="wordmark">lawexa</span>
+        <span class="vtag">v2</span>
+      </div>
+      <button class="newchat" data-goto="home" data-focus-composer>
+        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+        <span class="label">New chat</span>
+        <span class="kbd">N</span>
+      </button>
+    </div>
+    <nav class="side-nav scroll" aria-label="Primary">
+      <button class="navrow nav-conversations active" data-goto="convo">
+        <svg class="icon" aria-hidden="true"><use href="#i-message-square"/></svg>
+        <span class="label">Conversations</span>
+        <span class="kbd">⌘1</span>
+      </button>
+      <button class="navrow" id="libraryRow" aria-expanded="true" aria-controls="libraryGroup">
+        <svg class="icon" aria-hidden="true"><use href="#i-library"/></svg>
+        <span class="label">Library</span>
+        <svg class="icon icon-14 chev" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </button>
+      <div class="subgroup" id="libraryGroup">
+        <button class="subrow">Cases</button>
+        <button class="subrow">Statutes</button>
+        <button class="subrow">Notes</button>
+        <button class="subrow">Files</button>
+      </div>
+      <button class="navrow">
+        <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
+        <span class="label">Bookmarks</span>
+        <span class="kbd">⌘3</span>
+      </button>
+      <button class="navrow">
+        <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg>
+        <span class="label">Spaces</span>
+        <span class="kbd">⌘4</span>
+      </button>
+      <button class="navrow">
+        <svg class="icon" aria-hidden="true"><use href="#i-cap"/></svg>
+        <span class="label">Quiz</span>
+        <span class="kbd">⌘5</span>
+      </button>
+      <span class="mini side-label">Recent</span>
+      <button class="recentrow" data-goto="convo">
+        <span class="txt">Madukolu — the jurisdiction test</span>
+      </button>
+      <button class="recentrow">
+        <span class="txt">Tenant eviction — Lagos</span>
+      </button>
+      <button class="recentrow">
+        <span class="txt">Evidence Act s.84 — electronic evidence</span>
+      </button>
+    </nav>
+    <div class="side-foot">
+      <span class="avatar" aria-hidden="true">AO</span>
+      <span class="name">Adaeze Okafor</span>
+      <span class="plan-tag">PREMIUM</span>
+    </div>
+  </aside>
+
+  <!-- ---------- screen 1: home ---------- -->
+  <section class="screen screen-home" aria-label="Home">
+    <header class="header">
+      <span class="title">Home</span>
+      <span class="grow"></span>
+      <div class="header-actions">
+        <button class="btn-icon" aria-label="Notifications, 3 unread">
+          <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
+          <span class="badge">3</span>
+        </button>
+        <button class="btn-icon theme-toggle" aria-label="Toggle light or dark theme">
+          <svg class="icon i-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="icon i-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="home-main scroll">
+      <div class="home-col">
+        <h1 class="greeting">Good evening, Adaeze.</h1>
+        <p class="greeting-sub">What are we researching tonight?</p>
+
+        <!-- shimmer command-bar composer -->
+        <div class="shimmer home-composer">
+          <div class="shimmer-inner">
+            <div class="cmd-row">
+              <svg class="icon cmd-glyph" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+              <textarea class="cmd-input" id="homeInput" rows="1" placeholder="Ask anything about Nigerian law…" aria-label="Ask anything about Nigerian law"></textarea>
+              <span class="kbd">⌘K</span>
+            </div>
+            <div class="cmd-tools">
+              <button class="btn-attach" aria-label="Attach a file">
+                <svg class="icon" aria-hidden="true"><use href="#i-paperclip"/></svg>
+              </button>
+              <button class="chip">NG · Nigeria</button>
+              <button class="chip">Lawexa Expert</button>
+              <span class="spacer"></span>
+              <button class="btn-send" data-goto="convo" aria-label="Send">
+                <svg class="icon" aria-hidden="true"><use href="#i-arrow-up"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- suggested prompts -->
+        <div class="prompt-card">
+          <button class="prompt-row" data-goto="convo">
+            <svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>
+            <span class="label">Explain the ratio in Madukolu v Nkemdilim</span>
+            <span class="enter">↵</span>
+          </button>
+          <button class="prompt-row">
+            <svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>
+            <span class="label">Consent under the Land Use Act, state by state</span>
+            <span class="enter">↵</span>
+          </button>
+          <button class="prompt-row">
+            <svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>
+            <span class="label">Draft a memo on tenant eviction in Lagos</span>
+            <span class="enter">↵</span>
+          </button>
+          <button class="prompt-row">
+            <svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>
+            <span class="label">Quiz me on the Evidence Act 2011</span>
+            <span class="enter">↵</span>
+          </button>
+        </div>
+
+        <!-- shortcut tiles -->
+        <div class="tile-grid">
+          <button class="tile">
+            <svg class="icon" aria-hidden="true"><use href="#i-scale"/></svg>
+            <span class="tile-line"><span class="tile-count">12,406</span><span class="tile-noun">cases</span></span>
+          </button>
+          <button class="tile">
+            <svg class="icon" aria-hidden="true"><use href="#i-book"/></svg>
+            <span class="tile-line"><span class="tile-count">318</span><span class="tile-noun">statutes</span></span>
+          </button>
+          <button class="tile">
+            <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg>
+            <span class="tile-line"><span class="tile-count">64</span><span class="tile-noun">notes</span></span>
+          </button>
+          <button class="tile">
+            <svg class="icon" aria-hidden="true"><use href="#i-cap"/></svg>
+            <span class="tile-line"><span class="tile-count">9</span><span class="tile-noun">quizzes</span></span>
+          </button>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ---------- screen 2: conversation ---------- -->
+  <section class="screen screen-convo" id="convoScreen" aria-label="Conversation">
+    <header class="header">
+      <button class="btn-icon" data-goto="home" aria-label="Back to home">
+        <svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg>
+      </button>
+      <span class="title title-strong">Jurisdiction — the Madukolu test<span class="title-meta">· 6 authorities</span></span>
+      <span class="grow"></span>
+      <div class="header-actions">
+        <button class="btn-icon" aria-label="Share conversation">
+          <svg class="icon" aria-hidden="true"><use href="#i-share"/></svg>
+        </button>
+        <button class="btn-icon" aria-label="Notifications, 3 unread">
+          <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
+          <span class="badge">3</span>
+        </button>
+        <button class="btn-icon theme-toggle" aria-label="Toggle light or dark theme">
+          <svg class="icon i-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="icon i-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="convo-main scroll">
+      <div class="convo-col">
+
+        <!-- user message -->
+        <div class="msg-user">
+          <div class="bubble">
+            <p>What makes a court competent to hear a matter? I keep seeing <em class="case">Madukolu v Nkemdilim</em> cited — what does it actually decide?</p>
+          </div>
+          <span class="msg-time">21:42</span>
+        </div>
+
+        <!-- tool row -->
+        <button class="tool-row" aria-expanded="false">
+          <svg class="icon icon-spark" aria-hidden="true"><use href="#i-zap"/></svg>
+          <span class="tool-label">Searched Nigerian case law</span>
+          <span class="tool-meta">6 authorities · 1.8s</span>
+          <span class="grow"></span>
+          <svg class="icon icon-14 chev" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+        </button>
+
+        <!-- AI answer -->
+        <div class="msg-ai">
+          <p><em class="case">Madukolu v Nkemdilim</em> (1962) is the foundational authority on jurisdiction in Nigeria. The Federal Supreme Court, per Bairamian FJ, laid down the test that every court still applies before touching the merits of a case.</p>
+
+          <p class="lead">A court is competent only when all three conditions are met:</p>
+          <ol class="test-list">
+            <li><span class="li-num">1.</span><strong>Proper constitution</strong> — the bench is properly constituted as regards numbers and qualifications of its members, and no member is disqualified.</li>
+            <li><span class="li-num">2.</span><strong>Subject-matter jurisdiction</strong> — the case is within the court's jurisdiction and no statutory limitation applies.</li>
+            <li><span class="li-num">3.</span><strong>Due process</strong> — the case comes before the court initiated by due process of law, and every condition precedent to exercising jurisdiction has been fulfilled.</li>
+          </ol>
+
+          <figure class="quote">
+            <blockquote>
+              <p>Any defect in competence is fatal, for the proceedings are a nullity however well conducted and decided.</p>
+              <span class="attr">— BAIRAMIAN FJ, (1962) 2 SCNLR 341</span>
+            </blockquote>
+          </figure>
+
+          <div class="authorities">
+            <span class="mini">Authorities</span>
+            <div class="cite-stack">
+              <button class="cite">Madukolu v Nkemdilim (1962) 2 SCNLR 341</button>
+              <button class="cite">Skenconsult (Nig) Ltd v Ukey (1981) 1 SC 6</button>
+              <button class="cite">A-G Lagos State v Dosunmu (1989) 3 NWLR (Pt.111) 552</button>
+            </div>
+          </div>
+
+          <p class="tail">Where any limb fails, the defect goes to the root —<span class="caret" aria-hidden="true"></span></p>
+
+          <div class="msg-actions">
+            <div class="actions-hover">
+              <button class="btn-icon" aria-label="Copy answer">
+                <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>
+              </button>
+              <button class="btn-icon" aria-label="Good answer">
+                <svg class="icon" aria-hidden="true"><use href="#i-thumb-up"/></svg>
+              </button>
+              <button class="btn-icon" aria-label="Poor answer">
+                <svg class="icon" aria-hidden="true"><use href="#i-thumb-down"/></svg>
+              </button>
+            </div>
+            <div class="actions-touch">
+              <button class="btn-icon" aria-label="Message actions">
+                <svg class="icon" aria-hidden="true"><use href="#i-dots"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- dock: status strip + docked composer -->
+    <div class="dock">
+      <div class="dock-inner">
+        <div class="statusbar">
+          <span class="status-live"><span class="dot" aria-hidden="true"></span>streaming</span>
+          <span class="grow"></span>
+          <button class="btn-stop" id="stopBtn">Stop <span class="kbd">Esc</span></button>
+        </div>
+        <div class="shimmer">
+          <div class="shimmer-inner">
+            <div class="cmd-row">
+              <svg class="icon cmd-glyph" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+              <textarea class="cmd-input" id="convoInput" rows="1" placeholder="Ask anything about Nigerian law…" aria-label="Ask anything about Nigerian law"></textarea>
+              <span class="kbd">⌘K</span>
+              <button class="btn-send" aria-label="Send">
+                <svg class="icon" aria-hidden="true"><use href="#i-arrow-up"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------- mobile tab bar (home only) ---------- -->
+  <nav class="tabbar" aria-label="Tabs">
+    <button class="tab active" data-goto="home" aria-current="page">
+      <span class="tab-iconwrap"><svg class="icon icon-20" aria-hidden="true"><use href="#i-home"/></svg></span>
+      <span class="tab-label">Home</span>
+    </button>
+    <button class="tab" data-goto="convo">
+      <span class="tab-iconwrap"><svg class="icon icon-20" aria-hidden="true"><use href="#i-message-circle"/></svg></span>
+      <span class="tab-label">Chats</span>
+    </button>
+    <button class="tab">
+      <span class="tab-iconwrap"><svg class="icon icon-20" aria-hidden="true"><use href="#i-library"/></svg></span>
+      <span class="tab-label">Library</span>
+    </button>
+    <button class="tab">
+      <span class="tab-iconwrap">
+        <svg class="icon icon-20" aria-hidden="true"><use href="#i-bell"/></svg>
+        <span class="badge">3</span>
+      </span>
+      <span class="tab-label">Alerts</span>
+    </button>
+    <button class="tab">
+      <span class="tab-iconwrap"><svg class="icon icon-20" aria-hidden="true"><use href="#i-dots"/></svg></span>
+      <span class="tab-label">More</span>
+    </button>
+  </nav>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  var app = document.getElementById("app");
+  var convoScreen = document.getElementById("convoScreen");
+  var tabHome = document.getElementById("tabHome");
+  var tabConvo = document.getElementById("tabConvo");
+
+  /* ---------- theme ---------- */
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    root.classList.add("dark");
+  }
+  document.querySelectorAll(".theme-toggle").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      root.classList.toggle("dark");
+    });
+  });
+
+  /* ---------- screen switching (instant, no entrance animation) ---------- */
+  function go(screen) {
+    app.dataset.screen = screen;
+    var isConvo = screen === "convo";
+    tabHome.setAttribute("aria-selected", String(!isConvo));
+    tabConvo.setAttribute("aria-selected", String(isConvo));
+  }
+  document.querySelectorAll("[data-goto]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      go(el.getAttribute("data-goto"));
+      if (el.hasAttribute("data-focus-composer")) focusComposer();
+    });
+  });
+
+  /* ---------- library expand/collapse ---------- */
+  var libraryRow = document.getElementById("libraryRow");
+  var libraryGroup = document.getElementById("libraryGroup");
+  libraryRow.addEventListener("click", function () {
+    var open = libraryRow.getAttribute("aria-expanded") === "true";
+    libraryRow.setAttribute("aria-expanded", String(!open));
+    libraryGroup.classList.toggle("hidden", open);
+  });
+
+  /* ---------- streaming stop ---------- */
+  function stopStreaming() {
+    convoScreen.classList.add("stopped");
+  }
+  document.getElementById("stopBtn").addEventListener("click", stopStreaming);
+
+  /* ---------- composer ---------- */
+  function focusComposer() {
+    var id = app.dataset.screen === "convo" ? "convoInput" : "homeInput";
+    var el = document.getElementById(id);
+    if (el) el.focus();
+  }
+  var homeInput = document.getElementById("homeInput");
+  homeInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      go("convo");
+    }
+  });
+
+  /* ---------- keyboard-first affordances ---------- */
+  document.addEventListener("keydown", function (e) {
+    var tag = document.activeElement ? document.activeElement.tagName : "";
+    var typing = tag === "TEXTAREA" || tag === "INPUT";
+    var mod = e.metaKey || e.ctrlKey;
+    if (mod && (e.key === "k" || e.key === "K")) {
+      e.preventDefault();
+      focusComposer();
+    } else if (mod && e.key === "1") {
+      e.preventDefault();
+      go("convo");
+    } else if (!typing && !mod && !e.altKey && (e.key === "n" || e.key === "N")) {
+      e.preventDefault();
+      go("home");
+      focusComposer();
+    } else if (e.key === "Escape" && app.dataset.screen === "convo") {
+      stopStreaming();
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lawexa v2 — A · Counsel Gold</title>
+<script>
+  /* Apply saved theme before first paint */
+  (function () {
+    try {
+      var t = localStorage.getItem('counsel-gold-theme');
+      if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,0..100,0..1&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   1. Tokens
+   ============================================================ */
+:root {
+  --bg: #FAF9F5;
+  --surface: #FFFFFF;
+  --surface-2: #F3F1EA;
+  --ink: #211E18;
+  --ink-muted: #6F6759;
+  --border: #E7E2D7;
+  --gold: #C9A227;            /* surfaces, borders, fills with dark text — never text on light */
+  --gold-text: #8A6D1C;       /* links / accent text on light */
+  --gold-strong: #7A5F15;     /* accent text on gold-tint surfaces (contrast-safe) */
+  --gold-tint: #F7EFDA;
+  --on-gold: #211E18;
+  --ring: #A87F10;
+  --elev: 0 0 0 1px var(--border), 0 1px 2px rgba(0,0,0,.04), 0 4px 12px -4px rgba(0,0,0,.06);
+
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-composer: 22px;
+  --radius-pill: 999px;
+
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --font-ui: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-wordmark: "Comfortaa", var(--font-ui);
+
+  color-scheme: light;
+}
+.dark {
+  --bg: #1D1B16;
+  --surface: #26231D;
+  --surface-2: #2E2A23;
+  --ink: #F1EDE4;
+  --ink-muted: #A39A8A;
+  --border: #3A362D;
+  --gold: #E3B93C;            /* may be text on dark */
+  --gold-text: #E3B93C;
+  --gold-strong: #E3B93C;
+  --gold-tint: #3A3323;
+  --on-gold: #211E18;
+  --ring: #E3B93C;
+  --elev: inset 0 0 0 1px rgba(241, 237, 228, 0.09), 0 1px 2px rgba(0, 0, 0, 0.2);
+  color-scheme: dark;
+}
+
+/* ============================================================
+   2. Base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+button { font-family: inherit; }
+::selection { background: rgba(201, 162, 39, 0.3); }
+.dark ::selection { background: rgba(227, 185, 60, 0.3); }
+
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring-offset, var(--bg)), 0 0 0 4px var(--ring);
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Icons — lucide-style inline SVG */
+.i { width: 20px; height: 20px; flex: none; }
+.i-sm { width: 16px; height: 16px; }
+
+/* ============================================================
+   3. Spec chrome bar (neutral — not part of the design language)
+   ============================================================ */
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  background: #EFEDE8;
+  border-bottom: 1px solid #DCD9D1;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12.5px;
+  color: #4B4842;
+}
+.dark .chrome { background: #15130F; border-color: #2A2721; color: #B3AEA3; }
+.chrome-name { font-weight: 600; white-space: nowrap; }
+.chrome-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.dark .chrome-tabs { background: rgba(255, 255, 255, 0.07); }
+.chrome-tab {
+  border: 0;
+  background: transparent;
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: inherit;
+  cursor: pointer;
+}
+.chrome-tab.is-active { background: #FFFFFF; color: #211E18; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.dark .chrome-tab.is-active { background: #37342C; color: #F1EDE4; box-shadow: none; }
+.chrome-hint { margin-left: auto; color: #6B675E; white-space: nowrap; }
+.dark .chrome-hint { color: #9B958A; }
+.chrome-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.dark .chrome-btn { border-color: rgba(255, 255, 255, 0.16); }
+.chrome-btn .i { width: 15px; height: 15px; }
+@media (max-width: 619.98px) { .chrome-hint { display: none; } }
+
+/* Theme-toggle icon swap: moon in light (go dark), sun in dark (go light) */
+.icon-sun { display: none; }
+.dark .icon-sun { display: block; }
+.dark .icon-moon { display: none; }
+
+/* ============================================================
+   4. App shell
+   ============================================================ */
+.screen {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.pane {
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   5. Primitives
+   ============================================================ */
+.wordmark {
+  font-family: var(--font-wordmark);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+}
+.wordmark-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  margin-left: 3px;
+  display: inline-block;
+}
+
+.icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.icon-btn .i { width: 19px; height: 19px; }
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  border: 0;
+  background: var(--gold);
+  color: var(--on-gold);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease);
+}
+.btn-primary .i { width: 17px; height: 17px; }
+
+.badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  color: var(--on-gold);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg);
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--gold-tint);
+  color: var(--gold-strong);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.display {
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+}
+.case-name {
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+  font-weight: 500;
+  font-size: 1.02em;
+}
+
+/* ============================================================
+   6. Sidebar (desktop only)
+   ============================================================ */
+.sidebar {
+  display: none;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+.sidebar-top { padding: 20px 20px 14px; }
+.sidebar > .btn-primary { margin: 2px 16px 14px; }
+.side-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  flex: none;
+}
+.nav-item .i { width: 18px; height: 18px; color: var(--ink-muted); }
+.nav-item.is-active { background: var(--gold-tint); color: var(--gold-strong); }
+.nav-item.is-active .i { color: var(--gold-strong); }
+.nav-item.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--gold);
+}
+.nav-caret { margin-left: auto; width: 15px; height: 15px; color: var(--ink-muted); }
+.nav-sub { display: flex; flex-direction: column; gap: 2px; padding-left: 26px; }
+.nav-sub .nav-item { height: 34px; font-size: 13.5px; }
+.nav-sub .nav-item .i { width: 16px; height: 16px; }
+
+.section-label {
+  margin: 16px 10px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+  flex: none;
+}
+.recent-item {
+  display: block;
+  width: 100%;
+  padding: 0 10px;
+  height: 36px;
+  line-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13.5px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  flex: none;
+}
+.recent-item.is-active {
+  background: var(--gold-tint);
+  color: var(--gold-strong);
+  font-weight: 500;
+}
+.side-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.user-meta { display: flex; flex-direction: column; min-width: 0; }
+.user-name { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-plan { font-size: 12px; color: var(--ink-muted); }
+
+/* ============================================================
+   7. Top bar
+   ============================================================ */
+.topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.topbar-right { display: flex; align-items: center; gap: 2px; flex: none; }
+.breadcrumb { display: none; font-size: 13.5px; font-weight: 500; color: var(--ink-muted); }
+.topbar-wordmark { font-size: 18px; }
+.back-btn { width: 40px; height: 40px; margin-left: -6px; color: var(--ink); flex: none; }
+.convo-title {
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+  font-size: 17px;
+  font-weight: 560;
+  letter-spacing: 0.002em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ============================================================
+   8. Home screen
+   ============================================================ */
+.home-wrap {
+  width: 100%;
+  max-width: 720px;
+  margin: auto;               /* vertically centers when there is room */
+  padding: 36px 20px 40px;
+}
+.home-hero { text-align: center; }
+.greeting {
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+  font-size: 26px;
+  font-weight: 540;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.greeting-sub { margin-top: 8px; color: var(--ink-muted); font-size: 15px; }
+.home-wrap .shimmer { margin-top: 26px; }
+
+.prompts {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.prompt-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.shortcuts {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.shortcut-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 18px 10px 15px;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--elev);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease);
+}
+.shortcut-card .i { width: 20px; height: 20px; color: var(--gold-strong); }
+.shortcut-card:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring);
+}
+
+/* ============================================================
+   9. Signature — liquid-gold shimmer composer (compositor-only)
+   ============================================================ */
+.shimmer {
+  position: relative;
+  padding: 1px;
+  border-radius: var(--radius-composer);
+  overflow: hidden;
+}
+.shimmer::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 340%;                /* square ≥ wrapper diagonal, so rotation never gaps */
+  aspect-ratio: 1 / 1;
+  background: conic-gradient(from 0deg,
+    #F7E7B4, #EAB308, #C9A227, #F5E28A, #FFF8E1, #A87F10, #EAB308, #F7E7B4);
+  transform: translate(-50%, -50%) rotate(0turn);
+  animation: shimmer-spin 14s linear infinite;
+  will-change: transform;
+}
+.shimmer:focus-within::before { animation-duration: 30s; }
+@keyframes shimmer-spin {
+  to { transform: translate(-50%, -50%) rotate(1turn); }
+}
+
+.composer {
+  position: relative;
+  border-radius: 21px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  --ring-offset: var(--surface);
+}
+.composer-input {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  max-height: 180px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  padding: 15px 18px 6px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--gold-text);
+  caret-color: var(--gold-text);
+  border-radius: 14px;
+}
+.composer-input::placeholder { color: var(--ink-muted); opacity: 1; }
+.composer-dock .composer-input { min-height: 44px; padding-top: 13px; }
+/* Fallback focus ring, upgraded to a wrapper ring where :has() exists */
+.composer-input:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
+@supports selector(:has(*)) {
+  .composer-input:focus-visible { box-shadow: none; }
+  .shimmer:has(.composer-input:focus-visible) {
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring);
+  }
+}
+.composer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px 10px 12px;
+}
+.composer-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.attach-btn { width: 32px; height: 32px; }
+.attach-btn .i { width: 17px; height: 17px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip .i { width: 14px; height: 14px; color: var(--gold-strong); }
+.flag-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, #0E8A4A 34%, #FDFDF9 34% 66%, #0E8A4A 66%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  flex: none;
+}
+.send {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  color: var(--on-gold);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease);
+}
+.send .i { width: 18px; height: 18px; }
+.send:active { transform: scale(0.96); }
+
+/* ============================================================
+   10. Conversation screen
+   ============================================================ */
+.thread {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 18px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.msg-group {
+  animation: msg-in var(--duration-base) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.user-group { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.bubble {
+  max-width: 80%;
+  background: var(--surface-2);
+  border-radius: var(--radius-card);
+  padding: 12px 16px;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.stamp { font-size: 11.5px; color: var(--ink-muted); padding-right: 4px; }
+
+.tool-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--elev);
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.tool-row .spark { color: var(--gold-strong); width: 15px; height: 15px; }
+.tool-row .i-caret { width: 14px; height: 14px; }
+
+.ai-body { font-size: 15.5px; line-height: 1.6; }
+.ai-body p { margin: 0 0 14px; }
+.ai-body p:last-child { margin-bottom: 0; }
+.ai-body ol {
+  margin: 0 0 14px;
+  padding-left: 24px;
+  display: grid;
+  gap: 10px;
+}
+.ai-body li::marker { color: var(--gold-strong); font-weight: 600; }
+.ai-body blockquote {
+  margin: 16px 0;
+  padding: 13px 18px;
+  border-left: 3px solid var(--gold);
+  background: var(--surface-2);
+  border-radius: 4px 12px 12px 4px;
+}
+.ai-body blockquote p { margin: 0; font-style: italic; }
+.ai-body blockquote footer {
+  margin-top: 8px;
+  font-size: 13px;
+  font-style: normal;
+  color: var(--ink-muted);
+}
+
+.authorities { margin: 16px 0; }
+.authorities-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  margin-bottom: 9px;
+}
+.citations { display: flex; flex-wrap: wrap; gap: 8px; }
+.citation {
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--gold-tint);
+  color: var(--gold-strong);
+  padding: 7px 14px;
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.caret {
+  display: inline-block;
+  width: 6px;
+  height: 18px;
+  border-radius: 1px;
+  background: var(--gold);
+  margin-left: 3px;
+  vertical-align: -3px;
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+
+.msg-actions { display: none; align-items: center; gap: 2px; margin-top: 10px; height: 32px; }
+.msg-actions .icon-btn { width: 32px; height: 32px; }
+.msg-actions .icon-btn .i { width: 16px; height: 16px; }
+.overflow-btn { display: inline-flex; width: 32px; height: 32px; margin-top: 10px; }
+.overflow-btn .i { width: 17px; height: 17px; }
+
+.responding-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  padding: 6px 7px 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.pulse-dot { width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--gold); flex: none; }
+.pill-sep { color: var(--border); }
+.stop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stop-btn .i { width: 12px; height: 12px; }
+
+.composer-dock {
+  padding: 8px 16px calc(14px + env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+.dock-inner { max-width: 760px; margin: 0 auto; }
+
+/* ============================================================
+   11. Mobile bottom tab bar (Home screen, <768px)
+   ============================================================ */
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  height: calc(56px + env(safe-area-inset-bottom));
+  padding: 5px 8px calc(5px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.tab-item {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tab-item .i { width: 21px; height: 21px; }
+.tab-item.is-active { color: var(--gold-strong); }
+.tab-dot {
+  position: absolute;
+  top: 5px;
+  left: calc(50% + 6px);
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  border: 1.5px solid var(--surface);
+}
+
+/* ============================================================
+   12. Responsive shells
+   ============================================================ */
+@media (min-width: 768px) {
+  .tabbar { display: none; }
+  .greeting { font-size: 34px; }
+  .home-wrap { padding: 48px 24px; }
+  .prompts { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .shortcuts { grid-template-columns: repeat(4, 1fr); }
+  .thread { padding: 28px 24px 12px; }
+}
+@media (min-width: 1024px) {
+  .screen { grid-template-columns: 260px minmax(0, 1fr); }
+  .sidebar { display: flex; }
+  .breadcrumb { display: block; }
+  .topbar-wordmark { display: none; }
+  .topbar { padding: 0 16px 0 24px; }
+}
+
+/* ============================================================
+   13. Hover (pointer-hover devices only)
+   ============================================================ */
+@media (hover: hover) {
+  .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+  .btn-primary:hover { transform: translateY(-1px); }
+  .send:hover { transform: translateY(-1px); }
+  .chip:hover { background: var(--surface-2); }
+  .prompt-chip:hover { background: var(--surface-2); transform: translateY(-1px); }
+  .shortcut-card:hover { transform: translateY(-2px); }
+  .citation:hover { transform: translateY(-1px); }
+  .nav-item:hover { background: var(--surface-2); }
+  .nav-item.is-active:hover { background: var(--gold-tint); }
+  .recent-item:hover { background: var(--surface-2); }
+  .recent-item.is-active:hover { background: var(--gold-tint); }
+  .tool-row:hover { color: var(--ink); }
+  .stop-btn:hover { background: var(--surface-2); }
+  .tab-item:hover { color: var(--ink); }
+  .chrome-tab:hover:not(.is-active) { background: rgba(0, 0, 0, 0.05); }
+  .dark .chrome-tab:hover:not(.is-active) { background: rgba(255, 255, 255, 0.06); }
+  .chrome-btn:hover { background: rgba(0, 0, 0, 0.06); }
+  .dark .chrome-btn:hover { background: rgba(255, 255, 255, 0.08); }
+}
+
+/* Hover-revealed AI message actions (touch or narrow widths get the overflow button) */
+@media (hover: hover) and (min-width: 768px) {
+  .msg-actions { display: flex; opacity: 0; transition: opacity var(--duration-fast) var(--ease); }
+  .ai-group:hover .msg-actions,
+  .msg-actions:focus-within { opacity: 1; }
+  .overflow-btn { display: none; }
+}
+
+/* Focus rings for elements whose base styles carry a box-shadow (cascade repair) */
+.tool-row:focus-visible,
+.chrome .chrome-tab:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring-offset, var(--bg)), 0 0 0 4px var(--ring);
+}
+
+/* ============================================================
+   14. Reduced motion — static gold ring, no animation anywhere
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= Spec chrome ======================= -->
+<div class="chrome">
+  <span class="chrome-name">A — Counsel Gold</span>
+  <div class="chrome-tabs" role="tablist" aria-label="Mock screens">
+    <button type="button" class="chrome-tab is-active" role="tab" aria-selected="true" data-screen="home">Home</button>
+    <button type="button" class="chrome-tab" role="tab" aria-selected="false" data-screen="conversation">Conversation</button>
+  </div>
+  <span class="chrome-hint">resize for mobile</span>
+  <button type="button" class="chrome-btn js-theme" aria-label="Toggle light or dark theme">
+    <svg class="i icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    <svg class="i icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+  </button>
+</div>
+
+<!-- ======================= Screen 1 — Home ======================= -->
+<section class="screen" id="screen-home" aria-label="Home">
+
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <span class="wordmark">lawexa<span class="wordmark-dot" aria-hidden="true"></span></span>
+    </div>
+    <button type="button" class="btn-primary js-go-home">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      New chat
+    </button>
+    <nav class="side-nav" aria-label="Primary">
+      <button type="button" class="nav-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Conversations
+      </button>
+      <button type="button" class="nav-item" aria-expanded="true">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Library
+        <svg class="nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="nav-sub">
+        <button type="button" class="nav-item">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+          Cases
+        </button>
+        <button type="button" class="nav-item">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg>
+          Statutes
+        </button>
+        <button type="button" class="nav-item">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9Z"/><path d="M15 3v4a2 2 0 0 0 2 2h4"/></svg>
+          Notes
+        </button>
+        <button type="button" class="nav-item">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+          Files
+        </button>
+      </div>
+      <button type="button" class="nav-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+        Bookmarks
+      </button>
+      <button type="button" class="nav-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+        Spaces
+      </button>
+      <button type="button" class="nav-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+        Quiz
+      </button>
+      <div class="section-label">Recent</div>
+      <button type="button" class="recent-item js-go-conv">Madukolu — the jurisdiction test</button>
+      <button type="button" class="recent-item">Tenant eviction — Lagos</button>
+      <button type="button" class="recent-item">Evidence Act s.84 — electronic evidence</button>
+    </nav>
+    <div class="side-footer">
+      <span class="avatar" aria-hidden="true">AO</span>
+      <div class="user-meta">
+        <span class="user-name">Adaeze Okafor</span>
+        <span class="user-plan">Premium</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="pane">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="wordmark topbar-wordmark">lawexa<span class="wordmark-dot" aria-hidden="true"></span></span>
+        <nav class="breadcrumb" aria-label="Breadcrumb">Home</nav>
+      </div>
+      <div class="topbar-right">
+        <button type="button" class="icon-btn" aria-label="Notifications, 3 unread">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="badge" aria-hidden="true">3</span>
+        </button>
+        <button type="button" class="icon-btn js-theme" aria-label="Toggle light or dark theme">
+          <svg class="i icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg class="i icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="home-wrap">
+        <div class="home-hero">
+          <h1 class="greeting">Good evening, Adaeze.</h1>
+          <p class="greeting-sub">What are we researching tonight?</p>
+        </div>
+
+        <div class="shimmer">
+          <div class="composer">
+            <label class="sr-only" for="home-input">Ask anything about Nigerian law</label>
+            <textarea id="home-input" class="composer-input" rows="2" placeholder="Ask anything about Nigerian law…"></textarea>
+            <div class="composer-row">
+              <div class="composer-tools">
+                <button type="button" class="icon-btn attach-btn" aria-label="Attach a file">
+                  <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+                <button type="button" class="chip"><span class="flag-dot" aria-hidden="true"></span>Nigeria</button>
+                <button type="button" class="chip">
+                  <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+                  Lawexa Expert
+                </button>
+              </div>
+              <button type="button" class="send" id="home-send" aria-label="Send message">
+                <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="prompts">
+          <button type="button" class="prompt-chip">Explain the ratio in Madukolu v Nkemdilim</button>
+          <button type="button" class="prompt-chip">Consent under the Land Use Act, state by state</button>
+          <button type="button" class="prompt-chip">Draft a memo on tenant eviction in Lagos</button>
+          <button type="button" class="prompt-chip">Quiz me on the Evidence Act 2011</button>
+        </div>
+
+        <div class="shortcuts">
+          <button type="button" class="shortcut-card">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+            Cases
+          </button>
+          <button type="button" class="shortcut-card">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg>
+            Statutes
+          </button>
+          <button type="button" class="shortcut-card">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9Z"/><path d="M15 3v4a2 2 0 0 0 2 2h4"/></svg>
+            Notes
+          </button>
+          <button type="button" class="shortcut-card">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+            Quiz
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <nav class="tabbar" aria-label="Main">
+      <button type="button" class="tab-item is-active" aria-current="page">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        Home
+      </button>
+      <button type="button" class="tab-item js-go-conv">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chats
+      </button>
+      <button type="button" class="tab-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Library
+      </button>
+      <button type="button" class="tab-item">
+        <span class="tab-dot" aria-hidden="true"></span>
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Alerts
+      </button>
+      <button type="button" class="tab-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        More
+      </button>
+    </nav>
+  </div>
+</section>
+
+<!-- ======================= Screen 2 — Conversation ======================= -->
+<section class="screen" id="screen-conversation" aria-label="Conversation" hidden>
+
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <span class="wordmark">lawexa<span class="wordmark-dot" aria-hidden="true"></span></span>
+    </div>
+    <button type="button" class="btn-primary js-go-home">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      New chat
+    </button>
+    <nav class="side-nav" aria-label="Primary">
+      <button type="button" class="nav-item is-active" aria-current="page">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Conversations
+      </button>
+      <button type="button" class="nav-item" aria-expanded="true">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Library
+        <svg class="nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="nav-sub">
+        <button type="button" class="nav-item">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+          Cases
+        </button>
+        <button type="button" class="nav-item">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg>
+          Statutes
+        </button>
+        <button type="button" class="nav-item">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9Z"/><path d="M15 3v4a2 2 0 0 0 2 2h4"/></svg>
+          Notes
+        </button>
+        <button type="button" class="nav-item">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+          Files
+        </button>
+      </div>
+      <button type="button" class="nav-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+        Bookmarks
+      </button>
+      <button type="button" class="nav-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+        Spaces
+      </button>
+      <button type="button" class="nav-item">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+        Quiz
+      </button>
+      <div class="section-label">Recent</div>
+      <button type="button" class="recent-item is-active js-go-conv" aria-current="page">Madukolu — the jurisdiction test</button>
+      <button type="button" class="recent-item">Tenant eviction — Lagos</button>
+      <button type="button" class="recent-item">Evidence Act s.84 — electronic evidence</button>
+    </nav>
+    <div class="side-footer">
+      <span class="avatar" aria-hidden="true">AO</span>
+      <div class="user-meta">
+        <span class="user-name">Adaeze Okafor</span>
+        <span class="user-plan">Premium</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="pane">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="icon-btn back-btn js-go-home" aria-label="Back to home">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h1 class="convo-title">Jurisdiction — the Madukolu test</h1>
+      </div>
+      <div class="topbar-right">
+        <button type="button" class="icon-btn" aria-label="Share conversation">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </button>
+        <button type="button" class="icon-btn" aria-label="Notifications">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        </button>
+        <button type="button" class="icon-btn js-theme" aria-label="Toggle light or dark theme">
+          <svg class="i icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg class="i icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="thread">
+
+        <div class="msg-group user-group" style="--i:0">
+          <div class="bubble">What makes a court competent to hear a matter? I keep seeing Madukolu v Nkemdilim cited — what does it actually decide?</div>
+          <span class="stamp">9:42 PM</span>
+        </div>
+
+        <div class="msg-group" style="--i:1">
+          <button type="button" class="tool-row" aria-expanded="false">
+            <svg class="i spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+            Searched Nigerian case law · 6 authorities · 1.8s
+            <svg class="i i-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+
+        <div class="msg-group ai-group" style="--i:2">
+          <div class="ai-body">
+            <p><span class="case-name">Madukolu v Nkemdilim (1962)</span> is the foundational authority on jurisdiction in Nigeria. The Federal Supreme Court, per Bairamian FJ, laid down the test that every court still applies before touching the merits of a case.</p>
+            <p><strong>A court is competent only when all three conditions are met:</strong></p>
+            <ol>
+              <li><strong>Proper constitution</strong> — the bench is properly constituted as regards numbers and qualifications of its members, and no member is disqualified.</li>
+              <li><strong>Subject-matter jurisdiction</strong> — the case is within the court's jurisdiction and no statutory limitation applies.</li>
+              <li><strong>Due process</strong> — the case comes before the court initiated by due process of law, and every condition precedent to exercising jurisdiction has been fulfilled.</li>
+            </ol>
+            <blockquote>
+              <p>“Any defect in competence is fatal, for the proceedings are a nullity however well conducted and decided.”</p>
+              <footer>— Bairamian FJ</footer>
+            </blockquote>
+            <div class="authorities">
+              <span class="authorities-label">Authorities</span>
+              <div class="citations">
+                <button type="button" class="citation">Madukolu v Nkemdilim (1962) 2 SCNLR 341</button>
+                <button type="button" class="citation">Skenconsult (Nig) Ltd v Ukey (1981) 1 SC 6</button>
+                <button type="button" class="citation">A-G Lagos State v Dosunmu (1989) 3 NWLR (Pt.111) 552</button>
+              </div>
+            </div>
+            <p>Where any limb fails, the defect goes to the root —<span class="caret" aria-hidden="true"></span></p>
+          </div>
+          <div class="msg-actions">
+            <button type="button" class="icon-btn" aria-label="Copy answer">
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            </button>
+            <button type="button" class="icon-btn" aria-label="Good answer">
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+            </button>
+            <button type="button" class="icon-btn" aria-label="Poor answer">
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
+            </button>
+          </div>
+          <button type="button" class="icon-btn overflow-btn" aria-label="Message actions">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+          </button>
+        </div>
+
+        <div class="msg-group" style="--i:3">
+          <div class="responding-pill">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            Lawexa is responding
+            <span class="pill-sep" aria-hidden="true">·</span>
+            <button type="button" class="stop-btn">
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>
+              Stop
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <div class="composer-dock">
+      <div class="dock-inner">
+        <div class="shimmer">
+          <div class="composer">
+            <label class="sr-only" for="conv-input">Ask anything about Nigerian law</label>
+            <textarea id="conv-input" class="composer-input" rows="1" placeholder="Ask anything about Nigerian law…"></textarea>
+            <div class="composer-row">
+              <div class="composer-tools">
+                <button type="button" class="icon-btn attach-btn" aria-label="Attach a file">
+                  <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+                <button type="button" class="chip"><span class="flag-dot" aria-hidden="true"></span>Nigeria</button>
+                <button type="button" class="chip">
+                  <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+                  Lawexa Expert
+                </button>
+              </div>
+              <button type="button" class="send" aria-label="Send message">
+                <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Screen switching ---------- */
+  var screens = {
+    home: document.getElementById('screen-home'),
+    conversation: document.getElementById('screen-conversation')
+  };
+  var chromeTabs = Array.prototype.slice.call(document.querySelectorAll('.chrome-tab'));
+
+  function show(name) {
+    Object.keys(screens).forEach(function (key) {
+      screens[key].hidden = key !== name;
+    });
+    chromeTabs.forEach(function (tab) {
+      var on = tab.dataset.screen === name;
+      tab.classList.toggle('is-active', on);
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    var scroller = screens[name].querySelector('.content');
+    if (scroller) scroller.scrollTop = 0;
+  }
+
+  chromeTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () { show(tab.dataset.screen); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.js-go-home'), function (el) {
+    el.addEventListener('click', function () { show('home'); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.js-go-conv'), function (el) {
+    el.addEventListener('click', function () { show('conversation'); });
+  });
+
+  /* ---------- Theme ---------- */
+  var THEME_KEY = 'counsel-gold-theme';
+  Array.prototype.forEach.call(document.querySelectorAll('.js-theme'), function (btn) {
+    btn.addEventListener('click', function () {
+      var dark = document.documentElement.classList.toggle('dark');
+      try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) {}
+    });
+  });
+
+  /* ---------- Composer autogrow ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('.composer-input'), function (ta) {
+    ta.addEventListener('input', function () {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 180) + 'px';
+    });
+  });
+
+  /* ---------- Suggested prompts fill the home composer ---------- */
+  var homeInput = document.getElementById('home-input');
+  Array.prototype.forEach.call(document.querySelectorAll('.prompt-chip'), function (chip) {
+    chip.addEventListener('click', function () {
+      homeInput.value = chip.textContent.trim();
+      homeInput.dispatchEvent(new Event('input'));
+      homeInput.focus();
+    });
+  });
+
+  /* ---------- Sending from home opens the conversation ---------- */
+  document.getElementById('home-send').addEventListener('click', function () {
+    show('conversation');
+  });
+})();
+</script>
+</body>
+</html>

@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local debug dumps (may contain real user/API data) — kept on disk, never committed
+conv.json
+res.txt
+res-stream.txt
+*.stackdump

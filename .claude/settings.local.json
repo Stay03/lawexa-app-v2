@@ -20,7 +20,25 @@
       "Bash(if exist \"src\\\\components\\\\ui\" dir \"src\\\\components\\\\ui\")",
       "Bash(del nul)",
       "Read(//c/Users/stayn/OneDrive/Desktop/2023/lawexa-app-v2/lawexa-app/**)",
-      "Bash(npx next build)"
+      "Bash(npx next build)",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(git add types/radar.ts lib/api/radars.ts lib/api/radar-entities.ts lib/utils/cron.ts)",
+      "PowerShell(git add lib/hooks/useRadars.ts)",
+      "PowerShell(npm run lint 2>&1)",
+      "PowerShell(git add components/radar \"app/\\(main\\)/radars\" components/layout/app-sidebar.tsx)",
+      "PowerShell(git add components/radar lib/utils/radar-validation.ts \"app/\\(main\\)/radars\")",
+      "PowerShell(git add components/radar \"app/\\(main\\)/radars\")",
+      "PowerShell(npm run build 2>&1)",
+      "PowerShell(git add components/radar/RadarInboxView.tsx)",
+      "PowerShell(git add lib/hooks/useRadars.ts lib/utils/cron.ts components/radar)",
+      "PowerShell(git push origin main)",
+      "Bash(npx eslint *)",
+      "Bash(gh api *)",
+      "Bash(Get-ChildItem -Recurse -Include \"*.tsx\",\"*.ts\")",
+      "Bash(Select-String -Pattern \"FloatingPromptInput\")",
+      "Bash(Select-Object Path,LineNumber,Line)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(npm install *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\stayn\\OneDrive\\Desktop\\2023\\lawexa-app-v2\\lawexa-app\\app\\(admin)\\admin\\lawyer-verifications"

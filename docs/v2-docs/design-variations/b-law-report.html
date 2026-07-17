@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lawexa v2 — B · Law Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1&family=Libre+Franklin:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   B — LAW REPORT
+   Editorial, reading-first. Archival paper, ink, gilt edges.
+   Tokens → base → icons → spec chrome → shell → sidebar →
+   headers → home → composer → conversation → dock → tabbar →
+   media queries. Flat specificity throughout.
+   ============================================================ */
+
+/* ---------- 1. Tokens ---------- */
+:root {
+  --bg: #F5F2E9;
+  --surface: #FCFAF3;
+  --surface-2: #EFEBDE;
+  --ink: #262219;
+  --ink-muted: #736A56;
+  --rule: #DCD5C2;
+  --gold: #C9A227;
+  --gold-text: #836A15;
+  --gold-tint: #F3EAD1;
+  --eyebrow-ink: #4A4234;
+  --selection: rgba(201, 162, 39, 0.28);
+
+  --gilt: linear-gradient(180deg, #E6C654, #C9A227, #8F7014);
+
+  --r-control: 6px;
+  --r-card: 10px;
+  --r-composer: 16px;
+
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --shadow-composer: 0 10px 28px -14px rgba(38, 34, 25, 0.3);
+
+  --font-ui: "Libre Franklin", "Franklin Gothic Medium", sans-serif;
+  --font-read: "Fraunces", Georgia, serif;
+  --font-mark: "Comfortaa", sans-serif;
+
+  color-scheme: light;
+}
+.dark {
+  --bg: #171310;
+  --surface: #1F1A14;
+  --surface-2: #272119;
+  --ink: #ECE4D3;
+  --ink-muted: #9C917C;
+  --rule: #352E23;
+  --gold: #E0B84A;
+  --gold-text: #E0B84A;
+  --gold-tint: #332B1B;
+  --eyebrow-ink: #C9BFA8;
+  --selection: rgba(224, 184, 74, 0.28);
+  --shadow-composer: 0 12px 30px -12px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* ---------- 2. Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: var(--selection); }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+a { color: inherit; text-decoration: none; cursor: pointer; }
+ul, ol { list-style: none; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+* { scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+
+.eyebrow {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--eyebrow-ink);
+}
+
+/* ---------- 3. Icons ---------- */
+.icon {
+  width: 20px; height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+  display: block;
+}
+.icon-sm { width: 16px; height: 16px; }
+.icon-xs { width: 14px; height: 14px; }
+
+.icon-btn {
+  width: 34px; height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--r-control);
+  color: var(--ink-muted);
+  position: relative;
+  flex: none;
+}
+.icon-btn .icon { width: 20px; height: 20px; }
+
+/* theme toggle glyph swap */
+.glyph-sun { display: none; }
+.glyph-moon { display: block; }
+.dark .glyph-sun { display: block; }
+.dark .glyph-moon { display: none; }
+
+.badge {
+  position: absolute;
+  top: 2px; right: 1px;
+  min-width: 15px; height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #262219;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* ---------- 4. Spec chrome bar (not part of the design language) ---------- */
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  height: 40px;
+  background: #EDEDEB;
+  border-bottom: 1px solid #D8D8D4;
+  color: #52524E;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12.5px;
+  flex: none;
+}
+.dark .chrome { background: #1D1D1B; border-bottom-color: #33332F; color: #A6A6A0; }
+.chrome-name { font-weight: 600; letter-spacing: 0.01em; }
+.chrome-tabs { display: flex; gap: 2px; background: rgba(0,0,0,0.06); padding: 2px; border-radius: 7px; }
+.dark .chrome-tabs { background: rgba(255,255,255,0.07); }
+.chrome-tab { padding: 3px 12px; border-radius: 5px; font-size: 12px; color: inherit; }
+.chrome-tab[aria-selected="true"] { background: #FFFFFF; color: #1E1E1C; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.dark .chrome-tab[aria-selected="true"] { background: #3A3A36; color: #F0F0EC; }
+.chrome-theme { padding: 3px 10px; border-radius: 5px; border: 1px solid #CFCFC9; font-size: 12px; }
+.dark .chrome-theme { border-color: #44443F; }
+.chrome-hint { margin-left: auto; font-size: 11.5px; opacity: 0.75; }
+
+/* ---------- 5. App shell ---------- */
+.app { min-height: 0; position: relative; }
+.screen {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+}
+.screen[hidden] { display: none; }
+.main {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ---------- 6. Sidebar ---------- */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 18px 14px 14px;
+}
+.wordmark {
+  font-family: var(--font-mark);
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.side-brand { padding: 2px 8px 16px; }
+.btn-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 38px;
+  border: 1px solid var(--gold);
+  border-radius: var(--r-control);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.side-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--r-control);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.nav-item .icon { color: var(--ink-muted); }
+.nav-caret { margin-left: auto; color: var(--ink-muted); }
+.nav-item-active {
+  background: var(--gold-tint);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.nav-item-active::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--gilt);
+}
+.nav-item-active .icon { color: var(--gold-text); }
+.nav-sub { display: flex; flex-direction: column; gap: 1px; padding: 1px 0 3px; }
+.nav-sub-item {
+  display: block;
+  padding: 6px 10px 6px 41px;
+  border-radius: var(--r-control);
+  font-size: 13.5px;
+  color: var(--ink-muted);
+}
+.side-recent { margin-top: 26px; display: flex; flex-direction: column; gap: 1px; }
+.side-eyebrow { padding: 0 10px 8px; }
+.recent-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: var(--r-control);
+  font-size: 13.5px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-row-active { background: var(--gold-tint); color: var(--ink); }
+.side-footer {
+  border-top: 1px solid var(--rule);
+  margin-top: 14px;
+  padding: 14px 8px 4px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.avatar {
+  width: 32px; height: 32px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--gold-tint);
+  color: var(--gold-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  display: grid;
+  place-items: center;
+}
+.side-user { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.side-name { font-size: 13.5px; font-weight: 500; line-height: 1.25; }
+.side-plan { font-size: 12px; color: var(--ink-muted); line-height: 1.25; }
+
+/* ---------- 7. Headers ---------- */
+.header {
+  height: 56px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 20px;
+}
+.header-spacer { flex: 1; }
+.header-mobile { display: none; }
+.wordmark-sm { font-size: 18px; }
+
+.convo-title-wrap { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.convo-eyebrow { line-height: 1; }
+.convo-title {
+  font-family: var(--font-read);
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 30, "WONK" 0;
+  font-size: 20px;
+  font-weight: 560;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 8. Home ---------- */
+.hero {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: clamp(44px, 11vh, 108px) 24px 56px;
+}
+.hero-eyebrow { margin-bottom: 14px; }
+.display {
+  font-family: var(--font-read);
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 30, "WONK" 0;
+  font-size: 38px;
+  font-weight: 560;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+  max-width: 15em;
+  margin-bottom: 30px;
+}
+
+.prompts { margin-top: 38px; }
+.prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 15px 6px;
+  border-radius: var(--r-card);
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.prompt-row + .prompt-row { border-top: 1px solid var(--rule); }
+.prompt-mark {
+  font-family: var(--font-read);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--gold-text);
+  width: 18px;
+  text-align: center;
+  flex: none;
+}
+.prompt-text { flex: 1; min-width: 0; }
+.prompt-chev {
+  color: var(--ink-muted);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
+}
+.prompt-row:focus-visible .prompt-chev { opacity: 1; transform: none; }
+
+.quiet-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--rule);
+  margin-top: 6px;
+  padding: 20px 6px 0;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+}
+.quiet-link { color: var(--ink-muted); }
+.quiet-sep { color: var(--rule); user-select: none; }
+
+/* ---------- 9. The liquid-gold shimmer composer ---------- */
+.composer {
+  position: relative;
+  padding: 1px;
+  border-radius: var(--r-composer);
+  overflow: hidden;
+  isolation: isolate;
+}
+.composer::before {
+  content: "";
+  position: absolute;
+  inset: -150%;
+  background: conic-gradient(from 0deg,
+    #F7E7B4, #EAB308, #C9A227, #F5E28A, #FFF8E1, #A87F10, #EAB308, #F7E7B4);
+  animation: shimmer-rotate 16s linear infinite;
+  will-change: transform;
+}
+.composer:focus-within::before { animation-duration: 30s; }
+@keyframes shimmer-rotate { to { transform: rotate(1turn); } }
+.composer-inner {
+  position: relative;
+  background: var(--surface);
+  border-radius: 15px;
+  padding: 14px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.composer:has(.composer-input:focus-visible) .composer-inner {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+.composer-input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  resize: none;
+  width: 100%;
+  max-height: 160px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--gold-text);
+  caret-color: var(--gold-text);
+  padding: 2px 4px 0;
+}
+.composer-input::placeholder { color: var(--ink-muted); opacity: 1; }
+.composer-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  display: inline-flex;
+  align-items: center;
+}
+.send {
+  width: 36px; height: 36px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #262219;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.send .icon { width: 18px; height: 18px; }
+.send:active { transform: scale(0.96); }
+
+/* ---------- 10. Conversation ---------- */
+.thread {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 30px 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.msg-user { align-self: flex-end; max-width: min(85%, 560px); }
+.msg-user-bubble {
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  padding: 12px 16px;
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.msg-user-meta {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  border-radius: var(--r-control);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  align-self: flex-start;
+}
+.tool-spark { color: var(--gold-text); }
+.tool-chev { color: var(--ink-muted); }
+
+/* The gilt edge: the fore-edge of a bound report */
+.msg-ai {
+  position: relative;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-family: var(--font-read);
+  font-optical-sizing: auto;
+  font-size: 17px;
+  font-weight: 420;
+  line-height: 1.68;
+}
+.msg-ai::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 3px; bottom: 3px;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--gilt);
+}
+
+/* one-time staggered reveal — the only load animation */
+.reveal { animation: reveal var(--duration-base) var(--ease) both; }
+.reveal:nth-child(1) { animation-delay: 0ms; }
+.reveal:nth-child(2) { animation-delay: 60ms; }
+.reveal:nth-child(3) { animation-delay: 120ms; }
+.reveal:nth-child(4) { animation-delay: 180ms; }
+.reveal:nth-child(5) { animation-delay: 240ms; }
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+.lead { font-weight: 600; margin-bottom: 12px; }
+.test-list {
+  counter-reset: limb;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.test-list li {
+  counter-increment: limb;
+  position: relative;
+  padding-left: 38px;
+}
+.test-list li::before {
+  content: counter(limb) ".";
+  position: absolute;
+  left: 2px; top: 0;
+  font-family: var(--font-read);
+  font-variation-settings: "SOFT" 30, "WONK" 0;
+  font-size: 19px;
+  font-weight: 560;
+  line-height: 1.45;
+  color: var(--gold-text);
+  font-variant-numeric: tabular-nums;
+}
+.test-list strong { font-weight: 600; }
+
+.extract {
+  background: var(--surface-2);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 18px 22px;
+  font-style: italic;
+  line-height: 1.6;
+}
+.extract-source { margin-top: 10px; font-style: normal; }
+
+.authorities { display: flex; flex-direction: column; }
+.authorities-eyebrow { margin-bottom: 4px; }
+.cite-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 2px;
+  border-radius: var(--r-control);
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.cite-row + .cite-row { border-top: 1px solid var(--rule); }
+.cite-mark {
+  font-family: var(--font-read);
+  font-size: 14px;
+  color: var(--gold-text);
+  flex: none;
+}
+
+.streaming { display: block; }
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  background: var(--gold);
+  animation: caret-blink 1.1s steps(2, jump-none) infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+
+.msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: -6px;
+}
+.ghost {
+  width: 30px; height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--r-control);
+  color: var(--ink-muted);
+}
+.ghost .icon { width: 16px; height: 16px; }
+.more-touch { display: none; }
+.ghost:focus-visible { opacity: 1; }
+
+/* ---------- 11. Docked composer ---------- */
+.dock {
+  padding: 6px 24px calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.dock-composer { width: 100%; max-width: 720px; box-shadow: var(--shadow-composer); }
+.responding {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+.responding-dot {
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  animation: dot-pulse 1.6s var(--ease) infinite;
+}
+@keyframes dot-pulse { 50% { opacity: 0.35; } }
+.responding-sep { color: var(--rule); user-select: none; }
+.stop-btn {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--gold-text);
+  padding: 1px 2px;
+  border-radius: 4px;
+}
+
+/* ---------- 12. Mobile tab bar ---------- */
+.tabbar { display: none; }
+
+/* ---------- 13. Responsive ---------- */
+@media (max-width: 1023px) {
+  .screen { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; }
+}
+
+@media (max-width: 767px) {
+  .chrome-hint { display: none; }
+  .header-desktop { display: none; }
+  .header-mobile { display: flex; height: 52px; }
+  .display { font-size: 28px; }
+  .hero { padding: clamp(28px, 7vh, 56px) 18px 40px; }
+  .thread { padding: 24px 18px 22px; }
+  .dock { padding-left: 14px; padding-right: 14px; }
+  .convo-header { padding: 0 12px; }
+
+  .tabbar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid var(--rule);
+    background: var(--surface);
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  }
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 0 3px;
+    border-radius: var(--r-control);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-muted);
+  }
+  .tab .icon { width: 22px; height: 22px; }
+  .tab-active { color: var(--gold-text); font-weight: 600; }
+  .tab-icon-wrap { position: relative; display: inline-grid; place-items: center; }
+  .tab-dot {
+    position: absolute;
+    top: 0; right: -3px;
+    width: 6px; height: 6px;
+    border-radius: 999px;
+    background: var(--gold);
+  }
+}
+
+/* ---------- 14. Hover-only styling ---------- */
+@media (hover: hover) {
+  .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+  .btn-new:hover { background: var(--gold-tint); }
+  .nav-item:hover { background: var(--surface-2); }
+  .nav-item-active:hover { background: var(--gold-tint); }
+  .nav-sub-item:hover { background: var(--surface-2); color: var(--ink); }
+  .recent-row:hover { background: var(--surface-2); color: var(--ink); }
+  .chip:hover { background: var(--surface-2); color: var(--ink); }
+  .send:hover { filter: brightness(1.06); }
+  .prompt-row:hover { background: var(--surface); }
+  .prompt-row:hover .prompt-chev { opacity: 1; transform: none; }
+  .quiet-link:hover { color: var(--gold-text); text-decoration: underline; text-underline-offset: 3px; }
+  .tool-row:hover { color: var(--ink); }
+  .cite-row:hover { color: var(--gold-text); }
+  .stop-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .chrome-tab:hover { color: #1E1E1C; }
+  .dark .chrome-tab:hover { color: #F0F0EC; }
+  .chrome-theme:hover { background: rgba(0,0,0,0.05); }
+  .dark .chrome-theme:hover { background: rgba(255,255,255,0.06); }
+
+  .ghost { opacity: 0; transition: opacity var(--duration-fast) var(--ease); }
+  .msg-ai:hover .ghost, .msg-actions:focus-within .ghost { opacity: 1; }
+  .ghost:hover { background: var(--surface-2); color: var(--ink); }
+}
+@media (hover: none) {
+  .ghost { display: none; }
+  .more-touch {
+    display: inline-grid;
+    width: 30px; height: 30px;
+    place-items: center;
+    border-radius: var(--r-control);
+    color: var(--ink-muted);
+  }
+}
+
+/* ---------- 15. Reduced motion: shimmer becomes a static gold ring ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= Spec chrome (not the design language) ======================= -->
+<header class="chrome">
+  <span class="chrome-name">B — Law Report</span>
+  <div class="chrome-tabs" role="tablist" aria-label="Screens">
+    <button class="chrome-tab" role="tab" aria-selected="true" data-goto="home">Home</button>
+    <button class="chrome-tab" role="tab" aria-selected="false" data-goto="convo">Conversation</button>
+  </div>
+  <button class="chrome-theme" data-action="toggle-theme" aria-pressed="false">Light / dark</button>
+  <span class="chrome-hint">resize for mobile</span>
+</header>
+
+<!-- ======================= Icon library ======================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-chev-d" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98"/><path d="m15.41 6.51-6.82 3.98"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-thumb-up" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></symbol>
+  <symbol id="i-thumb-down" viewBox="0 0 24 24"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></symbol>
+</svg>
+
+<div class="app">
+
+  <!-- ======================= Screen 1 — Home ======================= -->
+  <section class="screen" id="screen-home" aria-label="Home">
+
+    <aside class="sidebar">
+      <div class="side-brand"><span class="wordmark">lawexa</span></div>
+      <button class="btn-new"><svg class="icon icon-sm"><use href="#i-plus"/></svg>New chat</button>
+      <nav class="side-nav" aria-label="Primary">
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-message"/></svg>Conversations</a>
+        <a class="nav-item" href="#" aria-expanded="true"><svg class="icon"><use href="#i-book"/></svg>Library<svg class="icon icon-xs nav-caret"><use href="#i-chev-d"/></svg></a>
+        <div class="nav-sub">
+          <a class="nav-sub-item" href="#">Cases</a>
+          <a class="nav-sub-item" href="#">Statutes</a>
+          <a class="nav-sub-item" href="#">Notes</a>
+          <a class="nav-sub-item" href="#">Files</a>
+        </div>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-bookmark"/></svg>Bookmarks</a>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-users"/></svg>Spaces</a>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-cap"/></svg>Quiz</a>
+        <div class="side-recent">
+          <div class="eyebrow side-eyebrow">Recent</div>
+          <button class="recent-row" data-goto="convo">Madukolu — the jurisdiction test</button>
+          <button class="recent-row">Tenant eviction — Lagos</button>
+          <button class="recent-row">Evidence Act s.84 — electronic evidence</button>
+        </div>
+      </nav>
+      <div class="side-footer">
+        <span class="avatar" aria-hidden="true">AO</span>
+        <span class="side-user">
+          <span class="side-name">Adaeze Okafor</span>
+          <span class="side-plan">Premium</span>
+        </span>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header header-desktop">
+        <span class="eyebrow">Home</span>
+        <span class="header-spacer"></span>
+        <button class="icon-btn" aria-label="Notifications, 3 unread">
+          <svg class="icon"><use href="#i-bell"/></svg><span class="badge">3</span>
+        </button>
+        <button class="icon-btn" data-action="toggle-theme" aria-label="Toggle light or dark theme">
+          <svg class="icon glyph-moon"><use href="#i-moon"/></svg>
+          <svg class="icon glyph-sun"><use href="#i-sun"/></svg>
+        </button>
+      </header>
+
+      <header class="header header-mobile">
+        <span class="wordmark wordmark-sm">lawexa</span>
+        <span class="header-spacer"></span>
+        <button class="icon-btn" aria-label="Notifications, 3 unread">
+          <svg class="icon"><use href="#i-bell"/></svg><span class="badge">3</span>
+        </button>
+        <button class="icon-btn" data-action="toggle-theme" aria-label="Toggle light or dark theme">
+          <svg class="icon glyph-moon"><use href="#i-moon"/></svg>
+          <svg class="icon glyph-sun"><use href="#i-sun"/></svg>
+        </button>
+      </header>
+
+      <div class="content">
+        <div class="hero">
+          <p class="eyebrow hero-eyebrow">Good evening</p>
+          <h1 class="display">Adaeze, what are we researching tonight?</h1>
+
+          <div class="composer">
+            <div class="composer-inner">
+              <textarea class="composer-input" rows="1" placeholder="Ask anything about Nigerian law…" aria-label="Ask anything about Nigerian law"></textarea>
+              <div class="composer-row">
+                <button class="icon-btn" aria-label="Attach a file"><svg class="icon"><use href="#i-clip"/></svg></button>
+                <button class="chip">Nigeria</button>
+                <button class="chip">Lawexa Expert</button>
+                <button class="send" data-goto="convo" aria-label="Send"><svg class="icon"><use href="#i-arrow-up"/></svg></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="prompts">
+            <button class="prompt-row" data-goto="convo">
+              <span class="prompt-mark" aria-hidden="true">§</span>
+              <span class="prompt-text">Explain the ratio in Madukolu v Nkemdilim</span>
+              <svg class="icon icon-sm prompt-chev"><use href="#i-chev-r"/></svg>
+            </button>
+            <button class="prompt-row" data-goto="convo">
+              <span class="prompt-mark" aria-hidden="true">§</span>
+              <span class="prompt-text">Consent under the Land Use Act, state by state</span>
+              <svg class="icon icon-sm prompt-chev"><use href="#i-chev-r"/></svg>
+            </button>
+            <button class="prompt-row" data-goto="convo">
+              <span class="prompt-mark" aria-hidden="true">§</span>
+              <span class="prompt-text">Draft a memo on tenant eviction in Lagos</span>
+              <svg class="icon icon-sm prompt-chev"><use href="#i-chev-r"/></svg>
+            </button>
+            <button class="prompt-row" data-goto="convo">
+              <span class="prompt-mark" aria-hidden="true">§</span>
+              <span class="prompt-text">Quiz me on the Evidence Act 2011</span>
+              <svg class="icon icon-sm prompt-chev"><use href="#i-chev-r"/></svg>
+            </button>
+          </div>
+
+          <div class="quiet-links">
+            <a class="quiet-link" href="#">Cases</a><span class="quiet-sep">·</span>
+            <a class="quiet-link" href="#">Statutes</a><span class="quiet-sep">·</span>
+            <a class="quiet-link" href="#">Notes</a><span class="quiet-sep">·</span>
+            <a class="quiet-link" href="#">Quiz</a>
+          </div>
+        </div>
+      </div>
+
+      <nav class="tabbar" aria-label="Bottom navigation">
+        <a class="tab tab-active" href="#" data-goto="home" aria-current="page">
+          <svg class="icon"><use href="#i-home"/></svg>Home</a>
+        <a class="tab" href="#" data-goto="convo">
+          <svg class="icon"><use href="#i-message"/></svg>Chats</a>
+        <a class="tab" href="#">
+          <svg class="icon"><use href="#i-book"/></svg>Library</a>
+        <a class="tab" href="#">
+          <span class="tab-icon-wrap"><svg class="icon"><use href="#i-bell"/></svg><span class="tab-dot"></span></span>Alerts</a>
+        <a class="tab" href="#">
+          <svg class="icon"><use href="#i-more"/></svg>More</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ======================= Screen 2 — Conversation ======================= -->
+  <section class="screen" id="screen-convo" aria-label="Conversation" hidden>
+
+    <aside class="sidebar">
+      <div class="side-brand"><span class="wordmark">lawexa</span></div>
+      <button class="btn-new" data-goto="home"><svg class="icon icon-sm"><use href="#i-plus"/></svg>New chat</button>
+      <nav class="side-nav" aria-label="Primary">
+        <a class="nav-item nav-item-active" href="#" aria-current="page"><svg class="icon"><use href="#i-message"/></svg>Conversations</a>
+        <a class="nav-item" href="#" aria-expanded="true"><svg class="icon"><use href="#i-book"/></svg>Library<svg class="icon icon-xs nav-caret"><use href="#i-chev-d"/></svg></a>
+        <div class="nav-sub">
+          <a class="nav-sub-item" href="#">Cases</a>
+          <a class="nav-sub-item" href="#">Statutes</a>
+          <a class="nav-sub-item" href="#">Notes</a>
+          <a class="nav-sub-item" href="#">Files</a>
+        </div>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-bookmark"/></svg>Bookmarks</a>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-users"/></svg>Spaces</a>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-cap"/></svg>Quiz</a>
+        <div class="side-recent">
+          <div class="eyebrow side-eyebrow">Recent</div>
+          <button class="recent-row recent-row-active">Madukolu — the jurisdiction test</button>
+          <button class="recent-row">Tenant eviction — Lagos</button>
+          <button class="recent-row">Evidence Act s.84 — electronic evidence</button>
+        </div>
+      </nav>
+      <div class="side-footer">
+        <span class="avatar" aria-hidden="true">AO</span>
+        <span class="side-user">
+          <span class="side-name">Adaeze Okafor</span>
+          <span class="side-plan">Premium</span>
+        </span>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header convo-header">
+        <button class="icon-btn" data-goto="home" aria-label="Back to home">
+          <svg class="icon"><use href="#i-chev-l"/></svg>
+        </button>
+        <div class="convo-title-wrap">
+          <span class="eyebrow convo-eyebrow">Conversation</span>
+          <h1 class="convo-title">Jurisdiction — the Madukolu test</h1>
+        </div>
+        <button class="icon-btn" aria-label="Share this conversation"><svg class="icon"><use href="#i-share"/></svg></button>
+        <button class="icon-btn" aria-label="Notifications, 3 unread">
+          <svg class="icon"><use href="#i-bell"/></svg><span class="badge">3</span>
+        </button>
+        <button class="icon-btn" data-action="toggle-theme" aria-label="Toggle light or dark theme">
+          <svg class="icon glyph-moon"><use href="#i-moon"/></svg>
+          <svg class="icon glyph-sun"><use href="#i-sun"/></svg>
+        </button>
+      </header>
+
+      <div class="content">
+        <div class="thread">
+
+          <div class="msg-user">
+            <div class="msg-user-bubble">What makes a court competent to hear a matter? I keep seeing Madukolu v Nkemdilim cited — what does it actually decide?</div>
+            <div class="msg-user-meta">9:42 PM</div>
+          </div>
+
+          <button class="tool-row" aria-expanded="false">
+            <svg class="icon icon-xs tool-spark"><use href="#i-spark"/></svg>
+            Searched Nigerian case law · 6 authorities · 1.8s
+            <svg class="icon icon-xs tool-chev"><use href="#i-chev-d"/></svg>
+          </button>
+
+          <div class="msg-ai">
+            <p class="reveal">Madukolu v Nkemdilim (1962) is the foundational authority on jurisdiction in Nigeria. The Federal Supreme Court, per Bairamian FJ, laid down the test that every court still applies before touching the merits of a case.</p>
+
+            <div class="reveal">
+              <p class="lead">A court is competent only when all three conditions are met:</p>
+              <ol class="test-list">
+                <li><strong>Proper constitution</strong> — the bench is properly constituted as regards numbers and qualifications of its members, and no member is disqualified.</li>
+                <li><strong>Subject-matter jurisdiction</strong> — the case is within the court&rsquo;s jurisdiction and no statutory limitation applies.</li>
+                <li><strong>Due process</strong> — the case comes before the court initiated by due process of law, and every condition precedent to exercising jurisdiction has been fulfilled.</li>
+              </ol>
+            </div>
+
+            <blockquote class="extract reveal">
+              <p>Any defect in competence is fatal, for the proceedings are a nullity however well conducted and decided.</p>
+              <footer class="eyebrow extract-source">— Bairamian FJ</footer>
+            </blockquote>
+
+            <div class="authorities reveal">
+              <div class="eyebrow authorities-eyebrow">Authorities</div>
+              <a class="cite-row" href="#"><span class="cite-mark" aria-hidden="true">§</span>Madukolu v Nkemdilim (1962) 2 SCNLR 341</a>
+              <a class="cite-row" href="#"><span class="cite-mark" aria-hidden="true">§</span>Skenconsult (Nig) Ltd v Ukey (1981) 1 SC 6</a>
+              <a class="cite-row" href="#"><span class="cite-mark" aria-hidden="true">§</span>A-G Lagos State v Dosunmu (1989) 3 NWLR (Pt.111) 552</a>
+            </div>
+
+            <p class="streaming reveal">Where any limb fails, the defect goes to the root —<span class="caret" aria-hidden="true"></span></p>
+
+            <div class="msg-actions">
+              <button class="ghost" aria-label="Copy answer"><svg class="icon"><use href="#i-copy"/></svg></button>
+              <button class="ghost" aria-label="Good answer"><svg class="icon"><use href="#i-thumb-up"/></svg></button>
+              <button class="ghost" aria-label="Poor answer"><svg class="icon"><use href="#i-thumb-down"/></svg></button>
+              <button class="more-touch" aria-label="Answer actions"><svg class="icon icon-sm"><use href="#i-more"/></svg></button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="responding" id="responding-pill">
+          <span class="responding-dot" aria-hidden="true"></span>
+          Lawexa is responding
+          <span class="responding-sep" aria-hidden="true">·</span>
+          <button class="stop-btn" id="stop-btn">Stop</button>
+        </div>
+        <div class="composer dock-composer">
+          <div class="composer-inner">
+            <textarea class="composer-input" rows="1" placeholder="Ask anything about Nigerian law…" aria-label="Ask anything about Nigerian law"></textarea>
+            <div class="composer-row">
+              <button class="icon-btn" aria-label="Attach a file"><svg class="icon"><use href="#i-clip"/></svg></button>
+              <button class="chip">Nigeria</button>
+              <button class="chip">Lawexa Expert</button>
+              <button class="send" aria-label="Send"><svg class="icon"><use href="#i-arrow-up"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var screens = {
+    home: document.getElementById('screen-home'),
+    convo: document.getElementById('screen-convo')
+  };
+  var chromeTabs = document.querySelectorAll('.chrome-tab');
+
+  function goto(name) {
+    Object.keys(screens).forEach(function (key) {
+      screens[key].hidden = key !== name;
+    });
+    chromeTabs.forEach(function (tab) {
+      tab.setAttribute('aria-selected', String(tab.dataset.goto === name));
+    });
+    var content = screens[name].querySelector('.content');
+    if (content) content.scrollTop = 0;
+  }
+
+  document.querySelectorAll('a[href="#"]').forEach(function (link) {
+    link.addEventListener('click', function (event) { event.preventDefault(); });
+  });
+
+  document.querySelectorAll('[data-goto]').forEach(function (el) {
+    el.addEventListener('click', function (event) {
+      event.preventDefault();
+      goto(el.dataset.goto);
+    });
+  });
+
+  document.querySelectorAll('[data-action="toggle-theme"]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var dark = root.classList.toggle('dark');
+      document.querySelectorAll('[data-action="toggle-theme"]').forEach(function (btn) {
+        if (btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', String(dark));
+      });
+    });
+  });
+
+  document.querySelectorAll('.composer-input').forEach(function (area) {
+    area.addEventListener('input', function () {
+      area.style.height = 'auto';
+      area.style.height = Math.min(area.scrollHeight, 160) + 'px';
+    });
+  });
+
+  var homeInput = document.querySelector('#screen-home .composer-input');
+  if (homeInput) {
+    homeInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        goto('convo');
+      }
+    });
+  }
+
+  var stopBtn = document.getElementById('stop-btn');
+  if (stopBtn) {
+    stopBtn.addEventListener('click', function () {
+      var pill = document.getElementById('responding-pill');
+      var caret = document.querySelector('.caret');
+      if (pill) pill.style.display = 'none';
+      if (caret) caret.remove();
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

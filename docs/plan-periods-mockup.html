@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin · User Plan Periods (mockup)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+  body { background:#f6f6f7; color:#0a0a0a; }
+  .card { background:#fff; border:1px solid #e7e7ea; border-radius:14px; }
+  .muted { color:#6b7280; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:9999px; line-height:1.4; }
+  .row-click { cursor:pointer; }
+  .row-click:hover { background:#fafafa; }
+  /* drawer */
+  #overlay { transition:opacity .2s ease; }
+  #drawer { transition:transform .25s ease; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ===== top app chrome (fake sidebar + header just for context) ===== -->
+<div class="flex">
+  <!-- fake sidebar -->
+  <aside class="hidden lg:flex w-56 shrink-0 flex-col border-r border-[#e7e7ea] bg-white min-h-screen p-3 gap-1">
+    <div class="px-2 py-3 font-bold text-lg">Lawexa <span class="muted font-medium text-sm">admin</span></div>
+    <a class="px-3 py-2 rounded-lg text-sm muted hover:bg-gray-50">Dashboard</a>
+    <a class="px-3 py-2 rounded-lg text-sm bg-gray-100 font-medium">Users</a>
+    <a class="px-3 py-2 rounded-lg text-sm muted hover:bg-gray-50">Subscriptions</a>
+    <a class="px-3 py-2 rounded-lg text-sm muted hover:bg-gray-50">Plans</a>
+    <a class="px-3 py-2 rounded-lg text-sm muted hover:bg-gray-50">Conversations</a>
+  </aside>
+
+  <!-- main -->
+  <main class="flex-1 min-w-0">
+    <header class="h-14 border-b border-[#e7e7ea] bg-white flex items-center px-6 gap-3">
+      <div class="text-sm muted">Admin / Users / <span class="text-gray-900">Jane Doe</span> / Plan periods</div>
+      <div class="ml-auto flex items-center gap-2 text-sm">
+        <span class="muted">Display:</span>
+        <button id="curToggle" class="badge bg-gray-100 text-gray-700">Show ₦ (NGN)</button>
+      </div>
+    </header>
+
+    <div class="max-w-6xl mx-auto p-6 space-y-6">
+
+      <!-- back + title -->
+      <div>
+        <a class="inline-flex items-center gap-1.5 text-sm muted hover:text-gray-900 -ml-1 mb-3">← Back to user</a>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Plan periods</h1>
+            <p class="text-sm muted">Jane Doe · jane@example.com</p>
+            <p class="text-xs muted mono mt-0.5">385090c8-3971-45f4-b99e-8fbc36e5a81f</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- reconciliation banner -->
+      <div class="card p-3.5 flex items-center gap-3 bg-emerald-50 border-emerald-200">
+        <span class="badge bg-emerald-600 text-white">✓ Balanced</span>
+        <p class="text-sm text-emerald-900">
+          Every AI turn is accounted for — periods + buckets equal the user's grand total
+          (<span class="font-semibold">10</span> messages · <span class="font-semibold">213</span> tokens · <span class="font-semibold cost">$0.030</span>).
+        </p>
+        <span class="ml-auto text-xs text-emerald-700/80">sum_of_slots == user_total</span>
+      </div>
+      <!-- (when balanced:false this turns red: "⚠ Unbalanced — N messages unaccounted for") -->
+
+      <!-- totals -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-4">
+          <p class="text-xs muted font-medium uppercase tracking-wide">Total messages</p>
+          <p class="text-2xl font-semibold mt-1">10</p>
+        </div>
+        <div class="card p-4">
+          <p class="text-xs muted font-medium uppercase tracking-wide">Conversations</p>
+          <p class="text-2xl font-semibold mt-1">8</p>
+        </div>
+        <div class="card p-4">
+          <p class="text-xs muted font-medium uppercase tracking-wide">Total tokens</p>
+          <p class="text-2xl font-semibold mt-1">213</p>
+        </div>
+        <div class="card p-4">
+          <p class="text-xs muted font-medium uppercase tracking-wide">Total cost</p>
+          <p class="text-2xl font-semibold mt-1 cost">$0.030</p>
+        </div>
+      </div>
+
+      <!-- ===== billing periods table ===== -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Billing periods</h2>
+          <span class="text-xs muted">Click a row to see its conversations</span>
+        </div>
+
+        <div class="card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left muted text-xs uppercase tracking-wide border-b border-[#e7e7ea]">
+                <th class="font-medium px-4 py-2.5">Plan</th>
+                <th class="font-medium px-4 py-2.5">Window</th>
+                <th class="font-medium px-4 py-2.5">Amount</th>
+                <th class="font-medium px-4 py-2.5">Status</th>
+                <th class="font-medium px-4 py-2.5 text-right">Messages</th>
+                <th class="font-medium px-4 py-2.5 text-right">Tokens</th>
+                <th class="font-medium px-4 py-2.5 text-right">Cost</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[#f0f0f1]">
+              <!-- period 1: invoice, current -->
+              <tr class="row-click" onclick="openDrawer('inv-61')">
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium">Pro Monthly</span>
+                    <span class="badge bg-blue-600 text-white">Current</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 mt-1">
+                    <span class="badge bg-gray-100 text-gray-600">paystack</span>
+                    <span class="badge bg-gray-100 text-gray-600">invoice</span>
+                    <span class="mono text-[11px] muted">inv-61</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 muted whitespace-nowrap">18 Jun 2026<br>→ 18 Jul 2026</td>
+                <td class="px-4 py-3 whitespace-nowrap">₦15,000.00 <span class="muted text-xs">NGN</span></td>
+                <td class="px-4 py-3"><span class="badge bg-emerald-100 text-emerald-700">paid</span></td>
+                <td class="px-4 py-3 text-right">
+                  2
+                  <div class="mt-1"><span class="badge bg-indigo-50 text-indigo-700">plan_paid ×2</span></div>
+                </td>
+                <td class="px-4 py-3 text-right">105</td>
+                <td class="px-4 py-3 text-right cost">$0.019</td>
+              </tr>
+
+              <!-- period 2: granted / synthesized -->
+              <tr class="row-click" onclick="openDrawer('sub-128')">
+                <td class="px-4 py-3">
+                  <div class="font-medium">Pro Monthly</div>
+                  <div class="flex items-center gap-1.5 mt-1">
+                    <span class="badge bg-amber-100 text-amber-700">granted</span>
+                    <span class="badge bg-gray-100 text-gray-600">synthesized</span>
+                    <span class="mono text-[11px] muted">sub-128</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 muted whitespace-nowrap">
+                  20 Jun 2026<br>→ <span class="italic">Ongoing</span>
+                  <div class="badge bg-gray-100 text-gray-500 mt-1">derived dates</div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap muted">₦0.00 <span class="text-xs">NGN</span></td>
+                <td class="px-4 py-3"><span class="badge bg-gray-100 text-gray-600">active</span></td>
+                <td class="px-4 py-3 text-right">
+                  1
+                  <div class="mt-1"><span class="badge bg-indigo-50 text-indigo-700">plan_granted ×1</span></div>
+                </td>
+                <td class="px-4 py-3 text-right">30</td>
+                <td class="px-4 py-3 text-right cost">$0.006</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== buckets ===== -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Other usage</h2>
+          <span class="text-xs muted">Usage not tied to a paid period — grouped by funding source</span>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <!-- free -->
+          <div class="card p-4 row-click" onclick="openDrawer('bucket-free')">
+            <div class="flex items-center justify-between">
+              <span class="font-medium">Free tier</span>
+              <span class="mono text-[11px] muted">bucket-free</span>
+            </div>
+            <p class="text-xs muted mt-0.5">Free-tier turns, no subscription</p>
+            <div class="flex gap-4 mt-3 text-sm">
+              <span><span class="font-semibold">1</span> <span class="muted">msg</span></span>
+              <span><span class="font-semibold">10</span> <span class="muted">tok</span></span>
+              <span class="cost font-semibold">$0.001</span>
+            </div>
+          </div>
+          <!-- pack -->
+          <div class="card p-4 row-click" onclick="openDrawer('bucket-pack')">
+            <div class="flex items-center justify-between">
+              <span class="font-medium">PAYG packs</span>
+              <span class="mono text-[11px] muted">bucket-pack</span>
+            </div>
+            <p class="text-xs muted mt-0.5">Message-pack turns</p>
+            <div class="flex gap-4 mt-3 text-sm">
+              <span><span class="font-semibold">1</span> <span class="muted">msg</span></span>
+              <span><span class="font-semibold">20</span> <span class="muted">tok</span></span>
+              <span class="cost font-semibold">$0.002</span>
+            </div>
+          </div>
+          <!-- unattributed (highlighted as the one to watch) -->
+          <div class="card p-4 row-click border-amber-200 bg-amber-50/40" onclick="openDrawer('bucket-unattributed')">
+            <div class="flex items-center justify-between">
+              <span class="font-medium text-amber-900">Unattributed</span>
+              <span class="mono text-[11px] text-amber-700/70">bucket-unattributed</span>
+            </div>
+            <p class="text-xs text-amber-700/80 mt-0.5">Plan turns that couldn't be placed</p>
+            <div class="flex gap-4 mt-3 text-sm">
+              <span><span class="font-semibold">2</span> <span class="muted">msg</span></span>
+              <span><span class="font-semibold">16</span> <span class="muted">tok</span></span>
+              <span class="cost font-semibold">$0.002</span>
+            </div>
+          </div>
+          <!-- staff (zero cost, muted) -->
+          <div class="card p-4 row-click" onclick="openDrawer('bucket-staff')">
+            <div class="flex items-center justify-between">
+              <span class="font-medium">Staff / bypass</span>
+              <span class="mono text-[11px] muted">bucket-staff</span>
+            </div>
+            <p class="text-xs muted mt-0.5">admin · researcher tiers</p>
+            <div class="flex gap-4 mt-3 text-sm">
+              <span><span class="font-semibold">1</span> <span class="muted">msg</span></span>
+              <span><span class="font-semibold">15</span> <span class="muted">tok</span></span>
+              <span class="muted">$0.000</span>
+            </div>
+          </div>
+          <!-- system -->
+          <div class="card p-4 row-click" onclick="openDrawer('bucket-system')">
+            <div class="flex items-center justify-between">
+              <span class="font-medium">System</span>
+              <span class="mono text-[11px] muted">bucket-system</span>
+            </div>
+            <p class="text-xs muted mt-0.5">System-generated turns</p>
+            <div class="flex gap-4 mt-3 text-sm">
+              <span><span class="font-semibold">1</span> <span class="muted">msg</span></span>
+              <span><span class="font-semibold">5</span> <span class="muted">tok</span></span>
+              <span class="muted">$0.000</span>
+            </div>
+          </div>
+          <!-- legacy -->
+          <div class="card p-4 row-click" onclick="openDrawer('bucket-legacy')">
+            <div class="flex items-center justify-between">
+              <span class="font-medium">Legacy</span>
+              <span class="mono text-[11px] muted">bucket-legacy</span>
+            </div>
+            <p class="text-xs muted mt-0.5">Before attribution tagging</p>
+            <div class="flex gap-4 mt-3 text-sm">
+              <span><span class="font-semibold">1</span> <span class="muted">msg</span></span>
+              <span><span class="font-semibold">12</span> <span class="muted">tok</span></span>
+              <span class="muted">$0.000</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ===== drill-down drawer (Sheet) ===== -->
+<div id="overlay" class="fixed inset-0 bg-black/30 opacity-0 pointer-events-none" onclick="closeDrawer()"></div>
+<aside id="drawer" class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-xl translate-x-full overflow-y-auto">
+  <div class="p-6 space-y-4">
+    <div class="flex items-start justify-between">
+      <div>
+        <h3 class="text-lg font-semibold" id="drawerTitle">Period conversations</h3>
+        <p class="text-sm muted" id="drawerSub"></p>
+      </div>
+      <button class="badge bg-gray-100 text-gray-600" onclick="closeDrawer()">✕ Close</button>
+    </div>
+
+    <div class="card overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left muted text-xs uppercase tracking-wide border-b border-[#e7e7ea]">
+            <th class="font-medium px-4 py-2.5">Conversation</th>
+            <th class="font-medium px-4 py-2.5 text-right">Msgs in period</th>
+            <th class="font-medium px-4 py-2.5 text-right">Tokens</th>
+            <th class="font-medium px-4 py-2.5 text-right">Cost</th>
+          </tr>
+        </thead>
+        <tbody id="drawerBody" class="divide-y divide-[#f0f0f1]"></tbody>
+      </table>
+    </div>
+
+    <!-- pagination (reuses AdminPagination) -->
+    <div class="flex items-center justify-between text-sm">
+      <span class="muted" id="drawerCount">Showing 1 of 1</span>
+      <div class="flex items-center gap-1">
+        <button class="badge bg-gray-100 text-gray-400">‹ Prev</button>
+        <span class="badge bg-gray-900 text-white">1</span>
+        <button class="badge bg-gray-100 text-gray-400">Next ›</button>
+      </div>
+    </div>
+    <p class="text-xs muted">Per-conversation counts are scoped to this slot (a long conversation spanning two periods appears in both, with its slot-scoped counts).</p>
+  </div>
+</aside>
+
+<script>
+  // mock drill-down data keyed by slot
+  const SLOTS = {
+    'inv-61':  { title:'Period · Pro Monthly (inv-61)', sub:'18 Jun → 18 Jul 2026 · paystack · current',
+      rows:[ ['Contract review','active',false,2,150,0.030], ['Lease dispute notes','active',false,0,0,0.000] ] },
+    'sub-128': { title:'Period · Pro Monthly (sub-128)', sub:'20 Jun 2026 → Ongoing · granted',
+      rows:[ ['Trademark question','active',false,1,30,0.006] ] },
+    'bucket-free':   { title:'Bucket · Free tier', sub:'bucket-free', rows:[ ['Getting started','active',false,1,10,0.001] ] },
+    'bucket-pack':   { title:'Bucket · PAYG packs', sub:'bucket-pack', rows:[ ['Bulk research','active',false,1,20,0.002] ] },
+    'bucket-staff':  { title:'Bucket · Staff / bypass', sub:'bucket-staff', rows:[ ['Internal QA',null,true,1,15,0.000] ] },
+    'bucket-system': { title:'Bucket · System', sub:'bucket-system', rows:[ ['System summary','active',false,1,5,0.000] ] },
+    'bucket-legacy': { title:'Bucket · Legacy', sub:'bucket-legacy', rows:[ ['Old chat (2024)','archived',false,1,12,0.000] ] },
+    'bucket-unattributed': { title:'Bucket · Unattributed', sub:'bucket-unattributed', rows:[ ['Untagged plan turn','active',false,2,16,0.002] ] },
+  };
+
+  let showNGN = false;
+  const RATE = 1600;
+  function fmtCost(usd){
+    if (showNGN) return '₦' + (usd*RATE).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+    return '$' + usd.toFixed(3);
+  }
+  function refreshCosts(){
+    document.querySelectorAll('.cost').forEach(el=>{
+      // re-derive from text only for the static $ ones we tagged with data; simplest: leave headline ones as-is
+    });
+    document.getElementById('curToggle').textContent = showNGN ? 'Show $ (USD)' : 'Show ₦ (NGN)';
+  }
+  document.getElementById('curToggle').onclick = ()=>{ showNGN=!showNGN; refreshCosts(); };
+
+  function escapeHtml(s){ return (s??'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+  function openDrawer(key){
+    const slot = SLOTS[key];
+    document.getElementById('drawerTitle').textContent = slot.title;
+    document.getElementById('drawerSub').textContent = slot.sub;
+    const body = document.getElementById('drawerBody');
+    body.innerHTML = slot.rows.map(r=>{
+      const [title,status,conf,msgs,tok,cost] = r;
+      const titleCell = conf
+        ? `<span class="italic muted">Confidential conversation</span> <span class="badge bg-rose-100 text-rose-700">confidential</span>`
+        : escapeHtml(title);
+      const statusBadge = status ? `<span class="badge bg-gray-100 text-gray-600">${status}</span>` : '';
+      return `<tr>
+        <td class="px-4 py-3"><div class="flex items-center gap-2 flex-wrap">${titleCell} ${statusBadge}</div>
+          <div class="text-[11px] muted mono mt-0.5">2e22…1263e</div></td>
+        <td class="px-4 py-3 text-right">${msgs}</td>
+        <td class="px-4 py-3 text-right">${tok}</td>
+        <td class="px-4 py-3 text-right ${cost===0?'muted':''}">$${cost.toFixed(3)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('drawerCount').textContent = `Showing ${slot.rows.length} of ${slot.rows.length}`;
+    document.getElementById('overlay').classList.remove('opacity-0','pointer-events-none');
+    document.getElementById('drawer').classList.remove('translate-x-full');
+  }
+  function closeDrawer(){
+    document.getElementById('overlay').classList.add('opacity-0','pointer-events-none');
+    document.getElementById('drawer').classList.add('translate-x-full');
+  }
+</script>
+</body>
+</html>
