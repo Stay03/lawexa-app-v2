@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lawexa v2 — v1 refined</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Comfortaa is used for the WORDMARK ONLY. All UI is v1's system sans stack. -->
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   LAWEXA v2 — "this IS Lawexa, just clean"
+   Re-skin to v1's identity: v1 oklch tokens (verbatim), v1's system
+   sans, v1 primitives (rounded-4xl controls, rounded-2xl ring cards,
+   gold-shimmer composer), the ORIGINAL shimmer CSS, the floating
+   composer, and the drawer as the only mobile nav.
+   tokens → primitives → shimmer → composer → shell → screens → drawer
+   ============================================================ */
+
+/* ---------- 1. Tokens — pulled VERBATIM from app/globals.css ---------- */
+:root{
+  /* :root block */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.58 0.14 82);
+  --primary-foreground: oklch(0.99 0.01 82);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0.01 82);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.58 0.22 27);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.58 0.14 82);
+  --radius: 0.45rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.58 0.14 82);
+  --sidebar-primary-foreground: oklch(0.99 0.01 82);
+  --sidebar-accent: oklch(0.97 0.01 82);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.58 0.14 82);
+
+  /* radius scale (verbatim from v1's @theme inline) */
+  --radius-sm: calc(var(--radius) - 4px);   /* 3.2px */
+  --radius-md: calc(var(--radius) - 2px);   /* 5.2px */
+  --radius-lg: var(--radius);               /* 7.2px */
+  --radius-xl: calc(var(--radius) + 4px);   /* 11.2px */
+  --radius-2xl: calc(var(--radius) + 8px);  /* 15.2px — cards */
+  --radius-3xl: calc(var(--radius) + 12px); /* 19.2px — composer */
+  --radius-4xl: calc(var(--radius) + 16px); /* 23.2px — controls (near-pill on 36px) */
+
+  /* v1's system sans for ALL UI; Comfortaa for the wordmark only */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mark: "Comfortaa", var(--font-sans);
+
+  /* derived tints (reference --primary/--input/--foreground so they follow the theme) */
+  --primary-10: color-mix(in oklch, var(--primary) 12%, transparent);   /* bg-primary/10 chips + active rows */
+  --primary-18: color-mix(in oklch, var(--primary) 18%, transparent);
+  --primary-hover: color-mix(in oklch, var(--primary) 90%, var(--foreground)); /* ≈ hover:bg-primary/80 darken */
+  --input-30: color-mix(in oklch, var(--input) 40%, transparent);       /* bg-input/30 */
+  --ring-50: color-mix(in oklch, var(--ring) 55%, transparent);         /* focus-visible ring/50 */
+  --foreground-10: color-mix(in oklch, var(--foreground) 10%, transparent); /* ring-foreground/10 card ring */
+
+  /* A11Y: v1 uses --primary as gold TEXT, but L0.58 gold on white is ~3:1.
+     For body-size gold text we darken to --gold-ink (hue/chroma kept) to reach
+     ~4.5:1; gold FILLS/rings stay the verbatim --primary. On dark, --primary
+     (L0.70) is already bright enough, so --gold-ink == --primary there. */
+  --gold-ink: oklch(0.52 0.145 82);
+  /* Dark ink on gold fills (per brief: "New-chat pill = gold with dark-ink
+     text"). v1's near-white primary-foreground on the L0.58 gold is only
+     4.2:1; a mid-dark ink is worse (~3.6:1) because the gold is a mid-tone —
+     only a near-black warm ink clears 4.5:1 (measured 4.58:1), so that's what
+     we use. (v1's own --foreground on gold is 4.55:1, same idea.) */
+  --on-gold: oklch(0.14 0.03 82);
+
+  color-scheme: light;
+}
+.dark{
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.70 0.14 82);
+  --primary-foreground: oklch(0.20 0.06 82);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0.03 82);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.70 0.14 82);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.70 0.14 82);
+  --sidebar-primary-foreground: oklch(0.20 0.06 82);
+  --sidebar-accent: oklch(0.269 0.02 82);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.70 0.14 82);
+
+  --gold-ink: var(--primary);
+  --on-gold: oklch(0.20 0.06 82);
+  color-scheme: dark;
+}
+
+/* ---------- 2. Base ---------- */
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  height:100vh;height:100dvh;
+  display:flex;flex-direction:column;overflow:hidden;
+  background:var(--background);color:var(--foreground);
+  font-family:var(--font-sans);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+::selection{background:oklch(0.58 0.14 82 / .35);}
+.dark ::selection{background:oklch(0.70 0.14 82 / .4);}
+button{appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;}
+textarea{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;resize:none;}
+textarea:focus{outline:none;}
+p{margin:0 0 10px;}
+strong{font-weight:600;}
+:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring-50);border-radius:var(--radius-lg);}
+.icon{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.icon-18{width:18px;height:18px;}
+.icon-20{width:20px;height:20px;}
+.scroll{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.scroll::-webkit-scrollbar{width:10px;}
+.scroll::-webkit-scrollbar-thumb{background:var(--border);border:3px solid transparent;background-clip:padding-box;border-radius:999px;}
+.scroll::-webkit-scrollbar-track{background:transparent;}
+
+/* ---------- 3. Primitives (v1 shapes) ---------- */
+/* icon button — ghost, near-circular (rounded-4xl on 36px) */
+.icon-btn{
+  position:relative;width:36px;height:36px;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-4xl);color:var(--muted-foreground);
+  transition:background 160ms ease,color 160ms ease,transform 120ms ease;
+}
+.icon-btn:active{transform:scale(.96);}
+/* chip / tag — rounded-full bg-primary/10 text-primary (v1 card tags) */
+.chip{
+  position:relative;display:inline-flex;align-items:center;gap:6px;
+  height:28px;padding:0 12px;border-radius:999px;
+  font-size:13px;font-weight:500;color:var(--gold-ink);
+  background:var(--primary-10);
+  transition:background 160ms ease;
+}
+.chip::after{content:"";position:absolute;inset:-4px;}   /* padded hit area */
+.chip:active{transform:scale(.97);}
+.tag{
+  display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;
+  font-size:11px;font-weight:600;letter-spacing:.02em;
+  color:var(--gold-ink);background:var(--primary-10);
+}
+/* card — rounded-2xl, flat ring elevation (ring-1 ring-foreground/10), no shadow */
+.card{
+  background:var(--card);color:var(--card-foreground);
+  border-radius:var(--radius-2xl);
+  box-shadow:inset 0 0 0 1px var(--foreground-10);
+}
+/* authority reference pill */
+.cite{
+  display:inline-flex;align-items:center;gap:8px;
+  min-height:36px;padding:7px 14px;width:fit-content;max-width:100%;
+  font-size:13px;color:var(--foreground);
+  background:var(--card);border-radius:var(--radius-xl);
+  box-shadow:inset 0 0 0 1px var(--foreground-10);
+  transition:background 160ms ease;
+}
+.cite .icon{color:var(--gold-ink);}
+.cite:active{transform:scale(.98);}
+.avatar{
+  width:28px;height:28px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:999px;background:var(--primary-10);color:var(--gold-ink);
+  font-size:11px;font-weight:600;
+}
+.badge{
+  position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:600;line-height:1;
+  color:var(--on-gold);background:var(--primary);border-radius:999px;
+  font-variant-numeric:tabular-nums;
+}
+.kbd{
+  font-size:11px;font-weight:500;line-height:1;color:var(--muted-foreground);
+  background:var(--muted);border-radius:var(--radius-sm);padding:3px 6px;white-space:nowrap;
+}
+
+/* ---------- 4. THE ORIGINAL SHIMMER (verbatim from app/globals.css) ---------- */
+@keyframes gradient-rotate {
+  0% { background-position: 0% 50%; }
+  15% { background-position: 80% 30%; }
+  25% { background-position: 20% 70%; }
+  40% { background-position: 90% 20%; }
+  55% { background-position: 10% 80%; }
+  70% { background-position: 70% 40%; }
+  85% { background-position: 30% 90%; }
+  100% { background-position: 0% 50%; }
+}
+.gold-shimmer {
+  background: linear-gradient(135deg, #fef3c7, #facc15, #eab308, #ca8a04, #cadd1d, #ac6407, #ffffff, #ca8a04, #eab308, #facc15, #fef3c7);
+  background-size: 800% 800%;
+  animation: gradient-rotate 25s ease-in-out infinite;
+  transition: background 0.3s ease;
+}
+.dark .gold-shimmer {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #eab308, #d97706, #facc15, #ca8a04, #fcd34d, #b45309, #f59e0b, #eab308, #fbbf24);
+  background-size: 800% 800%;
+  animation: gradient-rotate 25s ease-in-out infinite;
+}
+.gold-shimmer-focus,
+.gold-shimmer:focus-within {
+  background: linear-gradient(135deg, #ffffff, #c9dde6, #abc6d8, #d4c986, #9eb2c0, #d6b73b, #b0c2c9, #dac56a, #000000, #fef3c7, #ffffff);
+  background-size: 800% 800%;
+  animation: gradient-rotate 45s ease-in-out infinite;
+}
+.dark .gold-shimmer-focus,
+.dark .gold-shimmer:focus-within {
+  background: linear-gradient(135deg, #fcd34d, #e2e8f0, #cbd5e1, #fbbf24, #94a3b8, #f59e0b, #e2e8f0, #eab308, #64748b, #fef3c7, #fcd34d);
+  background-size: 800% 800%;
+  animation: gradient-rotate 45s ease-in-out infinite;
+}
+
+/* ---------- 5. Composer (v1 PromptInput default: gold-shimmer p-[1px] → inner) ---------- */
+.composer{padding:1px;border-radius:var(--radius-3xl);}
+.composer-inner{
+  background:var(--background);border-radius:var(--radius-3xl);padding:8px;
+  box-shadow:0 1px 2px rgba(0,0,0,.05);   /* shadow-xs */
+}
+.composer-input{
+  display:block;width:100%;min-height:44px;padding:8px 8px 4px;
+  font-size:15px;line-height:1.5;color:var(--gold-ink);caret-color:var(--primary);
+}
+.composer-input::placeholder{color:var(--muted-foreground);}
+.composer-tools{display:flex;align-items:center;gap:8px;padding:2px 2px 0;}
+.composer-tools .spacer{flex:1;}
+.send-btn{
+  width:36px;height:36px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:999px;background:var(--primary);color:var(--on-gold);
+  transition:background 160ms ease,transform 120ms ease;
+}
+.send-btn:active{transform:scale(.96);}
+/* single-row variant for the floating conversation composer */
+.composer-row{display:flex;align-items:flex-end;gap:8px;}
+.composer-row .composer-input{flex:1;min-width:0;min-height:36px;padding:8px 4px 6px 10px;}
+
+/* ---------- 6. Spec chrome (not part of the design language) ---------- */
+.specbar{flex:none;display:flex;align-items:center;gap:12px;min-height:44px;padding:5px 12px;background:#ECECEE;color:#55575E;border-bottom:1px solid #DCDDE1;font-family:var(--font-sans);font-size:12px;z-index:10;flex-wrap:wrap;}
+.dark .specbar{background:#101114;color:#9DA0A8;border-bottom-color:#26272C;}
+.spec-name{font-weight:600;color:#33353B;white-space:nowrap;}
+.dark .spec-name{color:#C9CBD1;}
+.spec-tabs{display:flex;gap:2px;background:rgba(0,0,0,.05);border-radius:999px;padding:2px;}
+.dark .spec-tabs{background:rgba(255,255,255,.06);}
+.spec-tab{height:26px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;font-size:12px;color:inherit;white-space:nowrap;}
+.spec-tab[aria-selected="true"]{background:#FFFFFF;color:#1B1D21;box-shadow:0 1px 2px rgba(0,0,0,.08);}
+.dark .spec-tab[aria-selected="true"]{background:#2A2C33;color:#E8E9EC;}
+.spec-grow{flex:1;}
+.spec-hint{opacity:.75;white-space:nowrap;}
+.spec-theme{width:30px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;color:inherit;}
+.specbar :focus-visible{box-shadow:0 0 0 2px #8A8D95;}
+.i-sun{display:none;}.i-moon{display:block;}
+.dark .i-sun{display:block;}.dark .i-moon{display:none;}
+
+/* ---------- 7. App shell ---------- */
+.app{flex:1;min-height:0;display:grid;grid-template-columns:264px minmax(0,1fr);position:relative;}
+.screen{display:none;grid-column:2;grid-row:1;min-height:0;grid-template-rows:56px minmax(0,1fr);position:relative;}
+.app[data-screen="home"] .screen-home{display:grid;}
+.app[data-screen="convo"] .screen-convo{display:grid;}
+
+/* ---------- 8. Sidebar (v1 shadcn sidebar look) ---------- */
+.sidebar{grid-column:1;grid-row:1;min-height:0;display:flex;flex-direction:column;background:var(--sidebar);color:var(--sidebar-foreground);border-right:1px solid var(--sidebar-border);}
+.side-top{padding:14px 12px 8px;}
+.brand{display:flex;align-items:baseline;gap:8px;padding:4px 8px 14px;}
+.wordmark{font-family:var(--font-mark);font-weight:700;font-size:19px;letter-spacing:-.01em;color:var(--foreground);}
+.vtag{font-size:11px;font-weight:600;color:var(--gold-ink);background:var(--primary-10);border-radius:999px;padding:1px 7px;}
+.newchat{
+  width:100%;height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;
+  background:var(--primary);color:var(--on-gold);font-size:14px;font-weight:600;
+  border-radius:var(--radius-4xl);
+  transition:background 160ms ease,transform 120ms ease;
+}
+.newchat:active{transform:scale(.98);}
+.newchat .label{flex:1;}
+.side-nav{flex:1;min-height:0;padding:6px 12px 12px;display:flex;flex-direction:column;gap:2px;}
+.navrow,.subrow,.recentrow{
+  position:relative;display:flex;align-items:center;gap:10px;width:100%;height:40px;padding:0 12px;
+  border-radius:var(--radius-md);color:var(--sidebar-foreground);font-size:14px;
+  transition:background 160ms ease,color 160ms ease;
+}
+.navrow{font-weight:500;}
+.subrow{height:36px;padding-left:38px;color:var(--muted-foreground);font-weight:400;}
+.recentrow{height:36px;color:var(--muted-foreground);font-weight:400;}
+.navrow .icon{color:var(--muted-foreground);}
+.navrow .label{flex:1;}
+.navrow .chev{color:var(--muted-foreground);transition:transform 180ms ease;}
+.navrow[aria-expanded="false"] .chev{transform:rotate(-90deg);}
+.subgroup{display:flex;flex-direction:column;gap:2px;}
+.subgroup.hidden{display:none;}
+/* the ONE active-state rule (startsWith highlight; shown on Library) — gold tint */
+.navrow.active{background:var(--primary-10);color:var(--gold-ink);font-weight:600;}
+.navrow.active .icon{color:var(--gold-ink);}
+.recentrow .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.side-label{padding:14px 12px 6px;display:block;font-size:12px;font-weight:500;color:var(--muted-foreground);}
+.side-foot{flex:none;display:flex;align-items:center;gap:10px;padding:12px;border-top:1px solid var(--sidebar-border);}
+.side-foot .name{flex:1;min-width:0;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ---------- 9. Header ---------- */
+.header{grid-row:1;display:flex;align-items:center;gap:6px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--background);z-index:3;}
+.header .title{font-size:15px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.header .title-meta{font-size:13px;font-weight:400;color:var(--muted-foreground);margin-left:8px;}
+.header .grow{flex:1;}
+.header-actions{display:flex;align-items:center;gap:2px;}
+.hdr-burger{display:none;}   /* shown only on mobile (drawer trigger) */
+
+/* ---------- 10. Home ---------- */
+.home-main{grid-row:2;padding:0 20px;}
+.home-col{max-width:720px;margin:0 auto;padding:clamp(28px,7vh,64px) 0 44px;}
+.greeting{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em;}
+.greeting-sub{margin:6px 0 0;font-size:14px;color:var(--muted-foreground);}
+.home-composer{margin-top:22px;}
+.prompt-card{margin-top:16px;overflow:hidden;}
+.prompt-row{display:flex;align-items:center;gap:12px;width:100%;height:48px;padding:0 16px;font-size:14px;transition:background 160ms ease;}
+.prompt-row + .prompt-row{border-top:1px solid var(--foreground-10);}
+.prompt-row .icon{color:var(--gold-ink);}
+.prompt-row .label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.prompt-row .enter{font-size:12px;color:var(--muted-foreground);opacity:0;}
+.prompt-row:hover .enter,.prompt-row:focus-visible .enter{opacity:1;}
+.tile-grid{margin-top:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.tile{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:14px 16px;transition:background 160ms ease,transform 120ms ease;}
+.tile:active{transform:scale(.98);}
+.tile .icon{color:var(--gold-ink);}
+.tile-line{display:flex;align-items:baseline;gap:6px;min-width:0;}
+.tile-count{font-size:16px;font-weight:600;color:var(--foreground);font-variant-numeric:tabular-nums;}
+.tile-noun{font-size:13px;color:var(--muted-foreground);}
+
+/* ---------- 11. Conversation (floating composer) ---------- */
+.convo-main{grid-row:2;padding:0 20px 172px;}
+.convo-col{max-width:760px;margin:0 auto;padding:24px 0 0;display:flex;flex-direction:column;}
+.msg-user{align-self:flex-end;max-width:min(560px,90%);}
+.msg-user .bubble{background:var(--muted);border-radius:var(--radius-2xl);padding:12px 16px;font-size:14px;line-height:1.6;}
+.msg-user .bubble p{margin:0;}
+.msg-time{display:block;margin-top:5px;text-align:right;font-size:12px;color:var(--muted-foreground);}
+.tool-row{margin-top:18px;display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 16px;border-radius:var(--radius-xl);background:var(--card);box-shadow:inset 0 0 0 1px var(--foreground-10);transition:background 160ms ease;}
+.tool-row .icon-spark{color:var(--gold-ink);}
+.tool-row .tool-label{font-size:14px;font-weight:500;}
+.tool-row .tool-meta{font-size:13px;color:var(--muted-foreground);}
+.tool-row .grow{flex:1;}
+.tool-row .chev{color:var(--muted-foreground);}
+.msg-ai{margin-top:18px;font-size:15px;line-height:1.7;}
+.lead{font-weight:600;margin-bottom:8px;}
+.test-list{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:10px;}
+.test-list li{position:relative;padding-left:28px;}
+.li-num{position:absolute;left:0;top:0;font-weight:600;color:var(--gold-ink);}
+.quote{margin:16px 0;}
+.quote blockquote{margin:0;padding:12px 16px;background:var(--muted);border-left:3px solid var(--primary);border-radius:var(--radius-lg);font-size:15px;line-height:1.65;}
+.quote blockquote p{margin:0 0 8px;font-style:italic;}
+.quote .attr{display:block;font-size:12px;color:var(--muted-foreground);}
+.authorities{margin:16px 0;}
+.authorities .a-label{display:block;margin-bottom:10px;font-size:12px;font-weight:500;color:var(--muted-foreground);}
+.cite-stack{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
+.tail{margin:0;}
+.caret{display:inline-block;width:8px;height:17px;margin-left:2px;vertical-align:text-bottom;background:var(--primary);border-radius:1px;animation:caret-blink 1.1s steps(1,end) infinite;}
+@keyframes caret-blink{50%{opacity:0;}}
+.stopped .caret{display:none;}
+.msg-actions{margin-top:12px;display:flex;align-items:center;gap:2px;min-height:36px;}
+.actions-hover{display:none;align-items:center;gap:2px;opacity:0;transition:opacity 160ms ease;}
+.actions-hover:focus-within{opacity:1;}
+.actions-touch{display:flex;}
+
+/* bottom scrim: messages dissolve as they slide under the floating composer */
+.convo-fade{position:absolute;left:0;right:0;bottom:0;height:150px;pointer-events:none;z-index:2;
+  background:linear-gradient(to top,var(--background) 24%,transparent);}
+/* floating dock: status pill + composer, detached ~16px from the edge */
+.convo-float{position:absolute;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom));padding:0 20px;z-index:4;pointer-events:none;}
+.convo-float-col{max-width:760px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:10px;}
+.convo-float-col > *{pointer-events:auto;}
+.statusbar{align-self:center;display:inline-flex;align-items:center;gap:10px;height:34px;padding:0 6px 0 14px;background:var(--card);border-radius:999px;box-shadow:inset 0 0 0 1px var(--foreground-10),0 4px 14px rgba(0,0,0,.08);}
+.stopped .statusbar{display:none;}
+.status-live{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-foreground);}
+.dot{width:7px;height:7px;flex:none;border-radius:999px;background:var(--primary);animation:dot-pulse 1.4s ease infinite;}
+@keyframes dot-pulse{50%{opacity:.3;}}
+.btn-stop{display:inline-flex;align-items:center;gap:8px;height:26px;padding:0 6px 0 12px;font-size:13px;font-weight:500;background:var(--secondary);color:var(--secondary-foreground);border-radius:999px;position:relative;transition:background 160ms ease,transform 120ms ease;}
+.btn-stop::after{content:"";position:absolute;inset:-8px;}
+.btn-stop:active{transform:scale(.97);}
+.convo-composer{width:100%;box-shadow:0 8px 28px rgba(0,0,0,.14);border-radius:var(--radius-3xl);}
+.dark .convo-composer{box-shadow:0 10px 32px rgba(0,0,0,.5);}
+
+/* ---------- 12. Drawer (the only mobile nav) ---------- */
+.drawer,.drawer-scrim{display:none;}
+.drawer-scrim{position:absolute;inset:0;background:rgba(10,11,13,.5);opacity:0;pointer-events:none;transition:opacity 200ms ease-out;z-index:60;}
+.app.drawer-open .drawer-scrim{opacity:1;pointer-events:auto;}
+.drawer{
+  position:absolute;top:0;left:0;bottom:0;width:min(86%,360px);
+  flex-direction:column;background:var(--sidebar);color:var(--sidebar-foreground);
+  border-right:1px solid var(--sidebar-border);box-shadow:0 10px 40px rgba(0,0,0,.28);
+  transform:translateX(-100%);visibility:hidden;
+  transition:transform 200ms ease-out,visibility 0s linear 200ms;z-index:61;
+}
+.app.drawer-open .drawer{transform:translateX(0);visibility:visible;transition:transform 200ms ease-out,visibility 0s;}
+.drawer-head{flex:none;display:flex;align-items:center;gap:6px;height:60px;padding:0 10px 0 18px;}
+.drawer-head .wordmark{flex:1;}
+.drawer-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px 12px 12px;}
+.drawer-row{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:var(--radius-md);font-size:14px;font-weight:500;color:var(--sidebar-foreground);transition:background 160ms ease;}
+.drawer-row .icon{color:var(--muted-foreground);}
+.drawer-reclabel{display:block;padding:16px 12px 8px;font-size:12px;font-weight:500;color:var(--muted-foreground);}
+.drawer-rec{position:relative;display:flex;align-items:center;width:100%;min-height:48px;padding:0 12px;border-radius:var(--radius-md);font-size:14px;color:var(--muted-foreground);transition:background 160ms ease,color 160ms ease;}
+.drawer-rec .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.drawer-rec.active{background:var(--primary-10);color:var(--gold-ink);font-weight:500;}
+.drawer-foot{flex:none;display:flex;align-items:center;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--sidebar-border);}
+.drawer-newchat{flex:1;display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px;border-radius:999px;background:var(--primary);color:var(--on-gold);font-weight:600;font-size:14px;transition:background 160ms ease,transform 120ms ease;}
+.drawer-newchat:active{transform:scale(.98);}
+.drawer-avatar{width:44px;height:44px;flex:none;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;transition:background 160ms ease;}
+
+/* ---------- 13. Hover (pointer devices only) ---------- */
+@media (hover:hover){
+  .icon-btn:hover{background:var(--muted);color:var(--foreground);}
+  .chip:hover{background:var(--primary-18);}
+  .cite:hover{background:var(--muted);}
+  .newchat:hover,.drawer-newchat:hover,.send-btn:hover{background:var(--primary-hover);}
+  .navrow:hover{background:var(--sidebar-accent);}
+  .navrow.active:hover{background:var(--primary-10);}
+  .subrow:hover,.recentrow:hover{background:var(--sidebar-accent);color:var(--foreground);}
+  .prompt-row:hover{background:var(--muted);}
+  .tile:hover{background:var(--muted);}
+  .tool-row:hover{background:var(--muted);}
+  .btn-stop:hover{background:var(--muted);}
+  .drawer-row:hover{background:var(--sidebar-accent);}
+  .drawer-rec:hover{background:var(--sidebar-accent);color:var(--foreground);}
+  .drawer-rec.active:hover{background:var(--primary-10);color:var(--gold-ink);}
+  .drawer-avatar:hover{background:var(--sidebar-accent);}
+  .spec-tab:hover:not([aria-selected="true"]){background:rgba(0,0,0,.05);}
+  .dark .spec-tab:hover:not([aria-selected="true"]){background:rgba(255,255,255,.07);}
+  .spec-theme:hover{background:rgba(0,0,0,.06);}
+  .dark .spec-theme:hover{background:rgba(255,255,255,.08);}
+  .actions-hover{display:flex;}
+  .actions-touch{display:none;}
+  .msg-ai:hover .actions-hover{opacity:1;}
+}
+
+/* ---------- 14. Responsive ---------- */
+@media (max-width:1023.98px){
+  .app{grid-template-columns:minmax(0,1fr);}
+  .sidebar{display:none;}
+  .screen{grid-column:1;}
+  .drawer{display:flex;}
+  .drawer-scrim{display:block;}
+  .hdr-burger{display:inline-flex;}
+}
+@media (max-width:767.98px){
+  .header{padding:0 10px;}
+  .home-main,.convo-main{padding-left:14px;padding-right:14px;}
+  .home-col{padding-top:26px;}
+  .tile-grid{grid-template-columns:repeat(2,1fr);}
+  .spec-hint{display:none;}
+  .convo-float{padding-left:14px;padding-right:14px;}
+}
+
+/* ---------- 15. Reduced motion: everything static; shimmer → static gold ring ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= icon sprite ======================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-message-square" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-library" viewBox="0 0 24 24"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2Z"/><path d="M15 21v-4a2 2 0 0 1 2-2h4"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.42 10.92a1 1 0 0 0-.02-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.94 15.5a2 2 0 0 0-1.44-1.44l-6.13-1.58a.5.5 0 0 1 0-.96l6.13-1.58a2 2 0 0 0 1.44-1.44l1.58-6.14a.5.5 0 0 1 .97 0l1.58 6.14a2 2 0 0 0 1.43 1.43l6.14 1.59a.5.5 0 0 1 0 .96l-6.14 1.59a2 2 0 0 0-1.43 1.43l-1.58 6.14a.5.5 0 0 1-.97 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-thumb-up" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></symbol>
+    <symbol id="i-thumb-down" viewBox="0 0 24 24"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.506l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></symbol>
+  </defs>
+</svg>
+
+<!-- ======================= spec chrome ======================= -->
+<div class="specbar">
+  <span class="spec-name">Lawexa v2 · v1 refined</span>
+  <div class="spec-tabs" role="tablist" aria-label="Screens">
+    <button class="spec-tab" role="tab" id="tabHome" aria-selected="true" data-goto="home">Home</button>
+    <button class="spec-tab" role="tab" id="tabConvo" aria-selected="false" data-goto="convo">Conversation</button>
+  </div>
+  <span class="spec-grow"></span>
+  <span class="spec-hint">resize for mobile</span>
+  <button class="spec-theme theme-toggle" aria-label="Toggle light or dark theme">
+    <svg class="icon i-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+    <svg class="icon i-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+  </button>
+</div>
+
+<!-- ======================= app ======================= -->
+<div class="app" id="app" data-screen="home">
+
+  <!-- ---------- sidebar ---------- -->
+  <aside class="sidebar">
+    <div class="side-top">
+      <div class="brand">
+        <span class="wordmark">lawexa</span>
+        <span class="vtag">v2</span>
+      </div>
+      <button class="newchat" data-goto="home" data-focus-composer>
+        <svg class="icon icon-18" aria-hidden="true"><use href="#i-edit"/></svg>
+        <span class="label">New chat</span>
+      </button>
+    </div>
+    <nav class="side-nav scroll" aria-label="Primary">
+      <button class="navrow" data-goto="convo">
+        <svg class="icon icon-18" aria-hidden="true"><use href="#i-message-square"/></svg>
+        <span class="label">Conversations</span>
+      </button>
+      <button class="navrow active" id="libraryRow" aria-expanded="true" aria-controls="libraryGroup">
+        <svg class="icon icon-18" aria-hidden="true"><use href="#i-library"/></svg>
+        <span class="label">Library</span>
+        <svg class="icon chev" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </button>
+      <div class="subgroup" id="libraryGroup">
+        <button class="subrow">Cases</button>
+        <button class="subrow">Statutes</button>
+        <button class="subrow">Notes</button>
+        <button class="subrow">Files</button>
+      </div>
+      <button class="navrow">
+        <svg class="icon icon-18" aria-hidden="true"><use href="#i-bookmark"/></svg>
+        <span class="label">Bookmarks</span>
+      </button>
+      <button class="navrow">
+        <svg class="icon icon-18" aria-hidden="true"><use href="#i-users"/></svg>
+        <span class="label">Spaces</span>
+      </button>
+      <button class="navrow">
+        <svg class="icon icon-18" aria-hidden="true"><use href="#i-cap"/></svg>
+        <span class="label">Quiz</span>
+      </button>
+      <span class="side-label">Recent</span>
+      <button class="recentrow" data-goto="convo"><span class="txt">Madukolu — the jurisdiction test</span></button>
+      <button class="recentrow"><span class="txt">Tenant eviction — Lagos</span></button>
+      <button class="recentrow"><span class="txt">Evidence Act s.84 — electronic evidence</span></button>
+    </nav>
+    <div class="side-foot">
+      <span class="avatar" aria-hidden="true">AO</span>
+      <span class="name">Adaeze Okafor</span>
+      <span class="tag">PREMIUM</span>
+    </div>
+  </aside>
+
+  <!-- ---------- screen 1: home ---------- -->
+  <section class="screen screen-home" aria-label="Home">
+    <header class="header">
+      <button class="icon-btn hdr-burger drawer-toggle" aria-label="Open menu" aria-haspopup="dialog" aria-expanded="false">
+        <svg class="icon icon-20" aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
+      <span class="title">Home</span>
+      <span class="grow"></span>
+      <div class="header-actions">
+        <button class="icon-btn" aria-label="Notifications, 3 unread">
+          <svg class="icon icon-20" aria-hidden="true"><use href="#i-bell"/></svg>
+          <span class="badge">3</span>
+        </button>
+        <button class="icon-btn theme-toggle" aria-label="Toggle light or dark theme">
+          <svg class="icon icon-20 i-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="icon icon-20 i-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="home-main scroll">
+      <div class="home-col">
+        <h1 class="greeting">Good evening, Adaeze.</h1>
+        <p class="greeting-sub">What are we researching tonight?</p>
+
+        <!-- shimmer composer (in-flow / hero) -->
+        <div class="gold-shimmer composer home-composer">
+          <div class="composer-inner">
+            <textarea class="composer-input" id="homeInput" rows="1" placeholder="Ask anything about Nigerian law…" aria-label="Ask anything about Nigerian law"></textarea>
+            <div class="composer-tools">
+              <button class="icon-btn" aria-label="Attach a file">
+                <svg class="icon icon-18" aria-hidden="true"><use href="#i-paperclip"/></svg>
+              </button>
+              <button class="chip">NG · Nigeria</button>
+              <button class="chip">Lawexa Expert</button>
+              <span class="spacer"></span>
+              <button class="send-btn" data-goto="convo" aria-label="Send">
+                <svg class="icon icon-18" aria-hidden="true"><use href="#i-arrow-up"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- suggested prompts -->
+        <div class="card prompt-card">
+          <button class="prompt-row" data-goto="convo">
+            <svg class="icon icon-18" aria-hidden="true"><use href="#i-sparkles"/></svg>
+            <span class="label">Explain the ratio in Madukolu v Nkemdilim</span>
+            <span class="enter">↵</span>
+          </button>
+          <button class="prompt-row">
+            <svg class="icon icon-18" aria-hidden="true"><use href="#i-sparkles"/></svg>
+            <span class="label">Consent under the Land Use Act, state by state</span>
+            <span class="enter">↵</span>
+          </button>
+          <button class="prompt-row">
+            <svg class="icon icon-18" aria-hidden="true"><use href="#i-sparkles"/></svg>
+            <span class="label">Draft a memo on tenant eviction in Lagos</span>
+            <span class="enter">↵</span>
+          </button>
+          <button class="prompt-row">
+            <svg class="icon icon-18" aria-hidden="true"><use href="#i-sparkles"/></svg>
+            <span class="label">Quiz me on the Evidence Act 2011</span>
+            <span class="enter">↵</span>
+          </button>
+        </div>
+
+        <!-- shortcut tiles -->
+        <div class="tile-grid">
+          <button class="card tile">
+            <svg class="icon icon-20" aria-hidden="true"><use href="#i-scale"/></svg>
+            <span class="tile-line"><span class="tile-count">12,406</span><span class="tile-noun">cases</span></span>
+          </button>
+          <button class="card tile">
+            <svg class="icon icon-20" aria-hidden="true"><use href="#i-book"/></svg>
+            <span class="tile-line"><span class="tile-count">318</span><span class="tile-noun">statutes</span></span>
+          </button>
+          <button class="card tile">
+            <svg class="icon icon-20" aria-hidden="true"><use href="#i-note"/></svg>
+            <span class="tile-line"><span class="tile-count">64</span><span class="tile-noun">notes</span></span>
+          </button>
+          <button class="card tile">
+            <svg class="icon icon-20" aria-hidden="true"><use href="#i-cap"/></svg>
+            <span class="tile-line"><span class="tile-count">9</span><span class="tile-noun">quizzes</span></span>
+          </button>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ---------- screen 2: conversation ---------- -->
+  <section class="screen screen-convo" id="convoScreen" aria-label="Conversation">
+    <header class="header">
+      <button class="icon-btn hdr-burger drawer-toggle" aria-label="Open menu" aria-haspopup="dialog" aria-expanded="false">
+        <svg class="icon icon-20" aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
+      <button class="icon-btn" data-goto="home" aria-label="Back to home">
+        <svg class="icon icon-20" aria-hidden="true"><use href="#i-chevron-left"/></svg>
+      </button>
+      <span class="title">Jurisdiction — the Madukolu test<span class="title-meta">6 authorities</span></span>
+      <span class="grow"></span>
+      <div class="header-actions">
+        <button class="icon-btn" aria-label="Share conversation">
+          <svg class="icon icon-20" aria-hidden="true"><use href="#i-share"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Notifications, 3 unread">
+          <svg class="icon icon-20" aria-hidden="true"><use href="#i-bell"/></svg>
+          <span class="badge">3</span>
+        </button>
+        <button class="icon-btn theme-toggle" aria-label="Toggle light or dark theme">
+          <svg class="icon icon-20 i-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="icon icon-20 i-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="convo-main scroll">
+      <div class="convo-col">
+
+        <!-- user message -->
+        <div class="msg-user">
+          <div class="bubble">
+            <p>What makes a court competent to hear a matter? I keep seeing <em>Madukolu v Nkemdilim</em> cited — what does it actually decide?</p>
+          </div>
+          <span class="msg-time">21:42</span>
+        </div>
+
+        <!-- tool row -->
+        <button class="tool-row" aria-expanded="false">
+          <svg class="icon icon-18 icon-spark" aria-hidden="true"><use href="#i-zap"/></svg>
+          <span class="tool-label">Searched Nigerian case law</span>
+          <span class="tool-meta">6 authorities · 1.8s</span>
+          <span class="grow"></span>
+          <svg class="icon chev" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+        </button>
+
+        <!-- AI answer -->
+        <div class="msg-ai">
+          <p><em>Madukolu v Nkemdilim</em> (1962) is the foundational authority on jurisdiction in Nigeria. The Federal Supreme Court, per Bairamian FJ, laid down the test that every court still applies before touching the merits of a case.</p>
+
+          <p class="lead">A court is competent only when all three conditions are met:</p>
+          <ol class="test-list">
+            <li><span class="li-num">1.</span><strong>Proper constitution</strong> — the bench is properly constituted as regards numbers and qualifications of its members, and no member is disqualified.</li>
+            <li><span class="li-num">2.</span><strong>Subject-matter jurisdiction</strong> — the case is within the court's jurisdiction and no statutory limitation applies.</li>
+            <li><span class="li-num">3.</span><strong>Due process</strong> — the case comes before the court initiated by due process of law, and every condition precedent to exercising jurisdiction has been fulfilled.</li>
+          </ol>
+
+          <figure class="quote">
+            <blockquote>
+              <p>Any defect in competence is fatal, for the proceedings are a nullity however well conducted and decided.</p>
+              <span class="attr">— Bairamian FJ, (1962) 2 SCNLR 341</span>
+            </blockquote>
+          </figure>
+
+          <div class="authorities">
+            <span class="a-label">Authorities</span>
+            <div class="cite-stack">
+              <button class="cite"><svg class="icon icon-18" aria-hidden="true"><use href="#i-scale"/></svg>Madukolu v Nkemdilim (1962) 2 SCNLR 341</button>
+              <button class="cite"><svg class="icon icon-18" aria-hidden="true"><use href="#i-scale"/></svg>Skenconsult (Nig) Ltd v Ukey (1981) 1 SC 6</button>
+              <button class="cite"><svg class="icon icon-18" aria-hidden="true"><use href="#i-scale"/></svg>A-G Lagos State v Dosunmu (1989) 3 NWLR (Pt.111) 552</button>
+            </div>
+          </div>
+
+          <p class="tail">Where any limb fails, the defect goes to the root —<span class="caret" aria-hidden="true"></span></p>
+
+          <div class="msg-actions">
+            <div class="actions-hover">
+              <button class="icon-btn" aria-label="Copy answer"><svg class="icon icon-18" aria-hidden="true"><use href="#i-copy"/></svg></button>
+              <button class="icon-btn" aria-label="Good answer"><svg class="icon icon-18" aria-hidden="true"><use href="#i-thumb-up"/></svg></button>
+              <button class="icon-btn" aria-label="Poor answer"><svg class="icon icon-18" aria-hidden="true"><use href="#i-thumb-down"/></svg></button>
+            </div>
+            <div class="actions-touch">
+              <button class="icon-btn" aria-label="Message actions"><svg class="icon icon-18" aria-hidden="true"><use href="#i-dots"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- scrim + floating composer -->
+    <div class="convo-fade" aria-hidden="true"></div>
+    <div class="convo-float">
+      <div class="convo-float-col">
+        <div class="statusbar">
+          <span class="status-live"><span class="dot" aria-hidden="true"></span>streaming</span>
+          <button class="btn-stop" id="stopBtn">Stop <span class="kbd">Esc</span></button>
+        </div>
+        <div class="gold-shimmer composer convo-composer">
+          <div class="composer-inner composer-row">
+            <textarea class="composer-input" id="convoInput" rows="1" placeholder="Ask anything about Nigerian law…" aria-label="Ask anything about Nigerian law"></textarea>
+            <button class="send-btn" aria-label="Send">
+              <svg class="icon icon-18" aria-hidden="true"><use href="#i-arrow-up"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MOBILE NAV · drawer ==================== -->
+  <div class="drawer-scrim" id="drawerScrim" aria-hidden="true"></div>
+  <aside class="drawer" id="navDrawer" role="dialog" aria-modal="true" aria-label="Navigation menu">
+    <div class="drawer-head">
+      <span class="wordmark">lawexa</span>
+      <button class="icon-btn" aria-label="Search conversations">
+        <svg class="icon icon-20" aria-hidden="true"><use href="#i-search"/></svg>
+      </button>
+      <button class="icon-btn" id="drawerClose" aria-label="Close menu">
+        <svg class="icon icon-20" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </div>
+    <div class="drawer-scroll scroll">
+      <button class="drawer-row"><svg class="icon icon-20" aria-hidden="true"><use href="#i-library"/></svg>Library</button>
+      <button class="drawer-row"><svg class="icon icon-20" aria-hidden="true"><use href="#i-users"/></svg>Spaces</button>
+      <button class="drawer-row"><svg class="icon icon-20" aria-hidden="true"><use href="#i-bookmark"/></svg>Bookmarks</button>
+      <button class="drawer-row"><svg class="icon icon-20" aria-hidden="true"><use href="#i-cap"/></svg>Quiz</button>
+      <button class="drawer-row"><svg class="icon icon-20" aria-hidden="true"><use href="#i-dots"/></svg>More</button>
+
+      <span class="drawer-reclabel">Recents</span>
+      <button class="drawer-rec active" data-goto="convo"><span class="txt">Madukolu — the jurisdiction test</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Tenant eviction — Lagos</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Evidence Act s.84 — electronic evidence</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Land Use Act consent — Kano</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Fundamental rights — FREP rules</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Garnishee proceedings — step by step</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Election petition timelines</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Company re-registration — CAMA 2020</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Hearsay exceptions — s.39</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Chieftaincy disputes — jurisdiction</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Perfection of title — Lagos</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">NDPR vs NDPA scope</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Contempt in facie curiae</span></button>
+      <button class="drawer-rec" data-goto="convo"><span class="txt">Arbitration clause drafting</span></button>
+    </div>
+    <div class="drawer-foot">
+      <button class="drawer-newchat" data-goto="home" data-focus-composer>
+        <svg class="icon icon-18" aria-hidden="true"><use href="#i-edit"/></svg>
+        New chat
+      </button>
+      <button class="drawer-avatar" aria-label="Account — Adaeze Okafor">
+        <span class="avatar" aria-hidden="true">AO</span>
+      </button>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  var app = document.getElementById("app");
+  var convoScreen = document.getElementById("convoScreen");
+  var tabHome = document.getElementById("tabHome");
+  var tabConvo = document.getElementById("tabConvo");
+
+  /* theme */
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) root.classList.add("dark");
+  document.querySelectorAll(".theme-toggle").forEach(function (b) {
+    b.addEventListener("click", function () { root.classList.toggle("dark"); });
+  });
+
+  /* drawer */
+  var drawerScrim = document.getElementById("drawerScrim");
+  var drawerToggles = document.querySelectorAll(".drawer-toggle");
+  function openDrawer() { app.classList.add("drawer-open"); drawerToggles.forEach(function (b) { b.setAttribute("aria-expanded", "true"); }); }
+  function closeDrawer() { app.classList.remove("drawer-open"); drawerToggles.forEach(function (b) { b.setAttribute("aria-expanded", "false"); }); }
+  drawerToggles.forEach(function (b) { b.addEventListener("click", function () { app.classList.contains("drawer-open") ? closeDrawer() : openDrawer(); }); });
+  document.getElementById("drawerClose").addEventListener("click", closeDrawer);
+  drawerScrim.addEventListener("click", closeDrawer);
+
+  /* screen switching */
+  function go(screen) {
+    app.dataset.screen = screen;
+    var isConvo = screen === "convo";
+    tabHome.setAttribute("aria-selected", String(!isConvo));
+    tabConvo.setAttribute("aria-selected", String(isConvo));
+    closeDrawer();
+  }
+  document.querySelectorAll("[data-goto]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      go(el.getAttribute("data-goto"));
+      if (el.hasAttribute("data-focus-composer")) focusComposer();
+    });
+  });
+
+  /* library expand/collapse */
+  var libraryRow = document.getElementById("libraryRow");
+  var libraryGroup = document.getElementById("libraryGroup");
+  libraryRow.addEventListener("click", function () {
+    var open = libraryRow.getAttribute("aria-expanded") === "true";
+    libraryRow.setAttribute("aria-expanded", String(!open));
+    libraryGroup.classList.toggle("hidden", open);
+  });
+
+  /* streaming stop */
+  function stopStreaming() { convoScreen.classList.add("stopped"); }
+  document.getElementById("stopBtn").addEventListener("click", stopStreaming);
+
+  /* composer */
+  function focusComposer() {
+    var id = app.dataset.screen === "convo" ? "convoInput" : "homeInput";
+    var el = document.getElementById(id);
+    if (el) el.focus();
+  }
+  document.getElementById("homeInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go("convo"); }
+  });
+
+  /* keyboard */
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      if (app.classList.contains("drawer-open")) closeDrawer();
+      else if (app.dataset.screen === "convo") stopStreaming();
+    }
+  });
+})();
+</script>
+</body>
+</html>

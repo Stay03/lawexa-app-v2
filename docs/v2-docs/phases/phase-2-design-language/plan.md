@@ -43,5 +43,12 @@ file for phase-3+ builders.
    The compositor rebuild is retired (kept in the parity file for the record).
 2. **Mobile nav: D — the drawer** (ChatGPT-style slide-in: nav rows + scrollable Recents as one
    region, pinned New-chat pill + avatar). Variants A/B/C retired.
-3. Overall direction verdict (Chambers Slate R2 as the language to encode): PENDING owner
-   confirmation.
+3. **Overall direction verdict: Chambers Slate REJECTED** (owner: "the only thing I want from
+   this is the shimmer and the sidebar thing; every other thing including the font is ugly.
+   I prefer the color of the v1"). New direction for round 3: **v1's visual identity kept** —
+   v1's exact color tokens (the oklch `:root`/`.dark` sets in `globals.css`), v1's soft shape
+   language (near-pill controls, `rounded-2xl` ringed cards, the real composer treatment), v1's
+   current typography (system sans; Comfortaa wordmark only) — executed *consistently* (one
+   scale, one radius per component class, disciplined spacing), PLUS the locked keepers:
+   original shimmer verbatim, the drawer (Nav D), the floating conversation composer.
+   Slate surfaces, Geist/Geist Mono, and the R2 density are all retired.
