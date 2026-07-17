@@ -51,7 +51,9 @@ coordinator fixes → runtime verification matrix → build → ship.
 2. `/settings/developer` SSR renders the "not available" fallback until the auth store hydrates
    client-side — consistent with the settings area's existing pattern; superseded when phase-1's
    session/DAL makes role available server-side.
-3. `V2_ENABLED=true` not yet set on Coolify — prod exit test pending (owner action).
+3. ~~`V2_ENABLED=true` not yet set on Coolify~~ — **prod exit test PASSED (owner, July 17,
+   2026)**: toggle on → v2 stub at `/`, fallthrough everywhere else, toggle back off clean,
+   normal accounts unaffected. Phase 0 closed.
 
 ## Notes for the next phase
 

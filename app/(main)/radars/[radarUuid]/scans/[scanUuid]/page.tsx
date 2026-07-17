@@ -33,7 +33,10 @@ export async function generateMetadata({ params }: ReportPageProps): Promise<Met
   // default site card so nothing leaks.
   if (!scan) {
     return {
-      title: SEO.defaultTitle,
+      // `absolute` opts out of the root "%s | Lawexa" template so this stays
+      // exactly "Lawexa - Nigerian Legal Resources" (defaultTitle is already
+      // brand-prefixed).
+      title: { absolute: SEO.defaultTitle },
       description: SEO.defaultDescription,
     };
   }
@@ -43,7 +46,9 @@ export async function generateMetadata({ params }: ReportPageProps): Promise<Met
   const canonicalUrl = `${appUrl}/radars/${radarUuid}/scans/${scanUuid}`;
 
   return {
-    title: `Lawexa - ${title}`,
+    // Bare title — the root "%s | Lawexa" template adds the brand suffix,
+    // giving "<title> | Lawexa" instead of the old double-branded prefix.
+    title,
     description,
     alternates: { canonical: canonicalUrl },
     openGraph: {
@@ -53,6 +58,18 @@ export async function generateMetadata({ params }: ReportPageProps): Promise<Met
       siteName: SEO.siteName,
       type: 'article',
       locale: SEO.locale,
+      // A child `openGraph` replaces the ancestor's WHOLESALE, which would
+      // silently drop the site-wide default card from `app/opengraph-image.tsx`
+      // — so reference it explicitly (metadataBase makes it absolute). Scans
+      // have no bespoke share image (unlike /c/[id]).
+      images: [
+        {
+          url: '/opengraph-image',
+          width: SEO.ogImageWidth,
+          height: SEO.ogImageHeight,
+          alt: SEO.siteName,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',

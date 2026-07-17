@@ -15,7 +15,10 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
   // Fallback for private, archived, or non-existent conversations (API returns 404)
   if (!conversation) {
     return {
-      title: SEO.defaultTitle,
+      // `absolute` opts out of the root "%s | Lawexa" template so this stays
+      // exactly "Lawexa - Nigerian Legal Resources" (defaultTitle is already
+      // brand-prefixed).
+      title: { absolute: SEO.defaultTitle },
       description: SEO.defaultDescription,
     };
   }
@@ -27,7 +30,9 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
   const ogImageUrl = `${appUrl}/api/og/c/${conversationId}`;
 
   return {
-    title: `Lawexa - ${meta.title}`,
+    // Bare title — the root "%s | Lawexa" template adds the brand suffix,
+    // giving "<title> | Lawexa" instead of the old double-branded prefix.
+    title: meta.title,
     description: meta.description,
     alternates: {
       canonical: canonicalUrl,

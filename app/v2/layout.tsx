@@ -1,8 +1,29 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+/**
+ * v2 metadata convention (exemplar for every phase-3+ feature route):
+ *
+ *  - `metadataBase` is NOT set here — the root layout (`app/layout.tsx`) owns it
+ *    and it flows down to the whole v2 tree.
+ *  - `title.template` ('%s | Lawexa') is inherited from root too, so v2 routes
+ *    export a BARE `title` and the brand suffix is appended automatically
+ *    (use `title.absolute` only to opt a route out).
+ *  - EVERY public v2 route ships a `generateMetadata` returning a real title,
+ *    description, canonical URL, and `openGraph`. The required shape is a server
+ *    `page.tsx` that exports `generateMetadata` and renders a `'use client'`
+ *    child: client modules cannot export metadata, so the server shell is
+ *    mandatory (mirrors the v1 `/c/[id]` reference implementation).
+ *  - OG images fall back to the site-wide `app/opengraph-image.tsx`; a route
+ *    with its own share card sets `openGraph.images`, which overrides the
+ *    default.
+ */
 export const metadata: Metadata = {
-  title: 'Lawexa v2 preview',
+  // `absolute` — "Lawexa v2 preview" already names the brand; the "%s | Lawexa"
+  // template would double-brand it.
+  title: { absolute: 'Lawexa v2 preview' },
+  description:
+    'Preview of the next-generation Lawexa experience — Nigerian legal research, cases, statutes, and notes.',
 };
 
 /**
