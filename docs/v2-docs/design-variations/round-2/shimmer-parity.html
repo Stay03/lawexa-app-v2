@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lawexa v2 — Shimmer parity (ORIGINAL vs REBUILD)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   SHIMMER PARITY — acceptance instrument
+   Two identical composers: ORIGINAL (background-position, verbatim
+   from app/globals.css) vs REBUILD (compositor-only transform).
+   Owner test: cannot tell them apart.
+
+   ── Mapping derivation (background-position → transform) ──────
+   Original: background-size:800% 800% on the wrapper means the
+   gradient image is 8W × 8H (W,H = wrapper padding-box). CSS
+   background-position:X% Y% places the image's top-left at
+       offset = (area − image) · pct
+              = (W − 8W)·X/100 , (H − 8H)·Y/100
+              = −7W·X/100 , −7H·Y/100.
+   Rebuild: a layer sized width:800% height:800% (= the same 8W×8H
+   box) painted with the same 135deg gradient, then translated.
+   CSS translate(P%,Q%) on the layer = P/100·8W , Q/100·8H
+   (transform percentages are relative to the LAYER's own box).
+   Equate x:  P/100·8W = −7W·X/100  →  P = −7/8·X = −0.875·X.
+   Likewise  Q = −0.875·Y.
+   So   background-position X% Y%  ≡  translate(−0.875X%, −0.875Y%).
+
+   Verify waypoints (px double-checked against the bg formula):
+     0%  50%  → translate(0%,      −43.75%)  px (0,      −3.5H)  ✓
+     80% 30%  → translate(−70%,    −26.25%)  px (−5.6W,  −2.1H)  ✓
+     20% 70%  → translate(−17.5%,  −61.25%)  px (−1.6W,  −4.9H)  ✓
+     90% 20%  → translate(−78.75%, −17.5%)   px (−6.3W,  −1.4H)  ✓
+     10% 80%  → translate(−8.75%,  −70%)     px (−0.7W,  −5.6H)  ✓
+     70% 40%  → translate(−61.25%, −35%)     px (−4.9W,  −2.8H)  ✓
+     30% 90%  → translate(−26.25%, −78.75%)  px (−2.1W,  −6.3H)  ✓
+   The map is a linear scalar (−0.875×), so ease-in-out applied to
+   translate eases the visible window identically to ease-in-out
+   applied to background-position — the motion is the same.
+   ============================================================ */
+
+/* ---------- tokens (subset of Chambers Slate) ---------- */
+:root{
+  --bg:#F7F7F8;
+  --surface:#FFFFFF;
+  --surface-2:#F1F1F3;
+  --ink:#1B1D21;
+  --ink-muted:#6B6F78;
+  --border:#E3E4E8;
+  --gold:#C9A227;
+  --gold-ink:#846910;                 /* WCAG-safe gold-as-text on light */
+  --gold-on-gold:#1B1D21;
+  --r-composer:12px;
+  --font-ui:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,Consolas,monospace;
+  --font-mark:"Comfortaa",var(--font-ui);
+  color-scheme:light;
+}
+.dark{
+  --bg:#17181C;
+  --surface:#1E2025;
+  --surface-2:#24262C;
+  --ink:#E8E9EC;
+  --ink-muted:#8D919B;
+  --border:#2C2E35;
+  --gold:#D9B23B;
+  --gold-ink:var(--gold);             /* bright gold is safe as text on slate */
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  min-height:100vh;
+  min-height:100dvh;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-ui);
+  font-size:13px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+button{appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;cursor:pointer;}
+textarea{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;resize:none;}
+textarea:focus{outline:none;}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+.icon{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;}
+.icon-14{width:14px;height:14px;}
+
+/* ---------- spec chrome ---------- */
+.specbar{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  min-height:44px;padding:6px 14px;
+  background:#ECECEE;color:#55575E;
+  border-bottom:1px solid #DCDDE1;
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:12px;
+}
+.dark .specbar{background:#101114;color:#9DA0A8;border-bottom-color:#26272C;}
+.spec-name{font-weight:600;color:#33353B;white-space:nowrap;}
+.dark .spec-name{color:#C9CBD1;}
+.spec-grow{flex:1;}
+.spec-ctl{display:inline-flex;align-items:center;gap:8px;}
+.spec-toggle{
+  display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px;
+  border:1px solid #D0D1D6;border-radius:7px;background:#F6F6F7;color:inherit;font-size:12px;
+}
+.dark .spec-toggle{background:#1A1B1F;border-color:#2A2C33;}
+.spec-toggle[aria-pressed="true"]{border-color:var(--gold);color:var(--gold-ink);background:rgba(201,162,39,.10);}
+.spec-toggle .sw{position:relative;width:26px;height:15px;border-radius:999px;background:#C7C8CE;transition:background .15s ease;}
+.dark .spec-toggle .sw{background:#3A3C43;}
+.spec-toggle[aria-pressed="true"] .sw{background:var(--gold);}
+.spec-toggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:999px;background:#fff;transition:transform .15s ease;}
+.spec-toggle[aria-pressed="true"] .sw::after{transform:translateX(11px);}
+.spec-theme{width:32px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid #D0D1D6;background:#F6F6F7;color:inherit;}
+.dark .spec-theme{background:#1A1B1F;border-color:#2A2C33;}
+.i-sun{display:none;}.i-moon{display:block;}
+.dark .i-sun{display:block;}.dark .i-moon{display:none;}
+.specbar :focus-visible{outline:2px solid #8A8D95;outline-offset:1px;}
+
+/* ---------- page ---------- */
+.wrap{max-width:920px;margin:0 auto;padding:clamp(20px,5vw,48px) 20px 64px;}
+.lede h1{margin:0 0 6px;font-size:20px;font-weight:600;letter-spacing:-.01em;}
+.lede p{margin:0;color:var(--ink-muted);font-size:13.5px;max-width:64ch;}
+
+.stage{
+  margin-top:28px;
+  display:grid;grid-template-columns:1fr 1fr;gap:20px;
+}
+@media (max-width:719.98px){.stage{grid-template-columns:1fr;}}
+
+.pane{display:flex;flex-direction:column;gap:12px;min-width:0;}
+.pane-head{display:flex;align-items:center;gap:8px;}
+.pane-tag{
+  font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--gold-ink);background:rgba(201,162,39,.12);
+  border:1px solid var(--border);border-radius:5px;padding:3px 7px;
+}
+.dark .pane-tag{background:rgba(217,178,59,.12);}
+.pane-sub{font-family:var(--font-mono);font-size:11px;color:var(--ink-muted);}
+
+/* ============================================================
+   ORIGINAL — verbatim copy of app/globals.css lines 296-339.
+   Do not edit; this is the source of truth being matched.
+   ============================================================ */
+@keyframes gradient-rotate {
+  0% { background-position: 0% 50%; }
+  15% { background-position: 80% 30%; }
+  25% { background-position: 20% 70%; }
+  40% { background-position: 90% 20%; }
+  55% { background-position: 10% 80%; }
+  70% { background-position: 70% 40%; }
+  85% { background-position: 30% 90%; }
+  100% { background-position: 0% 50%; }
+}
+.gold-shimmer {
+  background: linear-gradient(135deg, #fef3c7, #facc15, #eab308, #ca8a04, #cadd1d, #ac6407, #ffffff, #ca8a04, #eab308, #facc15, #fef3c7);
+  background-size: 800% 800%;
+  animation: gradient-rotate 25s ease-in-out infinite;
+  transition: background 0.3s ease;
+}
+.dark .gold-shimmer {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #eab308, #d97706, #facc15, #ca8a04, #fcd34d, #b45309, #f59e0b, #eab308, #fbbf24);
+  background-size: 800% 800%;
+  animation: gradient-rotate 25s ease-in-out infinite;
+}
+.gold-shimmer-focus,
+.gold-shimmer:focus-within {
+  background: linear-gradient(135deg, #ffffff, #c9dde6, #abc6d8, #d4c986, #9eb2c0, #d6b73b, #b0c2c9, #dac56a, #000000, #fef3c7, #ffffff);
+  background-size: 800% 800%;
+  animation: gradient-rotate 45s ease-in-out infinite;
+}
+.dark .gold-shimmer-focus,
+.dark .gold-shimmer:focus-within {
+  background: linear-gradient(135deg, #fcd34d, #e2e8f0, #cbd5e1, #fbbf24, #94a3b8, #f59e0b, #e2e8f0, #eab308, #64748b, #fef3c7, #fcd34d);
+  background-size: 800% 800%;
+  animation: gradient-rotate 45s ease-in-out infinite;
+}
+/* v1 usage: wrapper gold-shimmer p-[1px], inner surface, gold text */
+.orig{
+  padding:1px;border-radius:var(--r-composer);
+  box-shadow:0 1px 2px rgba(20,22,26,.04),0 6px 20px rgba(20,22,26,.07);
+}
+.dark .orig{box-shadow:0 1px 2px rgba(0,0,0,.25),0 8px 24px rgba(0,0,0,.4);}
+
+/* ============================================================
+   REBUILD — compositor-only (transform + opacity), same visual.
+   ============================================================ */
+.rb{
+  position:relative;
+  padding:1px;border-radius:var(--r-composer);
+  overflow:hidden;               /* clip the oversized layers to the ring */
+  isolation:isolate;
+  box-shadow:0 1px 2px rgba(20,22,26,.04),0 6px 20px rgba(20,22,26,.07);
+}
+.dark .rb{box-shadow:0 1px 2px rgba(0,0,0,.25),0 8px 24px rgba(0,0,0,.4);}
+.rb-layer{
+  position:absolute;top:0;left:0;
+  width:800%;height:800%;         /* 8W × 8H — identical box to the bg tile */
+  transform:translate(0%,-43.75%);/* == background-position 0% 50% (the 0% keyframe) */
+  transition:opacity .3s ease;    /* focus crossfade, compositor-friendly */
+  will-change:transform,opacity;
+  z-index:0;
+}
+/* base wander 25s; focus wander 45s — SAME waypoints, different duration */
+.rb-base{
+  background:linear-gradient(135deg,#fef3c7,#facc15,#eab308,#ca8a04,#cadd1d,#ac6407,#ffffff,#ca8a04,#eab308,#facc15,#fef3c7);
+  animation:shimmer-wander 25s ease-in-out infinite;
+  opacity:1;
+}
+.dark .rb-base{
+  background:linear-gradient(135deg,#fbbf24,#f59e0b,#eab308,#d97706,#facc15,#ca8a04,#fcd34d,#b45309,#f59e0b,#eab308,#fbbf24);
+}
+.rb-focus{
+  background:linear-gradient(135deg,#ffffff,#c9dde6,#abc6d8,#d4c986,#9eb2c0,#d6b73b,#b0c2c9,#dac56a,#000000,#fef3c7,#ffffff);
+  animation:shimmer-wander 45s ease-in-out infinite;
+  opacity:0;
+}
+.dark .rb-focus{
+  background:linear-gradient(135deg,#fcd34d,#e2e8f0,#cbd5e1,#fbbf24,#94a3b8,#f59e0b,#e2e8f0,#eab308,#64748b,#fef3c7,#fcd34d);
+}
+.rb:focus-within .rb-base{opacity:0;}
+.rb:focus-within .rb-focus{opacity:1;}
+/* translate waypoints = −0.875 × the original background-position pairs */
+@keyframes shimmer-wander{
+  0%   {transform:translate(0%,      -43.75%);}  /* 0%  50% */
+  15%  {transform:translate(-70%,    -26.25%);}  /* 80% 30% */
+  25%  {transform:translate(-17.5%,  -61.25%);}  /* 20% 70% */
+  40%  {transform:translate(-78.75%, -17.5%);}   /* 90% 20% */
+  55%  {transform:translate(-8.75%,  -70%);}     /* 10% 80% */
+  70%  {transform:translate(-61.25%, -35%);}     /* 70% 40% */
+  85%  {transform:translate(-26.25%, -78.75%);}  /* 30% 90% */
+  100% {transform:translate(0%,      -43.75%);}  /* 0%  50% */
+}
+
+/* ---------- shared composer inner (identical in both panes) ---------- */
+.c-inner{position:relative;z-index:1;border-radius:11px;background:var(--surface);}
+.c-row{display:flex;align-items:center;gap:10px;padding:12px 12px 12px 14px;}
+.c-glyph{color:var(--gold);}
+.c-input{
+  flex:1;min-width:0;height:20px;line-height:20px;font-size:14px;overflow:hidden;
+  color:var(--gold-ink);caret-color:var(--gold);white-space:nowrap;
+}
+.c-input::placeholder{color:var(--ink-muted);opacity:1;}
+.kbd{
+  font-family:var(--font-mono);font-size:11px;font-weight:500;line-height:1;color:var(--ink-muted);
+  background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;white-space:nowrap;
+}
+.c-tools{display:flex;align-items:center;gap:8px;padding:0 10px 10px;}
+.c-tools .spacer{flex:1;}
+.btn-mini{
+  width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:6px;color:var(--ink-muted);transition:transform .1s ease,background .15s ease,color .15s ease;
+}
+.btn-mini:active{transform:scale(.97);}
+.chip{
+  display:inline-flex;align-items:center;height:26px;padding:0 8px;font-size:12px;font-weight:500;
+  color:var(--ink-muted);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;white-space:nowrap;
+  transition:transform .1s ease,color .15s ease,border-color .15s ease;
+}
+.chip:active{transform:scale(.97);}
+.btn-send{
+  width:32px;height:32px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:6px;background:var(--gold);color:var(--gold-on-gold);
+  transition:transform .1s ease,opacity .15s ease;
+}
+.btn-send:active{transform:scale(.97);}
+
+/* ---------- caption / checklist ---------- */
+.checks{
+  margin-top:34px;padding:18px 20px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-composer);
+}
+.checks h2{margin:0 0 4px;font-size:13px;font-weight:600;}
+.checks .hint{margin:0 0 14px;color:var(--ink-muted);font-size:12.5px;}
+.check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px 22px;}
+.check{display:flex;gap:10px;align-items:flex-start;}
+.check .tick{flex:none;width:18px;height:18px;margin-top:1px;color:var(--gold-ink);}
+.check b{font-weight:600;}
+.check span{color:var(--ink-muted);font-size:12.5px;}
+.footnote{
+  margin-top:18px;padding-top:14px;border-top:1px solid var(--border);
+  color:var(--ink-muted);font-size:12px;line-height:1.6;
+}
+.footnote code{font-family:var(--font-mono);font-size:11.5px;color:var(--gold-ink);}
+
+/* ---------- reduced motion: static gold ring, no animation ----------
+   Both the OS setting and the manual spec-bar toggle resolve to the
+   same rest state so ORIGINAL and REBUILD stay visually matched. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important;}
+  .rb-layer{transform:translate(0,0) !important;}   /* == background-position 0% 0% */
+}
+html[data-rm="on"] *,
+html[data-rm="on"] *::before,
+html[data-rm="on"] *::after{animation:none !important;}
+html[data-rm="on"] .rb-layer{transform:translate(0,0) !important;transition:none !important;}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  </defs>
+</svg>
+
+<!-- ======================= spec chrome ======================= -->
+<div class="specbar">
+  <span class="spec-name">Shimmer parity · ORIGINAL vs REBUILD</span>
+  <span class="spec-grow"></span>
+  <div class="spec-ctl">
+    <button class="spec-toggle" id="rmToggle" aria-pressed="false">
+      <span class="sw" aria-hidden="true"></span>Reduce motion
+    </button>
+    <button class="spec-theme" id="themeToggle" aria-label="Toggle light or dark theme">
+      <svg class="icon icon-14 i-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+      <svg class="icon icon-14 i-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Gold shimmer — acceptance instrument</h1>
+    <p>Two identical composers. <b>ORIGINAL</b> runs the verbatim <code>.gold-shimmer</code> from
+      <code>app/globals.css</code> (animated <code>background-position</code>). <b>REBUILD</b> reproduces
+      it with compositor-only <code>transform</code> + <code>opacity</code>. Click into either field to
+      engage the focus palette (≈45s). Toggle theme and reduce-motion above. Acceptance = you can't tell
+      them apart.</p>
+  </div>
+
+  <div class="stage">
+    <!-- ORIGINAL -->
+    <div class="pane">
+      <div class="pane-head">
+        <span class="pane-tag">Original</span>
+        <span class="pane-sub">background-position · 25s / 45s</span>
+      </div>
+      <div class="gold-shimmer orig">
+        <div class="c-inner">
+          <div class="c-row">
+            <svg class="icon c-glyph" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+            <textarea class="c-input" rows="1" placeholder="Ask anything about Nigerian law…" aria-label="Original composer"></textarea>
+            <span class="kbd">⌘K</span>
+          </div>
+          <div class="c-tools">
+            <button class="btn-mini" aria-label="Attach a file"><svg class="icon" aria-hidden="true"><use href="#i-paperclip"/></svg></button>
+            <button class="chip">NG · Nigeria</button>
+            <span class="spacer"></span>
+            <button class="btn-send" aria-label="Send"><svg class="icon" aria-hidden="true"><use href="#i-arrow-up"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REBUILD -->
+    <div class="pane">
+      <div class="pane-head">
+        <span class="pane-tag">Rebuild</span>
+        <span class="pane-sub">transform + opacity · 25s / 45s</span>
+      </div>
+      <div class="rb">
+        <div class="rb-layer rb-base" aria-hidden="true"></div>
+        <div class="rb-layer rb-focus" aria-hidden="true"></div>
+        <div class="c-inner">
+          <div class="c-row">
+            <svg class="icon c-glyph" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+            <textarea class="c-input" rows="1" placeholder="Ask anything about Nigerian law…" aria-label="Rebuild composer"></textarea>
+            <span class="kbd">⌘K</span>
+          </div>
+          <div class="c-tools">
+            <button class="btn-mini" aria-label="Attach a file"><svg class="icon" aria-hidden="true"><use href="#i-paperclip"/></svg></button>
+            <button class="chip">NG · Nigeria</button>
+            <span class="spacer"></span>
+            <button class="btn-send" aria-label="Send"><svg class="icon" aria-hidden="true"><use href="#i-arrow-up"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- checklist -->
+  <div class="checks">
+    <h2>What to check (A/B them)</h2>
+    <p class="hint">Watch both rings together for ~30s, then focus one field, then toggle theme.</p>
+    <div class="check-grid">
+      <div class="check"><svg class="icon tick" aria-hidden="true"><use href="#i-check"/></svg><span><b>Idle wander, not a spin.</b> The light drifts along an irregular path — pausing, doubling back — never a steady rotation.</span></div>
+      <div class="check"><svg class="icon tick" aria-hidden="true"><use href="#i-check"/></svg><span><b>Speed feel.</b> One idle cycle ≈ 25s. It should read as ambient, not fast.</span></div>
+      <div class="check"><svg class="icon tick" aria-hidden="true"><use href="#i-check"/></svg><span><b>Focus slowdown + palette.</b> Click into a field: gold gives way to cool whitish-blue (light) / silver-gold (dark) and slows to ≈45s.</span></div>
+      <div class="check"><svg class="icon tick" aria-hidden="true"><use href="#i-check"/></svg><span><b>Dark mode.</b> Toggle theme — both rings switch to the vibrant dark palette and stay matched.</span></div>
+      <div class="check"><svg class="icon tick" aria-hidden="true"><use href="#i-check"/></svg><span><b>1px ring crispness.</b> The gold is a hairline; the inner surface (radius 11px) sits inside the 12px outer with no seam.</span></div>
+      <div class="check"><svg class="icon tick" aria-hidden="true"><use href="#i-check"/></svg><span><b>Reduced motion.</b> Toggle "Reduce motion" — both settle to the same static gold ring, no animation.</span></div>
+    </div>
+    <p class="footnote">
+      <b>Mapping:</b> <code>background-position X% Y%</code> ≡ <code>translate(−0.875·X%, −0.875·Y%)</code> of a layer
+      sized 800%×800% (derivation in the source comment). The map is a linear scalar, so <code>ease-in-out</code>
+      on translate eases the visible window identically. <b>Focus crossfade:</b> the rebuild keeps two layers —
+      base (25s) and focus (45s) — always running, and crossfades <code>opacity</code> over 0.3s on
+      <code>:focus-within</code> (the original's <code>transition: background .3s</code> is effectively an instant
+      palette swap, so the only honest difference is the two layers' independent phase at the moment of focus —
+      imperceptible on a 25–45s ambient drift).
+    </p>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var root=document.documentElement;
+  if(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches){root.classList.add("dark");}
+  document.getElementById("themeToggle").addEventListener("click",function(){root.classList.toggle("dark");});
+  var rm=document.getElementById("rmToggle");
+  rm.addEventListener("click",function(){
+    var on=root.getAttribute("data-rm")==="on";
+    root.setAttribute("data-rm",on?"off":"on");
+    rm.setAttribute("aria-pressed",String(!on));
+  });
+})();
+</script>
+</body>
+</html>

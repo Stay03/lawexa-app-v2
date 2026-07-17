@@ -129,10 +129,13 @@ Full citations live in the research transcripts; key URLs inline.
   the ring shows. Gate with `prefers-reduced-motion` (static gold border fallback — also satisfies
   WCAG 2.2.2 pause for >5s motion), pause off-screen, and **reserve it for signature surfaces**
   (composer, "Lawexa responding") — restraint keeps it premium.
-  **Owner acceptance criterion (round-1 feedback)**: the rebuild must be validated side-by-side
-  against the real `.gold-shimmer` in `globals.css` (same gradient stops, speed, focus-within
-  behavior, light/dark variants) until visually indistinguishable — none of the round-1 mockups
-  matched it.
+  **RESOLVED (round-2 A/B, July 17, 2026): the owner chose the ORIGINAL.** The side-by-side
+  parity instrument was built (`design-variations/round-2/shimmer-parity.html`), the owner
+  compared them, and the original `background-position` implementation ships in v2 verbatim.
+  The compositor-rebuild guidance above is retired for the shimmer specifically; the only
+  permitted changes are invisible safeguards (`prefers-reduced-motion` static ring, off-screen
+  `animation-play-state: paused`). The paint-per-frame cost is accepted as the price of the
+  signature — it is confined to the composer surfaces.
 - **Craft checklist** (Rauno's Web Interface Guidelines / Emil / Linear school — the "sleek"
   bar): visible `:focus-visible` box-shadow rings everywhere; hover states only under
   `@media (hover: hover)`; transitions on specific properties, never `all`; press scale ~0.96;

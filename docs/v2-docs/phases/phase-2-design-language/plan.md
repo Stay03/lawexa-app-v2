@@ -33,3 +33,15 @@ get built exactly once.
 Owner approval recorded here (date + what was approved); tokens/primitives/shell merged;
 side-by-side shimmer acceptance passed; a one-page "language spec" section appended to this
 file for phase-3+ builders.
+
+## Owner decisions — round 2 (July 17, 2026)
+
+1. **Shimmer: THE ORIGINAL.** Owner A/B'd `round-2/shimmer-parity.html` and chose the original
+   `background-position` implementation over the compositor rebuild. v2 ships the verbatim
+   `.gold-shimmer` CSS (all four variants, exact stops/timing). Permitted invisible-only
+   safeguards: `prefers-reduced-motion` static ring, `animation-play-state: paused` off-screen.
+   The compositor rebuild is retired (kept in the parity file for the record).
+2. **Mobile nav: D — the drawer** (ChatGPT-style slide-in: nav rows + scrollable Recents as one
+   region, pinned New-chat pill + avatar). Variants A/B/C retired.
+3. Overall direction verdict (Chambers Slate R2 as the language to encode): PENDING owner
+   confirmation.
