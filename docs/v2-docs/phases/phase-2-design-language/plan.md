@@ -73,3 +73,11 @@ tree behind the owner's toggle:
 - **Next build:** the real v2 shell + home (shadcn sidebar, prompt-kit composer + shimmer,
   drawer) — owner reviews the deployed product at /v2, and design tweaks iterate there.
   This merges the phase-2 exit into the start of phase-3 construction.
+
+## ⛳ GATE PASSED — owner approval (July 18, 2026)
+
+The live shell + home (commit `e53e2a0`, deployed behind the toggle) was reviewed by the owner
+in prod: **"I've checked it and it all looks good."** Phase 2 is CLOSED. The approved baseline:
+v1 tokens verbatim · shadcn `components/ui` + `components/prompt-kit` primitives · original
+gold-shimmer · ChatGPT-style drawer · uncrowded header · nav fallthrough to v1 pages. Design
+refinements continue by iteration on the live product during phase 3+.
