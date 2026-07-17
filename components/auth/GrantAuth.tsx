@@ -16,9 +16,11 @@ import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
 import { GrantLoginForm } from './GrantLoginForm';
+import { GrantRegisterForm } from './GrantRegisterForm';
 
 const ALLOWED_ORIGINS = [
   'https://bench.lawexa.com',
+  'https://ambassadors.lawexa.com',
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:5173',
@@ -43,6 +45,7 @@ export function GrantAuth() {
   const searchParams = useSearchParams();
   const { isAuthenticated, isGuest } = useAuthStore();
   const [state, setState] = useState<GrantState>({ status: 'loading' });
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const grantAttempted = useRef(false);
 
   const clientId = searchParams.get('client_id');
@@ -140,7 +143,9 @@ export function GrantAuth() {
         <CardTitle className="text-2xl font-bold">Authorize Application</CardTitle>
         <CardDescription>
           {state.status === 'login'
-            ? 'Sign in to your Lawexa account to continue'
+            ? authMode === 'login'
+              ? 'Sign in to your Lawexa account to continue'
+              : 'Create your Lawexa account to continue'
             : state.status === 'granting'
               ? 'Authorizing...'
               : state.status === 'success'
@@ -176,9 +181,18 @@ export function GrantAuth() {
           </div>
         )}
 
-        {state.status === 'login' && (
-          <GrantLoginForm onLoginSuccess={handleLoginSuccess} />
-        )}
+        {state.status === 'login' &&
+          (authMode === 'login' ? (
+            <GrantLoginForm
+              onLoginSuccess={handleLoginSuccess}
+              onSwitchToRegister={() => setAuthMode('register')}
+            />
+          ) : (
+            <GrantRegisterForm
+              onRegisterSuccess={handleLoginSuccess}
+              onSwitchToLogin={() => setAuthMode('login')}
+            />
+          ))}
 
         {state.status === 'error' && (
           <div className="flex flex-col items-center gap-3 py-8 text-center">

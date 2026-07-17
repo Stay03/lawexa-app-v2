@@ -19,41 +19,45 @@ import {
 
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { loginSchema } from '@/lib/utils/validation';
-import { extractApiError } from '@/lib/utils/api-error';
-import type { LoginFormData } from '@/types/auth';
+import { registerSchema } from '@/lib/utils/validation';
+import { extractApiError, getFieldError, type ApiError } from '@/lib/utils/api-error';
+import type { RegisterFormData } from '@/types/auth';
 
-interface GrantLoginFormProps {
-  onLoginSuccess: () => void;
-  onSwitchToRegister: () => void;
+interface GrantRegisterFormProps {
+  onRegisterSuccess: () => void;
+  onSwitchToLogin: () => void;
 }
 
-export function GrantLoginForm({ onLoginSuccess, onSwitchToRegister }: GrantLoginFormProps) {
+export function GrantRegisterForm({
+  onRegisterSuccess,
+  onSwitchToLogin,
+}: GrantRegisterFormProps) {
   const { setAuth } = useAuthStore();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
+      name: '',
       email: '',
       password: '',
+      password_confirmation: '',
     },
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: RegisterFormData) => {
     setError(null);
     setIsLoading(true);
 
     try {
-      const response = await authApi.login(data);
+      const response = await authApi.register(data);
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
-        onLoginSuccess();
+        onRegisterSuccess();
       }
     } catch (err) {
-      const apiError = extractApiError(err);
-      setError(apiError.message);
+      setError(extractApiError(err));
     } finally {
       setIsLoading(false);
     }
@@ -64,18 +68,28 @@ export function GrantLoginForm({ onLoginSuccess, onSwitchToRegister }: GrantLogi
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John Doe" {...field} />
+              </FormControl>
+              <FormMessage>{getFieldError(error?.errors, 'name')}</FormMessage>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
           name="email"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  {...field}
-                />
+                <Input type="email" placeholder="you@example.com" {...field} />
               </FormControl>
-              <FormMessage />
+              <FormMessage>{getFieldError(error?.errors, 'email')}</FormMessage>
             </FormItem>
           )}
         />
@@ -89,28 +103,42 @@ export function GrantLoginForm({ onLoginSuccess, onSwitchToRegister }: GrantLogi
               <FormControl>
                 <PasswordInput placeholder="••••••••" {...field} />
               </FormControl>
+              <FormMessage>{getFieldError(error?.errors, 'password')}</FormMessage>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="password_confirmation"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirm Password</FormLabel>
+              <FormControl>
+                <PasswordInput placeholder="••••••••" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
+        {error && !error.errors && (
+          <p className="text-sm text-destructive">{error.message}</p>
         )}
 
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Sign in to continue
+          Create account & continue
         </Button>
 
         <p className="text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
+          Already have an account?{' '}
           <button
             type="button"
-            onClick={onSwitchToRegister}
+            onClick={onSwitchToLogin}
             className="text-primary hover:underline"
           >
-            Create one
+            Sign in
           </button>
         </p>
       </form>
