@@ -1,0 +1,120 @@
+/* =============================================================================
+   v2 shell mechanics — Phase 1, WP6 (Mobile Shell Mechanics)
+   Implements the mobile baseline contract in docs/v2-docs/foundation-standards.md
+   §4. This file is MECHANICS ONLY — visual design is deferred to phase-2, so
+   everything here is structural and neutral (existing tokens via var(--…)).
+
+   Route scoping: this stylesheet is imported only by app/v2/layout.tsx, so it
+   ships ONLY with /v2/* on fresh loads — BUT React 19 never removes precedence
+   stylesheets from <head> once loaded, so after a soft (client-side) navigation
+   out of v2 the rules would keep applying to v1. That is why the document lock
+   below is scoped to `.v2-document-lock`, a class that DocumentLock
+   (document-lock.tsx) adds to <html> while the v2 layout is mounted and removes
+   on unmount — the sheet may persist, but its document-level rules go inert the
+   moment the user soft-navs into v1.
+   ============================================================================= */
+
+/* Non-scrolling document (standards §4), ACTIVE ONLY WHILE V2 IS MOUNTED. The
+   shell owns scrolling; the document itself must never scroll. Killing document
+   scroll is what prevents the iOS Safari toolbar/keyboard from pushing the whole
+   page around — the shell is pinned to the viewport and only its middle region
+   scrolls. Never write bare `html, body` rules in v2 stylesheets: the class
+   scope is what protects v1 during the strangler period (see header comment). */
+html.v2-document-lock,
+html.v2-document-lock body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* -----------------------------------------------------------------------------
+   Shell grid — header / scrollable content / dock, pinned to the viewport.
+   Rows: `auto 1fr auto` → header and dock size to content, the middle region
+   takes the rest and scrolls internally.
+
+   Height is the dynamic viewport (`100dvh`) minus the iOS keyboard inset written
+   by use-keyboard-inset.ts. On Android/Firefox (and any browser honouring
+   `interactive-widget=resizes-content`) the keyboard resizes the layout viewport
+   itself, so `--keyboard-inset` stays 0 and `100dvh` already tracks the keyboard
+   — no JS needed. The `100vh` line is a fallback for engines without `dvh`.
+   -------------------------------------------------------------------------- */
+.v2-shell {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh; /* fallback for engines without dvh */
+  height: 100dvh;
+  height: calc(100dvh - var(--keyboard-inset, 0px));
+  overflow: hidden;
+}
+
+/* Header row (grid-row 1). Neutral solid background so the safe-area strip under
+   the notch is filled by the bar rather than showing through — correct mobile
+   behaviour. Neutral token; phase-2 restyles the real header chrome. */
+.v2-shell__header {
+  grid-row: 1;
+  background: var(--background);
+}
+
+/* Scrollable content region (grid-row 2) — the ONLY scroll container in the
+   shell. `min-height: 0` lets the 1fr grid row shrink below its content so it can
+   actually scroll (grid items default to `min-height: auto`). `overscroll-behavior:
+   contain` stops scroll chaining / pull-to-refresh from leaking to the document. */
+.v2-shell__content {
+  grid-row: 2;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Dock slot (grid-row 3) — the home of the FLOATING composer in phase 3.
+   IMPORTANT (standards §4 + owner feedback): the composer must LOOK floating
+   (rounded, shadowed, inset margins, transcript scrolling visibly behind it) but
+   is positioned by THIS grid row — never `position: fixed`. Fixed composers break
+   under the iOS keyboard; the grid row + dvh/keyboard-inset height keep the dock
+   correctly above the keyboard for free. Structural row only until then. */
+.v2-shell__dock {
+  grid-row: 3;
+}
+
+/* -----------------------------------------------------------------------------
+   Safe-area utilities (standards §4). `viewport-fit=cover` (set in the v2 layout
+   viewport export) lets content extend under the notch/home-indicator; every
+   top/bottom bar must pad itself back out of the unsafe zone. Android needs this
+   too now (Chrome 135+ edge-to-edge default), not just iOS. Left/right cover the
+   landscape-notch case exposed by viewport-fit=cover.
+   -------------------------------------------------------------------------- */
+.v2-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.v2-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.v2-safe-left {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.v2-safe-right {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* -----------------------------------------------------------------------------
+   Hover-guard + touch conventions (standards §4).
+
+   Hover-guard convention: any hover-REVEAL styling (toolbars, action buttons that
+   appear on hover) MUST be wrapped so it only applies to devices with a real
+   pointer — otherwise touch devices get stuck-on hover states. Phase-2+
+   components wrap their hover rules like:
+
+       @media (hover: hover) and (pointer: fine) {
+         .thing:hover { … }
+       }
+
+   On touch (`pointer: coarse`) those actions become a long-press bottom sheet
+   with a visible overflow button instead. Tap targets ≥44px (primary) / ≥24px
+   (floor), inputs ≥16px font to avoid iOS zoom, and `:active` states replacing
+   (not just removing) the tap highlight are all enforced in phase-2+ components,
+   not in this mechanics layer — see standards §4.
+   -------------------------------------------------------------------------- */
+.v2-interactive {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}

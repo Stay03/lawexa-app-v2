@@ -23,10 +23,15 @@ Full citations live in the research transcripts; key URLs inline.
    Server Action/route handler. Proxy does optimistic cookie-presence checks only.
 4. **Version hygiene**: upgrade 16.1 → 16.2.x now; Next.js has a monthly security release program
    and the **July 20, 2026 patch** (4 high severity) must be applied promptly.
-5. **Enable `cacheComponents: true` for v2** (it's the only path to PPR in 16 and the announced
-   future default). It enforces Suspense-or-cache discipline at build time — greenfield v2 code
-   should be born compatible. `"use cache"`, `cacheLife`, `cacheTag` are stable; use
-   `revalidateTag(tag, profile)` two-arg form.
+5. **`cacheComponents: true` — DEFERRED to phase-7 cutover** (phase-1 investigation, July 17,
+   2026: the flag is global; it breaks 53 v1 routes because v1's client `(main)`/`(admin)`
+   layouts give PPR no server-side postpone point, and route-segment opt-outs are categorically
+   rejected under the flag). The v2 tree ALREADY passes under it — so v2 upholds the discipline
+   **by convention** (server layouts, per-route `loading.tsx`/`error.tsx`, DAL in `cache()`,
+   Suspense around request-time reads; never a `'use client'` layout) and the flag flips nearly
+   free at cutover. `"use cache"`, `cacheLife`, `cacheTag` are stable; use
+   `revalidateTag(tag, profile)` two-arg form when the flag lands. Evidence:
+   `phases/phase-1-engineering-foundation/cache-components-investigation.md`.
 6. **Mutations split**: Server Actions for form-ish flows (cookie→bearer + revalidation +
    `useActionState` in one round trip) but **route handlers for chat send / high-frequency
    interactions** — Server Actions execute serially per client. Never fetch data through our own
@@ -145,7 +150,11 @@ Full citations live in the research transcripts; key URLs inline.
   `theme-color` metas (light/dark). Safe-area padding on every top/bottom bar — **Android
   requires it now too** (Chrome 135+ edge-to-edge default), not just iOS.
 - **The composer keyboard recipe** (canonical, replaces all fixed-position composers):
-  non-scrolling document (`html, body { overflow: hidden }`), app shell
+  non-scrolling document — **scoped, during the strangler period, to a
+  lifecycle-managed class** (`html.v2-document-lock { overflow: hidden }` added/removed by a
+  client effect on v2 mount/unmount; React 19 never unloads route stylesheets, so a bare
+  `html, body` rule would leak into v1 after a soft navigation — wave-4b reviewer finding),
+  app shell
   `height: 100dvh` grid (`header / scrollable content / composer-or-tabs` rows), messages scroll
   internally with `overscroll-behavior: contain`. Android/Firefox handled by the meta + dvh with
   zero JS. iOS Safari (still no `interactive-widget`, no VirtualKeyboard API, fresh iOS 26

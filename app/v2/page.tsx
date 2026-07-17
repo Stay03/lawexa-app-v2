@@ -22,7 +22,7 @@ export default async function V2HomePage() {
   const session = await verifySession();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-6 px-6 py-16">
+    <main className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center gap-6 px-6 py-16">
       <Card className="w-full">
         <CardHeader>
           <CardTitle>Lawexa v2 preview — walking skeleton</CardTitle>

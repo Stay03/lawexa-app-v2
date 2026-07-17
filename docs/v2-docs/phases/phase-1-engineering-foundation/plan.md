@@ -25,8 +25,10 @@ Runs on existing v1 tokens; zero design decisions.
    helpers (`optimistic()`, `patching()`); first per-feature `queries.ts` exemplar with
    hierarchical `queryOptions()` factory; import-boundary ESLint rules (v2 may import `lib/api`,
    `types`, pure utils — never v1 components/hooks/stores).
-4. **`cacheComponents: true`** enabled and verified against the v2 stub (Suspense-or-cache
-   discipline; `"use cache"`/`cacheLife`/`cacheTag` conventions documented in-code).
+4. **`cacheComponents: true`** — ~~enable~~ INVESTIGATED July 17, 2026 → **DEFER to phase-7**
+   (global flag breaks 53 v1 routes via the client layouts; no per-route opt-out; v2 tree
+   already compatible). v2 upholds the discipline by convention instead. See
+   `cache-components-investigation.md` in this folder.
 5. **Metadata plumbing** (standards §1 correction 6 + audit Part 3 §12): v2 `metadataBase` +
    `title.template = '%s | Lawexa'`; `app/robots.ts` + `app/sitemap.ts` (site-wide, benefits v1
    immediately); default brand OG image; `generateMetadata` convention module. Verify

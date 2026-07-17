@@ -8,8 +8,16 @@ Per-phase execution detail lives in `phases/phase-N-*/plan.md`; each phase close
 
 > Research corrections applied (July 2026): the switch file is **`proxy.ts`** (middleware.ts is
 > deprecated in Next 16; proxy runs on Node runtime); auth enforcement lives in a server-only
-> **DAL**, not the proxy; v2 runs with **`cacheComponents: true`**; upgrade to Next 16.2.x and
-> apply the July 20, 2026 security patch. Details in the standards doc §1.
+> **DAL**, not the proxy; upgrade to Next 16.2.x and apply the July 20, 2026 security patch.
+> Details in the standards doc §1.
+>
+> **`cacheComponents` amendment (phase-1 investigation, July 17, 2026):** the flag is global and
+> breaks 53 v1 routes (root cause: v1's client `(main)`/`(admin)` layouts give PPR no server-side
+> postpone point; no per-route opt-out exists — even `force-dynamic` is rejected). **Deferred to
+> the phase-7 cutover**, where it becomes a near no-op because the v2 tree already passes. Until
+> then v2 meets the Suspense-or-cache discipline BY CONVENTION: server layouts, `loading.tsx`/
+> `error.tsx` per route, DAL under `cache()`, Suspense-wrapped request-time reads. Full evidence:
+> `phases/phase-1-engineering-foundation/cache-components-investigation.md`.
 
 ## 0. Locked decisions
 
