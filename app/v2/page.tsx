@@ -9,11 +9,17 @@ import {
 } from '@/components/ui/card';
 import { SwitchBackButton } from './switch-back-button';
 import { UI_COOKIE, V2_COOKIE_VALUE } from '@/v2/cookie';
+import { verifySession } from '@/v2/runtime/session';
 
 export default async function V2HomePage() {
   // cookies() is async in Next 16.
   const cookieStore = await cookies();
   const isPreviewOn = cookieStore.get(UI_COOKIE)?.value === V2_COOKIE_VALUE;
+
+  // Proves the DAL round trip: httpOnly session cookie → server → backend
+  // /auth/me → minimal DTO. A missing/invalid token resolves to null (the
+  // signed-out path) rather than throwing.
+  const session = await verifySession();
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-6 px-6 py-16">
@@ -35,6 +41,15 @@ export default async function V2HomePage() {
               {isPreviewOn ? 'set to "v2" (preview on)' : 'unset (preview off)'}
             </span>
             .
+          </p>
+          <p>
+            {/* DAL end-to-end proof — server-verified identity from the httpOnly
+                session cookie, never the client zustand store. */}
+            <span className="font-medium text-foreground">
+              {session
+                ? `Server session: signed in as ${session.user.name} (${session.user.role})`
+                : 'Server session: none (browse as guest or toggle to sync)'}
+            </span>
           </p>
           <p>
             Manage this preview from{' '}

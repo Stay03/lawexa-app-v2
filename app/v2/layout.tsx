@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { SessionSync } from './session-sync';
 
 /**
  * v2 metadata convention (exemplar for every phase-3+ feature route):
@@ -44,6 +45,11 @@ export default function V2Layout({
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">{children}</div>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Mirrors the v1 localStorage token into the httpOnly session cookie the
+          server DAL reads. Renders nothing; pure network side-effect. */}
+      <SessionSync />
+      {children}
+    </div>
   );
 }
