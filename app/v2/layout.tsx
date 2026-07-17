@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { V2QueryProvider } from '@/v2/runtime/query-provider';
 import { SessionSync } from './session-sync';
 
 /**
@@ -28,9 +29,12 @@ export const metadata: Metadata = {
 };
 
 /**
- * Server shell for the hidden v2 tree. Intentionally minimal — it inherits the
- * root providers (theme, query, toaster) from `app/layout.tsx`. Real chrome
- * (nav, breadcrumbs) arrives in later phases.
+ * Server shell for the hidden v2 tree. Inherits the root theme + toaster from
+ * `app/layout.tsx`, but mounts its OWN `V2QueryProvider` — the v2 QueryClient
+ * (v2 tiers + global MutationCache) nests inside and shadows the root v1
+ * `QueryProvider` for everything below, so v2 runs the v2 data policy while v1
+ * pages keep the root client untouched. Real chrome (nav, breadcrumbs) arrives
+ * in later phases.
  */
 export default function V2Layout({
   children,
@@ -49,7 +53,7 @@ export default function V2Layout({
       {/* Mirrors the v1 localStorage token into the httpOnly session cookie the
           server DAL reads. Renders nothing; pure network side-effect. */}
       <SessionSync />
-      {children}
+      <V2QueryProvider>{children}</V2QueryProvider>
     </div>
   );
 }
