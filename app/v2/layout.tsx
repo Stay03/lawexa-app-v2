@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import { notFound } from 'next/navigation';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { V2QueryProvider } from '@/v2/runtime/query-provider';
 import { AppShell } from '@/v2/shell/AppShell';
+import { V2Sidebar } from '@/v2/shell/V2Sidebar';
+import { V2Drawer } from '@/v2/shell/V2Drawer';
+import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
 import { SessionSync } from './session-sync';
@@ -61,27 +65,20 @@ export const viewport: Viewport = {
 };
 
 /**
- * Neutral phase-1 shell header — just the wordmark (Comfortaa is the brand face;
- * standards §3 reserves it for wordmarks). No nav yet: the mobile nav pattern is
- * an open phase-2 design question (bottom tab bar was rejected), so WP6 ships the
- * shell MECHANICS any nav can later slot into, not navigation UI. `bg-background`
- * / `border-b` keep it token-neutral until phase-2 restyles the header chrome.
- */
-const shellHeader = (
-  <div className="flex h-14 items-center border-b border-border bg-background px-4">
-    <span className="font-comfortaa text-base font-semibold tracking-tight text-foreground">
-      Lawexa
-    </span>
-  </div>
-);
-
-/**
  * Server shell for the hidden v2 tree. Inherits the root theme + toaster from
  * `app/layout.tsx`, but mounts its OWN `V2QueryProvider` — the v2 QueryClient
  * (v2 tiers + global MutationCache) nests inside and shadows the root v1
  * `QueryProvider` for everything below, so v2 runs the v2 data policy while v1
- * pages keep the root client untouched. Real chrome (nav, breadcrumbs) arrives
- * in later phases.
+ * pages keep the root client untouched.
+ *
+ * Chrome composition (phase 2→3): `SidebarProvider` owns the sidebar/drawer open
+ * state. `V2Sidebar` is the desktop rail (CSS-hidden on mobile, unmounted after
+ * hydration there). `SidebarInset` holds the `AppShell` grid, whose header slot
+ * is `V2Header` and whose content is the route. `V2Drawer` is the mobile drawer,
+ * the sole consumer of `openMobile`. The AppShell `dock` slot is left empty —
+ * the floating conversation composer arrives with the phase-3 conversation
+ * screen. The provider wrapper is pinned to the dynamic viewport so the shell's
+ * own `100dvh` grid owns all scrolling and the document never scrolls.
  */
 export default function V2Layout({
   children,
@@ -108,9 +105,15 @@ export default function V2Layout({
           lifecycle because React never unloads the stylesheet. */}
       <DocumentLock />
       <V2QueryProvider>
-        {/* Non-scrolling shell: header / scrollable content / dock (floating
-            composer's home in phase 3). Mechanics only — see AppShell. */}
-        <AppShell header={shellHeader}>{children}</AppShell>
+        <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
+          <V2Sidebar />
+          <SidebarInset className="min-h-0 overflow-hidden">
+            {/* Non-scrolling shell: header / scrollable content / dock (empty
+                this wave). Mechanics only — see AppShell. */}
+            <AppShell header={<V2Header />}>{children}</AppShell>
+          </SidebarInset>
+          <V2Drawer />
+        </SidebarProvider>
       </V2QueryProvider>
     </div>
   );

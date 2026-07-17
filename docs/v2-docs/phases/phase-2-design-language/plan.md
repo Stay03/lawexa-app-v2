@@ -52,3 +52,24 @@ file for phase-3+ builders.
    scale, one radius per component class, disciplined spacing), PLUS the locked keepers:
    original shimmer verbatim, the drawer (Nav D), the floating conversation composer.
    Slate surfaces, Geist/Geist Mono, and the R2 density are all retired.
+
+## Round 3 verdict + THE MEDIUM PIVOT (July 17, 2026)
+
+Round-3 mockup: **colors approved** (v1 palette verbatim stays); the mockup's execution
+rejected ("definitely not the design — it sucks"). Owner confirmed the real component stack:
+**shadcn/ui + prompt-kit**.
+
+**Decision — no more static HTML mockups.** Three rounds proved the medium can't represent
+shadcn/prompt-kit quality. Phase-2 design iteration moves onto REAL components in the live v2
+tree behind the owner's toggle:
+
+- **Primitive layer (final):** the existing shadcn `components/ui/**` and `components/prompt-kit/**`
+  are v2's shared primitives — the import-boundary exception for them becomes permanent policy
+  (they are library-derived primitives, not v1 feature code). No separate v2 primitive fork.
+- **Tokens:** v1's `globals.css` tokens ARE the v2 tokens (already inherited). No new tokens.css;
+  consistency is enforced at the component/usage layer.
+- **Locked:** original shimmer verbatim; drawer (ChatGPT pattern) on mobile; floating
+  conversation composer; system sans + Comfortaa wordmark; v1 shapes.
+- **Next build:** the real v2 shell + home (shadcn sidebar, prompt-kit composer + shimmer,
+  drawer) — owner reviews the deployed product at /v2, and design tweaks iterate there.
+  This merges the phase-2 exit into the start of phase-3 construction.

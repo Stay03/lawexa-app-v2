@@ -36,11 +36,15 @@ const eslintConfig = defineConfig([
             {
               target: ["./v2", "./app/v2"],
               from: "./components",
-              // `components/ui/**` allowed as an interim measure until phase-2
-              // ships the v2 primitives; then this exception is removed.
-              except: ["ui"],
+              // PERMANENT primitive-layer policy (phase-2 "medium pivot",
+              // docs/v2-docs/phases/phase-2-design-language/plan.md): the shadcn
+              // `components/ui/**` and prompt-kit `components/prompt-kit/**` are
+              // library-derived shared primitives — NOT v1 feature code — so v2
+              // builds on them directly and never forks them. Every OTHER
+              // `components/**` path stays v1 feature code and remains blocked.
+              except: ["ui", "prompt-kit"],
               message:
-                "v2 must not import v1 components (components/ui is the only interim exception, until phase-2 ships v2 primitives).",
+                "v2 must not import v1 feature components. Only components/ui and components/prompt-kit are allowed — they are the shared primitive layer (permanent policy, phase-2 medium pivot).",
             },
             {
               target: ["./v2", "./app/v2"],
