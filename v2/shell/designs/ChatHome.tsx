@@ -9,11 +9,11 @@ import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
 
 /**
- * HomeDesignA — "Warm Spotlight". The shimmer composer is the lit centerpiece:
- * a soft radial gold wash (built only from the --primary token at low opacity)
- * pools behind it, a Comfortaa greeting sits above (capped at v1's ~36px), and
- * everything else — the suggested prompts, a quiet quick-jump row — recedes into
- * generous negative space.
+ * ChatHome — the Chat tab's home surface (owner #34: the default tab). The
+ * shimmer composer is the lit centerpiece: a soft radial gold wash (built only
+ * from the --primary token at low opacity) pools behind it, a Comfortaa greeting
+ * sits above (capped at v1's ~36px), and everything else — the suggested prompts,
+ * a quiet quick-jump row — recedes into generous negative space.
  *
  * DESKTOP is TOP-anchored (owner #25) but sits a few lines lower than the first
  * pass (owner #33: `md:pt-24` was too high) — `md:pt-36` lands between the old
@@ -32,7 +32,7 @@ import { HomePrompts } from './HomePrompts';
  * the greeting and composer stay in lockstep. Suggested prompts are v1's ACTUAL
  * four (owner #21), shared via `HomePrompts`.
  *
- * Carries `data-design="a"` for the switch and the server-renderable
+ * Carries `data-home-tab="chat"` for the tab wrapper and the server-renderable
  * `data-v2-marker="V2-HOME"` marker the curl matrix greps for. Complete without
  * `name` (guests), which is threaded in when present.
  */
@@ -49,7 +49,7 @@ const QUICK_ACTIONS = [
   { href: '/quiz', label: 'Quiz', Icon: GraduationCap },
 ] as const;
 
-export function HomeDesignA({
+export function ChatHome({
   name,
   signedIn = false,
   role,
@@ -72,7 +72,7 @@ export function HomeDesignA({
   return (
     <div
       data-v2-marker="V2-HOME"
-      data-design="a"
+      data-home-tab="chat"
       className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col overflow-hidden px-4 pt-10 pb-8 md:pt-36 md:pb-12"
     >
       {/* Ambient warm spotlight (owner #32 — explicitly KEPT). Decorative,
@@ -86,8 +86,8 @@ export function HomeDesignA({
           MOBILE gets the consistent treatment (owner #32): the layers are DIMMER
           below `md` (desktop opacities are unchanged — owner kept them), and the
           whole container fades in on its OWN slow ~700ms curve on mount, so
-          switching to this design never flashes the glow at full strength (the
-          design roots key-remount, so the fade replays each appearance).
+          switching to this tab never flashes the glow at full strength (the
+          surface roots key-remount, so the fade replays each appearance).
           `motion-safe` guards it — reduced motion settles straight to visible. */}
       <div
         aria-hidden

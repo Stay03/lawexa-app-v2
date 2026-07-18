@@ -9,7 +9,7 @@ import type { SessionUser } from '@/v2/runtime/session';
 import { LogoMark, LogoWordmark } from './Logo';
 import { V2NotificationBell } from './V2NotificationBell';
 import { V2HeaderMenu } from './V2HeaderMenu';
-import { DesignSwitch } from './DesignSwitch';
+import { HomeTabs } from './HomeTabs';
 
 /**
  * V2Header — the top bar, deliberately UNCROWDED (a binding owner decision).
@@ -23,9 +23,10 @@ import { DesignSwitch } from './DesignSwitch';
  *    - Desktop (`hidden md:*`): `SidebarTrigger` (slides the rail off-canvas), the
  *      wordmark ONLY while the rail is collapsed (the expanded rail already shows
  *      it), a separator, and the "Home" breadcrumb slot.
- *  - CENTRE (grid col 2, auto): the dev A|B `DesignSwitch`, centred on mobile AND
- *    desktop. Equal `1fr` side columns keep it dead-centre; both clusters fit
- *    inside their track down to 320px, so it never collides.
+ *  - CENTRE (grid col 2, auto): the `HomeTabs` product control (Chat | Work |
+ *    Study, owner #34), centred on mobile AND desktop. Equal `1fr` side columns
+ *    keep it dead-centre; both clusters fit inside their track down to 320px,
+ *    where the control uses compact type so it never collides.
  *  - RIGHT (grid col 3): exactly TWO controls (owner #28) — the notification bell
  *    (hidden for guests) and the overflow menu (`V2HeaderMenu`), which now owns
  *    the light/dark theme toggle. The bare theme button has left the bar.
@@ -73,9 +74,10 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         </span>
       </div>
 
-      {/* CENTRE — the dev design switch, true centre of the bar (owner #29). */}
+      {/* CENTRE — the Chat|Work|Study product tabs, true centre of the bar
+          (owner #29 placement, #34 pivot). */}
       <div className="flex justify-center">
-        <DesignSwitch />
+        <HomeTabs />
       </div>
 
       {/* RIGHT cluster — bell + overflow menu (owner #28). Uncrowded by decree. */}
