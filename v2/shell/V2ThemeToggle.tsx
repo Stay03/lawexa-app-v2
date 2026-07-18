@@ -1,6 +1,5 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun, SunMoon } from 'lucide-react';
 
@@ -10,6 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useMounted } from './use-mounted';
 
 /**
  * V2ThemeToggle — light/dark switch reading the root `next-themes` provider
@@ -18,23 +18,10 @@ import {
  * HYDRATION-SAFE without setState-in-effect: `next-themes` returns `undefined`
  * for the resolved theme on the server (it can't read `localStorage`/`class`
  * there), so rendering a theme-specific icon on the first paint would mismatch.
- * Instead of the classic `useState`+`useEffect` mounted flag (which the React
- * Compiler lint rejects), we derive `mounted` from `useSyncExternalStore`: its
- * server snapshot is `false` and its client snapshot is `true`, so the server
- * and first hydration render agree (neutral icon), then React re-renders with
- * the real icon — no flash of the wrong glyph, no lint violation.
+ * `useMounted` (the shared shell idiom) keeps server and first hydration render
+ * agreeing on a neutral icon, then React re-renders with the real one — no
+ * flash of the wrong glyph, no lint violation.
  */
-
-const subscribeNoop = () => () => {};
-
-/** `false` on the server + first hydration render, `true` once on the client. */
-function useMounted(): boolean {
-  return useSyncExternalStore(
-    subscribeNoop,
-    () => true,
-    () => false,
-  );
-}
 
 export function V2ThemeToggle() {
   const mounted = useMounted();
