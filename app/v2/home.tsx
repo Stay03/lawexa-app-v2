@@ -19,7 +19,9 @@ import { HomeDesignB } from '@/v2/shell/designs/HomeDesignB';
  * they can't own the transition themselves). The store raises `fading` for a beat
  * before it swaps `mode`, so this wrapper fades the outgoing home OUT, the mode
  * flips at the low point, then it fades the incoming home IN — both directions
- * animate. `duration-150` matches the store's `FADE_MS`. `h-full` gives the design
+ * animate. Softened to `duration-200 ease-in-out` (owner #32 — the tab cross-fade
+ * gets slightly longer/eased so switching never flashes); it stays in lockstep
+ * with the store's `FADE_MS` (200ms), which is when the mode swaps. `h-full` gives the design
  * roots a definite height context for their own `min-h-full` while the wrapper
  * persists across the swap. Reduced motion skips the fade (store-side) and the
  * `motion-reduce` guard drops the transition here too.
@@ -43,7 +45,7 @@ export function V2Home({
   return (
     <div
       className={cn(
-        'h-full transition-opacity duration-150 ease-out motion-reduce:transition-none',
+        'h-full transition-opacity duration-200 ease-in-out motion-reduce:transition-none',
         fading ? 'opacity-0' : 'opacity-100',
       )}
     >

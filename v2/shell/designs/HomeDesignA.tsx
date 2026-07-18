@@ -15,11 +15,12 @@ import { HomePrompts } from './HomePrompts';
  * everything else — the suggested prompts, a quiet quick-jump row — recedes into
  * generous negative space.
  *
- * DESKTOP anchors HIGH (owner #25): the composition is TOP-anchored with generous
- * top padding (`md:pt-24`) rather than vertically centered low on the page — it
- * reads as deliberate, not cramped against the header. The desktop suggested
- * prompts are a quiet ChatGPT-style list UNDER the composer (owner #27), and the
- * quick-jump row is hidden (owner #20 — the sidebar already provides it).
+ * DESKTOP is TOP-anchored (owner #25) but sits a few lines lower than the first
+ * pass (owner #33: `md:pt-24` was too high) — `md:pt-36` lands between the old
+ * too-low centre and that too-high anchor, still clearly reading from the top, not
+ * cramped against the header. The desktop suggested prompts are a quiet
+ * ChatGPT-style list UNDER the composer (owner #27), and the quick-jump row is
+ * hidden (owner #20 — the sidebar already provides it).
  *
  * MOBILE stays thumb-first: the greeting rides the top, the quick-jump row sits
  * under it, and the compose cluster is pushed to the bottom via `mt-auto`. The
@@ -72,18 +73,29 @@ export function HomeDesignA({
     <div
       data-v2-marker="V2-HOME"
       data-design="a"
-      className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col overflow-hidden px-4 pt-10 pb-8 md:pt-24 md:pb-12"
+      className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col overflow-hidden px-4 pt-10 pb-8 md:pt-36 md:pb-12"
     >
-      {/* Ambient warm spotlight — decorative, aria-hidden, built only from the
-          --primary token at low opacity. Two layered radials (a wide static wash
-          and a slower breathing core) give the light depth; the breathe is a
-          whisper and is dropped entirely under reduced-motion. Positioned low on
-          mobile (composer docks at the thumb) and high on desktop (composer sits
-          near the top, owner #25) so the glow pools behind it in both. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-1/2 top-[70%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.06] blur-[120px] md:top-[40%] dark:bg-primary/[0.12]" />
+      {/* Ambient warm spotlight (owner #32 — explicitly KEPT). Decorative,
+          aria-hidden, built only from the --primary token at low opacity. Two
+          layered radials (a wide static wash and a slower breathing core) give the
+          light depth; the breathe is a whisper, dropped entirely under
+          reduced-motion. Positioned low on mobile (composer docks at the thumb)
+          and a touch below centre on desktop (tracks the composer's new lower
+          anchor, owner #33) so the glow pools behind it in both.
+
+          MOBILE gets the consistent treatment (owner #32): the layers are DIMMER
+          below `md` (desktop opacities are unchanged — owner kept them), and the
+          whole container fades in on its OWN slow ~700ms curve on mount, so
+          switching to this design never flashes the glow at full strength (the
+          design roots key-remount, so the fade replays each appearance).
+          `motion-safe` guards it — reduced motion settles straight to visible. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:fill-mode-both motion-safe:duration-700 motion-safe:ease-out"
+      >
+        <div className="absolute left-1/2 top-[70%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px] bg-primary/[0.03] dark:bg-primary/[0.06] md:top-[46%] md:bg-primary/[0.06] md:dark:bg-primary/[0.12]" />
         <div
-          className="absolute left-1/2 top-[72%] h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.12] blur-[90px] motion-safe:animate-pulse md:top-[42%] dark:bg-primary/20"
+          className="absolute left-1/2 top-[72%] h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[90px] motion-safe:animate-pulse bg-primary/[0.06] dark:bg-primary/10 md:top-[48%] md:bg-primary/[0.12] md:dark:bg-primary/20"
           style={{ animationDuration: '7s' }}
         />
       </div>

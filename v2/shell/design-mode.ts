@@ -32,8 +32,11 @@ export type DesignMode = 'a' | 'b';
 
 const STORAGE_KEY = 'lawexa-v2-design';
 const DEFAULT_MODE: DesignMode = 'a';
-/** Half a swap: fade the current home out, then the next home in. */
-const FADE_MS = 150;
+/** Half a swap: fade the current home out, then the next home in. Kept in
+ *  lockstep with the home wrapper's `duration-200` CSS (owner #32 softened the
+ *  cross-fade from 150→200ms); the mode swaps at this mark, i.e. the fade-out's
+ *  low point. Timing value only — no store-logic change. */
+const FADE_MS = 200;
 
 /** Cached snapshots so the `getSnapshot`s return referentially-stable values. */
 let currentMode: DesignMode | null = null;

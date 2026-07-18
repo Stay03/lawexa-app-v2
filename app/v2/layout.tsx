@@ -8,7 +8,6 @@ import { V2Drawer } from '@/v2/shell/V2Drawer';
 import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
-import { LogoPreload } from '@/v2/shell/LogoPreload';
 import { verifySession } from '@/v2/runtime/session';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
@@ -102,9 +101,6 @@ export default async function V2Layout({
 
   return (
     <div className="bg-background text-foreground">
-      {/* Warms BOTH brand PNGs into <head> before any surface mounts, so the
-          drawer's first-open logo hits a warm cache (owner #19). Renders nothing. */}
-      <LogoPreload />
       {/* Mirrors the v1 localStorage token into the httpOnly session cookie the
           server DAL reads. Renders nothing; pure network side-effect. */}
       <SessionSync />

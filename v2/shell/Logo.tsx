@@ -1,8 +1,4 @@
-import Image from 'next/image';
-
 import { cn } from '@/lib/utils';
-import wordmarkSrc from '@/public/images/logo.png';
-import markSrc from '@/public/android-chrome-512x512.png';
 
 /**
  * Brand logo lockup for the v2 shell chrome — the ONE source for every place the
@@ -10,31 +6,35 @@ import markSrc from '@/public/android-chrome-512x512.png';
  * header). Both marks are the gold-on-transparent brand assets, verified legible
  * in BOTH themes, so there is no per-theme asset swap to maintain.
  *
- * STATIC IMPORTS (not string `src`) are used deliberately: Next infers the
- * intrinsic width/height from the file (543×175 wordmark, 512×512 mark), so the
- * browser reserves the exact box and there is zero CLS — no magic dimension
- * numbers to drift from the asset. Display size is set purely in CSS.
+ * INLINED AS DATA URIs (owner #30 — "logos load INSTANTLY, definitively"). Both
+ * marks ship as base64 `data:` URIs baked into this module, so they render on the
+ * FIRST paint of every surface with ZERO network — no optimizer round-trip, no
+ * preload race, no cold-resize stall (the drawer's first-open logo delay is gone
+ * because there is no fetch to be late). The bytes are tiny:
+ *  - Wordmark: the raw 6.7KB `public/images/logo.png` (543×175) → ~9KB base64.
+ *  - Mark: the 512px source PNG was 134KB — far too heavy to inline — so it was
+ *    downscaled once (offline, sharp/lanczos3, 256-colour dithered palette) to a
+ *    96px `public/images/logo-mark-96.png` (~4.5KB) that is visually identical on
+ *    the gold gradient at the ≤36px it ever renders. That is what is inlined here.
+ * next/image is pointless for data URIs (nothing to optimize, no lazy loading
+ * wanted for persistent chrome), so these are plain <img>.
  *
- * INSTANT LOADING (owner bug: the drawer's logo took multiple seconds to appear
- * on first open). Three fixes, all correct for tiny persistent-chrome marks per
- * the Next 16 image guidance:
- *  - `unoptimized` — serve the raw static PNG straight from `/_next/static/…`
- *    instead of routing through the on-demand `/_next/image` optimizer. The
- *    optimizer round-trip (cold-resize on first hit) is exactly what stalled the
- *    drawer logo, which isn't requested until the Sheet first mounts. These marks
- *    are already tiny, so there is nothing to optimize.
- *  - `loading="eager"` — load immediately when mounted regardless of viewport,
- *    the Next 16 replacement for the deprecated `priority` prop for non-LCP art.
- *  - LAYOUT-LEVEL PRELOAD (owner #19) — `v2/shell/LogoPreload` calls
- *    `ReactDOM.preload` on BOTH asset URLs in `app/v2/layout.tsx`, above every
- *    surface, so the bytes are already in flight (and cached) before the drawer
- *    Sheet ever mounts. `unoptimized` makes the `<Image>` request the exact same
- *    raw `/_next/static/media/…` URL the preload warms — a guaranteed cache hit.
- *
- * The `h-* w-auto` display pattern is the Next-recommended way to resize while
- * preserving ratio — `width: auto` paired with a fixed height silences the
- * "modified one dimension but not the other" console warning.
+ * NO CLS: each <img> carries the asset's intrinsic `width`/`height` attributes
+ * (543×175 wordmark, 96×96 mark) so the browser reserves the correct box and
+ * derives the aspect-ratio; the display size is set purely in CSS (`h-* w-auto`
+ * for the wordmark, `size-*` for the square mark), which overrides the attribute
+ * pixels while keeping the ratio. `decoding="sync"` decodes the (already in-memory)
+ * data URI inline with the surrounding paint, so the lockup never flashes in a
+ * frame late. `select-none` keeps the chrome art non-selectable.
  */
+
+/** The full "Lawexa" gold wordmark (543×175, ≈3.1:1) inlined as a data URI. */
+const WORDMARK_SRC =
+  'data:image/png;base64,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';
+
+/** The square gold pillar mark (96×96) inlined as a data URI. */
+const MARK_SRC =
+  'data:image/png;base64,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';
 
 /** The full "Lawexa" gold wordmark (≈3.1:1). Defaults to h-8 (32px, v1's scale). */
 export function LogoWordmark({
@@ -46,11 +46,13 @@ export function LogoWordmark({
   alt?: string;
 }) {
   return (
-    <Image
-      src={wordmarkSrc}
+    // eslint-disable-next-line @next/next/no-img-element -- inlined data URI: next/image has nothing to optimize and would add a wrapper + lazy behaviour we explicitly don't want for instant persistent chrome.
+    <img
+      src={WORDMARK_SRC}
       alt={alt}
-      unoptimized
-      loading="eager"
+      width={543}
+      height={175}
+      decoding="sync"
       className={cn('h-8 w-auto select-none', className)}
     />
   );
@@ -67,11 +69,13 @@ export function LogoMark({
   alt?: string;
 }) {
   return (
-    <Image
-      src={markSrc}
+    // eslint-disable-next-line @next/next/no-img-element -- inlined data URI: see LogoWordmark.
+    <img
+      src={MARK_SRC}
       alt={alt}
-      unoptimized
-      loading="eager"
+      width={96}
+      height={96}
+      decoding="sync"
       className={cn('size-8 rounded-md select-none', className)}
     />
   );

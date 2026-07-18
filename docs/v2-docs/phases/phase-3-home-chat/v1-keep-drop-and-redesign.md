@@ -103,6 +103,37 @@ Nothing from this redesign is built yet.
     (with room for future items); it leaves the bar itself.
 29. **DesignSwitch centered in the header** (mobile + web).
 
+### A5. Owner's fourth live-review decisions + the Chat|Work|Study pivot (July 18, 2026; binding)
+
+30. **Logos load INSTANTLY, definitively**: inline both marks as data URIs (wordmark is 6.7KB;
+    downscale the 134KB/512px mark to ~96px first) — zero network, first-paint render, every
+    surface. LogoPreload becomes dead code and is deleted.
+31. **Jurisdiction flags**: each flag is fetched from an external CDN (jsDelivr) at render — the
+    flagless flash is banned. Reserve the flag's exact box, fade each in on load, and warm the
+    images in the background at low priority after the list resolves.
+32. **Gold spotlight stays** (owner explicitly kept it). Mobile gets the consistent treatment:
+    dimmer there + the glow fades in on its own slower curve; the tab cross-fade gets slightly
+    longer/eased so switching never flashes.
+33. **Design A desktop content comes DOWN a few lines** from the current top anchor (between the
+    old too-low and the current too-high).
+34. **THE A/B SWITCHER GRADUATES → Chat | Work | Study** (real product tabs, centered, persisted
+    per device, Chat default). Design B is DELETED; its launchpad DNA lives on in Work/Study.
+    Composer stays visible on all three tabs (owner did not veto).
+    - **Chat** = Design A as-is (minimal introduction).
+    - **Work** = work spaces (`?type=work`) with §17 rollup badges (unread_channels_count +
+      mention_count — typed from the backend contract), "Jump back in" channels (per-space
+      fetch now → cross-space endpoint when Ask B ships, w/ author+snippet preview),
+      Radar recent activity, recent-conversations strip.
+    - **Study** = study spaces (`?type=study`) w/ badges, Quiz (continue in-progress session +
+      stats strip from the shipped stats endpoint + topics), study-mode CTA (student-gated,
+      `study_mode` on create), recent bookmarks, conversations strip, and "recently viewed"
+      reserved for Ask A when it ships.
+    - Conversations have NO work/study tag (deliberately not requested — low value/cost).
+35. **Backend asks A (recently-viewed) + B (cross-space my-channels) are SENT and being built**
+    (their 8 clarifying questions answered July 18 — see `docs/v2-docs/backend-reply-2026-07-18-
+    statutes-cap-and-asks.md`, which also records the statute nodes-cap/outline exchange and our
+    release-coupled reader commitment).
+
 ---
 
 ## B. Shell + home — keep / drop / fix (first-hand study)
