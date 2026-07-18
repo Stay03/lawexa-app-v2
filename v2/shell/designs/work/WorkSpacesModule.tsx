@@ -29,9 +29,9 @@ const MAX_ROWS = 5;
  * gracefully when absent. Rows navigate to the real v1 space route
  * (`/spaces/{uuid}`), which lists that space's channels.
  *
- * Shares its spaces query with "Jump back in" via `WORK_SPACES_PARAMS`, so the
- * two modules cost one fetch. Only mounted for signed-in users (WorkHome gates
- * it), so no `enabled` guard is needed here.
+ * Reads the work-spaces query via the shared `WORK_SPACES_PARAMS` key. Only
+ * mounted for signed-in users (WorkHome gates it), so no `enabled` guard is
+ * needed here.
  */
 export function WorkSpacesModule() {
   const query = useQuery(spacesQueries.list(WORK_SPACES_PARAMS));

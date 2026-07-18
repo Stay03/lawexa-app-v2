@@ -200,6 +200,27 @@ export const spacesApi = {
 
 /** Channels are bound by uuid at the top level (matches `/channels/{uuid}`). */
 export const channelsApi = {
+  /**
+   * The caller's active-membership channels across ALL their spaces
+   * (`GET /channels`), sorted `last_message_at` desc (empty channels last),
+   * muted excluded unless `mention_count > 0`. Each row carries the per-space
+   * channel payload PLUS a `last_message` preview (see `types/collab.ts`) and its
+   * `space` context. This is the ONLY route that stamps `last_message`; supports
+   * `search` + `per_page` (server-controlled sort — visibility/sort/order ignored).
+   */
+  getMine: async (
+    params: ChannelListParams = {}
+  ): Promise<ChannelListResponse> => {
+    const response = await apiClient.get<ChannelListResponse>('/channels', {
+      params: {
+        search: params.search || undefined,
+        per_page: params.per_page ?? 20,
+        page: params.page ?? 1,
+      },
+    });
+    return response.data;
+  },
+
   getByUuid: async (uuid: string): Promise<ChannelResponse> => {
     const response = await apiClient.get<ChannelResponse>(`/channels/${uuid}`);
     return response.data;

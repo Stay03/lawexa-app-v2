@@ -218,6 +218,14 @@ export interface Channel {
   mention_count?: number;
   active_members_count: number;
   last_message_at: string | null;
+  /**
+   * A compact preview of the channel's most recent surviving message — a display
+   * name (`"Lawexa"` for AI-authored messages) and a plaintext snippet (markdown
+   * and mentions flattened, ≤120 chars). `null` when no message survives (e.g.
+   * the last was deleted). Stamped ONLY by `GET /api/channels` (the cross-space
+   * my-channels route); the per-space channel list never sets it.
+   */
+  last_message?: { author_name: string; snippet: string } | null;
   created_at: string;
   updated_at: string;
 }

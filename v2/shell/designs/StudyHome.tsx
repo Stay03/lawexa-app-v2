@@ -13,6 +13,7 @@ import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
 import { QuizModule } from './study/QuizModule';
 import { StudySpaces } from './study/StudySpaces';
+import { RecentlyViewed } from './study/RecentlyViewed';
 import { RecentBookmarks } from './study/RecentBookmarks';
 import { RecentConversations } from './study/RecentConversations';
 import { StudyModeCard, StudyModeChip } from './study/StudyMode';
@@ -186,14 +187,11 @@ export function StudyHome({
         )}
         style={{ animationDelay: '300ms' }}
       >
-        {/* ── ASK-A SEAM (recently-viewed) ──────────────────────────────────────
-            Backend is building the merged recently-viewed feed ({ type, viewed_at,
-            item }); see docs/v2-docs/backend-reply-2026-07-18-statutes-cap-and-asks.
-            When it ships, add `v2/features/recently-viewed/queries.ts` (a
-            `recentsPeek()` leaf over that endpoint, per the cases exemplar) and slot
-            a <RecentlyViewed /> module HERE — top of the rail, above Study spaces —
-            reusing the same ModuleCard/skeleton/error/empty parts. No placeholder
-            UI now: a skeleton would imply something is loading, and nothing is. */}
+        {/* Recently viewed — backend Ask A, LIVE. The merged { type, viewed_at,
+            item } feed of the user's last-opened cases / notes / statutes, top of
+            the rail (above Study spaces). Available to every signed-in user (not
+            spaces-gated), like the Bookmarks / Recent chats modules below it. */}
+        <RecentlyViewed />
 
         {/* Spaces are soft-launch role-gated in v1 (canAccessSpaces — same rule
             as WorkHome; reviewer HIGH finding). Rail geometry is safe: it is one
