@@ -13,7 +13,6 @@ export const statuteKeys = {
   countries: () => [...statuteKeys.all, 'countries'] as const,
   details: () => [...statuteKeys.all, 'detail'] as const,
   detail: (slug: string) => [...statuteKeys.details(), slug] as const,
-  nodes: (slug: string) => [...statuteKeys.all, 'nodes', slug] as const,
   akn: (slug: string) => [...statuteKeys.all, 'akn', slug] as const,
 };
 
@@ -65,19 +64,6 @@ export function useStatute(slug: string) {
     queryKey: statuteKeys.detail(slug),
     queryFn: () => statutesApi.getBySlug(slug),
     enabled: !!slug,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-}
-
-/**
- * Hook for fetching all nodes of a statute.
- * Loads all nodes in a single request (from=0, to=totalCount-1).
- */
-export function useStatuteNodes(slug: string, totalCount: number) {
-  return useQuery({
-    queryKey: statuteKeys.nodes(slug),
-    queryFn: () => statutesApi.getNodes(slug, 0, Math.max(totalCount - 1, 0)),
-    enabled: !!slug && totalCount > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

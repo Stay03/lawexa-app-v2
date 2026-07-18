@@ -49,7 +49,11 @@ export const statutesApi = {
   },
 
   /**
-   * Get nodes within a position range for a statute
+   * Get nodes within a position range for a statute.
+   * CAPPED at 100 nodes per request server-side (July 2026); the future
+   * ranged-hydration reader consumes this with the /outline endpoint —
+   * see the statute-nodes-cap migration record. Currently unconsumed
+   * (the live reader uses exportAkn; statutes-old was deleted).
    */
   getNodes: async (
     slug: string,

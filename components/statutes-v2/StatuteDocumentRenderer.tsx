@@ -15,7 +15,7 @@ interface StatuteDocumentRendererProps {
  * and renders via the recursive AknElementRenderer.
  */
 function StatuteDocumentRenderer({ slug }: StatuteDocumentRendererProps) {
-  const { data: xmlString, isLoading, isError, refetch } = useStatuteAkn(slug);
+  const { data: xmlString, isLoading, isError, error, refetch } = useStatuteAkn(slug);
 
   const bodyElement = useMemo(() => {
     if (!xmlString) return null;
@@ -37,10 +37,20 @@ function StatuteDocumentRenderer({ slug }: StatuteDocumentRendererProps) {
   }
 
   if (isError) {
+    // The statute endpoints are rate-limited server-side (10/min, 200/hour —
+    // only scripted bulk fetching hits them). A 429 deserves honest copy
+    // instead of the generic failure message.
+    const rateLimited =
+      (error as { response?: { status?: number } } | null)?.response?.status ===
+      429;
     return (
       <ErrorState
-        title="Failed to load statute content"
-        description="We couldn't load the content of this statute."
+        title={rateLimited ? 'Too many requests' : 'Failed to load statute content'}
+        description={
+          rateLimited
+            ? 'You are opening statutes very quickly. Wait a moment, then try again.'
+            : "We couldn't load the content of this statute."
+        }
         retry={() => refetch()}
       />
     );
