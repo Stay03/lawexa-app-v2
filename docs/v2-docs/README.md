@@ -23,6 +23,11 @@ Implementation runs in the numbered phases under [phases/](phases/). The ritual,
 repo's quiz/channels convention:
 
 - **Before starting a phase**: its `plan.md` is reviewed/expanded to full task detail.
+- **Before redesigning ANY page/screen** (standing rule, every session): first do a first-hand
+  **keep / redesign / drop study** of its v1 counterpart — element by element, its components and
+  data, what stays as-is, what gets rebuilt better, what dies. Write the verdicts into the phase
+  doc BEFORE building, so the redesign is deliberate and the record is consistent across sessions.
+  Example: `phases/phase-3-home-chat/v1-keep-drop-and-redesign.md` (home/sidebar/header/conversation).
 - **During**: every commit keeps v1 pixel-identical with the toggle off; `next build` before
   every push (main autodeploys to prod).
 - **At close**: `post-implementation.md` records what was built, deviations from plan,

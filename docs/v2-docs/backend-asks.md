@@ -137,3 +137,35 @@ described only the **payload/event shapes and field semantics** the v2 client wi
 naming style the API already uses. Field names, event name, and exact placement are all open to
 whatever fits the existing conventions best — treat the shapes above as the contract we need to
 consume, not a mandated design.
+
+---
+
+## RESPONSE — DELIVERED (backend team, July 18, 2026)
+
+All three asks answered. **Phase 5 (collab + notification spine) is unblocked** — the realtime
+badge model can be built exactly as specced. Authoritative contract now lives in the backend repo
+`frontend-contract.md §17–19` (Stay03/lawexa-api-v3 docs/channels) — read it before phase 5.
+
+**Ask 1 — counts in list payloads: COMPLETE.**
+- New `channel_message_mentions` pivot maintained transactionally on post/edit/AI-reply; historic
+  data via `lawexa:backfill-message-mentions` (chunked, idempotent, `--dry-run`).
+- `mention_count` on every channel row + channel detail (same single query as `unread_count`).
+- `unread_channels_count` + `mention_count` rollups on the spaces list + space detail. Muted
+  channels excluded from the activity-dot count, but their direct @mentions still badge (Slack
+  rule = **Ruling A**). **Ruling B**: AI mentions badge only when `ai_mentions_notify` is on. R2
+  notification behavior unchanged.
+
+**Ask 2 — live events: COMPLETE (incl. beyond-spec).**
+- `ChannelUnreadCountsUpdated` broadcasts **`.channel.unread` on `users.{uuid}`** with exactly the
+  6-key contract we asked for — absolute, self-healing counts, never any message content.
+- Four firing paths, one shared `ChannelUnreadCountBatch` (drift-guard test locks them to the
+  list-payload semantics): **post** (fan-out to other active members, ~6 constant queries
+  regardless of channel size), **markRead** (multi-device badge-clear echo, only on a real pointer
+  advance), **edit** (only members whose mention-membership changed), **delete** (count correction
+  to all).
+- **Client-side rule (adopt in phase 5): gate toasts by `my_notify_level`.**
+
+**Ask 3 — push: CONFIRMED code-complete, nothing to build.** It's a prod runtime check, not a
+frontend task: push-token rows exist → `php artisan lawexa:diagnose-push {uuid}` → verify queue
+worker + `failed_jobs`. (So the audit's "push send-side may be broken" is a deploy/runtime concern,
+not code.)
