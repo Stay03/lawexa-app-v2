@@ -15,6 +15,9 @@ import {
 } from '@/components/ui/sheet';
 import { useSidebar } from '@/components/ui/sidebar';
 import { SwitchBackButton } from '@/app/v2/switch-back-button';
+import type { SessionUser } from '@/v2/runtime/session';
+import { LogoV2Badge, LogoWordmark } from './Logo';
+import { V2UserFooter } from './V2UserFooter';
 import { v2NavItems, v2NewChat, v2Recents } from './nav.config';
 
 /**
@@ -30,7 +33,7 @@ import { v2NavItems, v2NewChat, v2Recents } from './nav.config';
  * sidebar context's `openMobile`; on mobile `V2Sidebar` renders `null`, so this
  * is the sole consumer of that state (no competing sheet).
  */
-export function V2Drawer() {
+export function V2Drawer({ user }: { user: SessionUser | null }) {
   const { openMobile, setOpenMobile } = useSidebar();
   const pathname = usePathname();
 
@@ -69,13 +72,9 @@ export function V2Drawer() {
         </SheetHeader>
 
         {/* Fixed header: wordmark + search + close. */}
-        <div className="v2-safe-top flex h-14 shrink-0 items-center gap-2 border-b border-border px-3">
-          <span className="font-comfortaa text-lg font-semibold tracking-tight text-foreground">
-            Lawexa
-          </span>
-          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-primary">
-            v2
-          </span>
+        <div className="v2-safe-top flex h-14 shrink-0 items-center gap-1.5 border-b border-border px-3">
+          <LogoWordmark className="h-7 w-auto" />
+          <LogoV2Badge />
           <span className="flex-1" />
           <Button
             variant="ghost"
@@ -160,25 +159,16 @@ export function V2Drawer() {
           </div>
         </div>
 
-        {/* Pinned footer: gold New chat pill + avatar (+ preview exit). */}
-        <div className="v2-safe-bottom shrink-0 border-t border-border p-3">
-          <div className="mb-2">
-            <SwitchBackButton />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button asChild className="h-11 flex-1 justify-start gap-2 rounded-full">
-              <Link href={v2NewChat.href} onClick={close}>
-                {NewChatIcon ? <NewChatIcon className="size-4" /> : null}
-                <span>{v2NewChat.label}</span>
-              </Link>
-            </Button>
-            <span
-              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-              aria-hidden="true"
-            >
-              AO
-            </span>
-          </div>
+        {/* Pinned footer: gold New chat pill + real account row + preview exit. */}
+        <div className="v2-safe-bottom flex shrink-0 flex-col gap-2 border-t border-border p-3">
+          <Button asChild className="h-11 w-full justify-start gap-2 rounded-full">
+            <Link href={v2NewChat.href} onClick={close}>
+              {NewChatIcon ? <NewChatIcon className="size-4" /> : null}
+              <span>{v2NewChat.label}</span>
+            </Link>
+          </Button>
+          <V2UserFooter user={user} />
+          <SwitchBackButton />
         </div>
       </SheetContent>
     </Sheet>

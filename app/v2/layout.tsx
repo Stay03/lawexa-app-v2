@@ -8,6 +8,7 @@ import { V2Drawer } from '@/v2/shell/V2Drawer';
 import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
+import { verifySession } from '@/v2/runtime/session';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
 
@@ -80,7 +81,7 @@ export const viewport: Viewport = {
  * screen. The provider wrapper is pinned to the dynamic viewport so the shell's
  * own `100dvh` grid owns all scrolling and the document never scrolls.
  */
-export default function V2Layout({
+export default async function V2Layout({
   children,
 }: {
   children: React.ReactNode;
@@ -91,6 +92,12 @@ export default function V2Layout({
   if (process.env.V2_ENABLED !== 'true') {
     notFound();
   }
+
+  // Server-verified identity for the shell chrome (footer avatar/name/plan gate,
+  // notification bell visibility). React-cached, so this shares the one
+  // `/auth/me` round trip with the page's own `verifySession()` call.
+  const session = await verifySession();
+  const user = session?.user ?? null;
 
   return (
     <div className="bg-background text-foreground">
@@ -106,13 +113,13 @@ export default function V2Layout({
       <DocumentLock />
       <V2QueryProvider>
         <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
-          <V2Sidebar />
+          <V2Sidebar user={user} />
           <SidebarInset className="min-h-0 overflow-hidden">
             {/* Non-scrolling shell: header / scrollable content / dock (empty
                 this wave). Mechanics only — see AppShell. */}
-            <AppShell header={<V2Header />}>{children}</AppShell>
+            <AppShell header={<V2Header user={user} />}>{children}</AppShell>
           </SidebarInset>
-          <V2Drawer />
+          <V2Drawer user={user} />
         </SidebarProvider>
       </V2QueryProvider>
     </div>

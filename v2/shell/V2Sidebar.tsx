@@ -28,6 +28,9 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { SwitchBackButton } from '@/app/v2/switch-back-button';
+import type { SessionUser } from '@/v2/runtime/session';
+import { LogoV2Badge, LogoWordmark } from './Logo';
+import { V2UserFooter } from './V2UserFooter';
 import { v2NavItems, v2NewChat, v2Recents } from './nav.config';
 
 /**
@@ -43,7 +46,7 @@ import { v2NavItems, v2NewChat, v2Recents } from './nav.config';
  * still ships in the server HTML (CSS `hidden md:block` keeps it off small
  * screens with no flash), then unmounts post-hydration on real mobile.
  */
-export function V2Sidebar() {
+export function V2Sidebar({ user }: { user: SessionUser | null }) {
   const isMobile = useIsMobile();
   const pathname = usePathname();
 
@@ -58,12 +61,8 @@ export function V2Sidebar() {
     <Sidebar collapsible="offExamples">
       <SidebarHeader className="gap-3">
         <div className="flex items-center gap-1.5 px-1 pt-1">
-          <span className="font-comfortaa text-lg font-semibold tracking-tight text-foreground">
-            Lawexa
-          </span>
-          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-primary">
-            v2
-          </span>
+          <LogoWordmark className="h-7 w-auto" />
+          <LogoV2Badge />
         </div>
         <Button
           asChild
@@ -169,21 +168,8 @@ export function V2Sidebar() {
       </SidebarContent>
 
       <SidebarFooter className="gap-2">
-        <div className="flex items-center gap-2 rounded-lg px-1 py-1">
-          <span
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary"
-            aria-hidden="true"
-          >
-            AO
-          </span>
-          <div className="grid min-w-0 flex-1 text-left leading-tight">
-            <span className="truncate text-sm font-medium">Adaeze Okafor</span>
-            <span className="truncate text-xs text-muted-foreground">
-              Premium
-            </span>
-          </div>
-        </div>
-        {/* Always-available exit from the preview (deliverable #7). */}
+        <V2UserFooter user={user} />
+        {/* Always-available exit from the preview. */}
         <SwitchBackButton />
       </SidebarFooter>
 

@@ -30,6 +30,8 @@ export interface SessionUser {
   name: string;
   email: string | null;
   role: UserRole;
+  /** Public avatar URL (safe to render); `null` when unset. */
+  avatar_url: string | null;
 }
 
 export interface SessionDTO {
@@ -62,6 +64,7 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
         name: user.name,
         email: user.email,
         role: user.role,
+        avatar_url: user.avatar_url ?? null,
       },
     };
   } catch {

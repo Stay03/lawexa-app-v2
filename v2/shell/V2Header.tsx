@@ -5,22 +5,36 @@ import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
+import type { SessionUser } from '@/v2/runtime/session';
+import { LogoMark, LogoWordmark, LogoV2Badge } from './Logo';
+import { V2NotificationBell } from './V2NotificationBell';
+import { V2ThemeToggle } from './V2ThemeToggle';
+import { DesignSwitch } from './DesignSwitch';
 
 /**
- * V2Header — the top bar, deliberately minimal (the audit flagged v1's header as
- * overloaded, so this ships only what the shell needs and leaves a right-side
- * actions slot for later phases).
+ * V2Header — the top bar, deliberately UNCROWDED (a binding owner decision):
+ * a left nav/brand cluster, a breadcrumb slot, and a right cluster of exactly
+ * three chrome controls — nothing else lands here.
  *
- *  - Mobile (`md:hidden`): a hamburger that opens `V2Drawer`, plus the wordmark.
- *  - Desktop (`hidden md:*`): `SidebarTrigger` (slides the rail off-canvas) and a
- *    breadcrumb slot placeholder.
+ *  - Mobile (`md:hidden`): the hamburger (keeps `id="v2-nav-trigger"`, the
+ *    focus-restore target for V2Drawer's `onCloseAutoFocus` — DO NOT CHANGE) plus
+ *    the compact square LogoMark (the wordmark would crowd a 360px bar next to
+ *    the right cluster; the full wordmark still lives in the drawer + sidebar).
+ *  - Desktop (`hidden md:*`): `SidebarTrigger` (slides the rail off-canvas), the
+ *    wordmark ONLY while the rail is collapsed (the expanded rail already shows
+ *    it — this keeps the brand visible in every chrome state without ever
+ *    duplicating it), a separator, and the "Home" breadcrumb slot.
+ *  - Right cluster (both): notification bell (hidden for guests) + theme toggle +
+ *    the dev design switch. All shrink-0 so they never wrap; the breadcrumb
+ *    spacer absorbs the slack, keeping the row clean down to 320px.
  *
- * Visibility is CSS-driven (Tailwind `md:` variants), not `useIsMobile()`, so the
- * correct bar paints before hydration with no flash. Lives inside the shell's
- * `<header>` (which already applies `v2-safe-top`), so it only draws the bar.
+ * Visibility is CSS-driven (`md:` variants), not `useIsMobile()`, so the correct
+ * bar paints before hydration with no flash.
  */
-export function V2Header() {
-  const { setOpenMobile } = useSidebar();
+export function V2Header({ user }: { user: SessionUser | null }) {
+  const { setOpenMobile, state } = useSidebar();
+  const signedIn = !!user;
+  const railCollapsed = state === 'collapsed';
 
   return (
     <div className="flex h-14 items-center gap-2 border-b border-border px-3">
@@ -36,26 +50,32 @@ export function V2Header() {
       >
         <Menu className="size-5" />
       </Button>
-      <span className="flex items-center gap-1.5 md:hidden">
-        <span className="font-comfortaa text-base font-semibold tracking-tight text-foreground">
-          Lawexa
-        </span>
+      <span className="flex shrink-0 items-center gap-1.5 md:hidden">
+        <LogoMark className="size-7" />
+        <LogoV2Badge />
       </span>
 
-      {/* Desktop: sidebar trigger + breadcrumb slot placeholder. */}
+      {/* Desktop: sidebar trigger + breadcrumb slot. The wordmark appears only
+          while the rail is collapsed, so the brand never leaves the chrome and
+          is never shown twice (reviewer finding). */}
       <SidebarTrigger className="-ml-1 hidden md:inline-flex" />
-      <Separator
-        orientation="vertical"
-        className="mr-1 hidden h-4 md:block"
-      />
-      <span className="hidden text-sm text-muted-foreground md:inline">
-        Home
-      </span>
+      {railCollapsed ? (
+        <span className="hidden shrink-0 items-center gap-1.5 md:flex">
+          <LogoWordmark className="h-6" />
+          <LogoV2Badge />
+        </span>
+      ) : null}
+      <Separator orientation="vertical" className="mr-1 hidden h-4 md:block" />
+      <span className="hidden text-sm text-muted-foreground md:inline">Home</span>
 
       <span className="flex-1" />
 
-      {/* Right-side actions slot — intentionally empty this wave (kept
-          uncrowded per the audit). Feature actions land in later phases. */}
+      {/* Right cluster — bell + theme + design switch. Uncrowded by decree. */}
+      <div className="flex shrink-0 items-center gap-1">
+        <V2NotificationBell signedIn={signedIn} />
+        <V2ThemeToggle />
+        <DesignSwitch />
+      </div>
     </div>
   );
 }
