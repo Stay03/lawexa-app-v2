@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import type { SessionUser } from '@/v2/runtime/session';
-import { LogoMark, LogoWordmark, LogoV2Badge } from './Logo';
+import { LogoMark, LogoWordmark } from './Logo';
 import { V2NotificationBell } from './V2NotificationBell';
 import { V2ThemeToggle } from './V2ThemeToggle';
 import { DesignSwitch } from './DesignSwitch';
@@ -37,7 +37,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   const railCollapsed = state === 'collapsed';
 
   return (
-    <div className="flex h-14 items-center gap-2 border-b border-border px-3">
+    <div className="flex h-14 items-center gap-2 px-3">
       {/* Mobile: hamburger opens the drawer. The id is the focus-restore target
           for V2Drawer's onCloseAutoFocus (no SheetTrigger exists). */}
       <Button
@@ -50,9 +50,8 @@ export function V2Header({ user }: { user: SessionUser | null }) {
       >
         <Menu className="size-5" />
       </Button>
-      <span className="flex shrink-0 items-center gap-1.5 md:hidden">
-        <LogoMark className="size-7" />
-        <LogoV2Badge />
+      <span className="flex shrink-0 items-center md:hidden">
+        <LogoMark className="size-8" />
       </span>
 
       {/* Desktop: sidebar trigger + breadcrumb slot. The wordmark appears only
@@ -60,9 +59,8 @@ export function V2Header({ user }: { user: SessionUser | null }) {
           is never shown twice (reviewer finding). */}
       <SidebarTrigger className="-ml-1 hidden md:inline-flex" />
       {railCollapsed ? (
-        <span className="hidden shrink-0 items-center gap-1.5 md:flex">
-          <LogoWordmark className="h-6" />
-          <LogoV2Badge />
+        <span className="hidden shrink-0 items-center md:flex">
+          <LogoWordmark className="h-8" />
         </span>
       ) : null}
       <Separator orientation="vertical" className="mr-1 hidden h-4 md:block" />

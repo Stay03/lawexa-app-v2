@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowUp,
   ArrowUpRight,
   BookText,
   ChevronRight,
@@ -14,36 +14,27 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import {
-  PromptInput,
-  PromptInputAction,
-  PromptInputActions,
-  PromptInputTextarea,
-} from '@/components/ui/prompt-input';
+import { stripPastedTags } from '@/lib/utils';
+import { getSmartGreetingParts } from '@/lib/constants/greetings';
+import { PulsingHeart } from '@/components/ui/pulsing-heart';
 import { useMounted } from '@/v2/shell/use-mounted';
-import { v2Recents } from '@/v2/shell/nav.config';
+import { conversationsQueries } from '@/v2/features/conversations/queries';
+import { HomeComposer } from './HomeComposer';
 
 /**
  * HomeDesignB — "Research Launchpad" (the power-user candidate). The gold-shimmer
  * composer stays the primary action, but it anchors an organized command center:
  * a designed quick-start tile grid (Cases / Statutes / Notes / Quiz) and a peek at
- * recent conversations. Each breakpoint is its own composition. On MOBILE the
+ * REAL recent conversations. Each breakpoint is its own composition. On MOBILE the
  * composer docks at the thumb via `position: sticky` (NOT fixed — shell-contract
- * compliant) so it is visible and reachable from first paint while the launchpad
- * scrolls behind a frosted dock. On DESKTOP it becomes a left-aligned workspace:
- * the composer sits high under the greeting, with the tiles + recents laid out
- * side by side below. The whole surface assembles with one signature — a staggered
- * fade-and-rise entrance (CSS-only, honouring `motion-reduce`). Carries
- * `data-design="b"` and the server-renderable `data-v2-marker="V2-HOME"` marker.
+ * compliant) and floats ALONE — a rounded, shadowed card with the launchpad
+ * scrolling visibly behind it (a soft bottom fade, no solid band). On DESKTOP it
+ * becomes a left-aligned workspace: the composer sits high under the greeting,
+ * with the tiles + recents laid out side by side below. The whole surface
+ * assembles with one signature — a staggered fade-and-rise entrance (CSS-only,
+ * honouring `motion-reduce`). Carries `data-design="b"` and the server-renderable
+ * `data-v2-marker="V2-HOME"` marker.
  */
-
-/** Real time-of-day greeting — resolved client-side from the mount-time hour. */
-function timeGreeting(hour: number): string {
-  if (hour >= 5 && hour < 12) return 'Good morning';
-  if (hour >= 12 && hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
 
 interface QuickStart {
   label: string;
@@ -68,9 +59,6 @@ const SUGGESTED_PROMPTS = [
   'Quiz me on the Evidence Act 2011',
 ] as const;
 
-/** A compact peek at recent conversations (sample data; wiring lands in phase 3). */
-const RECENTS_PEEK = v2Recents.slice(0, 5);
-
 /** Shared focus ring — unified across every interactive element. */
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
@@ -84,17 +72,52 @@ const FOCUS_RING =
 const REVEAL =
   'animate-in fade-in slide-in-from-bottom-2 fill-mode-both ease-out motion-reduce:animate-none';
 
-export function HomeDesignB({ name }: { name?: string }) {
-  const mounted = useMounted();
-  const [hour] = useState(() => new Date().getHours()); // lazy initializer — lint-sanctioned
+/**
+ * Compact relative time for a recents row. Pure — `now` is threaded in from a
+ * lazy `useState` initializer so no `Date.now()`/`new Date()` runs in render, and
+ * the timestamp is parsed with the deterministic `Date.parse`.
+ */
+function formatRelativeTime(iso: string, now: number): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return '';
+  const minutes = Math.max(0, Math.round((now - then) / 60000));
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d`;
+  const weeks = Math.round(days / 7);
+  if (weeks < 5) return `${weeks}w`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months}mo`;
+  return `${Math.round(days / 365)}y`;
+}
+
+export function HomeDesignB({
+  name,
+  signedIn = false,
+}: {
+  name?: string;
+  signedIn?: boolean;
+}) {
   const [input, setInput] = useState('');
 
-  // Neutral fallback until mount resolves the real local hour; keeps the hero
-  // stable (line-count reflow is still possible at hero sizes on narrow screens).
-  const greeting = mounted ? timeGreeting(hour) : 'Welcome back';
+  // v1's smart greeting, resolved once via a lazy initializer (engine internals
+  // use Math.random/Date). `useMounted` shows the neutral 'Welcome' fallback on
+  // the server + first client render, then the real greeting once mounted.
+  const mounted = useMounted();
+  const [parts] = useState(() => getSmartGreetingParts(name));
+  const [now] = useState(() => Date.now());
+  const greeting = mounted ? parts.greeting : 'Welcome';
+  const greetingName = mounted ? parts.name : '';
+  const isSpecial = mounted ? parts.isSpecial : null;
 
-  // Inert this wave — conversation wiring lands in a later phase.
-  const handleSubmit = () => {};
+  const recentsQuery = useQuery({
+    ...conversationsQueries.recents(),
+    enabled: signedIn,
+  });
+  const recents = (recentsQuery.data?.data ?? []).slice(0, 6);
 
   return (
     <div
@@ -102,18 +125,25 @@ export function HomeDesignB({ name }: { name?: string }) {
       data-design="b"
       className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-8 sm:px-6 md:py-12"
     >
-      {/* Greeting — always first, both breakpoints. */}
+      {/* Greeting — always first, both breakpoints. Capped at v1's ~36px scale. */}
       <header
         className={`${REVEAL} order-1 duration-500`}
         style={{ animationDelay: '0ms' }}
       >
-        <h1 className="font-comfortaa text-[30px] font-semibold leading-tight text-foreground md:text-[44px]">
-          {greeting}
-          {name ? (
+        <h1 className="font-comfortaa text-[26px] font-semibold leading-tight text-foreground md:text-[32px]">
+          {isSpecial === '__PULSING_HEART__' ? (
+            <PulsingHeart />
+          ) : (
             <>
-              , <span className="text-primary">{name}</span>
+              {greeting}
+              {greetingName ? (
+                <>
+                  {', '}
+                  <span className="text-primary">{greetingName}</span>
+                </>
+              ) : null}
             </>
-          ) : null}
+          )}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground md:text-base">
           Start something new, or pick up a thread.
@@ -126,8 +156,8 @@ export function HomeDesignB({ name }: { name?: string }) {
         aria-label="Launchpad"
         className="order-2 mt-8 md:order-4 md:mt-10 lg:grid lg:grid-cols-3 lg:gap-6"
       >
-        {/* Quick start */}
-        <div className="lg:col-span-2">
+        {/* Quick start — fills the row for guests (no recents column). */}
+        <div className={signedIn ? 'lg:col-span-2' : 'lg:col-span-3'}>
           <h2
             className={`${REVEAL} mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground duration-500`}
             style={{ animationDelay: '180ms' }}
@@ -168,43 +198,77 @@ export function HomeDesignB({ name }: { name?: string }) {
           </div>
         </div>
 
-        {/* Recents peek — a read-only preview; "All" opens the full list. Rows are
-            intentionally non-interactive this wave (real wiring lands in phase 3),
-            so they read as content, not as buttons that do nothing on tap. */}
-        <section
-          aria-label="Recent conversations"
-          className={`${REVEAL} mt-8 rounded-xl border border-border bg-card p-2 duration-500 sm:p-3 lg:col-span-1 lg:mt-0`}
-          style={{ animationDelay: '300ms' }}
-        >
-          <div className="mb-1 flex items-center justify-between px-2 pt-1">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Recent
-            </h2>
-            <Link
-              href="/conversations"
-              className={`${FOCUS_RING} inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground`}
-            >
-              All
-              <ChevronRight aria-hidden className="size-3.5" />
-            </Link>
-          </div>
-          <ul className="flex flex-col">
-            {RECENTS_PEEK.map((recent) => (
-              <li
-                key={recent.id}
-                className="flex items-center gap-3 rounded-lg px-2 py-2.5"
+        {/* Recents peek — REAL conversations (read-only). Hidden for guests. Rows
+            are links to `/c/{id}` (proxied to the v1 conversation page for now).
+            Loading skeletons + an empty state keep every state considered. */}
+        {signedIn ? (
+          <section
+            aria-label="Recent conversations"
+            className={`${REVEAL} mt-8 rounded-xl border border-border bg-card p-2 duration-500 sm:p-3 lg:col-span-1 lg:mt-0`}
+            style={{ animationDelay: '300ms' }}
+          >
+            <div className="mb-1 flex items-center justify-between px-2 pt-1">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Recent
+              </h2>
+              <Link
+                href="/conversations"
+                className={`${FOCUS_RING} inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground`}
               >
-                <MessageSquare
-                  aria-hidden
-                  className="size-4 shrink-0 text-muted-foreground/60"
-                />
-                <span className="min-w-0 flex-1 truncate text-sm text-foreground/90">
-                  {recent.title}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+                All
+                <ChevronRight aria-hidden className="size-3.5" />
+              </Link>
+            </div>
+
+            {recentsQuery.isPending ? (
+              <ul className="flex flex-col">
+                {[0.9, 0.65, 0.45, 0.3].map((opacity, index) => (
+                  <li
+                    key={index}
+                    className="flex items-center gap-3 px-2 py-2.5"
+                    style={{ opacity }}
+                  >
+                    <div className="size-4 shrink-0 animate-pulse rounded bg-muted" />
+                    <div className="h-3.5 flex-1 animate-pulse rounded bg-muted" />
+                  </li>
+                ))}
+              </ul>
+            ) : recentsQuery.isError ? (
+              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                Couldn&apos;t load conversations
+              </p>
+            ) : recents.length === 0 ? (
+              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                No conversations yet
+              </p>
+            ) : (
+              <ul className="flex flex-col">
+                {recents.map((conversation) => {
+                  const title = stripPastedTags(conversation.title);
+                  return (
+                    <li key={conversation.id}>
+                      <Link
+                        href={`/c/${conversation.id}`}
+                        className={`${FOCUS_RING} flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60`}
+                      >
+                        <MessageSquare
+                          aria-hidden
+                          className="size-4 shrink-0 text-muted-foreground/60"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground/90">
+                          {title}
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">
+                          {formatRelativeTime(conversation.updated_at, now)}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        ) : null}
       </section>
 
       {/* Suggested prompts — in the scrollable flow above the composer. On mobile
@@ -227,32 +291,27 @@ export function HomeDesignB({ name }: { name?: string }) {
       </div>
 
       {/* Composer dock — the primary action. MOBILE: `sticky bottom-0` pins it to
-          the thumb from first paint (frosted, full-bleed) while the launchpad
-          scrolls behind. DESKTOP: static, high under the greeting. The entrance
+          the thumb from first paint; the card floats ALONE (rounded + shadowed)
+          with a soft bottom fade dissolving the scrolling launchpad behind it —
+          no solid band. DESKTOP: static, high under the greeting. The entrance
           transform lives on the inner wrapper so it never touches the sticky
           element itself. */}
-      <div className="order-4 sticky bottom-0 z-10 -mx-4 border-t border-border/60 bg-background/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-6 sm:px-6 md:static md:order-2 md:z-auto md:mx-0 md:mt-6 md:max-w-2xl md:border-t-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0 md:backdrop-blur-none">
+      <div className="order-4 sticky bottom-0 z-10 -mx-4 px-4 pb-3 pt-6 sm:-mx-6 sm:px-6 md:static md:order-2 md:z-auto md:mx-0 md:mt-6 md:max-w-2xl md:px-0 md:pt-0 md:pb-0">
+        {/* Mobile-only bottom fade: scrolling content dissolves into the page
+            before it reaches the card (transparent up top, page bg by the card).
+            Decorative; desktop drops it (the composer is static there). */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent md:hidden"
+        />
         <div className={`${REVEAL} duration-500`} style={{ animationDelay: '90ms' }}>
-          <PromptInput value={input} onValueChange={setInput} onSubmit={handleSubmit}>
-            <PromptInputTextarea
-              placeholder="Ask anything about Nigerian law"
-              className="text-foreground"
-            />
-            <PromptInputActions className="flex items-center justify-end gap-2 px-3 pb-3">
-              <PromptInputAction tooltip="Send message">
-                <Button
-                  type="button"
-                  size="icon"
-                  className="size-11 rounded-full bg-primary hover:bg-primary/90 md:size-8"
-                  onClick={handleSubmit}
-                  disabled={!input.trim()}
-                  aria-label="Send message"
-                >
-                  <ArrowUp className="size-5" />
-                </Button>
-              </PromptInputAction>
-            </PromptInputActions>
-          </PromptInput>
+          <HomeComposer
+            value={input}
+            onValueChange={setInput}
+            signedIn={signedIn}
+            className="shadow-lg"
+            sendButtonClassName="md:size-9"
+          />
         </div>
       </div>
     </div>

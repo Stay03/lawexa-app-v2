@@ -39,6 +39,30 @@ Nothing from this redesign is built yet.
    the real user — from `verifySession()` (already called in `app/v2/page.tsx`) threaded to the
    shell, or `authStore` client-side (the sanctioned bridge). Real initials avatar + name + plan.
 
+### A2. Owner's live-review decisions (July 18, 2026 — after judging waves 1-2 at /v2; binding)
+
+8. **Logo bigger** — match v1's 140×32 wordmark scale (or slightly larger); **NO "v2" pill** anywhere.
+9. **New chat = a standard nav row** (sidebar + drawer), same shape/hover as every other row; the
+   ONLY difference is the label + icon in the theme gold. (REVERSES §B's earlier "keep the gold
+   button" note; the drawer-footer gold pill dies too.)
+10. **No horizontal chrome lines** — remove the header's bottom border and the sidebar edge border;
+    seamless surfaces like v1.
+11. **Greeting = v1's real smart engine** (`lib/constants/greetings/` — an ALLOWED v2 import):
+    randomized holiday/day/time greetings, different per refresh, 'Welcome' fallback pre-mount.
+    Desktop hero ≤ v1's ~36px. DROP the "What are we researching?" subline.
+12. **Composer furniture is visible NOW, not deferred to the chat wave**: single-line initial
+    height (auto-grow), jurisdiction badge, plus-menu with attach + redacted + confidential
+    (privacy CONSOLIDATED in the plus-menu per §C), workflow selector (Lite/Expert). v2-native
+    rebuilds (v1 components stay boundary-blocked); controls behave locally (menus open, toggles
+    flip visual state), real behavior lands with the chat wiring.
+13. **Recents/conversations = real data now** (read-only): a v2 conversations query factory feeds
+    the sidebar Recents, drawer Recents, and Design B's recents; rows navigate to `/c/{id}`
+    (falls through to v1 until the v2 conversation screen ships).
+14. **Design B's mobile dock**: the composer card floats ALONE (rounded, shadowed, page visibly
+    scrolling behind it) — no full-width solid band.
+15. **Logos must load instantly** (eager/preloaded; skip on-demand optimization for the tiny brand
+    PNGs) — the drawer's first-open logo delay is a bug.
+
 ---
 
 ## B. Shell + home — keep / drop / fix (first-hand study)

@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronRight } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronRight, MessageSquare } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { cn, stripPastedTags } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Button } from '@/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
@@ -28,10 +28,11 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { SwitchBackButton } from '@/app/v2/switch-back-button';
+import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
-import { LogoV2Badge, LogoWordmark } from './Logo';
+import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
-import { v2NavItems, v2NewChat, v2Recents } from './nav.config';
+import { v2NavItems, v2NewChat } from './nav.config';
 
 /**
  * V2Sidebar — the desktop navigation rail, built on the shadcn sidebar
@@ -45,10 +46,21 @@ import { v2NavItems, v2NewChat, v2Recents } from './nav.config';
  * double up. `useIsMobile()` is `false` during SSR and first paint, so the rail
  * still ships in the server HTML (CSS `hidden md:block` keeps it off small
  * screens with no flash), then unmounts post-hydration on real mobile.
+ *
+ * SEAMLESS CHROME (owner): the rail's edge border is removed by overriding the
+ * primitive's `group-data-[side=left]:border-r` from here (the variant prefix is
+ * required to beat the primitive's specificity) — components/ui/sidebar.tsx is
+ * v1-shared and must stay byte-identical.
  */
 export function V2Sidebar({ user }: { user: SessionUser | null }) {
   const isMobile = useIsMobile();
   const pathname = usePathname();
+  const signedIn = !!user;
+
+  const recentsQuery = useQuery({
+    ...conversationsQueries.recents(),
+    enabled: signedIn,
+  });
 
   if (isMobile) return null;
 
@@ -56,28 +68,37 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
     pathname === href || pathname.startsWith(`${href}/`);
 
   const NewChatIcon = v2NewChat.icon;
+  const recents = recentsQuery.data?.data ?? [];
 
   return (
-    <Sidebar collapsible="offExamples">
+    <Sidebar
+      collapsible="offExamples"
+      className="group-data-[side=left]:border-r-0"
+    >
       <SidebarHeader className="gap-3">
-        <div className="flex items-center gap-1.5 px-1 pt-1">
-          <LogoWordmark className="h-7 w-auto" />
-          <LogoV2Badge />
+        <div className="flex items-center px-1 pt-1">
+          <LogoWordmark className="h-8 w-auto" />
         </div>
-        <Button
-          asChild
-          className="h-10 w-full justify-start gap-2 rounded-full"
-        >
-          <Link href={v2NewChat.href}>
-            {NewChatIcon ? <NewChatIcon className="size-4" /> : null}
-            <span>{v2NewChat.label}</span>
-          </Link>
-        </Button>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
+            {/* New chat — a standard nav row (owner): identical shape/hover to
+                every other row; only the label + icon carry the theme gold. */}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                tooltip={v2NewChat.label}
+                className="text-primary hover:text-primary [&_svg]:text-primary"
+              >
+                <Link href={v2NewChat.href}>
+                  {NewChatIcon ? <NewChatIcon /> : null}
+                  <span className="font-medium">{v2NewChat.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
             {v2NavItems.map((item) => {
               const Icon = item.icon;
 
@@ -149,22 +170,59 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Recent</SidebarGroupLabel>
-          <SidebarMenu>
-            {v2Recents.map((recent) => (
-              <SidebarMenuItem key={recent.id}>
-                {/* Sample data this wave — non-navigating until phase-3 wiring. */}
-                <SidebarMenuButton
-                  type="button"
-                  className="text-muted-foreground"
-                >
-                  <span className="truncate">{recent.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
+        {/* Recent — real conversations (read-only). Hidden entirely for guests. */}
+        {signedIn ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Recent</SidebarGroupLabel>
+            <SidebarMenu>
+              {recentsQuery.isPending ? (
+                [0.9, 0.7, 0.5, 0.35, 0.2].map((opacity, index) => (
+                  <SidebarMenuItem key={index}>
+                    <div
+                      className="flex items-center gap-2 px-2 py-1.5"
+                      style={{ opacity }}
+                    >
+                      <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-muted" />
+                      <div className="h-3.5 flex-1 animate-pulse rounded bg-muted" />
+                    </div>
+                  </SidebarMenuItem>
+                ))
+              ) : recentsQuery.isError ? (
+                <div className="px-3 py-2 text-xs text-muted-foreground">
+                  Couldn&apos;t load conversations
+                </div>
+              ) : recents.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-muted-foreground">
+                  No conversations yet
+                </div>
+              ) : (
+                recents.map((conversation) => {
+                  const title = stripPastedTags(conversation.title);
+                  const active = isActive(`/c/${conversation.id}`);
+                  return (
+                    <SidebarMenuItem key={conversation.id}>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={title}
+                        isActive={active}
+                        className={cn(
+                          'text-muted-foreground',
+                          active &&
+                            'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary',
+                        )}
+                      >
+                        <Link href={`/c/${conversation.id}`}>
+                          <MessageSquare />
+                          <span className="truncate">{title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })
+              )}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : null}
       </SidebarContent>
 
       <SidebarFooter className="gap-2">

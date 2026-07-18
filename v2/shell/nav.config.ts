@@ -70,31 +70,3 @@ export const v2NavItems: V2NavItem[] = [
   { label: 'Spaces', href: '/spaces', icon: Boxes },
   { label: 'Quiz', href: '/quiz', icon: GraduationCap },
 ];
-
-/** A sample "recent conversation" row. */
-export interface V2Recent {
-  id: string;
-  title: string;
-}
-
-/**
- * Static sample Recents for the design wave — the 14 Nigerian legal titles from
- * the round-2 mockups. These are sample data (no real conversations exist yet),
- * so the rows are non-navigating; the live Recents list is wired in phase 3.
- */
-export const v2Recents: V2Recent[] = [
-  { id: 'madukolu-jurisdiction', title: 'Madukolu — the jurisdiction test' },
-  { id: 'tenant-eviction-lagos', title: 'Tenant eviction — Lagos' },
-  { id: 'evidence-act-s84', title: 'Evidence Act s.84 — electronic evidence' },
-  { id: 'land-use-act-kano', title: 'Land Use Act consent — Kano' },
-  { id: 'fundamental-rights-frep', title: 'Fundamental rights — FREP rules' },
-  { id: 'garnishee-proceedings', title: 'Garnishee proceedings — step by step' },
-  { id: 'election-petition-timelines', title: 'Election petition timelines' },
-  { id: 'company-reregistration-cama', title: 'Company re-registration — CAMA 2020' },
-  { id: 'hearsay-exceptions-s39', title: 'Hearsay exceptions — s.39' },
-  { id: 'chieftaincy-disputes', title: 'Chieftaincy disputes — jurisdiction' },
-  { id: 'perfection-of-title-lagos', title: 'Perfection of title — Lagos' },
-  { id: 'ndpr-vs-ndpa', title: 'NDPR vs NDPA scope' },
-  { id: 'contempt-in-facie-curiae', title: 'Contempt in facie curiae' },
-  { id: 'arbitration-clause-drafting', title: 'Arbitration clause drafting' },
-];

@@ -1,17 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowUp, GraduationCap, Landmark, NotebookPen, Scale } from 'lucide-react';
+import { GraduationCap, Landmark, NotebookPen, Scale } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import {
-  PromptInput,
-  PromptInputAction,
-  PromptInputActions,
-  PromptInputTextarea,
-} from '@/components/ui/prompt-input';
 import { cn } from '@/lib/utils';
+import { getSmartGreetingParts } from '@/lib/constants/greetings';
+import { PulsingHeart } from '@/components/ui/pulsing-heart';
 import { useMounted } from '@/v2/shell/use-mounted';
+import { HomeComposer } from './HomeComposer';
 
 /**
  * Suggested research prompts. Clicking one populates the composer (local state)
@@ -39,24 +35,9 @@ const QUICK_ACTIONS = [
 ] as const;
 
 /**
- * Real time-of-day greeting. Pure — the hour is threaded in from a lazy,
- * lint-sanctioned `useState` initializer so `new Date()` never runs in render.
- * Every branch returns a two-word string (as does the pre-mount fallback), which
- * minimizes — but does not fully prevent — hydration reflow: at the hero sizes,
- * with `text-balance`, a very narrow screen can reflow by one line for a single
- * frame on mount. That one-frame swap is accepted (dev-tool-grade flash); no
- * fixed height is reserved, so the hero keeps its full breathing room.
- */
-function timeGreeting(hour: number): string {
-  if (hour >= 5 && hour < 12) return 'Good morning';
-  if (hour >= 12 && hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-/**
  * HomeDesignA — "Warm Spotlight". The shimmer composer is the lit centerpiece:
  * a soft radial gold wash (built only from the --primary token at low opacity)
- * pools behind it, a large Comfortaa time-of-day greeting sits above, and
+ * pools behind it, a Comfortaa greeting sits above (capped at v1's ~36px), and
  * everything else — ghost prompt chips, a quiet quick-jump row — recedes into
  * generous negative space.
  *
@@ -65,24 +46,35 @@ function timeGreeting(hour: number): string {
  * `mt-auto`, landing the input in the thumb zone. Desktop recomposes the same
  * DOM into a vertically-centered hero.
  *
+ * The greeting is v1's REAL smart engine (`getSmartGreetingParts`): a randomized
+ * holiday/day/time greeting that differs per refresh, with probabilistic name
+ * inclusion and the '__PULSING_HEART__' special. It renders v1's 'Welcome'
+ * fallback pre-mount (server + first client render), then the real greeting once
+ * mounted — the lint-sanctioned `useMounted` + lazy `useState(initializer)` pair,
+ * so the engine's `Math.random`/`Date` never run in the render body.
+ *
  * Carries `data-design="a"` for the switch and the server-renderable
- * `data-v2-marker="V2-HOME"` the curl verification matrix greps for. Complete
- * and beautiful without `name` (guests), which is threaded in when present.
+ * `data-v2-marker="V2-HOME"` the curl verification matrix greps for. Complete and
+ * beautiful without `name` (guests), which is threaded in when present.
  */
-export function HomeDesignA({ name }: { name?: string }) {
+export function HomeDesignA({
+  name,
+  signedIn = false,
+}: {
+  name?: string;
+  signedIn?: boolean;
+}) {
   const [input, setInput] = useState('');
 
-  // Hydration-safe greeting: `useMounted` is false on the server and the first
-  // client render (neutral fallback), true once mounted. The hour is read once
-  // via a lazy initializer so the React Compiler lint never sees `new Date()` in
-  // the render body. The fallback is the same two-word shape, which minimizes
-  // (does not guarantee) a one-frame reflow on mount — see `timeGreeting`.
+  // v1's smart greeting, resolved once via a lazy initializer (engine internals
+  // use Math.random/Date, which must not run in render). `useMounted` holds the
+  // neutral 'Welcome' fallback on the server + first client render, then reveals
+  // the real greeting — no hydration mismatch.
   const mounted = useMounted();
-  const [hour] = useState(() => new Date().getHours());
-  const greeting = mounted ? timeGreeting(hour) : 'Welcome back';
-
-  // Inert this wave — real conversation wiring lands in a later phase.
-  const handleSubmit = () => {};
+  const [parts] = useState(() => getSmartGreetingParts(name));
+  const greeting = mounted ? parts.greeting : 'Welcome';
+  const greetingName = mounted ? parts.name : '';
+  const isSpecial = mounted ? parts.isSpecial : null;
 
   return (
     <div
@@ -113,22 +105,23 @@ export function HomeDesignA({ name }: { name?: string }) {
       {/* Greeting — the ONLY place gold text appears. It is large display type,
           where the token clears WCAG AA (3:1 large) in both themes; body-sized
           gold on light does not, so it lives nowhere else. Comfortaa for the
-          greeting; the supporting line stays system sans for typographic
-          contrast between rounded display and crisp utility text. */}
+          greeting; capped at v1's ~36px desktop scale. */}
       <header className="text-center">
-        <h1 className="font-comfortaa text-[2rem] font-semibold tracking-tight text-balance text-foreground sm:text-[2.5rem] md:text-[3.25rem]">
-          {greeting}
-          {name ? (
+        <h1 className="font-comfortaa text-[1.75rem] font-semibold tracking-tight text-balance text-foreground sm:text-[2rem] md:text-[2.25rem]">
+          {isSpecial === '__PULSING_HEART__' ? (
+            <PulsingHeart />
+          ) : (
             <>
-              {', '}
-              <span className="text-primary">{name}</span>
+              {greeting}
+              {greetingName ? (
+                <>
+                  {', '}
+                  <span className="text-primary">{greetingName}</span>
+                </>
+              ) : null}
             </>
-          ) : null}
-          .
+          )}
         </h1>
-        <p className="mt-3 text-base text-muted-foreground md:text-lg">
-          What are we researching?
-        </p>
       </header>
 
       {/* Quiet quick-jump nav — subordinate to the composer, muted until hovered.
@@ -173,36 +166,19 @@ export function HomeDesignA({ name }: { name?: string }) {
           ))}
         </div>
 
-        {/* The shimmer composer — my own composition of the shared PromptInput
-            primitives, so the ORIGINAL animated gold-shimmer border comes free
-            from the default variant. Enlarged and lifted off the glow with a soft
-            shadow; typed text is `text-foreground` (readable) rather than the
-            primitive's gold default. Submit is inert this wave. */}
-        <PromptInput
+        {/* The shared v2-native composer — the ORIGINAL animated gold-shimmer
+            border comes free from the default PromptInput variant. Enlarged and
+            lifted off the glow with a soft shadow; single-line initial height
+            (auto-grow), the full furniture (plus-menu, workflow, jurisdiction).
+            Submit is inert this wave. */}
+        <HomeComposer
           value={input}
           onValueChange={setInput}
-          onSubmit={handleSubmit}
+          signedIn={signedIn}
           className="p-2.5 shadow-lg"
-        >
-          <PromptInputTextarea
-            placeholder="Ask anything about Nigerian law"
-            className="min-h-[56px] text-base text-foreground placeholder:text-muted-foreground md:text-lg"
-          />
-          <PromptInputActions className="flex items-center justify-end px-2 pb-1">
-            <PromptInputAction tooltip="Send message">
-              <Button
-                type="button"
-                size="icon"
-                className="v2-interactive size-11 rounded-full bg-primary hover:bg-primary/90 md:size-10"
-                onClick={handleSubmit}
-                disabled={!input.trim()}
-                aria-label="Send message"
-              >
-                <ArrowUp className="size-5" />
-              </Button>
-            </PromptInputAction>
-          </PromptInputActions>
-        </PromptInput>
+          textareaClassName="text-base md:text-lg"
+          sendButtonClassName="md:size-10"
+        />
       </div>
     </div>
   );
