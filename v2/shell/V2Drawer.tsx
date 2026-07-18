@@ -1,12 +1,14 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { MessageSquare, Search, X } from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useInfiniteScrollSentinel } from './use-infinite-scroll';
 import {
   Sheet,
   SheetContent,
@@ -49,9 +51,19 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   const pathname = usePathname();
   const signedIn = !!user;
 
-  const recentsQuery = useQuery({
-    ...conversationsQueries.recents(),
+  // The single overflow-y-auto region below is the drawer's scroll root — the
+  // infinite sentinel measures its prefetch margin against THIS element.
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const recentsQuery = useInfiniteQuery({
+    ...conversationsQueries.infiniteRecents(),
     enabled: signedIn,
+  });
+  const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
+    hasNextPage: recentsQuery.hasNextPage,
+    isFetchingNextPage: recentsQuery.isFetchingNextPage,
+    fetchNextPage: recentsQuery.fetchNextPage,
+    rootRef: scrollRef,
   });
 
   const close = () => setOpenMobile(false);
@@ -59,7 +71,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
     pathname === href || pathname.startsWith(`${href}/`);
 
   const NewChatIcon = v2NewChat.icon;
-  const recents = recentsQuery.data?.data ?? [];
+  const recents = recentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
   return (
     <Sheet open={openMobile} onOpenChange={setOpenMobile}>
@@ -117,7 +129,10 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         </div>
 
         {/* ONE scroll region: New chat, nav rows, then Recents. */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2"
+        >
           <nav aria-label="Primary" className="flex flex-col gap-0.5">
             {/* New chat — a standard nav row (owner #9): identical shape/hover to
                 every other row; only the label + icon carry the theme gold. */}
@@ -224,6 +239,20 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                     );
                   })
                 )}
+
+                {/* Infinite sentinel (owner #26): present while more pages exist;
+                    scrolling it into the drawer's view loads the next page, with a
+                    skeleton row while that page is in flight (skeleton-first). */}
+                {recentsQuery.hasNextPage ? (
+                  <div ref={sentinelRef} aria-hidden className="px-3 py-1">
+                    {recentsQuery.isFetchingNextPage ? (
+                      <div className="flex h-9 items-center gap-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+                        <div className="size-4 shrink-0 animate-pulse rounded bg-muted" />
+                        <div className="h-3.5 flex-1 animate-pulse rounded bg-muted" />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </>
           ) : null}

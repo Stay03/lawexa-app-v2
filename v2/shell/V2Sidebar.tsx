@@ -1,12 +1,14 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { ChevronRight, MessageSquare } from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useInfiniteScrollSentinel } from './use-infinite-scroll';
 import {
   Collapsible,
   CollapsibleContent,
@@ -67,9 +69,19 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
   const pathname = usePathname();
   const signedIn = !!user;
 
-  const recentsQuery = useQuery({
-    ...conversationsQueries.recents(),
+  // The SidebarContent element is the rail's scroll region — the infinite
+  // sentinel measures its prefetch margin against THIS, not the viewport.
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const recentsQuery = useInfiniteQuery({
+    ...conversationsQueries.infiniteRecents(),
     enabled: signedIn,
+  });
+  const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
+    hasNextPage: recentsQuery.hasNextPage,
+    isFetchingNextPage: recentsQuery.isFetchingNextPage,
+    fetchNextPage: recentsQuery.fetchNextPage,
+    rootRef: scrollRef,
   });
 
   if (isMobile) return null;
@@ -78,7 +90,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
     pathname === href || pathname.startsWith(`${href}/`);
 
   const NewChatIcon = v2NewChat.icon;
-  const recents = recentsQuery.data?.data ?? [];
+  const recents = recentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
   return (
     <Sidebar
@@ -95,7 +107,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="px-1">
+      <SidebarContent ref={scrollRef} className="px-1">
         <SidebarGroup className="pb-1">
           <SidebarMenu className="gap-0.5">
             {/* New chat — a standard nav row (owner #9): identical shape/hover to
@@ -235,6 +247,24 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                   );
                 })
               )}
+
+              {/* Infinite sentinel (owner #26): while more pages exist this row
+                  lives at the end of the scroll region; scrolling it into view
+                  loads the next page, and a skeleton fills it while that page is
+                  in flight (skeleton-first). It disappears once the list is fully
+                  loaded, so there is no dangling spacer. */}
+              {recentsQuery.hasNextPage ? (
+                <SidebarMenuItem>
+                  <div ref={sentinelRef} aria-hidden className="px-2 py-1.5">
+                    {recentsQuery.isFetchingNextPage ? (
+                      <div className="flex items-center gap-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+                        <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-muted" />
+                        <div className="h-3.5 flex-1 animate-pulse rounded bg-muted" />
+                      </div>
+                    ) : null}
+                  </div>
+                </SidebarMenuItem>
+              ) : null}
             </SidebarMenu>
           </SidebarGroup>
         ) : null}

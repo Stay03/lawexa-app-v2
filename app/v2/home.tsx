@@ -1,7 +1,8 @@
 'use client';
 
+import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types/auth';
-import { useDesignMode } from '@/v2/shell/design-mode';
+import { useDesignFading, useDesignMode } from '@/v2/shell/design-mode';
 import { HomeDesignA } from '@/v2/shell/designs/HomeDesignA';
 import { HomeDesignB } from '@/v2/shell/designs/HomeDesignB';
 
@@ -12,6 +13,16 @@ import { HomeDesignB } from '@/v2/shell/designs/HomeDesignB';
  * `signedIn` are threaded from `app/v2/page.tsx` (server-verified session), so the
  * greeting name, composer furniture, and recents gating are correct on first
  * paint with no client auth round-trip.
+ *
+ * SYMMETRIC SWAP (owner #24): the A↔B flip is no longer a hard cut. This is the
+ * ONE persistent element that survives the swap (the design roots key-remount, so
+ * they can't own the transition themselves). The store raises `fading` for a beat
+ * before it swaps `mode`, so this wrapper fades the outgoing home OUT, the mode
+ * flips at the low point, then it fades the incoming home IN — both directions
+ * animate. `duration-150` matches the store's `FADE_MS`. `h-full` gives the design
+ * roots a definite height context for their own `min-h-full` while the wrapper
+ * persists across the swap. Reduced motion skips the fade (store-side) and the
+ * `motion-reduce` guard drops the transition here too.
  *
  * Both candidates carry the `data-v2-marker="V2-HOME"` marker on their root and
  * are server-renderable; the store's server snapshot is `'a'`, so the initial
@@ -27,9 +38,20 @@ export function V2Home({
   role?: UserRole;
 }) {
   const mode = useDesignMode();
-  return mode === 'b' ? (
-    <HomeDesignB name={name} signedIn={signedIn} role={role} />
-  ) : (
-    <HomeDesignA name={name} signedIn={signedIn} role={role} />
+  const fading = useDesignFading();
+
+  return (
+    <div
+      className={cn(
+        'h-full transition-opacity duration-150 ease-out motion-reduce:transition-none',
+        fading ? 'opacity-0' : 'opacity-100',
+      )}
+    >
+      {mode === 'b' ? (
+        <HomeDesignB name={name} signedIn={signedIn} role={role} />
+      ) : (
+        <HomeDesignA name={name} signedIn={signedIn} role={role} />
+      )}
+    </div>
   );
 }

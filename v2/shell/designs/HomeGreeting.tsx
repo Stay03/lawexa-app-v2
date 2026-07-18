@@ -26,11 +26,23 @@ import { useMounted } from '@/v2/shell/use-mounted';
  *
  *  3. CONFIDENTIAL MODE like v1 (owner #17): when confidential is on, the heading
  *     swaps to an emerald "Confidential Chat" and the v1 sub-copy appears — NOT a
- *     note under the composer. SMOOTH MOTION (owner rule #17): the heading colour
- *     transitions, its text cross-fades (keyed remount → `animate-in fade-in`), and
- *     the sub-copy expands/collapses via the grid-rows technique. Every transition
- *     is `motion-reduce`-guarded (and tw-animate-css `animate-in` is nulled under
- *     reduced motion by the globals guard).
+ *     note under the composer.
+ *
+ * SYMMETRIC MOTION (owner #24 — the refinement that this round fixes): the old
+ * build keyed-remounted the heading and sub-copy, so the ENTER animated but the
+ * EXIT snapped (the removed node cannot animate). Everything here is now a
+ * PERSISTENT-NODE cross-fade that animates BOTH directions:
+ *
+ *   - Heading: the greeting and the "Confidential Chat" line are two stacked
+ *     layers in a single grid cell (both always mounted); toggling confidential
+ *     cross-fades their opacity. Height stays at the taller layer, so the swap
+ *     never reflows.
+ *   - Sub-copy: two independent grid-rows collapsibles (confidential copy + the
+ *     design's own line), each with CONSTANT text that stays mounted, so the text
+ *     fades WHILE the row collapses/expands — symmetric in and out. They are
+ *     mutually exclusive, so at most one is ever open.
+ *
+ * Every transition is `motion-reduce`-guarded.
  */
 
 const CONFIDENTIAL_HEADING = 'Confidential Chat';
@@ -60,9 +72,6 @@ export function HomeGreeting({
   const [parts] = useState(() => getSmartGreetingParts(name));
 
   const centered = align === 'center';
-  // The active sub-copy: confidential copy wins; otherwise the design's own line
-  // (which may be absent for Design A).
-  const sublineText = confidential ? CONFIDENTIAL_SUBLINE : subline;
 
   return (
     <header className={cn(centered ? 'text-center' : 'text-left', className)}>
@@ -75,57 +84,100 @@ export function HomeGreeting({
         </div>
       ) : (
         <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-          <h1
-            // Keyed on the confidential flag so the text swap remounts and plays a
-            // short fade-in; the colour tweens via transition-colors.
-            key={confidential ? 'confidential' : 'greeting'}
-            className={cn(
-              'transition-colors duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
-              confidential ? 'text-emerald-600 dark:text-emerald-500' : 'text-foreground',
-              headingClassName,
-            )}
-          >
-            {confidential ? (
-              CONFIDENTIAL_HEADING
-            ) : parts.isSpecial === '__PULSING_HEART__' ? (
-              <PulsingHeart />
-            ) : (
-              <>
-                {parts.greeting}
-                {parts.name ? (
-                  <>
-                    {', '}
-                    <span className="text-primary">{parts.name}</span>
-                  </>
-                ) : null}
-              </>
-            )}
+          {/* Heading — two stacked layers cross-fade on the confidential toggle.
+              The <h1> is the single semantic heading; the inactive layer is
+              aria-hidden so assistive tech reads only the visible one. */}
+          <h1 className={cn('grid', headingClassName)}>
+            <span
+              aria-hidden={confidential}
+              className={cn(
+                'col-start-1 row-start-1 text-foreground transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                confidential ? 'opacity-0' : 'opacity-100',
+              )}
+            >
+              {parts.isSpecial === '__PULSING_HEART__' ? (
+                <PulsingHeart />
+              ) : (
+                <>
+                  {parts.greeting}
+                  {parts.name ? (
+                    <>
+                      {', '}
+                      <span className="text-primary">{parts.name}</span>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </span>
+            <span
+              aria-hidden={!confidential}
+              className={cn(
+                'col-start-1 row-start-1 text-emerald-600 transition-opacity duration-200 ease-out motion-reduce:transition-none dark:text-emerald-500',
+                confidential ? 'opacity-100' : 'opacity-0',
+              )}
+            >
+              {CONFIDENTIAL_HEADING}
+            </span>
           </h1>
 
-          {/* Sub-copy — expands/collapses smoothly (grid-rows 0fr↔1fr) so it never
-              just appears or disappears; the text itself cross-fades on swap. */}
-          <div
-            className={cn(
-              'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
-              sublineText ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-            )}
-          >
-            <div className="overflow-hidden">
-              {sublineText ? (
-                <p
-                  key={confidential ? 'confidential-sub' : 'default-sub'}
-                  className={cn(
-                    'mt-2 text-sm text-muted-foreground md:text-base motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
-                    centered && 'mx-auto max-w-md',
-                  )}
-                >
-                  {sublineText}
-                </p>
-              ) : null}
-            </div>
-          </div>
+          {/* Confidential sub-copy — its own collapsible (expands only when
+              confidential). Text is constant + always mounted, so it fades while
+              the row collapses/expands: symmetric both ways. */}
+          <SublineCollapse
+            expanded={confidential}
+            centered={centered}
+            text={CONFIDENTIAL_SUBLINE}
+          />
+
+          {/* The design's own sub-copy (Design B) — expands only when NOT
+              confidential. Omitted entirely when the design has no subline
+              (Design A), which is a stable prop, not a runtime toggle. */}
+          {subline ? (
+            <SublineCollapse
+              expanded={!confidential}
+              centered={centered}
+              text={subline}
+            />
+          ) : null}
         </div>
       )}
     </header>
+  );
+}
+
+/**
+ * One sub-copy row that expands/collapses symmetrically: `grid-template-rows`
+ * tweens 0fr↔1fr for the height and the text's opacity tweens in lockstep, so it
+ * never just appears or disappears in either direction. The text is a constant
+ * prop that stays mounted through the collapse (the fix for the enter-only exit).
+ */
+function SublineCollapse({
+  expanded,
+  centered,
+  text,
+}: {
+  expanded: boolean;
+  centered: boolean;
+  text: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+        expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+      )}
+    >
+      <div className="overflow-hidden">
+        <p
+          className={cn(
+            'mt-2 text-sm text-muted-foreground transition-opacity duration-200 ease-out motion-reduce:transition-none md:text-base',
+            expanded ? 'opacity-100' : 'opacity-0',
+            centered && 'mx-auto max-w-md',
+          )}
+        >
+          {text}
+        </p>
+      </div>
+    </div>
   );
 }

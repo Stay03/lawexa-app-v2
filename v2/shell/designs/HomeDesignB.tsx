@@ -19,6 +19,7 @@ import type { UserRole } from '@/types/auth';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
+import { HomePrompts } from './HomePrompts';
 
 /**
  * HomeDesignB — "Research Launchpad" (the power-user candidate). The gold-shimmer
@@ -58,16 +59,6 @@ const QUICK_START: QuickStart[] = [
   { label: 'Notes', description: 'Your saved research', href: '/notes', icon: NotebookPen },
   { label: 'Quiz', description: 'Test your knowledge', href: '/quiz', icon: GraduationCap },
 ];
-
-/** v1's ACTUAL suggested prompts — short stubs shown with a trailing "…";
- *  clicking drops the stub (without the "…") into the composer. No randomization
- *  (v1 has none). */
-const SUGGESTED_PROMPTS = [
-  'Explain this law',
-  'Find a case on',
-  'Do I have rights to',
-  'Connect me to a lawyer',
-] as const;
 
 /** Shared focus ring — unified across every interactive element. */
 const FOCUS_RING =
@@ -145,9 +136,13 @@ export function HomeDesignB({
           : 'max-w-2xl',
       )}
     >
-      {/* Greeting — top of both breakpoints; full width on desktop. */}
+      {/* Greeting — top of both breakpoints; full width on desktop. The
+          `md:order-1` keeps it first for the GUEST desktop flow (guests get a
+          plain flex column, not the grid), so it never sinks below the composer;
+          for signed-in users the grid's explicit placement wins and order is
+          inert. */}
       <div
-        className={`${REVEAL} order-1 duration-500 md:col-span-2`}
+        className={`${REVEAL} order-1 duration-500 md:order-1 md:col-span-2`}
         style={{ animationDelay: '0ms' }}
       >
         <HomeGreeting
@@ -275,28 +270,27 @@ export function HomeDesignB({
       ) : null}
 
       {/* Suggested prompts — MOBILE: `mt-auto` sinks them toward the thumb, above
-          the docked composer. DESKTOP: left column, under the composer. */}
+          the docked composer, in v1's stacked-list style. DESKTOP: left column,
+          under the composer, as a quiet ChatGPT-style list (owner #27). Both
+          presentations come from the shared `HomePrompts`; the container keeps its
+          order/grid slot so the layout is unchanged. */}
       <div
-        className={`${REVEAL} order-4 mt-auto flex flex-wrap gap-2 pt-8 duration-500 md:order-none md:col-start-1 md:row-start-3 md:mt-0 md:max-w-2xl md:pt-0`}
+        className={`${REVEAL} order-4 mt-auto pt-8 duration-500 md:order-3 md:col-start-1 md:row-start-3 md:mt-4 md:max-w-2xl md:pt-0`}
         style={{ animationDelay: '150ms' }}
       >
-        {SUGGESTED_PROMPTS.map((prompt) => (
-          <button
-            key={prompt}
-            type="button"
-            onClick={() => fillPrompt(prompt)}
-            className={`${FOCUS_RING} inline-flex min-h-11 items-center rounded-full border border-border bg-transparent px-4 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary hover:text-foreground active:bg-secondary md:min-h-9`}
-          >
-            {prompt}…
-          </button>
-        ))}
+        <div className="md:hidden">
+          <HomePrompts variant="mobile" onSelect={fillPrompt} />
+        </div>
+        <div className="hidden md:block">
+          <HomePrompts variant="desktop" onSelect={fillPrompt} />
+        </div>
       </div>
 
       {/* Composer dock — MOBILE: `sticky bottom-0`, floating alone with a soft
           bottom fade dissolving the scrolling content behind it. DESKTOP: static,
           left column under the greeting. The entrance transform lives on the inner
           wrapper so it never touches the sticky element. */}
-      <div className="order-5 sticky bottom-0 z-10 -mx-4 px-4 pb-3 pt-6 sm:-mx-6 sm:px-6 md:static md:order-none md:z-auto md:col-start-1 md:row-start-2 md:mx-0 md:max-w-2xl md:px-0 md:pb-0 md:pt-0">
+      <div className="order-5 sticky bottom-0 z-10 -mx-4 px-4 pb-3 pt-6 sm:-mx-6 sm:px-6 md:static md:order-2 md:z-auto md:col-start-1 md:row-start-2 md:mx-0 md:max-w-2xl md:px-0 md:pb-0 md:pt-0">
         {/* Mobile-only bottom fade (decorative; desktop drops it). */}
         <div
           aria-hidden

@@ -97,14 +97,20 @@ export function V2NotificationBell({ signedIn }: { signedIn: boolean }) {
       }
     >
       <Bell className="size-5" />
-      {hasBadge ? (
-        <span
-          aria-hidden="true"
-          className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground ring-2 ring-background"
-        >
-          {count > 99 ? '99+' : count}
-        </span>
-      ) : null}
+      {/* Unread badge — a PERSISTENT node whose scale + opacity tween in BOTH
+          directions (owner #24), so it never hard-pops on appear nor snaps away
+          on the last read. The count text is dropped while hidden so a "0" is
+          never shown mid-collapse; the button's aria-label carries the real
+          count for assistive tech (this is aria-hidden). */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          'absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground ring-2 ring-background transition-all duration-200 ease-out motion-reduce:transition-none',
+          hasBadge ? 'scale-100 opacity-100' : 'scale-0 opacity-0',
+        )}
+      >
+        {hasBadge ? (count > 99 ? '99+' : count) : null}
+      </span>
     </Button>
   );
 

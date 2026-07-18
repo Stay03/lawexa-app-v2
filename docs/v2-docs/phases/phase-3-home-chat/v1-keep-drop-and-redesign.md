@@ -86,6 +86,23 @@ Nothing from this redesign is built yet.
     shows a skeleton, then smoothly cross-fades to content. Never a placeholder STRING flash
     (the pre-mount 'Welcome' text was rejected).
 
+### A4. Owner's third live-review decisions (July 18, 2026; binding)
+
+24. **Motion symmetry (refines #17)**: every transition must animate BOTH directions — exits
+    animate too, never keyed-remount enter-only patterns. Implementers AND reviewers must
+    exercise the reverse direction of every state change. (Raised: confidential-mode exit was
+    jumpy while entry was smooth.)
+25. **Design A desktop**: content anchored toward the TOP (generous top padding), not vertically
+    centered low on the page.
+26. **Sidebar = fully scrollable + infinite Recents**: the conversations endpoint paginates, so
+    the Recents list is an infinite list (useInfiniteQuery + scroll sentinel) that keeps loading
+    as you scroll. Sidebar + drawer.
+27. **Suggested prompts presentation**: DESKTOP = ChatGPT-style vertical list under the composer
+    (small icon + text rows, left-aligned, quiet); MOBILE = v1's stacked list style.
+28. **Header right = bell + overflow dropdown menu**: the theme toggle moves INSIDE the dropdown
+    (with room for future items); it leaves the bar itself.
+29. **DesignSwitch centered in the header** (mobile + web).
+
 ---
 
 ## B. Shell + home — keep / drop / fix (first-hand study)
