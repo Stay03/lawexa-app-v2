@@ -168,6 +168,17 @@ export interface Space {
   active_members_count: number;
   /** List responses stamp the caller's role; `show` may omit it. */
   my_role?: MemberRole | null;
+  /**
+   * §17 activity rollups (backend frontend-contract) — members-only, stamped
+   * when the caller's membership is known. `unread_channels_count` = how many
+   * of the space's live channels have ≥1 unread message for the caller (muted
+   * channels EXCLUDED — mute kills the activity rollup); drives the space's
+   * unread dot. `mention_count` = the caller's total unread @mentions summed
+   * across the space's channels (muted INCLUDED — a mute never suppresses a
+   * direct @you); drives the numeric mention badge.
+   */
+  unread_channels_count?: number;
+  mention_count?: number;
   /** Roster present on `show`. */
   members?: Member[];
   created_at: string;
@@ -200,6 +211,11 @@ export interface Channel {
   settings?: Record<string, unknown> | null;
   /** Members-only; present when the query stamped it. */
   unread_count?: number;
+  /** §17 (backend frontend-contract): the subset of unread messages that
+   *  @mention the caller — members-only, gated like `unread_count`. Muted
+   *  members still receive it (mute kills the unread rollup, never a direct
+   *  mention badge). */
+  mention_count?: number;
   active_members_count: number;
   last_message_at: string | null;
   created_at: string;
