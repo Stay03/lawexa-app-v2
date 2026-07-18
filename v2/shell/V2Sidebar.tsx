@@ -36,22 +36,32 @@ import { v2NavItems, v2NewChat } from './nav.config';
 
 /**
  * V2Sidebar — the desktop navigation rail, built on the shadcn sidebar
- * primitives (the v2 primitive layer). Off-canvas collapsible: `SidebarTrigger`
- * (in `V2Header`) slides the whole rail away and `SidebarInset` reclaims the
- * width — clean, with no half-styled icon-rail state to maintain this wave.
+ * primitives. Off-canvas collapsible: `SidebarTrigger` (in `V2Header`) slides the
+ * whole rail away and `SidebarInset` reclaims the width.
+ *
+ * DESIGN PASS (owner #22): a deliberate spacing rhythm — a generous header with
+ * the h-10 wordmark (#5), grouped nav with quiet uppercase section labels, calm
+ * hover/active tints that fade rather than snap, and a footer set off from the
+ * scroll region by a hairline. Every interactive state carries `transition-colors`
+ * (owner rule #17 — no snap). The active tint is the brand gold at low opacity so
+ * the current route reads without shouting.
  *
  * MOBILE: returns `null`. The shadcn `<Sidebar>` would otherwise render its own
- * mobile `<Sheet>` bound to `openMobile`; suppressing it here leaves `openMobile`
- * to drive ONLY `V2Drawer` (the locked ChatGPT-style drawer), so the two never
- * double up. `useIsMobile()` is `false` during SSR and first paint, so the rail
- * still ships in the server HTML (CSS `hidden md:block` keeps it off small
- * screens with no flash), then unmounts post-hydration on real mobile.
+ * mobile `<Sheet>` bound to `openMobile`; suppressing it leaves `openMobile` to
+ * drive ONLY `V2Drawer`. `useIsMobile()` is `false` during SSR and first paint, so
+ * the rail still ships in the server HTML (CSS `hidden md:block`), then unmounts
+ * post-hydration on real mobile.
  *
- * SEAMLESS CHROME (owner): the rail's edge border is removed by overriding the
- * primitive's `group-data-[side=left]:border-r` from here (the variant prefix is
- * required to beat the primitive's specificity) — components/ui/sidebar.tsx is
- * v1-shared and must stay byte-identical.
+ * SEAMLESS CHROME (owner #10): the rail's edge border is removed by overriding the
+ * primitive's `group-data-[side=left]:border-r` from here — components/ui/sidebar
+ * is v1-shared and must stay byte-identical.
  */
+
+/** Shared active-row tint (brand gold, low opacity) — one definition for the top
+ *  nav rows, Library children, and recents, so the active treatment never drifts. */
+const ACTIVE_ROW =
+  'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary';
+
 export function V2Sidebar({ user }: { user: SessionUser | null }) {
   const isMobile = useIsMobile();
   const pathname = usePathname();
@@ -75,26 +85,30 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
       collapsible="offExamples"
       className="group-data-[side=left]:border-r-0"
     >
-      <SidebarHeader className="gap-3">
-        <div className="flex items-center px-1 pt-1">
-          <LogoWordmark className="h-8 w-auto" />
-        </div>
+      <SidebarHeader className="px-3 pb-1 pt-3">
+        <Link
+          href={v2NewChat.href}
+          aria-label="Lawexa home"
+          className="inline-flex w-fit items-center rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        >
+          <LogoWordmark className="h-10 w-auto" />
+        </Link>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarMenu>
-            {/* New chat — a standard nav row (owner): identical shape/hover to
+      <SidebarContent className="px-1">
+        <SidebarGroup className="pb-1">
+          <SidebarMenu className="gap-0.5">
+            {/* New chat — a standard nav row (owner #9): identical shape/hover to
                 every other row; only the label + icon carry the theme gold. */}
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
                 tooltip={v2NewChat.label}
-                className="text-primary hover:text-primary [&_svg]:text-primary"
+                className="font-medium text-primary transition-colors hover:text-primary [&_svg]:text-primary"
               >
                 <Link href={v2NewChat.href}>
                   {NewChatIcon ? <NewChatIcon /> : null}
-                  <span className="font-medium">{v2NewChat.label}</span>
+                  <span>{v2NewChat.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -113,14 +127,17 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                   >
                     <SidebarMenuItem>
                       <CollapsibleTrigger asChild>
-                        <SidebarMenuButton tooltip={item.label}>
+                        <SidebarMenuButton
+                          tooltip={item.label}
+                          className="transition-colors"
+                        >
                           {Icon ? <Icon /> : null}
                           <span>{item.label}</span>
                           <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <SidebarMenuSub>
+                        <SidebarMenuSub className="gap-0.5">
                           {item.items.map((sub) => {
                             const active = isActive(sub.href);
                             return (
@@ -128,10 +145,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                                 <SidebarMenuSubButton
                                   asChild
                                   isActive={active}
-                                  className={cn(
-                                    active &&
-                                      'bg-primary/10 text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary',
-                                  )}
+                                  className={cn('transition-colors', active && ACTIVE_ROW)}
                                 >
                                   <Link href={sub.href}>
                                     <span>{sub.label}</span>
@@ -154,10 +168,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                     asChild
                     tooltip={item.label}
                     isActive={active}
-                    className={cn(
-                      active &&
-                        'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary',
-                    )}
+                    className={cn('transition-colors', active && ACTIVE_ROW)}
                   >
                     <Link href={item.href}>
                       {Icon ? <Icon /> : null}
@@ -173,8 +184,10 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
         {/* Recent — real conversations (read-only). Hidden entirely for guests. */}
         {signedIn ? (
           <SidebarGroup>
-            <SidebarGroupLabel>Recent</SidebarGroupLabel>
-            <SidebarMenu>
+            <SidebarGroupLabel className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Recent
+            </SidebarGroupLabel>
+            <SidebarMenu className="gap-0.5">
               {recentsQuery.isPending ? (
                 [0.9, 0.7, 0.5, 0.35, 0.2].map((opacity, index) => (
                   <SidebarMenuItem key={index}>
@@ -188,11 +201,11 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                   </SidebarMenuItem>
                 ))
               ) : recentsQuery.isError ? (
-                <div className="px-3 py-2 text-xs text-muted-foreground">
+                <div className="px-2 py-2 text-xs text-muted-foreground">
                   Couldn&apos;t load conversations
                 </div>
               ) : recents.length === 0 ? (
-                <div className="px-3 py-2 text-xs text-muted-foreground">
+                <div className="px-2 py-2 text-xs text-muted-foreground">
                   No conversations yet
                 </div>
               ) : (
@@ -200,15 +213,17 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                   const title = stripPastedTags(conversation.title);
                   const active = isActive(`/c/${conversation.id}`);
                   return (
-                    <SidebarMenuItem key={conversation.id}>
+                    <SidebarMenuItem
+                      key={conversation.id}
+                      className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+                    >
                       <SidebarMenuButton
                         asChild
                         tooltip={title}
                         isActive={active}
                         className={cn(
-                          'text-muted-foreground',
-                          active &&
-                            'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary',
+                          'text-muted-foreground transition-colors',
+                          active && ACTIVE_ROW,
                         )}
                       >
                         <Link href={`/c/${conversation.id}`}>
@@ -225,7 +240,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
         ) : null}
       </SidebarContent>
 
-      <SidebarFooter className="gap-2">
+      <SidebarFooter className="gap-2 border-t border-sidebar-border/60 p-2">
         <V2UserFooter user={user} />
         {/* Always-available exit from the preview. */}
         <SwitchBackButton />

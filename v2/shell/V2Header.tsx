@@ -51,7 +51,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         <Menu className="size-5" />
       </Button>
       <span className="flex shrink-0 items-center md:hidden">
-        <LogoMark className="size-8" />
+        <LogoMark className="size-9" />
       </span>
 
       {/* Desktop: sidebar trigger + breadcrumb slot. The wordmark appears only
@@ -60,7 +60,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
       <SidebarTrigger className="-ml-1 hidden md:inline-flex" />
       {railCollapsed ? (
         <span className="hidden shrink-0 items-center md:flex">
-          <LogoWordmark className="h-8" />
+          <LogoWordmark className="h-9" />
         </span>
       ) : null}
       <Separator orientation="vertical" className="mr-1 hidden h-4 md:block" />

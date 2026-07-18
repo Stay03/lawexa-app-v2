@@ -16,7 +16,7 @@ import markSrc from '@/public/android-chrome-512x512.png';
  * numbers to drift from the asset. Display size is set purely in CSS.
  *
  * INSTANT LOADING (owner bug: the drawer's logo took multiple seconds to appear
- * on first open). Two fixes, both correct for tiny persistent-chrome marks per
+ * on first open). Three fixes, all correct for tiny persistent-chrome marks per
  * the Next 16 image guidance:
  *  - `unoptimized` — serve the raw static PNG straight from `/_next/static/…`
  *    instead of routing through the on-demand `/_next/image` optimizer. The
@@ -25,8 +25,11 @@ import markSrc from '@/public/android-chrome-512x512.png';
  *    are already tiny, so there is nothing to optimize.
  *  - `loading="eager"` — load immediately when mounted regardless of viewport,
  *    the Next 16 replacement for the deprecated `priority` prop for non-LCP art.
- *    We deliberately do NOT `preload`: preload is for the single true LCP hero,
- *    and preloading persistent chrome would only compete with real content.
+ *  - LAYOUT-LEVEL PRELOAD (owner #19) — `v2/shell/LogoPreload` calls
+ *    `ReactDOM.preload` on BOTH asset URLs in `app/v2/layout.tsx`, above every
+ *    surface, so the bytes are already in flight (and cached) before the drawer
+ *    Sheet ever mounts. `unoptimized` makes the `<Image>` request the exact same
+ *    raw `/_next/static/media/…` URL the preload warms — a guaranteed cache hit.
  *
  * The `h-* w-auto` display pattern is the Next-recommended way to resize while
  * preserving ratio — `width: auto` paired with a fixed height silences the

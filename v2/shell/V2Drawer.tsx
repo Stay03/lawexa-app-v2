@@ -28,12 +28,22 @@ import { v2NavItems, v2NewChat } from './nav.config';
  * (New chat first) then the Recents list (they scroll away together), and a
  * pinned footer with the real account row + the preview exit.
  *
- * Reuses `components/ui/sheet` (a Radix Dialog): it gives the scrim, Esc / scrim
- * close, focus trap, and the 200ms `side="left"` slide for free. The pinned
- * footer is achieved by making `SheetContent` a flex column and letting the
- * scroll region take `flex-1`. Bound to the sidebar context's `openMobile`; on
- * mobile `V2Sidebar` renders `null`, so this is the sole consumer of that state.
+ * DESIGN PASS (owner #22): the h-10 wordmark (#5), a consistent 44px row rhythm
+ * with calm hover/active tints that fade rather than snap (owner rule #17 —
+ * `transition-colors` everywhere), a quiet uppercase Recents label, and a footer
+ * set off by a hairline over the scrolling content.
+ *
+ * Reuses `components/ui/sheet` (a Radix Dialog): scrim, Esc / scrim close, focus
+ * trap, and the 200ms `side="left"` slide for free. The pinned footer is a flex
+ * column with the scroll region taking `flex-1`. Bound to the sidebar context's
+ * `openMobile`; on mobile `V2Sidebar` renders `null`, so this is the sole consumer
+ * of that state.
  */
+
+/** New-chat + primary nav share this base row shape so the drawer reads uniform. */
+const ROW_BASE =
+  'flex h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors';
+
 export function V2Drawer({ user }: { user: SessionUser | null }) {
   const { openMobile, setOpenMobile } = useSidebar();
   const pathname = usePathname();
@@ -63,8 +73,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         className="gap-0 p-0 data-[side=left]:w-[min(85%,360px)] data-[side=left]:max-w-none data-[side=left]:sm:max-w-none"
         // The drawer is opened by the external hamburger (no SheetTrigger), so
         // Radix has no trigger to restore focus to on close — without this,
-        // focus lands on <body> and keyboard/AT users lose their place
-        // (reviewer finding).
+        // focus lands on <body> and keyboard/AT users lose their place.
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           document.getElementById('v2-nav-trigger')?.focus();
@@ -78,8 +87,15 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         </SheetHeader>
 
         {/* Seamless header: wordmark + search + close (no divider). */}
-        <div className="v2-safe-top flex h-14 shrink-0 items-center gap-1.5 px-3">
-          <LogoWordmark className="h-8 w-auto" />
+        <div className="v2-safe-top flex h-16 shrink-0 items-center gap-1 px-3">
+          <Link
+            href={v2NewChat.href}
+            onClick={close}
+            aria-label="Lawexa home"
+            className="inline-flex items-center rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <LogoWordmark className="h-10 w-auto" />
+          </Link>
           <span className="flex-1" />
           <Button
             variant="ghost"
@@ -101,14 +117,14 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         </div>
 
         {/* ONE scroll region: New chat, nav rows, then Recents. */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
           <nav aria-label="Primary" className="flex flex-col gap-0.5">
-            {/* New chat — a standard nav row (owner): identical shape/hover to
+            {/* New chat — a standard nav row (owner #9): identical shape/hover to
                 every other row; only the label + icon carry the theme gold. */}
             <Link
               href={v2NewChat.href}
               onClick={close}
-              className="flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-primary transition-colors hover:bg-muted"
+              className={cn(ROW_BASE, 'font-medium text-primary hover:bg-muted')}
             >
               {NewChatIcon ? <NewChatIcon className="size-5 shrink-0" /> : null}
               <span className="truncate">{v2NewChat.label}</span>
@@ -123,7 +139,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                     href={item.href}
                     onClick={close}
                     className={cn(
-                      'flex h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors',
+                      ROW_BASE,
                       active
                         ? 'bg-primary/10 font-medium text-primary'
                         : 'text-foreground hover:bg-muted',
@@ -133,7 +149,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                     <span className="truncate">{item.label}</span>
                   </Link>
                   {item.items && item.items.length > 0 ? (
-                    <div className="mb-1 ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-border pl-3">
+                    <div className="mb-1 ml-[1.375rem] mt-0.5 flex flex-col gap-0.5 border-l border-border pl-3">
                       {item.items.map((sub) => {
                         const subActive = isActive(sub.href);
                         return (
@@ -162,8 +178,8 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
           {/* Recents — real conversations (read-only). Hidden for guests. */}
           {signedIn ? (
             <>
-              <p className="px-3 pb-1 pt-4 text-xs font-medium text-muted-foreground">
-                Recents
+              <p className="px-3 pb-1 pt-5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                Recent
               </p>
               <div className="flex flex-col gap-0.5">
                 {recentsQuery.isPending ? (
@@ -195,7 +211,8 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                         href={`/c/${conversation.id}`}
                         onClick={close}
                         className={cn(
-                          'flex h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors',
+                          ROW_BASE,
+                          'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
                           active
                             ? 'bg-primary/10 font-medium text-primary'
                             : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -212,9 +229,9 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
           ) : null}
         </div>
 
-        {/* Pinned footer: real account row + preview exit (no gold pill). Keeps a
-            top divider so the scroll region reads as distinct from the account
-            row — this is a pinned bar over scrolling content, not chrome edge. */}
+        {/* Pinned footer: real account row + preview exit (no gold pill). A
+            hairline sets it off from the scroll region — this is a pinned bar over
+            scrolling content, not a chrome edge. */}
         <div className="v2-safe-bottom flex shrink-0 flex-col gap-2 border-t border-border p-3">
           <V2UserFooter user={user} />
           <SwitchBackButton />

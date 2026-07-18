@@ -1,5 +1,6 @@
 'use client';
 
+import type { UserRole } from '@/types/auth';
 import { useDesignMode } from '@/v2/shell/design-mode';
 import { HomeDesignA } from '@/v2/shell/designs/HomeDesignA';
 import { HomeDesignB } from '@/v2/shell/designs/HomeDesignB';
@@ -16,11 +17,19 @@ import { HomeDesignB } from '@/v2/shell/designs/HomeDesignB';
  * are server-renderable; the store's server snapshot is `'a'`, so the initial
  * HTML always contains a design-A home with the marker present.
  */
-export function V2Home({ name, signedIn }: { name?: string; signedIn?: boolean }) {
+export function V2Home({
+  name,
+  signedIn,
+  role,
+}: {
+  name?: string;
+  signedIn?: boolean;
+  role?: UserRole;
+}) {
   const mode = useDesignMode();
   return mode === 'b' ? (
-    <HomeDesignB name={name} signedIn={signedIn} />
+    <HomeDesignB name={name} signedIn={signedIn} role={role} />
   ) : (
-    <HomeDesignA name={name} signedIn={signedIn} />
+    <HomeDesignA name={name} signedIn={signedIn} role={role} />
   );
 }

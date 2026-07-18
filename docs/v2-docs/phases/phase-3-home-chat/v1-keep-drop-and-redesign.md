@@ -63,6 +63,29 @@ Nothing from this redesign is built yet.
 15. **Logos must load instantly** (eager/preloaded; skip on-demand optimization for the tiny brand
     PNGs) — the drawer's first-open logo delay is a bug.
 
+### A3. Owner's second live-review decisions (July 18, 2026 — after the 11-fix round; binding)
+
+16. **Jurisdiction picker = the REAL list with flags** — a v2 query over `lib/api/jurisdictions`
+    (allowed), v1-parity picker UI. No static stub lists.
+17. **Confidential mode presents like v1** (its heading/copy treatment, not a note appearing under
+    the composer). **STANDING PROJECT RULE — smooth motion:** no UI state change may "just
+    appear/disappear"; every show/hide/swap gets a deliberate, subtle transition (~150-250ms
+    fade/slide), `motion-reduce` respected. Applies to ALL v2 work from now on.
+18. **Workflow selector fully role-aware like v1**: users → Lawexa Lite/Expert; admin/superadmin →
+    v1's full admin list. Role comes from the server session already threaded.
+19. **Logos preloaded at the layout level** (drawer first-open must be instant) and **bigger: h-10**
+    (40px) in sidebar + drawer.
+20. **Desktop home hides the library shortcuts** (Cases/Statutes/Notes/Quiz) — the sidebar already
+    provides them; mobile keeps them (the sidebar is behind the drawer there). Design B rebalances
+    its desktop layout accordingly.
+21. **Suggested prompts = v1's actual prompts/behavior** (study `app/(main)/page.tsx`), not
+    invented ones.
+22. **Sidebar design pass** (desktop rail + mobile drawer): sleeker, cleaner, deliberately
+    designed — spacing, hierarchy, hover/active states, footer.
+23. **Skeleton-first policy**: anything that resolves after first paint (greeting, plan line, …)
+    shows a skeleton, then smoothly cross-fades to content. Never a placeholder STRING flash
+    (the pre-mount 'Welcome' text was rejected).
+
 ---
 
 ## B. Shell + home — keep / drop / fix (first-hand study)

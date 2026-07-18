@@ -13,5 +13,5 @@ export default async function V2HomePage() {
   const session = await verifySession();
   const firstName = session?.user.name?.trim().split(/\s+/)[0];
 
-  return <V2Home name={firstName} signedIn={!!session} />;
+  return <V2Home name={firstName} signedIn={!!session} role={session?.user.role} />;
 }

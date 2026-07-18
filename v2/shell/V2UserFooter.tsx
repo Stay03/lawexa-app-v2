@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { subscriptionQueries } from '@/v2/features/subscription/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 
@@ -41,7 +42,9 @@ export function V2UserFooter({
     );
   }
 
-  const planName = planQuery.data?.data?.plan?.name ?? 'Free';
+  // Plan resolves after first paint — show a skeleton, then cross-fade to the
+  // real plan name (skeleton-first rule #23; never a placeholder-string flash).
+  const planName = planQuery.data?.data?.plan?.name;
 
   return (
     <div className={cn('flex items-center gap-2 rounded-lg px-1 py-1', className)}>
@@ -55,7 +58,13 @@ export function V2UserFooter({
         <span className="truncate text-sm font-medium text-foreground">
           {user.name}
         </span>
-        <span className="truncate text-xs text-muted-foreground">{planName}</span>
+        {planQuery.isPending ? (
+          <Skeleton className="mt-0.5 h-3 w-14 rounded" />
+        ) : (
+          <span className="truncate text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+            {planName ?? 'Free'}
+          </span>
+        )}
       </div>
     </div>
   );
