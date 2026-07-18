@@ -5,7 +5,7 @@ import { GraduationCap, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
-import { FOCUS_RING } from './parts';
+import { FOCUS_RING } from '../modules';
 
 /**
  * Study-mode entry (owner #34). In v1 `study_mode` is a composer-level toggle

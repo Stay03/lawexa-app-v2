@@ -1,20 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { MessageSquare } from 'lucide-react';
 
 import { stripPastedTags } from '@/lib/utils';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import {
+  Module,
   ModuleEmpty,
   ModuleError,
-  ModuleRowSkeleton,
-  ROW_CLASS,
-  WorkModule,
+  ModuleList,
+  ModuleRow,
+  ModuleSkeleton,
+  RowIconTile,
   formatRelativeTime,
-} from './primitives';
+} from '../modules';
 
 /** How many conversation rows the strip shows before "All" takes over. */
 const MAX_ROWS = 5;
@@ -32,12 +33,13 @@ export function RecentConversationsModule() {
   const conversations = (query.data?.data ?? []).slice(0, MAX_ROWS);
 
   return (
-    <WorkModule
+    <Module
       title="Recent conversations"
+      icon={MessageSquare}
       action={{ href: '/conversations', label: 'All' }}
     >
       {query.isPending ? (
-        <ModuleRowSkeleton rows={3} />
+        <ModuleSkeleton rows={3} lines={1} />
       ) : query.isError ? (
         <ModuleError
           message="Couldn't load conversations"
@@ -46,25 +48,18 @@ export function RecentConversationsModule() {
       ) : conversations.length === 0 ? (
         <ModuleEmpty icon={MessageSquare} title="No conversations yet" />
       ) : (
-        <ul className="flex flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+        <ModuleList>
           {conversations.map((conversation) => (
-            <li key={conversation.id}>
-              <Link href={`/c/${conversation.id}`} className={ROW_CLASS}>
-                <MessageSquare
-                  aria-hidden
-                  className="size-4 shrink-0 text-muted-foreground/70"
-                />
-                <span className="min-w-0 flex-1 truncate text-sm text-foreground/90">
-                  {stripPastedTags(conversation.title)}
-                </span>
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">
-                  {formatRelativeTime(conversation.updated_at, now)}
-                </span>
-              </Link>
-            </li>
+            <ModuleRow
+              key={conversation.id}
+              href={`/c/${conversation.id}`}
+              leading={<RowIconTile icon={MessageSquare} />}
+              title={stripPastedTags(conversation.title)}
+              meta={formatRelativeTime(conversation.updated_at, now)}
+            />
           ))}
-        </ul>
+        </ModuleList>
       )}
-    </WorkModule>
+    </Module>
   );
 }

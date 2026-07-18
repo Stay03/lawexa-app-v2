@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { formatScorePercent } from '@/lib/utils/quiz-format';
 import { quizQueries } from '@/v2/features/quiz/queries';
 import type { QuizStatsData } from '@/types/quiz';
-import { FOCUS_RING, ModuleCard, ModuleError } from './parts';
+import { FOCUS_RING, Module, ModuleError } from '../modules';
 
 /**
  * QuizModule — the Study tab's Quiz surface (owner #34). Three honest reads from
@@ -47,18 +47,19 @@ export function QuizModule() {
   const topics = (topicsQuery.data?.data ?? []).slice(0, 6);
 
   return (
-    <ModuleCard
+    <Module
       title="Quiz"
       icon={GraduationCap}
-      action={{ label: 'Stats', href: '/quiz/stats' }}
+      action={{ href: '/quiz/stats', label: 'Stats' }}
     >
       <div className="flex flex-col gap-3 px-4 pb-4 pt-1">
         {/* Primary block — continue an open session, or start a new one. The peek
             failure is the module's error (retryable in place). */}
         {peekQuery.isError ? (
-          <ModuleError onRetry={() => peekQuery.refetch()}>
-            Couldn&apos;t load your quiz.
-          </ModuleError>
+          <ModuleError
+            message="Couldn't load your quiz"
+            onRetry={() => peekQuery.refetch()}
+          />
         ) : peekQuery.isPending ? (
           <div
             className="h-[4.25rem] w-full rounded-xl bg-muted motion-safe:animate-pulse"
@@ -156,7 +157,7 @@ export function QuizModule() {
           </div>
         ) : null}
       </div>
-    </ModuleCard>
+    </Module>
   );
 }
 

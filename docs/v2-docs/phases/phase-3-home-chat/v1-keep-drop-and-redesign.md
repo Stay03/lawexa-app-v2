@@ -134,6 +134,21 @@ Nothing from this redesign is built yet.
     statutes-cap-and-asks.md`, which also records the statute nodes-cap/outline exchange and our
     release-coupled reader commitment).
 
+### A6. Owner's fifth live-review decisions (July 18, 2026, after the tabs shipped; binding)
+
+36. **Tab-switch gold light: slower, longer, smoother.** The glow's appearance during tab
+    transitions is too fast — give it a long gentle fade (~2s class, soft ease, lingering),
+    never a quick flash. Reduced-motion unchanged (instant, visible).
+37. **Work/Study desktop layout is redesigned** — the shipped grid reads as a mess: the left
+    column dies after the composer with a huge void, prompts orphaned at the bottom. The compose
+    cluster must stay TIGHT (greeting → composer → prompts adjacent), modules composed
+    deliberately around it, no dead voids, balanced columns.
+38. **ONE shared module design system** (`v2/shell/designs/modules/`) replaces the drifted
+    `work/primitives.tsx` + `study/parts.tsx` pair (reviewer DRY finding, now owner-visible):
+    clean, sleek, research-informed card/row/badge/skeleton/empty/error language consumed by
+    BOTH tabs (and future modules). Owner explicitly demanded online research/inspiration for
+    this pass — module components must look designed, not assembled.
+
 ---
 
 ## B. Shell + home — keep / drop / fix (first-hand study)

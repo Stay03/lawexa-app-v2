@@ -84,14 +84,21 @@ export function ChatHome({
           anchor, owner #33) so the glow pools behind it in both.
 
           MOBILE gets the consistent treatment (owner #32): the layers are DIMMER
-          below `md` (desktop opacities are unchanged — owner kept them), and the
-          whole container fades in on its OWN slow ~700ms curve on mount, so
-          switching to this tab never flashes the glow at full strength (the
-          surface roots key-remount, so the fade replays each appearance).
-          `motion-safe` guards it — reduced motion settles straight to visible. */}
+          below `md` (desktop opacities are unchanged — owner kept them).
+
+          GLOW ARRIVAL (owner #36 — the shipped ~700ms read as a flash on tab
+          switches): the whole container now BLOOMS in over a long ~2.2s soft
+          ease-out with `fill-mode-both`, so the first frame is fully dim (never a
+          pop) and the light gathers slowly rather than appearing. The surface
+          roots key-remount, so this replays on every appearance — the first load
+          AND every tab switch. It composes with the 200ms tab cross-fade by
+          design: the surface fades in quickly while the glow is still gathering
+          dim beneath it, so switching to Chat never flashes the light at strength.
+          `motion-safe` guards it — reduced motion settles straight to visible,
+          instant and unchanged. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:fill-mode-both motion-safe:duration-700 motion-safe:ease-out"
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:fill-mode-both motion-safe:duration-[2200ms] motion-safe:ease-out"
       >
         <div className="absolute left-1/2 top-[70%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px] bg-primary/[0.03] dark:bg-primary/[0.06] md:top-[46%] md:bg-primary/[0.06] md:dark:bg-primary/[0.12]" />
         <div

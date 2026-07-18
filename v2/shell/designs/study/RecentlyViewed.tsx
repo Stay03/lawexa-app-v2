@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   BookText,
@@ -11,29 +10,32 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { recentlyViewedQueries } from '@/v2/features/recently-viewed/queries';
 import type { RecentlyViewedItem } from '@/types/recently-viewed';
 import {
-  FOCUS_RING,
-  ModuleCard,
+  Module,
   ModuleEmpty,
   ModuleError,
-  ModuleSkeletonRows,
+  ModuleList,
+  ModuleRow,
+  ModuleSkeleton,
+  RowIconTile,
   formatRelativeTime,
-} from './parts';
+} from '../modules';
 
 /**
  * RecentlyViewed — the Study tab's "pick up what you were reading" module
  * (backend Ask A). Reads the `recentlyViewedQueries.recentsPeek()` peek — ONE
  * merged, interleaved feed of the cases, notes, and statutes the user last
- * opened, newest first — and renders a compact strip: a per-type icon, the
- * title, and the relative view time, each row linking to the real v1 content
- * route. Slotted at the TOP of the Study rail, above Study spaces.
+ * opened, newest first — and renders a compact strip: a per-type icon tile, the
+ * title, its type label, and the relative view time, each row linking to the real
+ * v1 content route. Slotted at the TOP of the Study rail.
  *
- * Rendered by StudyHome only for signed-in users (the rail never mounts for
- * guests). Skeleton → content cross-fade, a distinct error (never
- * error-as-empty), and a quiet empty state. A sparse / short page is NORMAL:
+ * ROW HIERARCHY: the secondary line now carries the content TYPE ("Case" / "Note"
+ * / "Statute") so a mixed feed is scannable at a glance — the leading tile and the
+ * label agree, the title stays the primary line, the view time trails.
+ *
+ * Rendered by StudyHome only for signed-in users. A sparse / short page is NORMAL:
  * statute view history only accrues from the endpoint's deploy day and deleted
  * items are skipped — so nothing here assumes a full list.
  */
@@ -44,13 +46,14 @@ interface ResolvedRow {
   href: string;
   Icon: LucideIcon;
   title: string;
+  label: string;
 }
 
 /**
- * Map a feed row to its route, icon, and title by content type. Each `item` is
- * the SAME summary payload its list page consumes, so the title fields match v1
- * exactly (cases/notes/statutes name their titles differently). The switch on
- * the `type` discriminant narrows `item` to Case / Note / Statute in each arm.
+ * Map a feed row to its route, icon, title, and type label by content type. Each
+ * `item` is the SAME summary payload its list page consumes, so the title fields
+ * match v1 exactly. The switch on the `type` discriminant narrows `item` to Case
+ * / Note / Statute in each arm.
  */
 function resolveRow(row: RecentlyViewedItem): ResolvedRow | null {
   switch (row.type) {
@@ -59,23 +62,25 @@ function resolveRow(row: RecentlyViewedItem): ResolvedRow | null {
         href: `/cases/${row.item.slug}`,
         Icon: Scale,
         title: row.item.display_title || row.item.title,
+        label: 'Case',
       };
     case 'note':
       return {
         href: `/notes/${row.item.slug}`,
         Icon: NotebookPen,
         title: row.item.title,
+        label: 'Note',
       };
     case 'statute':
       return {
         href: `/statutes/${row.item.slug}`,
         Icon: BookText,
         title: row.item.short_title || row.item.title,
+        label: 'Statute',
       };
     default:
       // Forward-compat: the contract is closed to three types today, but if the
-      // backend ever widens types[] the unknown rows are SKIPPED, not crashed on
-      // (reviewer note — the union makes this arm unreachable until then).
+      // backend ever widens types[] the unknown rows are SKIPPED, not crashed on.
       return null;
   }
 }
@@ -88,48 +93,35 @@ export function RecentlyViewed() {
   const rows = (query.data?.data ?? []).slice(0, MAX_ROWS);
 
   return (
-    <ModuleCard title="Recently viewed" icon={History}>
+    <Module title="Recently viewed" icon={History}>
       {query.isError ? (
-        <ModuleError onRetry={() => query.refetch()}>
-          Couldn&apos;t load your recent activity.
-        </ModuleError>
+        <ModuleError
+          message="Couldn't load your recent activity"
+          onRetry={() => query.refetch()}
+        />
       ) : query.isPending ? (
-        <ModuleSkeletonRows rows={3} />
+        <ModuleSkeleton rows={3} />
       ) : rows.length === 0 ? (
-        <ModuleEmpty>Nothing viewed yet.</ModuleEmpty>
+        <ModuleEmpty icon={History} title="Nothing viewed yet" />
       ) : (
-        <ul className="flex flex-col px-2 pb-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+        <ModuleList>
           {rows.map((row) => {
             const resolved = resolveRow(row);
             if (!resolved) return null;
-            const { href, Icon, title } = resolved;
+            const { href, Icon, title, label } = resolved;
             return (
-              <li key={`${row.type}-${row.item.id}`}>
-                <Link
-                  href={href}
-                  className={cn(
-                    'group flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60',
-                    FOCUS_RING,
-                  )}
-                >
-                  <span
-                    aria-hidden
-                    className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:text-foreground"
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-foreground transition-colors group-hover:text-primary">
-                    {title}
-                  </span>
-                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">
-                    {formatRelativeTime(row.viewed_at, now)}
-                  </span>
-                </Link>
-              </li>
+              <ModuleRow
+                key={`${row.type}-${row.item.id}`}
+                href={href}
+                leading={<RowIconTile icon={Icon} />}
+                title={title}
+                secondary={label}
+                meta={formatRelativeTime(row.viewed_at, now)}
+              />
             );
           })}
-        </ul>
+        </ModuleList>
       )}
-    </ModuleCard>
+    </Module>
   );
 }
