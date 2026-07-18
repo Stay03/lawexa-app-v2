@@ -24,9 +24,10 @@ import type { Jurisdiction, JurisdictionChoice } from '@/types/jurisdiction';
  * jurisdiction list (`v2/features/jurisdictions`), with flags, an "Auto" default,
  * a "No specific jurisdiction (comparative)" option, and per-row selection state.
  *
- * The choice is LOCAL state this wave (persisting it into the conversation slot is
- * chat-wave work); `auto` resolves like v1 — the signed-in user's profile country,
- * falling back to Nigeria (the backend's documented default).
+ * The choice is CONTROLLED by the composer (which reads it into the create payload
+ * and carries it into v1's per-conversation slot on send); `auto` resolves like v1 —
+ * the signed-in user's profile country, falling back to Nigeria (the backend's
+ * documented default).
  *
  * Flags come from `react-country-flag` (an existing dependency, SVG so they render
  * identically on every OS — unlike emoji flags on Windows), matching v1's renderer.
@@ -131,14 +132,22 @@ function CountryFlag({ code, className }: { code: string; className?: string }) 
 interface JurisdictionFieldProps {
   /** Only fetch when the surface is signed in (the endpoint needs a token). */
   signedIn: boolean;
+  /** Controlled choice — owned by the composer so submit can read it. */
+  value: JurisdictionChoice;
+  onChange: (next: JurisdictionChoice) => void;
   disabled?: boolean;
   /** Keep clicks inside portaled content from bubbling to PromptInput's root. */
   stop: (event: React.SyntheticEvent) => void;
 }
 
-export function JurisdictionField({ signedIn, disabled, stop }: JurisdictionFieldProps) {
+export function JurisdictionField({
+  signedIn,
+  value: choice,
+  onChange,
+  disabled,
+  stop,
+}: JurisdictionFieldProps) {
   const [open, setOpen] = useState(false);
-  const [choice, setChoice] = useState<JurisdictionChoice>({ mode: 'auto' });
 
   const profileCountry = useAuthStore((s) => s.user?.profile?.country);
   const jurisdictionsQuery = useQuery({
@@ -211,7 +220,7 @@ export function JurisdictionField({ signedIn, disabled, stop }: JurisdictionFiel
   const label = describe({ choice, autoMatch, overrideMatch });
 
   const select = (next: JurisdictionChoice) => {
-    setChoice(next);
+    onChange(next);
     setOpen(false);
   };
 

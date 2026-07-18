@@ -12,6 +12,7 @@ import { REVEAL } from './modules';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
+import { useComposerDraft } from './composer/useComposerDraft';
 import { QuizModule } from './study/QuizModule';
 import { StudySpaces } from './study/StudySpaces';
 import { RecentlyViewed } from './study/RecentlyViewed';
@@ -64,7 +65,7 @@ export function StudyHome({
   signedIn?: boolean;
   role?: UserRole;
 }) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useComposerDraft();
   const [confidential, setConfidential] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
@@ -76,7 +77,9 @@ export function StudyHome({
     composerAreaRef.current?.querySelector('textarea')?.focus();
   };
 
-  // Shared composer props — spread into the one composer each branch renders.
+  // Shared composer props — spread into the one composer each branch renders. The
+  // Study tab's study-mode CTA rides in as `studyMode`, so its create sends
+  // `study_mode: true` (v1 parity).
   const composerProps = {
     value: input,
     onValueChange: setInput,
@@ -84,6 +87,7 @@ export function StudyHome({
     role,
     confidential,
     onConfidentialChange: setConfidential,
+    studyMode,
     className: 'p-2.5 shadow-lg',
     textareaClassName: 'text-base md:text-lg',
     sendButtonClassName: 'md:size-10',

@@ -9,6 +9,7 @@ import { REVEAL } from './modules';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
+import { useComposerDraft } from './composer/useComposerDraft';
 import { WorkSpacesModule } from './work/WorkSpacesModule';
 import { JumpBackInModule } from './work/JumpBackInModule';
 import { RadarModule } from './work/RadarModule';
@@ -62,7 +63,7 @@ export function WorkHome({
   signedIn?: boolean;
   role?: UserRole;
 }) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useComposerDraft();
   const [confidential, setConfidential] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
 

@@ -7,6 +7,7 @@ import type { UserRole } from '@/types/auth';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
+import { useComposerDraft } from './composer/useComposerDraft';
 
 /**
  * ChatHome — the Chat tab's home surface (owner #34: the default tab). The
@@ -58,7 +59,7 @@ export function ChatHome({
   signedIn?: boolean;
   role?: UserRole;
 }) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useComposerDraft();
   const [confidential, setConfidential] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
 
