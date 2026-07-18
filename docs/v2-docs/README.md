@@ -3,6 +3,15 @@
 Everything about the v2 overhaul lives here. The old app (v1) keeps running untouched while v2
 is built behind a cookie + `proxy.ts` rewrite, visible only to researcher/admin/superadmin.
 
+## Why v2 — the north star (read first, applies to everyone incl. subagents)
+
+**v2 exists to keep the Lawexa codebase and system clean — no compromises.** v1 grew fast and
+accumulated mess; v2 is the chance to do it *properly*: clean architecture and clean code AND
+polished, deliberate UI/UX, with every part of the system given real attention — never "good
+enough." Concretely: no hacks, no `any`, no TODO punts; break each phase into subphases so nothing
+is rushed; study each v1 screen before redesigning it. **Coordinators must state this mission in
+every implementer/reviewer subagent brief** (subagents don't read this file).
+
 ## The three master docs (read in this order)
 
 1. **[architecture-audit.md](architecture-audit.md)** — what's wrong with v1. Full-codebase
@@ -22,6 +31,11 @@ Supporting: **[design-variations/](design-variations/)** — round-1 mockups + t
 Implementation runs in the numbered phases under [phases/](phases/). The ritual, matching the
 repo's quiz/channels convention:
 
+- **Break each phase into subphases/waves** (standing rule): never build a phase as one lump —
+  decompose it so every part gets proper attention and is properly implemented, each subphase its
+  own implement → adversarial-review → verify → ship loop. Record the breakdown in the phase
+  `plan.md`. (e.g. phase 3 → 3.0 shell+home redesign, engine port, wire composer, conversation
+  screen, cache, mobile-verify.)
 - **Before starting a phase**: its `plan.md` is reviewed/expanded to full task detail.
 - **Before redesigning ANY page/screen** (standing rule, every session): first do a first-hand
   **keep / redesign / drop study** of its v1 counterpart — element by element, its components and
