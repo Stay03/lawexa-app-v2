@@ -88,9 +88,20 @@ each its own implement → adversarial-review → verify → ship loop:
   the list. **Known cosmetic follow-ups (pre-existing, out of scope):** the drawer's Search
   button has no handler; `use-conversation-stream`/`JurisdictionField`/`StudyHome` import
   `lib/stores/authStore` (boundary quirk to revisit).
-- **W4 — cache integration** — **PENDING.** send/create/complete updates the conversations list
-  cache (`queryOptions` factory for conversations; RSC prefetch + hydration for the sidebar/list
-  recents on the same query source).
+- **W4 — cache integration** — **SHIPPED (`d8bb01d`).** The chat↔sidebar staleness bug class is
+  structurally closed: `v2/features/conversations/cache.ts` is the ONE shape-aware writer
+  (remove / touch / patch / upsert) over both cached list shapes (flat peek + infinite pages),
+  no-op reference-stable (precise invariant documented — recents consumers must never read
+  `dataUpdatedAt`); create upserts an optimistic row (guarded OFF for confidential/redacted —
+  privacy first), send + complete `touch`-bump the row, title arrival `patch`es in place (a late
+  title must not reorder), `deleteConfidential` reuses the module. RSC hydration:
+  `v2/features/conversations/server.ts` (server-only) prefetches page 1 of the EXACT
+  `infiniteRecents()` key over the DAL `apiFetch` (query string DERIVED from the shared params —
+  no drift), awaited in `app/v2/layout.tsx` behind a 3s timeout + `HydrationBoundary`, so a
+  signed-in hard load paints real sidebar rows at first paint; guests and API failures fall back
+  to today's client fetch. Adversarial review: **SHIP AS-IS** (first W4-class verdict; 4 LOW
+  findings, 3 applied). Known bound (review F4, documented in code): a send on a conversation
+  not present in any loaded recents page can't bump it — heals on the next natural refetch.
 - **W5 — conversations list page + manifest** — **PENDING.** The `/conversations` page, added to
   `routes.manifest.ts`, on the same query source as the sidebar recents.
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
