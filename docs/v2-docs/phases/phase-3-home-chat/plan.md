@@ -102,16 +102,29 @@ each its own implement → adversarial-review → verify → ship loop:
   to today's client fetch. Adversarial review: **SHIP AS-IS** (first W4-class verdict; 4 LOW
   findings, 3 applied). Known bound (review F4, documented in code): a send on a conversation
   not present in any loaded recents page can't bump it — heals on the next natural refetch.
-- **W5 — conversations list page + manifest** — **PENDING.** The `/conversations` page, added to
-  `routes.manifest.ts`, on the same query source as the sidebar recents.
+- **W5 — conversations list page + manifest** — **SHIPPED (`03a9b44`).** `/conversations` claimed
+  (exact manifest entry; v1 fallthrough intact); server shell + noindex metadata; the §E
+  keep/drop study (in `v1-keep-drop-and-redesign.md`) drove scope. URL-synced 300ms search
+  rebuilt lint-clean (guarded render-phase external-adopt — v1's props→state effect defect NOT
+  copied); `conversationsQueries.infiniteList({search})` keys under `lists()` so every W4 cache
+  write propagates (archived rows inline — this page is their only home); module-language rows
+  with the confidential emerald identity (v1 hid it), archived badge, anchored relative time;
+  distinct skeleton/empty(search-aware)/error/guest states. COLD adversarial review (the
+  implementer process died pre-report; reviewer derived intent from code): SHIP AFTER FIXES,
+  all applied — the search-hook desync reachable via bare `/conversations` nav links, the
+  sentinel re-rooted on the shell's real scroll container via the new
+  `v2/shell/shell-content.ts` id seam + `use-shell-scroll-root.ts` (a viewport root silently
+  loses `rootMargin` inside the nested overflow region — reusable lesson for every full-page
+  infinite list), the errored-search-under-kept-data silent failure (inline retry banner; dim
+  gated on `isFetching` so a settled error can't strand the list), 44px clear target,
+  confidential announced in the row's accessible name, placeholder-page fetch race masked.
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.
 
 ## Manifest additions
 
-At HEAD `v2/routes.manifest.ts` migrates `/` and `/c/*` (W3). `/conversations` joins when
-**W5** lands.
+At HEAD `v2/routes.manifest.ts` migrates `/`, `/c/*` (W3), and `/conversations` (W5).
 
 ## Exit criteria
 
