@@ -2,20 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useConversationStream,
   hasTranscript,
   deleteTranscript,
 } from '@/v2/runtime/chat-engine';
-import type {
-  MessageAttachment,
-  ConversationReference,
-  ConversationsListResponse,
-} from '@/types/chat';
+import type { MessageAttachment, ConversationReference } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
+import { conversationsCache } from '../cache';
 import { conversationsQueries } from '../queries';
 import {
   isConfidentialMark,
@@ -169,6 +166,9 @@ export function useConversationController(
 
   const narrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
   const stream = useConversationStream({
     // ── Privacy resolvers WIRED (see docblock). ──
     isConfidential: isConfidentialMark,
@@ -185,12 +185,16 @@ export function useConversationController(
       const line = truncateNarration(text);
       if (line) setNarration(line);
     },
+    // A turn finished — refresh this conversation's recents position + timestamp
+    // directly (covers the home-created turn 1, whose send ran in start-conversation
+    // rather than `submit`). No-op-stable when the row isn't cached (e.g. a
+    // confidential stub the server omits), so it never fabricates a leak.
+    onCompleted: () => {
+      conversationsCache.touch(queryClient, conversationId);
+    },
   });
 
   const { connectToStream, loadConversationHistory, loadConversationHistoryFromIDB, setConversationId, recoverPendingState, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle } = stream;
-
-  const router = useRouter();
-  const queryClient = useQueryClient();
 
   // ── Jurisdiction slot: seed once per conversation, persist on change. ──
   useEffect(() => {
@@ -305,6 +309,23 @@ export function useConversationController(
     });
   }, [conversationTitle, isConfidential]);
 
+  // ── Title upgrade → sidebar, no list refetch (wave-4 acceptance c). ──
+  // When this conversation's title resolves or upgrades (the async AI-name generation,
+  // or a history load), patch it into every recents cache IN PLACE — the sidebar/drawer
+  // adopt the real name without refetching the list, and WITHOUT reordering (recency
+  // owns position, not when the title happened to resolve). Confidential chats are
+  // skipped: their title is device-owned (IDB), whereas any server list stub is
+  // server-owned, so writing the device title onto it would only flicker on the next
+  // refetch. The RAW title is stored (consumers strip via `stripPastedTags`, exactly as
+  // for server rows); the write is no-op-stable when the title already matches, so this
+  // effect stays idempotent. `setQueriesData` is an external-store write (not React
+  // setState), so it is React-Compiler-clean inside an effect.
+  useEffect(() => {
+    if (conversationTitle && !isConfidential) {
+      conversationsCache.patch(queryClient, conversationId, { title: conversationTitle });
+    }
+  }, [conversationTitle, isConfidential, conversationId, queryClient]);
+
   // Clear on unmount only (a separate empty-dep effect, so a title/flag change
   // republishes without a transient empty flash), so the next route never inherits
   // this conversation's context.
@@ -328,6 +349,11 @@ export function useConversationController(
 
   const submit = useCallback(
     async (message: string, attachments: MessageAttachment[]) => {
+      // Optimistically bump this conversation to the top of the recents caches the
+      // instant the user sends — the sidebar/drawer reorder with NO refetch (wave-4
+      // acceptance a). No-op-stable when the row isn't cached; `onCompleted` refreshes
+      // the timestamp again when the turn settles.
+      conversationsCache.touch(queryClient, conversationId);
       const fileIds = attachments.map((a) => a.file_id);
       await send(message, {
         conversationId,
@@ -336,7 +362,7 @@ export function useConversationController(
         ...(fileIds.length > 0 && { fileIds, attachments }),
       });
     },
-    [send, conversationId, jurisdiction],
+    [send, conversationId, jurisdiction, queryClient],
   );
 
   const stop = useCallback(() => cancelStream(), [cancelStream]);
@@ -351,28 +377,11 @@ export function useConversationController(
     unmarkConfidential(conversationId);
     unmarkRedacted(conversationId);
     // Drop the row from every cached conversations list (peek + infinite pages)
-    // so no ghost entry lingers in the sidebar/drawer, THEN revalidate. There is
-    // no server delete endpoint — if the backend still returns a contentless stub
-    // on refetch, that's server truth (recorded as a backend ask); the content
-    // itself is already gone.
-    queryClient.setQueriesData<
-      ConversationsListResponse | InfiniteData<ConversationsListResponse>
-    >({ queryKey: conversationsQueries.lists() }, (cached) => {
-      if (!cached) return cached;
-      if ('pages' in cached) {
-        return {
-          ...cached,
-          pages: cached.pages.map((page) => ({
-            ...page,
-            data: page.data.filter((row) => String(row.id) !== conversationId),
-          })),
-        };
-      }
-      return {
-        ...cached,
-        data: cached.data.filter((row) => String(row.id) !== conversationId),
-      };
-    });
+    // via the shared shape-aware writer so no ghost entry lingers in the
+    // sidebar/drawer, THEN revalidate. There is no server delete endpoint — if the
+    // backend still returns a contentless stub on refetch, that's server truth
+    // (recorded as a backend ask); the content itself is already gone.
+    conversationsCache.remove(queryClient, conversationId);
     void queryClient.invalidateQueries({ queryKey: conversationsQueries.lists() });
     clearHeaderContext();
     router.push('/');

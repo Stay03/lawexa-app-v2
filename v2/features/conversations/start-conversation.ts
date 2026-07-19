@@ -11,6 +11,7 @@ import {
   renameTranscript,
   replaceLastUserTurnContent,
 } from '@/v2/runtime/chat-engine';
+import { conversationsCache, makeOptimisticConversation } from './cache';
 import { conversationsQueries } from './queries';
 
 /**
@@ -267,7 +268,23 @@ export async function startConversation(
     bridgeJurisdiction(conversationId, jurisdiction);
     writeConvInit(conversationId, { msg: displayMessage, exec: executionId, attachments });
 
-    // The recents everywhere (sidebar rail, mobile drawer, home strips) refresh.
+    // Put the new conversation at the top of every recents cache IMMEDIATELY, so the
+    // sidebar/drawer/home show it without waiting on a refetch (wave-4 acceptance b).
+    // SKIPPED for confidential/redacted: those hard-navigate (below), which rebuilds
+    // the cache from the server anyway — and a confidential message's text must never
+    // land in the recents cache, even transiently and even though it's client-only.
+    // The title is the user's own first message (honest, informative); the follow-up
+    // invalidation replaces the whole placeholder row with server truth.
+    if (!confidential && !redacted) {
+      conversationsCache.upsert(
+        deps.queryClient,
+        makeOptimisticConversation(conversationId, displayMessage),
+      );
+    }
+
+    // KEEP the invalidation: it reconciles the optimistic row to server truth (real
+    // fallback title, real fields, and the async AI-name upgrade) once the create
+    // settles — the upsert is the instant paint, this is the correctness backstop.
     void deps.queryClient.invalidateQueries({ queryKey: conversationsQueries.lists() });
 
     return {

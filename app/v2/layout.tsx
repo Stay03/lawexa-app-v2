@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import { notFound } from 'next/navigation';
+import { HydrationBoundary } from '@tanstack/react-query';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { V2QueryProvider } from '@/v2/runtime/query-provider';
+import { prefetchRecentsState } from '@/v2/features/conversations/server';
 import { AppShell } from '@/v2/shell/AppShell';
 import { DockProvider, DockHost } from '@/v2/shell/Dock';
 import { V2Sidebar } from '@/v2/shell/V2Sidebar';
@@ -100,6 +102,14 @@ export default async function V2Layout({
   const session = await verifySession();
   const user = session?.user ?? null;
 
+  // Server-prefetch the sidebar/drawer recents (first page) so a signed-in hard load
+  // paints real conversation rows at first paint, no skeleton flash (wave-4). Awaited
+  // deliberately (real rows require a resolved query) and gated on `user` — guests /
+  // failures get `undefined` (a no-op HydrationBoundary) and the client fetches as
+  // before. Same query key the chrome reads, so the client `useInfiniteQuery` adopts
+  // the hydrated page seamlessly. See `features/conversations/server.ts`.
+  const recentsState = await prefetchRecentsState(user);
+
   return (
     <div className="bg-background text-foreground">
       {/* Mirrors the v1 localStorage token into the httpOnly session cookie the
@@ -113,29 +123,35 @@ export default async function V2Layout({
           lifecycle because React never unloads the stylesheet. */}
       <DocumentLock />
       <V2QueryProvider>
-        {/* DockProvider bridges a route's floating composer into the AppShell
-            dock grid-row (grid-row 3, outside the scroll container) via a portal
-            — see v2/shell/Dock.tsx. Wraps the whole shell so both the dock host
-            (in the dock slot) and the page (in content) share one provider. When
-            no route portals anything, the dock stays empty and its row collapses. */}
-        <DockProvider>
-          <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
-            <V2Sidebar user={user} />
-            <SidebarInset className="min-h-0 overflow-hidden">
-              {/* Non-scrolling shell: header / scrollable content / dock. DockHost
-                  owns the dock slot: it renders an SSR height reservation on
-                  conversation routes (so the floating composer never causes CLS) and
-                  is the portal target for the real composer. On every other route it
-                  renders nothing and the dock row collapses to zero height — the
-                  bottom safe-area rides on the dock CONTENT, not this row, so no
-                  route gains a phantom notch strip. */}
-              <AppShell header={<V2Header user={user} />} dock={<DockHost />}>
-                {children}
-              </AppShell>
-            </SidebarInset>
-            <V2Drawer user={user} />
-          </SidebarProvider>
-        </DockProvider>
+        {/* Seed the browser query cache with the server-prefetched recents (the
+            sidebar/drawer read the same key), so signed-in first paint is real rows
+            rather than a skeleton. Inside the provider so it hydrates into the client
+            the chrome consumes; `undefined` state (guests / prefetch miss) is a no-op. */}
+        <HydrationBoundary state={recentsState}>
+          {/* DockProvider bridges a route's floating composer into the AppShell
+              dock grid-row (grid-row 3, outside the scroll container) via a portal
+              — see v2/shell/Dock.tsx. Wraps the whole shell so both the dock host
+              (in the dock slot) and the page (in content) share one provider. When
+              no route portals anything, the dock stays empty and its row collapses. */}
+          <DockProvider>
+            <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
+              <V2Sidebar user={user} />
+              <SidebarInset className="min-h-0 overflow-hidden">
+                {/* Non-scrolling shell: header / scrollable content / dock. DockHost
+                    owns the dock slot: it renders an SSR height reservation on
+                    conversation routes (so the floating composer never causes CLS) and
+                    is the portal target for the real composer. On every other route it
+                    renders nothing and the dock row collapses to zero height — the
+                    bottom safe-area rides on the dock CONTENT, not this row, so no
+                    route gains a phantom notch strip. */}
+                <AppShell header={<V2Header user={user} />} dock={<DockHost />}>
+                  {children}
+                </AppShell>
+              </SidebarInset>
+              <V2Drawer user={user} />
+            </SidebarProvider>
+          </DockProvider>
+        </HydrationBoundary>
       </V2QueryProvider>
     </div>
   );

@@ -43,13 +43,18 @@ const RECENTS_PARAMS: ListConversationsParams = {
  * page (owner #26: "initial page ~20") and no `page` (the infinite query threads
  * that per fetch). A module constant so the sidebar and drawer produce identical
  * keys and share ONE accumulating cache entry.
+ *
+ * EXPORTED + `satisfies` (not annotated) so the wave-4 server prefetcher
+ * (`server.ts`) reads the SAME concrete params to build its query string — one
+ * source of truth for the infinite-recents key, no client/server drift. `satisfies`
+ * keeps the literal types (`status: 'active'`, …) the fetcher needs.
  */
-const INFINITE_RECENTS_PARAMS: Omit<ListConversationsParams, 'page'> = {
+export const INFINITE_RECENTS_PARAMS = {
   per_page: 20,
   status: 'active',
   sort_by: 'updated_at',
   sort_order: 'desc',
-};
+} satisfies Omit<ListConversationsParams, 'page'>;
 
 export const conversationsQueries = {
   all: ['conversations'] as const,
