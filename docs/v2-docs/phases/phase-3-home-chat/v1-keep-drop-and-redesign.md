@@ -303,3 +303,29 @@ home; the loser's file is deleted; the switcher can stay (dev-only) or be remove
 
 After approval → phase-3 chat waves proper (engine port → wire composer → conversation screen →
 cache integration → mobile verification), using §C as the keep/drop scope.
+
+---
+
+## E. Conversations list page — keep/drop (W5 prep, first-hand study, July 19, 2026)
+
+From `app/(main)/conversations/page.tsx` (203 lines) + `components/conversations/{MyConversationCard,ConversationSearchBar,ConversationListGroup,ConversationListSkeleton}.tsx` + `lib/hooks/useConversations.ts`.
+
+**KEEP (capabilities to port):**
+- URL-synced `?search=` (shareable, back/forward-safe) with a 300ms debounced input + clear affordance; search-aware empty state with a "Clear search" action.
+- Infinite list (v1: per_page 15, sentinel + spinner + "No more conversations" end-cap); distinct skeleton / empty / error(retry) states; Suspense boundary for `useSearchParams`.
+- Row anatomy: the WHOLE row is a link to `/c/{id}`; title via `stripPastedTags`; `Archived` badge when `status === 'archived'`; relative `updated_at` time; quiet chevron affordance.
+- Staggered list entrance (v1 caps the stagger at 14 rows).
+
+**DROP / v1 defects the port must NOT copy:**
+- `formatDistanceToNow(new Date(...))` runs in render — impure-render (React Compiler lint ERROR in v2). The v2 relative time needs a lint-clean pattern.
+- `ConversationSearchBar` syncs local state from props inside an effect (setState-in-effect — lint ERROR in v2). Rebuild the debounce lint-clean.
+- The entrance animations are not `motion-safe`-gated (standing motion rule violation).
+- v1 layout chrome (`PageContainer`/`PageHeader`) is boundary-blocked; the v2 page lives in the AppShell content region and publishes its title to the header centre slot via `header-context` instead.
+
+**REDESIGN (v2-native upgrades):**
+- The list MUST ride the W4 query source: keys under `conversationsQueries.lists()` so every `conversationsCache` write (send-bump, create-upsert, title-patch, delete-remove) propagates to this page for free — that IS the point of W5 following W4.
+- Rows in the module design language (`v2/shell/designs/modules/` rows anatomy), 44px targets, both themes.
+- Surface `is_confidential` (emerald shield identity) — v1 hides it; v2's honesty language makes it visible.
+- Row count is unbounded server-side; v1 shows archived rows inline with a badge — v2 keeps that (this page is the only surface where archived conversations are reachable).
+
+Verdicts recorded BEFORE building per the standing rule; W5 adds `'/conversations'` (exact entry) to `v2/routes.manifest.ts`.

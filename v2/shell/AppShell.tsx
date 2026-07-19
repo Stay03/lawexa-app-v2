@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { V2_SHELL_CONTENT_ID } from './shell-content';
 
 /**
  * AppShell — the v2 non-scrolling shell frame (Phase 1, WP6).
@@ -47,7 +48,12 @@ export function AppShell({ children, header, dock }: AppShellProps) {
       {header != null ? (
         <header className="v2-shell__header v2-safe-top">{header}</header>
       ) : null}
-      <div className="v2-shell__content">{children}</div>
+      {/* The id lets full-page surfaces root IntersectionObservers against the
+          REAL scroll container (see use-shell-scroll-root.ts) — a viewport root
+          silently loses its rootMargin inside this nested overflow region. */}
+      <div id={V2_SHELL_CONTENT_ID} className="v2-shell__content">
+        {children}
+      </div>
       {dock != null ? <div className="v2-shell__dock">{dock}</div> : null}
     </div>
   );

@@ -56,6 +56,22 @@ export const INFINITE_RECENTS_PARAMS = {
   sort_order: 'desc',
 } satisfies Omit<ListConversationsParams, 'page'>;
 
+/**
+ * Options for the full conversations LIST PAGE (`/conversations`, wave-5). Only
+ * `search` varies at the call site — the rest of the params are fixed below.
+ */
+export interface ConversationsListPageOptions {
+  /** Title search (`?search=`). Empty / whitespace is treated as no filter. */
+  search?: string;
+}
+
+/**
+ * The list page's fixed page size. Matches v1's `/conversations` (`per_page 15`)
+ * — a smaller page than the sidebar peek because the page is a fuller row and the
+ * user scrolls it deliberately (the sentinel loads more).
+ */
+const LIST_PAGE_PER_PAGE = 15;
+
 export const conversationsQueries = {
   all: ['conversations'] as const,
 
@@ -99,4 +115,45 @@ export const conversationsQueries = {
       },
       staleTime: STALE_TIMES.standard,
     }),
+
+  /**
+   * The infinite list backing the `/conversations` PAGE (wave-5). Deliberately
+   * DIFFERENT params from the recents rail: it omits `status`, so ARCHIVED rows
+   * appear inline (the list page is the only surface where archived
+   * conversations are reachable — v1-keep-drop §E), and pages at `per_page 15`
+   * (v1 parity). Optional `search` maps to `?search=` for the title search.
+   *
+   * KEY FAMILY. Its queryKey lives under `lists()` (the same prefix
+   * `infiniteRecents()` uses), so every `conversationsCache` write
+   * (send-bump / create-upsert / title-patch / delete-remove) fans out to this
+   * entry too via `setQueriesData({ queryKey: lists() })` — that free
+   * propagation is the whole reason wave-5 follows wave-4. The `params` object
+   * (no `status`, `per_page 15`, optional `search`) can never collide with the
+   * recents key (`status:'active'`, `per_page 20`), and each distinct `search`
+   * is its own cache entry that also receives the fan-out.
+   *
+   * A single `params` object feeds BOTH the queryKey and the queryFn, so the key
+   * and the request can never drift. STANDARD tier — same reasoning as `list()`.
+   * `enabled` stays a call-site concern (guests never fetch).
+   */
+  infiniteList: ({ search }: ConversationsListPageOptions = {}) => {
+    const trimmed = search?.trim();
+    const params: ListConversationsParams = {
+      per_page: LIST_PAGE_PER_PAGE,
+      sort_by: 'updated_at',
+      sort_order: 'desc',
+      ...(trimmed ? { search: trimmed } : {}),
+    };
+    return infiniteQueryOptions({
+      queryKey: [...conversationsQueries.lists(), 'infinite', params] as const,
+      queryFn: ({ pageParam }) =>
+        chatApi.listConversations({ ...params, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage: ConversationsListResponse) => {
+        const { current_page, last_page } = lastPage.pagination;
+        return current_page < last_page ? current_page + 1 : undefined;
+      },
+      staleTime: STALE_TIMES.standard,
+    });
+  },
 };
