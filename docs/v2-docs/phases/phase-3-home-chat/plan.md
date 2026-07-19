@@ -50,12 +50,20 @@ each its own implement → adversarial-review → verify → ship loop:
   mode-store marks (`confidentialIds`/`redactedIds`) + hard-navigate so v1 hydrates them, no
   global-toggle leak. Real uploads (v1 validation), drafts, guest round-trip, recents-cache
   invalidation.
-- **W3 — conversation screen** (`/c/[conversationId]`) — **IN PROGRESS.** Claim the route in
-  `routes.manifest.ts`; mount the engine with the confidential/redacted resolvers wired (the
-  privacy acceptance criterion); virtualized message list (`@tanstack/react-virtual`,
-  `anchorTo: 'end'`, `followOnAppend`); floating dock composer on the keyboard-safe shell; one
-  unified activity region; **working message actions** (copy/feedback — dead buttons in v1) +
-  **Regenerate** on completed answers.
+- **W3 — conversation screen** (`/c/[conversationId]`) — **SHIPPED `f66bb7f`** (44 files).
+  `/c/*` claimed in `routes.manifest.ts` (v1 fallback intact; shared conversations render with
+  the view-only pill); engine mounted with the confidential/redacted resolvers wired over
+  `mode-marks.ts` — the privacy acceptance criterion PASSED its adversarial trace end-to-end;
+  per-row token repaint + native `content-visibility` virtualization (the standards' named
+  react-virtual ≥3.16 never shipped — dated correction in foundation-standards.md §5); all 15
+  §C cards ported; ONE activity region; scroll etiquette; dock composer (SSR reservation kills
+  the CLS); working copy + **"Ask again"** (honest re-send — a true in-place regenerate awaits a
+  backend endpoint, logged as a future ask).
+- **FIX ROUND (owner live review of W3, July 19 — runs BEFORE W4; decisions recorded in
+  §A7 of `v1-keep-drop-and-redesign.md`):** confidential-copy honesty + delete affordance +
+  expires_at enforcement; dock composer → v1 channels MessageComposer anatomy; tool-call
+  components redesign w/ symmetric animations; Library collapsible animation; HomeTabs scoped
+  to home (context title elsewhere); case-mention tooltips ported touch-friendly.
 - **W4 — cache integration** — **PENDING.** send/create/complete updates the conversations list
   cache (`queryOptions` factory for conversations; RSC prefetch + hydration for the sidebar/list
   recents on the same query source).
@@ -67,9 +75,8 @@ each its own implement → adversarial-review → verify → ship loop:
 
 ## Manifest additions
 
-At HEAD `v2/routes.manifest.ts` migrates only `/`, so `/c/{id}` currently falls through to v1's
-conversation page (the W2 strangler seam). `/c/[conversationId]` joins the manifest when **W3**
-lands; `/conversations` when **W5** lands.
+At HEAD `v2/routes.manifest.ts` migrates `/` and `/c/*` (W3). `/conversations` joins when
+**W5** lands.
 
 ## Exit criteria
 

@@ -149,6 +149,32 @@ Nothing from this redesign is built yet.
     BOTH tabs (and future modules). Owner explicitly demanded online research/inspiration for
     this pass — module components must look designed, not assembled.
 
+### A7. Owner's review of the W3 conversation screen (July 19, 2026; binding — the fix round
+### runs BEFORE chat wave W4)
+
+39. **Confidential honesty**: the claim "stored only on this device, never on our servers" is
+    true server-side but the transcripts persist INDEFINITELY in the device's IndexedDB
+    (`lawexa-confidential`; the schema's `expires_at` field is set/enforced by NOTHING, in v1
+    or v2 — and v1's "not stored after your session" copy is false locally). Fix: honest copy
+    ("Stored only on this device until you delete it — never on our servers") + a delete
+    affordance on confidential conversations + ENFORCE `expires_at` (prune on open).
+40. **Conversation dock composer anatomy = v1's CHANNELS `MessageComposer`**
+    (`components/collab/MessageComposer.tsx` — study first-hand), keeping the working `+` menu
+    and the jurisdiction chip.
+41. **Tool-call components redesigned** (CompactToolChain / ToolStepItem / ToolCallDetails):
+    clean/sleek/minimal per the module design system, with SYMMETRIC smooth animations on the
+    details dropdown AND the show-all/collapse transitions.
+42. **Library collapsible (sidebar + drawer) animates** — currently instant (the shared
+    Collapsible primitive is bare Radix); animate height both directions from the v2 usage via
+    the content-height variable, motion-reduce respected.
+43. **Chat|Work|Study tabs scoped to the HOME only** (owner default-approved option A): on
+    other routes the header's center slot shows context instead — the conversation title (+
+    confidential badge) on `/c/{id}`, page titles elsewhere. (Option B — global home shortcuts —
+    was considered and declined by default.)
+44. **Case-mention hover tooltips ported v2-natively** (a documented W3 deferral): case preview
+    over `lib/api/cases`, hover-card on desktop, TOUCH-FRIENDLY popover on mobile (the §C ask —
+    v1's are hover-only and invisible on phones).
+
 ---
 
 ## B. Shell + home — keep / drop / fix (first-hand study)
