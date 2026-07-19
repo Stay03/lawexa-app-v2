@@ -59,11 +59,35 @@ each its own implement → adversarial-review → verify → ship loop:
   §C cards ported; ONE activity region; scroll etiquette; dock composer (SSR reservation kills
   the CLS); working copy + **"Ask again"** (honest re-send — a true in-place regenerate awaits a
   backend endpoint, logged as a future ask).
-- **FIX ROUND (owner live review of W3, July 19 — runs BEFORE W4; decisions recorded in
-  §A7 of `v1-keep-drop-and-redesign.md`):** confidential-copy honesty + delete affordance +
-  expires_at enforcement; dock composer → v1 channels MessageComposer anatomy; tool-call
-  components redesign w/ symmetric animations; Library collapsible animation; HomeTabs scoped
-  to home (context title elsewhere); case-mention tooltips ported touch-friendly.
+- **FIX ROUND (owner live review of W3, July 19; decisions in §A7 of
+  `v1-keep-drop-and-redesign.md`) — SHIPPED (`9c905af`).** Three parallel Opus implementers +
+  one adversarial reviewer (verdict SHIP AFTER FIXES; all 7 findings applied). What landed:
+  honest confidential copy at ALL FOUR sites (the reviewer caught a fourth — HomeComposer's
+  `+`-menu item — the round's own briefs had missed) + `ConfidentialBanner` with a
+  destructive-confirm delete (disconnect → IDB wipe → both persisted marks cleared → optimistic
+  recents-cache removal → home) + attachment-level `expires_at` stamped from the 24h policy and
+  prune-filtered on open (transcript text has NO TTL — the binding copy governs);
+  `appendAssistantTurn` no longer create-if-absent (kills the delete-mid-stream resurrection
+  vector); dock composer rebuilt to the channels single-row anatomy with all staging inside the
+  card + `ComposerSkeleton` matched; tool chain redesigned on the module language — the v1
+  `animate-collapse-up/down` classes were proven DEAD (no keyframes exist anywhere; audit Part 2
+  was right) and the working replacement is the v2-named `.v2-collapse` utility in `shell.css`
+  (both directions, motion-reduce, `defaultOpen` first-paint caveat documented) with the
+  show-all/collapse now a mounted `0fr↔1fr` grid transition (+`inert` on the collapsed steps);
+  Library collapsible animated in the sidebar AND built-from-scratch in the drawer (its Library
+  was static; the top row deliberately became a toggle, `/cases` reachable via the child row);
+  tabs scoped to home with the centre slot showing route context via the new
+  `v2/shell/header-context.ts` store (controller publishes title+confidential incl. a
+  title-arrival fetch; header cross-fades tabs↔context with `inert`, skeleton-first title);
+  case-mention previews ported v2-natively (module-stable markdown `a` override, TanStack
+  cache, hover-card desktop / tap-preview popover on touch, origin-gated path-anchored slug
+  detection; new `components/ui/hover-card.tsx` primitive — v1 untouched).
+  **LOGGED BACKEND ASK:** confidential conversations may appear as contentless stubs in the
+  conversations list; v2 now deletes the device-owned content but no user-facing conversation
+  delete endpoint exists — we want a deleted confidential conversation to stop appearing in
+  the list. **Known cosmetic follow-ups (pre-existing, out of scope):** the drawer's Search
+  button has no handler; `use-conversation-stream`/`JurisdictionField`/`StudyHome` import
+  `lib/stores/authStore` (boundary quirk to revisit).
 - **W4 — cache integration** — **PENDING.** send/create/complete updates the conversations list
   cache (`queryOptions` factory for conversations; RSC prefetch + hydration for the sidebar/list
   recents on the same query source).
