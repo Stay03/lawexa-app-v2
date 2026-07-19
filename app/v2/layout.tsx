@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { V2QueryProvider } from '@/v2/runtime/query-provider';
 import { AppShell } from '@/v2/shell/AppShell';
+import { DockProvider, DockHost } from '@/v2/shell/Dock';
 import { V2Sidebar } from '@/v2/shell/V2Sidebar';
 import { V2Drawer } from '@/v2/shell/V2Drawer';
 import { V2Header } from '@/v2/shell/V2Header';
@@ -112,15 +113,29 @@ export default async function V2Layout({
           lifecycle because React never unloads the stylesheet. */}
       <DocumentLock />
       <V2QueryProvider>
-        <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
-          <V2Sidebar user={user} />
-          <SidebarInset className="min-h-0 overflow-hidden">
-            {/* Non-scrolling shell: header / scrollable content / dock (empty
-                this wave). Mechanics only — see AppShell. */}
-            <AppShell header={<V2Header user={user} />}>{children}</AppShell>
-          </SidebarInset>
-          <V2Drawer user={user} />
-        </SidebarProvider>
+        {/* DockProvider bridges a route's floating composer into the AppShell
+            dock grid-row (grid-row 3, outside the scroll container) via a portal
+            — see v2/shell/Dock.tsx. Wraps the whole shell so both the dock host
+            (in the dock slot) and the page (in content) share one provider. When
+            no route portals anything, the dock stays empty and its row collapses. */}
+        <DockProvider>
+          <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
+            <V2Sidebar user={user} />
+            <SidebarInset className="min-h-0 overflow-hidden">
+              {/* Non-scrolling shell: header / scrollable content / dock. DockHost
+                  owns the dock slot: it renders an SSR height reservation on
+                  conversation routes (so the floating composer never causes CLS) and
+                  is the portal target for the real composer. On every other route it
+                  renders nothing and the dock row collapses to zero height — the
+                  bottom safe-area rides on the dock CONTENT, not this row, so no
+                  route gains a phantom notch strip. */}
+              <AppShell header={<V2Header user={user} />} dock={<DockHost />}>
+                {children}
+              </AppShell>
+            </SidebarInset>
+            <V2Drawer user={user} />
+          </SidebarProvider>
+        </DockProvider>
       </V2QueryProvider>
     </div>
   );

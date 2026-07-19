@@ -76,6 +76,18 @@ html.v2-document-lock body {
   grid-row: 3;
 }
 
+/* SSR height reservation for the floating composer (see Dock.tsx). `DockReservation`
+   renders a composer-shaped skeleton (conversation routes only) so the dock row has
+   a stable height from first paint. The instant a route portals its real content
+   (marked `data-v2-dock-content`) into the dock, this rule hides the reservation —
+   pure CSS, applied synchronously with the DOM insertion, so there is never a
+   double-height frame and no coordinating React state is needed. The dock's bottom
+   safe-area lives on the CONTENT wrappers (reservation + portal), never on the row
+   itself, so a route with no dock content adds no notch strip and the row collapses. */
+.v2-shell__dock:has([data-v2-dock-content]) [data-v2-dock-reservation] {
+  display: none;
+}
+
 /* -----------------------------------------------------------------------------
    Safe-area utilities (standards §4). `viewport-fit=cover` (set in the v2 layout
    viewport export) lets content extend under the notch/home-indicator; every

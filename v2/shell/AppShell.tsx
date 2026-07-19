@@ -21,10 +21,13 @@ import type { ReactNode } from 'react';
  *    LOOK floating (rounded, shadowed, inset margins, transcript visible behind
  *    it) but let this grid row POSITION it — never `position: fixed`. The dvh +
  *    `--keyboard-inset` height keeps the dock above the iOS keyboard for free.
- *  - Header/dock get safe-area padding here so every bar clears the notch /
- *    home-indicator (`viewport-fit=cover`). Content authors don't repeat it.
+ *  - The HEADER gets bottom-notch-safe top padding here. The DOCK's bottom
+ *    safe-area rides on its CONTENT instead (the portaled composer / the
+ *    reservation — see Dock.tsx), NOT on this always-present row: a route with no
+ *    dock content (e.g. home) must gain no notch strip, and the empty row must
+ *    still collapse to zero height. Putting `v2-safe-bottom` here broke that.
  *  - Slots are optional: each element carries an explicit `grid-row`, so an
- *    omitted header or dock collapses its row without shifting the others.
+ *    omitted header or an empty dock collapses its row without shifting the others.
  *
  * Visuals are deliberately neutral (existing tokens) — phase-2 owns the real
  * header/dock chrome; this WP ships only the mechanics any nav can slot into.
@@ -45,9 +48,7 @@ export function AppShell({ children, header, dock }: AppShellProps) {
         <header className="v2-shell__header v2-safe-top">{header}</header>
       ) : null}
       <div className="v2-shell__content">{children}</div>
-      {dock != null ? (
-        <div className="v2-shell__dock v2-safe-bottom">{dock}</div>
-      ) : null}
+      {dock != null ? <div className="v2-shell__dock">{dock}</div> : null}
     </div>
   );
 }

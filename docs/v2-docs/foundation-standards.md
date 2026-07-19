@@ -189,6 +189,15 @@ Full citations live in the research transcripts; key URLs inline.
   (`anchorTo: 'end'`, `followOnAppend: true`, prepend stability, `measureElement` dynamic heights,
   `scrollToEnd()`). Headless, fits our stack; virtua is runner-up; react-window lacks chat
   semantics.
+  **CORRECTION (July 19, 2026, verified against the npm registry during chat wave 3):** the
+  version and APIs named above DO NOT EXIST — react-virtual's latest is **3.14.6** (no 3.15/3.16
+  ever shipped) and v3 has no `anchorTo`/`followOnAppend`. The library itself is installable;
+  what's absent are the chat-specific semantics this entry promised. The shipped v2 conversation
+  screen therefore virtualizes off-screen message groups with native CSS
+  (`content-visibility: auto` + `contain-intrinsic-size`), which sidesteps the genuinely hard
+  problem of windowing STREAMING content (measured heights change mid-stream) — see
+  `v2/features/conversations/conversation/MessageList.tsx`. Revisit a JS virtualizer only if
+  real transcripts outgrow the CSS approach.
 - **PWA**: manifest gets explicit `id`, `screenshots` (richer install UI),
   `launch_handler: navigate-existing` (notification clicks focus the existing window — right for
   chat); **Serwist** (`@serwist/next`) service worker — precache shell, SWR for images,
@@ -266,7 +275,7 @@ guides, pre-App-Router era):
 | Auth enforcement | server-only DAL, proxy optimistic-only | official guidance + CVE-2025-29927 lesson |
 | Query layer | queryOptions factories + tier table + global MutationCache | TkDodo/TanStack canon |
 | Primitives | Radix (pin `-b radix`) | mature; Base UI switch is optional, not urgent |
-| Virtualizer | @tanstack/react-virtual ≥3.16 | first-class chat semantics, headless |
+| Virtualizer | ~~@tanstack/react-virtual ≥3.16~~ native `content-visibility` (July 19 correction — the named version/APIs never shipped; latest is 3.14.6) | streaming-safe, zero deps |
 | Drawer | vaul | de-facto standard, Radix-based |
 | Streaming markdown | Streamdown | purpose-built for token streams |
 | Motion lib | tw-animate-css + `motion` at leaves | CSS-first; RSC-clean |

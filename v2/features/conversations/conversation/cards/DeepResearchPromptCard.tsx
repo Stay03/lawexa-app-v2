@@ -1,0 +1,81 @@
+'use client';
+
+import { useState } from 'react';
+import { Brain } from 'lucide-react';
+
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useV2ChatContext } from '@/v2/features/conversations/conversation/chat-context';
+import { NotificationNudge } from './NotificationNudge';
+import type { DeepResearchPromptInfo } from '@/lib/utils/parse-content-xml';
+
+interface DeepResearchPromptCardProps {
+  prompt: DeepResearchPromptInfo;
+  isInteracted?: boolean;
+}
+
+export function DeepResearchPromptCard({ prompt, isInteracted = false }: DeepResearchPromptCardProps) {
+  const [clicked, setClicked] = useState(false);
+  const chatContext = useV2ChatContext();
+
+  const handleAction = (label: string) => {
+    setClicked(true);
+    chatContext?.sendMessage(label);
+  };
+
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base font-medium">
+          <Brain className="size-4 text-primary" />
+          {prompt.title}
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">{prompt.message}</p>
+
+        <div className="rounded-lg bg-muted/50 p-3">
+          <p className="mb-1 text-xs font-medium text-muted-foreground">
+            Query Summary
+          </p>
+          <p className="text-sm">{prompt.querySummary}</p>
+        </div>
+
+        {prompt.estimatedSources.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {prompt.estimatedSources.map((source) => (
+              <Badge key={source} variant="outline">
+                {source}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <CardFooter className="flex flex-col gap-2">
+        <div className="flex gap-2 w-full">
+          {prompt.actions.map((action) => (
+            <Button
+              key={action.id}
+              variant={action.id === 'confirm' ? 'default' : 'outline'}
+              size="sm"
+              disabled={clicked || isInteracted || chatContext?.isStreaming}
+              onClick={() => handleAction(action.label)}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </div>
+        <NotificationNudge />
+      </CardFooter>
+    </Card>
+  );
+}

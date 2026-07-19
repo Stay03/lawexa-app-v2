@@ -14,7 +14,7 @@
  * `'/'` is treated as an exact path and therefore matches ONLY the root — it is
  * never allowed to behave as a catch-all prefix.
  */
-export const V2_ROUTES = ['/'] as const;
+export const V2_ROUTES = ['/', '/c/*'] as const;
 
 export type V2Route = (typeof V2_ROUTES)[number];
 
