@@ -47,7 +47,7 @@ import { useMounted } from '@/v2/shell/use-mounted';
 
 const CONFIDENTIAL_HEADING = 'Confidential Chat';
 const CONFIDENTIAL_SUBLINE =
-  'For privileged legal discussions and sensitive client matters. Chats are not stored after your session.';
+  'For privileged legal discussions and sensitive client matters. Stored only on this device until you delete it — never on our servers.';
 
 interface HomeGreetingProps {
   name?: string;

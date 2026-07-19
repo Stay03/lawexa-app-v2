@@ -1,10 +1,11 @@
 'use client';
 
 import { memo, useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { CaseMentionLink } from './CaseMentionLink';
 
 /**
  * MarkdownText — the streaming-safe markdown renderer (foundation-standards §5).
@@ -25,6 +26,17 @@ import { cn } from '@/lib/utils';
 
 // Stable module-level plugin list — a fresh array each render would defeat memo.
 const REMARK_PLUGINS = [remarkBreaks, remarkGfm];
+
+/**
+ * Stable module-level component overrides. MUST be defined once at module scope —
+ * a fresh `components` object per render would give every `MarkdownBlock` a new
+ * prop identity and defeat the per-block `React.memo` streaming pipeline. It
+ * overrides only `a`, routing case-mention links through the preview (hover-card
+ * on pointer devices, tap popover on touch); every other anchor renders exactly
+ * as react-markdown's default. {@link CaseMentionLink} holds no data hook, so a
+ * token flush never fetches or re-renders beyond the block already re-parsing.
+ */
+const MARKDOWN_COMPONENTS: Components = { a: CaseMentionLink };
 
 const PROSE_CLASS =
   'prose prose-sm dark:prose-invert max-w-none overflow-x-hidden break-words ' +
@@ -71,7 +83,11 @@ function splitMarkdownBlocks(text: string): string[] {
 }
 
 const MarkdownBlock = memo(function MarkdownBlock({ content }: { content: string }) {
-  return <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{content}</ReactMarkdown>;
+  return (
+    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
+      {content}
+    </ReactMarkdown>
+  );
 });
 
 export const MarkdownText = memo(function MarkdownText({

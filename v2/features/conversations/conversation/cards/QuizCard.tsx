@@ -195,7 +195,7 @@ export function QuizCard({
                 />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+            <CollapsibleContent className="v2-collapse">
               <div className="space-y-2 pt-3">
                 <p className="text-muted-foreground text-sm leading-relaxed">
                   {quiz.explanation}

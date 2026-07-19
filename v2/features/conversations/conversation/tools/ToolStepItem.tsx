@@ -1,28 +1,65 @@
 'use client';
 
-import { Brain } from 'lucide-react';
-import {
-  ChainOfThoughtStep,
-  ChainOfThoughtTrigger,
-  ChainOfThoughtContent,
-} from '@/components/prompt-kit';
+import { Brain, Check, ChevronDown, Loader2, X } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import { ToolCallDetails } from './ToolCallDetails';
 import { SearchResultsList } from '../cards/SearchResultsCards';
 import { StatuteResultsDisplay } from '../cards/StatuteResultsDisplay';
 import type { ToolMessage } from '@/types/chat';
 
 /**
- * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — v2 port of v1's
- * `components/chat/tool-step-item.tsx`. Byte-faithful: same tool-name → human-copy
- * mapping, same statute/memory special-casing, same expand/collapse and inline
- * result rendering. Only import locations changed (result cards now live under
- * `../cards`, the rest are allowed primitives/utils).
+ * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — REDESIGNED for the
+ * shared module design language (fix round §A7-41). Same BRAIN (the tool-name →
+ * human-copy mapping, the statute/memory special-casing, the expand-only-when-
+ * complete rule, the inline result rendering), NEW SKIN: it no longer leans on the
+ * `ChainOfThought*` primitives and their baked-in green-500 success circle + inline
+ * green-check SVG. Instead a native, quiet marker (monochrome, destructive-for-
+ * errors — gold/green reserved out of small marks) sits over a hairline connector,
+ * and the per-step details dropdown animates BOTH directions through the shared
+ * `.v2-collapse` utility (these collapsibles default closed, so it is safe always-on)
+ * — replacing the DEAD `animate-collapse-*` classes that never had keyframes.
  */
+
+/**
+ * A tool step's status dot — the module language's quiet marker: a `bg-secondary`
+ * disc with a muted glyph for loading/success, switching to a `destructive` tint
+ * only on failure. NEVER the old green palette. Memory tools carry a Brain (both
+ * while working and once recalled), mirroring the taxonomy's special-casing.
+ */
+export function ToolStepMarker({
+  status,
+  memory = false,
+}: {
+  status: 'loading' | 'success' | 'error';
+  memory?: boolean;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'relative z-10 flex size-5 shrink-0 items-center justify-center rounded-full',
+        status === 'error'
+          ? 'bg-destructive/10 text-destructive'
+          : 'bg-secondary text-muted-foreground',
+      )}
+    >
+      {status === 'error' ? (
+        <X className="size-3" strokeWidth={2.5} />
+      ) : memory ? (
+        <Brain className="size-3" />
+      ) : status === 'loading' ? (
+        <Loader2 className="size-3 animate-spin motion-reduce:animate-none" />
+      ) : (
+        <Check className="size-3" strokeWidth={2.5} />
+      )}
+    </span>
+  );
+}
 
 function getStatuteTitle(toolResult?: { data?: unknown }): string | null {
   if (!toolResult?.data || typeof toolResult.data !== 'object') return null;
@@ -176,40 +213,58 @@ export function ToolStepItem({
   );
 
   return (
-    <ChainOfThoughtStep
-      isLast={isLast}
-      status={status}
-      icon={isMemoryTool ? <Brain className="h-3 w-3" /> : undefined}
-      className={className}
-    >
-      <Collapsible open={isExpanded} onOpenChange={() => isComplete && onToggle()}>
-        <CollapsibleTrigger asChild disabled={!isComplete}>
-          <ChainOfThoughtTrigger
-            isClickable={isComplete}
-            isExpanded={isExpanded}
-            rightContent={undefined}
-          >
-            <span className="font-medium">{action}</span>
-            {detail && (
-              <span className="text-muted-foreground font-normal"> {detail}</span>
-            )}
-          </ChainOfThoughtTrigger>
-        </CollapsibleTrigger>
+    <div className={cn('relative pb-1', className)}>
+      {/* Hairline chain connector to the next step (Linear-style), hidden on the
+          last step. Sits under the marker's centre (marker is size-5). */}
+      {!isLast && (
+        <span className="bg-border absolute bottom-0 left-[9px] top-6 w-px" aria-hidden />
+      )}
 
-        <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
-          <ChainOfThoughtContent>
+      <Collapsible open={isExpanded} onOpenChange={() => isComplete && onToggle()}>
+        <div className="flex items-start gap-2">
+          <ToolStepMarker status={status} memory={isMemoryTool} />
+          <CollapsibleTrigger asChild disabled={!isComplete}>
+            <button
+              type="button"
+              disabled={!isComplete}
+              className={cn(
+                'flex min-h-6 flex-1 items-center gap-1.5 rounded-md py-0.5 pr-1 text-left transition-colors',
+                isComplete
+                  ? 'v2-interactive hover:bg-secondary/50 -mx-1.5 cursor-pointer px-1.5'
+                  : 'cursor-default',
+              )}
+            >
+              <span className="min-w-0 flex-1 text-sm leading-snug">
+                <span className="text-foreground font-medium">{action}</span>
+                {detail && <span className="text-muted-foreground font-normal"> {detail}</span>}
+              </span>
+              {isComplete && (
+                <ChevronDown
+                  aria-hidden
+                  className={cn(
+                    'text-muted-foreground size-3.5 shrink-0 transition-transform duration-200 motion-reduce:transition-none',
+                    isExpanded && 'rotate-180',
+                  )}
+                />
+              )}
+            </button>
+          </CollapsibleTrigger>
+        </div>
+
+        <CollapsibleContent className="v2-collapse">
+          <div className="border-border ml-[9px] mt-1.5 space-y-2 border-l pl-4">
             {!isStatuteTool && <ToolCallDetails message={message} />}
             {showSearchResults && <SearchResultsList message={message} />}
             <StatuteResultsDisplay message={message} />
-          </ChainOfThoughtContent>
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
       {isError && !isExpanded && (
-        <p className="text-destructive mt-1 text-sm">
+        <p className="text-destructive ml-7 mt-1 text-sm">
           Error: {message.toolResult?.error || 'Unknown error'}
         </p>
       )}
-    </ChainOfThoughtStep>
+    </div>
   );
 }

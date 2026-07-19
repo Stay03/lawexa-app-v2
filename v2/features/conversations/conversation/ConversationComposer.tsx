@@ -28,7 +28,6 @@ import { FileUpload, FileUploadContent } from '@/components/ui/file-upload';
 import {
   PromptInput,
   PromptInputAction,
-  PromptInputActions,
   PromptInputTextarea,
 } from '@/components/ui/prompt-input';
 import { cn, serializePastedContent } from '@/lib/utils';
@@ -48,12 +47,26 @@ import { usePastedContent } from './usePastedContent';
  * `position: fixed` (v1's defect). Its width is matched to the transcript column
  * (`max-w-2xl`), fixing v1's far-too-narrow `max-w-xs sm:max-w-md`.
  *
- * SURFACE = v1's CONVERSATION composer (studied first-hand), NOT home's: a
- * jurisdiction picker, real attachments (upload chips + drag-drop, PDF/DOC/DOCX/RTF,
- * 10MB × 10, dedup), pasted-content staging, a plus-menu (Attach + the conversation's
- * STICKY privacy modes shown locked), a redacted pill, the confidential file notice,
- * and a Send/Stop toggle. No workflow selector / confidential toggle / study mode —
- * those are turn-1 create concerns owned by the home composer.
+ * ANATOMY = v1's CHANNELS `MessageComposer` (fix round §A7-40, studied first-hand):
+ * ONE compact input row inside the `PromptInput` card — a round `+` menu on the left
+ * (text-primary), the auto-grow textarea in the middle (rows=1, height-capped then
+ * internal scroll), and the round Send/Stop button on the right. It replaces the old
+ * TWO-row card (a textarea row + a separate actions row) the owner called the wrong
+ * anatomy, and it pulls the jurisdiction/redacted pills DOWN from ABOVE the card to
+ * INSIDE it: everything that "arms" the next turn — the jurisdiction chip + redacted
+ * pill, the confidential file notice, the error banner, the attachment chips, and the
+ * pasted-content cards — stacks inside the card ABOVE the input row (the Grok/channels
+ * staging pattern). Overlays (the jurisdiction popover, tooltips, the +-menu) still
+ * float ABOVE the card.
+ *
+ * EVERY capability is preserved: jurisdiction picker, real attachments (upload chips +
+ * drag-drop, PDF/DOC/DOCX/RTF, 10MB × 10, dedup), pasted-content staging, the plus-menu
+ * (Attach + the conversation's STICKY privacy modes shown locked, now with honest
+ * confidential copy), the redacted pill, the confidential file notice, per-conversation
+ * draft persistence, the Send/Stop toggle with its cancelling state, the confidential
+ * `PromptInput` variant, `max-w-2xl` dock width, the portal-event `stop` guards, and
+ * the streaming/submitting disabled states. No workflow selector / confidential toggle /
+ * study mode — those are turn-1 create concerns owned by the home composer.
  */
 const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.rtf';
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
@@ -264,43 +277,6 @@ export function ConversationComposer({
           }}
         />
 
-        {/* Jurisdiction + redacted pill row. */}
-        <div className="mb-2 flex items-center gap-2">
-          <JurisdictionField
-            signedIn
-            value={jurisdiction}
-            onChange={onJurisdictionChange}
-            disabled={isStreaming || isSubmitting}
-            stop={stop}
-          />
-          {isRedacted && (
-            <div
-              className="bg-background flex items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
-              aria-label="Redacted mode is on for this conversation"
-            >
-              <VenetianMask className="h-3.5 w-3.5" />
-              <span className="font-medium">Redacted</span>
-            </div>
-          )}
-        </div>
-
-        {isConfidential && uploads.length > 0 && (
-          <p className="text-muted-foreground mb-2 text-xs">
-            Files in confidential chats are kept for up to 24 hours, then permanently deleted.
-            Make a local copy if you need to keep this file.
-          </p>
-        )}
-
-        {error && (
-          <div
-            role="alert"
-            className="border-destructive/40 bg-destructive/10 text-destructive mb-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            <span className="flex-1">{error}</span>
-          </div>
-        )}
-
         <PromptInput
           value={input}
           onValueChange={(next) => {
@@ -313,9 +289,51 @@ export function ConversationComposer({
           variant={isConfidential ? 'confidential' : 'default'}
           className="shadow-lg"
         >
+          {/* ── Staging stack: everything that arms the next turn lives INSIDE the
+              card, ABOVE the single input row (the channels/Grok pattern). ── */}
+
+          {/* Jurisdiction + redacted pill (meta row). */}
+          <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+            <JurisdictionField
+              signedIn
+              value={jurisdiction}
+              onChange={onJurisdictionChange}
+              disabled={isStreaming || isSubmitting}
+              stop={stop}
+            />
+            {isRedacted && (
+              <div
+                className="bg-background flex items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
+                aria-label="Redacted mode is on for this conversation"
+              >
+                <VenetianMask className="h-3.5 w-3.5" />
+                <span className="font-medium">Redacted</span>
+              </div>
+            )}
+          </div>
+
+          {/* Confidential file notice. */}
+          {isConfidential && uploads.length > 0 && (
+            <p className="text-muted-foreground mb-2 px-1 text-xs">
+              Files in confidential chats are kept for up to 24 hours, then permanently deleted.
+              Make a local copy if you need to keep this file.
+            </p>
+          )}
+
+          {/* Error banner. */}
+          {error && (
+            <div
+              role="alert"
+              className="border-destructive/40 bg-destructive/10 text-destructive mb-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span className="flex-1">{error}</span>
+            </div>
+          )}
+
           {/* Attachment chips. */}
           {uploads.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-2 pt-2">
+            <div className="mb-2 flex flex-wrap gap-2 px-1">
               {uploads.map((u) => (
                 <div
                   key={u.key}
@@ -358,7 +376,7 @@ export function ConversationComposer({
 
           {/* Pasted content staging. */}
           {pastedItems.length > 0 && (
-            <div className="mx-2 mt-2 flex gap-2 overflow-x-auto pb-1">
+            <div className="mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
               {pastedItems.map((item) => (
                 <PastedContentCard
                   key={item.id}
@@ -369,13 +387,8 @@ export function ConversationComposer({
             </div>
           )}
 
-          <PromptInputTextarea
-            placeholder={pastedItems.length > 0 ? 'Add a message…' : 'Ask a follow-up'}
-            className="text-foreground placeholder:text-muted-foreground"
-            onLargePaste={addPasted}
-          />
-
-          <PromptInputActions className="flex items-center gap-2 px-2 pb-1">
+          {/* ── The single input row: + menu | textarea | Send/Stop. ── */}
+          <div className="flex items-end gap-1.5">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -383,7 +396,7 @@ export function ConversationComposer({
                   aria-label="Attach files and privacy options"
                   onClick={stop}
                   disabled={isStreaming || isSubmitting}
-                  className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring relative flex size-9 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="size-5" />
                 </button>
@@ -424,7 +437,7 @@ export function ConversationComposer({
                         <span className="flex flex-col">
                           <span className="font-medium leading-tight">Confidential mode</span>
                           <span className="text-muted-foreground text-xs">
-                            Not stored after your session
+                            Stored only on this device until you delete it
                           </span>
                         </span>
                       </DropdownMenuCheckboxItem>
@@ -434,7 +447,11 @@ export function ConversationComposer({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <span className="flex-1" />
+            <PromptInputTextarea
+              placeholder={pastedItems.length > 0 ? 'Add a message…' : 'Ask a follow-up'}
+              className="text-foreground placeholder:text-muted-foreground min-h-11 flex-1 px-1 py-2.5"
+              onLargePaste={addPasted}
+            />
 
             {isStreaming ? (
               <PromptInputAction tooltip={isCancelling ? 'Cancelling' : 'Stop generating'}>
@@ -472,7 +489,7 @@ export function ConversationComposer({
                 </Button>
               </PromptInputAction>
             )}
-          </PromptInputActions>
+          </div>
         </PromptInput>
 
         <FileUploadContent>

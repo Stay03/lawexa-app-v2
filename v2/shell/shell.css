@@ -130,3 +130,54 @@ html.v2-document-lock body {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* -----------------------------------------------------------------------------
+   Collapsible height animation (fix round, owner #41/#42). v1's
+   `animate-collapse-up/down` classes are DEAD — no matching @keyframes exist
+   anywhere (architecture-audit.md Part 2 verified this), so every Radix
+   collapsible in the app snaps open/closed. This is the v2 replacement.
+
+   The names are v2-unique ON PURPOSE: defining keyframes under v1's names
+   would bring v1's dead classes to life globally and break the byte-identical
+   v1 guarantee — and this sheet persists across soft-navs into v1 (see the
+   header comment), so nothing here may ever match v1 markup.
+
+   Usage: put `v2-collapse` on a Radix `CollapsibleContent` (any element
+   carrying Radix's `data-state` + `--radix-collapsible-content-height`). Both
+   directions animate; reduced motion collapses instantly. CAVEAT — a
+   `defaultOpen` collapsible would PLAY the open animation on first paint
+   (CSS animations start when the style first applies): for those, attach the
+   class only after the first user toggle (`onOpenChange` sets a flag) so the
+   initial render is still.
+   -------------------------------------------------------------------------- */
+@keyframes v2-collapse-open {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+@keyframes v2-collapse-close {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+.v2-collapse {
+  overflow: hidden;
+}
+.v2-collapse[data-state='open'] {
+  animation: v2-collapse-open 200ms ease-out;
+}
+.v2-collapse[data-state='closed'] {
+  animation: v2-collapse-close 200ms ease-in;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-collapse[data-state='open'],
+  .v2-collapse[data-state='closed'] {
+    animation: none;
+  }
+}

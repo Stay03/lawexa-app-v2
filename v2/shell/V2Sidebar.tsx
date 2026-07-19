@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -34,7 +34,7 @@ import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
-import { v2NavItems, v2NewChat } from './nav.config';
+import { v2NavItems, v2NewChat, type V2NavItem } from './nav.config';
 
 /**
  * V2Sidebar — the desktop navigation rail, built on the shadcn sidebar
@@ -63,6 +63,75 @@ import { v2NavItems, v2NewChat } from './nav.config';
  *  nav rows, Library children, and recents, so the active treatment never drifts. */
 const ACTIVE_ROW =
   'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary';
+
+/**
+ * A top-level nav group with expandable children (Library). Extracted so it can
+ * own the first-toggle flag that gates the collapse ANIMATION (owner #42): the
+ * shared `Collapsible` primitive is bare Radix, so this attaches the `.v2-collapse`
+ * height utility (shell.css) to the content — but only AFTER the first user toggle,
+ * because a `defaultOpen` collapsible would otherwise PLAY the open animation on
+ * first paint (the shell.css caveat). The flag is set in `onOpenChange` — an
+ * event handler, never a setState-in-effect — so the initial render stays still
+ * and every toggle thereafter animates BOTH directions.
+ *
+ * Open state is UNCONTROLLED (`defaultOpen`), deliberately: v1's Library was
+ * permanently `open` (never collapsible — `nav-main.tsx` hardcodes `open={true}`
+ * and never renders its chevron), so there is no remembered collapsed state to
+ * honour. Starting open every mount matches that always-open feel while still
+ * letting the row collapse (now animated). The persistent rail keeps the
+ * uncontrolled state for the session; a full reload resets to open.
+ */
+function SidebarNavGroup({
+  item,
+  isActive,
+}: {
+  item: V2NavItem;
+  isActive: (href: string) => boolean;
+}) {
+  const [hasToggled, setHasToggled] = useState(false);
+  const Icon = item.icon;
+
+  return (
+    <Collapsible
+      asChild
+      defaultOpen
+      onOpenChange={() => setHasToggled(true)}
+      className="group/collapsible"
+    >
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton tooltip={item.label} className="transition-colors">
+            {Icon ? <Icon /> : null}
+            <span>{item.label}</span>
+            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 motion-reduce:transition-none" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        {/* `.v2-collapse` animates the content height BOTH directions (shell.css),
+            attached only post-first-toggle so first paint is still. */}
+        <CollapsibleContent className={cn(hasToggled && 'v2-collapse')}>
+          <SidebarMenuSub className="gap-0.5">
+            {item.items?.map((sub) => {
+              const active = isActive(sub.href);
+              return (
+                <SidebarMenuSubItem key={sub.label}>
+                  <SidebarMenuSubButton
+                    asChild
+                    isActive={active}
+                    className={cn('transition-colors', active && ACTIVE_ROW)}
+                  >
+                    <Link href={sub.href}>
+                      <span>{sub.label}</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
 
 export function V2Sidebar({ user }: { user: SessionUser | null }) {
   const isMobile = useIsMobile();
@@ -128,48 +197,15 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
             {v2NavItems.map((item) => {
               const Icon = item.icon;
 
-              // Expandable group (Library) — always-available children.
+              // Expandable group (Library) — its own component so it can hold the
+              // first-toggle flag that gates the collapse animation (owner #42).
               if (item.items && item.items.length > 0) {
                 return (
-                  <Collapsible
+                  <SidebarNavGroup
                     key={item.label}
-                    asChild
-                    defaultOpen
-                    className="group/collapsible"
-                  >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton
-                          tooltip={item.label}
-                          className="transition-colors"
-                        >
-                          {Icon ? <Icon /> : null}
-                          <span>{item.label}</span>
-                          <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub className="gap-0.5">
-                          {item.items.map((sub) => {
-                            const active = isActive(sub.href);
-                            return (
-                              <SidebarMenuSubItem key={sub.label}>
-                                <SidebarMenuSubButton
-                                  asChild
-                                  isActive={active}
-                                  className={cn('transition-colors', active && ACTIVE_ROW)}
-                                >
-                                  <Link href={sub.href}>
-                                    <span>{sub.label}</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
+                    item={item}
+                    isActive={isActive}
+                  />
                 );
               }
 

@@ -1,17 +1,29 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import {
   useConversationStream,
   hasTranscript,
+  deleteTranscript,
 } from '@/v2/runtime/chat-engine';
-import type { MessageAttachment, ConversationReference } from '@/types/chat';
+import type {
+  MessageAttachment,
+  ConversationReference,
+  ConversationsListResponse,
+} from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
+import { stripPastedTags } from '@/lib/utils';
+import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
+import { conversationsQueries } from '../queries';
 import {
   isConfidentialMark,
   isRedactedMark,
   markConfidential,
   markRedacted,
+  unmarkConfidential,
+  unmarkRedacted,
   useModeMarks,
 } from './mode-marks';
 
@@ -138,6 +150,12 @@ export interface ConversationController {
   regenerate: () => void;
   /** True when a completed answer exists and nothing is streaming. */
   canRegenerate: boolean;
+  /**
+   * Delete this confidential conversation from the device (§A7-39): wipes the
+   * IndexedDB transcript — the ONLY copy of the content — clears the local
+   * confidential/redacted marks, refreshes the recents, and navigates home.
+   */
+  deleteConfidential: () => Promise<void>;
 }
 
 export function useConversationController(
@@ -169,7 +187,10 @@ export function useConversationController(
     },
   });
 
-  const { connectToStream, loadConversationHistory, loadConversationHistoryFromIDB, setConversationId, recoverPendingState, send, cancelStream, isStreaming, messages } = stream;
+  const { connectToStream, loadConversationHistory, loadConversationHistoryFromIDB, setConversationId, recoverPendingState, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle } = stream;
+
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   // ── Jurisdiction slot: seed once per conversation, persist on change. ──
   useEffect(() => {
@@ -271,6 +292,38 @@ export function useConversationController(
 
   const { isConfidential, isRedacted } = useModeMarks(conversationId);
 
+  // ── Header context publish (§A7-43 seam; consumed by the header work). ──
+  // Push the conversation title + confidential flag into the shared header store
+  // so the centre slot can render them on `/c/{id}`. `title` is null until it
+  // resolves (skeleton-first); the title strips pasted-content tags exactly as v1's
+  // breadcrumb does. This is an external-store write (not React setState), so it is
+  // React-Compiler-clean in an effect.
+  useEffect(() => {
+    setHeaderContext({
+      title: conversationTitle ? stripPastedTags(conversationTitle) : null,
+      confidential: isConfidential,
+    });
+  }, [conversationTitle, isConfidential]);
+
+  // Clear on unmount only (a separate empty-dep effect, so a title/flag change
+  // republishes without a transient empty flash), so the next route never inherits
+  // this conversation's context.
+  useEffect(() => () => clearHeaderContext(), []);
+
+  // ── Title arrival for the fresh-create handoff (mirrors v1 first-hand). ──
+  // A brand-new conversation reaches the screen via the streaming handoff with NO
+  // history load, so its title is unknown until the first turn finishes. When the
+  // stream ends and no title is known yet, fetch it once (an engine action → its
+  // own external store, not React setState). Confidential chats 404 server-side
+  // (title lives in IDB), so the pointless fetch is skipped there.
+  const prevIsStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    if (prevIsStreamingRef.current && !isStreaming && !conversationTitle && !isConfidential) {
+      void fetchConversationTitle(conversationId);
+    }
+    prevIsStreamingRef.current = isStreaming;
+  }, [isStreaming, conversationTitle, isConfidential, conversationId, fetchConversationTitle]);
+
   const isOwner = serverUserId != null && ownerId != null && serverUserId === ownerId;
 
   const submit = useCallback(
@@ -287,6 +340,43 @@ export function useConversationController(
   );
 
   const stop = useCallback(() => cancelStream(), [cancelStream]);
+
+  const deleteConfidential = useCallback(async () => {
+    // Stop any in-flight stream FIRST so a late SSE write can't recreate the row
+    // we're about to delete, then wipe the transcript (the only copy of the
+    // content), shed the local marks (in-memory + persisted envelope, so a reload
+    // can't resurrect them), refresh recents, drop the header context, and go home.
+    disconnect();
+    await deleteTranscript(conversationId).catch(() => {});
+    unmarkConfidential(conversationId);
+    unmarkRedacted(conversationId);
+    // Drop the row from every cached conversations list (peek + infinite pages)
+    // so no ghost entry lingers in the sidebar/drawer, THEN revalidate. There is
+    // no server delete endpoint — if the backend still returns a contentless stub
+    // on refetch, that's server truth (recorded as a backend ask); the content
+    // itself is already gone.
+    queryClient.setQueriesData<
+      ConversationsListResponse | InfiniteData<ConversationsListResponse>
+    >({ queryKey: conversationsQueries.lists() }, (cached) => {
+      if (!cached) return cached;
+      if ('pages' in cached) {
+        return {
+          ...cached,
+          pages: cached.pages.map((page) => ({
+            ...page,
+            data: page.data.filter((row) => String(row.id) !== conversationId),
+          })),
+        };
+      }
+      return {
+        ...cached,
+        data: cached.data.filter((row) => String(row.id) !== conversationId),
+      };
+    });
+    void queryClient.invalidateQueries({ queryKey: conversationsQueries.lists() });
+    clearHeaderContext();
+    router.push('/');
+  }, [disconnect, conversationId, queryClient, router]);
 
   // "Ask again": re-send the last user turn (there is NO backend regenerate
   // endpoint, so this drives a fresh turn through engine.send — it genuinely adds
@@ -334,5 +424,6 @@ export function useConversationController(
     stop,
     regenerate,
     canRegenerate,
+    deleteConfidential,
   };
 }

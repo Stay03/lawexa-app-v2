@@ -6,6 +6,7 @@ import { DockPortal, ComposerSkeleton } from '@/v2/shell/Dock';
 import { useConversationController } from './useConversationController';
 import { MessageList } from './MessageList';
 import { ConversationComposer } from './ConversationComposer';
+import { ConfidentialBanner } from './ConfidentialBanner';
 import { V2ChatProvider } from './chat-context';
 
 /**
@@ -71,13 +72,7 @@ export function ConversationScreen({
         className="flex h-full min-h-0 flex-col"
       >
         {controller.isConfidential && (
-          <div className="v2-safe-left v2-safe-right flex items-center justify-center gap-2 border-b border-emerald-500/20 bg-emerald-500/5 px-4 py-1.5 text-xs text-emerald-700 dark:text-emerald-400 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-200">
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span className="font-medium">Confidential</span>
-            <span className="text-emerald-700/70 dark:text-emerald-400/70">
-              · stored only on this device, never on our servers
-            </span>
-          </div>
+          <ConfidentialBanner onDelete={controller.deleteConfidential} />
         )}
 
         <MessageList

@@ -69,7 +69,7 @@ export function ReasoningTrace({
             />
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+        <CollapsibleContent className="v2-collapse">
           <div className="border-muted mt-1 ml-1.5 border-l-2 pl-3">
             <MarkdownText
               content={text}

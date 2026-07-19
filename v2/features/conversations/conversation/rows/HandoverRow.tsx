@@ -111,7 +111,7 @@ export function HandoverRow({
           </div>
         </CollapsibleTrigger>
 
-        <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+        <CollapsibleContent className="v2-collapse">
           {handover.task && (
             <div className="bg-muted/30 mb-2 ml-7 rounded-md px-3 py-2">
               <p className="text-muted-foreground text-sm italic leading-relaxed">
@@ -157,7 +157,7 @@ export function HandoverRow({
                 />
               </button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="data-[state=closed]:animate-collapse-up data-[state=open]:animate-collapse-down overflow-hidden">
+            <CollapsibleContent className="v2-collapse">
               <div className="bg-muted/20 mt-2 max-h-60 overflow-y-auto rounded-lg border p-4">
                 <MarkdownText content={handover.handoverResultContent} />
               </div>

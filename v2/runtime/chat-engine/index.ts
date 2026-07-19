@@ -44,6 +44,7 @@ export {
   deleteTranscript,
   clearAllTranscripts,
   historyEntriesFor,
+  isConfidentialAttachmentExpired,
   type ConfidentialAttachment,
   type ConfidentialTranscript,
   type ConfidentialTranscriptEntry,

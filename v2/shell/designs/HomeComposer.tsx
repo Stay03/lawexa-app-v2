@@ -578,7 +578,7 @@ export function HomeComposer({
                       <span className="flex flex-col">
                         <span className="font-medium leading-tight">Confidential mode</span>
                         <span className="text-xs text-muted-foreground">
-                          Not stored after your session
+                          Stored only on this device until you delete it
                         </span>
                       </span>
                     </DropdownMenuCheckboxItem>

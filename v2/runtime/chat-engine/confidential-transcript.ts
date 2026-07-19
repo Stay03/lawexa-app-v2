@@ -29,11 +29,52 @@ const DB_NAME = 'lawexa-confidential';
 const DB_VERSION = 1;
 const STORE = 'transcripts';
 
+/**
+ * Confidential FILE lifetime (fix round §A7-39, item 1c). Confidential UPLOADS are
+ * deleted server-side after 24 hours — this is the documented server policy, shown
+ * to the user in the composer's file notice ("kept for up to 24 hours, then
+ * permanently deleted"). The upload response (`DocumentUploadResponse`, types/chat.ts)
+ * carries NO expiry timestamp, so there is no server-authoritative value to read;
+ * this 24h policy is the real contract, and it is stamped onto each attachment at
+ * write time as `expires_at`. IMPORTANT: this bounds only the FILE, never the
+ * TRANSCRIPT TEXT — the owner copy promises the transcript is "stored on this device
+ * until you delete it", so the text has NO TTL; only the ephemeral server file does.
+ */
+const CONFIDENTIAL_FILE_TTL_MS = 24 * 60 * 60 * 1000;
+
 export interface ConfidentialAttachment {
   file_id: number;
   file_name: string;
   file_size: number;
+  /**
+   * When the server-side FILE is deleted (write time + 24h; see
+   * {@link CONFIDENTIAL_FILE_TTL_MS}). Optional so v1-written rows (which never set
+   * it — the DB is physically shared) read back cleanly and are treated as
+   * never-expiring by {@link isConfidentialAttachmentExpired}.
+   */
   expires_at?: string;
+}
+
+/**
+ * True when a confidential attachment's server file has passed its `expires_at`
+ * (the 24h server-side deletion). PURE — `now` is threaded in (never `Date.now()`
+ * in a render path). A missing/unparseable `expires_at` (e.g. a legacy v1-written
+ * row) is treated as NOT expired, so nothing is pruned on uncertainty.
+ */
+export function isConfidentialAttachmentExpired(
+  expiresAt: string | undefined,
+  now: number,
+): boolean {
+  if (!expiresAt) return false;
+  const at = Date.parse(expiresAt);
+  return !Number.isNaN(at) && at <= now;
+}
+
+/** Stamp `expires_at` (write time + the 24h file policy) onto attachments that
+ *  don't already carry one — the single point that populates the dormant field. */
+function withFileExpiry(attachments: ConfidentialAttachment[]): ConfidentialAttachment[] {
+  const expiresAt = new Date(Date.now() + CONFIDENTIAL_FILE_TTL_MS).toISOString();
+  return attachments.map((a) => (a.expires_at ? a : { ...a, expires_at: expiresAt }));
 }
 
 export interface ConfidentialTranscriptEntry {
@@ -144,7 +185,9 @@ export async function appendUserTurn(
     created_at: nowIso(),
     local_id: newLocalId(),
     ...(payload.attachments && payload.attachments.length > 0 && {
-      attachments: payload.attachments,
+      // Stamp the 24h file expiry as the attachment is persisted, so the dormant
+      // `expires_at` field reflects the file's real server-side lifetime (§A7-39).
+      attachments: withFileExpiry(payload.attachments),
     }),
   };
   const updated: ConfidentialTranscript = {
@@ -186,12 +229,18 @@ export async function replaceLastUserTurnContent(
  * assistant row, its content is replaced — this is what makes the `text_done` and
  * `completed` writes idempotent: the first creates the row, the second updates it
  * with the authoritative final text.
+ *
+ * Never creates the transcript itself (unlike {@link appendUserTurn}): the user
+ * turn is always persisted BEFORE the POST, so an absent transcript here means it
+ * was just DELETED — a late in-flight write must not resurrect a row the user
+ * erased (§A7-39). Returns null in that case.
  */
 export async function appendAssistantTurn(
   conversation_id: string,
   content: string,
-): Promise<ConfidentialTranscriptEntry> {
-  const transcript = await ensureTranscript(conversation_id);
+): Promise<ConfidentialTranscriptEntry | null> {
+  const transcript = await getTranscript(conversation_id);
+  if (!transcript) return null;
 
   const tail = transcript.messages[transcript.messages.length - 1];
   if (tail && tail.role === 'assistant') {

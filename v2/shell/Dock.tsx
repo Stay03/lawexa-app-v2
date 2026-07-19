@@ -58,14 +58,27 @@ export function DockProvider({ children }: { children: ReactNode }) {
  * SSR `<DockReservation>` and a route's own "resolving" dock state (e.g. the
  * conversation screen while ownership/history load), so every transition between
  * them is seamless (identical geometry). Purely decorative.
+ *
+ * GEOMETRY LOCKSTEP (§A7-40): this MUST match `ConversationComposer`'s exact card
+ * geometry so the SSR reservation reserves the right height and the `:has()`
+ * retirement swaps to the real composer with NO CLS. The composer is now a single
+ * PromptInput card (`rounded-3xl p-2`) holding a meta row (the jurisdiction chip)
+ * over ONE input row (`+` button · textarea · Send), all `size-11`/`h-11` — so the
+ * skeleton mirrors exactly that stack, not the old pill-above-a-blank-card shape.
  */
 export function ComposerSkeleton() {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-3 pt-2" aria-hidden>
-      <div className="mb-2 flex items-center gap-2">
-        <div className="bg-muted h-8 w-24 animate-pulse rounded-full" />
+      <div className="border-border bg-muted/50 flex flex-col gap-2 rounded-3xl border p-2">
+        {/* Meta row — the jurisdiction chip. */}
+        <div className="bg-muted h-8 w-28 animate-pulse rounded-full" />
+        {/* Input row — + menu · textarea · Send, matching the size-11 controls. */}
+        <div className="flex items-end gap-1.5">
+          <div className="bg-muted size-11 shrink-0 animate-pulse rounded-full" />
+          <div className="bg-muted h-11 flex-1 animate-pulse rounded-2xl" />
+          <div className="bg-muted size-11 shrink-0 animate-pulse rounded-full" />
+        </div>
       </div>
-      <div className="border-border bg-muted/50 h-[92px] w-full animate-pulse rounded-3xl border" />
     </div>
   );
 }

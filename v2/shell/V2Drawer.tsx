@@ -1,14 +1,19 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { MessageSquare, Search, X } from 'lucide-react';
+import { ChevronRight, MessageSquare, Search, X } from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useInfiniteScrollSentinel } from './use-infinite-scroll';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Sheet,
   SheetContent,
@@ -22,7 +27,7 @@ import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
-import { v2NavItems, v2NewChat } from './nav.config';
+import { v2NavItems, v2NewChat, type V2NavItem } from './nav.config';
 
 /**
  * V2Drawer — the mobile navigation drawer (Nav D, locked). ChatGPT-style
@@ -45,6 +50,72 @@ import { v2NavItems, v2NewChat } from './nav.config';
 /** New-chat + primary nav share this base row shape so the drawer reads uniform. */
 const ROW_BASE =
   'flex h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors';
+
+/**
+ * Drawer counterpart of the sidebar's Library group (owner #42 — "sidebar +
+ * drawer"). Same interaction grammar as the rail: the top row is a TOGGLE, not a
+ * nav link (on the rail Library only expands; the children are the destinations),
+ * carries a chevron that rotates, holds the 44px `ROW_BASE` rhythm, and animates
+ * its height BOTH directions with `.v2-collapse` (shell.css) — attached only after
+ * the first user toggle (event-handler flag) so the `defaultOpen` first paint
+ * stays still (the shell.css caveat), matching the sidebar exactly.
+ *
+ * Open state is UNCONTROLLED (`defaultOpen`), like the rail. The Sheet remounts on
+ * each open, so the drawer always reopens expanded — the right default for a
+ * transient overlay (nothing to remember between openings), and consistent with
+ * v1, whose Library was permanently open.
+ */
+function DrawerNavGroup({
+  item,
+  isActive,
+  onNavigate,
+}: {
+  item: V2NavItem;
+  isActive: (href: string) => boolean;
+  onNavigate: () => void;
+}) {
+  const [hasToggled, setHasToggled] = useState(false);
+  const Icon = item.icon;
+
+  return (
+    <Collapsible
+      defaultOpen
+      onOpenChange={() => setHasToggled(true)}
+      className="group/collapsible"
+    >
+      <CollapsibleTrigger
+        className={cn(ROW_BASE, 'w-full text-foreground hover:bg-muted')}
+      >
+        {Icon ? <Icon className="size-5 shrink-0" /> : null}
+        <span className="truncate">{item.label}</span>
+        <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 motion-reduce:transition-none" />
+      </CollapsibleTrigger>
+      {/* `.v2-collapse` animates height both directions, post-first-toggle only. */}
+      <CollapsibleContent className={cn(hasToggled && 'v2-collapse')}>
+        <div className="mb-1 ml-[1.375rem] mt-0.5 flex flex-col gap-0.5 border-l border-border pl-3">
+          {item.items?.map((sub) => {
+            const subActive = isActive(sub.href);
+            return (
+              <Link
+                key={sub.label}
+                href={sub.href}
+                onClick={onNavigate}
+                className={cn(
+                  'flex h-10 items-center rounded-lg px-3 text-sm transition-colors',
+                  subActive
+                    ? 'bg-primary/10 font-medium text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                <span className="truncate">{sub.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 export function V2Drawer({ user }: { user: SessionUser | null }) {
   const { openMobile, setOpenMobile } = useSidebar();
@@ -146,46 +217,36 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
             </Link>
 
             {v2NavItems.map((item) => {
+              // Expandable group (Library) — a collapsible matching the rail
+              // (owner #42): toggle row + chevron + animated height both ways.
+              if (item.items && item.items.length > 0) {
+                return (
+                  <DrawerNavGroup
+                    key={item.label}
+                    item={item}
+                    isActive={isActive}
+                    onNavigate={close}
+                  />
+                );
+              }
+
               const Icon = item.icon;
               const active = isActive(item.href);
               return (
-                <div key={item.label}>
-                  <Link
-                    href={item.href}
-                    onClick={close}
-                    className={cn(
-                      ROW_BASE,
-                      active
-                        ? 'bg-primary/10 font-medium text-primary'
-                        : 'text-foreground hover:bg-muted',
-                    )}
-                  >
-                    {Icon ? <Icon className="size-5 shrink-0" /> : null}
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                  {item.items && item.items.length > 0 ? (
-                    <div className="mb-1 ml-[1.375rem] mt-0.5 flex flex-col gap-0.5 border-l border-border pl-3">
-                      {item.items.map((sub) => {
-                        const subActive = isActive(sub.href);
-                        return (
-                          <Link
-                            key={sub.label}
-                            href={sub.href}
-                            onClick={close}
-                            className={cn(
-                              'flex h-10 items-center rounded-lg px-3 text-sm transition-colors',
-                              subActive
-                                ? 'bg-primary/10 font-medium text-primary'
-                                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                            )}
-                          >
-                            <span className="truncate">{sub.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={close}
+                  className={cn(
+                    ROW_BASE,
+                    active
+                      ? 'bg-primary/10 font-medium text-primary'
+                      : 'text-foreground hover:bg-muted',
+                  )}
+                >
+                  {Icon ? <Icon className="size-5 shrink-0" /> : null}
+                  <span className="truncate">{item.label}</span>
+                </Link>
               );
             })}
           </nav>

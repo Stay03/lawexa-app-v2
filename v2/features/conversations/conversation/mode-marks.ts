@@ -68,6 +68,37 @@ function readEnvelopeIds(storageKey: string, idsField: string): string[] {
   }
 }
 
+/**
+ * Remove one id from a persisted v1 zustand-persist envelope's id array, preserving
+ * every OTHER field of `state` (and re-writing in zustand's exact `{ state, version }`
+ * shape — the same envelope `start-conversation.ts` writes). Without this, an
+ * in-memory unmark would RESURRECT on reload: {@link ensureSeeded} re-reads the
+ * envelope, so a deleted confidential id must leave the persisted store too. Absent
+ * envelope ⇒ no-op (nothing to prune).
+ */
+function removeFromEnvelope(storageKey: string, idsField: string, id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.sessionStorage.getItem(storageKey);
+    if (!raw) return;
+    const parsed: unknown = JSON.parse(raw);
+    const prevState: Record<string, unknown> =
+      parsed && typeof parsed === 'object' && typeof (parsed as { state?: unknown }).state === 'object'
+        ? { ...((parsed as { state: Record<string, unknown> }).state) }
+        : {};
+    const prevIds: unknown = prevState[idsField];
+    const ids = Array.isArray(prevIds) ? (prevIds as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+    const nextIds = ids.filter((x) => x !== id);
+    if (nextIds.length === ids.length) return; // id wasn't there — leave untouched
+    window.sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({ state: { ...prevState, [idsField]: nextIds }, version: 0 }),
+    );
+  } catch {
+    // sessionStorage unavailable — the in-memory unmark still applies this session.
+  }
+}
+
 /** Seed the in-memory sets from sessionStorage once (client-only, idempotent). */
 function ensureSeeded(): void {
   if (seeded || typeof window === 'undefined') return;
@@ -103,6 +134,29 @@ export function markRedacted(conversationId: string): void {
   ensureSeeded();
   if (redactedIds.has(conversationId)) return;
   redactedIds.add(conversationId);
+  notify();
+}
+
+/**
+ * Clear a conversation's confidential mark — in-memory AND in the persisted
+ * envelope (fix round §A7-39: the delete affordance clears the marks so the
+ * device stops treating the conversation as confidential). Removing only the
+ * in-memory entry would let {@link ensureSeeded} resurrect it from sessionStorage
+ * on the next mount, so the envelope is pruned in lockstep.
+ */
+export function unmarkConfidential(conversationId: string): void {
+  ensureSeeded();
+  removeFromEnvelope(CONFIDENTIAL_KEY, 'confidentialIds', conversationId);
+  if (!confidentialIds.delete(conversationId)) return;
+  notify();
+}
+
+/** Clear a conversation's redacted mark — in-memory AND in the persisted envelope
+ *  (sibling of {@link unmarkConfidential}; a deleted chat sheds both modes). */
+export function unmarkRedacted(conversationId: string): void {
+  ensureSeeded();
+  removeFromEnvelope(REDACTED_KEY, 'redactedIds', conversationId);
+  if (!redactedIds.delete(conversationId)) return;
   notify();
 }
 

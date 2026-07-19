@@ -53,6 +53,7 @@ import {
   appendUserTurn,
   getTranscript,
   historyEntriesFor,
+  isConfidentialAttachmentExpired,
   replaceLastUserTurnContent,
 } from './confidential-transcript';
 import type {
@@ -699,10 +700,20 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         }));
         return false;
       }
+      // Prune-on-open (§A7-39, 1c): a confidential upload is deleted server-side
+      // after 24h, so attachment references past their `expires_at` are dropped
+      // here rather than rendered as if the file still exists. Captured once as an
+      // action value (never in a render path). Non-destructive to IDB — the filter
+      // is at map time; the stored transcript TEXT is never touched (the owner copy
+      // promises it lives "until you delete it").
+      const now = Date.now();
       const messages: EngineMessage[] = transcript.messages.map((m, idx) => {
+        const live = (m.attachments ?? []).filter(
+          (a) => !isConfidentialAttachmentExpired(a.expires_at, now),
+        );
         const list: MessageAttachment[] | undefined =
-          m.attachments && m.attachments.length > 0
-            ? m.attachments.map((a) => ({
+          live.length > 0
+            ? live.map((a) => ({
                 file_id: a.file_id,
                 file_name: a.file_name,
                 file_size: a.file_size,

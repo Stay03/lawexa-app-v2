@@ -1,22 +1,34 @@
 'use client';
 
 import { useState } from 'react';
-import { ChainOfThought } from '@/components/prompt-kit';
-import { ToolStepItem } from './ToolStepItem';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolMessage } from '@/types/chat';
-import { ChevronDown } from 'lucide-react';
+import { ToolStepItem, ToolStepMarker } from './ToolStepItem';
 
 /**
- * CompactToolChain (v2 port of `components/chat/compact-tool-chain.tsx`).
- * Progressive disclosure for a run of tool calls: ≤2 shows all; >2 collapses to a
- * "N tool calls completed" badge + the current step, expandable to the full list.
- * Byte-faithful; only the ToolStepItem import location changed.
+ * CompactToolChain — REDESIGNED (fix round §A7-41) for the shared module design
+ * language, preserving the FULL taxonomy: ≤2 steps show all; >2 collapse to a
+ * quiet "N tool calls completed" summary + the current step, expandable to the
+ * whole list; per-step expand stays owned by {@link ToolStepItem}.
+ *
+ * THE FIX the owner called out: the show-all / collapse used to be a HARD
+ * conditional swap (zero transition). It is now a REAL both-directions animation —
+ * the hidden earlier steps stay MOUNTED inside a `grid-template-rows: 0fr↔1fr`
+ * region (the compositor-friendly height-auto technique; content height is resolved
+ * by the browser, so a variable-height list animates without measuring), with the
+ * opacity tweening in lockstep. Reduced motion settles instantly. No keyed remount,
+ * no dead `animate-collapse-*` classes, and the old inline green-check badge is gone
+ * in favour of the module's quiet monochrome marker.
  */
 interface CompactToolChainProps {
   messages: ToolMessage[];
   showSearchResults?: boolean;
 }
+
+/** The fresh-step entrance — a soft fade + rise, reduced-motion-guarded. */
+const STEP_REVEAL =
+  'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300 motion-safe:fill-mode-both';
 
 export function CompactToolChain({
   messages,
@@ -34,20 +46,12 @@ export function CompactToolChain({
     });
   };
 
-  const allComplete = messages.every((m) => m.toolStatus === 'complete');
-
+  // ≤2 steps: the whole (short) chain is always shown.
   if (messages.length <= 2) {
     return (
-      <ChainOfThought>
+      <div className="flex flex-col">
         {messages.map((message, index) => (
-          <div
-            key={message.id}
-            className={
-              index === messages.length - 1
-                ? 'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300 fill-mode-both'
-                : undefined
-            }
-          >
+          <div key={message.id} className={index === messages.length - 1 ? STEP_REVEAL : undefined}>
             <ToolStepItem
               message={message}
               isLast={index === messages.length - 1}
@@ -57,82 +61,88 @@ export function CompactToolChain({
             />
           </div>
         ))}
-      </ChainOfThought>
-    );
-  }
-
-  if (showAll) {
-    return (
-      <div>
-        <ChainOfThought>
-          {messages.map((message, index) => (
-            <ToolStepItem
-              key={message.id}
-              message={message}
-              isLast={index === messages.length - 1}
-              isExpanded={expandedSteps.has(message.id)}
-              onToggle={() => toggleStep(message.id)}
-              showSearchResults={showSearchResults}
-            />
-          ))}
-        </ChainOfThought>
-        <button
-          onClick={() => setShowAll(false)}
-          className="text-muted-foreground hover:text-foreground mt-1 flex items-center gap-1 pl-8 text-xs transition-colors"
-        >
-          <ChevronDown className="h-3 w-3 rotate-180" />
-          Collapse
-        </button>
       </div>
     );
   }
 
-  const hiddenCount = messages.length - 1;
+  // >2 steps: progressive disclosure. The earlier steps collapse behind a summary
+  // that animates open/closed BOTH ways; the current step is always visible.
+  const earlierMessages = messages.slice(0, -1);
   const currentMessage = messages[messages.length - 1];
+  const hiddenCount = earlierMessages.length;
+  const allComplete = messages.every((m) => m.toolStatus === 'complete');
 
   return (
-    <div>
-      <button
-        onClick={() => setShowAll(true)}
+    <div className="flex flex-col">
+      {/* Summary / Collapse toggle — a pseudo-step (marker + hairline connector to
+          the chain below), so it lines up with the real step rail. */}
+      <div className="relative pb-1">
+        <span className="bg-border absolute bottom-0 left-[9px] top-6 w-px" aria-hidden />
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className="v2-interactive text-muted-foreground hover:text-foreground -mx-1.5 flex min-h-8 items-center gap-2 rounded-md px-1.5 py-0.5 text-left transition-colors"
+        >
+          <ToolStepMarker status="success" />
+          <span className="text-sm">
+            {showAll
+              ? 'Collapse steps'
+              : `${hiddenCount} tool ${hiddenCount === 1 ? 'call' : 'calls'} completed`}
+          </span>
+          {!showAll && allComplete && (
+            <span className="text-muted-foreground/60 text-[11px]">· show all</span>
+          )}
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              'size-3.5 shrink-0 transition-transform duration-200 motion-reduce:transition-none',
+              showAll && 'rotate-180',
+            )}
+          />
+        </button>
+      </div>
+
+      {/* Hidden earlier steps — height 0fr↔1fr both-directions transition, staying
+          mounted so the reverse (collapse) animates too. */}
+      <div
         className={cn(
-          'mb-1.5 flex items-center gap-1.5 pl-1',
-          'text-muted-foreground hover:text-foreground transition-colors',
-          'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
+          'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+          showAll ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
         )}
       >
-        <div className="flex h-4 w-4 items-center justify-center rounded-full bg-green-500/10">
-          <svg
-            className="h-2.5 w-2.5 text-green-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={3}
+        <div className="overflow-hidden">
+          <div
+            inert={!showAll || undefined}
+            className={cn(
+              'flex flex-col transition-opacity duration-200 ease-out motion-reduce:transition-none',
+              showAll ? 'opacity-100' : 'opacity-0',
+            )}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
+            {earlierMessages.map((message) => (
+              <ToolStepItem
+                key={message.id}
+                message={message}
+                isLast={false}
+                isExpanded={expandedSteps.has(message.id)}
+                onToggle={() => toggleStep(message.id)}
+                showSearchResults={showSearchResults}
+              />
+            ))}
+          </div>
         </div>
-        <span className="text-xs">
-          {hiddenCount} tool {hiddenCount === 1 ? 'call' : 'calls'} completed
-        </span>
-        {allComplete && (
-          <span className="text-muted-foreground/60 text-[10px]">&middot; show all</span>
-        )}
-      </button>
+      </div>
 
-      <ChainOfThought>
-        <div
-          key={currentMessage.id}
-          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300 fill-mode-both"
-        >
-          <ToolStepItem
-            message={currentMessage}
-            isLast={true}
-            isExpanded={expandedSteps.has(currentMessage.id)}
-            onToggle={() => toggleStep(currentMessage.id)}
-            showSearchResults={showSearchResults}
-          />
-        </div>
-      </ChainOfThought>
+      {/* The current (last) step — always visible, entering softly. */}
+      <div className={STEP_REVEAL}>
+        <ToolStepItem
+          message={currentMessage}
+          isLast
+          isExpanded={expandedSteps.has(currentMessage.id)}
+          onToggle={() => toggleStep(currentMessage.id)}
+          showSearchResults={showSearchResults}
+        />
+      </div>
     </div>
   );
 }
