@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { onboardingApi } from '@/lib/api/onboarding';
+import { useMounted } from '@/lib/hooks/useMounted';
 import type { OnboardingProgressResponse } from '@/types/onboarding';
 
 export default function OnboardingLayout({
@@ -26,6 +27,7 @@ export default function OnboardingLayout({
     setAreasOfExpertise,
   } = useOnboardingStore();
   const [hydrated, setHydrated] = useState(false);
+  const mounted = useMounted();
 
   // Redirect unverified email users to check-email page
   useEffect(() => {
@@ -117,8 +119,20 @@ export default function OnboardingLayout({
     return null;
   }
 
-  // Show loading spinner during initial hydration
-  if (isAuthenticated && !hydrated) {
+  // Hold the step pages until (a) the first post-hydration render, and (b) the
+  // server progress fetch has settled.
+  //
+  // (a) is load-bearing: every step page bounces to step-1 when `userType` is
+  // empty, and the persisted store reports its *initial* state during the
+  // hydration render — zustand hands `getInitialState()` to
+  // `useSyncExternalStore` as the server snapshot, so `userType` reads as null
+  // on that pass even though localStorage was already read at store creation.
+  // A child effect fires before any parent effect, so the guard cannot be
+  // fixed from out here — the pages must simply not mount until the store
+  // reads true. Without this, any full page load of a step page (refresh,
+  // direct link, or the hard navigation `deploymentId` skew protection forces
+  // after a deploy) walls the user on step 1 forever.
+  if (!mounted || (isAuthenticated && !hydrated)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
