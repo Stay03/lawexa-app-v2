@@ -169,3 +169,14 @@ badge model can be built exactly as specced. Authoritative contract now lives in
 frontend task: push-token rows exist → `php artisan lawexa:diagnose-push {uuid}` → verify queue
 worker + `failed_jobs`. (So the audit's "push send-side may be broken" is a deploy/runtime concern,
 not code.)
+
+---
+
+## Related — a second backend exchange (July 18, 2026)
+
+Separate from the three notification-spine asks above, a second backend coordination round — the
+statute node-cap / `outline` reader alignment plus **Ask A** (recently-viewed) and **Ask B**
+(cross-space my-channels) — is recorded in
+[`backend-reply-2026-07-18-statutes-cap-and-asks.md`](backend-reply-2026-07-18-statutes-cap-and-asks.md).
+Both endpoints have since been **DELIVERED and consumed** (wired in `6da0025`: recently-viewed →
+Study tab, cross-space channels → the Work tab's "Jump back in").

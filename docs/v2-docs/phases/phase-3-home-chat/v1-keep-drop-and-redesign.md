@@ -239,6 +239,12 @@ liability.**
 
 ## D. Build plan for the next session (the "2 bold designs" round)
 
+> _Superseded in part (recorded July 19, 2026): §D's wave structure executed as written (waves
+> 1–3), but its endgame — the owner picking one of Designs A/B — was SUPERSEDED by §A5 item 34.
+> The A/B dev switcher graduated into real **Chat | Work | Study** product tabs: Design A became
+> the Chat tab, Design B was deleted with its DNA absorbed into Work/Study. Full record in
+> `post-implementation-3.0.md`. §D's body below is left unaltered as the historical plan._
+
 Runs under the standing workflow (Opus implementer → Opus reviewer → coordinator fixes → build →
 commit/push; main autodeploys, dark-launch rules hold). Three waves:
 

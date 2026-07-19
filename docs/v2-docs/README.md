@@ -42,6 +42,20 @@ repo's quiz/channels convention:
   data, what stays as-is, what gets rebuilt better, what dies. Write the verdicts into the phase
   doc BEFORE building, so the redesign is deliberate and the record is consistent across sessions.
   Example: `phases/phase-3-home-chat/v1-keep-drop-and-redesign.md` (home/sidebar/header/conversation).
+- **Research-first implementer sequence** (standing rule, every implementer brief): each
+  implementer works in order — understand the existing code → study the v1 counterpart
+  first-hand → web-research the patterns being implemented → refine the approach → implement.
+  Born of parity misses (v1's smart-greeting engine was reinvented before v1 was read). Origin:
+  `phases/phase-3-home-chat/v1-keep-drop-and-redesign.md` §A2 + `post-implementation-3.0.md`.
+- **Smooth + SYMMETRIC motion** (standing UI rule): no UI state change appears or disappears
+  abruptly — every show/hide/swap gets a deliberate ~150–250ms transition that animates BOTH
+  directions (exits too; keyed-remount enter-only patterns are banned), `motion-reduce` respected.
+  Implementers AND reviewers exercise every toggle both ways. Origin: same doc §A3 item 17 +
+  §A4 item 24.
+- **Skeleton-first** (standing UI rule): anything that resolves after first paint renders a
+  skeleton that cross-fades to content — placeholder STRINGS are banned (the pre-mount 'Welcome'
+  text was rejected), and error states are distinct from empty states. Origin: same doc §A3
+  item 23 + the shared module conventions (§A6 item 38).
 - **During**: every commit keeps v1 pixel-identical with the toggle off; `next build` before
   every push (main autodeploys to prod).
 - **At close**: `post-implementation.md` records what was built, deviations from plan,

@@ -203,6 +203,15 @@ Full citations live in the research transcripts; key URLs inline.
 **Streaming chat rendering** (P1):
 - Buffer SSE tokens in a ref; flush to state every 50–80ms wrapped in `startTransition` — never
   per token (per-token renders can stall long streams entirely).
+  **CORRECTION (July 19, 2026, adversarially verified):** external-store updates are ALWAYS
+  synchronous — `startTransition` cannot defer a `useSyncExternalStore` notification (React RFC
+  0214; react.dev `useSyncExternalStore` docs), so the operative mechanism is NOT the
+  `startTransition` wrapper but the **buffer-and-coalesce cadence itself**: deltas accumulate in
+  refs and a ~50–80ms flush notifies only the affected per-message subscribers. The
+  `startTransition` wrapper is retained as a forward-compatible seam but is **inert for external
+  stores**. Reference implementation: `v2/runtime/chat-engine/engine.ts` (with
+  `use-conversation-stream.ts`, which supplies `commit: (fn) => startTransition(fn)`) — wave-1's
+  engine work verified this against the React sources.
 - Streaming markdown via **Streamdown** (Vercel's react-markdown replacement that repairs
   unterminated markdown mid-stream) or a marked-lexer block pipeline with per-block `React.memo`.
 - Every message row `React.memo` by id; composer isolated so keystrokes never re-render the
