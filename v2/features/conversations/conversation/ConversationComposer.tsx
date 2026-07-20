@@ -628,3 +628,35 @@ export function ConversationComposer({
     </div>
   );
 }
+
+/**
+ * ComposerSkeleton — the composer's resolving/loading visual, co-located with the
+ * real composer so its geometry can never drift (lockstep discipline). Rendered by
+ * ConversationScreen in the FLOATING composer layer (the content region), NOT the
+ * dock — the composer relocated out of the dock grid-row so the transcript scrolls
+ * genuinely behind/under it. Because that layer is `absolute` (out of flow) over a
+ * transcript that already reserves its bottom padding, the skeleton→composer swap
+ * causes NO transcript CLS; the lockstep still matters so the FLOATING pill doesn't
+ * jump when it resolves (it grows upward from `bottom-0`, so a height change would
+ * shift the pill's top). Mirrors the empty composer exactly: a `mb-2` jurisdiction
+ * chip floating above a single-input-row card (`+` · textarea · Send), all
+ * `size-11`/`h-11`, at `max-w-xl`.
+ */
+export function ComposerSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-xl px-4 pb-3 pt-2" aria-hidden>
+      {/* Meta row — the jurisdiction chip, floating ABOVE the pill (mb-2). */}
+      <div className="mb-2 px-1">
+        <div className="bg-muted h-8 w-28 animate-pulse rounded-full" />
+      </div>
+      {/* The pill — the PromptInput card holding ONLY the single input row. */}
+      <div className="border-border bg-muted/50 rounded-3xl border p-2">
+        <div className="flex items-end gap-1.5">
+          <div className="bg-muted size-11 shrink-0 animate-pulse rounded-full" />
+          <div className="bg-muted h-11 flex-1 animate-pulse rounded-2xl" />
+          <div className="bg-muted size-11 shrink-0 animate-pulse rounded-full" />
+        </div>
+      </div>
+    </div>
+  );
+}

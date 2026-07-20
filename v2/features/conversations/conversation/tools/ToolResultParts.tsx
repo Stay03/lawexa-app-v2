@@ -205,3 +205,13 @@ export function ToolStateLine({
     </div>
   );
 }
+
+/**
+ * The explicit zero-result line — the calm, sentence-case answer to "it returned
+ * zero, and that isn't obvious". Deliberately icon-less: distinct from the checked
+ * "Completed"/success line and from the destructive error line, so an empty result
+ * reads as a calm fact, never as a failure or as "found something".
+ */
+export function ToolEmptyLine({ children }: { children: React.ReactNode }) {
+  return <p className="text-muted-foreground min-w-0 break-words text-xs">{children}</p>;
+}

@@ -354,6 +354,111 @@ export function extractWebResults(message: ToolMessage): WebResult[] | null {
   return out.length > 0 ? out : null;
 }
 
+/* ── affirmative zero-result detection ──────────────────────────────────── */
+
+/** The result-bearing tools whose collapsed step line should glance-hint a
+ *  zero-hit outcome ("… · no matches") — searches over a corpus. */
+export function isSearchLikeTool(name: string): boolean {
+  return (
+    name === 'search_cases' ||
+    name === 'search_notes' ||
+    name === 'search_statutes' ||
+    name === 'web_search'
+  );
+}
+
+function firstNumber(obj: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    if (typeof obj[key] === 'number') return obj[key] as number;
+  }
+  return null;
+}
+
+/**
+ * A quiet, sentence-case empty message ONLY when a SUCCESSFUL result payload
+ * DEMONSTRABLY holds an empty list — a recognised array key present and length 0,
+ * or an explicit `returned`/`total`/`count` of 0. Returns `null` (never a zero
+ * claim) when the step is still running, failed (the error line owns that), or
+ * the payload shape is simply unrecognised. "We couldn't read it" must never
+ * masquerade as "it returned zero" (owner's honesty requirement): an unknown
+ * shape falls through to the generic renderer, which stays truthful.
+ */
+export function detectEmptyResult(message: ToolMessage): string | null {
+  if (message.toolStatus !== 'complete') return null;
+  if (message.toolResult?.success === false) return null;
+  const inner = unwrap(message.toolResult?.data);
+  if (!inner) return null;
+
+  const name = message.toolName;
+
+  // Corpus searches + page fetches — tailored copy, keyed on a recognised array.
+  const searchSpecs: Array<{ names: string[]; keys: string[]; empty: string }> = [
+    { names: ['search_cases'], keys: ['cases'], empty: 'No cases matched' },
+    { names: ['search_notes'], keys: ['notes'], empty: 'No notes matched' },
+    { names: ['search_statutes'], keys: ['statutes'], empty: 'No statutes matched' },
+    {
+      names: ['web_search'],
+      keys: ['results', 'items', 'web', 'sources'],
+      empty: 'No web results',
+    },
+    {
+      names: ['get_page_content'],
+      keys: ['pages', 'documents', 'results'],
+      empty: 'No page content returned',
+    },
+  ];
+
+  for (const spec of searchSpecs) {
+    if (!spec.names.includes(name)) continue;
+    for (const key of spec.keys) {
+      if (Array.isArray(inner[key])) {
+        return (inner[key] as unknown[]).length === 0 ? spec.empty : null;
+      }
+    }
+    // Recognised tool but no recognised array — trust an explicit zero counter,
+    // otherwise stay silent (we could not read the list).
+    return firstNumber(inner, ['returned', 'total', 'count']) === 0 ? spec.empty : null;
+  }
+
+  if (name === 'read_statute') {
+    const mode = typeof inner.mode === 'string' ? inner.mode : undefined;
+    if (mode === 'outline') {
+      return Array.isArray(inner.outline) && inner.outline.length === 0
+        ? 'No outline available'
+        : null;
+    }
+    if ('content' in inner) {
+      const content = inner.content;
+      return content == null || (typeof content === 'string' && content.trim() === '')
+        ? 'No matching content'
+        : null;
+    }
+    return null;
+  }
+
+  if (isSingleEntityTool(name)) {
+    const key = name.includes('case') ? 'case' : 'note';
+    if (inner[key] === null) return name.includes('case') ? 'Case not found' : 'Note not found';
+    return null;
+  }
+
+  // Generic honest empty — a recognised empty list or an explicit zero counter,
+  // else null (unknown shape → the caller shows the server message / "Completed").
+  const rawData = message.toolResult?.data;
+  if (rawData && typeof rawData === 'object' && Array.isArray((rawData as Record<string, unknown>).data)) {
+    return ((rawData as Record<string, unknown>).data as unknown[]).length === 0
+      ? 'No results'
+      : null;
+  }
+  const genericKeys = ['results', 'items', 'cases', 'notes', 'statutes', 'lawyers'];
+  for (const key of genericKeys) {
+    if (Array.isArray(inner[key])) {
+      return (inner[key] as unknown[]).length === 0 ? 'No results' : null;
+    }
+  }
+  return firstNumber(inner, ['returned', 'total', 'count']) === 0 ? 'No results' : null;
+}
+
 /** Compact duration for a step header (`1.2s`, `12s`, `1m 30s`). Malformed
  *  input (NaN/negative/∞) renders nothing rather than "NaNs" (review F2). */
 export function formatDuration(ms: number): string {

@@ -2,8 +2,13 @@
 
 import { cn } from '@/lib/utils';
 import type { ToolMessage } from '@/types/chat';
-import { classifyParameters, extractResultMessage } from './tool-content';
-import { BoundedScroll, ToolSectionLabel, ToolStateLine } from './ToolResultParts';
+import { classifyParameters, detectEmptyResult, extractResultMessage } from './tool-content';
+import {
+  BoundedScroll,
+  ToolEmptyLine,
+  ToolSectionLabel,
+  ToolStateLine,
+} from './ToolResultParts';
 
 /**
  * ToolCallDetails — the GENERIC expanded body for a tool step that has no richer
@@ -34,11 +39,15 @@ export function ToolCallDetails({ message, className }: ToolCallDetailsProps) {
   const success = message.toolResult?.success !== false;
   const error = message.toolResult?.error ?? null;
   const serverMessage = extractResultMessage(message);
+  // An affirmative "returned zero" (empty-list payload) — null when the shape is
+  // merely unrecognised, so an unreadable result never masquerades as zero.
+  const empty = isComplete && success ? detectEmptyResult(message) : null;
 
   const hasParams = params.length > 0;
   // A quiet "Completed" only when there is genuinely nothing else to show, so an
   // expanded step is never blank — but never noise when there is real content.
-  const showDoneFallback = isComplete && success && !serverMessage && !hasParams;
+  const showDoneFallback =
+    isComplete && success && !empty && !serverMessage && !hasParams;
 
   return (
     <div className={cn('space-y-3 pt-2', className)}>
@@ -96,7 +105,8 @@ export function ToolCallDetails({ message, className }: ToolCallDetailsProps) {
       {isComplete && !success && (
         <ToolStateLine tone="error">{error || 'Failed'}</ToolStateLine>
       )}
-      {isComplete && success && serverMessage && (
+      {empty && <ToolEmptyLine>{empty}</ToolEmptyLine>}
+      {isComplete && success && !empty && serverMessage && (
         <ToolStateLine>{serverMessage}</ToolStateLine>
       )}
       {showDoneFallback && <ToolStateLine>Completed</ToolStateLine>}

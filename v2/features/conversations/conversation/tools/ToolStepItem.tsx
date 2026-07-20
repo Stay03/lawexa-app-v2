@@ -17,11 +17,13 @@ import {
 import { StatuteResultsDisplay, extractStatuteData } from '../cards/StatuteResultsDisplay';
 import { NoteLinkCard } from '../cards/NoteLinkCard';
 import {
+  detectEmptyResult,
   extractCreatedNote,
   extractSingleEntity,
   extractWebResults,
   formatDuration,
   isMemoryTool,
+  isSearchLikeTool,
 } from './tool-content';
 import type { ToolMessage } from '@/types/chat';
 
@@ -260,6 +262,9 @@ export function ToolStepItem({
     isComplete,
     message.toolResult ?? undefined,
   );
+  // Glance-level zero signal: a search that affirmatively returned nothing hints
+  // it on the COLLAPSED line, so a user need not expand to learn it found nothing.
+  const zeroHint = isSuccess && isSearchLikeTool(message.toolName) && detectEmptyResult(message);
 
   return (
     <div className={cn('relative pb-1', className)}>
@@ -289,6 +294,9 @@ export function ToolStepItem({
               <span className="min-w-0 flex-1 text-sm leading-snug">
                 <span className="text-foreground font-medium">{action}</span>
                 {detail && <span className="text-muted-foreground font-normal"> {detail}</span>}
+                {zeroHint && (
+                  <span className="text-muted-foreground/70 font-normal"> · no matches</span>
+                )}
               </span>
               {isComplete && message.latencyMs != null && (
                 <span className="text-muted-foreground/60 shrink-0 text-xs tabular-nums">

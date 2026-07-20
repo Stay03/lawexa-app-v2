@@ -16,21 +16,35 @@
  * (watchdog / heartbeat / IDB / history writes) keeps feeding from ARRIVED text.
  * All this layer decides is *how fast the already-arrived characters are revealed*.
  *
- * THE RATE MODEL (a proportional catch-up controller)
- * ---------------------------------------------------
- * Each cursor keeps a display index `shown` into its authoritative `target`. On a
- * fixed publish cadence (~30fps via rAF) it advances toward `target` at a velocity
+ * THE RATE MODEL (an eased, backlog-proportional catch-up controller)
+ * -------------------------------------------------------------------
+ * Each cursor keeps a display index `shown` into its authoritative `target` and a
+ * current reveal `velocity`. On a ~60fps rAF cadence it computes a TARGET velocity
  *
- *     velocity = max(baseCharsPerSecond, backlog / catchUpTau)        // chars/sec
+ *     targetVelocity = max(baseCharsPerSecond, backlog / catchUpTau)   // chars/sec
  *
- * where `backlog = target.length - shown`. The proportional term makes the display
- * approach the target EXPONENTIALLY: with a steady incoming rate R the steady-state
- * display lag is exactly `catchUpTau` SECONDS of text (Little's-law: backlog = R·τ,
- * velocity = R) regardless of R — so a burst is caught up smoothly (velocity rises
- * with backlog) and lag never grows unbounded. The `baseCharsPerSecond` floor keeps
- * a readable minimum pace and drains the final characters without a Zeno crawl.
- * When `backlog` hits 0 the loop simply stops — the display waits, it never invents
- * a pause mid-burst and never rubber-bands (motion is monotone, decelerating).
+ * where `backlog = target.length - shown`, then LOW-PASS filters the actual velocity
+ * toward it (`velocity += (targetVelocity - velocity)·(1 - e^(-dt/velTau))`) and
+ * advances `shown` by `velocity·dt`. Two effects compose:
+ *   1. The proportional target makes display lag settle at exactly `catchUpTau`
+ *      SECONDS of text for any steady incoming rate R (Little's-law: backlog = R·τ,
+ *      velocity = R) — so lag never grows unbounded.
+ *   2. The velocity low-pass is the "butter": when a provider BURST spikes the
+ *      backlog, the reveal speed ramps UP smoothly over ~velTau instead of dumping a
+ *      word-sized chunk in a single frame, then eases back down as the backlog
+ *      drains. Steady state is unchanged, so (1) still holds — the filter only shapes
+ *      the transient, turning the old per-frame "steps" into continuous acceleration.
+ * The `baseCharsPerSecond` floor keeps a readable minimum pace and drains the tail
+ * without a Zeno crawl. When `backlog` hits 0 the loop stops — the display waits, it
+ * never invents a pause mid-burst and never rubber-bands (motion is monotone).
+ *
+ * WHY 60fps + eased velocity (the "smooth like butter" second pass): at ~30fps with
+ * a raw proportional velocity, a real provider burst made `velocity·dt` land on
+ * word-sized-or-bigger jumps (backlog dominated), which read as chunky/word-by-word.
+ * Halving the frame time AND ramping velocity instead of stepping it makes each
+ * on-screen advance sub-word and continuous. The cost is markdown re-parse frequency
+ * of the streaming row's LAST block; it is bounded by that block's size and tunable
+ * via `publishIntervalMs`.
  *
  * Reference points that shaped the model (researched 2026-07):
  *  - Vercel AI SDK `smoothStream` — buffer + fixed per-chunk delay, word/line/char
@@ -41,6 +55,10 @@
  *  - ChatGPT/Claude web render analyses + flowtoken/Upstash write-ups — decouple the
  *    network from an rAF display loop, release characters at a consistent cadence,
  *    buffer outside React (akashbuilds.com, upstash.com/blog/smooth-streaming).
+ *  - lerp/low-pass interpolation as the standard "buttery" motion primitive — easing
+ *    a value toward a moving target per frame (kirupa buttery-smooth animations,
+ *    butter-smooth-scrolling); applied here to VELOCITY, not position, so catch-up
+ *    accelerates gradually.
  *
  * GRAPHEME SAFETY
  * ---------------
@@ -72,13 +90,19 @@ export interface StreamSmoothingConfig {
    *  i.e. the pre-smoothing behaviour. Default true. */
   enabled?: boolean;
   /** Floor reveal speed in characters/second — the minimum readable pace and the
-   *  rate the tail drains at. Default 120. */
+   *  rate the tail drains at. Default 140. */
   baseCharsPerSecond?: number;
   /** Catch-up time constant in ms. Steady-state display lag ≈ this many ms of text,
    *  independent of the incoming rate. Larger = smoother but laggier. Default 350. */
   catchUpTauMs?: number;
+  /** VELOCITY smoothing time constant in ms — how gradually the reveal speed itself
+   *  ramps toward its target when a burst arrives (a low-pass on velocity). This is
+   *  the "butter" lever: it spreads a burst's catch-up over a smooth acceleration
+   *  instead of a single word-sized step. Larger = smoother accel, slower to react.
+   *  Default 140. */
+  velocitySmoothingMs?: number;
   /** Min ms between publishes while smoothing (the visual frame rate; also bounds
-   *  markdown re-parse frequency). Default 33 (~30fps). */
+   *  markdown re-parse frequency). Default 16 (~60fps) for continuous motion. */
   publishIntervalMs?: number;
   /** dt clamp in ms — caps how much a single late/returning frame may advance, so a
    *  GC hitch or a background-tab return catches up over a few frames instead of one
@@ -91,6 +115,7 @@ export interface ResolvedSmoothingConfig {
   enabled: boolean;
   baseCharsPerSecond: number;
   catchUpTauMs: number;
+  velocitySmoothingMs: number;
   publishIntervalMs: number;
   maxFrameMs: number;
   /** Publish cadence used when disabled — the engine passes its `flushIntervalMs`
@@ -100,9 +125,10 @@ export interface ResolvedSmoothingConfig {
 
 export const SMOOTHING_DEFAULTS: Omit<ResolvedSmoothingConfig, 'disabledIntervalMs'> = {
   enabled: true,
-  baseCharsPerSecond: 120,
+  baseCharsPerSecond: 140,
   catchUpTauMs: 350,
-  publishIntervalMs: 33,
+  velocitySmoothingMs: 140,
+  publishIntervalMs: 16,
   maxFrameMs: 100,
 };
 
@@ -201,6 +227,9 @@ interface Cursor {
   shown: number;
   /** Cached `target.slice(0, shown)` — a stable reference for useSyncExternalStore. */
   published: string;
+  /** Current reveal velocity in code units/second — low-pass filtered so it ramps
+   *  smoothly toward its backlog-driven target rather than stepping. */
+  velocity: number;
 }
 
 export function createStreamSmoother(opts: StreamSmootherOptions): StreamSmoother {
@@ -209,10 +238,13 @@ export function createStreamSmoother(opts: StreamSmootherOptions): StreamSmoothe
     enabled: opts.config?.enabled ?? SMOOTHING_DEFAULTS.enabled,
     baseCharsPerSecond: opts.config?.baseCharsPerSecond ?? SMOOTHING_DEFAULTS.baseCharsPerSecond,
     catchUpTauMs: opts.config?.catchUpTauMs ?? SMOOTHING_DEFAULTS.catchUpTauMs,
+    velocitySmoothingMs: opts.config?.velocitySmoothingMs ?? SMOOTHING_DEFAULTS.velocitySmoothingMs,
     publishIntervalMs: opts.config?.publishIntervalMs ?? SMOOTHING_DEFAULTS.publishIntervalMs,
     maxFrameMs: opts.config?.maxFrameMs ?? SMOOTHING_DEFAULTS.maxFrameMs,
     disabledIntervalMs,
   };
+  const catchUpTauSec = cfg.catchUpTauMs / 1000;
+  const velTauSec = cfg.velocitySmoothingMs / 1000;
 
   const cursors = new Map<string, Cursor>();
   const useRaf = cfg.enabled && typeof requestAnimationFrame !== 'undefined';
@@ -243,8 +275,18 @@ export function createStreamSmoother(opts: StreamSmootherOptions): StreamSmoothe
       const before = c.shown;
       if (cfg.enabled) {
         const backlog = c.target.length - c.shown;
-        const velocity = Math.max(cfg.baseCharsPerSecond, backlog / (cfg.catchUpTauMs / 1000));
-        const stepUnits = Math.ceil(velocity * dtSeconds);
+        // Target velocity: a backlog-proportional term (keeps display lag bounded to
+        // ~catchUpTau seconds of text regardless of the incoming rate) with a floor
+        // (a readable minimum pace that also drains the tail without a Zeno crawl).
+        const targetVelocity = Math.max(cfg.baseCharsPerSecond, backlog / catchUpTauSec);
+        // Low-pass the velocity toward that target (frame-rate-independent). THIS is
+        // the butter: when a provider burst spikes the backlog, the reveal speed ramps
+        // UP over ~velocitySmoothingMs instead of dumping a word-sized chunk in one
+        // frame, then eases back down as the backlog drains. Steady state is unchanged
+        // (velocity → target), so lag stays bounded.
+        const k = velTauSec > 0 ? 1 - Math.exp(-dtSeconds / velTauSec) : 1;
+        c.velocity += (targetVelocity - c.velocity) * k;
+        const stepUnits = Math.max(1, Math.round(c.velocity * dtSeconds));
         c.shown =
           stepUnits >= backlog
             ? c.target.length
@@ -313,7 +355,7 @@ export function createStreamSmoother(opts: StreamSmootherOptions): StreamSmoothe
     setTarget(id, fullText) {
       let c = cursors.get(id);
       if (!c) {
-        c = { target: fullText, shown: 0, published: '' };
+        c = { target: fullText, shown: 0, published: '', velocity: cfg.baseCharsPerSecond };
         cursors.set(id, c);
       } else {
         c.target = fullText;
@@ -335,8 +377,14 @@ export function createStreamSmoother(opts: StreamSmootherOptions): StreamSmoothe
         c.target = fullText;
         c.shown = fullText.length;
         c.published = fullText;
+        c.velocity = cfg.baseCharsPerSecond;
       } else {
-        cursors.set(id, { target: fullText, shown: fullText.length, published: fullText });
+        cursors.set(id, {
+          target: fullText,
+          shown: fullText.length,
+          published: fullText,
+          velocity: cfg.baseCharsPerSecond,
+        });
       }
       onPublish(id);
     },

@@ -1,25 +1,44 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Eye, ShieldCheck } from 'lucide-react';
-import { DockPortal, ComposerSkeleton } from '@/v2/shell/Dock';
 import { useConversationController } from './useConversationController';
 import { MessageList } from './MessageList';
-import { ConversationComposer } from './ConversationComposer';
+import { ConversationComposer, ComposerSkeleton } from './ConversationComposer';
 import { ConfidentialBanner } from './ConfidentialBanner';
 import { V2ChatProvider } from './chat-context';
 
 /**
  * ConversationScreen — the v2 `/c/[id]` client root. Mounts the controller (engine
  * + privacy resolvers + handoff/recovery), renders the transcript in the shell's
- * content region, and PORTALS the floating composer into the dock grid-row. Carries
- * the server-renderable `data-v2-marker="V2-CONVERSATION"`.
+ * content region, and floats the composer OVER the transcript. Carries the
+ * server-renderable `data-v2-marker="V2-CONVERSATION"`.
  *
- * The screen root is `h-full flex flex-col min-h-0` so the MessageList scrolls
- * internally (`flex-1 min-h-0`) and the shell content never double-scrolls; the
- * composer lives OUTSIDE that scroll region (in the dock), so the transcript scrolls
- * behind it and the dvh + keyboard-inset grid keeps it keyboard-safe — no `vh`, no
- * `position: fixed` (the v1 defects the §C catalog calls out).
+ * FLOATING COMPOSER — IN THE CONTENT REGION, NOT THE DOCK (owner floating-pill round).
+ * The composer USED to portal into the AppShell dock grid-row; the owner rejected that
+ * look — the dock is a separate row BELOW the transcript, so the pill sat on an opaque
+ * band with no transcript above or below it. It now renders as an ABSOLUTE layer over
+ * the bottom of THIS screen (`relative` root), so the transcript genuinely scrolls
+ * BEHIND and UNDER the floating pill: text is visible above it, a soft top fade eases
+ * that transition, and the transparent area below the pill (down to the notch
+ * safe-area) shows the transcript too — no opaque band.
+ *
+ * KEYBOARD SAFETY — the same mechanism as the home sticky docks. ConversationScreen is
+ * `h-full` inside the shell content region (grid-row 2), whose height is
+ * `calc(100dvh - keyboard-inset)` minus the header. When the keyboard opens — the
+ * layout viewport shrinking on resize browsers, or `--keyboard-inset` being written on
+ * overlay browsers (see use-keyboard-inset.ts) — that region shrinks, this `relative`
+ * root shrinks, and the `absolute bottom-0` pill rides up above the keyboard. It is
+ * `absolute` rather than `sticky` because the pill must float OVER the transcript with
+ * text visible below it, which a flow-reserving `sticky` element cannot do; the
+ * keyboard-safety is identical (both are bottom-anchored inside the shrunken region).
+ *
+ * NO-CLS. The pill is out of flow (absolute), so it never shifts the transcript; the
+ * transcript instead reserves a stable bottom padding for it, measured live into
+ * `--v2-conv-dock-h` by the observer below (it grows with the composer's staging so the
+ * last message always clears the pill). The resolving `ComposerSkeleton` shares the
+ * pill's exact geometry, so the floating bar never jumps as ownership/history resolve.
+ * MessageList keeps its OWN internal scroller + scroll-etiquette untouched.
  */
 export function ConversationScreen({
   conversationId,
@@ -40,6 +59,28 @@ export function ConversationScreen({
     error,
     retryLastMessage,
   } = stream;
+
+  // Measure the floating composer's height into `--v2-conv-dock-h` so the transcript
+  // (and the jump-to-latest pill) reserve exactly enough bottom clearance — and
+  // re-measure as staging grows/shrinks the pill. No setState: it only writes a CSS
+  // custom property (React Compiler-clean, mirrors use-keyboard-inset.ts).
+  const screenRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const dock = dockRef.current;
+    const screen = screenRef.current;
+    if (!dock || !screen) return;
+    const sync = () => {
+      screen.style.setProperty('--v2-conv-dock-h', `${dock.offsetHeight}px`);
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(dock);
+    return () => {
+      observer.disconnect();
+      screen.style.removeProperty('--v2-conv-dock-h');
+    };
+  }, []);
 
   // Inline result cards fire follow-up turns through this (no attachments).
   // Depends on the STABLE `controller.submit` (a useCallback), not the whole
@@ -67,9 +108,10 @@ export function ConversationScreen({
   return (
     <V2ChatProvider sendMessage={sendFollowUp} isStreaming={isStreaming}>
       <div
+        ref={screenRef}
         data-v2-marker="V2-CONVERSATION"
         data-conversation-id={conversationId}
-        className="flex h-full min-h-0 flex-col"
+        className="relative flex h-full min-h-0 flex-col"
       >
         {controller.isConfidential && (
           <ConfidentialBanner onDelete={controller.deleteConfidential} />
@@ -88,38 +130,52 @@ export function ConversationScreen({
           onRegenerate={controller.regenerate}
           onRetry={retryLastMessage}
         />
-      </div>
 
-      <DockPortal>
-        {!controller.isOwnerResolved || isLoadingHistory ? (
-          // Ownership/history still resolving → the composer-shaped skeleton (same
-          // visual as the SSR reservation). NEVER the "shared" pill here: isOwner is
-          // false while the owner id is null, so the pill would misleadingly flash
-          // for owners on every direct-nav / reload / recents click.
-          <ComposerSkeleton />
-        ) : controller.isOwner ? (
-          <ConversationComposer
-            conversationId={conversationId}
-            jurisdiction={controller.jurisdiction}
-            onJurisdictionChange={controller.setJurisdiction}
-            isConfidential={controller.isConfidential}
-            isRedacted={controller.isRedacted}
-            isStreaming={isStreaming}
-            isCancelling={isCancelling}
-            onSubmit={controller.submit}
-            onStop={controller.stop}
-          />
-        ) : (
-          <ViewOnlyPill />
-        )}
-      </DockPortal>
+        {/* Floating composer layer — an ABSOLUTE overlay over the transcript's bottom
+            (never the dock row, never `position: fixed`). `pointer-events-none` lets
+            the transparent gaps pass touches/scroll through to the transcript behind;
+            only the pill re-enables events. `z-10` keeps it above the transcript. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+          <div ref={dockRef}>
+            {/* Soft top fade — dissolves the transcript as it scrolls up behind the
+                pill (owner-approved, like the home docks). Nothing below it is opaque,
+                so text stays visible under the floating pill. */}
+            <div
+              aria-hidden
+              className="pointer-events-none h-8 bg-gradient-to-t from-background via-background/60 to-transparent"
+            />
+            <div className="pointer-events-auto v2-safe-bottom">
+              {!controller.isOwnerResolved || isLoadingHistory ? (
+                // Ownership/history still resolving → the composer-shaped skeleton (same
+                // geometry as the real pill). NEVER the "shared" pill here: isOwner is
+                // false while the owner id is null, so it would misleadingly flash for
+                // owners on every direct-nav / reload / recents click.
+                <ComposerSkeleton />
+              ) : controller.isOwner ? (
+                <ConversationComposer
+                  conversationId={conversationId}
+                  jurisdiction={controller.jurisdiction}
+                  onJurisdictionChange={controller.setJurisdiction}
+                  isConfidential={controller.isConfidential}
+                  isRedacted={controller.isRedacted}
+                  isStreaming={isStreaming}
+                  isCancelling={isCancelling}
+                  onSubmit={controller.submit}
+                  onStop={controller.stop}
+                />
+              ) : (
+                <ViewOnlyPill />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </V2ChatProvider>
   );
 }
 
 /** Read-only footer for a shared conversation the viewer doesn't own (§C KEEP).
- *  Width tracks the floating composer pill (max-w-xl) so the two dock states
- *  stay in horizontal lockstep. */
+ *  Matches the pill's `max-w-xl` width so the floating bar keeps one silhouette. */
 function ViewOnlyPill() {
   return (
     <div className="mx-auto w-full max-w-xl px-4 pb-3 pt-2">

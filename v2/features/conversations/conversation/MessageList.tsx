@@ -48,7 +48,10 @@ import { ReferenceChips } from './ReferenceChips';
  * happens in callbacks (scroll / observer / click); effects only sync refs and
  * scroll imperatively (React Compiler-clean).
  */
-const BOTTOM_THRESHOLD_PX = 40;
+/** 80px: headroom for the EASED bottom-follow (it trails the true bottom by a
+ *  fraction of a line mid-ease, which must still count as "at bottom"); a real
+ *  user scroll-up of more than this still detaches instantly. */
+const BOTTOM_THRESHOLD_PX = 80;
 
 /** First tool/handover start, else first streaming placeholder — pure. */
 function computeStreamStart(messages: readonly EngineMessage[]): number | null {
@@ -94,6 +97,7 @@ export function MessageList({
   const messagesLenRef = useRef(messages.length);
   const detachBaselineRef = useRef(messages.length);
   const isStreamingRef = useRef(isStreaming);
+  const followRafRef = useRef<number | null>(null);
   const [showPill, setShowPill] = useState(false);
   const [pillCount, setPillCount] = useState(0);
 
@@ -121,13 +125,48 @@ export function MessageList({
 
   // Keep pinned to the newest content while at the bottom; else surface the pill.
   // All setState lives in this observer CALLBACK (external-system subscription).
+  //
+  // EASED BOTTOM-FOLLOW (owner "jumpy on new line", smoothing pass 2): the old
+  // instantaneous `scrollTop = scrollHeight` yanked the viewport a full line-height
+  // in one frame every time the streaming text WRAPPED — smooth horizontal reveal,
+  // discrete vertical hops. The follower lerps toward the bottom over a few frames
+  // instead, so vertical follow matches the text's butter. It only ever scrolls
+  // DOWN while pinned; the ease's transient gap stays under BOTTOM_THRESHOLD_PX,
+  // so it can never self-detach. Pin/detach/pill logic is unchanged.
   useEffect(() => {
     const content = contentRef.current;
     const scroller = scrollRef.current;
     if (!content || !scroller) return;
+
+    const followBottom = () => {
+      followRafRef.current = null;
+      const el = scrollRef.current;
+      if (!el || !atBottomRef.current) return;
+      const target = el.scrollHeight - el.clientHeight;
+      const diff = target - el.scrollTop;
+      if (diff <= 1) {
+        el.scrollTop = target;
+        return;
+      }
+      // BIG jump (history load, end-of-stream snap, card expand): SNAP. Easing a
+      // >threshold gap leaves a residual the scroll handler reads as a user
+      // scroll-up (its own scrollTop write fires `scroll`), detaching the pin and
+      // stranding the view ~25% down with a spurious pill (round-3 review, HIGH).
+      // Only the sub-line growth of normal streaming — the case the ease exists
+      // for — glides.
+      if (diff > BOTTOM_THRESHOLD_PX) {
+        el.scrollTop = target;
+        return;
+      }
+      el.scrollTop += Math.max(1, diff * 0.25);
+      followRafRef.current = requestAnimationFrame(followBottom);
+    };
+
     const observer = new ResizeObserver(() => {
       if (atBottomRef.current) {
-        scroller.scrollTop = scroller.scrollHeight;
+        if (followRafRef.current == null) {
+          followRafRef.current = requestAnimationFrame(followBottom);
+        }
         return;
       }
       const newSince = messagesLenRef.current - detachBaselineRef.current;
@@ -139,7 +178,10 @@ export function MessageList({
       }
     });
     observer.observe(content);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (followRafRef.current != null) cancelAnimationFrame(followRafRef.current);
+    };
   }, []);
 
   // Scroll handler (event callback — setState allowed). Disengage on any upward
@@ -172,7 +214,16 @@ export function MessageList({
         onScroll={handleScroll}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
-        <div ref={contentRef} className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6">
+        {/* Bottom padding clears the FLOATING composer that ConversationScreen lays
+            over this scroll region (the pill is absolute/out-of-flow, so the transcript
+            must reserve room for its last message to scroll clear of it). The height is
+            measured live into `--v2-conv-dock-h` by ConversationScreen and grows with
+            the composer's staging; the fallback covers the pre-measure first paint. The
+            extra 1rem is a resting gap above the pill's soft top fade. */}
+        <div
+          ref={contentRef}
+          className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6 pb-[calc(var(--v2-conv-dock-h,9.5rem)+1rem)]"
+        >
           {references.length > 0 && (
             <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
               <ReferenceChips references={references} />
@@ -227,11 +278,13 @@ export function MessageList({
       </div>
 
       {/* Jump-to-latest pill — count of messages since detach (§5). Symmetric
-          fade/slide both directions (standing rule #24). */}
+          fade/slide both directions (standing rule #24). Its `bottom` clears the
+          FLOATING composer (same `--v2-conv-dock-h` measure the transcript pads with),
+          so it rides just above the pill instead of behind it. */}
       <div
         aria-hidden={!showPill}
         className={[
-          'pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 transition-all duration-200 motion-reduce:transition-none',
+          'pointer-events-none absolute bottom-[calc(var(--v2-conv-dock-h,9.5rem)+1rem)] left-1/2 -translate-x-1/2 transition-all duration-200 motion-reduce:transition-none',
           showPill ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0',
         ].join(' ')}
       >

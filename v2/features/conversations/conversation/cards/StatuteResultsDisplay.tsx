@@ -223,19 +223,23 @@ function StatuteOutlineDisplay({
         meta={statuteMeta(statute)}
       />
       <div className="border-border border-t">
-        <BoundedScroll maxHeight="max-h-72" surface="from-card" className="py-1">
-          {topLevel.map((item) => (
-            <div key={item.pos} className="flex items-center gap-2 px-3 py-1.5 text-[11px]">
-              <span className="text-muted-foreground bg-secondary shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium uppercase">
-                {item.type}
-              </span>
-              {item.num && <span className="text-muted-foreground shrink-0">{item.num}</span>}
-              <span className="text-foreground/80 min-w-0 flex-1 truncate">
-                {item.title || ''}
-              </span>
-            </div>
-          ))}
-        </BoundedScroll>
+        {topLevel.length > 0 ? (
+          <BoundedScroll maxHeight="max-h-72" surface="from-card" className="py-1">
+            {topLevel.map((item) => (
+              <div key={item.pos} className="flex items-center gap-2 px-3 py-1.5 text-[11px]">
+                <span className="text-muted-foreground bg-secondary shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium uppercase">
+                  {item.type}
+                </span>
+                {item.num && <span className="text-muted-foreground shrink-0">{item.num}</span>}
+                <span className="text-foreground/80 min-w-0 flex-1 truncate">
+                  {item.title || ''}
+                </span>
+              </div>
+            ))}
+          </BoundedScroll>
+        ) : (
+          <p className="text-muted-foreground px-3 py-2 text-xs">No outline available</p>
+        )}
       </div>
     </ToolResultGroup>
   );
