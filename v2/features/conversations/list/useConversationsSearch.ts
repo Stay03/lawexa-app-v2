@@ -52,17 +52,14 @@ export function useConversationsSearch(): ConversationsSearch {
 
   const committedSearch = searchParams.get('search') ?? '';
 
+  // HOTFIX (owner report item 6): the previous "self-committed" render-phase
+  // adopt raced its own async `router.replace` echoes — an OLDER navigation's
+  // params landing after a NEWER commit was misclassified as an external change
+  // and clobbered the input mid-typing (characters vanishing/reappearing). The
+  // adopt is REMOVED until the rebuilt, race-free implementation lands; the
+  // known cost is the milder pre-existing desync (a bare-/conversations nav
+  // click while a search is active resets the LIST but not the box).
   const [inputValue, setInputValue] = useState(() => committedSearch);
-  // What THIS hook last wrote to the URL — the discriminator between its own
-  // commits (never resync) and external URL changes (adopt). See docblock.
-  const [selfCommitted, setSelfCommitted] = useState(() => committedSearch);
-
-  if (committedSearch !== selfCommitted) {
-    // The URL changed under us (bare-/conversations nav row, deep link) —
-    // adopt it. Guarded render-phase adjustment, not an effect.
-    setSelfCommitted(committedSearch);
-    setInputValue(committedSearch);
-  }
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -78,9 +75,6 @@ export function useConversationsSearch(): ConversationsSearch {
   // preserved so the URL contract stays generic.
   const commit = useCallback(
     (value: string) => {
-      // Record the self-commit FIRST so the searchParams update it causes is
-      // recognized as our own and never triggers the external-adopt path.
-      setSelfCommitted(value);
       const params = new URLSearchParams(searchParams.toString());
       if (value) params.set('search', value);
       else params.delete('search');
