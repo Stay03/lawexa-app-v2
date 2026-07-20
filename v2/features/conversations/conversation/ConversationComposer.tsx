@@ -40,31 +40,33 @@ import { PastedContentCard } from './PastedContentCard';
 import { usePastedContent } from './usePastedContent';
 
 /**
- * ConversationComposer — the FLOATING PILL dock composer for the conversation screen.
- * It lives in the AppShell dock grid-row (portaled there by ConversationScreen), so
- * it floats (rounded, shadowed, inset) while the shell's dvh + `--keyboard-inset` grid
- * keeps it above the keyboard — never `position: fixed` (v1's defect).
+ * ConversationComposer — the FLOATING PILL for the conversation screen. It is rendered
+ * by ConversationScreen as an ABSOLUTE layer over the bottom of the content scroll
+ * region (NOT the dock grid-row — the owner rejected that opaque-band look), so the
+ * transcript genuinely scrolls BEHIND and UNDER it; the shell's dvh + `--keyboard-inset`
+ * region keeps that layer above the keyboard — never `position: fixed`. This component
+ * owns only the pill + its staging; the float/keyboard/no-CLS mechanics live in
+ * ConversationScreen.
  *
- * FLOATING PILL (owner floating-pill round — reference: a Slack-style message bar). A
- * single compact rounded bar, deliberately NARROWER than the `max-w-2xl` transcript
- * column (`max-w-xl`, centred), so it reads as a floating island: the transcript is
- * visible above it, and a gap + the notch safe-area leave the page background visible
- * below it. The dock row is TRANSPARENT (no opaque band); legibility is solved by the
- * pill's own solid `bg-background` face + `shadow-lg` + the gap, so nothing bleeds
- * through the bar. `max-w-xl` narrows v1's over-wide match to the transcript while
- * still fixing v1's far-too-narrow `max-w-xs sm:max-w-md`.
+ * COMPACT PILL (owner-chosen v1 scale — the collapsed floating-prompt bar on the
+ * case/note/statute pages). Width `max-w-xs sm:max-w-md` (≈448px cap), a `min-h-9` (36px)
+ * textarea, and `size-8` round `+` / Send/Stop buttons — deliberately smaller than the
+ * home hero. The textarea FONT is NOT shrunk (base stays 16px on mobile → no iOS zoom).
+ * The pill's own solid `bg-background` face carries a DOWNWARD-biased soft shadow so it
+ * casts no shade band up into the transcript. (Owner note: this 28–32px control scale is
+ * an explicit, owner-preferred deviation from the 44px touch-target rule.)
  *
  * ANATOMY: ONE compact input row inside the `PromptInput` card — a round `+` menu on
  * the left (text-primary), the auto-grow textarea in the middle (rows=1, height-capped
  * then internal scroll), and the round Send/Stop button on the right. Everything that
- * "arms" the next turn now FLOATS ABOVE the pill (reversing the previous round's
- * inside-the-card stack, per the owner's floating-pill screenshot where the
- * jurisdiction chip floats above the bar): the jurisdiction chip + redacted pill (the
- * meta row), the confidential file notice, the error banner, the attachment chips, and
- * the pasted-content cards stack ABOVE the card — the Slack/Grok staging tray. Each
- * carries its own surface (border/tint), so it stays legible on the transparent dock;
- * the ones that appear mid-turn fade in (symmetric with the attachment chips' exit).
- * Overlays (the jurisdiction popover, tooltips, the +-menu) still float ABOVE the card.
+ * "arms" the next turn FLOATS ABOVE the pill (the owner's screenshot has the jurisdiction
+ * chip above the bar): the jurisdiction chip + redacted pill (the meta row), the
+ * confidential file notice, the error banner, the attachment chips, and the
+ * pasted-content cards stack ABOVE the card — the Slack/Grok staging tray. Each carries
+ * its own SOLID surface (the jurisdiction chip is `bg-background`, not translucent, so
+ * transcript text never shows through it while scrolling); the ones that appear mid-turn
+ * animate symmetrically (persistent-collapse notice/error, removing-set attachment +
+ * pasted chips). Overlays (the jurisdiction popover, tooltips, the +-menu) float above.
  *
  * EVERY capability is preserved: jurisdiction picker, real attachments (upload chips +
  * drag-drop, PDF/DOC/DOCX/RTF, 10MB × 10, dedup, symmetric add/remove animation),
@@ -75,11 +77,6 @@ import { usePastedContent } from './usePastedContent';
  * `stop` guards, and the streaming/submitting disabled states. No workflow selector /
  * confidential toggle / study mode — those are turn-1 create concerns owned by the home
  * composer.
- *
- * DOCK vs. SCROLL-REGION (shell contract): the pill stays in the dock grid-row (the
- * sanctioned, keyboard-safe mechanism) — literal transcript scrolling BELOW the bar
- * would require relocating it into the content scroll region as a sticky element, which
- * is out of scope here; the floating-island gap delivers the same read without it.
  */
 const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.rtf';
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
@@ -329,7 +326,7 @@ export function ConversationComposer({
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
   return (
-    <div className="mx-auto w-full max-w-xl px-4 pb-3 pt-2">
+    <div className="mx-auto w-full max-w-xs px-4 pb-3 pt-2 sm:max-w-md">
       <FileUpload onFilesAdded={handleFilesAdded} accept={ACCEPTED_FILE_TYPES} multiple>
         <input
           ref={fileInputRef}
@@ -504,7 +501,9 @@ export function ConversationComposer({
           disabled={isStreaming || isSubmitting}
           maxHeight={150}
           variant={isConfidential ? 'confidential' : 'default'}
-          className="shadow-lg"
+          // Downward-biased soft drop (not shadow-lg) so the floating pill casts NO
+          // visible shade band UP into the transcript / jurisdiction chip (owner).
+          className="shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]"
         >
           {/* ── The single input row: + menu | textarea | Send/Stop. ── */}
           <div className="flex items-end gap-1.5">
@@ -515,9 +514,9 @@ export function ConversationComposer({
                   aria-label="Attach files and privacy options"
                   onClick={stop}
                   disabled={isStreaming || isSubmitting}
-                  className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Plus className="size-5" />
+                  <Plus className="size-4" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-72" onClick={stop}>
@@ -568,7 +567,9 @@ export function ConversationComposer({
 
             <PromptInputTextarea
               placeholder={pastedItems.length > 0 ? 'Add a message…' : 'Ask a follow-up'}
-              className="text-foreground placeholder:text-muted-foreground min-h-11 flex-1 px-1 py-2.5"
+              // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
+              // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
+              className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
               onLargePaste={addPasted}
             />
 
@@ -578,15 +579,15 @@ export function ConversationComposer({
                   type="button"
                   size="icon"
                   variant="destructive"
-                  className="v2-interactive size-11 shrink-0 rounded-full disabled:opacity-70"
+                  className="v2-interactive size-8 shrink-0 rounded-full disabled:opacity-70"
                   onClick={onStop}
                   disabled={isCancelling}
                   aria-label={isCancelling ? 'Cancelling' : 'Stop generating'}
                 >
                   {isCancelling ? (
-                    <Loader2 className="size-5 animate-spin" />
+                    <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    <Square className="size-5" />
+                    <Square className="size-4" />
                   )}
                 </Button>
               </PromptInputAction>
@@ -595,15 +596,15 @@ export function ConversationComposer({
                 <Button
                   type="button"
                   size="icon"
-                  className="v2-interactive bg-primary hover:bg-primary/90 size-11 shrink-0 rounded-full"
+                  className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
                   onClick={handleSubmit}
                   disabled={!canSend}
                   aria-label="Send message"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="size-5 animate-spin" />
+                    <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    <ArrowUp className="size-5" />
+                    <ArrowUp className="size-4" />
                   )}
                 </Button>
               </PromptInputAction>
@@ -639,22 +640,24 @@ export function ConversationComposer({
  * causes NO transcript CLS; the lockstep still matters so the FLOATING pill doesn't
  * jump when it resolves (it grows upward from `bottom-0`, so a height change would
  * shift the pill's top). Mirrors the empty composer exactly: a `mb-2` jurisdiction
- * chip floating above a single-input-row card (`+` · textarea · Send), all
- * `size-11`/`h-11`, at `max-w-xl`.
+ * chip floating above a single-input-row card (`+` · textarea · Send) at the compact
+ * v1 scale — `size-8` controls, an `h-9` textarea, `max-w-xs sm:max-w-md`. Keep this in
+ * lockstep with the pill AND with the `--v2-conv-dock-h` fallback in MessageList.
  */
 export function ComposerSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-xl px-4 pb-3 pt-2" aria-hidden>
+    <div className="mx-auto w-full max-w-xs px-4 pb-3 pt-2 sm:max-w-md" aria-hidden>
       {/* Meta row — the jurisdiction chip, floating ABOVE the pill (mb-2). */}
       <div className="mb-2 px-1">
         <div className="bg-muted h-8 w-28 animate-pulse rounded-full" />
       </div>
-      {/* The pill — the PromptInput card holding ONLY the single input row. */}
+      {/* The pill — the PromptInput card holding ONLY the single input row, at the
+          compact v1-floating-prompt scale (size-8 controls, h-9 textarea). */}
       <div className="border-border bg-muted/50 rounded-3xl border p-2">
         <div className="flex items-end gap-1.5">
-          <div className="bg-muted size-11 shrink-0 animate-pulse rounded-full" />
-          <div className="bg-muted h-11 flex-1 animate-pulse rounded-2xl" />
-          <div className="bg-muted size-11 shrink-0 animate-pulse rounded-full" />
+          <div className="bg-muted size-8 shrink-0 animate-pulse rounded-full" />
+          <div className="bg-muted h-9 flex-1 animate-pulse rounded-2xl" />
+          <div className="bg-muted size-8 shrink-0 animate-pulse rounded-full" />
         </div>
       </div>
     </div>

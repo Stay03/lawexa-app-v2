@@ -134,39 +134,32 @@ export function ConversationScreen({
         {/* Floating composer layer — an ABSOLUTE overlay over the transcript's bottom
             (never the dock row, never `position: fixed`). `pointer-events-none` lets
             the transparent gaps pass touches/scroll through to the transcript behind;
-            only the pill re-enables events. `z-10` keeps it above the transcript. */}
+            only the pill re-enables events. `z-10` keeps it above the transcript. No
+            top fade/scrim: the transcript stays crisp right up to the pill (owner —
+            the fade read as a dim band above the bar). */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-          <div ref={dockRef}>
-            {/* Soft top fade — dissolves the transcript as it scrolls up behind the
-                pill (owner-approved, like the home docks). Nothing below it is opaque,
-                so text stays visible under the floating pill. */}
-            <div
-              aria-hidden
-              className="pointer-events-none h-8 bg-gradient-to-t from-background via-background/60 to-transparent"
-            />
-            <div className="pointer-events-auto v2-safe-bottom">
-              {!controller.isOwnerResolved || isLoadingHistory ? (
-                // Ownership/history still resolving → the composer-shaped skeleton (same
-                // geometry as the real pill). NEVER the "shared" pill here: isOwner is
-                // false while the owner id is null, so it would misleadingly flash for
-                // owners on every direct-nav / reload / recents click.
-                <ComposerSkeleton />
-              ) : controller.isOwner ? (
-                <ConversationComposer
-                  conversationId={conversationId}
-                  jurisdiction={controller.jurisdiction}
-                  onJurisdictionChange={controller.setJurisdiction}
-                  isConfidential={controller.isConfidential}
-                  isRedacted={controller.isRedacted}
-                  isStreaming={isStreaming}
-                  isCancelling={isCancelling}
-                  onSubmit={controller.submit}
-                  onStop={controller.stop}
-                />
-              ) : (
-                <ViewOnlyPill />
-              )}
-            </div>
+          <div ref={dockRef} className="pointer-events-auto v2-safe-bottom">
+            {!controller.isOwnerResolved || isLoadingHistory ? (
+              // Ownership/history still resolving → the composer-shaped skeleton (same
+              // geometry as the real pill). NEVER the "shared" pill here: isOwner is
+              // false while the owner id is null, so it would misleadingly flash for
+              // owners on every direct-nav / reload / recents click.
+              <ComposerSkeleton />
+            ) : controller.isOwner ? (
+              <ConversationComposer
+                conversationId={conversationId}
+                jurisdiction={controller.jurisdiction}
+                onJurisdictionChange={controller.setJurisdiction}
+                isConfidential={controller.isConfidential}
+                isRedacted={controller.isRedacted}
+                isStreaming={isStreaming}
+                isCancelling={isCancelling}
+                onSubmit={controller.submit}
+                onStop={controller.stop}
+              />
+            ) : (
+              <ViewOnlyPill />
+            )}
           </div>
         </div>
       </div>
@@ -175,10 +168,10 @@ export function ConversationScreen({
 }
 
 /** Read-only footer for a shared conversation the viewer doesn't own (§C KEEP).
- *  Matches the pill's `max-w-xl` width so the floating bar keeps one silhouette. */
+ *  Matches the pill's compact width so the floating bar keeps one silhouette. */
 function ViewOnlyPill() {
   return (
-    <div className="mx-auto w-full max-w-xl px-4 pb-3 pt-2">
+    <div className="mx-auto w-full max-w-xs px-4 pb-3 pt-2 sm:max-w-md">
       <div className="bg-muted/80 text-muted-foreground flex items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-center text-sm backdrop-blur">
         <Eye className="h-4 w-4 shrink-0" />
         View only — this is a shared conversation

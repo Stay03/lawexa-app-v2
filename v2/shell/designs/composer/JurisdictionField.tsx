@@ -233,13 +233,16 @@ export function JurisdictionField({
           onClick={stop}
           aria-label={`Jurisdiction: ${label.text}`}
           className={cn(
-            'v2-interactive inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors',
+            // SOLID always-on surface (owner: the chip was transparent while
+            // scrolling, so transcript text showed through it). `bg-background` is
+            // opaque in both themes; hover tints on top of it. The overridden state is
+            // distinguished by the gold border + foreground text, not a translucent
+            // fill, so it stays opaque too.
+            'v2-interactive inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border bg-background px-2.5 text-xs transition-colors',
             'text-muted-foreground hover:bg-secondary hover:text-foreground',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            isOverridden
-              ? 'border-primary/50 bg-primary/5 text-foreground'
-              : 'border-border bg-transparent',
+            isOverridden ? 'border-primary/50 text-foreground' : 'border-border',
           )}
         >
           {isLoading ? (

@@ -222,7 +222,7 @@ export function MessageList({
             extra 1rem is a resting gap above the pill's soft top fade. */}
         <div
           ref={contentRef}
-          className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6 pb-[calc(var(--v2-conv-dock-h,9.5rem)+1rem)]"
+          className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6 pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]"
         >
           {references.length > 0 && (
             <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
@@ -284,7 +284,7 @@ export function MessageList({
       <div
         aria-hidden={!showPill}
         className={[
-          'pointer-events-none absolute bottom-[calc(var(--v2-conv-dock-h,9.5rem)+1rem)] left-1/2 -translate-x-1/2 transition-all duration-200 motion-reduce:transition-none',
+          'pointer-events-none absolute bottom-[calc(var(--v2-conv-dock-h,7rem)+1rem)] left-1/2 -translate-x-1/2 transition-all duration-200 motion-reduce:transition-none',
           showPill ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0',
         ].join(' ')}
       >
