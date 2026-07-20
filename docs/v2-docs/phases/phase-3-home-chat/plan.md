@@ -118,6 +118,31 @@ each its own implement → adversarial-review → verify → ship loop:
   infinite list), the errored-search-under-kept-data silent failure (inline retry banner; dim
   gated on `isFetching` so a settled error can't strand the list), 44px clear target,
   confidential announced in the row's accessible name, placeholder-page fetch race masked.
+- **FIX ROUND 2 (owner device + live review, July 19-20) — SHIPPED** (hotfixes `f699ec1` +
+  `7c77287`, then the four-wave round `24ab675`). Owner items: (1) keyboard half-covering the
+  Chat-tab composer on a Galaxy A21 — root cause was BOTH a wrong capability guard in
+  `use-keyboard-inset.ts` (`'virtualKeyboard' in navigator` bailed on overlay browsers that
+  ignore `interactive-widget`; replaced with the self-calibrating occlusion measurement) AND
+  ChatHome's non-sticky `mt-auto` composer (now the same sticky bottom dock as Work/Study);
+  (2) composer → compact floating pill (`max-w-xl`, staging + jurisdiction chip float ABOVE,
+  transparent dock row, skeleton lockstep 122px byte-exact, staging stack symmetric both
+  directions + 40vh tray cap; HOME width deliberately unchanged — owner to confirm if it
+  should narrow too); (3+7) every tool/sub-agent rendering rebuilt on the new v2 presentation
+  layer (`tools/tool-content.ts` classifier + `BoundedScroll` — the raw-dump class is dead,
+  no redundant chips/counts, elevated result rows, notes render as note cards never raw HTML;
+  unknown tools keep their params); (4) `stream-smoother.ts` — presentation-only steady-release
+  with proportional catch-up (bounded ~350ms lag), grapheme-safe, terminal snaps, replay lumps
+  never typewriter, resilience surface verified byte-identical, `smoothing` config kill-switch
+  (constants τ=350ms/120cps/30fps await a live feel pass); (5) route loading boundaries are
+  skeletons (the phase-1 "Loading…" text violated skeleton-first); (6) /conversations search
+  rebuilt RACE-FREE after the review-fix regression — commits via native
+  `replaceState(null,…)` (the `history.state` arg tripped Next's internal-call `__NA` guard
+  and silently disabled filtering — caught by the re-review against the installed router
+  source), draft + consumed self-write queue + idle orphan prune. Loop: 4 parallel Opus
+  implementers → 3 Opus adversarial reviews (D REWORKED then re-verified; E/F/G SHIP AS-IS)
+  → coordinator fixes. Accepted-with-record: Chat-tab mobile DOM-vs-visual order divergence
+  (inherent, desktop kept matched); compact sub-44px disclosure toggles in the tool trace
+  (deliberate density; primary links are 44px).
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.
