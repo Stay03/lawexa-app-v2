@@ -143,6 +143,26 @@ each its own implement → adversarial-review → verify → ship loop:
   → coordinator fixes. Accepted-with-record: Chat-tab mobile DOM-vs-visual order divergence
   (inherent, desktop kept matched); compact sub-44px disclosure toggles in the tool trace
   (deliberate density; primary links are 44px).
+- **FIX ROUND 3 (owner live-test follow-ups, July 20) — SHIPPED (`82c2c7d`).** Owner items:
+  (1) "textarea still not floating" → the composer LEFT the dock grid-row (the dock and
+  transcript are stacked rows — nothing can scroll behind a dock composer, ever) for an
+  `absolute bottom-0` overlay inside the conversation screen: transcript scrolls behind AND
+  below the pill, keyboard safety inherited from the shrinking content region, dock
+  reservation retired (mechanism kept dormant), clearance measured live into
+  `--v2-conv-dock-h`; (2) jurisdiction popup halved on mobile (`max-h-32 sm:max-h-64`);
+  (3) zero-result honesty — `detectEmptyResult` claims zero ONLY on an affirmative empty
+  payload ("No cases matched" per variant + a quiet "· no matches" on search step lines;
+  unreadable shapes fall to the honest generic view); (4) "butter" — the new-line jump was
+  the transcript's one-frame `scrollTop` snap per line wrap (exposed by the smoother), now an
+  eased rAF bottom-follower, and the smoother's velocity is low-pass filtered at 60fps so
+  bursts ramp instead of dumping clause-sized chunks (steady-state lag unchanged). Combined
+  adversarial review: SHIP AFTER FIXES — the HIGH catch: the eased follower stranded the view
+  on any >threshold height jump (EVERY history load; end-of-stream snap) with a spurious
+  pill; big jumps now snap, only sub-line growth glides. Watch items for device testing:
+  60fps last-block markdown re-parse on low-end devices (`publishIntervalMs` is the lever);
+  the full-width pointer band flanking the pill on ≥576px (optional polish, recorded);
+  feel-tuning knobs `velocitySmoothingMs`/`catchUpTauMs`/ease `0.25`. OPEN OWNER DECISION:
+  narrow the HOME composer to match the conversation pill?
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.
