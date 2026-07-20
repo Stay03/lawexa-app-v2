@@ -17,20 +17,20 @@ export function NoteLinkCard({ note }: NoteLinkCardProps) {
   return (
     <Card size="sm">
       <CardContent className="flex items-center gap-3 py-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <FileText className="size-5 text-primary" />
+        <div className="bg-primary/10 flex size-9 shrink-0 items-center justify-center rounded-lg">
+          <FileText className="text-primary size-[18px]" />
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <a
             href={note.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-medium hover:underline line-clamp-1"
+            className="line-clamp-1 text-sm font-medium hover:underline"
           >
             {note.title}
           </a>
-          <p className="text-xs text-muted-foreground mt-0.5">Saved to your notes</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">Saved to your notes</p>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">

@@ -25,6 +25,9 @@ import type {
   CompletedEvent,
   ConversationData,
 } from '@/types/chat';
+import type { StreamSmoothingConfig } from './stream-smoother';
+
+export type { StreamSmoothingConfig } from './stream-smoother';
 
 // ─── Reasoning trace (§C thinking upgrade) ─────────────────────────────────
 // v1 RECEIVES `thinking` SSE events and DISCARDS their payload (useChatStream
@@ -170,9 +173,21 @@ export interface ChatEngineConfig extends ChatEngineHandlers {
 
   /**
    * Token-flush cadence in ms (foundation-standards §5 prescribes 50–80ms).
-   * Defaults to 60. Lower = smoother, higher = fewer re-renders.
+   * Defaults to 60. With smoothing ON this governs the DISABLED-mode publish cadence
+   * (arrival mirroring); with smoothing OFF it is the publish cadence outright.
    */
   flushIntervalMs?: number;
+
+  /**
+   * Streamed-answer smoothing (on by default). A presentation-only layer between
+   * token arrival and display: the row reveals already-arrived characters at an even,
+   * backlog-proportional cadence instead of mirroring the provider's bursty stream —
+   * so a lump paints smoothly and a stall no longer freezes mid-word, while the
+   * engine's accumulated state stays byte- and timing-authoritative (watchdog /
+   * heartbeat / IDB / history all still feed from ARRIVED text). Tunable/disable-able
+   * here, in one place; there is no UI toggle. See {@link StreamSmoothingConfig}.
+   */
+  smoothing?: StreamSmoothingConfig;
 
   /**
    * Wraps every flush/structural commit. The adapter passes React's

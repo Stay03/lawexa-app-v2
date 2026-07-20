@@ -24,9 +24,16 @@ import { useComposerDraft } from './composer/useComposerDraft';
  * hidden (owner #20 — the sidebar already provides it).
  *
  * MOBILE stays thumb-first: the greeting rides the top, the quick-jump row sits
- * under it, and the compose cluster is pushed to the bottom via `mt-auto`. The
- * suggested prompts there are v1's stacked list, sitting just above the docked
- * composer (owner #27).
+ * under it, and the compose cluster sinks to the bottom (`mt-auto`). The composer
+ * itself floats ALONE in a `sticky bottom-0` dock — the SAME structure the
+ * Work/Study tabs use — with the suggested prompts (v1's stacked list, owner #27)
+ * sinking just above it. This replaced an earlier `mt-auto`-only column: in a
+ * non-scrolling column there is nothing to scroll, so on browsers that OVERLAY the
+ * keyboard (older WebView / Samsung Internet on budget phones like the Galaxy A21)
+ * the composer sat half-behind the keyboard; the sticky dock pins it to the
+ * shrunken viewport bottom, above the keyboard (owner keyboard-bug fix — the
+ * root-cause half is the self-calibrating `--keyboard-inset`, see
+ * use-keyboard-inset.ts).
  *
  * The greeting (`HomeGreeting`) is v1's REAL smart engine with the skeleton-first
  * reveal and the symmetric confidential-mode swap. Confidential is owned here so
@@ -74,7 +81,7 @@ export function ChatHome({
     <div
       data-v2-marker="V2-HOME"
       data-home-tab="chat"
-      className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col overflow-hidden px-4 pt-10 pb-8 md:pt-36 md:pb-12"
+      className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-4 pt-10 pb-8 md:pt-36 md:pb-12"
     >
       {/* Ambient warm spotlight (owner #32 — explicitly KEPT). Decorative,
           aria-hidden, built only from the --primary token at low opacity. Two
@@ -135,17 +142,25 @@ export function ChatHome({
         ))}
       </nav>
 
-      {/* Compose cluster — pushed to the bottom on mobile (thumb-first) via
-          `mt-auto`, folded near the top on desktop (`md:mt-10`, top-anchored). */}
-      <div className="mt-auto md:mt-10">
-        {/* MOBILE prompts — v1's stacked list, just above the docked composer. */}
-        <div className="mb-3 md:hidden">
-          <HomePrompts variant="mobile" onSelect={fillPrompt} />
-        </div>
-
-        {/* The shared v2-native composer — the ORIGINAL animated gold-shimmer
-            border comes free from the default PromptInput variant. The ref is
-            the prompt-fill focus target (v1's querySelector pattern). */}
+      {/* Composer dock — MOBILE: `sticky bottom-0` so it pins to the (keyboard-shrunk)
+          viewport bottom rather than sitting half-behind an overlaying keyboard, with a
+          soft bottom fade dissolving the content scrolling behind it (never
+          `position: fixed` — shell-contract safe). DESKTOP: static, the approved
+          top-anchored hero (`md:mt-10`). Hoisted to a DIRECT root-flex child (the SAME
+          structure Work/Study use) so the tall root is its sticky containing block, not
+          a short nested wrapper; `order` sequences it AFTER the prompts on mobile
+          (thumb-docked) and BEFORE them on desktop. No transform lives on the sticky
+          element or its inner ref div — transforms break `position: sticky`. The gold
+          spotlight still pools behind it (the glow sits low on mobile / a touch below
+          centre on desktop, unchanged). */}
+      <div className="order-4 sticky bottom-0 z-10 -mx-4 px-4 pb-3 pt-6 md:order-3 md:static md:z-auto md:mx-0 md:mt-10 md:px-0 md:pb-0 md:pt-0">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent md:hidden"
+        />
+        {/* The shared v2-native composer — the ORIGINAL animated gold-shimmer border
+            comes free from the default PromptInput variant. The ref is the prompt-fill
+            focus target (v1's querySelector pattern). */}
         <div ref={composerAreaRef}>
           <HomeComposer
             value={input}
@@ -159,10 +174,17 @@ export function ChatHome({
             sendButtonClassName="md:size-10"
           />
         </div>
+      </div>
 
-        {/* DESKTOP prompts — a quiet ChatGPT-style list under the composer
-            (owner #27). Hidden on mobile. */}
-        <div className="mt-3 hidden md:block">
+      {/* Suggested prompts — MOBILE: v1's stacked list sinking toward the thumb
+          (`mt-auto`), just above the docked composer (owner #27). DESKTOP: a quiet
+          ChatGPT-style list directly under the composer. Exactly one shows per
+          breakpoint. */}
+      <div className="order-3 mt-auto pt-8 md:order-4 md:mt-3 md:pt-0">
+        <div className="md:hidden">
+          <HomePrompts variant="mobile" onSelect={fillPrompt} />
+        </div>
+        <div className="hidden md:block">
           <HomePrompts variant="desktop" onSelect={fillPrompt} />
         </div>
       </div>

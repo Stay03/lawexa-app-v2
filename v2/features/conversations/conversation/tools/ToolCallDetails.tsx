@@ -1,17 +1,24 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Check, XCircle } from 'lucide-react';
 import type { ToolMessage } from '@/types/chat';
-import { extractToolDisplayData } from '@/lib/utils/tool-display';
+import { classifyParameters, extractResultMessage } from './tool-content';
+import { BoundedScroll, ToolSectionLabel, ToolStateLine } from './ToolResultParts';
 
 /**
- * ToolCallDetails — the parameters + result summary inside an expanded tool step,
- * RESKINNED for the module design language (fix round §A7-41): the section labels
- * drop the templated `uppercase tracking-wide` treatment for sentence case, and the
- * success row swaps the green-500 check for the quiet monochrome marker language
- * (a muted `Check`) — failure keeps the `destructive` tint. Same data (via
- * `extractToolDisplayData`), same structure.
+ * ToolCallDetails — the GENERIC expanded body for a tool step that has no richer
+ * card (web fetches, memory recalls, and any unknown tool). It replaces the old
+ * flat `String(value)` parameter dump — the thing that turned exhibit 2's
+ * `create_note` HTML argument into a wall of raw source.
+ *
+ * The taxonomy now classifies the RAW parameters ({@link classifyParameters}):
+ *  • short scalars stay inline chips,
+ *  • long text / HTML / arrays become a BOUNDED, scrollable block (HTML stripped
+ *    to readable prose — never source), so nothing is ever unbounded,
+ *  • URL arrays become link rows.
+ * Redundant keys the step line already states (`query`, `case_id`, `mode`…) are
+ * dropped, and the result is a single quiet line — no "N results", no "found in
+ * Xs" (the duration sits on the step header).
  */
 interface ToolCallDetailsProps {
   message: ToolMessage;
@@ -19,49 +26,80 @@ interface ToolCallDetailsProps {
 }
 
 export function ToolCallDetails({ message, className }: ToolCallDetailsProps) {
-  const displayData = extractToolDisplayData(message);
+  const params = classifyParameters(message.toolParameters, message.toolName);
+  const chips = params.filter((p) => p.kind === 'chip');
+  const blocks = params.filter((p) => p.kind !== 'chip');
+
+  const isComplete = message.toolStatus === 'complete';
+  const success = message.toolResult?.success !== false;
+  const error = message.toolResult?.error ?? null;
+  const serverMessage = extractResultMessage(message);
+
+  const hasParams = params.length > 0;
+  // A quiet "Completed" only when there is genuinely nothing else to show, so an
+  // expanded step is never blank — but never noise when there is real content.
+  const showDoneFallback = isComplete && success && !serverMessage && !hasParams;
 
   return (
     <div className={cn('space-y-3 pt-2', className)}>
-      {displayData.parameters.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-muted-foreground text-xs font-medium">Parameters</p>
-          <div className="flex flex-wrap gap-2">
-            {displayData.parameters.map((param, idx) => (
-              <div
-                key={idx}
-                className="bg-muted inline-flex items-center gap-1.5 rounded-md px-2 py-1"
-              >
-                <span className="text-muted-foreground text-xs">{param.label}:</span>
-                <span className="text-foreground text-xs font-medium">{param.value}</span>
-              </div>
-            ))}
-          </div>
+      {hasParams && (
+        <div className="space-y-2">
+          <ToolSectionLabel>Parameters</ToolSectionLabel>
+
+          {chips.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {chips.map((param, idx) => (
+                <span
+                  key={`chip-${idx}`}
+                  className="bg-muted inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                >
+                  <span className="text-muted-foreground">{param.label}</span>
+                  <span className="text-foreground font-medium">{param.value}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {blocks.map((param, idx) => (
+            <div key={`block-${idx}`} className="space-y-1">
+              <p className="text-muted-foreground text-[11px]">{param.label}</p>
+              {param.kind === 'text' ? (
+                <BoundedScroll
+                  maxHeight="max-h-44"
+                  surface="from-muted"
+                  className="bg-muted rounded-lg border border-border px-3 py-2"
+                >
+                  <p className="text-foreground/80 whitespace-pre-wrap break-words text-xs leading-relaxed">
+                    {param.value}
+                  </p>
+                </BoundedScroll>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {param.urls.map((url, i) => (
+                    <a
+                      key={`url-${i}`}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary v2-interactive min-h-6 truncate text-xs hover:underline"
+                    >
+                      {url}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {message.toolStatus === 'complete' && (
-        <div className="space-y-1.5">
-          <p className="text-muted-foreground text-xs font-medium">Result</p>
-          <div className="flex items-center gap-2">
-            {displayData.success ? (
-              <>
-                <Check className="text-muted-foreground h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-                <span className="text-muted-foreground text-xs">
-                  {displayData.resultSummary || 'Completed successfully'}
-                </span>
-              </>
-            ) : (
-              <>
-                <XCircle className="text-destructive h-3.5 w-3.5 shrink-0" />
-                <span className="text-destructive text-xs">
-                  {displayData.error || 'Failed'}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
+      {isComplete && !success && (
+        <ToolStateLine tone="error">{error || 'Failed'}</ToolStateLine>
       )}
+      {isComplete && success && serverMessage && (
+        <ToolStateLine>{serverMessage}</ToolStateLine>
+      )}
+      {showDoneFallback && <ToolStateLine>Completed</ToolStateLine>}
     </div>
   );
 }

@@ -115,8 +115,11 @@ export default async function V2Layout({
       {/* Mirrors the v1 localStorage token into the httpOnly session cookie the
           server DAL reads. Renders nothing; pure network side-effect. */}
       <SessionSync />
-      {/* iOS keyboard-inset sync — writes `--keyboard-inset` for the shell height
-          (foundation-standards.md §4). Renders null; no-op off iOS Safari. */}
+      {/* Keyboard-inset sync — writes `--keyboard-inset` for the shell height
+          (foundation-standards.md §4). Renders null. Self-calibrating: ≈0 on
+          browsers that resize the layout viewport; the real keyboard height on
+          overlay browsers (iOS Safari, and the Android browsers that ignore
+          `interactive-widget` — the Galaxy-A21 class bug). */}
       <KeyboardInsetSync />
       {/* Adds `.v2-document-lock` to <html> while v2 is mounted (and removes it
           on soft-nav away) — the document-scroll lock must follow the shell's

@@ -117,10 +117,12 @@ export function ConversationScreen({
   );
 }
 
-/** Read-only footer for a shared conversation the viewer doesn't own (§C KEEP). */
+/** Read-only footer for a shared conversation the viewer doesn't own (§C KEEP).
+ *  Width tracks the floating composer pill (max-w-xl) so the two dock states
+ *  stay in horizontal lockstep. */
 function ViewOnlyPill() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-3 pt-2">
+    <div className="mx-auto w-full max-w-xl px-4 pb-3 pt-2">
       <div className="bg-muted/80 text-muted-foreground flex items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-center text-sm backdrop-blur">
         <Eye className="h-4 w-4 shrink-0" />
         View only — this is a shared conversation

@@ -3,18 +3,41 @@
 import { useEffect } from 'react';
 
 /**
- * iOS Safari keyboard-inset fallback (docs/v2-docs/foundation-standards.md §4).
+ * Keyboard-inset sync for the overlay case (docs/v2-docs/foundation-standards.md §4).
  *
- * The shell height is `calc(100dvh - var(--keyboard-inset, 0px))`. On every
- * platform EXCEPT iOS Safari the keyboard resizes the layout viewport itself
- * (Android/Firefox honour `interactive-widget=resizes-content`; some browsers
- * expose the VirtualKeyboard API), so `dvh` already tracks the keyboard and no
- * JS is needed — `--keyboard-inset` stays 0.
+ * The shell height is `calc(100dvh - var(--keyboard-inset, 0px))`. When a browser
+ * RESIZES the layout viewport for the on-screen keyboard, the ICB shrinks and
+ * `dvh` already tracks the keyboard for free (Chrome 108+/Firefox 132+ honour our
+ * `interactive-widget=resizes-content`; pre-108 Chrome resized by default). When a
+ * browser OVERLAYS the keyboard instead — iOS Safari always, post-108 Chrome
+ * without the meta, and any engine that ignores it (older WebView / older Samsung
+ * Internet on budget phones like the Galaxy A21) — only the VISUAL viewport shrinks,
+ * `dvh` stays full, and the dock/composer would sit BEHIND the keyboard. This hook
+ * writes the occluded height into `--keyboard-inset` so the shell shrinks and the
+ * composer rides above the keyboard.
  *
- * iOS Safari does neither: it overlays the keyboard without changing `dvh`, so
- * the dock (composer) would sit BEHIND the keyboard. This hook subscribes to
- * `visualViewport` and writes the occluded height into `--keyboard-inset`,
- * shrinking the shell so the dock rides above the keyboard.
+ * BEHAVIOUR MEASUREMENT, NOT CAPABILITY SNIFFING (owner keyboard-bug fix, verified
+ * against MDN + the Chrome viewport-resize-behavior blog + bramus' explainer):
+ *   - The occlusion formula `innerHeight − visualViewport.height − offsetTop` is
+ *     SELF-CALIBRATING. In the RESIZE case `window.innerHeight` shrinks in lockstep
+ *     with `visualViewport.height` (both reflect the resized layout viewport, and
+ *     `offsetTop` is 0 since there is nothing to scroll past), so the formula yields
+ *     ≈0 and we write 0 — no double-count with `dvh`. In the OVERLAY case only
+ *     `visualViewport.height` shrinks while `innerHeight` holds, so the formula
+ *     yields the true keyboard height and we write it. One formula, correct on every
+ *     platform.
+ *   - The previous `'virtualKeyboard' in navigator` early-return was WRONG: Chromium
+ *     has exposed `navigator.virtualKeyboard` since v94, but merely HAVING the API
+ *     does NOT mean the layout viewport resizes — that depends on honouring
+ *     `interactive-widget=resizes-content` (v108+) OR the pre-108 default, neither
+ *     of which the in-the-gap overlay browsers do. So the guard bailed on exactly
+ *     the phones that overlay, stranding the composer behind the keyboard. Removing
+ *     it lets the formula self-calibrate everywhere; no double-count is possible
+ *     because the resize case reads ≈0 by construction.
+ *   - No double-count edge from the VirtualKeyboard API's own `overlaysContent`
+ *     mode: we never set `navigator.virtualKeyboard.overlaysContent = true`, so it
+ *     stays the spec default `false` and the browser keeps resizing the visual
+ *     viewport — exactly what this formula measures.
  *
  * No `setState` — it only writes a CSS custom property on the document element
  * (React Compiler lint: an effect with listeners + cleanup and no render-phase
@@ -27,18 +50,19 @@ export function useKeyboardInset(): void {
     if (typeof window === 'undefined') return;
 
     const viewport = window.visualViewport;
-    // No visualViewport → nothing to measure. And when the browser exposes the
-    // VirtualKeyboard API it resizes the layout viewport for us, so this manual
-    // inset would double-count — skip both cases entirely.
+    // No visualViewport → nothing to measure. (No capability sniffing beyond this:
+    // the occlusion formula below self-calibrates to whatever the browser does with
+    // the keyboard — see the BEHAVIOUR MEASUREMENT note above.)
     if (!viewport) return;
-    if ('virtualKeyboard' in navigator) return;
 
     const root = document.documentElement;
 
     const update = (): void => {
       // Height occluded at the bottom of the layout viewport (keyboard + any
-      // accessory bar). Clamp ≥ 0 — iOS rubber-band scrolling can transiently
-      // make the raw value negative.
+      // accessory bar). Reads ≈0 when the browser resized the layout viewport
+      // (innerHeight shrank in lockstep) and the true keyboard height when it
+      // overlaid. Clamp ≥ 0 — rubber-band scrolling can transiently make the raw
+      // value negative.
       const occlusion = Math.max(
         0,
         window.innerHeight - viewport.height - viewport.offsetTop,

@@ -40,33 +40,46 @@ import { PastedContentCard } from './PastedContentCard';
 import { usePastedContent } from './usePastedContent';
 
 /**
- * ConversationComposer — the FLOATING dock composer for the conversation screen.
+ * ConversationComposer — the FLOATING PILL dock composer for the conversation screen.
  * It lives in the AppShell dock grid-row (portaled there by ConversationScreen), so
- * it looks floating (rounded, shadowed, inset, transcript scrolling behind) while
- * the shell's dvh + `--keyboard-inset` grid keeps it above the iOS keyboard — never
- * `position: fixed` (v1's defect). Its width is matched to the transcript column
- * (`max-w-2xl`), fixing v1's far-too-narrow `max-w-xs sm:max-w-md`.
+ * it floats (rounded, shadowed, inset) while the shell's dvh + `--keyboard-inset` grid
+ * keeps it above the keyboard — never `position: fixed` (v1's defect).
  *
- * ANATOMY = v1's CHANNELS `MessageComposer` (fix round §A7-40, studied first-hand):
- * ONE compact input row inside the `PromptInput` card — a round `+` menu on the left
- * (text-primary), the auto-grow textarea in the middle (rows=1, height-capped then
- * internal scroll), and the round Send/Stop button on the right. It replaces the old
- * TWO-row card (a textarea row + a separate actions row) the owner called the wrong
- * anatomy, and it pulls the jurisdiction/redacted pills DOWN from ABOVE the card to
- * INSIDE it: everything that "arms" the next turn — the jurisdiction chip + redacted
- * pill, the confidential file notice, the error banner, the attachment chips, and the
- * pasted-content cards — stacks inside the card ABOVE the input row (the Grok/channels
- * staging pattern). Overlays (the jurisdiction popover, tooltips, the +-menu) still
- * float ABOVE the card.
+ * FLOATING PILL (owner floating-pill round — reference: a Slack-style message bar). A
+ * single compact rounded bar, deliberately NARROWER than the `max-w-2xl` transcript
+ * column (`max-w-xl`, centred), so it reads as a floating island: the transcript is
+ * visible above it, and a gap + the notch safe-area leave the page background visible
+ * below it. The dock row is TRANSPARENT (no opaque band); legibility is solved by the
+ * pill's own solid `bg-background` face + `shadow-lg` + the gap, so nothing bleeds
+ * through the bar. `max-w-xl` narrows v1's over-wide match to the transcript while
+ * still fixing v1's far-too-narrow `max-w-xs sm:max-w-md`.
+ *
+ * ANATOMY: ONE compact input row inside the `PromptInput` card — a round `+` menu on
+ * the left (text-primary), the auto-grow textarea in the middle (rows=1, height-capped
+ * then internal scroll), and the round Send/Stop button on the right. Everything that
+ * "arms" the next turn now FLOATS ABOVE the pill (reversing the previous round's
+ * inside-the-card stack, per the owner's floating-pill screenshot where the
+ * jurisdiction chip floats above the bar): the jurisdiction chip + redacted pill (the
+ * meta row), the confidential file notice, the error banner, the attachment chips, and
+ * the pasted-content cards stack ABOVE the card — the Slack/Grok staging tray. Each
+ * carries its own surface (border/tint), so it stays legible on the transparent dock;
+ * the ones that appear mid-turn fade in (symmetric with the attachment chips' exit).
+ * Overlays (the jurisdiction popover, tooltips, the +-menu) still float ABOVE the card.
  *
  * EVERY capability is preserved: jurisdiction picker, real attachments (upload chips +
- * drag-drop, PDF/DOC/DOCX/RTF, 10MB × 10, dedup), pasted-content staging, the plus-menu
- * (Attach + the conversation's STICKY privacy modes shown locked, now with honest
- * confidential copy), the redacted pill, the confidential file notice, per-conversation
- * draft persistence, the Send/Stop toggle with its cancelling state, the confidential
- * `PromptInput` variant, `max-w-2xl` dock width, the portal-event `stop` guards, and
- * the streaming/submitting disabled states. No workflow selector / confidential toggle /
- * study mode — those are turn-1 create concerns owned by the home composer.
+ * drag-drop, PDF/DOC/DOCX/RTF, 10MB × 10, dedup, symmetric add/remove animation),
+ * pasted-content staging, the plus-menu (Attach + the conversation's STICKY privacy
+ * modes shown locked, with honest confidential copy), the redacted pill, the
+ * confidential file notice, per-conversation draft persistence, the Send/Stop toggle
+ * with its cancelling state, the confidential `PromptInput` variant, the portal-event
+ * `stop` guards, and the streaming/submitting disabled states. No workflow selector /
+ * confidential toggle / study mode — those are turn-1 create concerns owned by the home
+ * composer.
+ *
+ * DOCK vs. SCROLL-REGION (shell contract): the pill stays in the dock grid-row (the
+ * sanctioned, keyboard-safe mechanism) — literal transcript scrolling BELOW the bar
+ * would require relocating it into the content scroll region as a sticky element, which
+ * is out of scope here; the floating-island gap delivers the same read without it.
  */
 const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.rtf';
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
@@ -78,6 +91,8 @@ const ALLOWED_FILE_TYPES = [
   'application/rtf',
   'text/rtf',
 ];
+/** Attachment exit window — must clear before the row leaves the DOM. */
+const CHIP_EXIT_MS = 160;
 
 interface FileUploadEntry {
   key: string;
@@ -149,8 +164,22 @@ export function ConversationComposer({
     `conversation_draft_pasted_${conversationId}`,
   );
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<Set<string>>(new Set());
+  const [removingPasted, setRemovingPasted] = useState<Set<string>>(new Set());
+  // Error banner — a persistent COLLAPSE node: `errorText` persists through the exit
+  // so the height + opacity animate BOTH directions (one system with the confidential
+  // notice, which is likewise a persistent collapse of static copy). `errorOpen` drives
+  // the grid-collapse; the text only changes when a NEW error is shown, so a dismiss
+  // animates out with its own words still in place.
+  const [errorText, setErrorText] = useState('');
+  const [errorOpen, setErrorOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const showError = (message: string) => {
+    setErrorText(message);
+    setErrorOpen(true);
+  };
+  const hideError = () => setErrorOpen(false);
 
   const uploadedFiles = uploads.filter((u) => u.status === 'uploaded');
   const isUploading = uploads.some((u) => u.status === 'uploading');
@@ -161,7 +190,7 @@ export function ConversationComposer({
 
   const handleFilesAdded = async (newFiles: File[]) => {
     if (newFiles.length === 0) return;
-    if (error) setError(null);
+    if (errorOpen) hideError();
 
     const existingKeys = new Set(uploads.map((u) => `${u.file_name}::${u.file_size}`));
     const remainingSlots = MAX_FILES_PER_TURN - uploads.length;
@@ -200,10 +229,10 @@ export function ConversationComposer({
       });
     }
 
-    if (rejectedType) setError('Only PDF, DOC, DOCX, and RTF files are supported.');
-    else if (rejectedSize) setError('Each file must be 10MB or less.');
-    else if (rejectedCap) setError(`You can attach at most ${MAX_FILES_PER_TURN} files per message.`);
-    else if (rejectedDuplicate && accepted.length === 0) setError('That file is already attached.');
+    if (rejectedType) showError('Only PDF, DOC, DOCX, and RTF files are supported.');
+    else if (rejectedSize) showError('Each file must be 10MB or less.');
+    else if (rejectedCap) showError(`You can attach at most ${MAX_FILES_PER_TURN} files per message.`);
+    else if (rejectedDuplicate && accepted.length === 0) showError('That file is already attached.');
 
     if (accepted.length === 0) return;
     setUploads((prev) => [...prev, ...accepted.map((a) => a.entry)]);
@@ -236,7 +265,44 @@ export function ConversationComposer({
     );
   };
 
-  const removeUpload = (key: string) => setUploads((prev) => prev.filter((u) => u.key !== key));
+  // Play the exit animation, then drop the row. The timer (not an effect) commits the
+  // removal, so it also fires under reduced motion where the visual exit is suppressed.
+  const removeUpload = (key: string) => {
+    setRemoving((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+    window.setTimeout(() => {
+      setUploads((prev) => prev.filter((u) => u.key !== key));
+      setRemoving((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }, CHIP_EXIT_MS);
+  };
+
+  // Pasted-card removal mirrors the attachment chips: mark exiting, play the exit,
+  // then the timer commits `removePasted` — symmetric, and it still leaves under
+  // reduced motion where the visual exit is suppressed.
+  const handleRemovePasted = (id: string) => {
+    setRemovingPasted((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    window.setTimeout(() => {
+      removePasted(id);
+      setRemovingPasted((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, CHIP_EXIT_MS);
+  };
 
   const handleSubmit = async () => {
     if (isStreaming || isSubmitting || isUploading) return;
@@ -263,7 +329,7 @@ export function ConversationComposer({
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-3 pt-2">
+    <div className="mx-auto w-full max-w-xl px-4 pb-3 pt-2">
       <FileUpload onFilesAdded={handleFilesAdded} accept={ACCEPTED_FILE_TYPES} multiple>
         <input
           ref={fileInputRef}
@@ -277,70 +343,98 @@ export function ConversationComposer({
           }}
         />
 
-        <PromptInput
-          value={input}
-          onValueChange={(next) => {
-            setInput(next);
-            if (error) setError(null);
-          }}
-          onSubmit={handleSubmit}
-          disabled={isStreaming || isSubmitting}
-          maxHeight={150}
-          variant={isConfidential ? 'confidential' : 'default'}
-          className="shadow-lg"
+        {/* ── Staging tray: everything that arms the next turn FLOATS ABOVE the pill
+            (the Slack/Grok tray — reversed from the previous inside-the-card stack per
+            the owner's floating-pill screenshot). Each block carries its own surface,
+            so it stays legible on the transparent dock. ── */}
+
+        {/* Jurisdiction + redacted pill (meta row) — always present, so no entrance. */}
+        <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+          <JurisdictionField
+            signedIn
+            value={jurisdiction}
+            onChange={onJurisdictionChange}
+            disabled={isStreaming || isSubmitting}
+            stop={stop}
+          />
+          {isRedacted && (
+            <div
+              className="bg-background flex items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
+              aria-label="Redacted mode is on for this conversation"
+            >
+              <VenetianMask className="h-3.5 w-3.5" />
+              <span className="font-medium">Redacted</span>
+            </div>
+          )}
+        </div>
+
+        {/* Confidential file notice — a persistent-node collapse (grid-rows 0fr↔1fr +
+            opacity) so it animates BOTH directions; the copy is static, so it fades +
+            collapses cleanly when the last file leaves. Inert (aria-hidden) collapsed. */}
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+            isConfidential && uploads.length > 0 ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+          )}
         >
-          {/* ── Staging stack: everything that arms the next turn lives INSIDE the
-              card, ABOVE the single input row (the channels/Grok pattern). ── */}
-
-          {/* Jurisdiction + redacted pill (meta row). */}
-          <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
-            <JurisdictionField
-              signedIn
-              value={jurisdiction}
-              onChange={onJurisdictionChange}
-              disabled={isStreaming || isSubmitting}
-              stop={stop}
-            />
-            {isRedacted && (
-              <div
-                className="bg-background flex items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
-                aria-label="Redacted mode is on for this conversation"
-              >
-                <VenetianMask className="h-3.5 w-3.5" />
-                <span className="font-medium">Redacted</span>
-              </div>
-            )}
-          </div>
-
-          {/* Confidential file notice. */}
-          {isConfidential && uploads.length > 0 && (
-            <p className="text-muted-foreground mb-2 px-1 text-xs">
+          <div className="overflow-hidden">
+            <p
+              aria-hidden={!(isConfidential && uploads.length > 0)}
+              className={cn(
+                'text-muted-foreground mb-2 px-1 text-xs transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                isConfidential && uploads.length > 0 ? 'opacity-100' : 'opacity-0',
+              )}
+            >
               Files in confidential chats are kept for up to 24 hours, then permanently deleted.
               Make a local copy if you need to keep this file.
             </p>
-          )}
+          </div>
+        </div>
 
-          {/* Error banner. */}
-          {error && (
+        {/* Error banner — the SAME persistent-node collapse. `errorText` persists
+            through the exit (it only changes when a new error is shown), so the height +
+            opacity animate BOTH ways rather than the box vanishing. Inert + aria-hidden
+            when collapsed; `role="alert"` announces when it opens. */}
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+            errorOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+          )}
+        >
+          <div className="overflow-hidden">
             <div
               role="alert"
-              className="border-destructive/40 bg-destructive/10 text-destructive mb-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+              aria-hidden={!errorOpen}
+              className={cn(
+                'border-destructive/40 bg-destructive/10 text-destructive mb-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                errorOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
+              )}
             >
               <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-              <span className="flex-1">{error}</span>
+              <span className="flex-1">{errorText}</span>
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Attachment chips. */}
-          {uploads.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2 px-1">
-              {uploads.map((u) => (
+        {/* Attachment chips — symmetric add/remove animation (the exit plays before
+            the row is dropped from the DOM). Height-capped at 40vh with a quiet internal
+            scroll so a full tray of 10 chips can never squeeze the transcript on a small
+            phone with the keyboard up; the meta row, notice, and error sit OUTSIDE this
+            scroller so they always stay in view. */}
+        {uploads.length > 0 && (
+          <div className="mb-2 flex max-h-[40vh] flex-wrap gap-2 overflow-y-auto overscroll-contain px-1">
+            {uploads.map((u) => {
+              const isRemoving = removing.has(u.key);
+              return (
                 <div
                   key={u.key}
                   onClick={stop}
                   className={cn(
                     'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',
                     u.status === 'failed' ? 'bg-destructive/10 text-destructive' : 'bg-secondary',
+                    isRemoving
+                      ? 'motion-safe:animate-out motion-safe:fade-out motion-safe:zoom-out-95 motion-safe:duration-150'
+                      : 'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150',
                   )}
                 >
                   {u.status === 'uploading' ? (
@@ -370,23 +464,48 @@ export function ConversationComposer({
                     <X className="size-3.5" />
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
+        )}
 
-          {/* Pasted content staging. */}
-          {pastedItems.length > 0 && (
-            <div className="mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
-              {pastedItems.map((item) => (
-                <PastedContentCard
+        {/* Pasted content staging — each card animates in on add and OUT on remove
+            (the removing-set + timer mirror of the attachment chips), so removals are
+            symmetric rather than an abrupt vanish. */}
+        {pastedItems.length > 0 && (
+          <div className="mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
+            {pastedItems.map((item) => {
+              const isRemoving = removingPasted.has(item.id);
+              return (
+                <div
                   key={item.id}
-                  content={item.text}
-                  onRemove={() => removePasted(item.id)}
-                />
-              ))}
-            </div>
-          )}
+                  className={cn(
+                    'shrink-0',
+                    isRemoving
+                      ? 'motion-safe:animate-out motion-safe:fade-out motion-safe:zoom-out-95 motion-safe:duration-150'
+                      : 'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150',
+                  )}
+                >
+                  <PastedContentCard content={item.text} onRemove={() => handleRemovePasted(item.id)} />
+                </div>
+              );
+            })}
+          </div>
+        )}
 
+        {/* ── The pill: the PromptInput card holds ONLY the single input row. ── */}
+        <PromptInput
+          value={input}
+          onValueChange={(next) => {
+            setInput(next);
+            if (errorOpen) hideError();
+          }}
+          onSubmit={handleSubmit}
+          disabled={isStreaming || isSubmitting}
+          maxHeight={150}
+          variant={isConfidential ? 'confidential' : 'default'}
+          className="shadow-lg"
+        >
           {/* ── The single input row: + menu | textarea | Send/Stop. ── */}
           <div className="flex items-end gap-1.5">
             <DropdownMenu>

@@ -56,6 +56,7 @@ import {
   isConfidentialAttachmentExpired,
   replaceLastUserTurnContent,
 } from './confidential-transcript';
+import { createStreamSmoother } from './stream-smoother';
 import type {
   ChatEngine,
   ChatEngineConfig,
@@ -159,32 +160,35 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     setState((prev) => ({ ...prev, messages: fn(prev.messages) }));
   }
 
-  // ── Per-message live streaming-text store (flush target) ──
-  // liveText = authoritative accumulator (updated synchronously per delta);
-  // publishedText = what subscribers see (updated only on the flush tick).
+  // ── Per-message live streaming-text store ──
+  // liveText = authoritative accumulator (updated synchronously per delta, read by
+  // every terminal path). The SMOOTHER owns what subscribers actually see: it reveals
+  // liveText's already-arrived characters at an even, backlog-proportional cadence
+  // (see stream-smoother.ts) instead of mirroring the provider's bursts. liveText is
+  // never touched by it — smoothing is presentation only.
   const liveText = new Map<string, string>();
-  const publishedText = new Map<string, string>();
-  const textDirty = new Set<string>();
   const textListeners = new Map<string, Set<() => void>>();
   function notifyText(id: string) {
     textListeners.get(id)?.forEach((l) => l());
   }
+  const textSmoother = createStreamSmoother({
+    onPublish: notifyText,
+    commit: (fn) => commitFn(fn),
+    config: config.smoothing,
+    disabledIntervalMs: flushIntervalMs,
+  });
   function seedText(id: string, text: string) {
+    // Seed / reset / accumulated-text replay must appear instantly (no typewriter).
     liveText.set(id, text);
-    publishedText.set(id, text);
-    textDirty.delete(id);
-    notifyText(id);
+    textSmoother.snap(id, text);
   }
   function appendText(id: string, delta: string) {
     liveText.set(id, (liveText.get(id) ?? '') + delta);
-    textDirty.add(id);
-    ensureFlushLoop();
+    textSmoother.setTarget(id, liveText.get(id)!);
   }
   function clearText(id: string) {
     liveText.delete(id);
-    publishedText.delete(id);
-    textDirty.delete(id);
-    notifyText(id);
+    textSmoother.drop(id);
   }
   const streamingText: StreamingSource = {
     subscribe(id, listener) {
@@ -199,7 +203,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         if (set!.size === 0) textListeners.delete(id);
       };
     },
-    get: (id) => publishedText.get(id) ?? '',
+    get: (id) => textSmoother.get(id),
   };
 
   // ── Per-message live reasoning store (§C thinking upgrade) ──
@@ -207,13 +211,21 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // placeholder exists, so they are buffered by iteration and associated with the
   // placeholder id once it is created.
   const reasoningByIteration = new Map<number, { text: string; startedAt: number }>();
-  const publishedReasoning = new Map<string, string>();
-  const reasoningDirty = new Set<string>();
   const reasoningListeners = new Map<string, Set<() => void>>();
   const messageIdToIteration = new Map<string, number>();
   function notifyReasoning(id: string) {
     reasoningListeners.get(id)?.forEach((l) => l());
   }
+  // Reasoning shares the same smoothing policy as answer text (consistency: a jerky
+  // reasoning box next to a smooth answer would read as two different systems). Its
+  // authoritative text still lives in reasoningByIteration; the smoother only paces
+  // the reveal, keyed by message id.
+  const reasoningSmoother = createStreamSmoother({
+    onPublish: notifyReasoning,
+    commit: (fn) => commitFn(fn),
+    config: config.smoothing,
+    disabledIntervalMs: flushIntervalMs,
+  });
   const reasoning: StreamingSource = {
     subscribe(id, listener) {
       let set = reasoningListeners.get(id);
@@ -227,16 +239,19 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         if (set!.size === 0) reasoningListeners.delete(id);
       };
     },
-    get: (id) => publishedReasoning.get(id) ?? '',
+    get: (id) => reasoningSmoother.get(id),
   };
+  // Feed the latest reasoning target for a message id into the smoother (called when
+  // a `thinking` delta lands or a placeholder adopts already-buffered reasoning).
+  function pushReasoning(id: string, iteration: number) {
+    reasoningSmoother.setTarget(id, reasoningByIteration.get(iteration)?.text ?? '');
+  }
   // Finalize a message's reasoning: snapshot it onto the structural message and
   // clear the live buffer. Returns the trace to merge into the finalized message.
   function takeReasoning(id: string): ReasoningTrace {
     const iteration = messageIdToIteration.get(id);
     const entry = iteration !== undefined ? reasoningByIteration.get(iteration) : undefined;
-    publishedReasoning.delete(id);
-    reasoningDirty.delete(id);
-    notifyReasoning(id);
+    reasoningSmoother.drop(id);
     if (iteration !== undefined) reasoningByIteration.delete(iteration);
     if (entry && entry.text.trim()) {
       return { reasoning: entry.text.trim(), reasoningMs: Date.now() - entry.startedAt };
@@ -244,54 +259,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     return {};
   }
 
-  // ── Flush loop (the render-storm fix) ──
-  // Every `flushIntervalMs`, drain the dirty sets into the published maps and
-  // notify ONLY the affected per-message subscribers. Between ticks, deltas
-  // accumulate in refs untouched by React. This — not startTransition — is what
-  // keeps a long stream from stalling (verified: external-store updates ignore
-  // transitions). Runs only while a stream is active.
-  let flushTimer: ReturnType<typeof setInterval> | null = null;
-  function ensureFlushLoop() {
-    if (flushTimer) return;
-    flushTimer = setInterval(runFlush, flushIntervalMs);
-  }
-  function stopFlushLoop() {
-    if (flushTimer) {
-      clearInterval(flushTimer);
-      flushTimer = null;
-    }
-    runFlush(); // final drain so the last sub-cadence tokens are published
-  }
-  function runFlush() {
-    if (textDirty.size === 0 && reasoningDirty.size === 0) {
-      // SELF-TERMINATE on an idle tick (reviewer F1): terminal paths that don't
-      // run resetStreamingBuffers (real backend error, unparseable-frame branch,
-      // watchdog→poll recovery) would otherwise leave this interval ticking
-      // until unmount. Any later delta re-arms via ensureFlushLoop (appendText /
-      // thinking / connect), so a mid-stream pause costs one idempotent re-arm.
-      if (flushTimer) {
-        clearInterval(flushTimer);
-        flushTimer = null;
-      }
-      return;
-    }
-    const textIds = [...textDirty];
-    textDirty.clear();
-    const reasoningIds = [...reasoningDirty];
-    reasoningDirty.clear();
-    commitFn(() => {
-      for (const id of textIds) {
-        publishedText.set(id, liveText.get(id) ?? '');
-        notifyText(id);
-      }
-      for (const id of reasoningIds) {
-        const iteration = messageIdToIteration.get(id);
-        const entry = iteration !== undefined ? reasoningByIteration.get(iteration) : undefined;
-        publishedReasoning.set(id, entry?.text ?? '');
-        notifyReasoning(id);
-      }
-    });
-  }
+  // The per-message publish cadence (the render-storm fix) now lives in the two
+  // smoothers above: each drains already-arrived characters into its published value
+  // on an rAF cadence and notifies ONLY the affected per-message subscribers, so
+  // token arrival still never re-renders the transcript. Both self-terminate when
+  // no cursor has backlog and re-arm on the next setTarget (appendText / thinking).
 
   // ── Connection / resilience state (v1 refs, as closure vars) ──
   let eventSource: EventSource | null = null;
@@ -371,8 +343,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // If reasoning tokens for this iteration already arrived, light up the
       // placeholder's live reasoning immediately.
       if (reasoningByIteration.has(iteration)) {
-        reasoningDirty.add(id);
-        ensureFlushLoop();
+        pushReasoning(id, iteration);
       }
       setMessages((msgs) => [
         ...msgs,
@@ -782,7 +753,6 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     const es = new EventSource(streamUrl);
     eventSource = es;
     startWatchdog();
-    ensureFlushLoop();
 
     // Snapshot the dedup set built from history — skip SSE events already rendered.
     const dedup = dedupKeys;
@@ -902,6 +872,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         setMessages((msgs) =>
           msgs.map((m) => (m.id === msgId ? { ...m, content: finalText, isStreaming: false } : m)),
         );
+        // text_done = "the answer text is complete": reveal it in full now (the row
+        // already reads message.content once isStreaming flips false, so this is
+        // visually identical) and retire the smoothing cursor so it stops ticking
+        // in the gap before `completed`. No trailing typewriter after the answer ends.
+        textSmoother.snap(msgId, finalText);
       }
 
       // Confidential: persist the orchestrator's accumulated text the moment
@@ -1004,10 +979,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       entry.text += text;
       reasoningByIteration.set(iteration, entry);
       // If the answer placeholder for this iteration already exists, stream the
-      // reasoning live into it (throttled by the flush loop).
+      // reasoning live into it (paced by the reasoning smoother).
       if (streamingMessageId && currentIteration === iteration) {
-        reasoningDirty.add(streamingMessageId);
-        ensureFlushLoop();
+        pushReasoning(streamingMessageId, iteration);
       }
     });
 
@@ -1289,13 +1263,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // textByIteration + agentText). Structural rows are already finalized, so no
   // notify is needed here.
   function resetStreamingBuffers() {
-    stopFlushLoop();
+    textSmoother.clear();
+    reasoningSmoother.clear();
     liveText.clear();
-    publishedText.clear();
-    textDirty.clear();
     reasoningByIteration.clear();
-    publishedReasoning.clear();
-    reasoningDirty.clear();
     agentSlugToMessageId.clear();
     messageIdToIteration.clear();
   }
@@ -1336,7 +1307,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function disconnect() {
     stopWatchdog();
     stopPolling();
-    stopFlushLoop();
+    textSmoother.clear();
+    reasoningSmoother.clear();
     executionId = null;
     reconnectCount = 0;
     consecutiveHeartbeats = 0;
@@ -1344,11 +1316,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // Clear text accumulators on FULL disconnect (but never on SSE reconnect — the
     // placeholder must persist so `completed` can replace it).
     liveText.clear();
-    publishedText.clear();
-    textDirty.clear();
     reasoningByIteration.clear();
-    publishedReasoning.clear();
-    reasoningDirty.clear();
     agentSlugToMessageId.clear();
     messageIdToIteration.clear();
     streamingMessageId = null;
@@ -1651,6 +1619,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     if (disposed) return;
     disposed = true;
     disconnect();
+    textSmoother.dispose();
+    reasoningSmoother.dispose();
     structuralListeners.clear();
     textListeners.clear();
     reasoningListeners.clear();

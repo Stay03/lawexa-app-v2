@@ -59,20 +59,28 @@ export function DockProvider({ children }: { children: ReactNode }) {
  * conversation screen while ownership/history load), so every transition between
  * them is seamless (identical geometry). Purely decorative.
  *
- * GEOMETRY LOCKSTEP (§A7-40): this MUST match `ConversationComposer`'s exact card
- * geometry so the SSR reservation reserves the right height and the `:has()`
- * retirement swaps to the real composer with NO CLS. The composer is now a single
- * PromptInput card (`rounded-3xl p-2`) holding a meta row (the jurisdiction chip)
- * over ONE input row (`+` button · textarea · Send), all `size-11`/`h-11` — so the
- * skeleton mirrors exactly that stack, not the old pill-above-a-blank-card shape.
+ * GEOMETRY LOCKSTEP (floating-pill round): this MUST match `ConversationComposer`'s
+ * exact geometry so the SSR reservation reserves the right height and the `:has()`
+ * retirement swaps to the real composer with NO CLS. The composer is now a floating
+ * PILL, deliberately NARROWER than the transcript column (`max-w-xl`): the
+ * jurisdiction chip (a `mb-2` meta row) FLOATS ABOVE the PromptInput card, and the
+ * card (`rounded-3xl p-2`) holds ONLY the single input row (`+` button · textarea ·
+ * Send), all `size-11`/`h-11` — so the skeleton mirrors exactly that
+ * chip-above-a-single-row-card stack. (Width is not a CLS axis — the dock's HEIGHT is
+ * what the `1fr` content row reflows against — but the skeleton tracks the pill's
+ * width too so the reservation and the real bar share one silhouette.)
  */
 export function ComposerSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-3 pt-2" aria-hidden>
-      <div className="border-border bg-muted/50 flex flex-col gap-2 rounded-3xl border p-2">
-        {/* Meta row — the jurisdiction chip. */}
+    <div className="mx-auto w-full max-w-xl px-4 pb-3 pt-2" aria-hidden>
+      {/* Meta row — the jurisdiction chip, floating ABOVE the pill (mb-2, matching
+          the composer's meta row). */}
+      <div className="mb-2 px-1">
         <div className="bg-muted h-8 w-28 animate-pulse rounded-full" />
-        {/* Input row — + menu · textarea · Send, matching the size-11 controls. */}
+      </div>
+      {/* The pill — the PromptInput card holding ONLY the single input row
+          (+ menu · textarea · Send), matching the size-11/h-11 controls. */}
+      <div className="border-border bg-muted/50 rounded-3xl border p-2">
         <div className="flex items-end gap-1.5">
           <div className="bg-muted size-11 shrink-0 animate-pulse rounded-full" />
           <div className="bg-muted h-11 flex-1 animate-pulse rounded-2xl" />

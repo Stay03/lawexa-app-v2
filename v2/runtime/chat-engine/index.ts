@@ -30,6 +30,7 @@ export type {
   ReasoningTrace,
   RecoverResult,
   StreamingSource,
+  StreamSmoothingConfig,
 } from './types';
 export {
   ensureTranscript,

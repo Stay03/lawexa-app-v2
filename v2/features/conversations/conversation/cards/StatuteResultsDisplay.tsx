@@ -1,14 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { ScrollText, ChevronDown, ExternalLink, FileText } from 'lucide-react';
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from '@/components/ui/collapsible';
+import { ScrollText, FileText, ExternalLink } from 'lucide-react';
 import type { ToolMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
+import { BoundedScroll, ResultRowLink, ToolResultGroup } from '../tools/ToolResultParts';
 
 /******************************************************************************
                                Types
@@ -123,10 +118,6 @@ function parseStatuteXml(xml: string): React.ReactNode[] {
     .replace(/<\/?schedule[^>]*>/g, '')
     .replace(/<\/?part[^>]*>/g, '');
 
-  // Process subsections: <subsection pos="..." num="(1)">text</subsection>
-  // Process paragraphs: <paragraph pos="..." num="(a)">text</paragraph>
-  // Process headings: <heading pos="..." title="..."/>
-
   // Split into meaningful blocks
   const parts = text.split(/<\/?(?:subsection|paragraph|heading)[^>]*>/g);
   const tags = text.match(/<(?:subsection|paragraph|heading)[^>]*>/g) || [];
@@ -158,9 +149,9 @@ function parseStatuteXml(xml: string): React.ReactNode[] {
       const titleMatch = tags[tagIndex - 1]?.match(/title="([^"]*)"/);
       if (titleMatch) {
         nodes.push(
-          <p key={key++} className="font-medium text-foreground/90 mt-2 mb-1">
+          <p key={key++} className="text-foreground/90 mb-1 mt-2 text-xs font-medium">
             {titleMatch[1]}
-          </p>
+          </p>,
         );
       }
     } else {
@@ -168,14 +159,14 @@ function parseStatuteXml(xml: string): React.ReactNode[] {
         <p
           key={key++}
           className={cn(
-            'text-[11px] leading-relaxed text-foreground/80',
+            'text-foreground/80 text-[11px] leading-relaxed',
             indent === 1 && 'ml-4',
-            indent === 2 && 'ml-8'
+            indent === 2 && 'ml-8',
           )}
         >
           {num && <span className="text-muted-foreground mr-1">{num}</span>}
           {part}
-        </p>
+        </p>,
       );
     }
 
@@ -187,9 +178,9 @@ function parseStatuteXml(xml: string): React.ReactNode[] {
     const plainText = xml.replace(/<[^>]+>/g, '').trim();
     if (plainText) {
       nodes.push(
-        <p key={0} className="text-[11px] leading-relaxed text-foreground/80 whitespace-pre-wrap">
+        <p key={0} className="text-foreground/80 whitespace-pre-wrap text-[11px] leading-relaxed">
           {plainText}
-        </p>
+        </p>,
       );
     }
   }
@@ -201,68 +192,15 @@ function parseStatuteXml(xml: string): React.ReactNode[] {
                             Sub-components
 ******************************************************************************/
 
-function StatuteSearchRow({
-  item,
-  isExpanded,
-  onToggle,
-}: {
-  item: StatuteInfo;
-  isExpanded: boolean;
-  onToggle: () => void;
-}) {
-  const meta = [item.country?.name, item.year].filter(Boolean).join(' · ');
-
+function statuteMeta(item: StatuteInfo): string | undefined {
   return (
-    <Collapsible open={isExpanded} onOpenChange={onToggle}>
-      <CollapsibleTrigger asChild>
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/60">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-            <ScrollText className="h-2.5 w-2.5 text-primary" />
-          </span>
-          <span className="min-w-0 flex-1 truncate text-xs text-foreground">
-            {item.title}
-          </span>
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            {meta}
-          </span>
-          <ChevronDown
-            className={cn(
-              'h-3 w-3 shrink-0 text-muted-foreground transition-transform',
-              isExpanded && 'rotate-180'
-            )}
-          />
-        </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mx-3 mb-2 rounded-lg border border-border/30 bg-background/50 p-3">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-              {item.country?.name && <span>{item.country.name}</span>}
-              {item.year && (
-                <>
-                  <span className="text-border">·</span>
-                  <span>{item.year}</span>
-                </>
-              )}
-              {item.total_nodes && (
-                <>
-                  <span className="text-border">·</span>
-                  <span>{item.total_nodes.toLocaleString()} sections</span>
-                </>
-              )}
-            </div>
-          </div>
-          <a
-            href={`/statutes/${item.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
-          >
-            Open statute <ExternalLink className="h-2.5 w-2.5" />
-          </a>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    [
+      item.country?.name,
+      item.year ? String(item.year) : undefined,
+      item.total_nodes ? `${item.total_nodes.toLocaleString()} sections` : undefined,
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined
   );
 }
 
@@ -277,56 +215,29 @@ function StatuteOutlineDisplay({
   const topLevel = outline.filter((item) => item.depth === 0);
 
   return (
-    <div className="mt-3 rounded-xl border border-border/40 bg-muted/20">
-      {/* Statute header */}
-      <div className="px-3 pt-2.5 pb-2 border-b border-border/30">
-        <div className="flex items-center gap-2">
-          <ScrollText className="h-3.5 w-3.5 text-primary shrink-0" />
-          <span className="text-xs font-medium text-foreground truncate">{statute.title}</span>
-        </div>
-        <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
-          {statute.country?.name && <span>{statute.country.name}</span>}
-          {statute.year && (
-            <>
-              <span className="text-border">·</span>
-              <span>{statute.year}</span>
-            </>
-          )}
-          {statute.total_nodes && (
-            <>
-              <span className="text-border">·</span>
-              <span>{statute.total_nodes.toLocaleString()} sections</span>
-            </>
-          )}
-          {statute.approx_word_count && (
-            <>
-              <span className="text-border">·</span>
-              <span>~{statute.approx_word_count.toLocaleString()} words</span>
-            </>
-          )}
-        </div>
+    <ToolResultGroup>
+      <ResultRowLink
+        href={`/statutes/${statute.slug}`}
+        icon={ScrollText}
+        title={statute.title}
+        meta={statuteMeta(statute)}
+      />
+      <div className="border-border border-t">
+        <BoundedScroll maxHeight="max-h-72" surface="from-card" className="py-1">
+          {topLevel.map((item) => (
+            <div key={item.pos} className="flex items-center gap-2 px-3 py-1.5 text-[11px]">
+              <span className="text-muted-foreground bg-secondary shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium uppercase">
+                {item.type}
+              </span>
+              {item.num && <span className="text-muted-foreground shrink-0">{item.num}</span>}
+              <span className="text-foreground/80 min-w-0 flex-1 truncate">
+                {item.title || ''}
+              </span>
+            </div>
+          ))}
+        </BoundedScroll>
       </div>
-
-      {/* Outline items */}
-      <div className="max-h-[300px] overflow-y-auto py-1">
-        {topLevel.map((item) => (
-          <div
-            key={item.pos}
-            className="flex items-center gap-2 px-3 py-1.5 text-[11px]"
-          >
-            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase text-muted-foreground">
-              {item.type}
-            </span>
-            {item.num && (
-              <span className="shrink-0 text-muted-foreground">{item.num}</span>
-            )}
-            <span className="min-w-0 flex-1 truncate text-foreground/80">
-              {item.title || ''}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
+    </ToolResultGroup>
   );
 }
 
@@ -343,69 +254,57 @@ function StatuteContentDisplay({
   content: string;
   showing?: string;
 }) {
+  const title = sectionMatch
+    ? `Section ${sectionMatch.number} — ${sectionMatch.title}`
+    : statute?.title || 'Statute content';
+  const meta = sectionMatch
+    ? [sectionMatch.parent_context, statute?.title].filter(Boolean).join(' · ')
+    : showing;
+
   return (
-    <div className="mt-3 rounded-xl border border-border/40 bg-muted/20">
+    <ToolResultGroup>
       {/* Section header */}
-      <div className="px-3 pt-2.5 pb-2 border-b border-border/30">
-        {sectionMatch ? (
-          <>
-            <div className="flex items-center gap-2">
-              <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
-              <span className="text-xs font-medium text-foreground">
-                Section {sectionMatch.number} — {sectionMatch.title}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
-              <span>{sectionMatch.parent_context}</span>
-              {statute && (
-                <>
-                  <span className="text-border">·</span>
-                  <span className="truncate">{statute.title}</span>
-                </>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center gap-2">
-            <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="text-xs font-medium text-foreground truncate">
-              {statute?.title || 'Statute content'}
-            </span>
-            {showing && (
-              <span className="shrink-0 text-[10px] text-muted-foreground">
-                {showing}
-              </span>
-            )}
-          </div>
-        )}
+      <div className="border-border flex items-start gap-3 border-b px-3 py-2.5">
+        <span
+          aria-hidden
+          className="bg-secondary text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg"
+        >
+          <FileText className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground truncate text-sm font-medium">{title}</p>
+          {meta && <p className="text-muted-foreground truncate text-xs">{meta}</p>}
+        </div>
       </div>
 
       {/* Content */}
-      <div className="max-h-[250px] overflow-y-auto px-3 py-2 space-y-1">
+      <BoundedScroll maxHeight="max-h-64" surface="from-card" className="space-y-1 px-3 py-2">
         {parseStatuteXml(content)}
-      </div>
+      </BoundedScroll>
 
-      {/* Other matches note */}
-      {otherMatches && otherMatches.length > 0 && (
-        <div className="px-3 pb-2 text-[10px] text-muted-foreground">
-          Also found in: {otherMatches.map((m) => m.parent_context).join(', ')}
+      {/* Other matches + open link */}
+      {((otherMatches && otherMatches.length > 0) || statute?.slug) && (
+        <div className="border-border flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2">
+          {otherMatches && otherMatches.length > 0 ? (
+            <span className="text-muted-foreground min-w-0 truncate text-[10px]">
+              Also in {otherMatches.map((m) => m.parent_context).join(', ')}
+            </span>
+          ) : (
+            <span />
+          )}
+          {statute?.slug && (
+            <a
+              href={`/statutes/${statute.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary v2-interactive inline-flex shrink-0 items-center gap-1 text-xs hover:underline"
+            >
+              Open statute <ExternalLink className="size-3" />
+            </a>
+          )}
         </div>
       )}
-
-      {/* Open link */}
-      {statute?.slug && (
-        <div className="px-3 pb-2">
-          <a
-            href={`/statutes/${statute.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
-          >
-            Open statute <ExternalLink className="h-2.5 w-2.5" />
-          </a>
-        </div>
-      )}
-    </div>
+    </ToolResultGroup>
   );
 }
 
@@ -421,33 +320,24 @@ export function StatuteResultsDisplay({
   className?: string;
 }) {
   const data = extractStatuteData(message);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-
   if (!data) return null;
 
-  // Search results
+  // Search results — bounded list of link rows into each statute.
   if (data.mode === 'search' && data.statutes) {
     return (
-      <div className={cn('mt-3 rounded-xl border border-border/40 bg-muted/20', className)}>
-        <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Statutes
-          </span>
-          <span className="text-[10px] text-muted-foreground">
-            {data.total ?? data.statutes.length} results
-          </span>
-        </div>
-        <div className="max-h-[300px] overflow-y-auto pb-1">
+      <ToolResultGroup className={className}>
+        <BoundedScroll maxHeight="max-h-72" surface="from-card" className="p-1">
           {data.statutes.map((item) => (
-            <StatuteSearchRow
+            <ResultRowLink
               key={item.id}
-              item={item}
-              isExpanded={expandedId === item.id}
-              onToggle={() => setExpandedId((prev) => (prev === item.id ? null : item.id))}
+              href={`/statutes/${item.slug}`}
+              icon={ScrollText}
+              title={item.title}
+              meta={statuteMeta(item)}
             />
           ))}
-        </div>
-      </div>
+        </BoundedScroll>
+      </ToolResultGroup>
     );
   }
 

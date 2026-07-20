@@ -1,35 +1,57 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 
 /**
  * useConversationsSearch — the URL-synced, 300ms-debounced search state for the
- * `/conversations` page, rebuilt LINT-CLEAN (the v1 `ConversationSearchBar`
- * synced local state from props inside an effect — a `set-state-in-effect`
- * React-Compiler ERROR — and this hook removes that class of sync entirely).
+ * `/conversations` page, rebuilt RACE-FREE (owner report: "characters keep
+ * disappearing and appearing if I type fast, it's unusable").
  *
- * TWO values, ONE direction of flow:
- *  - `committedSearch` — read from the URL (`?search=`). It is the source of
- *    truth for the QUERY; it changes only after the debounce commits.
- *  - `inputValue` — the immediate text in the box, for a responsive field.
+ * ── THE TWO PRIOR FAILURES ────────────────────────────────────────────────────
+ * v0 lazy-inited the box from the URL once and never resynced, so an in-app soft
+ * nav to bare `/conversations` reset the LIST but left stale text in the box.
+ * v1 (hot-reverted `f699ec1`) committed via `router.replace` — an ASYNC RSC round
+ * trip whose echoes arrive with unbounded, out-of-order lag — then compared the URL
+ * against "the last value I committed"; a stale echo was misclassified as external
+ * and clobbered the box (characters vanish), then the fresh echo re-adopted them.
  *
- * EXTERNAL-CHANGE RECONCILE, WITHOUT A SYNC EFFECT (the v1 defect stays dead).
- * The URL can change under this hook while the component instance SURVIVES — an
- * in-app soft nav to bare `/conversations` (the sidebar nav row, the Work/Study
- * "All" links) drops `?search=` without a remount (W5 review finding 1). So the
- * hook tracks what IT last committed (`selfCommitted`): when `committedSearch`
- * diverges from that, the change was EXTERNAL and the box adopts the URL. A
- * self-commit landing mid-typing never resyncs (it always equals what the hook
- * wrote), so no keystroke can be eaten. The adopt runs as a GUARDED render-phase
- * state adjustment (React's sanctioned derived-state-reset pattern) — never a
- * props→state effect, so the React Compiler rules stay satisfied.
+ * ── HOW THIS SHAPE IS SAFE ────────────────────────────────────────────────────
  *
- * The debounce timer lives in a ref and is only ever touched from event
- * handlers (`onInputChange` / `onClear`) or the unmount cleanup — never from an
- * effect body that sets state — so the whole hook stays React-Compiler-clean.
- * (A debounce pending across an external adopt fires afterwards and re-commits
- * the typed text — box and URL stay consistent either way, never desynced.)
+ *   (1) COMMIT VIA THE NATIVE HISTORY API, WITH A `null` STATE ARG. The App Router
+ *       monkey-patches `window.history.replaceState`: when the state arg carries
+ *       Next's own `__NA`/`_N` marker it EARLY-RETURNS to the native call and the
+ *       `useSearchParams` sync (`applyUrlFromHistoryPushReplace`) never runs — so we
+ *       MUST pass `null`, not `window.history.state` (whose `__NA` is truthy after
+ *       hydration; passing it silently no-syncs — the URL bar moves but the list
+ *       never filters). Passing `null` is also what PRESERVES the Router's internal
+ *       history tree: Next's `copyNextJsInternalHistoryState(null)` re-copies `__NA`
+ *       + `__PRIVATE_NEXTJS_INTERNALS_TREE` onto the new entry, so back/forward keep
+ *       doing a soft restore instead of a hard reload. (Verified against the
+ *       installed next@16.2.10 source, app-router.js.) The write stays on the CLIENT
+ *       — no server round trip (the page's server component reads no `searchParams`)
+ *       — so there is no async navigation queue and thus no out-of-order echo.
+ *
+ *   (2) THE BOX IS A LOCAL DRAFT; EXTERNAL vs OUR-OWN CHANGES ARE TOLD APART BY A
+ *       CONSUMED SELF-WRITE QUEUE. `applyUrlFromHistoryPushReplace` dispatches the
+ *       sync inside `startTransition`, so `committedSearch` (the URL) updates at
+ *       TRANSITION priority — it can lag the synchronous write by ~a frame. While a
+ *       `draft` exists the box renders `draft` and NEVER reads `committedSearch`, so
+ *       that lag can never blank or replay what the user is typing. When the URL does
+ *       change we reconcile ONCE (guarded by `seen`): if the new value is one of our
+ *       own outstanding writes (`pending`, consumed here) it is our echo — keep the
+ *       draft when it is newer typing (the post-commit keystroke), otherwise drop it
+ *       once it has fully landed; if it is NOT in `pending` it is a genuine external
+ *       change (soft nav, back/forward, URL edit) and we reset the box to the URL.
+ *       Consuming `pending` is what defeats the v1 trap: a value is "ours" only until
+ *       its echo is seen, so re-navigating to a value we once wrote is correctly
+ *       external — no stale comparison can resurrect abandoned typing.
+ *
+ * The only render-phase state writes are the sanctioned "adjust state during render"
+ * resets (verified: they pass `--max-warnings 0`, whereas the same reset in an effect
+ * trips `react-hooks/set-state-in-effect`). `committedSearch` is the single source of
+ * truth for the LIST query + shareable URL; `draft` is the single source of truth for
+ * the box.
  */
 
 const DEBOUNCE_MS = 300;
@@ -46,23 +68,28 @@ export interface ConversationsSearch {
 }
 
 export function useConversationsSearch(): ConversationsSearch {
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
-
   const committedSearch = searchParams.get('search') ?? '';
 
-  // HOTFIX (owner report item 6): the previous "self-committed" render-phase
-  // adopt raced its own async `router.replace` echoes — an OLDER navigation's
-  // params landing after a NEWER commit was misclassified as an external change
-  // and clobbered the input mid-typing (characters vanishing/reappearing). The
-  // adopt is REMOVED until the rebuilt, race-free implementation lands; the
-  // known cost is the milder pre-existing desync (a bare-/conversations nav
-  // click while a search is active resets the LIST but not the box).
-  const [inputValue, setInputValue] = useState(() => committedSearch);
+  // The box text while the user is editing (`null` ⇒ the box follows the URL). The
+  // single source of truth for what the field shows; never derived from a URL echo.
+  const [draft, setDraft] = useState<string | null>(null);
+  // The last committed value already reconciled, so the reconcile below runs exactly
+  // once per URL change.
+  const [seen, setSeen] = useState(committedSearch);
+  // Our own outstanding URL writes, consumed as their echoes arrive. Membership here
+  // is what marks an incoming `committedSearch` as ours rather than external.
+  const [pending, setPending] = useState<string[]>([]);
+
+  // Mirror of `draft`, read by the debounce at fire time (300ms later, so this
+  // effect-sync is always current by then) to abandon a commit whose draft has since
+  // been cleared or superseded.
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
@@ -70,36 +97,80 @@ export function useConversationsSearch(): ConversationsSearch {
     }
   }, []);
 
-  // Write the value into the URL. `replace` (no history spam) + `scroll: false`
-  // (the list must not jump to the top on each keystroke). Other params are
-  // preserved so the URL contract stays generic.
-  const commit = useCallback(
-    (value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value) params.set('search', value);
-      else params.delete('search');
-      const query = params.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, {
-        scroll: false,
-      });
-    },
-    [router, pathname, searchParams],
-  );
+  // ── Reconcile a URL change exactly once (the "adjust state during render" reset) ──
+  if (committedSearch !== seen) {
+    setSeen(committedSearch);
+    const idx = pending.indexOf(committedSearch);
+    if (idx !== -1) {
+      // OUR echo. Consume it (and any earlier writes this one leapfrogged).
+      const rest = pending.slice(idx + 1);
+      setPending(rest);
+      // Drop the draft only once it has fully landed with nothing newer in flight;
+      // otherwise keep it — it is typing that post-dates this commit (the transition
+      // -lag keystroke), so the box keeps showing it, re-based onto the new URL.
+      if (draft !== null && draft === committedSearch && rest.length === 0) {
+        setDraft(null);
+      }
+    } else {
+      // EXTERNAL change (soft nav, back/forward, URL edit). Reset box + list together:
+      // the box follows the URL and any in-flight self-writes are discarded.
+      if (draft !== null) setDraft(null);
+      if (pending.length !== 0) setPending([]);
+    }
+  } else if (pending.length !== 0 && (draft === null || draft === committedSearch)) {
+    // IDLE-AND-SYNCED PRUNE (re-verify residual (c)): a coalesced pair of writes
+    // that nets an UNCHANGED URL (e.g. debounce-commit('a') + immediate clear
+    // within one transition window) never produces an observable `committedSearch`
+    // change, so the reconcile above never consumes those entries. Once the box
+    // shows exactly the URL, nothing is meaningfully in flight — a legitimate
+    // in-flight echo always has `draft` differing from the lagging URL — so any
+    // remaining entries are dead orphans. Drop them so a much-later external nav
+    // to the same value can never be misclassified as our own echo.
+    setPending([]);
+    if (draft !== null) setDraft(null);
+  }
+
+  // Box value, PURELY DERIVED — the draft while editing, else the URL. No URL echo
+  // can overwrite in-flight typing.
+  const inputValue = draft !== null ? draft : committedSearch;
+
+  // Write the value into the URL. Reads the LIVE URL (never a stale React snapshot)
+  // to preserve other params and to skip a redundant write. `replaceState(null, …)`
+  // per cause (1). Records the write in `pending` so its echo is recognised as ours.
+  const commit = useCallback((value: string) => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if ((params.get('search') ?? '') === value) return; // already reflected
+    if (value) params.set('search', value);
+    else params.delete('search');
+    const queryString = params.toString();
+    const url = queryString
+      ? `${window.location.pathname}?${queryString}`
+      : window.location.pathname;
+    setPending((prev) => [...prev, value]);
+    window.history.replaceState(null, '', url);
+  }, []);
 
   const onInputChange = useCallback(
     (value: string) => {
-      setInputValue(value);
+      setDraft(value);
       clearTimer();
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        commit(value);
+        // Commit the LIVE draft, and only while one exists: if an external change (or
+        // clear) has since dropped it, this late timer commits nothing, so it can
+        // never re-apply typing the user has navigated away from.
+        const latest = draftRef.current;
+        if (latest !== null) commit(latest);
       }, DEBOUNCE_MS);
     },
     [clearTimer, commit],
   );
 
   const onClear = useCallback(() => {
-    setInputValue('');
+    // Empty draft (not `null`) so the box shows empty immediately, without a one-frame
+    // flash of the pre-clear URL value while the commit's transition lands.
+    setDraft('');
     clearTimer();
     commit('');
   }, [clearTimer, commit]);
