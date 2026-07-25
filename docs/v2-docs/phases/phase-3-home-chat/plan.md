@@ -266,6 +266,37 @@ each its own implement → adversarial-review → verify → ship loop:
   be derived from the per-event `seq` we already receive because the user's message is never delivered
   as a stream event. Two named seams (`isAlreadyOnScreen`, the gate in `adoptConversationHistory`)
   make removing guard 1 a small change when it lands.
+- **BACKEND ASK LANDED + GLOW REMOVED + THINKING ORB (July 25) — SHIPPED.**
+  **(1) THE HOME GLOW IS GONE.** The owner asked to fix how it behaved across a tab switch, saw the
+  fix, then removed the effect outright. `HomeGlow.tsx` deleted, the light removed from `ChatHome`,
+  and the `swapCount`/`useHomeTabSwaps` seam added for it removed from `home-tab.ts` — no dead code
+  left behind. Do not reintroduce a decorative light without asking; it was built, refined twice
+  (#32, #36), fixed once more, and dropped.
+  **(2) `persisted_message_ids` IS LIVE — THE MERGE LIMIT IS RETIRED.** Backend shipped it as
+  `Message.id`s, NOT `seq`, and their override was correct: `seq` restarts at 1 every turn (so it
+  collides across turns in one conversation) and is absent from both the user's message and the final
+  answer — the two rows the feature exists for. Wiring: new `authoredMessageIds` (server ids, stored
+  in the `msg_{id}` ROW-id shape so `isAlreadyOnScreen` stays ONE membership test) fed by
+  `settleTurn()` on all three terminals (`completed`/`cancelled`/`error`) and by `user_message_id`
+  from `POST /api/chat` at send time — the belt for a stream that dies before its terminal.
+  `rowsAreServerOnly` deleted; the only remaining bail-out is `turnsAwaitingIds > 0`, which is the
+  backend's own documented gap (§7: the CLIENT-side `timeout` event finalizes nothing, so it carries
+  no ids). Counted in `connectToStream` — the one door BOTH the composer send and the home handoff
+  pass through — and floored at zero so a duplicate terminal (live relay + catchup replay) cannot
+  license a merge for an unsettled turn. **ID NAMESPACES SPLIT:** engine-drawn rows moved from
+  `msg_` to `local_` (`LOCAL_ROW_PREFIX`), because the extend-only guard must tell "a server row that
+  vanished from history" (bail) from "a local row that was never in it" (expected) — and both used
+  to start `msg_`. Verified across the repo that nothing parses either prefix; v1's own generators
+  untouched. Backend's `metadata.execution_id` warning checked, not assumed: the only null-metadata
+  reads are `!apiMsg.metadata?.type` in `transform-api-messages.ts`, which is exactly the marker they
+  said to key on.
+  **(3) THINKING ORB.** `thinking-orbs` (MIT, 0.1.1, ~38KB, zero runtime deps) replaces the spinning
+  `Loader2` in `ActivityStatus`; owner chose the `solving` state at the `20` inline preset (the two
+  presets are separate designs, not a scale factor). Plain 2D canvas — no WebGL/filters — honours
+  `prefers-reduced-motion` with a single static frame, and self-pauses off-screen and on a hidden
+  tab, which matters most on a live transcript. `aria-hidden` because the row is already a
+  `role="status"` live region whose text carries the meaning. WATCH: 0.1.x, so the API is not settled;
+  it is small and MIT, so vendoring is the fallback.
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.

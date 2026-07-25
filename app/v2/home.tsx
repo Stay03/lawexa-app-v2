@@ -6,7 +6,6 @@ import { useHomeTab, useHomeTabFading } from '@/v2/shell/home-tab';
 import { ChatHome } from '@/v2/shell/designs/ChatHome';
 import { WorkHome } from '@/v2/shell/designs/WorkHome';
 import { StudyHome } from '@/v2/shell/designs/StudyHome';
-import { HomeGlow } from '@/v2/shell/designs/HomeGlow';
 
 /**
  * V2Home — the tab-reading client wrapper. Reads the shared `home-tab` store
@@ -64,20 +63,12 @@ export function V2Home() {
   const surfaceRole = role ?? undefined;
 
   return (
-    <div className="relative h-full">
-      {/* The ambient gold spotlight — OUTSIDE the cross-fade below, and outside the
-          keyed surfaces, on purpose. It is the one element that must survive a tab
-          swap: the owner asked for the light to stay lit through the switch and hold
-          while the incoming tab loads, instead of vanishing the instant the old
-          surface unmounted. `relative` on this root is what its `absolute inset-0`
-          hangs from; `-z-10` keeps it behind every surface. See HomeGlow. */}
-      <HomeGlow />
-      <div
-        className={cn(
-          'h-full transition-opacity duration-200 ease-in-out motion-reduce:transition-none',
-          fading ? 'opacity-0' : 'opacity-100',
-        )}
-      >
+    <div
+      className={cn(
+        'h-full transition-opacity duration-200 ease-in-out motion-reduce:transition-none',
+        fading ? 'opacity-0' : 'opacity-100',
+      )}
+    >
       {/* KEYED ON IDENTITY. The surfaces capture `name` in a first-render-only lazy
           initializer (`HomeGreeting`), so a surface mounted for one identity can never
           re-read it for another. That normally cannot happen — the session is resolved
@@ -89,14 +80,13 @@ export function V2Home() {
           identity" structural. It is a no-op on every normal render (the id never
           changes), and on sign-out it correctly discards the previous user's surface
           state rather than carrying it into the guest view. */}
-        {tab === 'work' ? (
-          <WorkHome key={userId} name={firstName} signedIn={signedIn} role={surfaceRole} />
-        ) : tab === 'study' ? (
-          <StudyHome key={userId} name={firstName} signedIn={signedIn} role={surfaceRole} />
-        ) : (
-          <ChatHome key={userId} name={firstName} signedIn={signedIn} role={surfaceRole} />
-        )}
-      </div>
+      {tab === 'work' ? (
+        <WorkHome key={userId} name={firstName} signedIn={signedIn} role={surfaceRole} />
+      ) : tab === 'study' ? (
+        <StudyHome key={userId} name={firstName} signedIn={signedIn} role={surfaceRole} />
+      ) : (
+        <ChatHome key={userId} name={firstName} signedIn={signedIn} role={surfaceRole} />
+      )}
     </div>
   );
 }

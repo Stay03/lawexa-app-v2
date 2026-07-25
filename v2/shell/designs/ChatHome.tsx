@@ -18,10 +18,14 @@ import {
 
 /**
  * ChatHome — the Chat tab's home surface (owner #34: the default tab). The
- * shimmer composer is the lit centerpiece: a soft radial gold wash (built only
- * from the --primary token at low opacity) pools behind it, a Comfortaa greeting
- * sits above (capped at v1's ~36px), and everything else — the suggested prompts,
- * a quiet quick-jump row — recedes into generous negative space.
+ * shimmer composer is the centerpiece, a Comfortaa greeting sits above (capped at
+ * v1's ~36px), and everything else — the suggested prompts, a quiet quick-jump row
+ * — recedes into generous negative space.
+ *
+ * NO AMBIENT SPOTLIGHT. A soft radial gold wash used to pool behind the composer
+ * (owner #32/#36). The owner removed it outright on July 25 — the whole effect, not
+ * a tuning — so the surface now carries no decorative light at all. Do not
+ * reintroduce one without asking; it was tried, refined twice, and dropped.
  *
  * DESKTOP is TOP-anchored (owner #25) but sits a few lines lower than the first
  * pass (owner #33: `md:pt-24` was too high) — `md:pt-36` lands between the old
@@ -84,13 +88,6 @@ export function ChatHome({
       data-home-tab="chat"
       className={HOME_SURFACE_FOCUSED}
     >
-      {/* The ambient warm spotlight is NOT here any more — it is `HomeGlow`, rendered
-          by the persistent home wrapper (`app/v2/home.tsx`). It had to leave: this
-          surface key-remounts on a tab swap, so a glow owned here vanished in the
-          same frame the swap started, exactly when it should have been covering the
-          incoming tab's load. Nothing visual changed in the move; the geometry and
-          the approved 2.2s bloom went across verbatim. */}
-
       {/* Greeting — Comfortaa, capped at v1's ~36px. Skeleton-first + the symmetric
           confidential swap live inside HomeGreeting. */}
       <HomeGreeting

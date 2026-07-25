@@ -50,20 +50,6 @@ let fadeTimer: ReturnType<typeof setTimeout> | null = null;
  *  chat→work→chat land on chat: during the fade `currentTab` lags, so it can't
  *  express intent. */
 let targetTab: HomeTab | null = null;
-/**
- * How many times the USER has swapped tabs this page load. Not a tab value — a
- * count of deliberate actions, and that distinction is the whole point.
- *
- * `HomeGlow` holds the ambient light lit across a swap while the incoming tab
- * loads. Triggering that on "the tab value changed" is wrong: `getServerSnapshot`
- * is always `'chat'`, so a device whose stored tab is Work reconciles chat → work
- * immediately after hydration on EVERY hard load, which looks identical to a swap
- * and would light a glow the Work tab is not supposed to have. A counter that only
- * `setHomeTab` increments cannot be confused by that reconcile — nor by the
- * cross-tab `storage` path below, which deliberately does NOT increment it (that
- * tab is in the background; nobody is watching a transition there).
- */
-let swapCount = 0;
 const listeners = new Set<() => void>();
 
 function readFromStorage(): HomeTab {
@@ -160,10 +146,6 @@ export function setHomeTab(tab: HomeTab): void {
     fadeTimer = null;
   }
 
-  // Counted BEFORE either branch emits, so every deliberate swap is announced in
-  // the same notification as the state it changed (see `swapCount`).
-  swapCount += 1;
-
   // Reduced motion → instant swap, no fade window.
   if (prefersReducedMotion()) {
     currentTab = tab;
@@ -212,24 +194,6 @@ export function useHomeTabSelection(): HomeTab {
     getSelectionSnapshot,
     getTabServerSnapshot,
   );
-}
-
-function getSwapSnapshot(): number {
-  return swapCount;
-}
-
-function getSwapServerSnapshot(): number {
-  return 0;
-}
-
-/**
- * Subscribe to the count of deliberate tab swaps (see {@link swapCount}). A
- * consumer that must react to the ACT of switching — rather than to the tab value,
- * which also changes on the post-hydration reconcile — watches this and compares it
- * against the last count it saw. `HomeGlow` is the consumer.
- */
-export function useHomeTabSwaps(): number {
-  return useSyncExternalStore(subscribe, getSwapSnapshot, getSwapServerSnapshot);
 }
 
 /**

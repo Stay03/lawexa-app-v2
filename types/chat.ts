@@ -188,6 +188,8 @@ export interface CompletedEvent {
   // fall back to local IndexedDB transcript.
   replayable?: boolean;
   timestamp: string;
+  /** See {@link TerminalEvent.persisted_message_ids}. */
+  persisted_message_ids?: number[];
 }
 
 // Terminal event emitted by backend when a streaming execution is cancelled
@@ -198,6 +200,8 @@ export interface CancelledEvent {
   iteration?: number;
   status?: 'cancelled';
   timestamp?: string;
+  /** See {@link TerminalEvent.persisted_message_ids}. */
+  persisted_message_ids?: number[];
 }
 
 // v2_stream token-level streaming events
@@ -266,6 +270,39 @@ export interface ErrorEvent {
   error_message?: string;
   message?: string;
   timestamp?: string;
+  /** See {@link TerminalEvent.persisted_message_ids}. */
+  persisted_message_ids?: number[];
+}
+
+/**
+ * The three events that END a stream all carry the ids of every message the
+ * execution saved (backend `docs/streaming/persisted-message-ids.md`, 2026-07-25).
+ *
+ * WHAT IT IS FOR. A client draws its rows from the stream before the server has
+ * saved anything, so those rows have no server identity — and the user's own
+ * message is never delivered as a stream event at all, so nothing else could ever
+ * supply it. This list is what lets a screen that has sent a turn tell "the
+ * server's copy of a row I am already showing" apart from "a new row from another
+ * tab", which is the whole of the cross-tab merge.
+ *
+ * IDS, NOT `seq`. `seq` was asked for first and the backend correctly refused it:
+ * it restarts at 1 on every turn (so it collides with earlier turns in the same
+ * conversation) and it is absent from both the user's message and the final
+ * assistant answer — the two rows the feature exists for. These are `Message.id`
+ * values, which appear on every row of `GET /api/conversations/{id}`.
+ *
+ * SEMANTICS: every row the turn wrote (user message, tool calls and results,
+ * handovers, narration, the answer); present on all three delivery paths (live
+ * relay, catchup replay, rebuilt-from-database); `[]` for confidential
+ * conversations, which persist nothing. Order and repeats are not meaningful —
+ * treat it as a set.
+ *
+ * KNOWN LIMIT (backend §7): the client-side `timeout` event does NOT carry it,
+ * because nothing is finalized at that moment. The authoritative terminal event
+ * received on reconnect does.
+ */
+export interface TerminalEvent {
+  persisted_message_ids?: number[];
 }
 
 // Pending response (409) from POST /api/chat
@@ -358,6 +395,17 @@ export interface ChatStartResponse {
     // turn. Use this in place of the raw input so the local store stays in
     // sync without a refetch.
     user_message_content?: string;
+    /**
+     * The saved id of the user's message (backend, 2026-07-25). Belt-and-braces for
+     * the cross-tab merge: the client draws the user's row optimistically, before
+     * the server has saved anything, so without this the row has no server identity
+     * until the turn's terminal event reports it. Knowing it at SEND time means the
+     * user's own message stays reconcilable even if the stream dies before that
+     * terminal event ever arrives.
+     *
+     * Absent for confidential turns, which persist nothing.
+     */
+    user_message_id?: number;
   };
 }
 
@@ -427,6 +475,14 @@ export interface ApiMessage {
     latency_ms?: number;
     iteration?: number;
     seq?: number;
+    /**
+     * The execution that wrote this row (backend, 2026-07-25). Its arrival means
+     * `metadata` is now an OBJECT on every message — rows that used to carry
+     * `metadata: null` no longer do. Nothing here reads null-ness as "plain
+     * message" (`transform-api-messages.ts` keys on the absence of `metadata.type`,
+     * which is the real marker and is unchanged) — verified, not assumed.
+     */
+    execution_id?: string;
     context?: 'handover';
     target_agent?: string;
     agent_slug?: string;
@@ -437,7 +493,6 @@ export interface ApiMessage {
     error_code?: string;
     retryable?: boolean;
     retry_after_ms?: number | null;
-    execution_id?: string;
     // Partial message fields (streaming cancel/error with rescued text buffer).
     // When partial === true, content holds the actual partial assistant text
     // the user saw stream in. reason describes why it was cut short.
