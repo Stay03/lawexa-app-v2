@@ -44,5 +44,5 @@ import { V2Home } from './home';
 export const unstable_dynamicStaleTime = 300;
 
 export default function V2HomePage() {
-  return <V2Home />;
+  return <V2Home tab="chat" />;
 }

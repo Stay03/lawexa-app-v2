@@ -1,17 +1,21 @@
 'use client';
 
-import { cn } from '@/lib/utils';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { useHomeTab, useHomeTabFading } from '@/v2/shell/home-tab';
+import type { HomeTab } from '@/v2/shell/home-tabs';
 import { ChatHome } from '@/v2/shell/designs/ChatHome';
 import { WorkHome } from '@/v2/shell/designs/WorkHome';
 import { StudyHome } from '@/v2/shell/designs/StudyHome';
 
 /**
- * V2Home — the tab-reading client wrapper. Reads the shared `home-tab` store
- * (the same store the header `HomeTabs` control writes) and renders the active
- * home surface — Chat | Work | Study (owner #34) — so switching tabs re-renders
- * the home in lockstep.
+ * V2Home — the shared body of the three home ROUTES. Each route (`/`, `/work`,
+ * `/study`) renders this with its own `tab`, so the surface on screen is decided by
+ * the URL and therefore by the SERVER — see `v2/shell/home-tabs.ts` for why that
+ * replaced a `localStorage` store, and what it fixed.
+ *
+ * NO CROSS-FADE HERE ANY MORE. The old wrapper faded the outgoing surface out and
+ * the incoming one in, because it was the one element that survived a swap. A tab
+ * change is now a NAVIGATION: the router owns the transition, each tab has its own
+ * `loading.tsx` for a cold visit, and a warm one is served from the router cache.
  *
  * SESSION FROM CONTEXT, NOT PROPS. `name` / `signedIn` / `role` used to be
  * threaded down from `app/v2/page.tsx`, which meant the page had to `await
@@ -49,10 +53,8 @@ import { StudyHome } from '@/v2/shell/designs/StudyHome';
  * snapshot is `'chat'`, so the initial HTML always contains the Chat home with
  * the marker present.
  */
-export function V2Home() {
+export function V2Home({ tab }: { tab: HomeTab }) {
   const { name, signedIn, role, userId } = useV2Session();
-  const tab = useHomeTab();
-  const fading = useHomeTabFading();
 
   // v1 parity: the greeting engine takes the FIRST name only. A pure string
   // derivation of an already-resolved value — no clock, no randomness, nothing
@@ -63,12 +65,7 @@ export function V2Home() {
   const surfaceRole = role ?? undefined;
 
   return (
-    <div
-      className={cn(
-        'h-full transition-opacity duration-200 ease-in-out motion-reduce:transition-none',
-        fading ? 'opacity-0' : 'opacity-100',
-      )}
-    >
+    <div className="h-full">
       {/* KEYED ON IDENTITY. The surfaces capture `name` in a first-render-only lazy
           initializer (`HomeGreeting`), so a surface mounted for one identity can never
           re-read it for another. That normally cannot happen — the session is resolved

@@ -21,5 +21,5 @@ import { HomeFallback } from '@/v2/shell/designs/HomeFallback';
  * them, not duplicated in the route folder where it would quietly drift.
  */
 export default function V2Loading() {
-  return <HomeFallback />;
+  return <HomeFallback tab="chat" />;
 }

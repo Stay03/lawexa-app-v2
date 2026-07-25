@@ -14,7 +14,15 @@
  * `'/'` is treated as an exact path and therefore matches ONLY the root — it is
  * never allowed to behave as a catch-all prefix.
  */
-export const V2_ROUTES = ['/', '/c/*', '/conversations'] as const;
+/**
+ * `/work` and `/study` are v2-ONLY paths — the home's Work and Study tabs, which
+ * became real routes so the server can render the right surface and the right
+ * skeleton on a hard load (see `v2/shell/home-tabs.ts`). A user without the v2
+ * cookie who follows one falls through to v1, which has no such page, and gets
+ * v1's 404. Accepted while v2 is a preview: the links only exist because a v2 user
+ * made them, and the edge closes at cutover.
+ */
+export const V2_ROUTES = ['/', '/work', '/study', '/c/*', '/conversations'] as const;
 
 export type V2Route = (typeof V2_ROUTES)[number];
 

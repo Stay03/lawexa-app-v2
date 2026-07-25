@@ -12,6 +12,7 @@ import { LogoMark, LogoWordmark } from './Logo';
 import { V2NotificationBell } from './V2NotificationBell';
 import { V2HeaderMenu } from './V2HeaderMenu';
 import { HomeTabs } from './HomeTabs';
+import { homeTabForPath } from './home-tabs';
 import { useHeaderContext } from './header-context';
 
 /**
@@ -30,7 +31,7 @@ import { useHeaderContext } from './header-context';
  *      the centre already carries that, so the left stays uncrowded and never
  *      duplicates it. Routes with no category hide the label + its separator.
  *  - CENTRE (grid col 2, auto): route-scoped (owner #43, option A). On the home
- *    (`/`) it is the `HomeTabs` product control (Chat | Work | Study, owner #34);
+ *    (`/`, `/work`, `/study`) it is the `HomeTabs` product control (owner #34);
  *    on every other route it surfaces that route's published context — the title
  *    (+ a compact confidential badge), skeleton-first while it resolves. `HeaderCenter`
  *    cross-fades the two symmetrically. Equal `1fr` side columns keep it dead-centre;
@@ -52,7 +53,9 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   const signedIn = !!user;
   const railCollapsed = state === 'collapsed';
 
-  const isHome = pathname === '/';
+  // Every home ROUTE shows the tab control, not just the root — Work and Study are
+  // their own paths now (see v2/shell/home-tabs.ts).
+  const isHome = homeTabForPath(pathname ?? '') !== null;
   // Routes that EXPECT context show a title skeleton while it's null (skeleton-first)
   // instead of an empty centre. Mirrors Dock.tsx's conversation-route test; kept
   // generic so a future route can opt in the same way.

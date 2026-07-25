@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { useHomeTab } from '@/v2/shell/home-tab';
+import type { HomeTab } from '@/v2/shell/home-tabs';
 import { HomePrompts } from './HomePrompts';
 import { HomeQuickJump } from './HomeQuickJump';
 import { Module, ModuleSkeleton } from './modules';
@@ -139,8 +139,7 @@ import {
 /** `HomePrompts` requires a handler; nothing in an inert subtree can fire one. */
 const NOOP = () => {};
 
-export function HomeFallback() {
-  const tab = useHomeTab();
+export function HomeFallback({ tab }: { tab: HomeTab }) {
 
   return (
     <>
