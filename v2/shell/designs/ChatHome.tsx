@@ -84,37 +84,12 @@ export function ChatHome({
       data-home-tab="chat"
       className={HOME_SURFACE_FOCUSED}
     >
-      {/* Ambient warm spotlight (owner #32 — explicitly KEPT). Decorative,
-          aria-hidden, built only from the --primary token at low opacity. Two
-          layered radials (a wide static wash and a slower breathing core) give the
-          light depth; the breathe is a whisper, dropped entirely under
-          reduced-motion. Positioned low on mobile (composer docks at the thumb)
-          and a touch below centre on desktop (tracks the composer's new lower
-          anchor, owner #33) so the glow pools behind it in both.
-
-          MOBILE gets the consistent treatment (owner #32): the layers are DIMMER
-          below `md` (desktop opacities are unchanged — owner kept them).
-
-          GLOW ARRIVAL (owner #36 — the shipped ~700ms read as a flash on tab
-          switches): the whole container now BLOOMS in over a long ~2.2s soft
-          ease-out with `fill-mode-both`, so the first frame is fully dim (never a
-          pop) and the light gathers slowly rather than appearing. The surface
-          roots key-remount, so this replays on every appearance — the first load
-          AND every tab switch. It composes with the 200ms tab cross-fade by
-          design: the surface fades in quickly while the glow is still gathering
-          dim beneath it, so switching to Chat never flashes the light at strength.
-          `motion-safe` guards it — reduced motion settles straight to visible,
-          instant and unchanged. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:fill-mode-both motion-safe:duration-[2200ms] motion-safe:ease-out"
-      >
-        <div className="absolute left-1/2 top-[70%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px] bg-primary/[0.03] dark:bg-primary/[0.06] md:top-[46%] md:bg-primary/[0.06] md:dark:bg-primary/[0.12]" />
-        <div
-          className="absolute left-1/2 top-[72%] h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[90px] motion-safe:animate-pulse bg-primary/[0.06] dark:bg-primary/10 md:top-[48%] md:bg-primary/[0.12] md:dark:bg-primary/20"
-          style={{ animationDuration: '7s' }}
-        />
-      </div>
+      {/* The ambient warm spotlight is NOT here any more — it is `HomeGlow`, rendered
+          by the persistent home wrapper (`app/v2/home.tsx`). It had to leave: this
+          surface key-remounts on a tab swap, so a glow owned here vanished in the
+          same frame the swap started, exactly when it should have been covering the
+          incoming tab's load. Nothing visual changed in the move; the geometry and
+          the approved 2.2s bloom went across verbatim. */}
 
       {/* Greeting — Comfortaa, capped at v1's ~36px. Skeleton-first + the symmetric
           confidential swap live inside HomeGreeting. */}

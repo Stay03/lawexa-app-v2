@@ -170,10 +170,13 @@ export function HomeFallback() {
  * `order` values put the prompts ABOVE the thumb-docked composer on mobile and
  * BELOW the composer on desktop.
  *
- * The ambient gold spotlight is deliberately NOT reproduced. `ChatHome`'s glow
- * blooms in from fully dim over ~2.2s with `fill-mode-both`, so its first frame
- * is invisible anyway — drawing one here would either double the bloom or flash
- * the light at strength before the real one starts from zero.
+ * The ambient gold spotlight is deliberately NOT reproduced. `HomeGlow` blooms in
+ * from fully dim over ~2.2s with `fill-mode-both`, so its first frame is invisible
+ * anyway — drawing one here would either double the bloom or flash the light at
+ * strength before the real one starts from zero. (The glow now lives in the
+ * persistent home wrapper rather than in `ChatHome`, so it also survives tab swaps;
+ * that changes nothing for this fallback, which is replaced wholesale the moment
+ * the real home mounts.)
  */
 function ChatFrame() {
   return (
