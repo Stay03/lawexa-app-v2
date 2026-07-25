@@ -163,6 +163,27 @@ each its own implement → adversarial-review → verify → ship loop:
   the full-width pointer band flanking the pill on ≥576px (optional polish, recorded);
   feel-tuning knobs `velocitySmoothingMs`/`catchUpTauMs`/ease `0.25`. OPEN OWNER DECISION:
   narrow the HOME composer to match the conversation pill?
+- **PERF + STREAMING ROUND (owner's nine steps, July 20) — SHIPPED (`e7e1c31`).** Loop: 4 parallel
+  Opus implementers → 3 per-workstream adversarial reviews → rework → 2 sequential implementers →
+  ONE whole-body review of the seams. Every verdict was SHIP AFTER FIXES; all findings closed.
+  **Speed:** pages stopped awaiting `verifySession()` (identity now published once from the layout,
+  which does not re-render on soft nav); the layout's two server calls run concurrently; the
+  conversation transcript became `conversationsQueries.detail` seeded into the engine, so a revisit
+  paints transcript AND composer in the first frame; lists retain 30 min. **Privacy:** the whole-body
+  review found two HIGH issues the per-item reviews could not see — the v2 QueryClient is a module
+  singleton that v1's sign-out does not clear, and v1 login/logout are soft navs, so the next user
+  on a shared device saw the previous user's lists/bookmarks/spaces/radars/quiz scores; and a
+  transient `/auth/me` failure could cache a private transcript under a `viewerId: null` partition.
+  Both closed by `v2/runtime/cache-identity-guard.tsx`. **Streaming:** rate + cadence bugs fixed,
+  word release with a compositor fade (smoother and ~60% cheaper), a bounded end-of-answer drain,
+  and a second `line` style with a stand-in bar — switchable from Settings → Developer, reachable
+  from a new role-gated v2 header item. **Loading:** the home fallback reads the active tab and
+  shares one geometry module with the real surfaces; static chrome reserves a still shape and only
+  data pulses; skeletons stop pulsing under reduced motion (v2-scoped). Plus the reusable
+  "N new conversations" pill for phase 4. **NEW STANDING RULE:** never render a skeleton over
+  content already in cache (standards §8 + corollary). **RECORDED FOR THEIR OWN WAVES:** shared-device
+  confidential ownership (`useConversationController` grants ownership from a device-local IDB
+  transcript), and unpartitioned conversation LIST cache keys.
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.
