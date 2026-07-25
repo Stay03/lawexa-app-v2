@@ -297,7 +297,9 @@ each its own implement → adversarial-review → verify → ship loop:
   tab, which matters most on a live transcript. `aria-hidden` because the row is already a
   `role="status"` live region whose text carries the meaning. WATCH: 0.1.x, so the API is not settled;
   it is small and MIT, so vendoring is the fallback.
-- **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
+- **W6 — on-device mobile verification + metadata** — **PASSED (owner, July 25).** The owner ran the
+  checklist on real devices and reported it clean, which OPENS THE PHASE GATE. Remaining before
+  `post-implementation.md`: the two recorded privacy items below. Original scope: iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.
 
