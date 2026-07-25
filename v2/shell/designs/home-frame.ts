@@ -63,44 +63,20 @@
 export const HOME_SURFACE_FOCUSED =
   'relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-4 pt-10 pb-8 md:pt-36 md:pb-12';
 
-/**
- * The signed-in workspace surface — one ordered flex column on mobile, a
- * two-column grid (primary + a 20rem rail) from `md` up, with the greeting
- * spanning row 1 and both columns top-aligned so a tall rail can never inflate
- * the left column into a void (owner #37).
+/*
+ * THE TWO-COLUMN WORKSPACE FRAME IS GONE (owner, July 25).
+ *
+ * `HOME_SURFACE_WORKSPACE` and its blocks — the greeting row, the `display:contents`
+ * left column, the 20rem rail, and the primary/secondary module slots — described a
+ * layout no surface renders any more. Work and Study were rebuilt onto
+ * `HOME_SURFACE_FOCUSED`, the same single reading column Chat uses, because the rail
+ * was removed outright rather than restyled.
+ *
+ * Deleted rather than kept dormant: a frame nobody renders drifts silently from the
+ * surfaces, which is the exact failure this file exists to prevent. The `contents
+ * md:flex` trick and the mobile `order` scale it documented are preserved where they
+ * are still load-bearing — on the focused frame's composer dock, below.
  */
-export const HOME_SURFACE_WORKSPACE =
-  'relative mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 pb-8 pt-8 sm:px-6 md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-x-8 md:gap-y-6 md:pb-12 md:pt-12';
-
-/* ── Workspace blocks ─────────────────────────────────────────────────────── */
-
-/** Greeting — first on mobile, full-width row 1 on desktop. */
-export const WORKSPACE_GREETING = 'order-1 md:col-span-2 md:row-start-1';
-
-/** See "THE `contents` TRICK" above before touching this. */
-export const WORKSPACE_LEFT_COLUMN =
-  'contents md:flex md:min-w-0 md:flex-col md:gap-4 md:col-start-1 md:row-start-2';
-
-/** The glance rail — mid-scroll on mobile, grid column 2 on desktop. */
-export const WORKSPACE_RAIL =
-  'order-4 mt-6 flex flex-col gap-4 md:col-start-2 md:row-start-2 md:mt-0 md:min-w-0';
-
-/** Primary left-column module (Work: "Jump back in"; Study: Quiz). */
-export const WORKSPACE_PRIMARY_MODULE = 'order-2 mt-6 md:order-3 md:mt-0';
-
-/** Secondary left-column module (Study: the study-mode CTA). Unused by Work. */
-export const WORKSPACE_SECONDARY_MODULE = 'order-3 mt-3 md:order-4 md:mt-0';
-
-/** Suggested prompts — sunk to the thumb on mobile, under the composer on desktop. */
-export const WORKSPACE_PROMPTS = 'order-5 mt-auto pt-8 md:order-2 md:mt-0 md:pt-0';
-
-/**
- * The workspace composer dock. MOBILE: `sticky bottom-0`, floating alone, its
- * negative margins bleeding the fade to the surface edges (which are `px-4`,
- * `sm:px-6`). DESKTOP: static, the top of the left column.
- */
-export const WORKSPACE_COMPOSER_DOCK =
-  'sticky bottom-0 z-10 order-6 -mx-4 px-4 pb-3 pt-6 sm:-mx-6 sm:px-6 md:static md:z-auto md:order-1 md:mx-0 md:px-0 md:pb-0 md:pt-0';
 
 /* ── Chat blocks ──────────────────────────────────────────────────────────── */
 
@@ -114,6 +90,19 @@ export const CHAT_COMPOSER_DOCK =
 
 /** Chat's prompts — ABOVE the dock on mobile, BELOW the composer on desktop. */
 export const CHAT_PROMPTS = 'order-3 mt-auto pt-8 md:order-4 md:mt-3 md:pt-0';
+
+/**
+ * The home's SECTION STACK — the ordered list of data sections under the compose
+ * cluster on Work and Study (owner's July-25 redesign). `order-5`/`md:order-5`
+ * places it after the prompts at both breakpoints; `mt-auto` on the prompts still
+ * sinks the compose cluster toward the thumb on mobile, so the sections scroll
+ * ABOVE it there and read BELOW it on desktop — the same inversion the prompts and
+ * composer already use, and the reason the mobile order values are not sequential.
+ *
+ * `gap-7` is the grouping mechanism now that nothing is boxed: sections are told
+ * apart by the space between them, which costs no border and no padding.
+ */
+export const HOME_SECTIONS = 'order-2 mt-6 flex flex-col gap-7 md:order-5 md:mt-8';
 
 /** Chat's mobile-only quick-jump nav row (owner #20 — the sidebar covers desktop). */
 export const CHAT_QUICK_JUMP =

@@ -13,7 +13,7 @@ import { FOCUS_RING } from '../modules';
  * turn into study mode on create (studied first-hand in `app/(main)/page.tsx`:
  * `isStudent && <Switch checked={studyMode} … />`, sending `study_mode: true`).
  *
- * The Study tab surfaces that toggle as a MODULE CTA (`StudyModeCard`) and marks
+ * The Study tab surfaces that toggle as a MODULE CTA (`StudyModeRow`) and marks
  * the composer with a quiet status pill (`StudyModeChip`) when it is on — the same
  * split v1 uses for confidential mode (toggle in one place, a heading/marker
  * elsewhere). The real network wiring (sending `study_mode: true` on submit) lands
@@ -31,7 +31,7 @@ import { FOCUS_RING } from '../modules';
  * text target flips it; the active state tints the card with a smooth,
  * `motion-reduce`-guarded transition (never a hard swap).
  */
-export function StudyModeCard({
+export function StudyModeRow({
   checked,
   onCheckedChange,
 }: {
@@ -41,21 +41,23 @@ export function StudyModeCard({
   const switchId = useId();
 
   return (
+    // A ROW, not a card (owner's July-25 redesign removed the boxes). It keeps the
+    // checked tint — this one genuinely has an on/off state worth showing — but
+    // wears it as a soft background instead of a border, so it sits in the section
+    // stack without reintroducing the chrome the redesign removed.
     <div
       className={cn(
-        'flex items-center gap-3 rounded-2xl border p-3.5 transition-colors duration-200 ease-out motion-reduce:transition-none',
-        checked ? 'border-primary/40 bg-primary/5' : 'border-border bg-card',
+        'flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors duration-200 ease-out motion-reduce:transition-none',
+        checked ? 'bg-primary/5' : 'bg-transparent',
       )}
     >
-      <span
+      <GraduationCap
         aria-hidden
         className={cn(
-          'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 motion-reduce:transition-none',
-          checked ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
+          'size-4 shrink-0 transition-colors duration-200 motion-reduce:transition-none',
+          checked ? 'text-primary' : 'text-muted-foreground/70',
         )}
-      >
-        <GraduationCap className="size-5" />
-      </span>
+      />
 
       <label htmlFor={switchId} className="min-w-0 flex-1 cursor-pointer select-none">
         <span className="block text-sm font-medium text-foreground">Study mode</span>

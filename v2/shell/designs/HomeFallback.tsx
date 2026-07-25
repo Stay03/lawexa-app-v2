@@ -1,30 +1,18 @@
 'use client';
 
-import {
-  Bookmark as BookmarkIcon,
-  History,
-  MessageSquare,
-  Radar,
-} from 'lucide-react';
-
 import { Skeleton } from '@/components/ui/skeleton';
 import type { HomeTab } from '@/v2/shell/home-tabs';
 import { HomePrompts } from './HomePrompts';
 import { HomeQuickJump } from './HomeQuickJump';
-import { Module, ModuleSkeleton } from './modules';
+import { HomeSection, HomeSectionSkeleton } from './sections/HomeSection';
 import {
   CHAT_COMPOSER_DOCK,
+  HOME_SECTIONS,
   CHAT_PROMPTS,
   DOCK_FADE,
   HOME_GREETING_SKELETON_HEADING,
   HOME_GREETING_SKELETON_SUBLINE,
   HOME_SURFACE_FOCUSED,
-  HOME_SURFACE_WORKSPACE,
-  WORKSPACE_COMPOSER_DOCK,
-  WORKSPACE_GREETING,
-  WORKSPACE_LEFT_COLUMN,
-  WORKSPACE_PROMPTS,
-  WORKSPACE_RAIL,
 } from './home-frame';
 
 /**
@@ -119,7 +107,7 @@ import {
  *    on this route's server work: its text is built from the signed-in first name
  *    that `verifySession()` resolves. It reuses `HomeGreeting`'s own skeleton
  *    geometry so the hand-off is skeleton → identical skeleton → text.
- *  • THE MODULE RAIL gets STILL `ModuleSkeleton`s inside real `Module` frames (a pulse promises a request; this boundary waits on an RSC payload, and the module queries beneath it are often already warm) —
+ *  • THE SECTION STACK gets real headings over STILL `HomeSectionSkeleton` rows (a pulse promises a request; this boundary waits on an RSC payload, and the section queries beneath it are often already warm) —
  *    exactly what each module renders while its query is pending, so the fallback
  *    and the first mounted frame are the same picture.
  *
@@ -147,13 +135,7 @@ export function HomeFallback({ tab }: { tab: HomeTab }) {
         Loading your home
       </span>
       <div aria-hidden inert className="h-full">
-        {tab === 'work' ? (
-          <WorkspaceFrame rail={<WorkRail />} />
-        ) : tab === 'study' ? (
-          <WorkspaceFrame rail={<StudyRail />} />
-        ) : (
-          <ChatFrame />
-        )}
+        {tab === 'chat' ? <ChatFrame /> : <TabFrame tab={tab} />}
       </div>
     </>
   );
@@ -187,116 +169,11 @@ function ChatFrame() {
       </div>
 
       <div className={CHAT_PROMPTS}>
-        <PromptsBlock />
+        <PromptsBlock tab="chat" />
       </div>
     </div>
   );
 }
-
-/**
- * The Work/Study frame — the two-column workspace. Only the RAIL differs between
- * the tabs, so it is a slot; everything structural is shared, which is what keeps
- * the two fallbacks from drifting apart the way the surfaces once did.
- *
- * The left column reserves the composer and the prompts only. The role-gated
- * modules ("Jump back in", Quiz, the study-mode CTA, and the spaces modules) are
- * NOT drawn: the fallback has no session, and inventing a panel that half the
- * audience never sees would trade one jump for a worse one. The rail therefore
- * shows exactly the modules every signed-in user gets.
- */
-function WorkspaceFrame({ rail }: { rail: React.ReactNode }) {
-  return (
-    <div className={HOME_SURFACE_WORKSPACE}>
-      <div className={WORKSPACE_GREETING}>
-        <GreetingSkeleton align="left" subline />
-      </div>
-
-      {/* `contents` below md — its children join the ROOT flex so the `order`
-          scale interleaves them with the rail and the sticky dock keeps the tall
-          root as its containing block. */}
-      <div className={WORKSPACE_LEFT_COLUMN}>
-        <div className={WORKSPACE_COMPOSER_DOCK}>
-          <div className={DOCK_FADE} />
-          <ComposerShape />
-        </div>
-
-        <div className={WORKSPACE_PROMPTS}>
-          <PromptsBlock />
-        </div>
-      </div>
-
-      <div className={WORKSPACE_RAIL}>{rail}</div>
-    </div>
-  );
-}
-
-/**
- * The rails' ungated modules — the ones EVERY signed-in user gets.
- *
- * ROW COUNTS ARE NOT DECLARED HERE. `<ModuleSkeleton still />` is exactly what
- * each real module renders while pending, so the fallback inherits the one
- * shared reservation policy automatically. Hand-copying counts into this file
- * would silently reintroduce the very shift the policy removes the first time a
- * module's number changed — the drift class this whole workstream exists to kill.
- *
- * `prefetch: false` on every header action is load-bearing, not cosmetic:
- * `next/link` prefetches by default and registers with a shared
- * IntersectionObserver through a callback ref, and `inert` stops focus, clicks
- * and pointer events but NOT refs, observers or network. Without it this
- * about-to-be-deleted subtree fires real RSC prefetches for /radars, /bookmarks
- * and /conversations — invisible in dev, where prefetching is disabled, and live
- * in production. `inert` does cover the hover path, since inert content is not
- * hit-testable, so there is no `onMouseEnter` to trigger the eager fetch.
- */
-function WorkRail() {
-  return (
-    <>
-      <Module
-        title="Radar"
-        icon={Radar}
-        action={{ href: '/radars', label: 'All', prefetch: false }}
-      >
-        <ModuleSkeleton still />
-      </Module>
-      <Module
-        title="Recent conversations"
-        icon={MessageSquare}
-        action={{ href: '/conversations', label: 'All', prefetch: false }}
-      >
-        <ModuleSkeleton lines={1} still />
-      </Module>
-    </>
-  );
-}
-
-/** The Study rail's ungated modules. See `WorkRail` for the counts + prefetch. */
-function StudyRail() {
-  return (
-    <>
-      <Module title="Recently viewed" icon={History}>
-        <ModuleSkeleton still />
-      </Module>
-      <Module
-        title="Bookmarks"
-        icon={BookmarkIcon}
-        action={{ href: '/bookmarks', label: 'All', prefetch: false }}
-      >
-        <ModuleSkeleton still />
-      </Module>
-      <Module
-        title="Recent chats"
-        icon={MessageSquare}
-        action={{ href: '/conversations', label: 'All', prefetch: false }}
-      >
-        <ModuleSkeleton lines={1} still />
-      </Module>
-    </>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Reserved pieces                                                             */
-/* -------------------------------------------------------------------------- */
 
 /**
  * The greeting's skeleton, at `HomeGreeting`'s own pre-mount geometry — the one
@@ -326,16 +203,74 @@ function GreetingSkeleton({
   );
 }
 
-/** Both prompt presentations, each CSS-gated to its breakpoint — exactly how the
- *  real surfaces render them, so precisely one is ever visible. */
-function PromptsBlock() {
+/**
+ * The Work / Study frame — the SAME focused column the real surfaces now use.
+ *
+ * The old two-column workspace frame and its two hand-built rails are gone with
+ * the rail itself. What is left is the shared shape plus the tab's own section
+ * headings, which is all these tabs are.
+ *
+ * WHY THE HEADINGS ARE REAL TEXT AND THE ROWS ARE SKELETONS. A heading is static
+ * chrome — "Jump back in" is a literal, known before any request — so drawing it
+ * still and solid is honest and makes the hand-off to the real section change
+ * nothing but the rows. The rows genuinely are waiting on data, so they pulse.
+ * That is standards §8 applied per element rather than per block.
+ *
+ * `still` on every skeleton: this fallback waits on an RSC payload, not on the
+ * API, and the queries behind the real sections are frequently already warm.
+ * Pulsing here would animate over data we already hold.
+ *
+ * `prefetch: false` on every heading action is load-bearing, not cosmetic:
+ * `next/link` prefetches by default through a callback ref + shared
+ * IntersectionObserver, and `inert` stops focus, clicks and pointer events but NOT
+ * refs, observers or network. Without it this about-to-be-deleted subtree fires
+ * real RSC prefetches — invisible in dev, where prefetching is off, and live in
+ * production.
+ *
+ * ROLE-GATED SECTIONS ARE NOT DRAWN. The fallback has no session, and reserving a
+ * panel that half the audience never sees trades one settle for a worse one — so
+ * "Jump back in" (spaces-gated) and the student-gated study-mode row are omitted,
+ * exactly as the old frame omitted their boxed ancestors.
+ */
+function TabFrame({ tab }: { tab: Exclude<HomeTab, 'chat'> }) {
+  return (
+    <div className={HOME_SURFACE_FOCUSED}>
+      <GreetingSkeleton align="center" subline />
+
+      <div className={CHAT_COMPOSER_DOCK}>
+        <div className={DOCK_FADE} />
+        <ComposerShape />
+      </div>
+
+      <div className={CHAT_PROMPTS}>
+        <PromptsBlock tab={tab} />
+      </div>
+
+      <div className={HOME_SECTIONS}>
+        <HomeSection
+          title="Recent conversations"
+          action={{ href: '/conversations', label: 'All', prefetch: false }}
+        >
+          <HomeSectionSkeleton still />
+        </HomeSection>
+        {tab === 'study' ? (
+          <HomeSection title="Recently viewed">
+            <HomeSectionSkeleton still />
+          </HomeSection>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function PromptsBlock({ tab }: { tab: HomeTab }) {
   return (
     <>
       <div className="md:hidden">
-        <HomePrompts variant="mobile" onSelect={NOOP} />
+        <HomePrompts variant="mobile" tab={tab} onSelect={NOOP} />
       </div>
       <div className="hidden md:block">
-        <HomePrompts variant="desktop" onSelect={NOOP} />
+        <HomePrompts variant="desktop" tab={tab} onSelect={NOOP} />
       </div>
     </>
   );
