@@ -1,95 +1,160 @@
 import 'server-only';
 import { dehydrate, type DehydratedState } from '@tanstack/react-query';
-import type { ConversationsListResponse } from '@/types/chat';
+import type { ConversationsListResponse, ListConversationsParams } from '@/types/chat';
 import { apiFetch } from '@/v2/runtime/api-server';
+import { getSessionToken } from '@/v2/runtime/session-token';
 import { getServerQueryClient } from '@/v2/runtime/query';
-import type { SessionUser } from '@/v2/runtime/session';
 import { conversationsQueries, INFINITE_RECENTS_PARAMS } from './queries';
 
 /**
  * conversations — server prefetch (wave-4 RSC hydration).
  *
- * THE SERVER-FETCH GAP. `conversationsQueries.infiniteRecents()` fetches via
- * `chatApi` (axios; its interceptor reads the browser localStorage token) — which
- * cannot run in an RSC. So this module fetches the SAME resource over the server DAL
- * ({@link apiFetch}: httpOnly session cookie → `Authorization: Bearer`, built and
- * kept server-side) and hydrates the EXACT SAME query key with the EXACT SAME shape.
+ * THE SERVER-FETCH GAP. `conversationsQueries.*` fetch via `chatApi` (axios; its
+ * interceptor reads the browser localStorage token) — which cannot run in an RSC. So
+ * this module fetches the SAME resources over the server DAL ({@link apiFetch}: httpOnly
+ * session cookie → `Authorization: Bearer`, built and kept server-side) and hydrates the
+ * EXACT SAME query keys with the EXACT SAME shapes.
  *
  * Shape parity is guaranteed structurally: both fetchers return the parsed Laravel
  * envelope typed `ConversationsListResponse` (`chatApi.listConversations` returns
  * `response.data`; `apiFetch` returns `response.json()` — same JSON body). Key parity
- * is guaranteed by reusing `infiniteRecents()`'s own `queryKey` /
- * `initialPageParam` / `getNextPageParam` here and overriding only the `queryFn`, and
- * by building the query string from the shared {@link INFINITE_RECENTS_PARAMS}.
+ * is guaranteed by reusing each leaf's own `queryKey` / `initialPageParam` /
+ * `getNextPageParam` here and overriding only the `queryFn`, and by DERIVING every query
+ * string from the same params object that formed the key (never hand-enumerated).
  *
  * `import 'server-only'` keeps this (and `apiFetch`) out of every client bundle; the
  * dehydrated state it returns is plain serializable data that crosses to the client.
  */
 
-/** Bound on the prefetch's serial TTFB cost: a hung conversations endpoint must
- *  not stall the whole /v2 shell. On timeout the fetch rejects, the query lands
- *  in error state, dehydration excludes it, and the client fetches normally. */
+/** Bound on the prefetch's TTFB cost: a hung conversations endpoint must not stall
+ *  the whole /v2 shell. On timeout the fetch rejects, the query lands in error state,
+ *  dehydration excludes it, and the client fetches normally. */
 const PREFETCH_TIMEOUT_MS = 3000;
 
-/** Fetch one recents page over the server DAL, mirroring `chatApi.listConversations`
- *  with the shared infinite-recents params. The query string is DERIVED from the
- *  shared constant (never hand-enumerated), so a future param added to
- *  `INFINITE_RECENTS_PARAMS` can't silently drift between the client fetcher and
- *  this one while the query key claims they match (review F2). */
-function fetchRecentsPage(page: number): Promise<ConversationsListResponse> {
+/**
+ * Fetch a conversations list over the server DAL, mirroring `chatApi.listConversations`
+ * exactly: it takes the SAME params object the client fetcher would pass and serializes
+ * it the same way axios does (`{ params }` — every defined key, nothing else). Callers
+ * therefore hand it the literal argument their client counterpart uses, so the request
+ * this makes and the request the hydrated query would have made cannot drift, even in
+ * which keys are present (review F2).
+ */
+function fetchConversationsPage(
+  params: ListConversationsParams,
+): Promise<ConversationsListResponse> {
   const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(INFINITE_RECENTS_PARAMS)) {
+  for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) query.set(key, String(value));
   }
-  query.set('page', String(page));
   return apiFetch<ConversationsListResponse>(`/conversations?${query.toString()}`, {
     signal: AbortSignal.timeout(PREFETCH_TIMEOUT_MS),
   });
 }
 
 /**
- * Prefetch the FIRST page of the sidebar/drawer recents and return the dehydrated
- * cache for a `<HydrationBoundary>`, so a signed-in hard load paints real rows at
- * first paint (no skeleton flash) and the client `useInfiniteQuery` adopts the
- * hydrated page seamlessly.
+ * Prefetch BOTH conversation-list entries the v2 shell reads on a hard load, and return
+ * the dehydrated cache for a single `<HydrationBoundary>`:
  *
- *  - GUESTS (`user === null`): returns `undefined` — no fetch, nothing dehydrated,
- *    no server-only work. The client query stays gated on `enabled: signedIn`, so
- *    the shell behaves exactly as today.
+ *  1. `infiniteRecents()` — the sidebar + drawer Recents (`per_page 20`, infinite). Real
+ *     rows in the first-paint HTML instead of a skeleton flash.
+ *  2. `recents()` — the home's recent-conversation PEEK (`per_page 10`, single page),
+ *     read by the Work tab's `RecentConversationsModule` and the Study tab's
+ *     `RecentConversations`. A DIFFERENT query key from (1), so before this the home
+ *     always re-fetched client-side a strict subset of data the server already had.
+ *
+ * Both land in the ONE React-`cache()`d server QueryClient and dehydrate together, so
+ * the layout's single `<HydrationBoundary>` seeds both keys.
+ *
+ * CONCURRENT, not serial. The two requests are issued together, and the layout runs this
+ * whole function concurrently with `verifySession()` — which is why it no longer needs
+ * the verified user (below) and why the shell's server round trips overlap instead of
+ * stacking. TTFB is the slowest single request, not their sum.
+ *
+ * (2) IS DELIBERATELY OVER-FETCHED — the honest trade. This runs in the LAYOUT, which has
+ * no way to know the route (layouts receive no pathname, by design, because they do not
+ * re-render on navigation). So the peek is fetched on hard loads of `/v2`, `/conversations`
+ * AND `/c/{id}`, while its only consumers mount on the HOME and only on the Work or Study
+ * tab. On `/c/{id}`, on `/conversations`, and on the home's default Chat tab it is
+ * genuinely wasted: one small backend request plus ~10 records serialized into that
+ * document's HTML. Concurrency hides the LATENCY but not that cost — this is backend load
+ * and payload, and calling it free would be wrong.
+ *
+ * It is still the right call, because every alternative is worse:
+ *   - Prefetching it from `app/v2/page.tsx` instead would restore a blocking `await` on
+ *     the home page segment — the exact defect (a skeleton on every navigation) that the
+ *     session rework removed.
+ *   - Doing that non-blockingly, via the pending-dehydration path the query config
+ *     supports, gives up the whole point: the rows would arrive after paint, i.e. the
+ *     skeleton is back anyway, for far more machinery.
+ *   - Synthesising the peek from (1)'s first page (its 10 newest rows ARE a prefix of
+ *     (1)'s 20) would save the request but not the payload, and would mean fabricating a
+ *     `pagination` envelope the API never sent — a cache entry that lies about its
+ *     provenance.
+ * The cost is bounded (hard loads only — the layout renders once per full page load, not
+ * per navigation) and it buys a removed client round trip on the home, the most-visited
+ * route, for the Work/Study tabs that a returning user's persisted tab choice lands on.
+ * If a future route-scoped prefetch seam appears, (2) belongs behind it.
+ *
+ *  - GUESTS: the cookie check below returns `undefined` — no fetch, nothing dehydrated,
+ *    no server-only work. The client queries stay gated on `enabled: signedIn` / are
+ *    never mounted, so the shell behaves exactly as today.
  *  - AWAITED, not streamed: acceptance criterion (d) requires real rows in the
- *    first-paint HTML, which is only possible if the query is RESOLVED before render.
+ *    first-paint HTML, which is only possible if the queries are RESOLVED before render.
  *    The pending-dehydration path the query config supports would still paint a
- *    skeleton, so it is deliberately NOT used here. The cost is one `/conversations`
- *    round trip after the already-awaited `/auth/me`; it REPLACES the client mount
- *    fetch (the hydrated page is fresh within its 60s staleTime, so the client does
- *    not refetch), so it is not extra total work — just moved server-side.
- *  - FAILURE: graceful. `prefetchInfiniteQuery` does not reject on a fetch error — it
- *    leaves the query in error state, which `shouldDehydrateQuery` (success/pending
- *    only) then EXCLUDES, so the returned state simply carries no recents entry and
- *    the client fetches normally (skeleton → rows). The `try/catch` additionally
- *    guards any unexpected throw by returning `undefined`. The shell never crashes.
+ *    skeleton, so it is deliberately NOT used here. The cost REPLACES the client mount
+ *    fetches (the hydrated pages are fresh within their 60s staleTime, so the client
+ *    does not refetch) — not extra total work, just moved server-side.
+ *  - FAILURE: graceful, and independent per query. `prefetch*Query` does not reject on a
+ *    fetch error — it leaves the query in error state, which `shouldDehydrateQuery`
+ *    (success/pending only) then EXCLUDES. `allSettled` additionally guarantees that an
+ *    unexpected throw from one prefetch cannot discard the other's resolved data. And the
+ *    try/catch spans EVERYTHING, including the cookie read: this function is awaited
+ *    inside the layout's `Promise.all`, so anything it lets escape would take the whole
+ *    v2 shell down rather than degrading to a client-side fetch. It never throws.
  */
-export async function prefetchRecentsState(
-  user: SessionUser | null,
-): Promise<DehydratedState | undefined> {
-  if (!user) return undefined;
-
-  const queryClient = getServerQueryClient();
-  const options = conversationsQueries.infiniteRecents();
-
+export async function prefetchRecentsState(): Promise<DehydratedState | undefined> {
   try {
-    await queryClient.prefetchInfiniteQuery({
-      queryKey: options.queryKey,
-      queryFn: ({ pageParam }) => fetchRecentsPage(pageParam),
-      initialPageParam: options.initialPageParam,
-      getNextPageParam: options.getNextPageParam,
-      staleTime: options.staleTime,
-      // First page only — subsequent pages load client-side via the sentinel.
-      pages: 1,
-    });
+    // Cookie PRESENCE only — a zero-network read, and deliberately not a verified session:
+    // it answers "is it worth ATTEMPTING a prefetch?", never "is this user authorized?"
+    // (the backend authorizes each request itself). A stale or revoked token simply 401s
+    // into the failure path, which is the same `undefined`-shaped outcome the guest branch
+    // produces. Checking the cookie instead of awaiting `verifySession()` is what lets the
+    // layout run this CONCURRENTLY with its own session verification.
+    const token = await getSessionToken();
+    if (!token) return undefined;
+
+    const queryClient = getServerQueryClient();
+    const infinite = conversationsQueries.infiniteRecents();
+    const peek = conversationsQueries.recents();
+    // The peek's params object is the LAST segment of its own query key (`list(params)`
+    // builds the key as `[...lists(), params]`). Reading it back off the key — rather than
+    // re-declaring it — is what makes the request and the entry it hydrates provably the
+    // same query, without `queries.ts` having to export a second params constant.
+    const [, , peekParams] = peek.queryKey;
+
+    await Promise.allSettled([
+      queryClient.prefetchInfiniteQuery({
+        queryKey: infinite.queryKey,
+        // Literal mirror of `infiniteRecents()`'s own queryFn argument.
+        queryFn: ({ pageParam }) =>
+          fetchConversationsPage({ ...INFINITE_RECENTS_PARAMS, page: pageParam }),
+        initialPageParam: infinite.initialPageParam,
+        getNextPageParam: infinite.getNextPageParam,
+        staleTime: infinite.staleTime,
+        // First page only — subsequent pages load client-side via the sentinel.
+        pages: 1,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: peek.queryKey,
+        // Literal mirror of `recents()`'s own queryFn argument (the peek carries no
+        // `page` — it is a single fixed page, so the API's default is the contract).
+        queryFn: () => fetchConversationsPage(peekParams),
+        staleTime: peek.staleTime,
+      }),
+    ]);
+
+    return dehydrate(queryClient);
   } catch {
     return undefined;
   }
-
-  return dehydrate(queryClient);
 }

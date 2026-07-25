@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { quizApi } from '@/lib/api/quiz';
 import type { QuizSessionListParams } from '@/types/quiz';
-import { STALE_TIMES } from '@/v2/runtime/query';
+import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
 
 /**
  * Quiz query factory — copies the `v2/features/cases/queries.ts` exemplar: a
@@ -48,6 +48,10 @@ export const quizQueries = {
       queryKey: [...quizQueries.sessions(), params] as const,
       queryFn: () => quizApi.listSessions(params),
       staleTime: STALE_TIMES.standard,
+      // Home-glance retention: outlive TanStack's 5-minute default so a return to
+      // the home paints this module from cache instead of a skeleton. Without it
+      // the conversations recents were warm while every other module was cold.
+      gcTime: GC_TIMES.list,
     }),
 
   /** The read-only active-session PEEK (single page) shared by the home module. */
@@ -62,6 +66,7 @@ export const quizQueries = {
       queryKey: [...quizQueries.all, 'stats'] as const,
       queryFn: () => quizApi.getStats(),
       staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
     }),
 
   /**

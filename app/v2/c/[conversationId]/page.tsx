@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { fetchConversationForMetadata } from '@/lib/api/server';
 import { SEO, getAppUrl } from '@/lib/constants/seo';
-import { verifySession } from '@/v2/runtime/session';
 import { ConversationScreen } from '@/v2/features/conversations/conversation/ConversationScreen';
 
 /**
@@ -12,9 +11,20 @@ import { ConversationScreen } from '@/v2/features/conversations/conversation/Con
  * "%s | Lawexa" template appends the brand; canonical + OG built from the FRONTEND
  * app URL, never the backend `meta.canonical`; the per-conversation OG card).
  *
- * `verifySession()` is React-cached, so this shares the single `/auth/me` round
- * trip with the layout; the resolved user id is threaded to the client screen for
- * the server-verified ownership (view-only) check.
+ * OWNERSHIP, UNCHANGED IN STRENGTH. This segment no longer calls
+ * `verifySession()` — that `await` was an uncached `/auth/me` round trip on every
+ * navigation into a conversation (React `cache()` dedupes only within one server
+ * render, and a soft navigation re-renders this page without re-rendering the
+ * layout), which is what made `loading.tsx` cover a wait on Laravel every time.
+ * The route stays dynamic, so that boundary still shows for one I/O-free Next
+ * round trip — the wait is shortened, not removed. The ownership id
+ * the client screen checks against is still `verifySession()`'s server-verified
+ * `user.id` and nothing else: the v2 layout calls `verifySession()` once and
+ * publishes that id through `<V2SessionProvider>`, and `ConversationScreen` reads
+ * it from there. Same function, same server, same value — only the delivery
+ * changed, from a prop threaded through this page to context threaded through the
+ * layout. Cookie presence is never substituted for it, and the backend remains
+ * the authority regardless (the transcript fetch 401s on its own).
  */
 interface ConversationPageProps {
   params: Promise<{ conversationId: string }>;
@@ -70,13 +80,8 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
 }
 
 export default async function V2ConversationPage({ params }: ConversationPageProps) {
+  // The only remaining await: the route params, which cost no I/O.
   const { conversationId } = await params;
-  const session = await verifySession();
 
-  return (
-    <ConversationScreen
-      conversationId={conversationId}
-      serverUserId={session?.user.id ?? null}
-    />
-  );
+  return <ConversationScreen conversationId={conversationId} />;
 }

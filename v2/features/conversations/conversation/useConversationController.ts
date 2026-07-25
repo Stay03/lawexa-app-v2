@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useConversationStream,
   hasTranscript,
@@ -12,8 +12,9 @@ import type { MessageAttachment, ConversationReference } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
+import { useStreamStyle } from '@/v2/stream-style';
 import { conversationsCache } from '../cache';
-import { conversationsQueries } from '../queries';
+import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import {
   isConfidentialMark,
   isRedactedMark,
@@ -38,7 +39,45 @@ import {
  * mode-store sessionStorage envelope — never `lib/stores`). So a confidential
  * turn writes the device-owned IndexedDB + replays `messages[]`, and a redacted
  * turn gets the server's redacted swap — byte-identical to v1's behavior.
+ *
+ * TRANSCRIPT CACHING (why the history fetch moved out of the engine). Opening a
+ * conversation used to re-download it EVERY time — the engine fired
+ * `GET /conversations/{id}` on every mount and held `isLoadingHistory` for the whole
+ * round trip, so the tenth visit cost exactly as much as the first and showed the
+ * same two skeletons. The fetch now goes through `conversationsQueries.detail`, the
+ * same TanStack layer the rest of v2 runs on, and the engine is SEEDED from that
+ * cache at construction. A revisit therefore paints the transcript in its first
+ * committed render — with ownership already resolved from the same cached record, so
+ * the composer is real rather than a skeleton — and the revalidation lands behind it.
+ *
+ * THE THREE THINGS THAT CACHE MUST NEVER DO, and where each is stopped:
+ *  1. HOLD CONFIDENTIAL CONTENT. A confidential transcript is device-owned (IDB) and
+ *     404s from the server by design. The query is left DISABLED for a conversation
+ *     this device knows is confidential, the fetcher refuses any record flagged
+ *     `is_confidential` (throwing, so nothing is stored), the engine's IDB path never
+ *     writes to the cache, and {@link ConversationController.deleteConfidential}
+ *     removes the entry outright. See each site below.
+ *  2. LET ANOTHER USER READ IT. The cache entry is partitioned by the
+ *     server-verified viewer id (see `conversationsQueries.detail`), because the v2
+ *     QueryClient is a module singleton that survives v1's sign-out.
+ *  3. RACE THE LIVE STREAM. Adoption is guarded inside the engine
+ *     (`adoptConversationHistory`), not here — a background revalidation cannot
+ *     disturb a streaming answer even if this controller asked it to.
  */
+
+/** Stable empty references — a fresh `[]` per render would churn every consumer. */
+const NO_REFERENCES: ConversationReference[] = [];
+
+/**
+ * Map a failed history load onto the sentinel strings the screen renders. Byte-identical
+ * to the mapping the engine's former `loadConversationHistory` performed, so `not_found`
+ * still reaches the screen's "not available" state and everything else is an inline banner.
+ */
+function historyErrorMessage(err: unknown): string {
+  const status = (err as { response?: { status?: number } } | null | undefined)?.response?.status;
+  if (status === 404) return 'not_found';
+  return err instanceof Error ? err.message : 'Failed to load conversation';
+}
 
 const CONV_INIT_PREFIX = 'conv_init_';
 const CONV_JURISDICTION_PREFIX = 'conv_jurisdiction_';
@@ -130,6 +169,14 @@ export interface ConversationController {
    * owner id is still null).
    */
   isOwnerResolved: boolean;
+  /**
+   * Whether the transcript is still being loaded and there is NOTHING to show yet.
+   * The union of both history paths (the device-owned IndexedDB load and the server
+   * query), AND-ed with "the engine holds no messages" — so it is structurally
+   * impossible for a skeleton to cover cached content. On a revisit it is `false`
+   * from the very first render.
+   */
+  isLoadingHistory: boolean;
   /** Confidential surface treatment (device-owned transcript). */
   isConfidential: boolean;
   /** Redacted mode (sticky) — drives the composer's locked redacted pill. */
@@ -159,8 +206,7 @@ export function useConversationController(
   conversationId: string,
   serverUserId: number | null,
 ): ConversationController {
-  const [ownerId, setOwnerId] = useState<number | null>(null);
-  const [references, setReferences] = useState<ConversationReference[]>([]);
+  const [localOwnerId, setLocalOwnerId] = useState<number | null>(null);
   const [jurisdiction, setJurisdictionState] = useState<JurisdictionChoice>({ mode: 'auto' });
   const [narration, setNarration] = useState<string | null>(null);
 
@@ -169,17 +215,68 @@ export function useConversationController(
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const { isConfidential, isRedacted } = useModeMarks(conversationId);
+
+  // ── The cached transcript (server path). ──
+  // DISABLED for a conversation this device already knows is confidential: that
+  // content is device-owned and 404s server-side, so the request would be both
+  // pointless and the one request whose response we must never store. The
+  // `hasTranscript` probe in the mount flow below is the authority; this mark is the
+  // synchronous first gate, and the fetcher's `is_confidential` refusal is the third.
+  const detailOptions = useMemo(
+    () => conversationsQueries.detail({ conversationId, viewerId: serverUserId }),
+    [conversationId, serverUserId],
+  );
+  const detailQuery = useQuery({ ...detailOptions, enabled: !isConfidential });
+  const detailData = detailQuery.data ?? null;
+  const detailKey = detailOptions.queryKey;
+
+  // ── Streaming style (a per-device developer preference) → the engine. ──
+  // Memoized on the primitive so the object identity only changes when the choice
+  // does; the engine's `setSmoothing` also no-ops on an unchanged resolution, so a
+  // live stream switches rhythm mid-answer without rebuilding anything.
+  const streamStyle = useStreamStyle();
+  const smoothing = useMemo(() => ({ style: streamStyle }), [streamStyle]);
+
   const stream = useConversationStream({
+    smoothing,
+    // THE WARM-CACHE SEED. Read once, when the engine is constructed: on a revisit
+    // this is already the full transcript, so the engine's first snapshot carries it
+    // and the screen paints with no skeleton and no empty frame. On a cold open it is
+    // null and the mount flow adopts the fetch when it lands.
+    initialHistory: detailData,
     // ── Privacy resolvers WIRED (see docblock). ──
     isConfidential: isConfidentialMark,
     isRedacted: isRedactedMark,
+    // Server history the ENGINE fetched for itself during stream recovery
+    // (`pollForCompletion` / `checkStaleStream` — the paths that reload a
+    // conversation after a dropped stream). It is fresher than anything cached, so
+    // it is written straight into the same entry the query owns: one source for
+    // ownership, references, and the next open. NEVER for a confidential
+    // conversation — its content is device-owned. (Those paths cannot produce
+    // confidential content anyway, since the server 404s it; this is the belt.)
     onHistoryLoaded: (data) => {
-      setOwnerId(data.user_id);
-      setReferences(data.references ?? []);
       // Mirror server stickiness into the local marks so the composer reflects the
       // conversation's mode and the resolvers agree on subsequent turns.
       if (data.is_redacted) markRedacted(data.id);
       if (data.is_confidential) markConfidential(data.id);
+      if (data.is_confidential || isConfidentialMark(data.id)) return;
+      // Keyed off `data.id`, not this render's conversation, so a record can only
+      // ever be written under its OWN entry.
+      queryClient.setQueryData(
+        conversationsQueries.detail({ conversationId: data.id, viewerId: serverUserId }).queryKey,
+        data,
+      );
+    },
+    // A turn is now in flight, so whatever is cached for this conversation is about
+    // to be out of date. Mark it invalid but do NOT refetch: the live stream is the
+    // truth on screen, and `onCompleted` below is where the real revalidation
+    // belongs. This fires for every connect — the home handoff's first turn, a
+    // `submit`, "ask again", a retry, and a recovery reconnect — so no route into a
+    // turn can leave a stale entry behind if the user navigates away mid-answer.
+    onConnected: () => {
+      if (isConfidentialMark(conversationId)) return;
+      void queryClient.invalidateQueries({ queryKey: detailKey, refetchType: 'none' });
     },
     onNarration: (text) => {
       const line = truncateNarration(text);
@@ -189,12 +286,21 @@ export function useConversationController(
     // directly (covers the home-created turn 1, whose send ran in start-conversation
     // rather than `submit`). No-op-stable when the row isn't cached (e.g. a
     // confidential stub the server omits), so it never fabricates a leak.
+    //
+    // ALSO the transcript's terminal cache write: the turn is persisted server-side,
+    // so revalidate. With this screen mounted the active observer refetches in the
+    // background (the engine ignores the result — it holds the richer live copy —
+    // but the CACHE becomes server truth, so the next open is correct rather than
+    // one turn short). With no observer left, the entry is simply marked invalid and
+    // the next open revalidates on mount.
     onCompleted: () => {
       conversationsCache.touch(queryClient, conversationId);
+      if (isConfidentialMark(conversationId)) return;
+      void queryClient.invalidateQueries({ queryKey: detailKey });
     },
   });
 
-  const { connectToStream, loadConversationHistory, loadConversationHistoryFromIDB, setConversationId, recoverPendingState, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle } = stream;
+  const { connectToStream, adoptConversationHistory, loadConversationHistoryFromIDB, setConversationId, setError, recoverPendingState, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle } = stream;
 
   // ── Jurisdiction slot: seed once per conversation, persist on change. ──
   useEffect(() => {
@@ -251,7 +357,7 @@ export function useConversationController(
       // Fresh handoff from the home composer: attach to the live execution. The
       // creator is the owner (server-verified id threaded from the page).
       connectToStream(executionId, message, attachments);
-      if (serverUserId != null) setOwnerId(serverUserId);
+      if (serverUserId != null) setLocalOwnerId(serverUserId);
       // Drop the ?init=1 marker so a manual reload takes the recovery path.
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, '', `/c/${conversationId}`);
@@ -272,12 +378,42 @@ export function useConversationController(
         markConfidential(conversationId);
         await loadConversationHistoryFromIDB(conversationId);
         if (cancelled) return;
-        if (serverUserId != null) setOwnerId(serverUserId);
+        // PRE-EXISTING DEFECT, DELIBERATELY LEFT ALONE (it deserves its own wave, and
+        // this one must not widen it): this trusts a device-local transcript as proof
+        // of ownership, so ANY signed-in user on this device is treated as the owner
+        // of a confidential conversation the device holds. The caching work does not
+        // touch it — the query is disabled on this path, nothing confidential is
+        // cached, and the value below still never leaves this component.
+        if (serverUserId != null) setLocalOwnerId(serverUserId);
         await recoverPendingState(conversationId).catch(() => {});
         return;
       }
-      await loadConversationHistory(conversationId);
+
+      try {
+        // Cache-first history. Resolves from the warm entry with NO request (the
+        // revisit case — the engine was already seeded with this exact record at
+        // construction, so `adopt` is a no-op and simply confirms it), or performs
+        // the single fetch the query layer then owns, dedupes and retains.
+        const data = await queryClient.ensureQueryData(detailOptions);
+        if (cancelled) return;
+        adoptConversationHistory(data);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ConfidentialConversationError) {
+          // The server reported a device-owned conversation whose transcript this
+          // device does NOT have (the `hasTranscript` probe above already said so).
+          // Nothing was cached; fall through to the device path, which surfaces the
+          // honest "not available here" state instead of an empty transcript.
+          markConfidential(conversationId);
+          await loadConversationHistoryFromIDB(conversationId);
+          if (cancelled) return;
+        } else {
+          setError(historyErrorMessage(err));
+        }
+      }
       if (cancelled) return;
+      // Unchanged ordering: history ALWAYS settles before recovery re-attaches, so a
+      // reconnect can never find an empty transcript to stream into.
       await recoverPendingState(conversationId).catch(() => {});
     })();
 
@@ -287,14 +423,49 @@ export function useConversationController(
   }, [
     conversationId,
     serverUserId,
+    detailOptions,
+    queryClient,
     connectToStream,
-    loadConversationHistory,
+    adoptConversationHistory,
     loadConversationHistoryFromIDB,
     setConversationId,
+    setError,
     recoverPendingState,
   ]);
 
-  const { isConfidential, isRedacted } = useModeMarks(conversationId);
+  // Mirror the server's sticky modes into the local marks the composer and the
+  // engine's resolvers read. An external-store write (not React setState) and
+  // idempotent, so it is React-Compiler-clean in an effect and safe to re-run.
+  // Structural sharing keeps `detailData` referentially identical across a
+  // revalidation that changed nothing, so this does not even re-run then.
+  useEffect(() => {
+    if (!detailData) return;
+    if (detailData.is_redacted) markRedacted(detailData.id);
+    if (detailData.is_confidential) markConfidential(detailData.id);
+  }, [detailData]);
+
+  // BRIDGE THE VIEWER-KEY SWAP. `detailOptions` is keyed by `serverUserId`, so when
+  // the session refresh flips it null → real (the guest window on a first v2 visit,
+  // a sign-in, an expired cookie, or an `/auth/me` blip), the query key CHANGES and
+  // `detailData` is undefined for one render. Without this, `ownerId` would fall
+  // back to null for that render and the working composer would collapse into
+  // `ComposerSkeleton` and back — a grey flash on a surface the user is already
+  // typing into. Remembering the last server-resolved owner bridges the gap.
+  // Ownership does NOT weaken: this only carries a value the SERVER already
+  // returned for THIS conversation, and `isOwner` still compares it against the
+  // server-verified `serverUserId`.
+  useEffect(() => {
+    if (detailData?.user_id != null) setLocalOwnerId(detailData.user_id);
+  }, [detailData]);
+
+  // Adopt a COLD fetch that resolved after this screen mounted (the mount flow's
+  // `ensureQueryData` covers the common case; this covers a fetch that was already
+  // in flight, e.g. a StrictMode remount landing on the first mount's request). The
+  // engine's own guards decide: a live stream, another conversation's record, or an
+  // already-populated transcript all decline. An engine call, not setState.
+  useEffect(() => {
+    if (detailData) adoptConversationHistory(detailData);
+  }, [detailData, adoptConversationHistory]);
 
   // ── Header context publish (§A7-43 seam; consumed by the header work). ──
   // Push the conversation title + confidential flag into the shared header store
@@ -345,7 +516,31 @@ export function useConversationController(
     prevIsStreamingRef.current = isStreaming;
   }, [isStreaming, conversationTitle, isConfidential, conversationId, fetchConversationTitle]);
 
+  // ── Ownership (composer vs. view-only) — still SERVER-DERIVED. ──
+  // The owner id comes from the conversation record the server returned: on a
+  // revisit that record is the CACHED one, but it is the same server response, it
+  // was fetched under this viewer's own bearer token, and its cache entry is
+  // partitioned by the server-verified viewer id — so a different signed-in user on
+  // this device reads a different (cold) entry and can never inherit it. `null`
+  // still means "not the owner", the strictly safe direction.
+  //
+  // `localOwnerId` is the fallback for the two paths that have no server record to
+  // read: the fresh-create handoff (the creator IS the owner) and the confidential
+  // device path (see the defect note in the mount flow).
+  const ownerId = detailData?.user_id ?? localOwnerId;
   const isOwner = serverUserId != null && ownerId != null && serverUserId === ownerId;
+
+  const references = detailData?.references ?? NO_REFERENCES;
+
+  // ── The skeleton gate (standing rule: never a skeleton over cached content). ──
+  // `detailQuery.isPending` means "this query has no data at all"; it is also true
+  // for a DISABLED query, hence the `enabled` term. AND-ing the whole thing with an
+  // empty transcript is what makes the rule structural rather than a promise: the
+  // instant the engine holds rows — seeded from cache, adopted from a fetch, loaded
+  // from IndexedDB, or streaming a live turn — the skeleton is off.
+  const isLoadingHistory =
+    (stream.isLoadingHistory || (!isConfidential && detailQuery.isPending)) &&
+    messages.length === 0;
 
   const submit = useCallback(
     async (message: string, attachments: MessageAttachment[]) => {
@@ -383,6 +578,16 @@ export function useConversationController(
     // (recorded as a backend ask); the content itself is already gone.
     conversationsCache.remove(queryClient, conversationId);
     void queryClient.invalidateQueries({ queryKey: conversationsQueries.lists() });
+    // …and drop any transcript cache entry for this conversation, for EVERY viewer
+    // partition (the key prefix stops before the viewer id). Nothing confidential is
+    // supposed to be in there — the query is disabled for confidential conversations
+    // and the fetcher refuses such records — so this removes at most a stub. It is
+    // here anyway because "the delete wiped the content but a cached copy outlived
+    // it" is the one failure this affordance must be structurally incapable of, and
+    // a `removeQueries` is cheaper than trusting three upstream guards forever.
+    queryClient.removeQueries({
+      queryKey: [...conversationsQueries.details(), conversationId],
+    });
     clearHeaderContext();
     router.push('/');
   }, [disconnect, conversationId, queryClient, router]);
@@ -423,6 +628,7 @@ export function useConversationController(
     stream,
     isOwner,
     isOwnerResolved: ownerId !== null,
+    isLoadingHistory,
     isConfidential,
     isRedacted,
     references,

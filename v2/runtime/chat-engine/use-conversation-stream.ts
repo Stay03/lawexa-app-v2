@@ -81,7 +81,7 @@ export interface UseConversationStreamResult {
   // ── Actions (v1 useChatStream parity) ──
   send: ChatEngine['send'];
   connectToStream: ChatEngine['connectToStream'];
-  loadConversationHistory: ChatEngine['loadConversationHistory'];
+  adoptConversationHistory: ChatEngine['adoptConversationHistory'];
   loadConversationHistoryFromIDB: ChatEngine['loadConversationHistoryFromIDB'];
   fetchConversationTitle: ChatEngine['fetchConversationTitle'];
   setConversationId: ChatEngine['setConversationId'];
@@ -103,6 +103,14 @@ export function useConversationStream(
   // transition) never changes; the first render's callbacks seed the handlers and
   // the effect below keeps them fresh — so no ref is smuggled through render (which
   // the React Compiler `react-hooks/refs` rule forbids).
+  //
+  // `options.initialHistory` rides this SAME once-only channel by design: the host
+  // passes the warm cache entry for the conversation it is opening, and the engine
+  // is born holding that transcript, so the first committed render already paints it
+  // (no skeleton, no empty frame). Later renders' `initialHistory` is ignored —
+  // history that arrives after construction goes through the guarded
+  // `adoptConversationHistory`, which is what keeps a background revalidation from
+  // ever racing a live stream.
   const [engine] = useState<ChatEngine>(() =>
     createChatEngine({
       ...options,
@@ -114,8 +122,16 @@ export function useConversationStream(
   // Push the latest callbacks + mode resolvers into the long-lived engine every
   // render. Engine callbacks fire from async SSE events (always after this effect),
   // so they never see a stale handler. Not a setState — no React-Compiler conflict.
+  //
+  // `smoothing` rides the same effect. It used to be construction-only, which meant
+  // the streaming-style preference could not reach an already-built engine (this
+  // hook's `useState` initializer runs exactly once, and `updateHandlers` only swaps
+  // `ChatEngineHandlers`) — changing it silently did nothing until a remount. The
+  // engine's `setSmoothing` re-resolves both smoothers' configs in place and no-ops
+  // when nothing changed, so calling it every render is free.
   useEffect(() => {
     engine.updateHandlers(options);
+    engine.setSmoothing(options.smoothing);
   });
 
   // Tear down the live stream + timers on unmount (idempotent; the engine stays
@@ -142,7 +158,7 @@ export function useConversationStream(
     reasoning: engine.reasoning,
     send: engine.send,
     connectToStream: engine.connectToStream,
-    loadConversationHistory: engine.loadConversationHistory,
+    adoptConversationHistory: engine.adoptConversationHistory,
     loadConversationHistoryFromIDB: engine.loadConversationHistoryFromIDB,
     fetchConversationTitle: engine.fetchConversationTitle,
     setConversationId: engine.setConversationId,

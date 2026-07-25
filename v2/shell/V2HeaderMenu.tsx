@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { LogOut, Moon, MoreVertical, Sun, SunMoon } from 'lucide-react';
+import { FlaskConical, LogOut, Moon, MoreVertical, Sun, SunMoon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +12,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { canAccessV2Preview } from '@/lib/utils/v2-access';
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { useMounted } from './use-mounted';
 
 /**
@@ -30,11 +33,23 @@ import { useMounted } from './use-mounted';
  * glyph/label until the client mounts, then React re-renders with the real state
  * — no mismatch, no lint violation. The trigger glyph is theme-neutral, so the
  * bar itself never flashes.
+ *
+ * DEVELOPER ROW (role-gated). v2 has no Settings surface of its own — `/settings`
+ * is not in `routes.manifest.ts` and the nav config has no entry — so the
+ * developer flags (the v2-preview cookie, the streaming style) were unreachable
+ * from inside v2. This row is the one path to them. It is gated by
+ * `canAccessV2Preview` on the SERVER-VERIFIED role from `useV2Session`, exactly
+ * like the v1 nav link and the `/settings/developer` page's own fallback, so
+ * ordinary users never see it. `/settings/developer` still lives in v1, so this
+ * is a genuine cross-experience link — a real `<Link>`/anchor, so it is
+ * middle-clickable and copyable rather than a JS-only jump.
  */
 export function V2HeaderMenu() {
   const mounted = useMounted();
+  const { role } = useV2Session();
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const showDeveloper = canAccessV2Preview(role);
 
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
 
@@ -74,6 +89,18 @@ export function V2HeaderMenu() {
             </span>
           ) : null}
         </DropdownMenuItem>
+
+        {showDeveloper ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="min-h-11 md:min-h-8">
+              <Link href="/settings/developer">
+                <FlaskConical className="text-muted-foreground" />
+                <span>Developer</span>
+              </Link>
+            </DropdownMenuItem>
+          </>
+        ) : null}
 
         <DropdownMenuSeparator />
 

@@ -66,6 +66,18 @@ html.v2-document-lock body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* The region carries `tabIndex={-1}` so surfaces can move focus INTO it
+   programmatically (NewRowsPill does this on accept, so a keyboard user lands on
+   the rows they asked for instead of on <body>). That makes it focusable, and a
+   keyboard-driven focus would otherwise match `:focus-visible` and outline the
+   entire scroll area. Suppress the ring on this container only — it is a scroll
+   viewport, not a control, and the thing the user is meant to see is the content
+   inside it. Real controls keep their own focus rings untouched. */
+.v2-shell__content:focus,
+.v2-shell__content:focus-visible {
+  outline: none;
+}
+
 /* Dock slot (grid-row 3) — the home of the FLOATING composer in phase 3.
    IMPORTANT (standards §4 + owner feedback): the composer must LOOK floating
    (rounded, shadowed, inset margins, transcript scrolling visibly behind it) but
@@ -178,6 +190,92 @@ html.v2-document-lock body {
 @media (prefers-reduced-motion: reduce) {
   .v2-collapse[data-state='open'],
   .v2-collapse[data-state='closed'] {
+    animation: none;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Streamed-answer word reveal (`v2-stream-word`).
+   The smoother releases LIVE answer text in whole words (~23 publishes/second at
+   140 cps instead of ~60); this compositor-only fade supplies the sub-word
+   smoothness that lower publish rate gives up. `rehype-stream-words.ts` wraps each
+   word of streaming markdown in a span carrying this class, and React's positional
+   reconciliation means only NEWLY-created spans exist to run the animation —
+   already-painted words keep their DOM nodes and never re-flash.
+
+   Opacity only: `transform` does not apply to non-replaced inline elements, and
+   forcing `inline-block` to make it apply would change word wrapping and
+   whitespace handling. Opacity is compositor-driven, needs no layout, and at ~23
+   words/second only a handful of spans are animating at any moment.
+
+   v2-unique class name: nothing in v1 renders `.v2-stream-word`, so this rule is
+   inert if the sheet survives a soft-nav into v1 (see the header comment).
+   -------------------------------------------------------------------------- */
+@keyframes v2-stream-word-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.v2-stream-word {
+  animation: v2-stream-word-in 160ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-stream-word {
+    animation: none;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   `line` streaming style — the stand-in bar for the line still arriving
+   (`v2-stream-line`, rendered by StreamingLineSkeleton INSIDE the prose
+   container).
+
+   It must occupy the slot the next line will occupy, so it is exactly one
+   `prose-sm` paragraph line tall (line-height 1.7142857em) and, when it directly
+   follows a paragraph, it cancels that paragraph's bottom margin
+   (`prose-sm p { margin-bottom: 1.1428571em }`). The adjacent-sibling selector is
+   what makes that exact rather than guessed: after a heading, list or blockquote
+   no rule matches and the natural block gap is kept, which is correct — a new
+   block really is starting there.
+
+   v2-unique class name: nothing in v1 renders `.v2-stream-line`, so this rule is
+   inert if the sheet survives a soft-nav into v1 (see the header comment).
+   -------------------------------------------------------------------------- */
+.v2-stream-line {
+  display: flex;
+  align-items: center;
+  height: 1.7142857em;
+}
+p + .v2-stream-line {
+  margin-top: -1.1428571em;
+}
+
+/* -----------------------------------------------------------------------------
+   Skeleton pulse under reduced motion (review R1 #7).
+
+   `components/ui/skeleton.tsx` uses a bare `animate-pulse`, and NO reduced-motion
+   rule for it exists anywhere (globals.css and this sheet were both checked). So
+   every skeleton in the app — the shared primitive and the hand-rolled bars alike
+   — keeps pulsing for a user who asked the OS to reduce motion, and a skeleton
+   that outlives a slow request also breaches WCAG 2.2.2 (no auto-animation past
+   5s without a control). Standards §8(iv) makes stilling it binding for v2.
+
+   Fixing the PRIMITIVE would change the class string every v1 surface emits, so
+   the fix lives here instead, scoped to `html.v2-document-lock` — the class
+   `DocumentLock` adds while the v2 layout is mounted and removes on unmount. That
+   scoping is what makes this correct rather than convenient: it stills every v2
+   skeleton at once (including the hand-rolled bars the primitive fix would have
+   missed) and is provably inert the moment the user soft-navs into v1, so v1's
+   rendering is untouched in both motion modes.
+
+   When the primitive itself gains `motion-safe:animate-pulse`, delete this block
+   and the local `motion-reduce:animate-none` guards in ModuleSkeleton/QuizModule.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html.v2-document-lock .animate-pulse {
     animation: none;
   }
 }

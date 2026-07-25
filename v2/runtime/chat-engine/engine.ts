@@ -33,6 +33,7 @@ import {
   type HandoverMessage,
   type ErrorMessage,
   type ConversationMessage,
+  type ConversationData,
   type MessageAttachment,
   type ApiMessage,
   type SendMessageOptions,
@@ -66,6 +67,7 @@ import type {
   ReasoningTrace,
   RecoverResult,
   StreamingSource,
+  StreamSmoothingConfig,
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -177,6 +179,16 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     config: config.smoothing,
     disabledIntervalMs: flushIntervalMs,
   });
+  /**
+   * The reasoning trace shares every smoothing tunable with the answer EXCEPT the
+   * release style, which is pinned to `flow`. The reasoning box is a small
+   * collapsible that is usually one or two lines tall: holding a whole line back in
+   * it (with no room for the answer's stand-in skeleton) reads as a freeze rather
+   * than as a rhythm. The answer is the surface the line style exists for.
+   */
+  const reasoningSmoothingConfig = (
+    smoothing: StreamSmoothingConfig | undefined,
+  ): StreamSmoothingConfig => ({ ...smoothing, style: 'flow' });
   function seedText(id: string, text: string) {
     // Seed / reset / accumulated-text replay must appear instantly (no typewriter).
     liveText.set(id, text);
@@ -216,14 +228,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function notifyReasoning(id: string) {
     reasoningListeners.get(id)?.forEach((l) => l());
   }
-  // Reasoning shares the same smoothing policy as answer text (consistency: a jerky
-  // reasoning box next to a smooth answer would read as two different systems). Its
-  // authoritative text still lives in reasoningByIteration; the smoother only paces
-  // the reveal, keyed by message id.
+  // Reasoning shares every smoothing tunable with the answer text (consistency: a
+  // jerky reasoning box next to a smooth answer would read as two different systems)
+  // EXCEPT the release style, which is pinned to `flow` — see
+  // `reasoningSmoothingConfig` above. Its authoritative text still lives in
+  // reasoningByIteration; the smoother only paces the reveal, keyed by message id.
   const reasoningSmoother = createStreamSmoother({
     onPublish: notifyReasoning,
     commit: (fn) => commitFn(fn),
-    config: config.smoothing,
+    config: reasoningSmoothingConfig(config.smoothing),
     disabledIntervalMs: flushIntervalMs,
   });
   const reasoning: StreamingSource = {
@@ -271,6 +284,30 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   let pollInterval: ReturnType<typeof setInterval> | null = null;
   let lastEventTime = 0;
   let conversationId: string | null = null;
+  /**
+   * Which conversation the rows currently in `state.messages` belong to (`null`
+   * when the transcript has never been populated). This is NOT the same question as
+   * `conversationId`, which is "what is the engine pointed at" and can be re-aimed
+   * (`setConversationId`) while the previous conversation's rows are still on
+   * screen. Only {@link adoptConversationHistory} reads it, to tell "I already hold
+   * THIS conversation — a revalidation must not replace it" apart from "I hold some
+   * OTHER conversation — replace it". Written wherever a transcript BEGINS: server
+   * adoption, the device-owned IDB load, and the first user turn of a live send.
+   */
+  let messagesConversationId: string | null = null;
+  /**
+   * The EXACT server record the current rows were built from (`null` when they came
+   * from anywhere else — the device-owned IDB transcript, or a live turn). Identity,
+   * not equality: the host's query layer keeps a revalidation referentially
+   * identical when nothing actually changed (structural sharing), so `data ===
+   * appliedHistory` is a precise "this is the same snapshot I rendered".
+   *
+   * It exists to keep `dedupKeys` and the rendered rows describing the SAME history.
+   * Rebuilding the dedup set from a NEWER snapshot than the rows on screen would
+   * make the engine skip replayed SSE events for messages it never rendered —
+   * silently missing rows after a reconnect.
+   */
+  let appliedHistory: ConversationData | null = null;
   let executionId: string | null = null;
   let reconnectCount = 0;
   let consecutiveHeartbeats = 0;
@@ -311,6 +348,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       timestamp: new Date(),
       ...(list && list.length > 0 && { attachments: list, attachment: list[0] }),
     };
+    // A live turn is a transcript beginning too (the home handoff opens a brand-new
+    // conversation this way, with no history load at all), so the rows from here on
+    // belong to the conversation the engine is pointed at.
+    messagesConversationId = conversationId;
     setMessages((msgs) => [...msgs, message]);
     setState((prev) => ({ ...prev, error: null }));
     return message;
@@ -335,6 +376,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // visible in history (iteration-1 text is kept above iteration-2 tool calls).
   function ensureStreamingPlaceholder(iteration: number): string {
     if (currentIteration !== iteration) {
+      // Close the previous iteration's row from the authoritative accumulator before
+      // walking away from it (see retireStreamingPlaceholder — a no-op when
+      // `text_reset` already closed it, which is the normal path).
+      retireStreamingPlaceholder();
       currentIteration = iteration;
       const id = generateId();
       streamingMessageId = id;
@@ -608,55 +653,113 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     }
   }
 
-  // ─── History loading ────────────────────────────────────────────────────────
+  // ─── History adoption ───────────────────────────────────────────────────────
+  //
+  // THE HOST OWNS THE FETCH; THE ENGINE OWNS THE STATE. Server history used to be
+  // downloaded by the engine itself on every mount, which made re-opening the same
+  // conversation ten times download it ten times. The React host now reads it
+  // through the query layer (`conversationsQueries.detail`), so a revisit is served
+  // from cache and revalidated behind the paint, and hands the result here.
+  //
+  // Nothing about this weakens the resilience surface: the engine still owns its
+  // OWN recovery fetches (`pollForCompletion` / `checkStaleStream`), which are
+  // stream-lifecycle concerns rather than "open this conversation".
 
-  async function loadConversationHistory(convId: string) {
-    setState((prev) => ({ ...prev, isLoadingHistory: true, error: null, conversationId: convId }));
-    conversationId = convId;
-    try {
-      const response = await chatApi.getConversation(convId);
-      if (response.success && response.data.messages) {
-        const apiMessages = response.data.messages;
-        const transformedMessages = transformApiMessages(apiMessages);
-        // Build the seq dedup set from history — collision-free dedup for SSE
-        // reconnect (skip events already rendered from persisted messages).
-        const dedup = new Set<number>();
-        for (const msg of apiMessages) {
-          const seq = msg.metadata?.seq;
-          if (seq !== undefined) dedup.add(seq);
-        }
-        dedupKeys = dedup;
-        setState((prev) => ({
-          ...prev,
-          messages: transformedMessages,
-          conversationTitle: response.data.title || null,
-          isLoadingHistory: false,
-        }));
-        handlers.onHistoryLoaded?.(response.data);
-      } else {
-        setState((prev) => ({
-          ...prev,
-          error: response.message || 'Failed to load conversation',
-          isLoadingHistory: false,
-        }));
-      }
-    } catch (err) {
-      // Detect 404 specifically so the screen can show a "not available" state.
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      const errorMsg =
-        status === 404
-          ? 'not_found'
-          : err instanceof Error
-            ? err.message
-            : 'Failed to load conversation';
-      setState((prev) => ({ ...prev, error: errorMsg, isLoadingHistory: false }));
-      handlers.onError?.(errorMsg);
-    }
+  /**
+   * True while ANY live activity owns the transcript: an open SSE connection, the
+   * polling fallback, an unfinished streaming placeholder, or a pending cancel.
+   * Server history may NEVER be applied inside this window — the live stream is the
+   * sole authority over the rows it is writing, and a late/background revalidation
+   * landing here would overwrite text the user is watching arrive.
+   */
+  function isStreamActive(): boolean {
+    return (
+      eventSource !== null ||
+      pollInterval !== null ||
+      streamingMessageId !== null ||
+      isCancelling ||
+      state.isStreaming ||
+      state.isCancelling
+    );
   }
 
-  // Confidential sibling of loadConversationHistory — confidential conversations
-  // 404 from the server by design, so history comes from IndexedDB. Returns true
-  // if a transcript was found, false on a cold-load (wiped / new device).
+  /**
+   * Build the seq dedup set from persisted history — collision-free dedup for SSE
+   * reconnect (skip events already rendered from persisted messages).
+   */
+  function dedupFromHistory(apiMessages: ApiMessage[]): Set<number> {
+    const dedup = new Set<number>();
+    for (const msg of apiMessages) {
+      const seq = msg.metadata?.seq;
+      if (seq !== undefined) dedup.add(seq);
+    }
+    return dedup;
+  }
+
+  /** Write server history into the store. Unconditional — callers do the guarding. */
+  function applyHistory(data: ConversationData) {
+    conversationId = data.id;
+    messagesConversationId = data.id;
+    appliedHistory = data;
+    dedupKeys = dedupFromHistory(data.messages);
+    const transformedMessages = transformApiMessages(data.messages);
+    setState((prev) => ({
+      ...prev,
+      conversationId: data.id,
+      messages: transformedMessages,
+      conversationTitle: data.title || null,
+      isLoadingHistory: false,
+      error: null,
+    }));
+  }
+
+  /**
+   * Adopt server history the host fetched (from cache or network). Returns whether
+   * the transcript was actually replaced.
+   *
+   * THREE GUARDS, in order — each one protects an answer the user could otherwise
+   * lose:
+   *
+   *  1. WRONG CONVERSATION. A response for a different id is ignored outright, so a
+   *     late resolve from a conversation the user has navigated away from can never
+   *     paint under the current one.
+   *  2. THE LIVE STREAM ALWAYS WINS ({@link isStreamActive}). Nothing is touched —
+   *     not even `dedupKeys`, because rebuilding it mid-stream from history that now
+   *     contains the CURRENT turn's persisted `seq` values would make the engine drop
+   *     the rest of that turn's events as duplicates, silently truncating the answer.
+   *  3. SEED-ONLY FOR THE VIEW. Once the engine holds THIS conversation's messages,
+   *     a later record is not applied at all — only the SAME snapshot the rows came
+   *     from may refresh `dedupKeys` (see {@link appliedHistory}; that re-arm is what
+   *     keeps a StrictMode remount's reconnect from re-rendering already-persisted
+   *     events, since the unmount cleared the set). Rows belonging to a DIFFERENT
+   *     conversation are always replaced — see {@link messagesConversationId}.
+   *
+   *     Why the view is seed-only: the engine's rows carry state the server response
+   *     does not — the §C reasoning traces (`reasoning` / `reasoningMs`) and the live
+   *     `partial` markers — so wholesale replacement would silently erase them, and a
+   *     response that lags the just-finished turn by even one message would blank an
+   *     answer the user is reading. The CACHE still reconciles behind the paint, so
+   *     the next open is server truth; the open screen keeps the richer local copy.
+   */
+  function adoptConversationHistory(data: ConversationData): boolean {
+    if (conversationId !== null && data.id !== conversationId) return false;
+    if (isStreamActive()) return false;
+    const holdsThisConversation =
+      messagesConversationId === data.id && state.messages.length > 0;
+    // A NEWER snapshot than the rows on screen: leave everything alone, `dedupKeys`
+    // included (see `appliedHistory` — a mismatched dedup set loses messages).
+    if (holdsThisConversation && data !== appliedHistory) return false;
+    dedupKeys = dedupFromHistory(data.messages);
+    if (holdsThisConversation) return false;
+    applyHistory(data);
+    return true;
+  }
+
+  // Confidential sibling of the adoption path above — confidential conversations
+  // 404 from the server by design, so history comes from IndexedDB. This one DOES
+  // own its read, because the device-owned transcript must never travel through the
+  // shared query cache. Returns true if a transcript was found, false on a cold-load
+  // (wiped / new device).
   async function loadConversationHistoryFromIDB(convId: string): Promise<boolean> {
     setState((prev) => ({ ...prev, isLoadingHistory: true, error: null, conversationId: convId }));
     conversationId = convId;
@@ -698,6 +801,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           ...(list && { attachments: list, attachment: list[0] }),
         } as ChatMessage;
       });
+      messagesConversationId = convId;
       setState((prev) => ({
         ...prev,
         messages,
@@ -873,10 +977,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           msgs.map((m) => (m.id === msgId ? { ...m, content: finalText, isStreaming: false } : m)),
         );
         // text_done = "the answer text is complete": reveal it in full now (the row
-        // already reads message.content once isStreaming flips false, so this is
-        // visually identical) and retire the smoothing cursor so it stops ticking
-        // in the gap before `completed`. No trailing typewriter after the answer ends.
-        textSmoother.snap(msgId, finalText);
+        // already reads message.content once isStreaming flips false) — but hand the
+        // final text over as a bounded DRAIN rather than a snap, so the last ~350ms of
+        // already-arrived text keeps revealing at the normal rhythm instead of landing
+        // in one frame (the end-of-answer "pop"). Presentation only: the row above
+        // ALREADY carries the full authoritative text, so nothing after this point
+        // depends on the smoother, and the drain's worst failure mode is the old pop —
+        // never stranded text. Capped at `maxDrainMs` and abandoned by every other
+        // terminal; see the TERMINAL DRAIN note in stream-smoother.ts.
+        textSmoother.finish(msgId, finalText);
       }
 
       // Confidential: persist the orchestrator's accumulated text the moment
@@ -1055,10 +1164,21 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       const placeholderId = streamingMessageId;
       if (placeholderId) {
         const trace = takeReasoning(placeholderId);
+        // Never blank an answer we already have. `completed` used to write
+        // `event.content ?? event.message ?? ''` unconditionally, so an empty
+        // `completed` (seen after `text_done` has already finalized the row) wiped
+        // text the user was reading. Fall back to the authoritative accumulator, then
+        // to whatever is already on the row — the same shape `end`/`timeout` use.
+        const accumulated = liveText.get(placeholderId) ?? '';
         setMessages((msgs) =>
           msgs.map((m) => {
             if (m.id === placeholderId) {
-              return { ...m, content: finalText, isStreaming: false, ...trace };
+              return {
+                ...m,
+                content: finalText || accumulated || m.content,
+                isStreaming: false,
+                ...trace,
+              };
             }
             // Clear handoverResultContent when the final response duplicates it —
             // common with Writer agents whose output becomes the final text.
@@ -1133,7 +1253,18 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         return;
       }
 
-      // Real error — render inline.
+      // Real error. FINALIZE THE OPEN PLACEHOLDER FIRST — this branch used to fall
+      // straight through to `addErrorMessage`, leaving the streaming row at
+      // `content:''` / `isStreaming:true` with its text living only in the live
+      // store, and nothing after this point can ever finalize it (the watchdog is
+      // stopped, the EventSource is closed and nulled, so no other terminal listener
+      // will fire). The row therefore kept reading the live store forever: whatever
+      // the smoother had not yet released was permanently invisible, and because
+      // `showActions` is gated on `!isStreaming` the user could not even copy the
+      // part they could see. Mirrors the `end`/`timeout` shape exactly, including the
+      // `partial` marker, so an interrupted answer reads as interrupted.
+      finalizeOpenPlaceholder('error');
+
       if (parsed) {
         const errorMsg = parsed.error_message || parsed.message || 'Something went wrong';
         const errorCode = parsed.error_code || 'UNKNOWN';
@@ -1146,6 +1277,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         setState((prev) => ({ ...prev, error: errorMsg, isStreaming: false, isCancelling: false }));
         handlers.onError?.(errorMsg);
       }
+      resetStreamingBuffers();
     });
 
     // cancelled — backend-confirmed user stop. Keep partial text.
@@ -1259,6 +1391,73 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     };
   }
 
+  /**
+   * Finalize whatever streaming placeholder is still open, from the AUTHORITATIVE
+   * accumulator, and detach the streaming refs. Used by the real-error terminal,
+   * which previously abandoned the row mid-stream.
+   *
+   * CANNOT DOUBLE-FINALIZE: it no-ops when `streamingMessageId` is already null, and
+   * nulls it before returning. Every other terminal either nulls the same ref before
+   * this can run or cannot run at all afterwards (the EventSource is closed and
+   * `eventSource`/`executionId` nulled before this is reached, so no sibling listener
+   * and no `onerror` reconnect follows).
+   */
+  function finalizeOpenPlaceholder(reason: 'error'): void {
+    const placeholderId = streamingMessageId;
+    if (!placeholderId) return;
+    const finalText = liveText.get(placeholderId) ?? '';
+    const trace = takeReasoning(placeholderId);
+    setMessages((msgs) =>
+      msgs.map((m) => {
+        if (m.id !== placeholderId) return m;
+        const content = finalText || m.content;
+        return {
+          ...m,
+          content,
+          isStreaming: false,
+          ...trace,
+          ...(content ? { partial: { reason } } : {}),
+        };
+      }),
+    );
+    clearText(placeholderId);
+    messageIdToIteration.delete(placeholderId);
+    streamingMessageId = null;
+    currentIteration = null;
+  }
+
+  /**
+   * Retire the OUTGOING placeholder when a NEW iteration starts without a
+   * `text_reset` to close the old one.
+   *
+   * Pre-existing answer-text loss this closes: `ensureStreamingPlaceholder` created a
+   * fresh row for the new iteration and simply abandoned the previous one at
+   * `content:''` / `isStreaming:true`, with its text living only in the live store —
+   * which `resetStreamingBuffers()` then wiped at the end of the turn, so that row
+   * painted EMPTY from then on. The text is authoritative in `liveText`, so it is
+   * written onto the row here (same shape `text_reset`'s final-response path uses);
+   * a placeholder that accumulated nothing is removed instead, so an empty bubble
+   * never flashes between iterations.
+   */
+  function retireStreamingPlaceholder(): void {
+    const prevId = streamingMessageId;
+    if (!prevId) return;
+    const text = liveText.get(prevId) ?? '';
+    const trace = takeReasoning(prevId);
+    if (text.trim()) {
+      setMessages((msgs) =>
+        msgs.map((m) =>
+          m.id === prevId ? { ...m, content: text, isStreaming: false, ...trace } : m,
+        ),
+      );
+    } else {
+      setMessages((msgs) => msgs.filter((m) => m.id !== prevId));
+    }
+    clearText(prevId);
+    messageIdToIteration.delete(prevId);
+    streamingMessageId = null;
+  }
+
   // Clear the streaming accumulators at the end of a turn (v1 cleared
   // textByIteration + agentText). Structural rows are already finalized, so no
   // notify is needed here.
@@ -1307,6 +1506,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function disconnect() {
     stopWatchdog();
     stopPolling();
+    // A terminal drain must never outlive the surface it was drawing into: land it
+    // before clearing, so no cursor keeps ticking for a row that is going away.
+    textSmoother.abandonDrains();
     textSmoother.clear();
     reasoningSmoother.clear();
     executionId = null;
@@ -1339,6 +1541,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     if (!execId || !token) return;
     if (isCancelling) return; // ref-based guard, immune to React batching
     isCancelling = true;
+    // Stop must feel INSTANT. If a terminal drain is in flight (Stop pressed inside
+    // the ~400ms after text_done), land it now — a cancel never waits on animation.
+    textSmoother.abandonDrains();
     setState((prev) => ({ ...prev, isCancelling: true }));
     void chatApi.cancelStream(execId, token);
   }
@@ -1346,6 +1551,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function clearChat() {
     disconnect();
     conversationId = null;
+    messagesConversationId = null;
+    appliedHistory = null;
     jurisdiction = { mode: 'auto' };
     state = INITIAL_SNAPSHOT;
     commitFn(notifyStructural);
@@ -1613,6 +1820,38 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     }
   }
 
+  // ─── Construction seed (the cache-warm first paint) ─────────────────────────
+  //
+  // When the host already holds this conversation's history — the query cache is
+  // warm from an earlier visit this session — it passes it in here and the engine
+  // opens ALREADY POPULATED. This is the difference between "paints instantly" and
+  // "paints empty, then fills in an effect one frame later": the very first
+  // `getSnapshot()` React ever reads carries the transcript.
+  //
+  // Assigned DIRECTLY rather than through `setState`, deliberately: construction
+  // runs inside the host's `useState` initializer (render phase), and `setState`
+  // routes through the injected `commit` — React's `startTransition` — which must
+  // not be called during render. There is nothing to notify anyway; the first
+  // listener subscribes after this returns.
+  //
+  // SSR/HYDRATION. `getServerSnapshot()` stays the frozen empty snapshot. That is
+  // consistent because a server render has no browser query cache to seed from, so
+  // `initialHistory` is only ever populated on the client — and on the one render
+  // that both happens (a hard load), the client's cache is cold too.
+  if (config.initialHistory) {
+    const seed = config.initialHistory;
+    conversationId = seed.id;
+    messagesConversationId = seed.id;
+    appliedHistory = seed;
+    dedupKeys = dedupFromHistory(seed.messages);
+    state = {
+      ...INITIAL_SNAPSHOT,
+      conversationId: seed.id,
+      messages: transformApiMessages(seed.messages),
+      conversationTitle: seed.title || null,
+    };
+  }
+
   // ─── Public engine handle ───────────────────────────────────────────────────
 
   function dispose() {
@@ -1637,7 +1876,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     reasoning,
     send,
     connectToStream,
-    loadConversationHistory,
+    adoptConversationHistory,
     loadConversationHistoryFromIDB,
     fetchConversationTitle,
     setConversationId,
@@ -1650,6 +1889,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     recoverPendingState,
     updateHandlers(next) {
       handlers = next;
+    },
+    setSmoothing(next) {
+      // Both smoothers no-op when nothing actually resolved differently, so the
+      // adapter may call this on every render without churning the live cursors.
+      textSmoother.setConfig(next);
+      reasoningSmoother.setConfig(reasoningSmoothingConfig(next));
     },
     dispose,
   };

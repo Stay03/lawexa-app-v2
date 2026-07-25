@@ -1,24 +1,25 @@
+import { HomeFallback } from '@/v2/shell/designs/HomeFallback';
+
 /**
- * Route-level loading boundary for the v2 root (`/` — the home). SKELETON, never
- * text (owner report item 5: the old "Loading…" string violated the standing
- * skeleton-first rule — placeholder strings are banned; it predated the rule).
- * Geometry approximates the home's compose cluster (greeting line → composer
- * card → prompt rows) so the hand-off to the real page reads as content
- * resolving into place, not a layout swap. Purely decorative.
+ * Route-level loading boundary for the v2 root (`/` — the home).
+ *
+ * Next compiles this file into the `fallback` of a real `<Suspense>` that wraps
+ * `page.tsx` (and never the layout above it), so what it renders is the shape the
+ * user looks at while `app/v2/page.tsx` resolves its server session.
+ *
+ * A server shell rendering a `'use client'` child — the same convention every v2
+ * `page.tsx` follows, and the reason the fallback can be tab-aware at all: the
+ * active home tab lives only in `localStorage`, which no server render can see,
+ * but a client reference in the fallback payload is rendered by React IN THE
+ * BROWSER on a soft navigation. On a hard load it streams inside the static shell
+ * and reads the store's server snapshot (`'chat'`) — which is right, because the
+ * page it hands off to paints Chat too. `HomeFallback` carries the full rationale,
+ * the per-tab geometry, and the inertness guarantees.
+ *
+ * This file stays deliberately thin: the fallback's geometry belongs beside the
+ * surfaces it mirrors (`v2/shell/designs/`), sharing one frame definition with
+ * them, not duplicated in the route folder where it would quietly drift.
  */
 export default function V2Loading() {
-  return (
-    <div
-      aria-hidden
-      className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center gap-6 px-6 pb-24"
-    >
-      <div className="bg-muted h-8 w-56 animate-pulse rounded-lg" />
-      <div className="border-border bg-muted/50 h-[110px] w-full animate-pulse rounded-3xl border" />
-      <div className="space-y-3">
-        <div className="bg-muted h-4 w-3/5 animate-pulse rounded" />
-        <div className="bg-muted h-4 w-1/2 animate-pulse rounded" />
-        <div className="bg-muted h-4 w-2/5 animate-pulse rounded" />
-      </div>
-    </div>
-  );
+  return <HomeFallback />;
 }

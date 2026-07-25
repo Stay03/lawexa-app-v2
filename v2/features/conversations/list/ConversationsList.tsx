@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import type { ConversationListItem } from '@/types/chat';
+import { useNewRows } from '@/v2/runtime/use-new-rows';
+import { NewRowsPill } from '@/v2/shell/NewRowsPill';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
@@ -27,6 +30,17 @@ function PageShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+/** Stable empty rows reference — a fresh `[]` per render would defeat the
+ *  `useNewRows` carried-rows check and re-seed its baseline on every render. */
+const NO_ROWS: readonly ConversationListItem[] = [];
+
+/** Module-level (⇒ referentially stable) row accessors for `useNewRows`. */
+const conversationId = (row: ConversationListItem): string => row.id;
+/** The list's sort axis: `updated_at desc`. `Date.parse` is deterministic, so it
+ *  is safe in render (unlike `Date.now()`); `NaN` fails closed in the hook. */
+const conversationSortKey = (row: ConversationListItem): number =>
+  Date.parse(row.updated_at);
 
 /**
  * ConversationsList — the `/conversations` body (the `useSearchParams` consumer,
@@ -52,6 +66,14 @@ function PageShell({ children }: { children: React.ReactNode }) {
  * search resolves, so search-as-you-type never flashes a skeleton (the
  * skeleton-first policy governs FIRST paint, not every keystroke) — honouring
  * the standing no-abrupt-swap rule.
+ *
+ * RETURN BEHAVIOUR. The query now carries `GC_TIMES.list` (30min), so leaving and
+ * coming back renders the SAME rows at the SAME depth immediately instead of a
+ * cold skeleton — never a skeleton over content we already hold. The 60s
+ * staleTime still refetches on remount; `useNewRows` + `NewRowsPill` are what
+ * make that refresh land honestly, announcing anything that arrived above the
+ * user's position rather than splicing it in. Both are feature-agnostic and are
+ * the pattern the phase-4 cases / statutes / notes lists reuse.
  */
 export function ConversationsList({ signedIn }: { signedIn: boolean }) {
   // Captured ONCE (lazy init) so no clock read runs in render (React Compiler
@@ -65,6 +87,42 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
     ...conversationsQueries.infiniteList({ search: committedSearch }),
     enabled: signedIn,
     placeholderData: keepPreviousData,
+  });
+
+  // Flattened rows, memoised on `data` alone. TanStack's structural sharing keeps
+  // `data` referentially identical when a background refetch changes nothing, and
+  // `keepPreviousData` hands back the PREVIOUS `data` object during a search
+  // transition — so this array's identity is exactly the "did the data really
+  // change" signal `useNewRows` needs to tell carried-over rows from new ones.
+  const pages = query.data?.pages;
+  const items = useMemo(
+    () => pages?.flatMap((page) => page.data) ?? NO_ROWS,
+    [pages],
+  );
+
+  // NEW-ROWS PROJECTION (owner ask). The list is retained for 30 minutes
+  // (`GC_TIMES.list`), so a return paints the cached rows instantly and the
+  // mount refetch lands behind them. Rows that arrive ABOVE what the user is
+  // looking at are withheld and counted rather than spliced in under their eyes;
+  // everything else (title patches, deletes, later pages) applies immediately.
+  // `resetKey` is the ACTIVE search and `rowsArePlaceholder` is TanStack's own
+  // "these rows are the OUTGOING search's" flag, so an unfiltered watermark can
+  // never leak into a filtered list and no pill can appear across a search
+  // transition. No `isSelfAuthored` is needed here: this page has no composer, so
+  // no cache write can originate while it is mounted (the seam exists for the
+  // always-mounted sidebar, where a self-created row must never read as news).
+  //
+  // `isAtTop` is deliberately NOT passed. Next resets this scroll region to the
+  // top on every soft nav (`layout-router.js` → `domNode.scrollIntoView()`), so an
+  // at-top auto-accept would silently absorb the new rows in precisely the
+  // "go back and show me what's new" case the pill is for — see the option's
+  // docblock in `use-new-rows.ts`.
+  const { visibleRows, newCount, accept } = useNewRows({
+    rows: items,
+    getId: conversationId,
+    getSortKey: conversationSortKey,
+    resetKey: activeSearch,
+    rowsArePlaceholder: query.isPlaceholderData,
   });
 
   // Sentinel rooted against the shell's REAL scroll container (review finding:
@@ -91,7 +149,8 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
     );
   }
 
-  const items = query.data?.pages.flatMap((page) => page.data) ?? [];
+  // Every list-STATE decision reads the true loaded set (`items`), never the
+  // projection — withholding rows must never make a populated list look empty.
   const showInitialSkeleton = query.isPending;
   const showError = query.isError && items.length === 0;
   const showEmpty = !showInitialSkeleton && !showError && items.length === 0;
@@ -112,6 +171,10 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
         busy={query.isFetching && dim}
         className="mb-4"
       />
+
+      {/* Out-of-flow (`h-0`) overlay — mounted in every state so its exit tween
+          always plays; `newCount` is 0 unless a real list is on screen. */}
+      <NewRowsPill count={newCount} onAccept={accept} noun="conversation" />
 
       {showInitialSkeleton ? (
         <ConversationsListSkeleton />
@@ -143,7 +206,7 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
             </div>
           ) : null}
           <ul className="flex flex-col">
-            {items.map((conversation, index) => (
+            {visibleRows.map((conversation, index) => (
               <ConversationRow
                 key={conversation.id}
                 conversation={conversation}

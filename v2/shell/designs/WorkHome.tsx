@@ -10,6 +10,19 @@ import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
 import { useComposerDraft } from './composer/useComposerDraft';
+import {
+  DOCK_FADE,
+  HOME_GREETING_HEADING_FOCUSED,
+  HOME_GREETING_HEADING_WORKSPACE,
+  HOME_SURFACE_FOCUSED,
+  HOME_SURFACE_WORKSPACE,
+  WORKSPACE_COMPOSER_DOCK,
+  WORKSPACE_GREETING,
+  WORKSPACE_LEFT_COLUMN,
+  WORKSPACE_PRIMARY_MODULE,
+  WORKSPACE_PROMPTS,
+  WORKSPACE_RAIL,
+} from './home-frame';
 import { WorkSpacesModule } from './work/WorkSpacesModule';
 import { JumpBackInModule } from './work/JumpBackInModule';
 import { RadarModule } from './work/RadarModule';
@@ -50,9 +63,34 @@ import { RecentConversationsModule } from './work/RecentConversationsModule';
  *
  * GUESTS get the honest minimum — greeting + composer + prompts, centered and
  * thumb-docked (the modules need a session and are never rendered, so they never
- * fetch). ONE subtle staggered entrance (`REVEAL`, `fill-mode-both`,
- * `motion-reduce`-instant). Carries `data-home-tab="work"` + the server-renderable
+ * fetch). Carries `data-home-tab="work"` + the server-renderable
  * `data-v2-marker="V2-HOME"` marker on every root.
+ *
+ * ── THE ENTRANCE RULE: A BLOCK THE FALLBACK PRE-DRAWS GETS NO ENTRANCE ──────
+ * `REVEAL` is `fill-mode-both` over a `from`-only enter keyframe, so a block
+ * carrying it is held fully INVISIBLE for its whole `animationDelay` and only
+ * then fades up over its duration. That is right for something arriving from
+ * nowhere — and actively wrong for something the route fallback has already
+ * painted, because the block visibly BLANKS at the hand-off and then fades back
+ * in. With the old stagger (80/160/240ms delays over 500ms) the artifact ran to
+ * roughly 740ms.
+ *
+ * So the greeting, composer, prompts and rail — every block `HomeFallback` draws
+ * — now render plainly, and the hand-off is seamless. "Jump back in" KEEPS
+ * `REVEAL`: it is role-gated, the fallback deliberately omits it, and it really
+ * does arrive with the payload. Its stagger delay is dropped, since it is no
+ * longer part of a sequence. (Chat needed no change — `ChatHome` never had
+ * `REVEAL`.)
+ *
+ * FRAME: every container class below comes from `home-frame.ts` — the ONE
+ * definition the route-level fallback (`HomeFallback`) also consumes, so the
+ * loading shape and this surface cannot drift apart. That module also documents
+ * the two mechanics this layout depends on and that are easy to break: the
+ * `contents md:flex` left column (which keeps the sticky dock's containing block
+ * tall on mobile) and the shared mobile `order` scale. The extraction renumbered
+ * this tab's mobile `order` values onto that shared scale — the rendered sequence
+ * (greeting → jump back in → rail → prompts → composer) is unchanged, since
+ * `order` is a sort key and the gap it leaves is inert.
  */
 export function WorkHome({
   name,
@@ -94,14 +132,14 @@ export function WorkHome({
       <div
         data-v2-marker="V2-HOME"
         data-home-tab="work"
-        className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-4 pt-10 pb-8 md:pt-36 md:pb-12"
+        className={HOME_SURFACE_FOCUSED}
       >
         <HomeGreeting
           name={name}
           confidential={confidential}
           align="center"
           subline="Your spaces and active matters, together in one place."
-          headingClassName="font-comfortaa text-[1.75rem] font-semibold tracking-tight text-balance sm:text-[2rem] md:text-[2.25rem]"
+          headingClassName={HOME_GREETING_HEADING_FOCUSED}
         />
 
         <div className="mt-auto md:mt-10">
@@ -128,16 +166,17 @@ export function WorkHome({
     <div
       data-v2-marker="V2-HOME"
       data-home-tab="work"
-      className="relative mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 pb-8 pt-8 sm:px-6 md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-x-8 md:gap-y-6 md:pb-12 md:pt-12"
+      className={HOME_SURFACE_WORKSPACE}
     >
-      {/* Greeting — full-width, left-aligned (workspace feel). */}
-      <div className={cn(REVEAL, 'order-1 duration-500 md:col-span-2 md:row-start-1')}>
+      {/* Greeting — full-width, left-aligned (workspace feel). NO entrance: the
+          route fallback already drew this block (see the ENTRANCE RULE above). */}
+      <div className={WORKSPACE_GREETING}>
         <HomeGreeting
           name={name}
           confidential={confidential}
           align="left"
           subline="Pick up where you left off, or start something new."
-          headingClassName="font-comfortaa text-[26px] font-semibold leading-tight md:text-[32px]"
+          headingClassName={HOME_GREETING_HEADING_WORKSPACE}
         />
       </div>
 
@@ -145,21 +184,15 @@ export function WorkHome({
           root scroll flex (its sticky dock needs the root as its containing block);
           a real flex column (grid col 1) on desktop that flows independently of the
           rail, so it can never orphan. */}
-      <div className="contents md:flex md:min-w-0 md:flex-col md:gap-4 md:col-start-1 md:row-start-2">
+      <div className={WORKSPACE_LEFT_COLUMN}>
         {/* Composer dock — MOBILE: `sticky bottom-0`, floating alone with a soft
-            bottom fade. DESKTOP: static, top of the left column. The reveal
-            transform lives on the INNER wrapper so it never touches the sticky
-            element (transforms break `position: sticky`). */}
-        <div className="sticky bottom-0 z-10 order-5 -mx-4 px-4 pb-3 pt-6 sm:-mx-6 sm:px-6 md:static md:z-auto md:order-1 md:mx-0 md:px-0 md:pb-0 md:pt-0">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent md:hidden"
-          />
-          <div
-            ref={composerAreaRef}
-            className={cn(REVEAL, 'duration-500')}
-            style={{ animationDelay: '80ms' }}
-          >
+            bottom fade. DESKTOP: static, top of the left column. NO entrance (the
+            fallback pre-draws the composer's shape). The inner wrapper STAYS: it
+            carries `composerAreaRef` for prompt-fill focus, and keeping the ref
+            div free of transforms is what protects the sticky dock. */}
+        <div className={WORKSPACE_COMPOSER_DOCK}>
+          <div aria-hidden className={DOCK_FADE} />
+          <div ref={composerAreaRef}>
             <HomeComposer {...composerProps} />
           </div>
         </div>
@@ -167,13 +200,7 @@ export function WorkHome({
         {/* Suggested prompts — MOBILE: `mt-auto` sinks them toward the thumb, above
             the docked composer (v1's stacked list). DESKTOP: directly under the
             composer, a quiet ChatGPT-style list (owner #27) — the tight cluster. */}
-        <div
-          className={cn(
-            REVEAL,
-            'order-4 mt-auto pt-8 duration-500 md:order-2 md:mt-0 md:pt-0',
-          )}
-          style={{ animationDelay: '160ms' }}
-        >
+        <div className={WORKSPACE_PROMPTS}>
           <div className="md:hidden">
             <HomePrompts variant="mobile" onSelect={fillPrompt} />
           </div>
@@ -186,26 +213,21 @@ export function WorkHome({
             (canAccessSpaces: researcher/admin/superadmin) — the same rule applies
             here or plain users would hit a dead panel. MOBILE: scrolls right under
             the greeting (order-2). DESKTOP: the left column, below the compose
-            cluster, where its previews get room. */}
+            cluster, where its previews get room.
+
+            KEEPS its entrance — the fallback deliberately does not draw this
+            role-gated module, so it genuinely arrives with the payload. The
+            stagger delay is gone: there is no sequence left to stagger against. */}
         {showSpaces ? (
-          <div
-            className={cn(REVEAL, 'order-2 mt-6 duration-500 md:order-3 md:mt-0')}
-            style={{ animationDelay: '200ms' }}
-          >
+          <div className={cn(REVEAL, WORKSPACE_PRIMARY_MODULE, 'duration-500')}>
             <JumpBackInModule />
           </div>
         ) : null}
       </div>
 
       {/* RAIL — the glance modules. MOBILE: scrolls between the resume-hero and the
-          compose cluster (order-3). DESKTOP: the right column (grid col 2). */}
-      <div
-        className={cn(
-          REVEAL,
-          'order-3 mt-6 flex flex-col gap-4 duration-500 md:col-start-2 md:row-start-2 md:mt-0 md:min-w-0',
-        )}
-        style={{ animationDelay: '240ms' }}
-      >
+          compose cluster (order-4). DESKTOP: the right column (grid col 2). */}
+      <div className={WORKSPACE_RAIL}>
         {showSpaces ? <WorkSpacesModule /> : null}
         <RadarModule />
         <RecentConversationsModule />

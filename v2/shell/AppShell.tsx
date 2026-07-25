@@ -51,7 +51,11 @@ export function AppShell({ children, header, dock }: AppShellProps) {
       {/* The id lets full-page surfaces root IntersectionObservers against the
           REAL scroll container (see use-shell-scroll-root.ts) — a viewport root
           silently loses its rootMargin inside this nested overflow region. */}
-      <div id={V2_SHELL_CONTENT_ID} className="v2-shell__content">
+      {/* `tabIndex={-1}` makes the region PROGRAMMATICALLY focusable without adding
+          a tab stop, so a control that removes itself on activation (the new-rows
+          pill, which goes `inert` in the same commit) can hand focus somewhere
+          honest instead of dropping it to <body>. */}
+      <div id={V2_SHELL_CONTENT_ID} tabIndex={-1} className="v2-shell__content">
         {children}
       </div>
       {dock != null ? <div className="v2-shell__dock">{dock}</div> : null}

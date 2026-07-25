@@ -231,7 +231,9 @@ export function JurisdictionField({
           type="button"
           disabled={disabled}
           onClick={stop}
-          aria-label={`Jurisdiction: ${label.text}`}
+          aria-label={
+            isLoading ? 'Jurisdiction, loading' : `Jurisdiction: ${label.text}`
+          }
           className={cn(
             // SOLID always-on surface (owner: the chip was transparent while
             // scrolling, so transcript text showed through it). `bg-background` is
@@ -246,13 +248,32 @@ export function JurisdictionField({
           )}
         >
           {isLoading ? (
-            <Skeleton className="size-4 rounded-full" />
-          ) : label.mode === 'none' ? (
-            <Layers className="size-3.5 shrink-0" aria-hidden />
+            // SKELETON-FIRST, BOTH SLOTS. The label used to fall back to the
+            // literal string 'Jurisdiction' while the list resolved — a
+            // placeholder string standing in for late-resolving data, which the
+            // standing rule bans. Now the icon AND the label are skeletons, each
+            // at a FIXED size: the icon holds the flag's exact `1.1em` box (so
+            // the resolved flag drops in with no reflow, rather than the old
+            // `size-4` block shrinking to 1.1em) and the label bar is a fixed
+            // width close to a typical country name, so the chip's width barely
+            // moves when the real text lands.
+            <>
+              <Skeleton
+                className="shrink-0 rounded-[2px]"
+                style={{ width: FLAG_BOX, height: FLAG_BOX }}
+              />
+              <Skeleton className="h-3 w-12 rounded" />
+            </>
           ) : (
-            <Flag code={label.code} className="shrink-0" />
+            <>
+              {label.mode === 'none' ? (
+                <Layers className="size-3.5 shrink-0" aria-hidden />
+              ) : (
+                <Flag code={label.code} className="shrink-0" />
+              )}
+              <span className="max-w-[7.5rem] truncate">{label.text}</span>
+            </>
           )}
-          <span className="max-w-[7.5rem] truncate">{label.text}</span>
           <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
         </button>
       </PopoverTrigger>
@@ -471,6 +492,10 @@ function describe(args: {
     return { mode: 'none', text: 'No jurisdiction', code: undefined };
   }
   const j = choice.mode === 'override' ? overrideMatch : autoMatch;
+  // The bare 'Jurisdiction' is now only reachable once the query has SETTLED
+  // without a match (an error, or a list with no auto candidate) — the pending
+  // window renders skeletons instead. In those settled states it is the
+  // control's NAME, not a placeholder standing in for data that is still coming.
   return {
     mode: choice.mode,
     text: j?.name ?? (choice.mode === 'override' ? choice.slug : 'Jurisdiction'),

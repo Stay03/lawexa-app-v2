@@ -49,7 +49,8 @@ export function RecentConversations() {
           onRetry={() => recentsQuery.refetch()}
         />
       ) : recentsQuery.isPending ? (
-        <ModuleSkeleton rows={3} lines={1} />
+        // Shared median reservation; `lines={1}` is row SHAPE, not count.
+        <ModuleSkeleton lines={1} />
       ) : recents.length === 0 ? (
         <ModuleEmpty icon={MessageSquare} title="No conversations yet" />
       ) : (

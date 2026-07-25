@@ -1,8 +1,9 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
+import { Search } from 'lucide-react';
 
-import { Skeleton } from '@/components/ui/skeleton';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { ConversationsList } from './ConversationsList';
 import { ConversationsListSkeleton } from './states';
@@ -27,8 +28,20 @@ import { ConversationsListSkeleton } from './states';
  *  2. Wraps the `useSearchParams` consumer in a `Suspense` boundary (§E keep /
  *     Next requirement), with a fallback that mirrors the loading state so the
  *     hand-off to real content is seamless.
+ *
+ * `signedIn` is READ FROM CONTEXT rather than taken as a prop. It is the same
+ * server-verified `!!session` value as before — the v2 layout computes it once
+ * from `verifySession()` and publishes it — but sourcing it here means the
+ * `/conversations` page shell no longer has to `await` `/auth/me` before it can
+ * render, which is what put a Laravel round trip behind the route skeleton on
+ * every navigation (the skeleton itself remains — the route is still dynamic —
+ * but now covers an I/O-free Next round trip). The flag is
+ * resolved on this component's first render (SSR on a hard load, in-memory
+ * context on a soft nav), so `ConversationsList` never sees it flip.
  */
-export function ConversationsScreen({ signedIn }: { signedIn: boolean }) {
+export function ConversationsScreen() {
+  const { signedIn } = useV2Session();
+
   useEffect(() => {
     setHeaderContext({ title: 'Conversations', confidential: false });
     return () => clearHeaderContext();
@@ -41,12 +54,38 @@ export function ConversationsScreen({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-/** Suspense fallback — the search field + list skeleton in the reading column. */
+/**
+ * Suspense fallback — the search field + list skeleton in the reading column.
+ * The field is STATIC CHROME, so it is a still reserved SHAPE, not a pulse: it
+ * waits on no request (its value lives in `useConversationsSearch`, its
+ * placeholder is a literal). This mirrors `app/v2/conversations/loading.tsx`
+ * exactly, so route boundary → this fallback → the live field is one continuous
+ * still shape and never reads static → pulsing → content (standards §8).
+ */
 function ConversationsFallback() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6">
-      <Skeleton className="mb-4 h-11 w-full rounded-4xl" />
-      <ConversationsListSkeleton />
-    </div>
+    <>
+      <span role="status" className="sr-only">
+        Loading your conversations
+      </span>
+      {/* `aria-hidden` + `inert` per standards §8(ii): a Suspense fallback is
+          DELETED (not reconciled) when content arrives, so anything focusable in
+          here would lose focus and caret mid-interaction. The announcement rides
+          the sibling `role="status"` node, which is never inert. */}
+      <div
+        aria-hidden
+        inert
+        className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6"
+      >
+        <div className="relative mb-4">
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <div className="h-11 w-full rounded-4xl border border-input bg-input/30" />
+        </div>
+        <ConversationsListSkeleton />
+      </div>
+    </>
   );
 }

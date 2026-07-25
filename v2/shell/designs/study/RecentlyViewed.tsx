@@ -100,7 +100,10 @@ export function RecentlyViewed() {
           onRetry={() => query.refetch()}
         />
       ) : query.isPending ? (
-        <ModuleSkeleton rows={3} />
+        // Shared median reservation (see `ModuleSkeleton`). Emphatically NOT
+        // MAX_ROWS here: a sparse page is normal for this feed (see above), so a
+        // cap-sized skeleton would collapse the hardest of any module.
+        <ModuleSkeleton />
       ) : rows.length === 0 ? (
         <ModuleEmpty icon={History} title="Nothing viewed yet" />
       ) : (

@@ -48,8 +48,11 @@ export function WorkSpacesModule() {
       icon={Briefcase}
       action={{ href: '/spaces', label: 'All' }}
     >
+      {/* No `rows` override: the shared median reservation is the one policy and
+          it lives in `ModuleSkeleton` (see its docblock for why reserving at
+          MAX_ROWS was tried and reverted). */}
       {query.isPending ? (
-        <ModuleSkeleton rows={3} />
+        <ModuleSkeleton />
       ) : query.isError ? (
         <ModuleError
           message="Couldn't load your spaces"

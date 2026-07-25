@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { Eye, ShieldCheck } from 'lucide-react';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { useConversationController } from './useConversationController';
 import { MessageList } from './MessageList';
 import { ConversationComposer, ComposerSkeleton } from './ConversationComposer';
@@ -39,14 +40,24 @@ import { V2ChatProvider } from './chat-context';
  * last message always clears the pill). The resolving `ComposerSkeleton` shares the
  * pill's exact geometry, so the floating bar never jumps as ownership/history resolve.
  * MessageList keeps its OWN internal scroller + scroll-etiquette untouched.
+ *
+ * OWNERSHIP ID FROM CONTEXT (privacy-relevant — read this before changing it).
+ * `serverUserId` is the SERVER-VERIFIED user id the controller compares against the
+ * conversation's owner to decide composer vs. view-only. It used to arrive as a prop
+ * from `app/v2/c/[id]/page.tsx`, which had to `await verifySession()` to produce it —
+ * an uncached `/auth/me` round trip on every navigation, so the route skeleton covered a
+ * wait on Laravel every time (the skeleton stays — the route is still dynamic — but now
+ * covers an I/O-free Next round trip). It now comes from `<V2SessionProvider>`, which
+ * the v2 layout populates
+ * from ITS `verifySession()` call. The value is byte-for-byte the same
+ * (`session?.user.id ?? null`), produced by the same server-only DAL call against the
+ * same backend; only the delivery path changed. It is NEVER derived from cookie
+ * presence or from any client-held identity, and `null` (signed out / unverifiable)
+ * still means "not the owner" — the strictly safe direction. The backend remains the
+ * real authority: the transcript fetch is authorized independently and 401s on its own.
  */
-export function ConversationScreen({
-  conversationId,
-  serverUserId,
-}: {
-  conversationId: string;
-  serverUserId: number | null;
-}) {
+export function ConversationScreen({ conversationId }: { conversationId: string }) {
+  const { userId: serverUserId } = useV2Session();
   const controller = useConversationController(conversationId, serverUserId);
   const { stream } = controller;
   const {
@@ -55,10 +66,14 @@ export function ConversationScreen({
     reasoning,
     isStreaming,
     isCancelling,
-    isLoadingHistory,
     error,
     retryLastMessage,
   } = stream;
+  // NOT `stream.isLoadingHistory` — that flag only covers the device-owned
+  // IndexedDB load. The controller's flag is the union of both history paths AND-ed
+  // with "there is nothing to show yet", so a conversation served from the
+  // transcript cache never renders a skeleton over content it already has.
+  const { isLoadingHistory } = controller;
 
   // Measure the floating composer's height into `--v2-conv-dock-h` so the transcript
   // (and the jump-to-latest pill) reserve exactly enough bottom clearance — and
@@ -144,6 +159,11 @@ export function ConversationScreen({
               // geometry as the real pill). NEVER the "shared" pill here: isOwner is
               // false while the owner id is null, so it would misleadingly flash for
               // owners on every direct-nav / reload / recents click.
+              //
+              // On a REVISIT neither term is ever true: the cached conversation record
+              // carries `user_id`, so ownership is resolved in the first render and the
+              // real composer paints immediately — this skeleton is now only the cold
+              // open, which is what it was always meant to be.
               <ComposerSkeleton />
             ) : controller.isOwner ? (
               <ConversationComposer

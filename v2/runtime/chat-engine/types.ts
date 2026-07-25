@@ -27,7 +27,7 @@ import type {
 } from '@/types/chat';
 import type { StreamSmoothingConfig } from './stream-smoother';
 
-export type { StreamSmoothingConfig } from './stream-smoother';
+export type { StreamSmoothingConfig, StreamStyle } from './stream-smoother';
 
 // ─── Reasoning trace (§C thinking upgrade) ─────────────────────────────────
 // v1 RECEIVES `thinking` SSE events and DISCARDS their payload (useChatStream
@@ -70,6 +70,13 @@ export interface ChatEngineSnapshot {
    * authoritative terminal SSE event (`cancelled`/`completed`/`error`/`timeout`).
    */
   isCancelling: boolean;
+  /**
+   * True only while the engine is loading the DEVICE-OWNED confidential transcript
+   * out of IndexedDB. SERVER history is fetched by the host through the query layer
+   * (see {@link ChatEngine.adoptConversationHistory}), so its pending state lives
+   * there — the screen ORs the two. It is never true once the engine holds
+   * messages, which is what keeps a skeleton off cached content.
+   */
   isLoadingHistory: boolean;
   conversationId: string | null;
   conversationTitle: string | null;
@@ -172,6 +179,21 @@ export interface ChatEngineConfig extends ChatEngineHandlers {
   getToken: () => string | null;
 
   /**
+   * Conversation history the HOST already had at construction time — the warm
+   * query-cache entry for a conversation the user viewed earlier this session.
+   * When present the engine opens already populated, so the transcript is in the
+   * FIRST snapshot React reads and the screen paints it with no skeleton and no
+   * empty frame.
+   *
+   * READ EXACTLY ONCE, at construction (the React adapter builds the engine in a
+   * `useState` initializer, so this is the one render where it can matter).
+   * Everything that arrives later — a cold fetch resolving, a background
+   * revalidation — goes through {@link ChatEngine.adoptConversationHistory}, which
+   * is guarded. Pass `null` when nothing is cached.
+   */
+  initialHistory?: ConversationData | null;
+
+  /**
    * Token-flush cadence in ms (foundation-standards §5 prescribes 50–80ms).
    * Defaults to 60. With smoothing ON this governs the DISABLED-mode publish cadence
    * (arrival mirroring); with smoothing OFF it is the publish cadence outright.
@@ -184,8 +206,12 @@ export interface ChatEngineConfig extends ChatEngineHandlers {
    * backlog-proportional cadence instead of mirroring the provider's bursty stream —
    * so a lump paints smoothly and a stall no longer freezes mid-word, while the
    * engine's accumulated state stays byte- and timing-authoritative (watchdog /
-   * heartbeat / IDB / history all still feed from ARRIVED text). Tunable/disable-able
-   * here, in one place; there is no UI toggle. See {@link StreamSmoothingConfig}.
+   * heartbeat / IDB / history all still feed from ARRIVED text).
+   *
+   * This is the CONSTRUCTION seed only. The release STYLE is a user preference
+   * (`v2/stream-style.ts`), so it must be changeable on a live engine — see
+   * {@link ChatEngine.setSmoothing}, which the React adapter drives from its
+   * every-render handler effect. See {@link StreamSmoothingConfig}.
    */
   smoothing?: StreamSmoothingConfig;
 
@@ -205,7 +231,12 @@ export interface ChatEngineConfig extends ChatEngineHandlers {
  * The framework-light core returned by {@link createChatEngine}. The React adapter
  * ({@link useConversationStream}) reflects it into a component; wave-3 rows read
  * live text/reasoning through {@link streamingText}/{@link reasoning}. Every action
- * mirrors a v1 `useChatStream` method 1:1 for a drop-in parity surface.
+ * mirrors a v1 `useChatStream` method 1:1 for a drop-in parity surface, with ONE
+ * deliberate divergence: v1's `loadConversationHistory` (which fetched the
+ * transcript itself, on every mount) is replaced by
+ * {@link ChatEngine.adoptConversationHistory}, because the fetch now belongs to the
+ * host's query layer so a re-opened conversation is served from cache. The BEHAVIOUR
+ * of a history load is unchanged; only who performs the request moved.
  */
 export interface ChatEngine {
   // ── Structural store (useSyncExternalStore) ──
@@ -229,7 +260,20 @@ export interface ChatEngine {
     initialMessage?: string,
     initialAttachments?: MessageAttachment[] | MessageAttachment,
   ): void;
-  loadConversationHistory(conversationId: string): Promise<void>;
+  /**
+   * Adopt SERVER history the host fetched — from its cache or over the network.
+   * The engine deliberately does NOT fetch this itself: the host routes it through
+   * the query layer so a re-opened conversation is served from cache instead of
+   * re-downloaded, and so the transcript's cache policy (freshness, retention,
+   * viewer partitioning) lives in ONE place rather than inside the state machine.
+   *
+   * Guarded, and returns whether the transcript was actually replaced: a response
+   * for another conversation is ignored, a LIVE stream is never disturbed (not even
+   * its dedup set), and once the engine holds messages a revalidation refreshes
+   * only the dedup set. See the implementation's docblock for what each guard
+   * protects.
+   */
+  adoptConversationHistory(data: ConversationData): boolean;
   loadConversationHistoryFromIDB(conversationId: string): Promise<boolean>;
   fetchConversationTitle(convId: string): Promise<void>;
   setConversationId(id: string): void;
@@ -250,6 +294,21 @@ export interface ChatEngine {
    * always invokes the freshest handlers without being rebuilt.
    */
   updateHandlers(handlers: ChatEngineHandlers): void;
+
+  /**
+   * Re-resolve the smoothing tunables on a LIVE engine. `smoothing` used to be
+   * construction-only (`createStreamSmoother` resolved it once, and the adapter
+   * builds the engine inside a `useState` initializer that runs exactly once), so a
+   * changed streaming style silently did nothing until a full remount. The adapter
+   * now pushes the latest config through here from the same every-render effect that
+   * refreshes the handlers.
+   *
+   * Cursor state is preserved — the reveal continues from where it is, so the
+   * published value stays a prefix across the switch. The REASONING smoother is
+   * deliberately pinned to `flow` whatever this says (line-stepping the small
+   * collapsible reasoning box reads as a freeze, not as a rhythm).
+   */
+  setSmoothing(smoothing: StreamSmoothingConfig | undefined): void;
 
   /** Full teardown for React unmount — disconnects and stops every timer. */
   dispose(): void;

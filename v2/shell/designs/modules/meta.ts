@@ -22,9 +22,17 @@ export const FOCUS_RING =
  * `fill-mode-both` holds each block hidden through its stagger delay so nothing
  * pre-flashes on the first frame; `motion-safe` + the globals reduced-motion
  * guard settle everything to its natural, fully-visible state instantly for
- * users who ask for less motion. Callers add their own `animationDelay` (stagger)
- * and `duration-*` (pacing) — the module system leaves pacing to the composition
- * so each tab can tune its rhythm without forking the token.
+ * users who ask for less motion. Callers add their own `duration-*` (pacing) —
+ * the module system leaves pacing to the composition so each tab can tune its
+ * rhythm without forking the token.
+ *
+ * WHERE IT MAY BE USED (the entrance rule — see `WorkHome`'s docblock): ONLY on
+ * a block the route-level fallback does NOT pre-draw. `fill-mode-both` holds the
+ * block fully invisible until the animation runs, so putting this on something
+ * `HomeFallback` already painted makes it BLANK at the hand-off and fade back
+ * in. That is why the home surfaces now carry it on their role-gated modules
+ * alone, and why the old staggered `animationDelay` chain is gone — a stagger
+ * only makes sense across a sequence of blocks that are all genuinely arriving.
  */
 export const REVEAL =
   'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:ease-out';

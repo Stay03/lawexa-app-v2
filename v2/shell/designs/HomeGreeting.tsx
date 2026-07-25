@@ -7,6 +7,10 @@ import { getSmartGreetingParts } from '@/lib/constants/greetings';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PulsingHeart } from '@/components/ui/pulsing-heart';
 import { useMounted } from '@/v2/shell/use-mounted';
+import {
+  HOME_GREETING_SKELETON_HEADING,
+  HOME_GREETING_SKELETON_SUBLINE,
+} from './home-frame';
 
 /**
  * HomeGreeting — the shared greeting header for both home designs, owning three
@@ -79,8 +83,11 @@ export function HomeGreeting({
         // Skeleton sized to the greeting box so there is zero layout jump on the
         // cross-fade to real content.
         <div className={cn('flex flex-col gap-2', centered && 'items-center')}>
-          <Skeleton className="h-8 w-56 rounded-lg sm:w-64 md:h-9 md:w-72" />
-          {subline ? <Skeleton className="h-4 w-40 rounded md:w-52" /> : null}
+          {/* Geometry is owned by `home-frame.ts` so the route fallback reserves
+              the IDENTICAL box — imported, never re-declared, so the two cannot
+              drift (A4 handoff). */}
+          <Skeleton className={HOME_GREETING_SKELETON_HEADING} />
+          {subline ? <Skeleton className={HOME_GREETING_SKELETON_SUBLINE} /> : null}
         </div>
       ) : (
         <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">

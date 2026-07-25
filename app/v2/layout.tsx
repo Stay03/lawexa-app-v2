@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { HydrationBoundary } from '@tanstack/react-query';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { V2QueryProvider } from '@/v2/runtime/query-provider';
+import { V2CacheIdentityGuard } from '@/v2/runtime/cache-identity-guard';
 import { prefetchRecentsState } from '@/v2/features/conversations/server';
 import { AppShell } from '@/v2/shell/AppShell';
 import { DockProvider, DockHost } from '@/v2/shell/Dock';
@@ -12,6 +13,7 @@ import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
 import { verifySession } from '@/v2/runtime/session';
+import { V2SessionProvider } from '@/v2/runtime/session-context';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
 
@@ -73,7 +75,10 @@ export const viewport: Viewport = {
  * `app/layout.tsx`, but mounts its OWN `V2QueryProvider` — the v2 QueryClient
  * (v2 tiers + global MutationCache) nests inside and shadows the root v1
  * `QueryProvider` for everything below, so v2 runs the v2 data policy while v1
- * pages keep the root client untouched.
+ * pages keep the root client untouched. It also mounts `V2SessionProvider` — the
+ * ONE place the v2 tree fetches identity, published to every page below (see
+ * `v2/runtime/session-context.tsx` for why the pages must not fetch it
+ * themselves).
  *
  * Chrome composition (phase 2→3): `SidebarProvider` owns the sidebar/drawer open
  * state. `V2Sidebar` is the desktop rail (CSS-hidden on mobile, unmounted after
@@ -96,25 +101,40 @@ export default async function V2Layout({
     notFound();
   }
 
-  // Server-verified identity for the shell chrome (footer avatar/name/plan gate,
-  // notification bell visibility). React-cached, so this shares the one
-  // `/auth/me` round trip with the page's own `verifySession()` call.
-  const session = await verifySession();
-  const user = session?.user ?? null;
+  // THE LAYOUT IS THE ONE PLACE THE SESSION IS FETCHED (see session-context.tsx).
+  // A layout does not re-render on a soft navigation — Next reuses the cached layout
+  // segment and requests only the changed page segment — so this `/auth/me` round trip
+  // is paid once per FULL page load and is then free for the rest of the visit. That is
+  // why the pages below no longer call `verifySession()` themselves: doing so cost an
+  // uncached round trip (and therefore the route skeleton) on EVERY navigation.
+  //
+  // CONCURRENT, not serial. These two were previously awaited one after the other, so
+  // the shell's TTFB was `/auth/me` PLUS `/conversations`. `prefetchRecentsState()` now
+  // gates itself on cookie PRESENCE (a zero-network read) instead of taking the verified
+  // user, so both requests are in flight at once and TTFB is the slower of the two.
+  const [session, recentsState] = await Promise.all([
+    verifySession(),
+    prefetchRecentsState(),
+  ]);
 
-  // Server-prefetch the sidebar/drawer recents (first page) so a signed-in hard load
-  // paints real conversation rows at first paint, no skeleton flash (wave-4). Awaited
-  // deliberately (real rows require a resolved query) and gated on `user` — guests /
-  // failures get `undefined` (a no-op HydrationBoundary) and the client fetches as
-  // before. Same query key the chrome reads, so the client `useInfiniteQuery` adopts
-  // the hydrated page seamlessly. See `features/conversations/server.ts`.
-  const recentsState = await prefetchRecentsState(user);
+  // Server-verified identity for the shell chrome (footer avatar/name/plan gate,
+  // notification bell visibility).
+  const user = session?.user ?? null;
 
   return (
     <div className="bg-background text-foreground">
       {/* Mirrors the v1 localStorage token into the httpOnly session cookie the
-          server DAL reads. Renders nothing; pure network side-effect. */}
-      <SessionSync />
+          server DAL reads. Renders nothing; pure network side-effect.
+
+          It is handed the session THIS render published so it can tell whether
+          that snapshot is still true. It writes the cookie client-side, AFTER
+          this layout already read it — so on a first v2 visit or a fresh sign-in
+          the layout resolved a guest from a cookie that did not exist yet. Since
+          the layout no longer re-renders per navigation, nothing would ever
+          correct that; SessionSync therefore calls `router.refresh()` when — and
+          only when — its sync actually changed the identity the server can see.
+          The no-loop argument lives in that module's docblock. */}
+      <SessionSync serverSignedIn={!!session} serverUserId={user?.id ?? null} />
       {/* Keyboard-inset sync — writes `--keyboard-inset` for the shell height
           (foundation-standards.md §4). Renders null. Self-calibrating: ≈0 on
           browsers that resize the layout viewport; the real keyboard height on
@@ -126,35 +146,58 @@ export default async function V2Layout({
           lifecycle because React never unloads the stylesheet. */}
       <DocumentLock />
       <V2QueryProvider>
-        {/* Seed the browser query cache with the server-prefetched recents (the
-            sidebar/drawer read the same key), so signed-in first paint is real rows
-            rather than a skeleton. Inside the provider so it hydrates into the client
-            the chrome consumes; `undefined` state (guests / prefetch miss) is a no-op. */}
-        <HydrationBoundary state={recentsState}>
-          {/* DockProvider bridges a route's floating composer into the AppShell
-              dock grid-row (grid-row 3, outside the scroll container) via a portal
-              — see v2/shell/Dock.tsx. Wraps the whole shell so both the dock host
-              (in the dock slot) and the page (in content) share one provider. When
-              no route portals anything, the dock stays empty and its row collapses. */}
-          <DockProvider>
-            <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
-              <V2Sidebar user={user} />
-              <SidebarInset className="min-h-0 overflow-hidden">
-                {/* Non-scrolling shell: header / scrollable content / dock. DockHost
-                    owns the dock slot: it renders an SSR height reservation on
-                    conversation routes (so the floating composer never causes CLS) and
-                    is the portal target for the real composer. On every other route it
-                    renders nothing and the dock row collapses to zero height — the
-                    bottom safe-area rides on the dock CONTENT, not this row, so no
-                    route gains a phantom notch strip. */}
-                <AppShell header={<V2Header user={user} />} dock={<DockHost />}>
-                  {children}
-                </AppShell>
-              </SidebarInset>
-              <V2Drawer user={user} />
-            </SidebarProvider>
-          </DockProvider>
-        </HydrationBoundary>
+        {/* PRIVACY BOUNDARY — drops the whole v2 cache whenever the verified viewer
+            changes. The v2 QueryClient is a module singleton and v1's sign-out clears
+            only the v1 client, while v1's logout AND login are soft navigations — so
+            without this, one user's cached lists, bookmarks, spaces, radars,
+            recently-viewed and quiz scores would paint for the NEXT user on the same
+            device for up to the 30-minute retention. See the file for the full trace. */}
+        <V2CacheIdentityGuard userId={user?.id ?? null} />
+        {/* Publishes the ALREADY-COMPUTED session to the v2 client tree, so pages and
+            screens read the server-verified identity from context instead of each
+            awaiting `/auth/me` themselves. Because this layout is preserved across soft
+            navigations, the value is resolved and free on every subsequent nav — the
+            home's greeting name, role gating, and the `/c/{id}` ownership id are all
+            correct on the FIRST render of every route, with no late-arriving props and
+            therefore no reflow. See v2/runtime/session-context.tsx. */}
+        <V2SessionProvider
+          signedIn={!!session}
+          userId={user?.id ?? null}
+          name={user?.name ?? null}
+          role={user?.role ?? null}
+        >
+          {/* Seed the browser query cache with the server-prefetched recents — BOTH the
+              sidebar/drawer infinite list and the home's single-page peek, which are
+              different query keys — so signed-in first paint is real rows rather than a
+              skeleton and the home never re-fetches a subset the server already has.
+              Inside the provider so it hydrates into the client the chrome consumes;
+              `undefined` state (guests / prefetch miss) is a no-op. */}
+          <HydrationBoundary state={recentsState}>
+            {/* DockProvider bridges a route's floating composer into the AppShell
+                dock grid-row (grid-row 3, outside the scroll container) via a portal
+                — see v2/shell/Dock.tsx. Wraps the whole shell so both the dock host
+                (in the dock slot) and the page (in content) share one provider. When
+                no route portals anything, the dock stays empty and its row collapses. */}
+            <DockProvider>
+              <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
+                <V2Sidebar user={user} />
+                <SidebarInset className="min-h-0 overflow-hidden">
+                  {/* Non-scrolling shell: header / scrollable content / dock. DockHost
+                      owns the dock slot: it renders an SSR height reservation on
+                      conversation routes (so the floating composer never causes CLS) and
+                      is the portal target for the real composer. On every other route it
+                      renders nothing and the dock row collapses to zero height — the
+                      bottom safe-area rides on the dock CONTENT, not this row, so no
+                      route gains a phantom notch strip. */}
+                  <AppShell header={<V2Header user={user} />} dock={<DockHost />}>
+                    {children}
+                  </AppShell>
+                </SidebarInset>
+                <V2Drawer user={user} />
+              </SidebarProvider>
+            </DockProvider>
+          </HydrationBoundary>
+        </V2SessionProvider>
       </V2QueryProvider>
     </div>
   );

@@ -51,17 +51,51 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   const live = useStreamingText(streamingText, message.id);
   const liveReasoning = useStreamingReasoning(reasoning, message.id);
 
-  const text = isStreaming ? live : message.content;
+  // TERMINAL DRAIN. The smoother may still be revealing the tail of a FINISHED
+  // answer (see `finish` in stream-smoother.ts): the engine writes the full text
+  // and flips `isStreaming` in one commit, so without this the undrained ~350ms
+  // of already-arrived text would land in a single frame — the end-of-answer pop.
+  // While draining, `live` is a strict PREFIX of the authoritative
+  // `message.content`, and reading it is what turns that snap into a smooth
+  // landing. The predicate IS the safety net: the moment this layer stops offering
+  // a prefix — cursor dropped or cleared, smoothing disabled, or a different
+  // server-canonical text — the FULL `message.content` renders immediately. The
+  // worst failure mode is the old pop; text can never be stranded.
+  const draining =
+    !isStreaming &&
+    live.length > 0 &&
+    live.length < message.content.length &&
+    message.content.startsWith(live);
+  const text = isStreaming || draining ? live : message.content;
   const reasoningText = isStreaming ? liveReasoning : message.reasoning ?? '';
   const partial = (message as ChatMessage).partial;
-  const showActions = !isStreaming && text.trim().length > 0;
+  // Actions wait for the landing: mid-drain `text` is a prefix, so Copy would copy a
+  // truncated answer and the buttons would be pushed down as the tail arrives.
+  const showActions = !isStreaming && !draining && message.content.trim().length > 0;
 
   return (
     <div className="w-full">
       <ReasoningTrace text={reasoningText} isStreaming={isStreaming} reasoningMs={message.reasoningMs} />
 
-      {text && (
-        <ChatContent content={text} isStreaming={isStreaming} isInteracted={isInteracted} />
+      {/* Rendered while STREAMING even with no text yet: in the `line` release style
+          the first unit is deliberately held until it is complete, and ChatContent's
+          skeleton bar is what stands in for it. Gating on `text` alone left that
+          opening beat blank (the transcript's activity status has already stepped
+          aside once the assistant placeholder exists). With empty text and the
+          `flow` style this renders a zero-height prose container, so nothing about
+          the current look changes. */}
+      {(text || isStreaming) && (
+        // The two gates are passed SEPARATELY because they want different answers
+        // during a drain: the per-word fade and the "generating" pill stay on (text
+        // is still appearing; a half-revealed card tag must not flash raw XML), but
+        // the `line` stand-in bar must not — the answer is complete, so a pulsing
+        // placeholder under it would promise a line that is never coming.
+        <ChatContent
+          content={text}
+          isStreaming={isStreaming}
+          isDraining={draining}
+          isInteracted={isInteracted}
+        />
       )}
 
       {partial && (

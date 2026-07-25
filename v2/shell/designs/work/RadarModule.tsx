@@ -47,8 +47,9 @@ export function RadarModule() {
 
   return (
     <Module title="Radar" icon={Radar} action={{ href: '/radars', label: 'All' }}>
+      {/* Shared median reservation — see `ModuleSkeleton`. */}
       {query.isPending ? (
-        <ModuleSkeleton rows={2} />
+        <ModuleSkeleton />
       ) : query.isError ? (
         <ModuleError
           message="Couldn't load radars"

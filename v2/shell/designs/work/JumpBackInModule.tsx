@@ -9,6 +9,7 @@ import { channelsQueries } from '@/v2/features/channels/queries';
 import {
   CountBadge,
   Module,
+  ModuleEmpty,
   ModuleError,
   ModuleList,
   ModuleRow,
@@ -37,12 +38,29 @@ import {
  * pill and the relative time sit in the aligned trailing cluster.
  *
  * Only mounted for signed-in users behind the spaces soft-launch gate (WorkHome
- * gates it). Hidden entirely when the caller has no channels — never an empty
- * "Jump back in" panel.
+ * gates it).
+ *
+ * THREE STATES, NEVER A DISAPPEARING ACT. This module used to `return null` once
+ * it resolved to zero channels — after having occupied a skeleton. On mobile it
+ * sits at `order-2`, directly under the greeting, so that unmount yanked the
+ * entire rest of the surface upward the moment the query settled, and left a
+ * ghost gap in the reveal stagger on the way there. It now resolves into a
+ * designed EMPTY state inside the frame it was already holding.
+ *
+ * Stated precisely, because the fix is real but partial: the module KEEPS its
+ * place and its header, and what changes is only its body — three reserved rows
+ * becoming the shorter empty state. That is still a settle of roughly one row's
+ * worth of height, not zero. What is gone is the whole-module disappearance and
+ * the ghost gap. Closing the remainder would mean padding the empty state to the
+ * skeleton's height, which trades an honest small settle for permanent dead
+ * space — not worth it.
  */
 
 /** One small page of the caller's most-recent channels. A module constant so the
- *  query key is stable and every render resolves to a single cache entry. */
+ *  query key is stable and every render resolves to a single cache entry. The
+ *  response is NOT sliced, so this page size is also the row cap — but the
+ *  skeleton still reserves the shared median, not this number (see
+ *  `ModuleSkeleton`: reserving at the cap makes the collapse-to-sparse worse). */
 const MINE_PARAMS: ChannelListParams = { per_page: 6 };
 
 export function JumpBackInModule() {
@@ -50,19 +68,21 @@ export function JumpBackInModule() {
   const query = useQuery(channelsQueries.mine(MINE_PARAMS));
   const channels = query.data?.data ?? [];
 
-  // Resolved-but-empty → hide the module (never an empty "Jump back in" panel).
-  if (!query.isPending && !query.isError && channels.length === 0) {
-    return null;
-  }
-
   return (
     <Module title="Jump back in" icon={Hash}>
       {query.isPending ? (
-        <ModuleSkeleton rows={3} />
+        // Shared median reservation — see `ModuleSkeleton`.
+        <ModuleSkeleton />
       ) : query.isError ? (
         <ModuleError
           message="Couldn't load channels"
           onRetry={() => query.refetch()}
+        />
+      ) : channels.length === 0 ? (
+        <ModuleEmpty
+          icon={Hash}
+          title="No recent channels"
+          action={{ href: '/spaces', label: 'Browse spaces' }}
         />
       ) : (
         <ModuleList>

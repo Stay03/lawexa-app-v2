@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FlaskConical } from 'lucide-react';
+import { FlaskConical, TextCursorInput } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { V2_COOKIE_CLEAR, V2_COOKIE_SET, hasV2Cookie } from '@/v2/cookie';
+import { readStreamStyle, setStreamStyle } from '@/v2/stream-style';
 
 export function DeveloperSettings() {
   // Lazy initializer reads the cookie once, on mount — never in an effect
@@ -21,12 +22,23 @@ export function DeveloperSettings() {
     () => typeof document !== 'undefined' && hasV2Cookie(document.cookie)
   );
 
+  // Same idiom for the streaming style: a lazy initializer reads the persisted
+  // value once. This card is the only writer, so local state and the store cannot
+  // drift; v2's transcript subscribes to the store and picks the change up live
+  // (no reload — the engine re-resolves its smoothers in place).
+  const [lineStream, setLineStream] = useState(() => readStreamStyle() === 'line');
+
   function handleToggle(next: boolean) {
     document.cookie = next ? V2_COOKIE_SET : V2_COOKIE_CLEAR;
     // Hard navigation (not a router transition): a client push would keep stale
     // prefetched RSC payloads from the other variant. A full load re-runs the
     // proxy with the new cookie so the whole app switches cleanly.
     window.location.assign('/');
+  }
+
+  function handleStreamStyle(next: boolean) {
+    setLineStream(next);
+    setStreamStyle(next ? 'line' : 'flow');
   }
 
   return (
@@ -57,6 +69,25 @@ export function DeveloperSettings() {
             id="v2-preview"
             checked={previewEnabled}
             onCheckedChange={handleToggle}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="v2-line-stream" className="flex items-center gap-2">
+              <TextCursorInput className="h-4 w-4" />
+              Line-by-line answers
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Releases a streamed answer one line at a time, with a placeholder
+              for the line still arriving, instead of the continuous word-by-word
+              flow. Applies to the v2 chat only and takes effect immediately.
+            </p>
+          </div>
+          <Switch
+            id="v2-line-stream"
+            checked={lineStream}
+            onCheckedChange={handleStreamStyle}
           />
         </div>
       </CardContent>

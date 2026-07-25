@@ -1,13 +1,20 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { GraduationCap, Landmark, NotebookPen, Scale } from 'lucide-react';
 
 import type { UserRole } from '@/types/auth';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
+import { HomeQuickJump } from './HomeQuickJump';
 import { useComposerDraft } from './composer/useComposerDraft';
+import {
+  CHAT_COMPOSER_DOCK,
+  CHAT_PROMPTS,
+  DOCK_FADE,
+  HOME_GREETING_HEADING_FOCUSED,
+  HOME_SURFACE_FOCUSED,
+} from './home-frame';
 
 /**
  * ChatHome — the Chat tab's home surface (owner #34: the default tab). The
@@ -43,19 +50,13 @@ import { useComposerDraft } from './composer/useComposerDraft';
  * Carries `data-home-tab="chat"` for the tab wrapper and the server-renderable
  * `data-v2-marker="V2-HOME"` marker the curl matrix greps for. Complete without
  * `name` (guests), which is threaded in when present.
+ *
+ * FRAME: every container class below comes from `home-frame.ts` — the ONE
+ * definition the route-level fallback (`HomeFallback`) also consumes, so the
+ * loading shape and this surface cannot drift apart. The quick-jump row moved to
+ * `HomeQuickJump` for the same reason (its pills wrap, so only the real component
+ * reserves the real height). Nothing about the design changed in the extraction.
  */
-
-/**
- * Quiet quick-jump navigation (MOBILE ONLY). Clean canonical paths that fall
- * through the v2 proxy to the v1 screens, so these are real full-page `<a>`
- * navigations — not client-side router links.
- */
-const QUICK_ACTIONS = [
-  { href: '/cases', label: 'Cases', Icon: Scale },
-  { href: '/statutes', label: 'Statutes', Icon: Landmark },
-  { href: '/notes', label: 'Notes', Icon: NotebookPen },
-  { href: '/quiz', label: 'Quiz', Icon: GraduationCap },
-] as const;
 
 export function ChatHome({
   name,
@@ -81,7 +82,7 @@ export function ChatHome({
     <div
       data-v2-marker="V2-HOME"
       data-home-tab="chat"
-      className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-4 pt-10 pb-8 md:pt-36 md:pb-12"
+      className={HOME_SURFACE_FOCUSED}
     >
       {/* Ambient warm spotlight (owner #32 — explicitly KEPT). Decorative,
           aria-hidden, built only from the --primary token at low opacity. Two
@@ -121,26 +122,13 @@ export function ChatHome({
         name={name}
         confidential={confidential}
         align="center"
-        headingClassName="font-comfortaa text-[1.75rem] font-semibold tracking-tight text-balance sm:text-[2rem] md:text-[2.25rem]"
+        headingClassName={HOME_GREETING_HEADING_FOCUSED}
       />
 
       {/* Quiet quick-jump nav — MOBILE ONLY (owner #20). Real `<a>` links to
-          canonical paths (proxied to v1 for now). */}
-      <nav
-        aria-label="Quick links"
-        className="mt-6 flex flex-wrap items-center justify-center gap-1.5 md:hidden"
-      >
-        {QUICK_ACTIONS.map(({ href, label, Icon }) => (
-          <a
-            key={href}
-            href={href}
-            className="v2-interactive inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <Icon className="size-4 shrink-0" aria-hidden />
-            {label}
-          </a>
-        ))}
-      </nav>
+          canonical paths (proxied to v1 for now). Shared with the route fallback
+          so the reserved row wraps exactly like this one. */}
+      <HomeQuickJump />
 
       {/* Composer dock — MOBILE: `sticky bottom-0` so it pins to the (keyboard-shrunk)
           viewport bottom rather than sitting half-behind an overlaying keyboard, with a
@@ -153,11 +141,8 @@ export function ChatHome({
           element or its inner ref div — transforms break `position: sticky`. The gold
           spotlight still pools behind it (the glow sits low on mobile / a touch below
           centre on desktop, unchanged). */}
-      <div className="order-4 sticky bottom-0 z-10 -mx-4 px-4 pb-3 pt-6 md:order-3 md:static md:z-auto md:mx-0 md:mt-10 md:px-0 md:pb-0 md:pt-0">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent md:hidden"
-        />
+      <div className={CHAT_COMPOSER_DOCK}>
+        <div aria-hidden className={DOCK_FADE} />
         {/* The shared v2-native composer — the ORIGINAL animated gold-shimmer border
             comes free from the default PromptInput variant. The ref is the prompt-fill
             focus target (v1's querySelector pattern). */}
@@ -180,7 +165,7 @@ export function ChatHome({
           (`mt-auto`), just above the docked composer (owner #27). DESKTOP: a quiet
           ChatGPT-style list directly under the composer. Exactly one shows per
           breakpoint. */}
-      <div className="order-3 mt-auto pt-8 md:order-4 md:mt-3 md:pt-0">
+      <div className={CHAT_PROMPTS}>
         <div className="md:hidden">
           <HomePrompts variant="mobile" onSelect={fillPrompt} />
         </div>

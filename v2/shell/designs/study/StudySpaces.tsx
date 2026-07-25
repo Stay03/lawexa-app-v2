@@ -50,7 +50,8 @@ export function StudySpaces() {
           onRetry={() => spacesQuery.refetch()}
         />
       ) : spacesQuery.isPending ? (
-        <ModuleSkeleton rows={3} />
+        // Shared median reservation — see `ModuleSkeleton`.
+        <ModuleSkeleton />
       ) : spaces.length === 0 ? (
         <ModuleEmpty
           icon={GraduationCap}

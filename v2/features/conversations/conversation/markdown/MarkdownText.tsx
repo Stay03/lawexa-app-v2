@@ -1,11 +1,13 @@
 'use client';
 
 import { memo, useMemo } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown, { type Components, type Options } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { CaseMentionLink } from './CaseMentionLink';
+import { rehypeStreamWords } from './rehype-stream-words';
+import { StreamingLineSkeleton } from './StreamingLineSkeleton';
 
 /**
  * MarkdownText — the streaming-safe markdown renderer (foundation-standards §5).
@@ -22,10 +24,32 @@ import { CaseMentionLink } from './CaseMentionLink';
  * Each `<ReactMarkdown>` renders its block elements as direct children (react-markdown
  * v10 renders a fragment, no wrapper), so all blocks are direct children of the one
  * prose container and prose vertical rhythm is preserved across block boundaries.
+ *
+ * WORD FADE (`animate`). Live streaming text is released in whole WORDS by the
+ * smoother, which cuts the publish rate from ~60/s to ~23/s; the sub-word smoothness
+ * that buys back is supplied by a compositor-only opacity fade on each newly-mounted
+ * word, injected by the {@link rehypeStreamWords} rehype plugin. Both pipelines are
+ * module-level constants and are passed to `MarkdownBlock` as a PROP, so the
+ * per-block memo still holds within a mode and still invalidates when the mode flips
+ * — which is what guarantees a finished message ends up with zero span overhead.
  */
 
 // Stable module-level plugin list — a fresh array each render would defeat memo.
 const REMARK_PLUGINS = [remarkBreaks, remarkGfm];
+
+/**
+ * The two rehype pipelines, BOTH module-level constants (the memo constraint: a
+ * fresh array per render gives every `MarkdownBlock` a new prop identity and
+ * silently defeats the per-block `React.memo`, turning the streaming pipeline's
+ * biggest win into a large regression).
+ *
+ * `animate` selects between them, and because the choice is a stable REFERENCE the
+ * memo still holds within a mode AND correctly invalidates on the mode change — so
+ * a finished message re-renders exactly once, with zero word spans left in its DOM
+ * ({@link rehypeStreamWords}).
+ */
+const REHYPE_ANIMATED: Options['rehypePlugins'] = [rehypeStreamWords];
+const REHYPE_PLAIN: Options['rehypePlugins'] = [];
 
 /**
  * Stable module-level component overrides. MUST be defined once at module scope —
@@ -82,9 +106,19 @@ function splitMarkdownBlocks(text: string): string[] {
   return blocks.length > 0 ? blocks : [text];
 }
 
-const MarkdownBlock = memo(function MarkdownBlock({ content }: { content: string }) {
+const MarkdownBlock = memo(function MarkdownBlock({
+  content,
+  rehypePlugins,
+}: {
+  content: string;
+  rehypePlugins: Options['rehypePlugins'];
+}) {
   return (
-    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
+    <ReactMarkdown
+      remarkPlugins={REMARK_PLUGINS}
+      rehypePlugins={rehypePlugins}
+      components={MARKDOWN_COMPONENTS}
+    >
       {content}
     </ReactMarkdown>
   );
@@ -93,16 +127,32 @@ const MarkdownBlock = memo(function MarkdownBlock({ content }: { content: string
 export const MarkdownText = memo(function MarkdownText({
   content,
   className,
+  animate = false,
+  showLineSkeleton = false,
 }: {
   content: string;
   className?: string;
+  /** While true, newly-revealed words fade in (see {@link rehypeStreamWords}). Set
+   *  only for LIVE streaming text; a finished message renders with no span
+   *  overhead at all. */
+  animate?: boolean;
+  /**
+   * `line` streaming style only: render the stand-in bar for the line still
+   * arriving, as the last child INSIDE this prose container — which is where the
+   * next line will actually appear. A PRIMITIVE rather than a `ReactNode` slot on
+   * purpose: a node prop would be a fresh element every render and would defeat
+   * this component's memo for every finished message in the transcript.
+   */
+  showLineSkeleton?: boolean;
 }) {
   const blocks = useMemo(() => splitMarkdownBlocks(content), [content]);
+  const rehypePlugins = animate ? REHYPE_ANIMATED : REHYPE_PLAIN;
   return (
     <div className={cn(PROSE_CLASS, className)}>
       {blocks.map((block, index) => (
-        <MarkdownBlock key={index} content={block} />
+        <MarkdownBlock key={index} content={block} rehypePlugins={rehypePlugins} />
       ))}
+      {showLineSkeleton && <StreamingLineSkeleton />}
     </div>
   );
 });

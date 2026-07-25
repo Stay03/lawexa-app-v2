@@ -13,6 +13,20 @@ import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
 import { useComposerDraft } from './composer/useComposerDraft';
+import {
+  DOCK_FADE,
+  HOME_GREETING_HEADING_FOCUSED,
+  HOME_GREETING_HEADING_WORKSPACE,
+  HOME_SURFACE_FOCUSED,
+  HOME_SURFACE_WORKSPACE,
+  WORKSPACE_COMPOSER_DOCK,
+  WORKSPACE_GREETING,
+  WORKSPACE_LEFT_COLUMN,
+  WORKSPACE_PRIMARY_MODULE,
+  WORKSPACE_PROMPTS,
+  WORKSPACE_RAIL,
+  WORKSPACE_SECONDARY_MODULE,
+} from './home-frame';
 import { QuizModule } from './study/QuizModule';
 import { StudySpaces } from './study/StudySpaces';
 import { RecentlyViewed } from './study/RecentlyViewed';
@@ -52,9 +66,26 @@ import { StudyModeCard, StudyModeChip } from './study/StudyMode';
  * `order` interleaves the left-column children with the rail into one scroll.
  *
  * GUESTS get the honest-minimum surface (greeting + composer + prompts, no
- * modules). ONE subtle staggered entrance (`REVEAL`, `fill-mode-both`, instant
- * under reduced motion). Both paths carry `data-home-tab="study"` + the
- * server-renderable `data-v2-marker="V2-HOME"` marker.
+ * modules). Both paths carry `data-home-tab="study"` + the server-renderable
+ * `data-v2-marker="V2-HOME"` marker.
+ *
+ * ── THE ENTRANCE RULE: A BLOCK THE FALLBACK PRE-DRAWS GETS NO ENTRANCE ──────
+ * `REVEAL` is `fill-mode-both` over a `from`-only enter keyframe, so a block
+ * carrying it is held fully INVISIBLE for its whole `animationDelay` and only
+ * then fades up — right for something arriving from nowhere, actively wrong for
+ * something `HomeFallback` has already painted, which visibly BLANKS at the
+ * hand-off before fading back in. The greeting, composer, prompts and rail
+ * therefore render plainly. Quiz KEEPS `REVEAL` (role-gated, omitted by the
+ * fallback, genuinely late), minus its stagger delay. The study-mode CTA keeps
+ * its own softer fade: it is student-gated on a CLIENT-only profession read, so
+ * it really does resolve after hydration. See `WorkHome` for the full rationale.
+ *
+ * FRAME: every container class below comes from `home-frame.ts` — the ONE
+ * definition the route-level fallback (`HomeFallback`) also consumes, so the
+ * loading shape and this surface cannot drift apart. That module also documents
+ * the `contents md:flex` left column and the shared mobile `order` scale, both of
+ * which this layout depends on. Study already sat on that scale, so the
+ * extraction changed no `order` value here.
  */
 export function StudyHome({
   name,
@@ -109,14 +140,14 @@ export function StudyHome({
       <div
         data-v2-marker="V2-HOME"
         data-home-tab="study"
-        className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-4 pb-8 pt-10 md:pb-12 md:pt-36"
+        className={HOME_SURFACE_FOCUSED}
       >
         <HomeGreeting
           name={name}
           confidential={confidential}
           align="center"
           subline="Quizzes, bookmarks, and everything you're learning."
-          headingClassName="font-comfortaa text-[1.75rem] font-semibold tracking-tight text-balance sm:text-[2rem] md:text-[2.25rem]"
+          headingClassName={HOME_GREETING_HEADING_FOCUSED}
         />
 
         <div className="mt-auto md:mt-10">
@@ -140,36 +171,31 @@ export function StudyHome({
     <div
       data-v2-marker="V2-HOME"
       data-home-tab="study"
-      className="relative mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 pb-8 pt-8 sm:px-6 md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-x-8 md:gap-y-6 md:pb-12 md:pt-12"
+      className={HOME_SURFACE_WORKSPACE}
     >
-      {/* Greeting — full-width, left-aligned (workspace feel). */}
-      <div className={cn(REVEAL, 'order-1 duration-500 md:col-span-2 md:row-start-1')}>
+      {/* Greeting — full-width, left-aligned (workspace feel). NO entrance: the
+          route fallback already drew this block (see the ENTRANCE RULE above). */}
+      <div className={WORKSPACE_GREETING}>
         <HomeGreeting
           name={name}
           confidential={confidential}
           align="left"
           subline="Your quizzes, spaces, and saved research."
-          headingClassName="font-comfortaa text-[26px] font-semibold leading-tight md:text-[32px]"
+          headingClassName={HOME_GREETING_HEADING_WORKSPACE}
         />
       </div>
 
       {/* LEFT COLUMN — `display:contents` on mobile so the composer hoists to the
           root scroll flex; a real flex column (grid col 1) on desktop. */}
-      <div className="contents md:flex md:min-w-0 md:flex-col md:gap-4 md:col-start-1 md:row-start-2">
+      <div className={WORKSPACE_LEFT_COLUMN}>
         {/* Composer dock — MOBILE: `sticky bottom-0`, floating alone with a soft
-            bottom fade. DESKTOP: static, top of the left column. The entrance
-            transform lives on the inner wrapper so it never touches the sticky
-            element. */}
-        <div className="sticky bottom-0 z-10 order-6 -mx-4 px-4 pb-3 pt-6 sm:-mx-6 sm:px-6 md:static md:z-auto md:order-1 md:mx-0 md:px-0 md:pb-0 md:pt-0">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent md:hidden"
-          />
-          <div
-            ref={composerAreaRef}
-            className={cn(REVEAL, 'duration-500')}
-            style={{ animationDelay: '80ms' }}
-          >
+            bottom fade. DESKTOP: static, top of the left column. NO entrance (the
+            fallback pre-draws the composer's shape). The inner wrapper STAYS: it
+            carries `composerAreaRef` for prompt-fill focus, and keeping the ref
+            div free of transforms is what protects the sticky dock. */}
+        <div className={WORKSPACE_COMPOSER_DOCK}>
+          <div aria-hidden className={DOCK_FADE} />
+          <div ref={composerAreaRef}>
             {/* Study-mode marker — rides ABOVE the composer, animating symmetrically
                 in/out (owner #24). Only mounted for students, matching the CTA. */}
             {isStudent ? (
@@ -181,13 +207,7 @@ export function StudyHome({
 
         {/* Suggested prompts — MOBILE: `mt-auto` toward the thumb. DESKTOP: directly
             under the composer, the tight cluster. */}
-        <div
-          className={cn(
-            REVEAL,
-            'order-5 mt-auto pt-8 duration-500 md:order-2 md:mt-0 md:pt-0',
-          )}
-          style={{ animationDelay: '160ms' }}
-        >
+        <div className={WORKSPACE_PROMPTS}>
           <div className="md:hidden">
             <HomePrompts variant="mobile" onSelect={fillPrompt} />
           </div>
@@ -199,10 +219,10 @@ export function StudyHome({
         {/* Quiz — the primary learning module. MOBILE: scrolls under the greeting
             (order-2). DESKTOP: left column, below the compose cluster. */}
         {showQuiz ? (
-          <div
-            className={cn(REVEAL, 'order-2 mt-6 duration-500 md:order-3 md:mt-0')}
-            style={{ animationDelay: '200ms' }}
-          >
+          // KEEPS its entrance — the fallback deliberately does not draw this
+          // role-gated module, so it genuinely arrives with the payload. The
+          // stagger delay is gone: there is no sequence left to stagger against.
+          <div className={cn(REVEAL, WORKSPACE_PRIMARY_MODULE, 'duration-500')}>
             <QuizModule />
           </div>
         ) : null}
@@ -211,7 +231,12 @@ export function StudyHome({
             profession read), so it fades in on mount rather than popping in.
             MOBILE order-3 (beside Quiz); DESKTOP below Quiz in the left column. */}
         {isStudent ? (
-          <div className="order-3 mt-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300 md:order-4 md:mt-0">
+          <div
+            className={cn(
+              WORKSPACE_SECONDARY_MODULE,
+              'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300',
+            )}
+          >
             <StudyModeCard checked={studyMode} onCheckedChange={setStudyMode} />
           </div>
         ) : null}
@@ -219,13 +244,7 @@ export function StudyHome({
 
       {/* RAIL — the glance modules. MOBILE: scrolls between the learning modules
           and the compose cluster (order-4). DESKTOP: the right column (grid col 2). */}
-      <div
-        className={cn(
-          REVEAL,
-          'order-4 mt-6 flex flex-col gap-4 duration-500 md:col-start-2 md:row-start-2 md:mt-0 md:min-w-0',
-        )}
-        style={{ animationDelay: '240ms' }}
-      >
+      <div className={WORKSPACE_RAIL}>
         {/* Recently viewed — backend Ask A, LIVE. Available to every signed-in user
             (not spaces-gated), top of the rail. */}
         <RecentlyViewed />

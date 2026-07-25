@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { recentlyViewedApi } from '@/lib/api/recently-viewed';
 import type { RecentlyViewedParams } from '@/types/recently-viewed';
-import { STALE_TIMES } from '@/v2/runtime/query';
+import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
 
 /**
  * Recently-viewed query factory (the `cases` exemplar pattern) — wraps
@@ -42,6 +42,10 @@ export const recentlyViewedQueries = {
       queryKey: [...recentlyViewedQueries.lists(), params] as const,
       queryFn: () => recentlyViewedApi.getList(params),
       staleTime: STALE_TIMES.standard,
+      // Home-glance retention: outlive TanStack's 5-minute default so a return to
+      // the home paints this module from cache instead of a skeleton. Without it
+      // the conversations recents were warm while every other module was cold.
+      gcTime: GC_TIMES.list,
     }),
 
   /** The read-only home PEEK (single small page) shared by the Study module. */

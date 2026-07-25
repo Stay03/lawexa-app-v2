@@ -38,8 +38,10 @@ export function RecentConversationsModule() {
       icon={MessageSquare}
       action={{ href: '/conversations', label: 'All' }}
     >
+      {/* Shared median reservation (see `ModuleSkeleton`); `lines={1}` is row
+          SHAPE, not count — it matches the real one-line conversation strip. */}
       {query.isPending ? (
-        <ModuleSkeleton rows={3} lines={1} />
+        <ModuleSkeleton lines={1} />
       ) : query.isError ? (
         <ModuleError
           message="Couldn't load conversations"

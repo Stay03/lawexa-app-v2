@@ -31,6 +31,7 @@ export type {
   RecoverResult,
   StreamingSource,
   StreamSmoothingConfig,
+  StreamStyle,
 } from './types';
 export {
   ensureTranscript,

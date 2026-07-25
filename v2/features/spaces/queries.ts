@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { spacesApi } from '@/lib/api/collab';
 import type { SpaceListParams } from '@/types/collab';
-import { STALE_TIMES } from '@/v2/runtime/query';
+import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
 
 /**
  * Spaces query factory (the cases exemplar pattern) — SHARED by the Work and
@@ -23,5 +23,9 @@ export const spacesQueries = {
       queryKey: [...spacesQueries.lists(), params] as const,
       queryFn: () => spacesApi.getList(params),
       staleTime: STALE_TIMES.standard,
+      // Home-glance retention: outlive TanStack's 5-minute default so a return to
+      // the home paints this module from cache instead of a skeleton. Without it
+      // the conversations recents were warm while every other module was cold.
+      gcTime: GC_TIMES.list,
     }),
 };

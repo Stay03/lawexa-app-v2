@@ -111,7 +111,8 @@ export function RecentBookmarks() {
           onRetry={() => bookmarksQuery.refetch()}
         />
       ) : bookmarksQuery.isPending ? (
-        <ModuleSkeleton rows={3} />
+        // Shared median reservation — see `ModuleSkeleton`.
+        <ModuleSkeleton />
       ) : bookmarks.length === 0 ? (
         <ModuleEmpty icon={BookmarkIcon} title="Nothing saved yet" />
       ) : (

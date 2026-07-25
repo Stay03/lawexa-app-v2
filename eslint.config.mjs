@@ -107,11 +107,13 @@ const eslintConfig = defineConfig([
             {
               target: ".",
               from: "./v2",
-              // `@/v2/cookie` (toggle surfaces like DeveloperSettings) and
-              // `@/v2/routes.manifest` (proxy) are the only sanctioned crossings.
-              except: ["cookie.ts", "routes.manifest.ts"],
+              // The sanctioned crossings, all dependency-free contract modules
+              // that pull no v2 runtime toward the v1 bundle: `@/v2/cookie` and
+              // `@/v2/stream-style` (the v2 preference surfaces in
+              // DeveloperSettings) and `@/v2/routes.manifest` (proxy).
+              except: ["cookie.ts", "routes.manifest.ts", "stream-style.ts"],
               message:
-                "v1 code must not import from v2 (only @/v2/cookie and @/v2/routes.manifest are sanctioned crossings).",
+                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style and @/v2/routes.manifest are sanctioned crossings).",
             },
           ],
         },

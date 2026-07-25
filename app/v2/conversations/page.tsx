@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { verifySession } from '@/v2/runtime/session';
 import { ConversationsScreen } from '@/v2/features/conversations/list/ConversationsScreen';
 
 /**
@@ -15,9 +14,17 @@ import { ConversationsScreen } from '@/v2/features/conversations/list/Conversati
  * indexing. No canonical / OG share card is emitted (that would advertise a page
  * that resolves to a sign-in wall).
  *
- * `verifySession()` is React-cached, so this shares the single `/auth/me` round
- * trip with the layout; the signed-in flag is threaded to the client screen so a
- * guest gets the sign-in state instead of a perpetually-gated skeleton.
+ * This segment awaits NOTHING. It used to open with `await verifySession()` just
+ * to compute the `signedIn` flag, which cost an uncached `/auth/me` round trip on
+ * every navigation here (React `cache()` dedupes only within one server render,
+ * and a soft navigation re-renders this page without re-rendering the layout) —
+ * so `loading.tsx` covered a wait on Laravel every time. The route is still
+ * dynamic, so `loading.tsx` still appears for one I/O-free Next round trip; the
+ * wait is shortened, not removed.
+ * The screen now reads the same server-verified flag from `<V2SessionProvider>`,
+ * which the layout published from its own single `/auth/me` call. Guests are
+ * unchanged: `signedIn` is still `!!session`, so a stale or revoked token still
+ * resolves to the signed-out state, never a perpetually-gated skeleton.
  */
 export function generateMetadata(): Metadata {
   return {
@@ -27,7 +34,6 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default async function V2ConversationsPage() {
-  const session = await verifySession();
-  return <ConversationsScreen signedIn={!!session} />;
+export default function V2ConversationsPage() {
+  return <ConversationsScreen />;
 }

@@ -45,12 +45,36 @@ export const STALE_TIMES = {
 } as const;
 
 /**
- * gcTime companions. Only the reference tier overrides the default gcTime — a
- * 30-minute cache window keeps list data (and its scroll position on back-nav)
- * around well past its 10-minute staleTime.
+ * gcTime companions — the RETENTION lever, orthogonal to `STALE_TIMES`.
+ *
+ * gcTime is NOT a freshness control: it decides how long an entry survives with
+ * ZERO observers (i.e. after the user navigates away and the last consumer
+ * unmounts). Freshness is still owned entirely by the staleTime tier — a query
+ * past its staleTime refetches in the background on remount no matter how long
+ * its data has been retained. So a long gcTime never buys staleness; it buys the
+ * ability to render the cached rows INSTANTLY on return and let that refetch land
+ * behind them, instead of falling back to a cold skeleton.
+ *
+ *  - `reference` 30min  statutes / cases lists; pairs with `STALE_TIMES.reference`.
+ *  - `list`      30min  any paginated list a user leaves and comes back to inside
+ *                       one working session (conversations, and the phase-4
+ *                       cases/statutes/notes lists). Sized to outlast the longest
+ *                       realistic intra-session detour — read a conversation, do
+ *                       some research, come back — because TanStack's 5-minute
+ *                       default expires well inside that window and turns an
+ *                       ordinary "back to the list" into a genuinely cold query
+ *                       (full skeleton, and every loaded infinite page lost).
+ *                       Deliberately NOT `Infinity`: a tab parked for hours would
+ *                       otherwise pin unbounded infinite-scroll pages forever.
+ *
+ * `list` and `reference` currently agree on 30 minutes and are still kept apart:
+ * they are independent policies (data character vs. navigation retention), and
+ * collapsing them would silently couple chat-list retention to reference-data
+ * retention the next time either is retuned.
  */
 export const GC_TIMES = {
   reference: 30 * 60 * 1000,
+  list: 30 * 60 * 1000,
 } as const;
 
 /**

@@ -283,3 +283,133 @@ guides, pre-App-Router era):
 | Tailwind lint | eslint-plugin-better-tailwindcss | v4-aware token enforcement |
 | Shimmer | rotor/translate rebuild, gated + reserved | compositor-only, identical look |
 | Fonts | Fraunces display+serif roles, UI sans body, Comfortaa brand-only | roles not decoration; WONK 0 for professional |
+| Loading | §8 — skeletons only for data; `loading.tsx` = inert outer shape | owner: "those parts of the screen should just appear immediately" |
+
+## 8. The loading convention (binding on every v2 page)
+
+Written after the owner rejected the home's loading experience: *"the home skeleton is
+always the same even when its landing on either of the 3 tabs and none of the design of the
+tab match the skeleton… i also notice the skeleton is of the textarea and im not sure why
+that should have a loading skeleton… those part of the screens should just appear
+immediately."* He was right on both counts, and the two failures generalise. These four
+rules and the corollary are the fix, and they apply to every screen we build from here.
+
+**Reference implementation: `app/v2/conversations/loading.tsx`** (static reserved search
+field + real list skeleton, `aria-hidden` + `inert`, one `role="status"`). The home's
+equivalent — `app/v2/loading.tsx` → `v2/shell/designs/HomeFallback.tsx` — shows the same
+rules applied to a surface with three different destination layouts.
+
+### (i) Anything we already have renders immediately, and never gets a skeleton
+
+A skeleton is a promise that data is coming. Static chrome — a textarea, a placeholder
+string, a send button, fixed suggested prompts, a nav row, a search field, a section title
+— has nothing coming. Skeletoning it is a lie that also delays the UI. Render it for real,
+on the first frame. Polaris states the rule outright: *"Show static content that never
+changes on a page and use skeleton loading for dynamic content."*
+
+The corollary for placement: static chrome that must survive a route transition belongs in
+`layout.tsx`, which `loading.tsx` explicitly does **not** wrap.
+
+Before adding a skeleton, answer *"what request is this waiting on?"* If there isn't one,
+it gets a **reserved shape** at the real geometry — quiet, still, and **never pulsing** —
+or it gets rendered outright. A pulse is reserved for a real in-flight read.
+
+### (ii) `loading.tsx` holds the page's real outer SHAPE, and nothing interactive
+
+Next compiles `loading.tsx` into the `fallback` of a `<Suspense>` around `page.tsx`
+(verified in `next/dist/client/components/layout-router.js`). It takes **no props** — not
+`params`, not `searchParams` (`create-component-tree.js` passes only a `key`).
+
+- **It must draw the destination's actual frame** — same max-width, padding, anchoring,
+  breakpoint `order`, and grid — or the hand-off is a layout swap, not content resolving.
+  Next's own streaming guide: *"Design skeleton fallbacks that match the dimensions of the
+  content they represent… use fixed or `min-height` containers so the space is reserved."*
+  Share the frame with the real surface (see `v2/shell/designs/home-frame.ts`) instead of
+  redrawing it; a hand-drawn fallback diverges within two design rounds.
+- **It must be inert.** When content resolves, the fallback fiber is a *sibling* of the
+  content fiber and is pushed to `deletions` with `ChildDeletion` — a full unmount. DOM
+  nodes are removed, state is discarded, and focus drops to `<body>`. React's own caveat:
+  *"React does not preserve any state for renders that got suspended before they were able
+  to mount for the first time."* So a focusable control in a fallback destroys focus, caret
+  and in-flight typing the moment the payload lands. On a hard load it is worse: the
+  streamed HTML is swapped by an inline script that can run *before* hydration, so the
+  control may never have been interactive at all. Mark the fallback `aria-hidden` **and**
+  `inert`.
+- **Accessibility**: decorative shapes are `aria-hidden`; exactly **one** visually-hidden
+  `role="status"` node per boundary carries the announcement. Never `aria-live` per skeleton
+  bar. Skeleton shapes are never keyboard-focusable (`inert` guarantees it).
+- **It may be a Client Component** (`'use client'`, or a server shell rendering a client
+  child — the repo convention). This is what lets a fallback read client-only state. Know
+  which render you get: on a **hard load** it is part of the streamed static shell and runs
+  on the **server** (`useSyncExternalStore` → `getServerSnapshot`); on a **soft navigation**
+  no HTML is transferred and React renders it in the **browser** (`getSnapshot`, real
+  `localStorage`). Design it to be correct under both, and say which you rely on.
+- **Do not assume it paints.** Today `loading.tsx` forces deferral of everything beneath it,
+  so it always shows on navigation. Under `cacheComponents` (§1.5) it becomes an ordinary
+  Suspense boundary and a cached static page can go straight to content. Separately, React
+  19.2 throttles reveals to ~300ms, so a boundary that resolves in 50ms may still be on
+  screen for ~300ms — which is exactly why the geometry has to be right.
+
+### (iii) Never `await` in a page body for data only part of the page needs
+
+One `await` at the top of a `page.tsx` blocks the whole route on the slowest read, and a
+high `loading.tsx` then replaces the entire screen with a full-page skeleton. Push the await
+down into the child that needs it and wrap **that child** in `<Suspense>` with a fallback
+sized to that region. Next: *"Prefer explicit `<Suspense>` boundaries close to the dynamic
+access… now the entire page falls back to a full-page skeleton instead of streaming
+granularly."* Keep LCP elements outside/above boundaries so they ship in the static shell.
+
+Note the layout interaction: if a **layout** reads runtime data (`cookies()`, `headers()`,
+an uncached fetch), `loading.js` shows no fallback for it — navigation simply blocks until
+the layout finishes. Runtime reads in a layout need their own `<Suspense>`.
+
+### (iv) Every client query region owns three explicit states
+
+A region backed by a query renders exactly one of:
+
+1. **Pending** — a skeleton at the region's *real* geometry, reserved at a realistic
+   **median** length. Not at the row cap: a list that clamps with `.slice(0, MAX)` can
+   never resolve longer than the cap, so cap-sized skeletons defend against a shift that
+   cannot happen while making the one that does — collapsing onto a short or empty list —
+   far worse. Reserve near the middle, absorb a small settle either way, never a large one.
+   `v2/shell/designs/modules/` is the house pattern (`ModuleSkeleton` mirrors `ModuleRow`
+   exactly and owns the single reservation number; no module overrides it).
+2. **Error** — visually distinct from empty (never error-as-empty), naming what failed and
+   offering a real in-place retry (`refetch`).
+3. **Empty** — a *designed* state: quiet icon, one sentence, and an action where one exists.
+   Never `return null`. A module that vanishes after occupying a skeleton yanks everything
+   below it upward — the exact defect `JumpBackInModule` shipped with.
+
+All three states **cross-fade in** (`CONTENT_FADE`), `motion-reduce`-guarded — the error and
+empty states too, not just the list. A true cross-fade *across a Suspense boundary* is
+impossible (fallback and content never coexist in the DOM), so animate the *content's*
+entrance and let matched dimensions do the rest.
+
+**Entrance rule — a block the fallback pre-draws gets NO entrance.** `REVEAL` is
+`fill-mode-both` over a `from`-only enter keyframe, so it holds its block fully invisible
+for the whole `animationDelay` before fading up. On a block a `loading.tsx` already painted
+that reads as a BLANK-then-fade at the hand-off (measured at up to ~740ms on the Work tab's
+old 80/160/240ms stagger). Entrances belong only on blocks the fallback does not draw —
+role-gated modules, client-resolved content.
+
+**Pulse discipline** — a skeleton must not animate under `prefers-reduced-motion`, and must
+not pulse past 5s (WCAG 2.2.2 Pause, Stop, Hide); a long wait settles to a still
+placeholder. **CLOSED FOR v2:** `components/ui/skeleton.tsx` still hard-codes bare
+`animate-pulse`, but `v2/shell/shell.css` now carries
+`@media (prefers-reduced-motion: reduce) { html.v2-document-lock .animate-pulse { animation: none } }`
+— scoped to the class `DocumentLock` puts on `<html>` only while the v2 layout is mounted, so it
+stills EVERY v2 skeleton (including hand-rolled bars the primitive fix would miss) and is
+provably inert the moment the user soft-navs into v1. **New v2 skeletons therefore need no
+local guard.** The remaining local `motion-reduce:animate-none` in `ModuleSkeleton`/`QuizModule`
+is redundant and can be deleted. Fixing the primitive itself stays the long-term goal for
+v1's sake; it is v1-shared, so it needs a byte-identity call (the change is
+reduced-motion-only and cannot alter v1's default rendering, but it does alter v1's emitted
+class strings).
+
+### Corollary: never render a skeleton over content already in cache
+
+If the data is in the query cache, render it. A skeleton that replaces content the user
+just saw is a regression, not a loading state — it is the "flash of skeleton" that makes an
+app feel slower than it is. Use `keepPreviousData` for filter/search transitions (dim the
+existing list, keep it), gate the skeleton on `isPending` (never on `isFetching`), and let
+background refetches be invisible.
