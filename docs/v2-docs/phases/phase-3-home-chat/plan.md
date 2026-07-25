@@ -213,6 +213,29 @@ each its own implement → adversarial-review → verify → ship loop:
   tsc 0 / eslint 0 / `V2_ENABLED=true next build` clean.
   NOT VERIFIED IN A BROWSER — the mechanism is confirmed end to end at the server boundary, but the
   absence of the skeleton on a return trip is for the owner's live test.
+- **CHECK-ON-VISIT (owner multi-tab test, July 25) — SHIPPED.** The owner created a chat in a second
+  tab, moved between pages in the first, and saw no request. Correct diagnosis: retention (`GC_TIMES`)
+  and freshness (`STALE_TIMES`) answer different questions from the one a user asks by NAVIGATING to
+  a list — "what is new since I was last here?" — and a 60s staleTime meant an arrival inside the
+  minute sent nothing at all, so the `NewRowsPill` had nothing to count. New third lever
+  `REFETCH_ON_VISIT` (`v2/runtime/query.ts`) = `refetchOnMount: 'always'`, on `list()` (the home
+  peek) and `infiniteList()` (the /conversations page). Cached rows still paint first — the query
+  has data, so `isPending` is false and no skeleton is reachable — and the check goes out behind
+  them on EVERY arrival. NOT `staleTime: 0` (that also fires on every window focus, a different and
+  noisier promise). NOT on `infiniteRecents()`: the sidebar/drawer live in the LAYOUT, which is
+  preserved across soft nav, so it never remounts on an arrival — the flag would only re-fetch what
+  `server.ts` just prefetched on a hard load. Cost stated in the docblocks: one request per arrival,
+  and for the infinite list one per LOADED PAGE (a reader five pages deep pays five on return).
+  **FOUND WHILE CHECKING, RECORDED FOR ITS OWN PASS:** the TRANSCRIPT cannot use the same flag today.
+  `engine.adoptConversationHistory` declines any snapshot newer than the rows it already holds (so
+  `dedupKeys` can never describe a different history than the rendered rows — a mismatch silently
+  drops replayed SSE messages after a reconnect), so a conversation continued in another tab shows
+  its old transcript until the entry is replaced and the screen re-opened. The fix is in the ENGINE:
+  replace rows AND dedupKeys together when no stream is active AND the engine has authored nothing
+  since it applied that history (the second term is what stops the post-turn `onCompleted`
+  revalidation from rebuilding a transcript whose live tool/handover rows are richer than the
+  server's). Deliberately not ridden along on a query-policy change — it is streaming-path surgery
+  and wants its own review.
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.

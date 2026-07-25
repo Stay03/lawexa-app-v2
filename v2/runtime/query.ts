@@ -78,6 +78,45 @@ export const GC_TIMES = {
 } as const;
 
 /**
+ * CHECK ON EVERY VISIT — the third lever, and the one that makes a retained list
+ * honest (owner, July 25).
+ *
+ * `staleTime` answers "is this data still good?" and `gcTime` answers "do we still
+ * hold it?". Neither answers the question a user actually asks by navigating to a
+ * list: "what is new since I was last here?" A retained list paints instantly, but
+ * with a 60-second `staleTime` an ARRIVAL inside that minute sends no request at
+ * all — so a row created in another tab, on another device, or by a teammate simply
+ * does not appear, and the "N new" pill has nothing to announce. The owner found
+ * this exactly: create a chat in a second tab, move between pages in the first, and
+ * nothing updates.
+ *
+ * `refetchOnMount: 'always'` decouples the two questions. The cached rows still
+ * paint in the first frame (the query has data, so it is not `pending` and no
+ * skeleton is possible), and the check goes out behind them every single time the
+ * user arrives. That is the whole "cached first, then update, then announce" shape,
+ * and it is what the pill was built for.
+ *
+ * WHY NOT `staleTime: 0`. That would also refetch on every window focus and every
+ * reconnect, which is a different and much noisier promise. Arrival is the moment
+ * the user is asking; focus is not.
+ *
+ * COST, STATED PLAINLY. One list request per navigation to a list surface. For an
+ * INFINITE list TanStack refetches every page the user has loaded, so the cost
+ * scales with how deep they scrolled before leaving — a reader five pages down pays
+ * five requests on return. That is accepted deliberately: a list that is five pages
+ * deep is exactly the one where silently showing stale rows is worst.
+ *
+ * Apply it to LIST leaves the user NAVIGATES TO. Two exclusions, both real:
+ *  - A list that lives in the LAYOUT (the sidebar/drawer recents) never remounts on
+ *    a soft navigation, so the flag cannot fire on the arrivals it exists for — it
+ *    would only ever re-fetch what the server just prefetched on a hard load.
+ *  - A detail/record query wants the opposite default (see
+ *    `conversationsQueries.detail`), where replacing the rows on screen mid-session
+ *    would be wrong.
+ */
+export const REFETCH_ON_VISIT = 'always' as const;
+
+/**
  * The mutation `meta` contract, typed onto TanStack's `Register` so every
  * `mutation.meta` across v2 is checked (see the module augmentation below).
  *

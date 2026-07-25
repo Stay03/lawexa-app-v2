@@ -5,7 +5,7 @@ import type {
   ConversationsListResponse,
   ListConversationsParams,
 } from '@/types/chat';
-import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
+import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 
 /**
  * Conversations query policy — copies the `v2/features/cases/queries.ts`
@@ -127,9 +127,14 @@ export const conversationsQueries = {
    * page unmounts the last observer; on TanStack's 5-minute default gcTime the
    * entry is then dropped, so any return past that is a genuinely COLD query —
    * a full skeleton over rows we used to have. 30 minutes covers the whole
-   * working session, and the 60s staleTime still forces a background refetch on
-   * every remount, so the retained rows paint instantly and the refresh lands
+   * working session, so the retained rows paint instantly and the refresh lands
    * behind them (the "never skeleton over cached content" rule).
+   *
+   * `REFETCH_ON_VISIT` is what guarantees that refresh actually happens. The 60s
+   * staleTime alone did NOT: an arrival inside the minute sent no request at all,
+   * so a conversation created in another tab or on another device never appeared
+   * (owner, July 25 — see the constant for the full reasoning). One page, so one
+   * request per arrival at the home.
    */
   list: (params: ListConversationsParams = {}) =>
     queryOptions({
@@ -137,6 +142,7 @@ export const conversationsQueries = {
       queryFn: () => chatApi.listConversations(params),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
     }),
 
   /** The read-only Recents PEEK (single page) shared by the Design B home panel. */
@@ -154,6 +160,15 @@ export const conversationsQueries = {
    * them is thrown away five minutes after the last v2 surface unmounts (a
    * detour into v1). Retention rebuilds the rail at its previous depth instead
    * of at page 1.
+   *
+   * DELIBERATELY NO `REFETCH_ON_VISIT`. The sidebar and drawer live in the v2
+   * LAYOUT, which is preserved across soft navigation — so this query does not
+   * remount when the user moves between pages, and `refetchOnMount` would never
+   * fire on the arrivals the flag exists for. It WOULD fire once per full page
+   * load, immediately re-fetching the page the server just prefetched into the
+   * `HydrationBoundary` (`server.ts`). That is cost with no benefit, so it is left
+   * off. This rail stays fresh through the `conversationsCache` writers, the
+   * window-focus refetch, and its 60s staleTime.
    */
   infiniteRecents: () =>
     infiniteQueryOptions({
@@ -200,6 +215,15 @@ export const conversationsQueries = {
    * user's position is announced rather than spliced in under their eyes.
    * (Each distinct `search` is its own entry and retains independently, so
    * clearing a search also returns to a warm unfiltered list.)
+   *
+   * `REFETCH_ON_VISIT` is what makes that announcement possible AT ALL. Retention
+   * on its own was only half the promise: the rows came back warm, but an arrival
+   * inside the 60s staleTime asked the server NOTHING, so a conversation created in
+   * another tab could never appear and the pill had nothing to count. This is the
+   * surface the owner tested, and the one where the cost is highest — TanStack
+   * refetches every loaded page, so a reader five pages deep pays five requests on
+   * return. Accepted deliberately: five pages deep is precisely where silently
+   * showing stale rows is worst.
    */
   infiniteList: ({ search }: ConversationsListPageOptions = {}) => {
     const trimmed = search?.trim();
@@ -225,6 +249,7 @@ export const conversationsQueries = {
       // entries for no benefit, since the warm-on-return value comes from the
       // unfiltered entry. Filtered searches keep the 5-minute default.
       gcTime: trimmed ? undefined : GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
     });
   },
 
@@ -261,6 +286,25 @@ export const conversationsQueries = {
    * reach this cache even if the backend's behaviour changes. The screen also
    * leaves this query DISABLED for a conversation it already knows is
    * confidential, so the request is never even made.
+   *
+   * NO `REFETCH_ON_VISIT` HERE, AND THE KNOWN BOUND THAT COMES WITH IT.
+   * The list leaves check on every arrival (see `REFETCH_ON_VISIT`); this one does
+   * not, because a fresh fetch would not currently CHANGE anything on screen. The
+   * engine's `adoptConversationHistory` declines any snapshot newer than the rows it
+   * already holds — deliberately, so that its `dedupKeys` can never describe a
+   * different history than the rendered rows (a mismatch silently drops replayed
+   * SSE messages after a reconnect). So a conversation continued in ANOTHER TAB or
+   * on another device shows its old transcript on this device until the cache entry
+   * is replaced and the screen is opened again.
+   *
+   * Adding `refetchOnMount` alone would therefore buy a request and no visible
+   * change. The real fix is in the engine: let adoption REPLACE rows and dedupKeys
+   * together (which is exactly what keeps them in step) when no stream is active
+   * AND the engine has authored nothing since it applied that history — the second
+   * term is what stops the post-turn `onCompleted` revalidation from rebuilding a
+   * transcript whose live tool/handover rows are richer than the server's. RECORDED
+   * FOR ITS OWN PASS (owner, July 25): it is engine surgery on the streaming path
+   * and wants its own review, not a rider on a query-policy change.
    *
    * FRESHNESS. `STALE_TIMES.standard` (60s): a conversation the viewer is not
    * actively driving changes only from another tab/device, and the mount +
