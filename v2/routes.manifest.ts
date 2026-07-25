@@ -22,7 +22,22 @@
  * v1's 404. Accepted while v2 is a preview: the links only exist because a v2 user
  * made them, and the edge closes at cutover.
  */
-export const V2_ROUTES = ['/', '/work', '/study', '/c/*', '/conversations'] as const;
+/**
+ * `/cases/*` covers the library, every case page, and every full judgment. It is
+ * the first PUBLIC surface v2 claims — a signed-out reader and a search-engine
+ * crawler both land on the v2 tree only if they carry the opt-in cookie, so in
+ * practice crawlers still see v1 until cutover. That is the correct order: the
+ * v2 pages ship their metadata and OG cards now, and flipping the audience is a
+ * separate, reversible decision.
+ */
+export const V2_ROUTES = [
+  '/',
+  '/work',
+  '/study',
+  '/c/*',
+  '/conversations',
+  '/cases/*',
+] as const;
 
 export type V2Route = (typeof V2_ROUTES)[number];
 

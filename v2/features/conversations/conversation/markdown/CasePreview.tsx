@@ -15,8 +15,10 @@ import { casesQueries } from '@/v2/features/cases/queries';
  * popover share it). It fetches LAZILY: this component only mounts inside the
  * Radix content, which Radix renders only once the preview opens — so a merely
  * visible case link never fetches, and a stream never triggers a request. Data
- * flows through the shared `casesQueries.detail` leaf (the lean `getBySlug`
- * payload, reference-tier cache), so a second open is instant from cache.
+ * flows through the `casesQueries.preview` leaf (the LEAN `getBySlug` payload —
+ * no related citation sets, since a transcript can mention a dozen cases and a
+ * hover must not pull a dozen judgments' worth of them), so a second open is
+ * instant from cache.
  *
  * Three explicit, component-scoped states (module design system): a skeleton
  * shaped like the resolved card (skeleton-first, no layout jump), a DISTINCT
@@ -62,7 +64,7 @@ function buildSummary(detail: CaseDetail): string {
 }
 
 export function CasePreview({ slug, href }: { slug: string; href: string }) {
-  const query = useQuery(casesQueries.detail(slug));
+  const query = useQuery(casesQueries.preview(slug));
   const detail = query.data?.data ?? null;
 
   if (query.isPending) {

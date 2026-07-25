@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { SearchFieldShape } from '@/v2/shell/SearchField';
 import { ConversationsListSkeleton } from '@/v2/features/conversations/list/states';
 
 /**
@@ -37,14 +37,9 @@ export default function ConversationsLoading() {
         inert
         className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6"
       >
-        {/* Reserved search field — the real chrome's shape, held still. */}
-        <div className="relative mb-4">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-          />
-          <div className="h-11 w-full rounded-4xl border border-input bg-input/30" />
-        </div>
+        {/* Reserved search field — the real chrome's shape, held still. Imported
+            from the same module as the live field so the two cannot drift. */}
+        <SearchFieldShape className="mb-4" />
         <ConversationsListSkeleton />
       </div>
     </>

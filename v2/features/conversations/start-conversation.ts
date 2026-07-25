@@ -4,7 +4,7 @@ import { AxiosError } from 'axios';
 import { chatApi } from '@/lib/api/chat';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
-import type { MessageAttachment } from '@/types/chat';
+import type { ChatReference, MessageAttachment } from '@/types/chat';
 import {
   appendUserTurn,
   deleteTranscript,
@@ -64,6 +64,17 @@ export interface StartConversationInput {
   confidential?: boolean;
   /** Redacted mode (plus-menu) — turn-1 sticky flag; 503 fails closed. */
   redacted?: boolean;
+  /**
+   * Tie this new conversation to the content it is about — the case page's
+   * "ask about this case" composer sends `[{ type: 'case', id: slug }]`.
+   *
+   * Id-native and sticky: the backend validates the reference, merges and dedupes
+   * it server-side, and honours it on the FIRST turn only, which is exactly what
+   * this create path is. That link is what makes
+   * `GET /cases/{slug}/conversations` able to list a reader's prior threads about
+   * a case, so the follow-up a week later resumes rather than restarts.
+   */
+  references?: ChatReference[];
 }
 
 export interface StartConversationDeps {
@@ -196,8 +207,16 @@ export async function startConversation(
   input: StartConversationInput,
   deps: StartConversationDeps,
 ): Promise<StartConversationResult> {
-  const { message, attachments, jurisdiction, workflowId, studyMode, confidential, redacted } =
-    input;
+  const {
+    message,
+    attachments,
+    jurisdiction,
+    workflowId,
+    studyMode,
+    confidential,
+    redacted,
+    references,
+  } = input;
   const fileIds = attachments.map((a) => a.file_id);
 
   // Confidential turn 1: persist the user turn to IDB BEFORE the POST so a crash
@@ -229,6 +248,8 @@ export async function startConversation(
       ...(confidential && { is_confidential: true, messages: [] }),
       // Redacted turn 1: sticky flag; the server swaps the message text.
       ...(redacted && { is_redacted: true }),
+      // Content this chat is about (case slug, …) — first turn only, sticky.
+      ...(references && references.length > 0 && { references }),
     };
     const response = await chatApi.start(applyJurisdiction(baseBody, jurisdiction));
 

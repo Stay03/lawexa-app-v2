@@ -1,0 +1,93 @@
+/**
+ * The case reading surface.
+ *
+ * WHY CSS AND NOT TAILWIND CLASSES. Everything here styles text the component
+ * does not emit element-by-element: the paragraphs inside `CaseText`, the blocks
+ * inside a quoted passage. Descendant rules are the honest tool for that, and
+ * they keep `CaseDocument.tsx` about STRUCTURE rather than a wall of
+ * `[&>p]:mt-4` selectors.
+ *
+ * WHY IT IS NOT `app/globals.css`'s `.case-document`. That block is v1's, it is
+ * global, and the v2 tree does not reach into v1 styling any more than it reaches
+ * into v1 components. This is the v2 reading surface, scoped to `.v2-case-doc`,
+ * living beside the component that renders it.
+ *
+ * The type is Fraunces — the standards' reading serif for "long-form judgments"
+ * — with `WONK 0` and a low `SOFT`, which is the difference between editorial and
+ * whimsical. `opsz` is pinned per role rather than left to `auto` so a heading
+ * and a paragraph do not drift apart at different viewport widths.
+ */
+
+.v2-case-doc {
+  --doc-measure: 68ch;
+}
+
+/* ── The heading block ──────────────────────────────────────────────────── */
+
+.v2-case-doc .doc-title {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 1.2rem + 1.6vw, 2.125rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* ── Section headings inside the document ───────────────────────────────── */
+
+.v2-case-doc .doc-heading {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 20;
+  font-weight: 600;
+  font-size: 1.0625rem;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+}
+
+/* ── Body prose ─────────────────────────────────────────────────────────── */
+
+.v2-case-doc .doc-prose {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 30, 'WONK' 0, 'opsz' 14;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: color-mix(in oklch, var(--foreground) 92%, transparent);
+  font-feature-settings: 'kern', 'liga', 'calt', 'onum';
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  max-width: var(--doc-measure);
+}
+
+@media (min-width: 768px) {
+  .v2-case-doc .doc-prose {
+    font-size: 1.125rem;
+    line-height: 1.8;
+  }
+}
+
+.v2-case-doc .doc-prose > p + p {
+  margin-top: 1.1em;
+}
+
+.v2-case-doc .doc-prose strong {
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+/**
+ * The holding. Set apart by a rule and a slight lift rather than a card — the
+ * standing "no box" rule applies to a judgment as much as to the home.
+ */
+.v2-case-doc .doc-holding {
+  border-inline-start: 2px solid color-mix(in oklch, var(--primary) 55%, transparent);
+  padding-inline-start: 1rem;
+}
+
+.v2-case-doc .doc-holding .doc-prose {
+  font-style: italic;
+  color: color-mix(in oklch, var(--foreground) 88%, transparent);
+}
+
+/* Reduced motion is handled globally for the v2 tree (shell.css stills every
+   `.animate-pulse` under `html.v2-document-lock`), so nothing is needed here. */

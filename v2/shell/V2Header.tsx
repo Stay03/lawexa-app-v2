@@ -57,11 +57,22 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   // their own paths now (see v2/shell/home-tabs.ts).
   const isHome = homeTabForPath(pathname ?? '') !== null;
   // Routes that EXPECT context show a title skeleton while it's null (skeleton-first)
-  // instead of an empty centre. Mirrors Dock.tsx's conversation-route test; kept
-  // generic so a future route can opt in the same way.
-  const expectsContext = pathname?.startsWith('/c/') ?? false;
+  // instead of an empty centre. A route opts in when its title is LATE — fetched
+  // rather than known — which is true of a conversation and of a case, and false
+  // of `/cases` itself (a literal string, published on mount, so it simply
+  // cross-fades in with no skeleton).
+  const path = pathname ?? '';
+  const isConversation = path.startsWith('/c/');
+  const isCase = /^\/cases\/[^/]/.test(path);
+  const expectsContext = isConversation || isCase;
   // Quiet orientation label for the left cluster — a category, NOT the title.
-  const leftLabel = isHome ? 'Home' : expectsContext ? 'Conversation' : null;
+  const leftLabel = isHome
+    ? 'Home'
+    : isConversation
+      ? 'Conversation'
+      : isCase
+        ? 'Case'
+        : null;
 
   return (
     <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-2 px-3">

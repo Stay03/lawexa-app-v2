@@ -172,6 +172,17 @@ not code.)
 
 ---
 
+## Related — the cases read endpoints (July 25, 2026)
+
+Phase 4 wave 1 rebuilt the case library, the case page and the full judgment. The endpoints
+that reader uses, and four open questions about them, are in
+[`backend-ask-2026-07-25-cases-read-endpoints.md`](backend-ask-2026-07-25-cases-read-endpoints.md).
+The one that can cost a reader something they paid for: **does `GET /api/cases/{slug}`
+record a view and spend a plan unit on every request?** One reader reading one case can
+produce up to five of those calls, two of them from a shared link's preview.
+
+---
+
 ## Related — a second backend exchange (July 18, 2026)
 
 Separate from the three notification-spine asks above, a second backend coordination round — the

@@ -1,8 +1,8 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
-import { Search } from 'lucide-react';
 
+import { SearchFieldShape } from '@/v2/shell/SearchField';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { ConversationsList } from './ConversationsList';
@@ -78,13 +78,7 @@ function ConversationsFallback() {
         inert
         className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6"
       >
-        <div className="relative mb-4">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-          />
-          <div className="h-11 w-full rounded-4xl border border-input bg-input/30" />
-        </div>
+        <SearchFieldShape className="mb-4" />
         <ConversationsListSkeleton />
       </div>
     </>

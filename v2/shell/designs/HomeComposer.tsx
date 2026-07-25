@@ -44,6 +44,7 @@ import { chatApi } from '@/lib/api/chat';
 import { extractApiError, extractBlockedReason } from '@/lib/utils/api-error';
 import type { IBlockedReason } from '@/types/message-pack';
 import type { UserRole } from '@/types/auth';
+import type { ChatReference } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import {
   RedactionUnavailableError,
@@ -130,6 +131,21 @@ export interface HomeComposerProps {
   onConfidentialChange: (next: boolean) => void;
   /** Study-mode CTA state (Study tab only) — sends `study_mode: true` on create. */
   studyMode?: boolean;
+  /**
+   * Tie the new conversation to the content it is about. Set by a CONTENT page
+   * (the case page's ask composer sends `[{ type: 'case', id: slug }]`); the home
+   * leaves it undefined.
+   *
+   * This is the whole reason the case page reuses this composer rather than
+   * growing its own: one composer, one create path, one set of privacy and
+   * jurisdiction rules. v1 answered the same need with a SECOND chat engine
+   * embedded in a sheet (800 lines with its own SSE handling and its own message
+   * rendering, which drifted from the real conversation page). Here the case page
+   * creates a normal conversation and hands the reader to the real one.
+   */
+  references?: ChatReference[];
+  /** Placeholder override — a content page asks about its own subject. */
+  placeholder?: string;
   /** Extra classes for the PromptInput card (per-design shadow / padding). */
   className?: string;
   /** Extra classes for the textarea (per-design font sizing). */
@@ -146,6 +162,8 @@ export function HomeComposer({
   confidential,
   onConfidentialChange,
   studyMode = false,
+  references,
+  placeholder = 'Ask a legal question',
   className,
   textareaClassName,
   sendButtonClassName,
@@ -313,6 +331,7 @@ export function HomeComposer({
           studyMode,
           confidential,
           redacted,
+          references,
         },
         { queryClient },
       );
@@ -500,7 +519,7 @@ export function HomeComposer({
           ) : null}
 
           <PromptInputTextarea
-            placeholder="Ask a legal question"
+            placeholder={placeholder}
             className={cn('text-foreground placeholder:text-muted-foreground', textareaClassName)}
           />
 
