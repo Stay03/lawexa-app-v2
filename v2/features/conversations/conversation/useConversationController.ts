@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useConversationStream,
-  hasTranscript,
+  claimTranscript,
   deleteTranscript,
 } from '@/v2/runtime/chat-engine';
 import type { MessageAttachment, ConversationReference } from '@/types/chat';
@@ -221,7 +221,7 @@ export function useConversationController(
   // DISABLED for a conversation this device already knows is confidential: that
   // content is device-owned and 404s server-side, so the request would be both
   // pointless and the one request whose response we must never store. The
-  // `hasTranscript` probe in the mount flow below is the authority; this mark is the
+  // `claimTranscript` check in the mount flow below is the authority; this mark is the
   // synchronous first gate, and the fetcher's `is_confidential` refusal is the third.
   const detailOptions = useMemo(
     () => conversationsQueries.detail({ conversationId, viewerId: serverUserId }),
@@ -372,18 +372,35 @@ export function useConversationController(
     // IndexedDB transcript FIRST, then still try to recover any in-flight execution
     // (confidential status carries execution_id).
     void (async () => {
-      const localExists = await hasTranscript(conversationId).catch(() => false);
+      // WHO, NOT JUST WHETHER (the shared-device fix). This used to ask only
+      // `hasTranscript` — does this DEVICE hold one — and then hand ownership to
+      // whoever was signed in. A device is not a person: on a shared laptop the next
+      // user to sign in could open this conversation's URL out of the browser
+      // history and be shown the whole transcript as its owner. `claimTranscript`
+      // answers for the VIEWER, and binds an unowned record to them (see its
+      // docblock for why adoption, and not refusal, is the right rule for content
+      // that has no other copy).
+      const claim = await claimTranscript(conversationId, serverUserId).catch(
+        () => 'missing' as const,
+      );
       if (cancelled) return;
-      if (localExists) {
+      if (claim === 'foreign') {
+        // A transcript IS here, and it is someone else's. Render exactly what a
+        // genuinely absent one renders — saying more would confirm that this
+        // conversation exists on this device and that a particular colleague used
+        // it, which is the leak, not the fix. No owner id is set, so the composer
+        // stays view-only regardless.
+        markConfidential(conversationId);
+        setError('confidential_transcript_lost');
+        return;
+      }
+      if (claim === 'owned') {
         markConfidential(conversationId);
         await loadConversationHistoryFromIDB(conversationId);
         if (cancelled) return;
-        // PRE-EXISTING DEFECT, DELIBERATELY LEFT ALONE (it deserves its own wave, and
-        // this one must not widen it): this trusts a device-local transcript as proof
-        // of ownership, so ANY signed-in user on this device is treated as the owner
-        // of a confidential conversation the device holds. The caching work does not
-        // touch it — the query is disabled on this path, nothing confidential is
-        // cached, and the value below still never leaves this component.
+        // Ownership is now EARNED, not assumed: this branch is only reachable when
+        // the stored `owner_user_id` is this viewer (or was unset and has just been
+        // bound to them).
         if (serverUserId != null) setLocalOwnerId(serverUserId);
         await recoverPendingState(conversationId).catch(() => {});
         return;
@@ -401,7 +418,8 @@ export function useConversationController(
         if (cancelled) return;
         if (err instanceof ConfidentialConversationError) {
           // The server reported a device-owned conversation whose transcript this
-          // device does NOT have (the `hasTranscript` probe above already said so).
+          // device does NOT have, or holds for a DIFFERENT user (the claim above already
+          // said so).
           // Nothing was cached; fall through to the device path, which surfaces the
           // honest "not available here" state instead of an empty transcript.
           markConfidential(conversationId);
@@ -432,6 +450,20 @@ export function useConversationController(
     setError,
     recoverPendingState,
   ]);
+
+  // ── Bind a NEW confidential transcript to its creator. ──
+  // The mount flow's `claimTranscript` guards the DIRECT-NAV path, but a freshly
+  // created confidential conversation arrives through the `conv_init` handoff
+  // branch, which returns before reaching it — so without this the transcript would
+  // stay unowned from creation until its first re-open, and anyone signing in on
+  // the device during that window could open it. Claiming here closes the window:
+  // the creator is by definition the viewer looking at it right now. Idempotent
+  // (a claim on an already-owned record is a read), so it is safe on every render
+  // pass and on a remount.
+  useEffect(() => {
+    if (!isConfidential || serverUserId == null) return;
+    void claimTranscript(conversationId, serverUserId).catch(() => {});
+  }, [isConfidential, conversationId, serverUserId]);
 
   // Mirror the server's sticky modes into the local marks the composer and the
   // engine's resolvers read. An external-store write (not React setState) and

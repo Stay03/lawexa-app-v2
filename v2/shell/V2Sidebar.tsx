@@ -137,13 +137,17 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
   const isMobile = useIsMobile();
   const pathname = usePathname();
   const signedIn = !!user;
+  // The cache PARTITION for the recents key (see `ViewerScoped`). Taken from the
+  // SERVER-verified user the layout already threads in here — no hook needed, and
+  // it is the same id `V2SessionProvider` publishes.
+  const viewerId = user?.id ?? null;
 
   // The SidebarContent element is the rail's scroll region — the infinite
   // sentinel measures its prefetch margin against THIS, not the viewport.
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const recentsQuery = useInfiniteQuery({
-    ...conversationsQueries.infiniteRecents(),
+    ...conversationsQueries.infiniteRecents({ viewerId }),
     enabled: signedIn,
   });
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({

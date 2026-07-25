@@ -121,13 +121,17 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   const { openMobile, setOpenMobile } = useSidebar();
   const pathname = usePathname();
   const signedIn = !!user;
+  // The cache PARTITION for the recents key (see `ViewerScoped`). Taken from the
+  // SERVER-verified user the layout already threads in here — no hook needed, and
+  // it is the same id `V2SessionProvider` publishes.
+  const viewerId = user?.id ?? null;
 
   // The single overflow-y-auto region below is the drawer's scroll root — the
   // infinite sentinel measures its prefetch margin against THIS element.
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const recentsQuery = useInfiniteQuery({
-    ...conversationsQueries.infiniteRecents(),
+    ...conversationsQueries.infiniteRecents({ viewerId }),
     enabled: signedIn,
   });
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({

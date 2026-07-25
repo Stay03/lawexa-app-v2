@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
@@ -76,6 +77,8 @@ const conversationSortKey = (row: ConversationListItem): number =>
  * the pattern the phase-4 cases / statutes / notes lists reuse.
  */
 export function ConversationsList({ signedIn }: { signedIn: boolean }) {
+  // The cache PARTITION — see `ViewerScoped`. Not a request parameter.
+  const { userId: viewerId } = useV2Session();
   // Captured ONCE (lazy init) so no clock read runs in render (React Compiler
   // purity); every row's relative time is measured against this fixed anchor.
   const [now] = useState(() => Date.now());
@@ -84,7 +87,7 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
   const activeSearch = committedSearch.trim();
 
   const query = useInfiniteQuery({
-    ...conversationsQueries.infiniteList({ search: committedSearch }),
+    ...conversationsQueries.infiniteList({ search: committedSearch, viewerId }),
     enabled: signedIn,
     placeholderData: keepPreviousData,
   });

@@ -64,9 +64,33 @@ export const INFINITE_RECENTS_PARAMS = {
  * Options for the full conversations LIST PAGE (`/conversations`, wave-5). Only
  * `search` varies at the call site — the rest of the params are fixed below.
  */
-export interface ConversationsListPageOptions {
+export interface ConversationsListPageOptions extends ViewerScoped {
   /** Title search (`?search=`). Empty / whitespace is treated as no filter. */
   search?: string;
+}
+
+/**
+ * VIEWER PARTITION — carried by every list key, not just the transcript's.
+ *
+ * `viewerId` is NOT a request parameter (the request is authorized by the bearer
+ * token); it is a CACHE PARTITION, and it is REQUIRED so that forgetting it is a
+ * type error rather than a silent leak.
+ *
+ * WHY IT IS NEEDED WHEN A GUARD ALREADY EXISTS. `V2CacheIdentityGuard` empties the
+ * whole v2 cache whenever the verified viewer changes, which does close this today.
+ * But it is ONE component carrying the promise for seven feature families: the v2
+ * QueryClient is a module singleton, v1's sign-out clears only v1's client, and v1
+ * login and logout are soft navigations — so any future path that changes the user
+ * without waking that guard hands the next person the previous person's
+ * conversation titles and previews. Partitioning makes the wrong list unreadable
+ * rather than merely un-rendered; the guard stays as the second layer.
+ *
+ * `null` (signed out) is its own partition, so a guest can never read a signed-in
+ * list either.
+ */
+export interface ViewerScoped {
+  /** The server-verified viewer id (`V2SessionSnapshot.userId`), `null` if signed out. */
+  viewerId: number | null;
 }
 
 /**
@@ -136,9 +160,9 @@ export const conversationsQueries = {
    * (owner, July 25 — see the constant for the full reasoning). One page, so one
    * request per arrival at the home.
    */
-  list: (params: ListConversationsParams = {}) =>
+  list: ({ viewerId, ...params }: ListConversationsParams & ViewerScoped) =>
     queryOptions({
-      queryKey: [...conversationsQueries.lists(), params] as const,
+      queryKey: [...conversationsQueries.lists(), params, { viewerId }] as const,
       queryFn: () => chatApi.listConversations(params),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
@@ -146,7 +170,8 @@ export const conversationsQueries = {
     }),
 
   /** The read-only Recents PEEK (single page) shared by the Design B home panel. */
-  recents: () => conversationsQueries.list(RECENTS_PARAMS),
+  recents: ({ viewerId }: ViewerScoped) =>
+    conversationsQueries.list({ ...RECENTS_PARAMS, viewerId }),
 
   /**
    * The infinite Recents list backing the sidebar rail + mobile drawer (owner
@@ -170,12 +195,13 @@ export const conversationsQueries = {
    * off. This rail stays fresh through the `conversationsCache` writers, the
    * window-focus refetch, and its 60s staleTime.
    */
-  infiniteRecents: () =>
+  infiniteRecents: ({ viewerId }: ViewerScoped) =>
     infiniteQueryOptions({
       queryKey: [
         ...conversationsQueries.lists(),
         'infinite',
         INFINITE_RECENTS_PARAMS,
+        { viewerId },
       ] as const,
       queryFn: ({ pageParam }) =>
         chatApi.listConversations({ ...INFINITE_RECENTS_PARAMS, page: pageParam }),
@@ -225,7 +251,7 @@ export const conversationsQueries = {
    * return. Accepted deliberately: five pages deep is precisely where silently
    * showing stale rows is worst.
    */
-  infiniteList: ({ search }: ConversationsListPageOptions = {}) => {
+  infiniteList: ({ search, viewerId }: ConversationsListPageOptions) => {
     const trimmed = search?.trim();
     const params: ListConversationsParams = {
       per_page: LIST_PAGE_PER_PAGE,
@@ -234,7 +260,12 @@ export const conversationsQueries = {
       ...(trimmed ? { search: trimmed } : {}),
     };
     return infiniteQueryOptions({
-      queryKey: [...conversationsQueries.lists(), 'infinite', params] as const,
+      queryKey: [
+        ...conversationsQueries.lists(),
+        'infinite',
+        params,
+        { viewerId },
+      ] as const,
       queryFn: ({ pageParam }) =>
         chatApi.listConversations({ ...params, page: pageParam }),
       initialPageParam: 1,

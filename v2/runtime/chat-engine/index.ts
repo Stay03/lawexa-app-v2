@@ -37,6 +37,8 @@ export {
   ensureTranscript,
   getTranscript,
   hasTranscript,
+  claimTranscript,
+  type TranscriptClaim,
   appendUserTurn,
   appendAssistantTurn,
   replaceLastUserTurnContent,

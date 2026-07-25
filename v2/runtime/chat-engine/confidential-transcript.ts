@@ -93,6 +93,25 @@ export interface ConfidentialTranscript {
   workflow_id?: number;
   title?: string;
   messages: ConfidentialTranscriptEntry[];
+  /**
+   * WHO THIS TRANSCRIPT BELONGS TO — the privacy fix for shared devices.
+   *
+   * The content of a confidential conversation lives ONLY here and never reaches
+   * our servers, which is the promise the UI makes. But "the device holds it" was
+   * the whole of the ownership test, and a device is not a person: on a shared
+   * laptop, the next user to sign in could open the conversation's URL — sitting in
+   * the browser history — and be shown the entire transcript as its owner.
+   *
+   * OPTIONAL, AND THAT IS DELIBERATE. This store is shared BYTE-FOR-BYTE with v1
+   * (same DB name, version, store, keyPath and index). Adding a required field, or
+   * bumping `DB_VERSION`, would break that. An optional key is invisible to v1: it
+   * writes records without it and passes ours through untouched.
+   *
+   * See {@link claimTranscript} for how an unowned record — one v1 wrote, or one v2
+   * wrote before this existed — is handled without destroying access to content
+   * that has no other copy.
+   */
+  owner_user_id?: number;
 }
 
 // Typed schema — the single improvement over v1's untyped `IDBPDatabase`. The
@@ -152,6 +171,7 @@ export async function ensureTranscript(
     workflow_id: seed?.workflow_id,
     title: seed?.title,
     messages: seed?.messages ?? [],
+    ...(seed?.owner_user_id !== undefined && { owner_user_id: seed.owner_user_id }),
   };
   await db.put(STORE, transcript);
   return transcript;
@@ -166,11 +186,67 @@ export async function getTranscript(
   return row ?? null;
 }
 
-/** True if this device holds a transcript for the conversation (cheap key probe). */
+/** True if this device holds a transcript for the conversation (cheap key probe).
+ *
+ *  DOES NOT ANSWER "MAY THIS VIEWER READ IT" — use {@link claimTranscript} for
+ *  that. This probe is kept for callers that only need existence (e.g. deciding
+ *  whether a delete has anything to do). */
 export async function hasTranscript(conversation_id: string): Promise<boolean> {
   const db = await getDB();
   const key = await db.getKey(STORE, conversation_id);
   return key != null;
+}
+
+/** What {@link claimTranscript} decided about this viewer and this transcript. */
+export type TranscriptClaim =
+  /** No transcript on this device. */
+  | 'missing'
+  /** This viewer owns it (or has just adopted an unowned one) — safe to open. */
+  | 'owned'
+  /** It belongs to a DIFFERENT user of this device. Treat exactly as `missing`. */
+  | 'foreign';
+
+/**
+ * Decide whether `viewerId` may open the device-owned transcript, and bind an
+ * unowned one to them.
+ *
+ * ── THE THREE CASES ─────────────────────────────────────────────────────────
+ *  • Stamped with THIS viewer → `owned`.
+ *  • Stamped with someone else → `foreign`. The caller must render the same
+ *    "not available here" state it renders for `missing` — see below.
+ *  • Not stamped at all → ADOPTED by this viewer, then `owned`.
+ *
+ * ── WHY ADOPTION, RATHER THAN REFUSING THE UNSTAMPED ────────────────────────
+ * Refusing them would be the stricter rule and it is the wrong one: this store is
+ * the ONLY copy of that content, so locking out every record written before this
+ * field existed — and every record v1 still writes today, since v1 has no concept
+ * of it — would destroy the user's own data to close a hole. Adoption is no weaker
+ * than the behaviour it replaces (an unstamped record was readable by anyone) and
+ * strictly stronger from the moment it happens, which is the first open. In
+ * practice that first open is the creator's, because they are the one who just made
+ * it.
+ *
+ * ── THE CALLER MUST NOT DISTINGUISH `foreign` FROM `missing` ────────────────
+ * Telling a user "this belongs to someone else" would itself leak: it confirms that
+ * a particular confidential conversation exists on this device and that a specific
+ * colleague used it. The honest, non-leaking answer is the one we already show when
+ * a transcript is genuinely absent.
+ *
+ * A `null` viewer (signed out) never owns and never adopts — it can only read a
+ * record it could already prove was its own, which is none.
+ */
+export async function claimTranscript(
+  conversation_id: string,
+  viewerId: number | null,
+): Promise<TranscriptClaim> {
+  const db = await getDB();
+  const row = await db.get(STORE, conversation_id);
+  if (!row) return 'missing';
+  if (viewerId == null) return 'foreign';
+  if (row.owner_user_id === viewerId) return 'owned';
+  if (row.owner_user_id !== undefined) return 'foreign';
+  await db.put(STORE, { ...row, owner_user_id: viewerId });
+  return 'owned';
 }
 
 /** Append a user turn (persisted BEFORE the POST so a crash never loses it). */

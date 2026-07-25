@@ -297,9 +297,25 @@ each its own implement → adversarial-review → verify → ship loop:
   tab, which matters most on a live transcript. `aria-hidden` because the row is already a
   `role="status"` live region whose text carries the meaning. WATCH: 0.1.x, so the API is not settled;
   it is small and MIT, so vendoring is the fallback.
+- **BOTH RECORDED PRIVACY ITEMS CLOSED (July 25).** (1) SHARED-DEVICE CONFIDENTIAL OWNERSHIP:
+  `ConfidentialTranscript` gains an optional `owner_user_id` and `claimTranscript()` replaces
+  `hasTranscript()` at the gate — ownership is now the VIEWER's, not the device's. Optional because
+  the store is shared byte-for-byte with v1 (a required field or a `DB_VERSION` bump would break
+  it). An UNSTAMPED record is ADOPTED, not refused: this is the only copy of that content, so
+  locking out everything written before the field existed — including everything v1 still writes —
+  would destroy user data to close a hole. A `foreign` transcript renders exactly what a `missing`
+  one renders, because "this belongs to someone else" would itself confirm the conversation exists
+  on this device. The create path claims too, so a new transcript is bound at birth rather than at
+  first re-open. (2) LIST CACHE KEYS: `viewerId` is now REQUIRED on every list key (`ViewerScoped`),
+  so forgetting it is a type error; the wrong list is unreadable rather than merely un-rendered, and
+  `V2CacheIdentityGuard` becomes the second layer instead of the only one. `server.ts` stays
+  CONCURRENT — all three requests go out together and the id is needed only at the WRITE, after
+  every response is in hand (`verifySession()` is React-`cache()`d, so it shares the layout's single
+  round trip); a cookie that no longer resolves to a user now hydrates nothing rather than seeding
+  the guest entry with a signed-in user's rows.
 - **W6 — on-device mobile verification + metadata** — **PASSED (owner, July 25).** The owner ran the
-  checklist on real devices and reported it clean, which OPENS THE PHASE GATE. Remaining before
-  `post-implementation.md`: the two recorded privacy items below. Original scope: iOS Safari + Android Chrome
+  checklist on real devices and reported it clean, which OPENS THE PHASE GATE. The two recorded privacy items are
+  now CLOSED too (see below), so `post-implementation.md` is the only thing left in the phase. Original scope: iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.
 

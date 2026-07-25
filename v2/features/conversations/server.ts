@@ -3,6 +3,7 @@ import { dehydrate, type DehydratedState } from '@tanstack/react-query';
 import type { ConversationsListResponse, ListConversationsParams } from '@/types/chat';
 import { apiFetch } from '@/v2/runtime/api-server';
 import { getSessionToken } from '@/v2/runtime/session-token';
+import { verifySession } from '@/v2/runtime/session';
 import { getServerQueryClient } from '@/v2/runtime/query';
 import { conversationsQueries, INFINITE_RECENTS_PARAMS } from './queries';
 
@@ -66,7 +67,8 @@ function fetchConversationsPage(
  * the layout's single `<HydrationBoundary>` seeds both keys.
  *
  * CONCURRENT, not serial. The two requests are issued together, and the layout runs this
- * whole function concurrently with `verifySession()` — which is why it no longer needs
+ * whole function concurrently with `verifySession()` — the id is needed only at the
+ * WRITE, after every response is in hand. Historically this is why it no longer needs
  * the verified user (below) and why the shell's server round trips overlap instead of
  * stacking. TTFB is the slowest single request, not their sum.
  *
@@ -124,34 +126,47 @@ export async function prefetchRecentsState(): Promise<DehydratedState | undefine
     if (!token) return undefined;
 
     const queryClient = getServerQueryClient();
-    const infinite = conversationsQueries.infiniteRecents();
-    const peek = conversationsQueries.recents();
-    // The peek's params object is the LAST segment of its own query key (`list(params)`
-    // builds the key as `[...lists(), params]`). Reading it back off the key — rather than
-    // re-declaring it — is what makes the request and the entry it hydrates provably the
-    // same query, without `queries.ts` having to export a second params constant.
-    const [, , peekParams] = peek.queryKey;
+    // A throwaway instance built only to READ the params back off its key — the
+    // viewer is irrelevant here and is supplied properly at the write below.
+    const peek = conversationsQueries.recents({ viewerId: null });
+    // The peek's params object is the SECOND-TO-LAST segment of its own key
+    // (`list()` builds it as `[...lists(), params, { viewerId }]`). Reading it back
+    // off the key — rather than re-declaring it — is what makes the request and the
+    // entry it hydrates provably the same query.
+    const peekParams = peek.queryKey[2];
 
-    await Promise.allSettled([
-      queryClient.prefetchInfiniteQuery({
-        queryKey: infinite.queryKey,
-        // Literal mirror of `infiniteRecents()`'s own queryFn argument.
-        queryFn: ({ pageParam }) =>
-          fetchConversationsPage({ ...INFINITE_RECENTS_PARAMS, page: pageParam }),
-        initialPageParam: infinite.initialPageParam,
-        getNextPageParam: infinite.getNextPageParam,
-        staleTime: infinite.staleTime,
-        // First page only — subsequent pages load client-side via the sentinel.
-        pages: 1,
-      }),
-      queryClient.prefetchQuery({
-        queryKey: peek.queryKey,
-        // Literal mirror of `recents()`'s own queryFn argument (the peek carries no
-        // `page` — it is a single fixed page, so the API's default is the contract).
-        queryFn: () => fetchConversationsPage(peekParams),
-        staleTime: peek.staleTime,
-      }),
+    // ── PARTITIONED, AND STILL CONCURRENT. ──
+    // The list keys now carry the viewer id (`ViewerScoped`), so this prefetch needs
+    // the verified user before it can decide WHERE to store what it fetched. Awaiting
+    // that first would put `/auth/me` in front of `/conversations` again and undo the
+    // TTFB win of running them together. So all three go out at once and the id is
+    // only needed at the WRITE, which is after every response is in hand anyway.
+    //
+    // `verifySession()` is React-`cache()`d, so this shares the layout's single
+    // `/auth/me` round trip rather than adding one.
+    const [session, infinitePage, peekPage] = await Promise.all([
+      verifySession(),
+      fetchConversationsPage({ ...INFINITE_RECENTS_PARAMS, page: 1 }),
+      fetchConversationsPage(peekParams),
     ]);
+
+    // A cookie that no longer resolves to a user: hydrate nothing. Writing under a
+    // `null` partition would seed the GUEST entry with a signed-in user's rows.
+    if (!session) return undefined;
+    const viewerId = session.user.id;
+
+    queryClient.setQueryData(
+      conversationsQueries.infiniteRecents({ viewerId }).queryKey,
+      // First page only — subsequent pages load client-side via the sentinel. The
+      // shape must match what `useInfiniteQuery` expects, since this replaces the
+      // former `prefetchInfiniteQuery` (which cannot be used now: the key depends on
+      // a value that is not known until after the fetch).
+      { pages: [infinitePage], pageParams: [1] },
+    );
+    queryClient.setQueryData(
+      conversationsQueries.recents({ viewerId }).queryKey,
+      peekPage,
+    );
 
     return dehydrate(queryClient);
   } catch {

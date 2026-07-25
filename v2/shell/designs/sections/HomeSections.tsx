@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { BookText, Hash, Lock, MessageSquare, NotebookPen, Scale } from 'lucide-react';
 
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
@@ -97,7 +98,8 @@ export function ChannelMessagesSection() {
  */
 export function ConversationsSection() {
   const [now] = useState(() => Date.now());
-  const query = useQuery(conversationsQueries.recents());
+  const { userId: viewerId } = useV2Session();
+  const query = useQuery(conversationsQueries.recents({ viewerId }));
   const conversations = (query.data?.data ?? []).slice(0, HOME_SECTION_ROWS);
 
   return (
