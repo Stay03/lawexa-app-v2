@@ -6,6 +6,14 @@ Docker partition (`/var/lib/docker`) filled up — build cache + old images + ca
 locally). Coolify keeps the previous container running on a failed build, so prod stays safe.
 The `$NIXPACKS_PATH UndefinedVar` warning in build logs is harmless Nixpacks template noise.
 
+**Second occurrence: July 25, 2026 (commit bd132db).** Same signature, and it failed EARLIER in
+the pipeline than the first one — inside `npm ci`, at step 7/11, before a single file was
+compiled (`npm warn tar TAR_ENTRY_ERROR ENOSPC: no space left on device, write`). Failing during
+dependency extraction rather than during `next build` means the host had less headroom this time,
+not more. The prevention section below was NOT applied after the first occurrence; it is now the
+main action, not an optional follow-up. Two failures a week apart on a host that keeps adding
+build cache is a schedule, not an accident.
+
 ## Fix, safest-first (SSH as root/docker user)
 
 1. **Assess (read-only):**
