@@ -168,9 +168,22 @@ export function MessageList({
   const groups = useMemo(() => groupMessages(messages), [messages]);
   const streamStartTime = useMemo(() => computeStreamStart(messages), [messages]);
   const lastGroupIndex = groups.length - 1;
-  const lastMessage = messages[messages.length - 1];
-  const showActivity =
-    isStreaming && (!!narration || (!!lastMessage && lastMessage.role !== 'assistant'));
+  /**
+   * WHILE A TURN IS RUNNING, THIS ROW IS ALWAYS ON (owner, July 25: "as long as it's
+   * still streaming that part should always show").
+   *
+   * It used to also require narration, or a last message that was not an assistant
+   * row. Both extra terms were wrong once the model started writing: the controller
+   * expires narration after 8s (NARRATION_TTL_MS) so the calm line can fall back to
+   * its resting label — but that fallback never got a chance, because the expiry
+   * flipped this condition false and took the ORB with it. The row vanished
+   * mid-answer, which is exactly when the reader most wants to know work is still
+   * happening.
+   *
+   * `ActivityStatus` already renders the resting label when narration is null, so
+   * the TTL now does what its own docstring says instead of hiding the region.
+   */
+  const showActivity = isStreaming;
 
   /**
    * WHERE THE ACTIVITY ROW GOES — above the answer, not below it (owner, July 25).
