@@ -79,9 +79,9 @@ export function DeveloperSettings() {
               Line-by-line answers
             </Label>
             <p className="text-sm text-muted-foreground">
-              Releases a streamed answer one line at a time, with a placeholder
-              for the line still arriving, instead of the continuous word-by-word
-              flow. Applies to the v2 chat only and takes effect immediately.
+              Releases a streamed answer one line at a time instead of the
+              continuous word-by-word flow. Applies to the v2 chat only and takes
+              effect immediately.
             </p>
           </div>
           <Switch

@@ -5,7 +5,8 @@ import { Eye, ShieldCheck } from 'lucide-react';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useConversationController } from './useConversationController';
 import { MessageList } from './MessageList';
-import { ConversationComposer, ComposerSkeleton } from './ConversationComposer';
+import { ConversationComposer } from './ConversationComposer';
+import { ComposerSkeleton } from './skeletons';
 import { ConfidentialBanner } from './ConfidentialBanner';
 import { V2ChatProvider } from './chat-context';
 
@@ -46,8 +47,9 @@ import { V2ChatProvider } from './chat-context';
  * conversation's owner to decide composer vs. view-only. It used to arrive as a prop
  * from `app/v2/c/[id]/page.tsx`, which had to `await verifySession()` to produce it —
  * an uncached `/auth/me` round trip on every navigation, so the route skeleton covered a
- * wait on Laravel every time (the skeleton stays — the route is still dynamic — but now
- * covers an I/O-free Next round trip). It now comes from `<V2SessionProvider>`, which
+ * wait on Laravel every time. (That skeleton is now absent on a return trip as well: the
+ * page exports `unstable_dynamicStaleTime`, so the router serves the segment from its
+ * cache instead of re-fetching it.) It now comes from `<V2SessionProvider>`, which
  * the v2 layout populates
  * from ITS `verifySession()` call. The value is byte-for-byte the same
  * (`session?.user.id ?? null`), produced by the same server-only DAL call against the

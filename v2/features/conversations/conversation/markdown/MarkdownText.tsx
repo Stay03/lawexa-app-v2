@@ -7,7 +7,6 @@ import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { CaseMentionLink } from './CaseMentionLink';
 import { rehypeStreamWords } from './rehype-stream-words';
-import { StreamingLineSkeleton } from './StreamingLineSkeleton';
 
 /**
  * MarkdownText — the streaming-safe markdown renderer (foundation-standards §5).
@@ -128,7 +127,6 @@ export const MarkdownText = memo(function MarkdownText({
   content,
   className,
   animate = false,
-  showLineSkeleton = false,
 }: {
   content: string;
   className?: string;
@@ -136,14 +134,6 @@ export const MarkdownText = memo(function MarkdownText({
    *  only for LIVE streaming text; a finished message renders with no span
    *  overhead at all. */
   animate?: boolean;
-  /**
-   * `line` streaming style only: render the stand-in bar for the line still
-   * arriving, as the last child INSIDE this prose container — which is where the
-   * next line will actually appear. A PRIMITIVE rather than a `ReactNode` slot on
-   * purpose: a node prop would be a fresh element every render and would defeat
-   * this component's memo for every finished message in the transcript.
-   */
-  showLineSkeleton?: boolean;
 }) {
   const blocks = useMemo(() => splitMarkdownBlocks(content), [content]);
   const rehypePlugins = animate ? REHYPE_ANIMATED : REHYPE_PLAIN;
@@ -152,7 +142,6 @@ export const MarkdownText = memo(function MarkdownText({
       {blocks.map((block, index) => (
         <MarkdownBlock key={index} content={block} rehypePlugins={rehypePlugins} />
       ))}
-      {showLineSkeleton && <StreamingLineSkeleton />}
     </div>
   );
 });

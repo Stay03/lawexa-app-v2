@@ -631,35 +631,14 @@ export function ConversationComposer({
 }
 
 /**
- * ComposerSkeleton — the composer's resolving/loading visual, co-located with the
- * real composer so its geometry can never drift (lockstep discipline). Rendered by
- * ConversationScreen in the FLOATING composer layer (the content region), NOT the
- * dock — the composer relocated out of the dock grid-row so the transcript scrolls
- * genuinely behind/under it. Because that layer is `absolute` (out of flow) over a
- * transcript that already reserves its bottom padding, the skeleton→composer swap
- * causes NO transcript CLS; the lockstep still matters so the FLOATING pill doesn't
- * jump when it resolves (it grows upward from `bottom-0`, so a height change would
- * shift the pill's top). Mirrors the empty composer exactly: a `mb-2` jurisdiction
- * chip floating above a single-input-row card (`+` · textarea · Send) at the compact
- * v1 scale — `size-8` controls, an `h-9` textarea, `max-w-xs sm:max-w-md`. Keep this in
- * lockstep with the pill AND with the `--v2-conv-dock-h` fallback in MessageList.
+ * The composer's RESOLVING visual lives in `./skeletons` (`ComposerSkeleton`), not
+ * here. It was co-located with the real pill for lockstep, but the route boundary
+ * (`app/v2/c/[id]/loading.tsx`) has to draw the same shape — and it is a SERVER
+ * component, so importing it from this `'use client'` module would drag the whole
+ * prompt-input tree into the loading payload. `./skeletons` is dependency-free and
+ * server-safe, and it is now the ONE definition every consumer renders.
+ *
+ * LOCKSTEP STILL APPLIES: change the pill's geometry below and change
+ * `ComposerSkeleton` in the same commit (its docblock names the three numbers that
+ * must agree).
  */
-export function ComposerSkeleton() {
-  return (
-    <div className="mx-auto w-full max-w-xs px-4 pb-3 pt-2 sm:max-w-md" aria-hidden>
-      {/* Meta row — the jurisdiction chip, floating ABOVE the pill (mb-2). */}
-      <div className="mb-2 px-1">
-        <div className="bg-muted h-8 w-28 animate-pulse rounded-full" />
-      </div>
-      {/* The pill — the PromptInput card holding ONLY the single input row, at the
-          compact v1-floating-prompt scale (size-8 controls, h-9 textarea). */}
-      <div className="border-border bg-muted/50 rounded-3xl border p-2">
-        <div className="flex items-end gap-1.5">
-          <div className="bg-muted size-8 shrink-0 animate-pulse rounded-full" />
-          <div className="bg-muted h-9 flex-1 animate-pulse rounded-2xl" />
-          <div className="bg-muted size-8 shrink-0 animate-pulse rounded-full" />
-        </div>
-      </div>
-    </div>
-  );
-}

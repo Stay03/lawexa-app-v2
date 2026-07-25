@@ -14,8 +14,10 @@ import type { StreamStyle } from './runtime/chat-engine/stream-smoother';
  *    controller pays for them and each new word fades in. Reads as one moving body
  *    of text.
  *  - `line` — one reader-sized unit at a time (a source line, a sentence, or a table
- *    held whole), with a skeleton bar standing in for the unit still arriving. Reads
- *    as a document being written line by line.
+ *    held whole). Reads as a document being written line by line. It is a RELEASE
+ *    RHYTHM and nothing else: the stand-in bar that once marked the unit still
+ *    arriving was removed on the owner's call, so this preference now reaches only
+ *    the smoother and never the renderer.
  *
  * WHY localStorage AND NOT A COOKIE. `v2/cookie.ts` is a cookie because the SERVER
  * proxy has to read it on every request. Nothing on the server ever needs to know

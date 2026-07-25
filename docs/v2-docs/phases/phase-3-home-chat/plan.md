@@ -184,6 +184,35 @@ each its own implement → adversarial-review → verify → ship loop:
   content already in cache (standards §8 + corollary). **RECORDED FOR THEIR OWN WAVES:** shared-device
   confidential ownership (`useConversationController` grants ownership from a device-local IDB
   transcript), and unpartitioned conversation LIST cache keys.
+- **NAVIGATION + TRANSCRIPT ROUND (owner's four items, July 25) — SHIPPED.** Built and reviewed by
+  the coordinator directly (the owner asked for no subagents this round). **(1)** The `line` stream
+  style's stand-in bar is gone — the style is now a release rhythm and nothing else, so
+  `useStreamStyle` no longer reaches the renderer at all (`StreamingLineSkeleton.tsx` deleted, plus
+  its prop on `MarkdownText`/`ChatContent` and the `.v2-stream-line` rule). **(2+3) THE ROOT CAUSE
+  BEHIND BOTH:** every v2 route is dynamic (the layout reads cookies) and Next's default
+  `staleTimes.dynamic` is `0`, so EVERY navigation re-fetched the segment and `loading.tsx` covered
+  the wait — which is why none of the wave-4/5 cache work was ever visible. Fixed with the PER-PAGE
+  `export const unstable_dynamicStaleTime = 300` on the three v2 pages, deliberately NOT
+  `experimental.staleTimes` in `next.config.ts` (that would re-time every v1 route too; Next forbids
+  the export in layouts, which is the same boundary from the other side). Identity stays exact:
+  `SessionSync` → `router.refresh()` → `invalidateBfCache()` version-bumps every cached segment, and
+  `V2CacheIdentityGuard` clears the query cache on the same edge. VERIFIED: `V2_ENABLED=true next
+  build` classifies all three as ƒ, and `next start` emits `"d":300` in the RSC body of `/`,
+  `/conversations` and `/c/{id}` (Next 16.2.10 `segment-cache/bfcache.js` reads that into `staleAt`).
+  NOTE: a build with `V2_ENABLED` unset prerenders the v2 routes as STATIC 404s — the kill switch
+  fires before `cookies()` — so only a `V2_ENABLED=true` build is representative. **(3)** The route
+  boundary and the screen's own resolving state drew DIFFERENT silhouettes (transcript-only vs.
+  transcript + composer), so the text-box skeleton appeared on a cold open and vanished on a warm
+  one; both now render the one definition in `v2/features/conversations/conversation/skeletons.tsx`
+  (server-safe, so the route boundary ships no client JS for it). **(4)** The transcript painted at
+  `scrollTop 0` and only jumped to the bottom after the ResizeObserver + rAF — one guaranteed frame
+  of the wrong end of the conversation, then a full-height jump. A LAYOUT effect now lands the first
+  paint at the bottom before the browser draws; the last four groups are exempt from
+  `content-visibility` so the arrival screenful is measured rather than estimated
+  (`UNVIRTUALIZED_TAIL`); and the transcript fades in instead of cutting in.
+  tsc 0 / eslint 0 / `V2_ENABLED=true next build` clean.
+  NOT VERIFIED IN A BROWSER — the mechanism is confirmed end to end at the server boundary, but the
+  absence of the skeleton on a return trip is for the owner's live test.
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.

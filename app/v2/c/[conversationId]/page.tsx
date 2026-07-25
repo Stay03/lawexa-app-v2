@@ -16,8 +16,8 @@ import { ConversationScreen } from '@/v2/features/conversations/conversation/Con
  * navigation into a conversation (React `cache()` dedupes only within one server
  * render, and a soft navigation re-renders this page without re-rendering the
  * layout), which is what made `loading.tsx` cover a wait on Laravel every time.
- * The route stays dynamic, so that boundary still shows for one I/O-free Next
- * round trip — the wait is shortened, not removed. The ownership id
+ * That shortened the wait but did not remove the boundary; `unstable_dynamicStaleTime`
+ * below does, by letting a return trip skip the round trip entirely. The ownership id
  * the client screen checks against is still `verifySession()`'s server-verified
  * `user.id` and nothing else: the v2 layout calls `verifySession()` once and
  * publishes that id through `<V2SessionProvider>`, and `ConversationScreen` reads
@@ -78,6 +78,24 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
     robots: { index: true, follow: true },
   };
 }
+
+/**
+ * KEEP THIS PAGE IN THE CLIENT ROUTER CACHE FOR 5 MINUTES. Same lever and same
+ * safety argument as `app/v2/conversations/page.tsx`, which carries the full note.
+ *
+ * The transcript itself is already cached (`conversationsQueries.detail`, 30-minute
+ * retention, seeded into the engine at construction), so a revisit re-painted it in
+ * the first render — but only AFTER a server round trip that this segment does not
+ * need, with `loading.tsx` over the top of it. Re-using the payload is what lets
+ * that first render actually be the first thing the user sees.
+ *
+ * WHAT THE PAYLOAD HOLDS. Only this route's metadata (title, canonical, OG card).
+ * That is head content, invisible in-app, and `fetchConversationForMetadata` is
+ * itself revalidated every 60s server-side. A conversation whose title upgrades
+ * within the window shows the new title in the app immediately regardless — the
+ * header reads it from the engine, not from here.
+ */
+export const unstable_dynamicStaleTime = 300;
 
 export default async function V2ConversationPage({ params }: ConversationPageProps) {
   // The only remaining await: the route params, which cost no I/O.

@@ -34,8 +34,9 @@ import { ConversationsListSkeleton } from './states';
  * from `verifySession()` and publishes it — but sourcing it here means the
  * `/conversations` page shell no longer has to `await` `/auth/me` before it can
  * render, which is what put a Laravel round trip behind the route skeleton on
- * every navigation (the skeleton itself remains — the route is still dynamic —
- * but now covers an I/O-free Next round trip). The flag is
+ * every navigation. (The skeleton itself is now gone on a return trip too — the
+ * page exports `unstable_dynamicStaleTime`, so the router serves the segment from
+ * its cache instead of re-fetching it.) The flag is
  * resolved on this component's first render (SSR on a hard load, in-memory
  * context on a soft nav), so `ConversationsList` never sees it flip.
  */

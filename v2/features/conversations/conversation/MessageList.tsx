@@ -1,6 +1,13 @@
 'use client';
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ArrowDown, RotateCcw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +26,7 @@ import { ErrorRow } from './rows/ErrorRow';
 import { CompactToolChain } from './tools/CompactToolChain';
 import { ActivityStatus } from './ActivityStatus';
 import { ReferenceChips } from './ReferenceChips';
+import { TranscriptSkeleton } from './skeletons';
 
 /**
  * MessageList — the natively-virtualized, memoized transcript with chat scroll
@@ -38,7 +46,13 @@ import { ReferenceChips } from './ReferenceChips';
  * than force-fit a fragile windowing of streaming content, off-screen rows are
  * virtualized natively with `content-visibility: auto` + `contain-intrinsic-size:
  * auto` (the browser skips rendering/layout off-screen and remembers measured
- * height — no scroll jump). The active/last group is never containment-virtualized.
+ * height — no scroll jump). The last few groups — the screenful the reader lands on
+ * — are never containment-virtualized; see UNVIRTUALIZED_TAIL for why an estimated
+ * tail made the first paint settle visibly.
+ *
+ * FIRST PAINT. The opening scroll position is set in a LAYOUT effect, so the first
+ * frame the user sees is already at the bottom of the conversation. The transcript
+ * then fades in rather than cutting in. Both are below, each with its own note.
  *
  * SCROLL ETIQUETTE (foundation-standards §5). Follow only within ~40px of the
  * bottom; any upward scroll disengages instantly; a jump-to-latest pill shows the
@@ -52,6 +66,36 @@ import { ReferenceChips } from './ReferenceChips';
  *  fraction of a line mid-ease, which must still count as "at bottom"); a real
  *  user scroll-up of more than this still detaches instantly. */
 const BOTTOM_THRESHOLD_PX = 80;
+
+/**
+ * How many groups at the END of the transcript are exempt from native
+ * virtualization, on top of the last one.
+ *
+ * WHY THIS IS NOT ZERO (the owner's "the messages just load jumpy"). Off-screen
+ * groups carry `contain-intrinsic-size: auto 240px`, so before a group has ever
+ * been rendered the browser SIZES IT AT A GUESS. On a fresh mount every group
+ * except the last is a guess, which means `scrollHeight` — the number the
+ * scroll-to-bottom below aims at — is a guess too. The view lands near the bottom,
+ * the real groups around it then render at their true heights, the total height
+ * moves, and the follower corrects: content visibly settling under the reader.
+ *
+ * Four real groups is about one phone screenful, so the region the user actually
+ * looks at on arrival is measured rather than estimated. Everything further up
+ * stays virtualized and resolves off-screen, where a height change costs nothing
+ * (the browser's scroll anchoring absorbs it and the follower is already pinned to
+ * a bottom that did not move).
+ */
+const UNVIRTUALIZED_TAIL = 3;
+
+/**
+ * `useLayoutEffect` in the browser, `useEffect` on the server — React warns that a
+ * layout effect does nothing during SSR, and the conversation screen does server-
+ * render (with an empty transcript, so the browser branch is the only one that ever
+ * has work to do). Resolved ONCE at module scope, so the hook call site below is
+ * unconditional and rules-of-hooks holds.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 /** First tool/handover start, else first streaming placeholder — pure. */
 function computeStreamStart(messages: readonly EngineMessage[]): number | null {
@@ -109,6 +153,34 @@ export function MessageList({
   const lastMessage = messages[messages.length - 1];
   const showActivity =
     isStreaming && (!!narration || (!!lastMessage && lastMessage.role !== 'assistant'));
+
+  // ── THE FIRST PAINT LANDS AT THE BOTTOM, BEFORE THE BROWSER DRAWS ANYTHING. ──
+  //
+  // Owner: "the messages just load on the page jumpy". This was the whole of it.
+  // Nothing set the scroll position for the first render, so the browser drew the
+  // transcript at scrollTop 0 — the START of the conversation — and only afterwards
+  // did the ResizeObserver below fire, schedule a frame, and snap to the bottom. So
+  // every open painted at least one frame of the wrong end of the conversation and
+  // then jumped the full height of it.
+  //
+  // A LAYOUT effect is the fix, not a passive one: it runs after the DOM is updated
+  // and BEFORE the browser paints, so the very first frame the user sees is already
+  // at the bottom. There is no jump left to smooth, because there is no jump.
+  //
+  // Assigning past the maximum clamps to it, so `scrollHeight` needs no arithmetic
+  // and cannot overshoot. It fires on the commit where the transcript first has
+  // content — the same effect covers a warm cache (content in the first render) and
+  // a cold fetch (content arriving later) — and the ref makes it once per mount, so
+  // it can never fight a user who has scrolled up. `MessageList` remounts per
+  // conversation, so the next conversation gets its own first landing.
+  const didInitialScrollRef = useRef(false);
+  useIsomorphicLayoutEffect(() => {
+    if (didInitialScrollRef.current || messages.length === 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    didInitialScrollRef.current = true;
+    el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
 
   // Sync refs + imperative scroll on a new turn. No setState here (Compiler-clean):
   // scrolling to the bottom fires the scroll handler, which resets the pill.
@@ -230,27 +302,44 @@ export function MessageList({
             </div>
           )}
 
-          {isLoadingHistory && <HistorySkeleton />}
+          {isLoadingHistory && <TranscriptSkeleton />}
 
-          {groups.map((group, gi) => (
-            <GroupRow
-              key={groupKey(group, gi)}
-              group={group}
-              virtualize={gi < lastGroupIndex}
-              isLastGroup={gi === lastGroupIndex}
-              hasLaterUserTurn={
-                group.type === 'single' &&
-                group.message.role === 'assistant' &&
-                groups.slice(gi + 1).some((g) => g.type === 'single' && g.message.role === 'user')
-              }
-              streamingText={streamingText}
-              reasoning={reasoning}
-              isStreaming={isStreaming}
-              canRegenerate={canRegenerate}
-              onRegenerate={onRegenerate}
-              onRetry={onRetry}
-            />
-          ))}
+          {/* The transcript FADES IN rather than cutting in (standing rule #24 —
+              nothing appears abruptly). The wrapper mounts on the commit that first
+              has groups, so the fade plays exactly once per open: over the deleted
+              route/history skeleton on a cold load, and on arrival at the bottom on
+              a warm one. It stays mounted afterwards, so streaming never replays it.
+              Its own `gap-6` keeps the column's rhythm unchanged by the extra
+              element. */}
+          {groups.length > 0 && (
+            <div className="flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+              {groups.map((group, gi) => (
+                <GroupRow
+                  key={groupKey(group, gi)}
+                  group={group}
+                  // The last few groups are never virtualized — see
+                  // UNVIRTUALIZED_TAIL. They are the screenful the reader lands on,
+                  // so they must be MEASURED, not estimated, or the view settles
+                  // under them after the first paint.
+                  virtualize={gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
+                  isLastGroup={gi === lastGroupIndex}
+                  hasLaterUserTurn={
+                    group.type === 'single' &&
+                    group.message.role === 'assistant' &&
+                    groups
+                      .slice(gi + 1)
+                      .some((g) => g.type === 'single' && g.message.role === 'user')
+                  }
+                  streamingText={streamingText}
+                  reasoning={reasoning}
+                  isStreaming={isStreaming}
+                  canRegenerate={canRegenerate}
+                  onRegenerate={onRegenerate}
+                  onRetry={onRetry}
+                />
+              ))}
+            </div>
+          )}
 
           {showActivity && (
             <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
@@ -382,26 +471,3 @@ const GroupRow = memo(function GroupRow({
 
   return <div style={style}>{body}</div>;
 });
-
-/** Skeleton-first history load — occupies plausible geometry, no text flash. */
-function HistorySkeleton() {
-  return (
-    <div className="flex flex-col gap-6" aria-hidden>
-      <div className="flex justify-end">
-        <div className="bg-muted h-10 w-2/3 animate-pulse rounded-3xl" />
-      </div>
-      <div className="space-y-2">
-        <div className="bg-muted h-4 w-full animate-pulse rounded" />
-        <div className="bg-muted h-4 w-11/12 animate-pulse rounded" />
-        <div className="bg-muted h-4 w-4/5 animate-pulse rounded" />
-      </div>
-      <div className="flex justify-end">
-        <div className="bg-muted h-10 w-1/2 animate-pulse rounded-3xl" />
-      </div>
-      <div className="space-y-2">
-        <div className="bg-muted h-4 w-full animate-pulse rounded" />
-        <div className="bg-muted h-4 w-3/4 animate-pulse rounded" />
-      </div>
-    </div>
-  );
-}

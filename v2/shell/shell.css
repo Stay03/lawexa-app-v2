@@ -229,31 +229,6 @@ html.v2-document-lock body {
 }
 
 /* -----------------------------------------------------------------------------
-   `line` streaming style — the stand-in bar for the line still arriving
-   (`v2-stream-line`, rendered by StreamingLineSkeleton INSIDE the prose
-   container).
-
-   It must occupy the slot the next line will occupy, so it is exactly one
-   `prose-sm` paragraph line tall (line-height 1.7142857em) and, when it directly
-   follows a paragraph, it cancels that paragraph's bottom margin
-   (`prose-sm p { margin-bottom: 1.1428571em }`). The adjacent-sibling selector is
-   what makes that exact rather than guessed: after a heading, list or blockquote
-   no rule matches and the natural block gap is kept, which is correct — a new
-   block really is starting there.
-
-   v2-unique class name: nothing in v1 renders `.v2-stream-line`, so this rule is
-   inert if the sheet survives a soft-nav into v1 (see the header comment).
-   -------------------------------------------------------------------------- */
-.v2-stream-line {
-  display: flex;
-  align-items: center;
-  height: 1.7142857em;
-}
-p + .v2-stream-line {
-  margin-top: -1.1428571em;
-}
-
-/* -----------------------------------------------------------------------------
    Skeleton pulse under reduced motion (review R1 #7).
 
    `components/ui/skeleton.tsx` uses a bare `animate-pulse`, and NO reduced-motion
