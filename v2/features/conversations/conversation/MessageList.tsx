@@ -139,11 +139,28 @@ export function MessageList({
   const contentRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const messagesLenRef = useRef(messages.length);
-  const detachBaselineRef = useRef(messages.length);
-  const isStreamingRef = useRef(isStreaming);
   const followRafRef = useRef<number | null>(null);
-  const [showPill, setShowPill] = useState(false);
-  const [pillCount, setPillCount] = useState(0);
+
+  /**
+   * THE JUMP-TO-LATEST PILL, AS ONE DERIVED VALUE.
+   *
+   * `null` means the reader is at the bottom. Any other value is the message count
+   * captured at the moment they scrolled away, so "how many have I not seen?" is
+   * `messages.length - detachedAt`, computed during render.
+   *
+   * IT USED TO BE A REF READ INSIDE THE ResizeObserver, AND THAT WAS A REAL BUG.
+   * The observer callback is delivered after layout but BEFORE paint, while the
+   * effect that refreshed the message-count ref is passive and runs after it. During
+   * streaming the flaw was invisible: the transcript grows dozens of times, so a
+   * later callback always caught up. But a merge from another tab grows the
+   * transcript exactly ONCE — that single callback read the pre-merge count, got
+   * zero, and the pill never appeared at all. Deriving the count removes the
+   * ordering question instead of racing it, and takes two pieces of state and two
+   * refs out of the component.
+   */
+  const [detachedAt, setDetachedAt] = useState<number | null>(null);
+  const showPill = detachedAt !== null;
+  const pillCount = detachedAt === null ? 0 : Math.max(0, messages.length - detachedAt);
 
   // Keyed on the (structurally stable) messages reference — stable group objects
   // across token flushes and unrelated parent re-renders, so GroupRow's memo holds.
@@ -182,10 +199,10 @@ export function MessageList({
     el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
-  // Sync refs + imperative scroll on a new turn. No setState here (Compiler-clean):
-  // scrolling to the bottom fires the scroll handler, which resets the pill.
+  // Sync the length ref + imperative scroll on a new turn. No setState here
+  // (Compiler-clean): scrolling to the bottom fires the scroll handler, which
+  // re-attaches and so clears the pill.
   useEffect(() => {
-    isStreamingRef.current = isStreaming;
     const prevLen = messagesLenRef.current;
     messagesLenRef.current = messages.length;
     const last = messages[messages.length - 1];
@@ -193,10 +210,11 @@ export function MessageList({
       const el = scrollRef.current;
       if (el) el.scrollTop = el.scrollHeight; // sending always scrolls into view
     }
-  }, [messages, isStreaming]);
+  }, [messages]);
 
-  // Keep pinned to the newest content while at the bottom; else surface the pill.
-  // All setState lives in this observer CALLBACK (external-system subscription).
+  // Keep pinned to the newest content while at the bottom. The observer now has ONE
+  // job — the eased bottom-follow — because the pill is derived from render state
+  // (see `detachedAt`) instead of being pushed from here. It sets no state at all.
   //
   // EASED BOTTOM-FOLLOW (owner "jumpy on new line", smoothing pass 2): the old
   // instantaneous `scrollTop = scrollHeight` yanked the viewport a full line-height
@@ -235,18 +253,9 @@ export function MessageList({
     };
 
     const observer = new ResizeObserver(() => {
-      if (atBottomRef.current) {
-        if (followRafRef.current == null) {
-          followRafRef.current = requestAnimationFrame(followBottom);
-        }
-        return;
-      }
-      const newSince = messagesLenRef.current - detachBaselineRef.current;
-      if (newSince > 0) {
-        setShowPill(true);
-        setPillCount(newSince);
-      } else if (isStreamingRef.current) {
-        setShowPill(true);
+      if (!atBottomRef.current) return;
+      if (followRafRef.current == null) {
+        followRafRef.current = requestAnimationFrame(followBottom);
       }
     });
     observer.observe(content);
@@ -257,7 +266,10 @@ export function MessageList({
   }, []);
 
   // Scroll handler (event callback — setState allowed). Disengage on any upward
-  // scroll; re-engage + clear the pill at the bottom.
+  // scroll; re-engage at the bottom. Capturing `messages.length` HERE is what makes
+  // the count honest: it is the number of messages the reader had actually seen at
+  // the moment they looked away, taken from this render's own value rather than
+  // from a ref that some other callback may not have refreshed yet.
   const handleScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
@@ -265,11 +277,11 @@ export function MessageList({
     const atBottom = distance <= BOTTOM_THRESHOLD_PX;
     atBottomRef.current = atBottom;
     if (atBottom) {
-      detachBaselineRef.current = messagesLenRef.current;
-      setShowPill(false);
-      setPillCount(0);
-    } else {
-      setShowPill(true);
+      setDetachedAt(null);
+    } else if (detachedAt === null) {
+      // Only the FIRST scroll away sets the mark — later scrolls while already
+      // detached must not keep resetting it, or the count would never grow.
+      setDetachedAt(messages.length);
     }
   };
 
@@ -388,7 +400,14 @@ export function MessageList({
           tabIndex={showPill ? 0 : -1}
         >
           <ArrowDown className="h-4 w-4" />
-          {pillCount > 0 ? `${pillCount} new` : 'Latest'}
+          {/* Named, not counted, at one — "New message" is what the reader is
+              actually being told, and one is the common case now that a message
+              can arrive from another tab. */}
+          {pillCount === 0
+            ? 'Latest'
+            : pillCount === 1
+              ? 'New message'
+              : `${pillCount} new messages`}
         </Button>
       </div>
     </div>

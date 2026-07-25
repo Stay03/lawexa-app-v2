@@ -159,6 +159,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     commitFn(notifyStructural);
   }
   function setMessages(fn: (msgs: readonly EngineMessage[]) => EngineMessage[]) {
+    // EVERY locally-authored row change flows through here — a user turn, a
+    // streaming placeholder, a tool row, an error row, a handover update. So this
+    // is the one place that can retire `rowsAreServerOnly` without a new code path
+    // ever being able to forget to (see that flag for what it gates).
+    //
+    // The two SERVER writers deliberately bypass this helper and call `setState`
+    // directly (`applyHistory`, `mergeServerHistory`): their rows carry real server
+    // identity, so they must not retire the flag.
+    rowsAreServerOnly = false;
     setState((prev) => ({ ...prev, messages: fn(prev.messages) }));
   }
 
@@ -308,6 +317,35 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    * silently missing rows after a reconnect.
    */
   let appliedHistory: ConversationData | null = null;
+  /**
+   * True while EVERY row on screen came from a server snapshot — nothing has been
+   * drawn locally since the last {@link applyHistory}.
+   *
+   * It is the precondition for {@link mergeServerHistory}, and the reason is an
+   * identity gap, not caution. A row built from history is named `msg_{serverId}`
+   * by `transformApiMessages`, so "do I already show this server message?" is an
+   * exact test. A row this client drew ITSELF — above all the user's own message,
+   * which is rendered the moment they press send — carries a local name and never
+   * learns which persisted message it became: the terminal SSE event reports that
+   * the turn finished, not what was written, and the user's message is never
+   * delivered as a stream event at all. On such a screen the server's copy of a row
+   * we are already showing is indistinguishable from a genuinely new one, and
+   * merging would show the user their own message twice.
+   *
+   * So: merge only where the test is exact. A screen that has sent a turn simply
+   * waits until it is re-opened (which re-seeds from the cache = server truth).
+   * Late, never wrong.
+   *
+   * ── THE SEAM (backend ask 2026-07-25) ───────────────────────────────────────
+   * The ask is for the identifiers of the messages an execution persisted, on its
+   * terminal event, INCLUDING the user's own message. When it lands:
+   *   1. collect them into a set as each turn finishes (they are exactly "server
+   *      messages already represented on this screen"),
+   *   2. widen {@link isAlreadyOnScreen} to consult that set as well as the row ids,
+   *   3. drop this flag from the gate in {@link adoptConversationHistory}.
+   * The merge itself does not change. Both extension points are named below.
+   */
+  let rowsAreServerOnly = false;
   let executionId: string | null = null;
   let reconnectCount = 0;
   let consecutiveHeartbeats = 0;
@@ -507,6 +545,14 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function mergeMissedMessages(apiMessages: ApiMessage[]) {
     if (apiMessages.length === 0) return;
     const transformed = transformApiMessages(apiMessages);
+    // MIXED IDENTITY COMES OUT OF HERE: the rows kept up to and including the last
+    // user message are the LOCAL ones this client drew, spliced in front of server
+    // rows. So the "everything on screen came from the server" guarantee cannot
+    // survive it (see `rowsAreServerOnly`). In practice the flag is already false —
+    // a recovery implies a send, which drew the local user row through `setMessages`
+    // — but this writes through `setState`, so stating it here keeps the invariant
+    // local to the function that breaks it instead of inferred from a caller.
+    rowsAreServerOnly = false;
     setState((prev) => {
       const lastUserIdx = [...prev.messages].reverse().findIndex((m) => m.role === 'user');
       if (lastUserIdx === -1) {
@@ -703,6 +749,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     appliedHistory = data;
     dedupKeys = dedupFromHistory(data.messages);
     const transformedMessages = transformApiMessages(data.messages);
+    // `setState`, NOT `setMessages` — these rows ARE the server's, so the flag that
+    // records "everything on screen came from the server" is (re)armed here.
+    rowsAreServerOnly = true;
     setState((prev) => ({
       ...prev,
       conversationId: data.id,
@@ -711,6 +760,89 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       isLoadingHistory: false,
       error: null,
     }));
+  }
+
+  /**
+   * Is this transformed server row ALREADY on screen?
+   *
+   * Exact, not a heuristic: `transformApiMessages` names every history row
+   * `msg_{serverMessageId}`, and that id is stable and identical in every tab. So a
+   * plain membership test over the rows we hold answers the question completely —
+   * for rows that came from the server, which is the only case
+   * {@link mergeServerHistory} is allowed to run in (see {@link rowsAreServerOnly}).
+   *
+   * SEAM: when the backend ask lands, this also consults the set of persisted
+   * identifiers each finished turn reported, so locally-drawn rows are recognised
+   * too and the `rowsAreServerOnly` gate can be dropped.
+   */
+  function isAlreadyOnScreen(row: EngineMessage, held: ReadonlySet<string>): boolean {
+    return held.has(row.id);
+  }
+
+  /**
+   * ADD what the server has and we do not — and touch nothing else.
+   *
+   * This is what makes a conversation open in two tabs converge (owner, July 25):
+   * tab B sends a turn, tab A revalidates on its next visit/focus, and the new
+   * messages appear at the bottom of tab A.
+   *
+   * WHY ADD RATHER THAN REPLACE. The rows on screen carry state the history payload
+   * does not return — the §C reasoning traces (`reasoning` / `reasoningMs`) and the
+   * live `partial` markers. Re-applying a snapshot wholesale erases them, remounts
+   * every row (so `content-visibility` measurements and the per-row streaming stores
+   * are thrown away), and would fire after EVERY turn, because `onCompleted`
+   * revalidates. Appending cannot do any of that: existing rows are untouched
+   * objects, so React reconciles them by identity and only the new rows mount.
+   *
+   * ORDER IS THE SERVER'S. `next` is the whole transcript in server order and our
+   * rows are a prefix of it, so appending the remainder preserves the thread. A row
+   * we hold that the server no longer has simply stays — there is no message-delete
+   * endpoint, and dropping rows is not this function's job.
+   *
+   * `dedupKeys` and `appliedHistory` are updated TOGETHER with the rows, which is
+   * exactly the invariant the old bail-out existed to protect: the dedup set now
+   * describes precisely the history the rendered rows came from, so an SSE reconnect
+   * still skips the right events (see {@link appliedHistory}).
+   */
+  function mergeServerHistory(data: ConversationData): boolean {
+    const next = transformApiMessages(data.messages);
+    const nextIds = new Set(next.map((m) => m.id));
+
+    // EXTEND ONLY. Every row we show must still exist in the new snapshot, or this
+    // snapshot does not describe the transcript on screen and appending to it would
+    // leave a row behind that the server no longer renders.
+    //
+    // It is not hypothetical. `transformApiMessages` decides whether an untagged
+    // assistant message is the final answer or inter-tool narration by looking
+    // AHEAD for tool work in the same turn — so a snapshot fetched while another tab
+    // is mid-turn can render a line as the answer, and the next snapshot, now
+    // carrying that turn's tool rows, reclassify the SAME message as narration and
+    // drop it. Bailing here leaves the screen exactly as it was and waits for a
+    // snapshot that agrees; `appliedHistory` and `dedupKeys` are deliberately left
+    // pointing at the history the rows really came from.
+    for (const row of state.messages) {
+      if (!nextIds.has(row.id)) return false;
+    }
+
+    const held = new Set(state.messages.map((m) => m.id));
+    const added = next.filter((row) => !isAlreadyOnScreen(row, held));
+
+    // Re-point the dedup/history bookkeeping at the snapshot the rows now describe,
+    // whether or not anything was appended — a revalidation that changed nothing
+    // still moves us onto the newer snapshot object.
+    appliedHistory = data;
+    dedupKeys = dedupFromHistory(data.messages);
+    if (added.length === 0) return false;
+
+    // `setState`, NOT `setMessages`: appended rows are the SERVER's, so the
+    // `rowsAreServerOnly` guarantee survives a merge and a screen can keep merging
+    // for as long as it never draws a row of its own.
+    setState((prev) => ({
+      ...prev,
+      messages: [...prev.messages, ...added],
+      conversationTitle: data.title || prev.conversationTitle,
+    }));
+    return true;
   }
 
   /**
@@ -727,28 +859,39 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    *     not even `dedupKeys`, because rebuilding it mid-stream from history that now
    *     contains the CURRENT turn's persisted `seq` values would make the engine drop
    *     the rest of that turn's events as duplicates, silently truncating the answer.
-   *  3. SEED-ONLY FOR THE VIEW. Once the engine holds THIS conversation's messages,
-   *     a later record is not applied at all — only the SAME snapshot the rows came
-   *     from may refresh `dedupKeys` (see {@link appliedHistory}; that re-arm is what
-   *     keeps a StrictMode remount's reconnect from re-rendering already-persisted
-   *     events, since the unmount cleared the set). Rows belonging to a DIFFERENT
+   *  3. NEVER REPLACE THE VIEW — ADD TO IT. Once the engine holds THIS
+   *     conversation's messages, a NEWER snapshot is never applied wholesale. It is
+   *     {@link mergeServerHistory merged}: rows the server has and we do not are
+   *     appended, and nothing on screen is touched. The same snapshot the rows came
+   *     from still just refreshes `dedupKeys` (that re-arm is what keeps a
+   *     StrictMode remount's reconnect from re-rendering already-persisted events,
+   *     since the unmount cleared the set). Rows belonging to a DIFFERENT
    *     conversation are always replaced — see {@link messagesConversationId}.
    *
-   *     Why the view is seed-only: the engine's rows carry state the server response
-   *     does not — the §C reasoning traces (`reasoning` / `reasoningMs`) and the live
-   *     `partial` markers — so wholesale replacement would silently erase them, and a
-   *     response that lags the just-finished turn by even one message would blank an
-   *     answer the user is reading. The CACHE still reconciles behind the paint, so
-   *     the next open is server truth; the open screen keeps the richer local copy.
+   *     Why never replace: the engine's rows carry state the server response does
+   *     not — the §C reasoning traces (`reasoning` / `reasoningMs`) and the live
+   *     `partial` markers — so wholesale replacement would silently erase them, and
+   *     a response that lags the just-finished turn by even one message would blank
+   *     an answer the user is reading. Appending has neither failure mode.
+   *
+   *     Why merging is nonetheless SAFE where it used to bail: the old bail-out
+   *     protected the pairing of `dedupKeys` with the rendered rows. The merge
+   *     updates both from the same snapshot in the same step, so that pairing is
+   *     preserved by construction rather than by refusing to act. What it cannot do
+   *     is recognise rows this client drew ITSELF — see {@link rowsAreServerOnly},
+   *     which is why the merge is gated on having drawn none.
    */
   function adoptConversationHistory(data: ConversationData): boolean {
     if (conversationId !== null && data.id !== conversationId) return false;
     if (isStreamActive()) return false;
     const holdsThisConversation =
       messagesConversationId === data.id && state.messages.length > 0;
-    // A NEWER snapshot than the rows on screen: leave everything alone, `dedupKeys`
-    // included (see `appliedHistory` — a mismatched dedup set loses messages).
-    if (holdsThisConversation && data !== appliedHistory) return false;
+    if (holdsThisConversation && data !== appliedHistory) {
+      // SEAM: drop `rowsAreServerOnly` from this gate once each finished turn
+      // reports the identifiers it persisted (backend ask 2026-07-25).
+      if (!rowsAreServerOnly) return false;
+      return mergeServerHistory(data);
+    }
     dedupKeys = dedupFromHistory(data.messages);
     if (holdsThisConversation) return false;
     applyHistory(data);
@@ -802,6 +945,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         } as ChatMessage;
       });
       messagesConversationId = convId;
+      // Device-owned rows, named from the IDB `local_id` — no server identity, so
+      // the merge must never treat them as matchable. (A confidential conversation
+      // never reaches the server detail query at all, so this is belt to that brace.)
+      rowsAreServerOnly = false;
       setState((prev) => ({
         ...prev,
         messages,
@@ -1844,6 +1991,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     messagesConversationId = seed.id;
     appliedHistory = seed;
     dedupKeys = dedupFromHistory(seed.messages);
+    // The seed IS a server snapshot, so a revisit that paints straight from cache
+    // can still merge whatever arrived while the user was away — this is the common
+    // path for the two-tab case, not an edge one.
+    rowsAreServerOnly = true;
     state = {
       ...INITIAL_SNAPSHOT,
       conversationId: seed.id,

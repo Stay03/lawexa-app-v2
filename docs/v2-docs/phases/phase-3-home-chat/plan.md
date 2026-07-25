@@ -236,6 +236,36 @@ each its own implement → adversarial-review → verify → ship loop:
   revalidation from rebuilding a transcript whose live tool/handover rows are richer than the
   server's). Deliberately not ridden along on a query-policy change — it is streaming-path surgery
   and wants its own review.
+- **CROSS-TAB TRANSCRIPT MERGE (owner, July 25) — SHIPPED.** Closes the item logged one entry above.
+  `adoptConversationHistory` no longer bails on a newer snapshot: it MERGES via new
+  `mergeServerHistory` — rows the server has and the screen does not are APPENDED, nothing on screen
+  is replaced. Append rather than replace because the rows carry §C reasoning traces and `partial`
+  markers the history payload never returns, and because a replace would remount every row (losing
+  `content-visibility` measurements and the per-row streaming stores) after EVERY turn, since
+  `onCompleted` revalidates. THE COMPARISON IS EXACT, NOT A HEURISTIC: `transformApiMessages` names
+  every history row `msg_{serverMessageId}` — stable and identical in every tab — so membership is
+  the whole test (`isAlreadyOnScreen`). `dedupKeys` + `appliedHistory` move with the rows in the same
+  step, which is precisely the invariant the old bail-out existed to protect. TWO GUARDS: (1) new
+  `rowsAreServerOnly` — merge only when nothing on screen was drawn locally, retired structurally
+  inside `setMessages` (the single funnel for every local row) and re-armed only by `applyHistory` /
+  the `initialHistory` seed, because a locally-drawn row (above all the user's own message) has NO
+  server identity and merging would show it twice; (2) EXTEND-ONLY — every held row must still exist
+  in the new snapshot, else bail untouched. Guard 2 is not hypothetical: the narration lookahead in
+  `transformApiMessages` can reclassify an answer as narration once the next snapshot carries that
+  turn's tool rows, so a snapshot fetched while ANOTHER tab is mid-turn can legitimately drop a row.
+  `conversationsQueries.detail` gains `REFETCH_ON_VISIT` now that a fetch produces a visible change
+  (cached-first is preserved — the mount flow's `ensureQueryData` returns the cached record without
+  waiting). **PILL REBUILT, NOT WIRED UP:** its count was a ref read inside the ResizeObserver, which
+  is delivered BEFORE paint while the effect refreshing that ref is passive and runs after — invisible
+  during streaming (dozens of growths, a later callback catches up) but fatal for a merge, which grows
+  the transcript exactly ONCE and would have read zero. Now one derived value (`detachedAt`, captured
+  in the scroll handler), which deleted two state atoms and two refs and left the observer with only
+  the bottom-follow. Label is now "New message" / "N new messages". **BACKEND ASK OPEN**
+  (`docs/v2-docs/backend-ask-2026-07-25-stream-persisted-message-ids.md`, backend building): the
+  identifiers an execution persisted, on its terminal event, INCLUDING the user's message — it cannot
+  be derived from the per-event `seq` we already receive because the user's message is never delivered
+  as a stream event. Two named seams (`isAlreadyOnScreen`, the gate in `adoptConversationHistory`)
+  make removing guard 1 a small change when it lands.
 - **W6 — on-device mobile verification + metadata** — **PENDING.** iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.

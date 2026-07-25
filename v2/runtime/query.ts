@@ -106,13 +106,16 @@ export const GC_TIMES = {
  * five requests on return. That is accepted deliberately: a list that is five pages
  * deep is exactly the one where silently showing stale rows is worst.
  *
- * Apply it to LIST leaves the user NAVIGATES TO. Two exclusions, both real:
- *  - A list that lives in the LAYOUT (the sidebar/drawer recents) never remounts on
- *    a soft navigation, so the flag cannot fire on the arrivals it exists for — it
- *    would only ever re-fetch what the server just prefetched on a hard load.
- *  - A detail/record query wants the opposite default (see
- *    `conversationsQueries.detail`), where replacing the rows on screen mid-session
- *    would be wrong.
+ * Apply it to anything the user NAVIGATES TO whose consumer can act on the answer.
+ * That includes record queries, not only lists — `conversationsQueries.detail`
+ * carries it so a conversation continued in another tab shows its new messages on
+ * arrival. The consumer must be able to ADD what arrived without discarding what is
+ * on screen; a consumer that would replace the view wants the opposite default.
+ *
+ * ONE REAL EXCLUSION: a query that lives in the LAYOUT (the sidebar/drawer recents)
+ * never remounts on a soft navigation, so the flag cannot fire on the arrivals it
+ * exists for — it would only ever re-fetch what the server just prefetched on a
+ * hard load.
  */
 export const REFETCH_ON_VISIT = 'always' as const;
 

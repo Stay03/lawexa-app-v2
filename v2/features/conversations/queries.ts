@@ -287,24 +287,23 @@ export const conversationsQueries = {
    * leaves this query DISABLED for a conversation it already knows is
    * confidential, so the request is never even made.
    *
-   * NO `REFETCH_ON_VISIT` HERE, AND THE KNOWN BOUND THAT COMES WITH IT.
-   * The list leaves check on every arrival (see `REFETCH_ON_VISIT`); this one does
-   * not, because a fresh fetch would not currently CHANGE anything on screen. The
-   * engine's `adoptConversationHistory` declines any snapshot newer than the rows it
-   * already holds — deliberately, so that its `dedupKeys` can never describe a
-   * different history than the rendered rows (a mismatch silently drops replayed
-   * SSE messages after a reconnect). So a conversation continued in ANOTHER TAB or
-   * on another device shows its old transcript on this device until the cache entry
-   * is replaced and the screen is opened again.
+   * `REFETCH_ON_VISIT` — AND WHY IT ONLY EARNS ITS KEEP NOW. Arriving at a
+   * conversation re-checks it, exactly as arriving at a list does. Until the engine
+   * could act on the answer this would have bought a request and no visible change:
+   * `adoptConversationHistory` declined every snapshot newer than the rows it held.
+   * It now MERGES instead — messages the server has and the screen does not are
+   * appended, and nothing on screen is replaced — so the request produces the
+   * behaviour the user expects: open a conversation you continued in another tab and
+   * the new messages are there, at the bottom.
    *
-   * Adding `refetchOnMount` alone would therefore buy a request and no visible
-   * change. The real fix is in the engine: let adoption REPLACE rows and dedupKeys
-   * together (which is exactly what keeps them in step) when no stream is active
-   * AND the engine has authored nothing since it applied that history — the second
-   * term is what stops the post-turn `onCompleted` revalidation from rebuilding a
-   * transcript whose live tool/handover rows are richer than the server's. RECORDED
-   * FOR ITS OWN PASS (owner, July 25): it is engine surgery on the streaming path
-   * and wants its own review, not a rider on a query-policy change.
+   * The engine still declines to merge into a screen that drew rows of its own (the
+   * user's own message has no server identity until the backend ask lands — see
+   * `rowsAreServerOnly` in engine.ts). That bound lives THERE, not here: this leaf's
+   * job is only to make sure fresh data arrives.
+   *
+   * Cached first, then update, is preserved: the mount flow reads the transcript
+   * with `ensureQueryData`, which returns the cached record without waiting, so the
+   * engine is seeded and painted before this refetch is even issued.
    *
    * FRESHNESS. `STALE_TIMES.standard` (60s): a conversation the viewer is not
    * actively driving changes only from another tab/device, and the mount +
@@ -340,6 +339,7 @@ export const conversationsQueries = {
       },
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
       // A missing / forbidden / device-owned conversation is a settled answer, not
       // a blip: retrying it only delays the "not available" screen. Everything else
       // keeps the client's default single retry.
