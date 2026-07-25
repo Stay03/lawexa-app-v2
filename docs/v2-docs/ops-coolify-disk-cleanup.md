@@ -19,18 +19,36 @@ build cache is a schedule, not an accident.
 1. **Assess (read-only):**
    ```bash
    df -h              # the mount holding /var/lib/docker near 100% confirms it
-   docker system df   # RECLAIMABLE column = your headroom (Build Cache + Images usually huge)
+   docker system df   # RECLAIMABLE column — but see the warning below
    ```
+   **`docker system df` UNDER-REPORTS THE BUILD CACHE, BADLY.** On July 25 it declared
+   `Build Cache … 472.3MB`; `docker builder prune -af` then reclaimed **6.251GB** from that
+   same cache — 13× more. It reports the cache *records* it can account for, not the cache
+   *mounts* (`--mount=type=cache`, which is where the npm cache lives). So never conclude
+   "the cache is small, the problem must be elsewhere" from this table. Run
+   `docker system df -v` for the itemised view, or just prune the cache first — it is the
+   zero-risk step regardless.
+
+   Read the table for what it IS reliable about: **Local Volumes**. On July 25 those were
+   29.66GB with `0B` reclaimable and every volume active — that is the database and uploads,
+   and it is untouchable. Knowing that up front is what keeps a tired operator away from
+   `--volumes`.
 2. **Coolify built-in cleanup first:** UI → Servers → (server) → **Cleanup Storage** action
    (newer builds: Configuration → Advanced / Docker Cleanup tab). Only touches
    Coolify-managed resources; won't run mid-deploy. Re-check `df -h`; if several GB freed, skip
    to Redeploy.
-3. **Manual prunes (safe on a live host):**
+3. **Manual prunes (safe on a live host).** This exact pair recovered **9.04GB** on July 25,
+   from 493MB free, which was ample — the full image prune below was not needed:
    ```bash
-   docker builder prune --keep-storage 5g   # biggest safe win (includes the npm cache mount)
-   # or: docker builder prune -af           # clears ALL build cache; next build just slower
-   docker system prune                      # stopped containers, unused networks, dangling images
-   docker image prune -a                    # any image not backing a RUNNING container
+   docker builder prune -af                      # July 25: 6.251GB. Zero risk — cache only.
+   docker image prune -a --filter "until=72h"    # July 25: 2.788GB. KEEPS the last 3 days of
+                                                 # images, so Coolify can still roll back.
+   df -h                                         # stop here if you have a few GB
+   ```
+   Only if that is not enough:
+   ```bash
+   docker system prune    # stopped containers, unused networks, dangling images
+   docker image prune -a  # EVERY unused image — you lose rollback to older builds
    ```
    **⚠️ NEVER blindly `docker system prune -a --volumes`** — `--volumes` deletes unattached
    volumes = permanent data loss if a DB/uploads live on this host. Check first:
