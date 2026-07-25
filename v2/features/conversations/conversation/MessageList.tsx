@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Fragment,
   memo,
   useEffect,
   useLayoutEffect,
@@ -171,6 +172,30 @@ export function MessageList({
   const showActivity =
     isStreaming && (!!narration || (!!lastMessage && lastMessage.role !== 'assistant'));
 
+  /**
+   * WHERE THE ACTIVITY ROW GOES — above the answer, not below it (owner, July 25).
+   *
+   * It used to render after every group, so once the model began writing, the orb
+   * and its narration sat UNDER the growing text and were shoved further down the
+   * page by every token. The indicator for the work chased its own output.
+   *
+   * It now sits immediately BEFORE the answer being written: anchored under the tool
+   * steps that produced it, with the text growing beneath it. When no answer has
+   * started yet (tools still running) that same rule puts it last, which is still
+   * "immediately above where the answer will appear" — one rule, both cases.
+   *
+   * `groups.length` means "after everything"; any smaller index means "before that
+   * group". `-1` is "not shown".
+   */
+  const lastGroup = groups[lastGroupIndex];
+  const lastGroupIsAnswer =
+    lastGroup?.type === 'single' && lastGroup.message.role === 'assistant';
+  const activityIndex = !showActivity
+    ? -1
+    : lastGroupIsAnswer
+      ? lastGroupIndex
+      : groups.length;
+
   // ── THE FIRST PAINT LANDS AT THE BOTTOM, BEFORE THE BROWSER DRAWS ANYTHING. ──
   //
   // Owner: "the messages just load on the page jumpy". This was the whole of it.
@@ -326,37 +351,47 @@ export function MessageList({
           {groups.length > 0 && (
             <div className="flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
               {groups.map((group, gi) => (
-                <GroupRow
-                  key={groupKey(group, gi)}
-                  group={group}
-                  // The last few groups are never virtualized — see
-                  // UNVIRTUALIZED_TAIL. They are the screenful the reader lands on,
-                  // so they must be MEASURED, not estimated, or the view settles
-                  // under them after the first paint.
-                  virtualize={gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
-                  isLastGroup={gi === lastGroupIndex}
-                  hasLaterUserTurn={
-                    group.type === 'single' &&
-                    group.message.role === 'assistant' &&
-                    groups
-                      .slice(gi + 1)
-                      .some((g) => g.type === 'single' && g.message.role === 'user')
-                  }
-                  streamingText={streamingText}
-                  reasoning={reasoning}
-                  isStreaming={isStreaming}
-                  canRegenerate={canRegenerate}
-                  onRegenerate={onRegenerate}
-                  onRetry={onRetry}
-                />
+                <Fragment key={groupKey(group, gi)}>
+                  {gi === activityIndex && (
+                    <ActivityRow startTime={streamStartTime} narration={narration} />
+                  )}
+                  <GroupRow
+                    group={group}
+                    // The last few groups are never virtualized — see
+                    // UNVIRTUALIZED_TAIL. They are the screenful the reader lands
+                    // on, so they must be MEASURED, not estimated, or the view
+                    // settles under them after the first paint.
+                    virtualize={gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
+                    isLastGroup={gi === lastGroupIndex}
+                    hasLaterUserTurn={
+                      group.type === 'single' &&
+                      group.message.role === 'assistant' &&
+                      groups
+                        .slice(gi + 1)
+                        .some((g) => g.type === 'single' && g.message.role === 'user')
+                    }
+                    streamingText={streamingText}
+                    reasoning={reasoning}
+                    isStreaming={isStreaming}
+                    canRegenerate={canRegenerate}
+                    onRegenerate={onRegenerate}
+                    onRetry={onRetry}
+                  />
+                </Fragment>
               ))}
+              {/* `activityIndex === groups.length` — nothing is being written yet, so
+                  the row sits after the last group, which is still immediately above
+                  where the answer will appear. */}
+              {activityIndex === groups.length && (
+                <ActivityRow startTime={streamStartTime} narration={narration} />
+              )}
             </div>
           )}
 
-          {showActivity && (
-            <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-              <ActivityStatus startTime={streamStartTime} narration={narration} />
-            </div>
+          {/* The one case the in-list placements cannot cover: activity with no
+              groups at all (a turn whose first event is narration). */}
+          {groups.length === 0 && showActivity && (
+            <ActivityRow startTime={streamStartTime} narration={narration} />
           )}
 
           {error && (
@@ -410,6 +445,21 @@ export function MessageList({
               : `${pillCount} new messages`}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** The activity row's own entrance, shared by the three places it can be placed. */
+function ActivityRow({
+  startTime,
+  narration,
+}: {
+  startTime: number | null;
+  narration: string | null;
+}) {
+  return (
+    <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+      <ActivityStatus startTime={startTime} narration={narration} />
     </div>
   );
 }
