@@ -315,7 +315,8 @@ each its own implement → adversarial-review → verify → ship loop:
   the guest entry with a signed-in user's rows.
 - **W6 — on-device mobile verification + metadata** — **PASSED (owner, July 25).** The owner ran the
   checklist on real devices and reported it clean, which OPENS THE PHASE GATE. The two recorded privacy items are
-  now CLOSED too (see below), so `post-implementation.md` is the only thing left in the phase. Original scope: iOS Safari + Android Chrome
+  CLOSED too (see below), and `post-implementation.md` is written. **PHASE 3 IS CLOSED
+  (July 25, 2026).** Original scope: iOS Safari + Android Chrome
   (keyboard, safe-area, long-press action sheet, 44px targets); conversation `generateMetadata`/OG
   kept and moved into the v2 convention.
 
