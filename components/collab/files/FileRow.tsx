@@ -4,6 +4,7 @@ import { useState } from 'react';
 import {
   Download,
   File as FileIcon,
+  FileArchive,
   FileSpreadsheet,
   FileText,
   ImageIcon,
@@ -41,6 +42,7 @@ type FileIconKind =
   | 'image'
   | 'spreadsheet'
   | 'presentation'
+  | 'archive'
   | 'document'
   | 'generic';
 
@@ -70,6 +72,13 @@ export function fileIcon(mimeType: string, name: string): FileIconKind {
     ['pptx', 'ppt'].includes(ext)
   ) {
     return 'presentation';
+  }
+  if (
+    mime === 'application/zip' ||
+    mime === 'application/x-zip-compressed' ||
+    ext === 'zip'
+  ) {
+    return 'archive';
   }
   if (
     mime === 'application/pdf' ||
@@ -103,6 +112,8 @@ function FileTypeIcon({
       return <FileSpreadsheet className={className} />;
     case 'presentation':
       return <Presentation className={className} />;
+    case 'archive':
+      return <FileArchive className={className} />;
     case 'document':
       return <FileText className={className} />;
     default:
@@ -127,6 +138,9 @@ export function FileRow({ file, channel, currentUserId }: FileRowProps) {
   const download = useDownloadFile();
   const deleteFile = useDeleteChannelFile(channel.uuid);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Archives are served as-is — no server-side malware scan yet.
+  const isArchive = fileIcon(file.mime_type, file.original_name) === 'archive';
 
   const canDelete =
     file.uploader.id === currentUserId ||
@@ -169,6 +183,12 @@ export function FileRow({ file, channel, currentUserId }: FileRowProps) {
           {formatBytes(file.size)} · {file.uploader.name} ·{' '}
           {formatRelativeTime(file.created_at)}
         </p>
+        {isArchive && (
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Archives aren&apos;t scanned — only open files from people you
+            trust.
+          </p>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">

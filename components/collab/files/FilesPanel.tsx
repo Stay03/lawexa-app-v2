@@ -31,6 +31,7 @@ const ALLOWED_EXTENSIONS = [
   'csv',
   'xlsx',
   'pptx',
+  'zip',
   'jpg',
   'jpeg',
   'png',

@@ -143,8 +143,8 @@ A per-channel document library. Files are **channel content** (member-only reads
 
 ### Upload a file
 `POST /api/channels/{channelUuid}/files` · throttle 30/min — **multipart/form-data**, single field **`file`**.
-- Max **15 MB**. Allowed: `pdf, doc, docx, txt, rtf, csv, xlsx, pptx, jpg, jpeg, png, gif, webp` — validated by **both** extension and content type (a mismatched/spoofed file → `422`).
-- → `201` with the File object. (Text is extracted from documents in the background so Lawexa can reference them.)
+- Max **15 MB**. Allowed: `pdf, doc, docx, txt, rtf, csv, xlsx, pptx, zip, jpg, jpeg, png, gif, webp` — validated by **both** extension and content type (a mismatched/spoofed file → `422`).
+- → `201` with the File object. (Text is extracted from documents in the background so Lawexa can reference them. Archives and images have no text — Lawexa cannot reference them; zips are download-only and are **not** scanned for malware.)
 
 ### Download a file
 `GET /api/files/{id}/download` (the existing generic endpoint) → returns/redirects to the file URL. Gated by membership: members `200`; non-members (incl. admins/governors) `403`.
