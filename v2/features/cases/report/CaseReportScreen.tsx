@@ -6,11 +6,11 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import { extractViewLimitError } from '@/lib/utils/api-error';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { casesQueries } from '../queries';
+import { formatCaseName } from '../case-name';
 import { formatCaseDate } from '../case-row-model';
 import { CaseText } from '../detail/case-text';
 import {
@@ -40,7 +40,8 @@ export function CaseReportScreen({ slug }: { slug: string }) {
   const query = useQuery(casesQueries.report(slug));
   const detail = query.data?.data ?? null;
   const report = detail?.full_report ?? null;
-  const title = detail ? getCaseDisplayTitle(detail) : null;
+  const rawTitle = detail ? detail.display_title || detail.title : null;
+  const title = rawTitle ? formatCaseName(rawTitle) : null;
 
   useEffect(() => {
     if (!title) return;
@@ -99,7 +100,12 @@ export function CaseReportScreen({ slug }: { slug: string }) {
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Full judgment
             </p>
-            <h1 className="doc-title text-foreground">{title}</h1>
+            <h1 className="doc-title text-foreground" title={rawTitle ?? undefined}>
+              {title}
+            </h1>
+            {detail.citation ? (
+              <p className="doc-citation">{detail.citation}</p>
+            ) : null}
             <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
               {[detail.court?.name, detail.country?.name, date]
                 .filter(Boolean)
@@ -108,7 +114,13 @@ export function CaseReportScreen({ slug }: { slug: string }) {
             {detail.judges.length > 0 ? (
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Before: </span>
-                {detail.judges.map((judge) => judge.name).join(', ')}
+                {detail.judges
+                  .map(
+                    (judge) =>
+                      formatCaseName(judge.name) +
+                      (judge.role ? ` (${judge.role})` : ''),
+                  )
+                  .join(', ')}
               </p>
             ) : null}
           </header>

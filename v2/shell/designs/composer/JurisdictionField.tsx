@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import ReactCountryFlag from 'react-country-flag';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, Globe, Layers, RotateCcw, Search } from 'lucide-react';
 
@@ -13,6 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { FLAG_H, FLAG_W, FlagIcon } from '@/v2/shell/FlagIcon';
 import { jurisdictionsQueries } from '@/v2/features/jurisdictions/queries';
 import type { Jurisdiction, JurisdictionChoice } from '@/types/jurisdiction';
 
@@ -29,8 +29,12 @@ import type { Jurisdiction, JurisdictionChoice } from '@/types/jurisdiction';
  * the signed-in user's profile country, falling back to Nigeria (the backend's
  * documented default).
  *
- * Flags come from `react-country-flag` (an existing dependency, SVG so they render
- * identically on every OS — unlike emoji flags on Windows), matching v1's renderer.
+ * Flags come from `v2/shell/FlagIcon` — SELF-HOSTED SVGs (the `flag-icons`
+ * package, bundled and served from our own origin). The previous renderer
+ * fetched each flag from a public CDN at render time, and on a device that
+ * could not reach it the chip showed nothing (owner report, July 29). First-
+ * party assets remove the failure mode outright, which also made the old
+ * CDN-warming effect and per-flag load state here unnecessary — both deleted.
  *
  * PORTAL-EVENT DISCIPLINE (studied from v1): React synthetic events bubble through
  * the React tree even out of portaled popover content, so a click inside would
@@ -40,17 +44,6 @@ import type { Jurisdiction, JurisdictionChoice } from '@/types/jurisdiction';
  */
 
 const DEFAULT_FALLBACK_SLUG = 'nigeria';
-
-/** react-country-flag's OWN default CDN base (`node_modules/react-country-flag`:
- *  `https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/{code}.svg`). We warm
- *  these exact URLs in the background so the warmed request === the one the
- *  renderer makes → a guaranteed cache hit. Keep in sync if the renderer default
- *  ever changes (we never pass a custom `cdnUrl`, so it can't drift silently). */
-const FLAG_CDN_URL = 'https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/';
-
-/** The flag's reserved footprint (v1 parity: `1.1em`). The placeholder block and
- *  the SVG share this exact box so the slot never shifts as flags resolve. */
-const FLAG_BOX = '1.1em';
 
 /** Map a jurisdiction to a flag-renderable ISO 3166-1 alpha-2 code (v1's rule):
  *  most carry a 2-letter ISO code; UK subdivisions (ENG/SCT/NIR) fall back to the
@@ -62,71 +55,13 @@ function flagCode(j: Jurisdiction | undefined): string | undefined {
   return undefined;
 }
 
+/** A flag when the code is renderable, the neutral globe when it is not. The
+ *  artwork itself is first-party (see FlagIcon), so there is no load state. */
 function Flag({ code, className }: { code: string | undefined; className?: string }) {
   if (!code) {
     return <Globe className={cn('size-4 text-muted-foreground', className)} aria-hidden />;
   }
-  return <CountryFlag code={code} className={className} />;
-}
-
-/**
- * A single CDN flag that never flashes flagless (owner #31). react-country-flag
- * fetches each SVG from jsDelivr at render, so the slot reserves the EXACT flag
- * box up front (a subtle neutral placeholder holds it — skeleton-first, zero
- * layout shift) and the SVG fades in once loaded (~200ms, instant under reduced
- * motion). Background warming (see JurisdictionField) means most are cached by
- * the time the picker opens, so this usually reveals immediately.
- *
- * react-country-flag renders a bare <img> and spreads rest props onto it (verified
- * in its source), so `onLoad`/`onError`/`className`/`style` all reach the image —
- * but it does NOT forward a ref. To also catch flags ALREADY warm in cache (whose
- * `load` can fire before React wires `onLoad`), a wrapper ref checks the child
- * <img>'s `.complete` once on mount. `onError` still reveals a missing flag rather
- * than stranding the placeholder.
- */
-function CountryFlag({ code, className }: { code: string; className?: string }) {
-  const [loaded, setLoaded] = useState(false);
-
-  const revealIfCached = useCallback((node: HTMLSpanElement | null) => {
-    if (!node) return;
-    const img = node.querySelector('img');
-    if (img?.complete && img.naturalWidth > 0) setLoaded(true);
-  }, []);
-
-  return (
-    <span
-      ref={revealIfCached}
-      aria-hidden
-      className={cn('relative inline-block shrink-0 align-middle', className)}
-      style={{ width: FLAG_BOX, height: FLAG_BOX }}
-    >
-      {/* Reserved-box placeholder — a quiet neutral block that holds the flag's
-          footprint until the SVG resolves, then fades out as the flag fades in.
-          Both directions transition; reduced motion snaps. */}
-      <span
-        className={cn(
-          'absolute inset-0 rounded-[2px] bg-muted transition-opacity duration-200 ease-out motion-reduce:transition-none',
-          loaded ? 'opacity-0' : 'opacity-100',
-        )}
-      />
-      <ReactCountryFlag
-        countryCode={code}
-        svg
-        loading="eager"
-        onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
-        // Fade + reduced-motion live on the className (so `motion-reduce` can
-        // disable the transition); layout/geometry lives on `style` (overrides
-        // the component's own 1em sizing to fill the reserved box).
-        className={cn(
-          'rounded-[2px] transition-opacity duration-200 ease-out motion-reduce:transition-none',
-          loaded ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-        aria-hidden
-      />
-    </span>
-  );
+  return <FlagIcon code={code} className={className} />;
 }
 
 interface JurisdictionFieldProps {
@@ -156,48 +91,6 @@ export function JurisdictionField({
   });
   const jurisdictions = jurisdictionsQuery.data;
   const isLoading = jurisdictionsQuery.isPending && signedIn;
-
-  // Warm every flag SVG in the background once the LIST resolves (owner #31), so
-  // opening the picker doesn't fire a burst of first-time CDN fetches. Runs at
-  // LOW priority (requestIdleCallback → setTimeout fallback) and is pure
-  // fire-and-forget — no state, so it never competes with interactive work and
-  // stays clear of the setState-in-effect lint. Warmed URLs match the renderer's
-  // exactly (FLAG_CDN_URL), so the real render hits a warm cache.
-  useEffect(() => {
-    if (!jurisdictions || jurisdictions.length === 0 || typeof window === 'undefined') {
-      return;
-    }
-    const urls = new Set<string>();
-    for (const j of jurisdictions) {
-      const code = flagCode(j);
-      if (code) urls.add(`${FLAG_CDN_URL}${code.toLowerCase()}.svg`);
-    }
-    if (urls.size === 0) return;
-
-    let idleHandle: number | undefined;
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-    const warm = () => {
-      for (const url of urls) {
-        // Constructing an Image and setting src is enough to prime the HTTP
-        // cache; the element is intentionally never attached to the DOM.
-        const img = new Image();
-        img.src = url;
-      }
-    };
-
-    if ('requestIdleCallback' in window) {
-      idleHandle = window.requestIdleCallback(warm, { timeout: 2000 });
-    } else {
-      timeoutHandle = setTimeout(warm, 0);
-    }
-
-    return () => {
-      if (idleHandle !== undefined && 'cancelIdleCallback' in window) {
-        window.cancelIdleCallback(idleHandle);
-      }
-      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
-    };
-  }, [jurisdictions]);
 
   // What "auto" effectively researches as: profile country → Nigeria fallback.
   const autoMatch = useMemo<Jurisdiction | undefined>(() => {
@@ -252,15 +145,14 @@ export function JurisdictionField({
             // literal string 'Jurisdiction' while the list resolved — a
             // placeholder string standing in for late-resolving data, which the
             // standing rule bans. Now the icon AND the label are skeletons, each
-            // at a FIXED size: the icon holds the flag's exact `1.1em` box (so
-            // the resolved flag drops in with no reflow, rather than the old
-            // `size-4` block shrinking to 1.1em) and the label bar is a fixed
-            // width close to a typical country name, so the chip's width barely
-            // moves when the real text lands.
+            // at a FIXED size: the icon holds the flag's exact 4×3 box (so the
+            // resolved flag drops in with no reflow) and the label bar is a
+            // fixed width close to a typical country name, so the chip's width
+            // barely moves when the real text lands.
             <>
               <Skeleton
                 className="shrink-0 rounded-[2px]"
-                style={{ width: FLAG_BOX, height: FLAG_BOX }}
+                style={{ width: FLAG_W, height: FLAG_H }}
               />
               <Skeleton className="h-3 w-12 rounded" />
             </>

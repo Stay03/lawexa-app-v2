@@ -4,12 +4,12 @@ import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
-import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import { extractViewLimitError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { casesQueries } from '../queries';
-import { CaseAsk } from './CaseAsk';
+import { formatCaseName } from '../case-name';
+import { CaseAskDock, CaseChatsSection } from './CaseAsk';
 import { CaseDocument } from './CaseDocument';
 import {
   CASE_COLUMN,
@@ -30,6 +30,12 @@ import {
  * and their plan's view allowance. Merging them would mean either caching a
  * per-user response across users or emitting metadata only signed-in readers can
  * see — both wrong.
+ *
+ * LAYOUT: a min-h-full flex column. The document and the reader's prior chats
+ * are the flow; `CaseAskDock` is `sticky bottom-0` at the end of it, so the
+ * composer floats over the judgment for the whole read (owner, July 29 — the
+ * same mechanic as the home tabs' dock, and the same reachable-composer feel as
+ * the conversation screen).
  */
 export function CaseScreen({ slug }: { slug: string }) {
   return (
@@ -48,16 +54,16 @@ function CaseBody({ slug }: { slug: string }) {
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
-  const title = detail ? getCaseDisplayTitle(detail) : null;
+  const name = detail ? formatCaseName(detail.display_title || detail.title) : null;
 
   // Publish the header title once it resolves, and clear it on the way out so
   // the next route never inherits this case's name. An external-store write, not
   // React state — which is what makes it legal in an effect under the React
   // Compiler lint.
   useEffect(() => {
-    if (!title) return;
-    setHeaderContext({ title, confidential: false });
-  }, [title]);
+    if (!name) return;
+    setHeaderContext({ title: name, confidential: false });
+  }, [name]);
   useEffect(() => () => clearHeaderContext(), []);
 
   if (query.isPending) {
@@ -92,19 +98,21 @@ function CaseBody({ slug }: { slug: string }) {
   }
 
   return (
-    <div className={CASE_COLUMN}>
-      {/* `.v2-case-doc` scopes the reading typography (case-document.css) over
-          BOTH the judgment and the ask cluster, so their headings match. */}
-      <div className="v2-case-doc flex flex-col gap-10 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+    // The tall column the sticky dock needs: content, then the dock pinned to
+    // the bottom edge. `.v2-case-doc` scopes the reading typography
+    // (case-document.css) over the document AND the chats section, so their
+    // headings match.
+    <div className="v2-case-doc mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
+      <div className="flex flex-col gap-10 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         <CaseDocument detail={detail} />
-        <CaseAsk
-          slug={slug}
-          title={title ?? detail.title}
-          signedIn={signedIn}
-          viewerId={userId}
-          role={role}
-        />
+        {signedIn ? <CaseChatsSection slug={slug} viewerId={userId} /> : null}
       </div>
+      <CaseAskDock
+        slug={slug}
+        title={name ?? detail.title}
+        signedIn={signedIn}
+        role={role}
+      />
     </div>
   );
 }

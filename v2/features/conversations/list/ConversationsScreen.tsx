@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from 'react';
 
 import { SearchFieldShape } from '@/v2/shell/SearchField';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { ConversationsList } from './ConversationsList';
@@ -73,11 +74,7 @@ function ConversationsFallback() {
           DELETED (not reconciled) when content arrives, so anything focusable in
           here would lose focus and caret mid-interaction. The announcement rides
           the sibling `role="status"` node, which is never inert. */}
-      <div
-        aria-hidden
-        inert
-        className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6"
-      >
+      <div aria-hidden inert className={LIST_COLUMN}>
         <SearchFieldShape className="mb-4" />
         <ConversationsListSkeleton />
       </div>

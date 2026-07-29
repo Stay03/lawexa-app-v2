@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { formatTreatment, type RelatedCaseDisplay } from '@/lib/utils/related-cases';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { formatCaseName } from '../case-name';
 import { formatCaseDate } from '../case-row-model';
 
 /**
@@ -21,12 +22,14 @@ import { formatCaseDate } from '../case-row-model';
  * TEXT, not as a dead link — a link that goes nowhere is worse than no link. The
  * shared `citedEdgeToDisplay` mapper already encodes that as `href === null`.
  *
- * ── TREATMENT IS THE POINT ──────────────────────────────────────────────────
+ * ── TREATMENT IS THE POINT — SO `referred_to` IS NOT SHOWN ─────────────────
  * "Overruled" and "Followed" are not decoration on a citation, they are the
- * reason a lawyer reads the list. The badge carries a tone (neutral / caution /
- * negative) from the shared `formatTreatment`, and an unknown value — the
- * backend may extend the enum — is title-cased and shown neutrally rather than
- * dropped.
+ * reason a lawyer reads the list. But `referred_to` is the enum's catch-all —
+ * on real judgments it lands on nearly every row (thirteen identical "Referred
+ * to" badges on the first case reviewed), and a mark that appears on every row
+ * marks nothing. A citation IS a referral; the badge earns its ink only when
+ * the treatment says more than that. Unknown future values still render,
+ * title-cased and neutral.
  */
 export function RelatedCaseList({
   title,
@@ -60,12 +63,16 @@ export function RelatedCaseList({
 
 function RelatedCaseRow({ item }: { item: RelatedCaseDisplay }) {
   const year = formatCaseDate(item.judgmentDate, 'year');
-  const treatment = formatTreatment(item.treatment);
+  // The catch-all treatment is suppressed — see the docblock.
+  const treatment =
+    item.treatment === 'referred_to' ? null : formatTreatment(item.treatment);
 
   const body = (
     <>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm text-foreground">{item.title}</span>
+        <span className="block text-sm text-foreground" title={item.title}>
+          {formatCaseName(item.title)}
+        </span>
         {item.court || year ? (
           <span className="mt-0.5 block text-xs text-muted-foreground">
             {[item.court?.name, year].filter(Boolean).join(' · ')}

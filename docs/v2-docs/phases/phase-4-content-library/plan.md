@@ -152,6 +152,61 @@ both `app/sitemap.ts` and `lib/api/server.ts` — a sitemap that silently lists 
 exactly like one that works. **Phase-4 exit criterion partially unmet for cases until the
 backend answers.**
 
+## Wave 1, owner review round 1 (July 29) — eight items, all landed
+
+The owner reviewed the live surfaces with screenshots and handed over the backend's own
+change report for `GET /api/cases` / `GET /api/cases/{slug}` (the July 6–29 commits:
+citation edges, new scalars, structured collections, coram roles, frozen slugs, the new
+two-part body format). Everything below shipped in one round:
+
+1. **View counts removed** from the library rows, the trending rows, and the case heading.
+   A popularity number on every row is ranking data; Trending is where ranking lives.
+2. **Flags are self-hosted.** The composer's jurisdiction flags were fetched per-render
+   from the jsDelivr CDN (`react-country-flag`), so a device that couldn't reach it showed
+   nothing — the owner's device. Replaced with the `flag-icons` package (same artwork),
+   bundled by Next: **542 flag SVGs now serve from our origin** (`v2/shell/FlagIcon.tsx`),
+   the CDN-warming effect and per-flag load state deleted, and the box is a true 4×3 (the
+   old renderer stretched flags square).
+3. **Search stays on Trending** — focusing it hands the reader back to the Library view
+   (`onFocusCapture`; the field stays mounted so focus and the keystroke survive).
+4. **The case view was criticised and rebuilt** (owner: "criticize it and improve it, feel
+   free to be creative"):
+   - **The all-caps wall is gone.** `formatCaseName` (`v2/features/cases/case-name.ts`)
+     sets "WILSON V. C.O.P" as "Wilson v. C.O.P" — conservative, rule-listed casing (the
+     versus token, acronym-by-no-vowels, initials-by-dots, known report abbreviations,
+     connectives) that returns already-mixed-case input verbatim and keeps the source
+     string on hover. Applied to the heading, list rows, related-case rows, judges, the
+     hover preview, the header title and the Study home's recently-viewed.
+   - **Name and citation split** everywhere: the heading is the name; the citation is its
+     own quiet sans line (`doc-citation`); list rows carry the first citation in the meta
+     line (`firstCitation`).
+   - **The July contract now renders**: `outcome` as a gold badge under the heading (the
+     first question a lawyer asks), `suit_no` + `origin_state` as a facts line,
+     `report_principles[]` as structured entries (tag chip, ratio/obiter mark, attributed
+     judge with coram role, an **Unreviewed** badge on rows only Researcher+ receive),
+     `court_history[]` as a numbered timeline with linked steps, `statutes_cited[]` beside
+     the case citations, and coram roles on the Before line. Flat `principles` remains the
+     fallback for the unenriched corpus.
+   - **The new body format reads as structure**: a standalone `Held:` paragraph is promoted
+     to a real part heading (`doc-part-heading`), splitting the summary into facts and
+     judgment.
+   - **"Referred to" badges suppressed** — the enum's catch-all landed on thirteen of
+     thirteen rows on the first case reviewed; a mark on every row marks nothing. Real
+     treatments (followed/distinguished/overruled/…) still badge.
+   - **The holding is no longer italic** — multi-paragraph italics are an emphasis voice
+     used as a reading voice; the gold rule carries the signal alone.
+5. **The ask composer floats.** `CaseAskDock` is `sticky bottom-0` at the end of a
+   min-h-full column — the home dock's proven mechanic, with the gradient dissolve on all
+   breakpoints — so the composer rides over the judgment for the whole read. Desktop gets
+   the three prompt chips in the dock; "Your chats about this case" stays in the flow as
+   the last section (the v1 *feature* kept, the v1 floating-panel *design* not).
+6. **One list column.** `v2/shell/page-columns.ts` (`LIST_COLUMN`, max-w-3xl) is now
+   imported by `/conversations` and `/cases` and both route fallbacks — wider on big
+   monitors, consistent by construction, and equal to the case page's own column.
+7. Types: `types/case.ts` gained `CoramRole`, `ReportPrinciple`, `StatuteCitedEdge`,
+   `CourtHistoryStep`, and the new optional scalars on `CaseDetail` — all optional because
+   the corpus is mixed and bot UAs get the lean payload.
+
 **Open with the backend team**
 
 `backend-ask-2026-07-25-cases-read-endpoints.md` — every endpoint the reader uses, plus the

@@ -96,10 +96,22 @@ export function CaseText({ value }: { value: string }) {
           );
         }
         const rest = paragraph.slice(match[0].length);
+        // A STANDALONE heading — the July body format puts `Held:` alone on
+        // its own line between the facts and the judgment — is promoted to a
+        // real part heading (`doc-part-heading`, styled in case-document.css)
+        // so the summary visibly breaks into its halves. A heading with prose
+        // on the same line stays an inline lead-in.
+        if (!rest) {
+          return (
+            <p key={index} className="doc-part-heading">
+              {match[1]}
+            </p>
+          );
+        }
         return (
           <p key={index} className="whitespace-pre-line">
             <strong>{match[1]}:</strong>
-            {rest ? <Fragment> {rest}</Fragment> : null}
+            <Fragment> {rest}</Fragment>
           </p>
         );
       })}

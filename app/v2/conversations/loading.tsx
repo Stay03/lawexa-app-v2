@@ -1,4 +1,5 @@
 import { SearchFieldShape } from '@/v2/shell/SearchField';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { ConversationsListSkeleton } from '@/v2/features/conversations/list/states';
 
 /**
@@ -32,11 +33,7 @@ export default function ConversationsLoading() {
       <span role="status" className="sr-only">
         Loading your conversations
       </span>
-      <div
-        aria-hidden
-        inert
-        className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6"
-      >
+      <div aria-hidden inert className={LIST_COLUMN}>
         {/* Reserved search field — the real chrome's shape, held still. Imported
             from the same module as the live field so the two cannot drift. */}
         <SearchFieldShape className="mb-4" />

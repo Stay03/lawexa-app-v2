@@ -34,6 +34,18 @@
   text-wrap: balance;
 }
 
+/**
+ * The report citation, on its own line under the name. Set in the UI sans at a
+ * small size — a citation is a REFERENCE STRING, not prose, and keeping it out
+ * of the serif is what stops it reading as part of the name it used to be
+ * fused into.
+ */
+.v2-case-doc .doc-citation {
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+  color: var(--muted-foreground);
+}
+
 /* ── Section headings inside the document ───────────────────────────────── */
 
 .v2-case-doc .doc-heading {
@@ -78,15 +90,33 @@
 /**
  * The holding. Set apart by a rule and a slight lift rather than a card — the
  * standing "no box" rule applies to a judgment as much as to the home.
+ *
+ * NOT italic (July 29). Principles are now routinely multi-paragraph — one
+ * doctrine per paragraph, or several verbatim extracts — and italics are an
+ * emphasis voice, not a reading voice; whole paragraphs of them measurably
+ * slow reading. The gold rule alone carries the "this is the law" signal.
  */
 .v2-case-doc .doc-holding {
   border-inline-start: 2px solid color-mix(in oklch, var(--primary) 55%, transparent);
   padding-inline-start: 1rem;
 }
 
-.v2-case-doc .doc-holding .doc-prose {
-  font-style: italic;
-  color: color-mix(in oklch, var(--foreground) 88%, transparent);
+/**
+ * A standalone part heading inside the summary ("Held:") — the July body
+ * format is facts ¶, a bare `Held:` line, judgment ¶s, so the heading gets a
+ * real break's worth of air and the sans voice, splitting the summary into its
+ * two readable halves without any markup arriving from the API.
+ */
+.v2-case-doc .doc-prose p.doc-part-heading {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+}
+
+.v2-case-doc .doc-prose > p + p.doc-part-heading {
+  margin-top: 1.8em;
 }
 
 /* Reduced motion is handled globally for the v2 tree (shell.css stills every

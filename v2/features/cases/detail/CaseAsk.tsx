@@ -14,30 +14,27 @@ import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { casesQueries } from '../queries';
 
 /**
- * CaseAsk — "ask Lawexa about this case", and the reader's own prior threads
- * about it.
+ * The case page's chat surface, in two pieces the screen composes:
  *
- * ── ONE CHAT SURFACE ────────────────────────────────────────────────────────
- * v1 answered this with a SECOND chat implementation: a floating pill that
- * opened a sheet containing its own SSE handling, its own message renderer, its
- * own tool-call rendering and its own conversation list — around 800 lines that
- * had already drifted from the real conversation page (different thinking
- * indicator, legacy stream mode, no reasoning traces).
+ *  • {@link CaseAskDock} — the composer, FLOATING over the reading (owner,
+ *    July 29: "the chat text area in the view case page is at the bottom of
+ *    the page instead of floating on the page like it is in the message
+ *    conversation page"). It rides the home tabs' proven sticky-dock mechanic
+ *    (`sticky bottom-0` inside the shell's one scroll region + a gradient that
+ *    dissolves content scrolling behind it), so the composer is reachable the
+ *    whole read, on every breakpoint — never `position: fixed`.
+ *  • {@link CaseChatsSection} — the reader's own prior threads about this case,
+ *    in the document flow. This is the v1 feature the owner kept ("I need the
+ *    features, it's the design I don't need"): v1 buried the list inside its
+ *    floating panel's second chat engine; v2 lists the same threads as plain
+ *    rows into the REAL conversation screen.
  *
- * v2 has a conversation page worth going to. So this creates a NORMAL
- * conversation — same composer, same `startConversation`, same privacy and
- * jurisdiction rules as the home — tagged with `references: [{ type: 'case' }]`,
- * and hands the reader to `/c/{id}`. Nothing about chat is reimplemented here.
- * The reference is what makes those threads findable again, which is what the
- * list below reads.
- *
- * ── WHY IT IS INLINE, NOT FLOATING ──────────────────────────────────────────
- * A deliberate change from v1, and the one most worth a second opinion. A
- * composer floating over a judgment covers the text being read, and a judgment is
- * the one page where the words matter most. Placed at the end, it is where a
- * reader arrives when they have read enough to have a question. If it turns out
- * people want to ask mid-read, the fix is a floating layer like the conversation
- * screen's — the create path would not change.
+ * ── ONE CHAT SYSTEM ─────────────────────────────────────────────────────────
+ * Nothing about chat is reimplemented here. The dock submits through the same
+ * `HomeComposer` → `startConversation` path as the home, tagged with
+ * `references: [{ type: 'case' }]`, and hands the reader to `/c/{id}` — the
+ * one conversation screen. The reference is also what makes the threads below
+ * findable (`GET /cases/{slug}/conversations`).
  */
 
 /** Openers worth one tap. Deliberately few — a wall of chips is a menu. */
@@ -47,17 +44,16 @@ const PROMPTS = [
   'How has this case been treated since?',
 ] as const;
 
-export function CaseAsk({
+export function CaseAskDock({
   slug,
   title,
   signedIn,
-  viewerId,
   role,
 }: {
   slug: string;
+  /** The readable case name — the placeholder carries the context. */
   title: string;
   signedIn: boolean;
-  viewerId: number | null;
   role: UserRole | null;
 }) {
   const [draft, setDraft] = useState('');
@@ -66,13 +62,36 @@ export function CaseAsk({
   const [confidential, setConfidential] = useState(false);
 
   return (
-    <section aria-label="Ask about this case" className="flex flex-col gap-4">
-      <div>
-        <h2 className="doc-heading">Ask about this case</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Your question opens a new chat that already knows this case.
-        </p>
-      </div>
+    // `mt-auto` pins the dock to the viewport bottom even on a short case;
+    // `sticky bottom-0` floats it while the judgment scrolls behind. The
+    // negative margin + padding pair lets the gradient bleed to the column
+    // edges, exactly like the home dock.
+    <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-8">
+      {/* Dissolve the text scrolling behind the pill instead of colliding with
+          it — every breakpoint, since the dock floats on all of them. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent"
+      />
+
+      {/* Case-shaped openers — one tap fills the composer, the reader edits or
+          sends. Desktop-only: on a phone the dock must stay one thumb-row tall. */}
+      <ul className="mb-2 hidden flex-wrap gap-1.5 sm:flex">
+        {PROMPTS.map((prompt) => (
+          <li key={prompt}>
+            <button
+              type="button"
+              onClick={() => setDraft(prompt)}
+              className={cn(
+                'v2-interactive inline-flex min-h-8 items-center rounded-full border border-border bg-background px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+                FOCUS_RING,
+              )}
+            >
+              {prompt}
+            </button>
+          </li>
+        ))}
+      </ul>
 
       <HomeComposer
         value={draft}
@@ -86,26 +105,7 @@ export function CaseAsk({
         textareaClassName="text-[15px]"
         sendButtonClassName="md:size-9"
       />
-
-      <ul className="flex flex-wrap gap-1.5">
-        {PROMPTS.map((prompt) => (
-          <li key={prompt}>
-            <button
-              type="button"
-              onClick={() => setDraft(prompt)}
-              className={cn(
-                'v2-interactive inline-flex min-h-8 items-center rounded-full border border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-                FOCUS_RING,
-              )}
-            >
-              {prompt}
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {signedIn ? <CaseChats slug={slug} viewerId={viewerId} /> : null}
-    </section>
+    </div>
   );
 }
 
@@ -116,34 +116,46 @@ export function CaseAsk({
  *
  * Renders NOTHING when there are none — the one place in v2 where an empty
  * region is allowed to vanish rather than show a designed empty state, because
- * it is not a promised slot: the composer above it already says what to do, and
- * an empty "no chats yet" line under it would be pure noise. It is also below
- * everything, so nothing is yanked upward when it resolves.
+ * it is not a promised slot: the dock below already says what to do, and an
+ * empty "no chats yet" line would be pure noise. It is also the LAST block in
+ * the flow, so nothing is yanked upward when it resolves empty.
  */
-function CaseChats({ slug, viewerId }: { slug: string; viewerId: number | null }) {
+export function CaseChatsSection({
+  slug,
+  viewerId,
+}: {
+  slug: string;
+  viewerId: number | null;
+}) {
   const query = useQuery(casesQueries.conversations(slug, { viewerId }));
   const [now] = useState(() => Date.now());
   const rows = query.data?.data ?? [];
 
   if (query.isPending) {
     return (
-      <div aria-hidden className="flex flex-col gap-2 pt-1">
-        <Skeleton className="h-3 w-32 rounded" />
+      <div aria-hidden className="flex flex-col gap-2">
+        <Skeleton className="h-3 w-40 rounded" />
         <Skeleton className="h-9 w-full rounded-lg" />
       </div>
     );
   }
 
-  // An error here is not worth a banner: the composer above still works, and the
-  // threads are reachable from /conversations. Fail quiet, never fail loud on a
+  // An error here is not worth a banner: the dock still works, and the threads
+  // are reachable from /conversations. Fail quiet, never fail loud on a
   // secondary read.
   if (query.isError || rows.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1 pt-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-      <h3 className="px-1 text-xs font-medium text-muted-foreground">
-        Your chats about this case
-      </h3>
+    <section
+      aria-label="Your chats about this case"
+      className="flex flex-col gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+    >
+      <div className="px-1">
+        <h2 className="doc-heading">Your chats about this case</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Pick one up where you left it, or ask something new below.
+        </p>
+      </div>
       <ul className="flex flex-col divide-y divide-border/60">
         {rows.map((row) => (
           <li key={row.id}>
@@ -168,6 +180,6 @@ function CaseChats({ slug, viewerId }: { slug: string; viewerId: number | null }
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }

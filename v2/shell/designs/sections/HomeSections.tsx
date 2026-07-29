@@ -5,6 +5,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { BookText, Hash, Lock, MessageSquare, NotebookPen, Scale } from 'lucide-react';
 
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
+import { formatCaseName } from '@/v2/features/cases/case-name';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import { recentlyViewedQueries } from '@/v2/features/recently-viewed/queries';
@@ -140,7 +141,8 @@ function resolveViewed(row: RecentlyViewedItem) {
       return {
         href: `/cases/${row.item.slug}`,
         icon: Scale,
-        title: row.item.display_title || row.item.title,
+        // Same readable-name treatment as every other v2 case surface.
+        title: formatCaseName(row.item.display_title || row.item.title),
         label: 'Case',
       };
     case 'note':

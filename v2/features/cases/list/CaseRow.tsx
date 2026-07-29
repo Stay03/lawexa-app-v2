@@ -2,7 +2,6 @@
 
 import { memo } from 'react';
 import Link from 'next/link';
-import { Eye } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -17,19 +16,16 @@ import { caseHref, formatCaseDate, type CaseRowModel } from '../case-row-model';
  *     whole list — the same chrome the owner rejected on the home ("I don't like
  *     the box"). Here, as there, grouping is a hairline BETWEEN rows and nothing
  *     around them.
- *  2. THE META SHOUTED AS LOUD AS THE CASE. v1 set the title at 20px and every
- *     piece of metadata at 16px, and boxed the court and country in filled
- *     chips — so a scan hit four grey pills before it reached a case name. The
- *     case name is the only thing worth scanning, so it is the only thing at
- *     full weight; everything else is one quiet line beneath it.
+ *  2. THE TITLE WAS AN ALL-CAPS WALL with the citation fused in, and the meta
+ *     shouted at 16px in filled chips. The row title is now the READABLE case
+ *     name alone (`formatCaseName`; source form on hover), and the citation
+ *     leads one quiet meta line — the shape a law report entry actually has.
  *  3. TAGS WERE BUTTONS INSIDE A LINK. v1 nested `<button>`s in the row's
  *     `<Link>` and called `preventDefault` to stop the navigation — which works
- *     with a mouse and is a coin toss with a screen reader, because the row's
- *     accessible name then swallowed five tag names. Tags moved OUT of the row
- *     to the filter bar, where filtering belongs.
- *  4. THE HOLDING WAS PRE-TRUNCATED IN JS at 300 characters and then clamped
- *     again in CSS at two lines, so the ellipsis a reader saw was usually the
- *     wrong one. One clamp now, in CSS, at the real width.
+ *     with a mouse and is a coin toss with a screen reader. Tags moved to the
+ *     case page and the filter chip.
+ *  4. THE VIEW COUNT IS GONE (owner, July 29) — a popularity number on every
+ *     row is ranking data, and the Trending view is where ranking lives.
  *
  * `memo` matters here specifically: the bookmark mutation fans out across every
  * cached case surface, so an unmemoised row would re-render the whole visible
@@ -47,6 +43,13 @@ export const CaseRow = memo(function CaseRow({
   index: number;
 }) {
   const date = formatCaseDate(row.judgmentDate);
+  const meta = [
+    row.citation,
+    row.countryMark && row.court
+      ? `${row.countryMark} · ${row.court}`
+      : row.countryMark || row.court,
+    date,
+  ].filter((part): part is string => Boolean(part));
 
   return (
     <li
@@ -62,31 +65,31 @@ export const CaseRow = memo(function CaseRow({
             FOCUS_RING,
           )}
         >
-          <h3 className="truncate text-[15px] font-medium text-foreground transition-colors group-hover:text-primary">
+          <h3
+            title={row.rawTitle}
+            className="truncate text-[15px] font-medium text-foreground transition-colors group-hover:text-primary"
+          >
             {row.title}
           </h3>
 
-          {/* One quiet meta line. Every part is optional, and the separators are
-              rendered between what is actually present — never a stray bullet. */}
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-            {row.countryMark ? (
-              <span className="font-medium tracking-wide">{row.countryMark}</span>
-            ) : null}
-            {row.court ? <Dot before={!!row.countryMark}>{row.court}</Dot> : null}
-            {date ? (
-              <Dot before={!!row.countryMark || !!row.court}>
-                <span className="tabular-nums">{date}</span>
-              </Dot>
-            ) : null}
-            {row.viewsCount > 0 ? (
-              <Dot before={!!row.countryMark || !!row.court || !!date}>
-                <span className="inline-flex items-center gap-1">
-                  <Eye aria-hidden className="size-3" />
-                  <span className="tabular-nums">{row.viewsCount}</span>
+          {/* One quiet meta line: citation first (a lawyer reads name +
+              citation as one unit), then jurisdiction, then the date. */}
+          {meta.length > 0 ? (
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              {meta.map((part, partIndex) => (
+                <span key={partIndex} className="inline-flex items-center gap-2">
+                  {partIndex > 0 ? (
+                    <span aria-hidden className="text-muted-foreground/40">
+                      ·
+                    </span>
+                  ) : null}
+                  <span className={part === date ? 'tabular-nums' : undefined}>
+                    {part}
+                  </span>
                 </span>
-              </Dot>
-            ) : null}
-          </p>
+              ))}
+            </p>
+          ) : null}
 
           {row.holding ? (
             <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
@@ -106,13 +109,3 @@ export const CaseRow = memo(function CaseRow({
     </li>
   );
 });
-
-/** A separator dot rendered only when something precedes it. */
-function Dot({ before, children }: { before: boolean; children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-2">
-      {before ? <span aria-hidden className="text-muted-foreground/40">·</span> : null}
-      {children}
-    </span>
-  );
-}

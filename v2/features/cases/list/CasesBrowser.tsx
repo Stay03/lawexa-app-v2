@@ -12,6 +12,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlSearch } from '@/v2/runtime/use-url-search';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { SearchField } from '@/v2/shell/SearchField';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
@@ -64,11 +65,10 @@ import {
 /** Stable empty rows reference — a fresh `[]` per render would churn the memo. */
 const NO_ROWS: readonly CaseRowModel[] = [];
 
-/** The centred reading column every state shares — the conversations column. */
+/** The centred reading column every state shares — the SHARED v2 list column
+ *  (`page-columns.ts`), identical to `/conversations` by construction. */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6">{children}</div>
-  );
+  return <div className={LIST_COLUMN}>{children}</div>;
 }
 
 export function CasesBrowser() {
@@ -158,7 +158,17 @@ export function CasesBrowser() {
 
   return (
     <PageShell>
-      {view === 'library' ? (
+      {/* The search field renders on BOTH views (owner, July 29) so the surface
+          never loses its most-used control — but search FILTERS the library, so
+          on Trending the first keystroke's focus hands the reader back to the
+          library view. The field stays mounted across the switch, so focus and
+          the keystroke that caused it survive; `onFocusCapture` fires before
+          the input's own handlers, making the swap invisible. */}
+      <div
+        onFocusCapture={
+          view === 'trending' ? () => setView('library') : undefined
+        }
+      >
         <SearchField
           value={inputValue}
           onChange={onInputChange}
@@ -168,7 +178,7 @@ export function CasesBrowser() {
           label="Search cases by title"
           className="mb-3"
         />
-      ) : null}
+      </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <ViewTabs value={view} onChange={setView} />

@@ -1,6 +1,6 @@
 import type { Case } from '@/types/case';
 import type { TrendingCaseDetailItem } from '@/types/trending';
-import { getCaseDisplayTitle } from '@/lib/utils/case-title';
+import { firstCitation, formatCaseName } from './case-name';
 
 /**
  * ONE row model, two sources.
@@ -14,12 +14,23 @@ import { getCaseDisplayTitle } from '@/lib/utils/case-title';
  * v2 normalises at the edge instead. Both endpoints map into this model, ONE row
  * component renders it, and the two views of the case library are provably the
  * same design — which is the whole reason they can sit behind a pair of tabs.
+ *
+ * NAME AND CITATION ARE SPLIT (owner review, July 29). The old rows fused them
+ * into one all-caps wall ("WILSON V. C.O.P, (2026) JELR 115357 (CA); …"), which
+ * made the one thing worth scanning — the case name — the hardest thing to
+ * find. The row title is now the readable name alone (`formatCaseName`, with
+ * the source string kept in `rawTitle` for the hover), and the FIRST citation
+ * moves into the quiet meta line where a lawyer's eye expects it.
  */
 export interface CaseRowModel {
   id: number;
   slug: string;
-  /** The full heading — display title plus its citation, resolved once. */
+  /** The case NAME, mixed-cased — no citation. */
   title: string;
+  /** The source heading, verbatim, for the `title` attribute. */
+  rawTitle: string;
+  /** The first report citation, or null. */
+  citation: string | null;
   court: string | null;
   /** A short country mark (`NG`, `GH`) — the abbreviation, else the code. */
   countryMark: string | null;
@@ -27,30 +38,34 @@ export interface CaseRowModel {
   /** The holding: the one line worth reading before opening the case. */
   holding: string | null;
   tags: string[];
-  viewsCount: number;
   isBookmarked: boolean;
 }
 
 export function browseRow(item: Case): CaseRowModel {
+  const raw = item.display_title || item.title;
   return {
     id: item.id,
     slug: item.slug,
-    title: getCaseDisplayTitle(item),
+    title: formatCaseName(raw),
+    rawTitle: raw,
+    citation: firstCitation(item.citation),
     court: item.court?.name ?? null,
     countryMark: item.country?.abbreviation || item.country?.code || null,
     judgmentDate: item.judgment_date,
     holding: item.principles?.trim() || item.excerpt?.trim() || null,
     tags: item.tags ?? [],
-    viewsCount: item.views_count,
     isBookmarked: item.is_bookmarked,
   };
 }
 
 export function trendingRow(item: TrendingCaseDetailItem): CaseRowModel {
+  const raw = item.display_title || item.title;
   return {
     id: item.id,
     slug: item.slug,
-    title: getCaseDisplayTitle(item),
+    title: formatCaseName(raw),
+    rawTitle: raw,
+    citation: firstCitation(item.citation),
     court: item.court,
     // The trending payload has no `abbreviation`, only `code` — so the mark is
     // slightly less specific here. That is the API's shape, not a rendering
@@ -60,7 +75,6 @@ export function trendingRow(item: TrendingCaseDetailItem): CaseRowModel {
     judgmentDate: item.judgment_date,
     holding: item.principles?.trim() || null,
     tags: item.tags ?? [],
-    viewsCount: item.views_count,
     isBookmarked: item.is_bookmarked,
   };
 }

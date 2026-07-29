@@ -6,8 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, ArrowUpRight, CalendarDays, Scale } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import type { CaseDetail } from '@/types/case';
+import { formatCaseName } from '@/v2/features/cases/case-name';
 import { casesQueries } from '@/v2/features/cases/queries';
 
 /**
@@ -79,7 +79,9 @@ export function CasePreview({ slug, href }: { slug: string; href: string }) {
 }
 
 function PreviewBody({ detail, href }: { detail: CaseDetail; href: string }) {
-  const title = getCaseDisplayTitle(detail);
+  // The readable name alone — the citation is reference data the card's meta
+  // row does not need, and the all-caps fused form defeated the line clamp.
+  const title = formatCaseName(detail.display_title || detail.title);
   const court = detail.court?.name?.trim() ?? '';
   const date = formatJudgmentDate(detail.judgment_date);
   const summary = useMemo(() => buildSummary(detail), [detail]);

@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from 'react';
 
 import { SearchFieldShape } from '@/v2/shell/SearchField';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { CasesBrowser } from './CasesBrowser';
 import { CasesListSkeleton } from './states';
@@ -59,7 +60,7 @@ export function CasesFallback() {
       {/* `aria-hidden` + `inert` per standards §8ii: a Suspense fallback is
           DELETED (not reconciled) when content arrives, so anything focusable
           in here would lose focus and caret mid-interaction. */}
-      <div aria-hidden inert className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6">
+      <div aria-hidden inert className={LIST_COLUMN}>
         <SearchFieldShape className="mb-3" />
         <div className="mb-3 flex items-center">
           <div className="h-9 w-40 rounded-full bg-secondary/60" />

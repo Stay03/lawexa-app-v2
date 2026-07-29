@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { ConversationListItem } from '@/types/chat';
 import { useNewRows } from '@/v2/runtime/use-new-rows';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { NewRowsPill } from '@/v2/shell/NewRowsPill';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
@@ -23,13 +24,10 @@ import {
   NextPageSkeleton,
 } from './states';
 
-/** The centred reading column every list state shares. */
+/** The centred reading column every list state shares — the SHARED v2 list
+ *  column (`page-columns.ts`), so this page and `/cases` cannot drift apart. */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5 sm:pt-6">
-      {children}
-    </div>
-  );
+  return <div className={LIST_COLUMN}>{children}</div>;
 }
 
 /** Stable empty rows reference — a fresh `[]` per render would defeat the

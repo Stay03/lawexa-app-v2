@@ -18,11 +18,18 @@ export interface Country {
   abbreviation: string;
 }
 
+// The judge's role on a case's coram (pivot field, July 2026 contract).
+// `null` = unknown / legacy row.
+export type CoramRole = 'lead' | 'concurring' | 'dissenting';
+
 // Judge type for case detail
 export interface Judge {
   id: number;
   name: string;
   slug: string;
+  // Coram role pivot — optional because pre-July payloads (and cached
+  // responses) do not carry it.
+  role?: CoramRole | null;
   created_at: string;
   updated_at: string;
 }
@@ -96,6 +103,49 @@ export interface CitedByCase extends RelatedCase {
   treatment: CaseTreatment | null;
 }
 
+// A verbatim principle extracted from the judgment (report_principles[]).
+// End users (below Researcher) receive ONLY `reviewed: true` rows — the server
+// filters the rest — so `reviewed: false` is visible to Researcher+ accounts
+// and should be badged as unreviewed, never hidden client-side.
+export interface ReportPrinciple {
+  id: number;
+  principle: string;
+  // Present only when the principle is attributed; `role` is the judge's coram
+  // role on THIS case.
+  judge?: { id: number; name: string; slug: string; role: CoramRole | null } | null;
+  type: 'ratio' | 'obiter' | null;
+  tag: string | null;
+  law_type: string[] | null;
+  reviewed: boolean;
+  order: number;
+}
+
+// One statute this judgment cited (statutes_cited[]). When `statute_id` is set
+// a `statute` object is included — render as a link; when null, render `raw`
+// as plain text (unresolved; a future healing job links these).
+export interface StatuteCitedEdge {
+  id: number;
+  statute_id: number | null;
+  raw: string | null;
+  provision: string | null;
+  statute?: { id: number; title: string; slug: string } | null;
+}
+
+// One step of the case's procedural chain (court_history[], ordered). When
+// `related_case_id` is set, title/slug/court/decided_date/outcome describe the
+// linked case; otherwise `label` is the whole entry.
+export interface CourtHistoryStep {
+  id: number;
+  related_case_id: number | null;
+  label: string | null;
+  order: number;
+  title: string | null;
+  slug: string | null;
+  court: string | null;
+  decided_date: string | null;
+  outcome: CaseOutcome | null;
+}
+
 // Meta information for SEO
 export interface CaseMeta {
   title: string;
@@ -136,9 +186,25 @@ export interface CaseViewLimitError {
 }
 
 // Full case detail (from GET /api/cases/{slug})
+//
+// July 2026 contract notes (docs/api/case-structures-and-enrichment.md,
+// backend repo): the show endpoint ALWAYS loads the structured relations
+// (report_principles / statutes_cited / court_history) — only full_report and
+// the citation sets stay behind include params. All structured fields are
+// typed optional because the corpus is mixed (bot UAs get a lean payload, and
+// cached pre-July responses lack them).
 export interface CaseDetail extends Case {
   body: string | null;
   judges: Judge[];
+  // Falls back to `title` server-side when unset.
+  short_title?: string;
+  suit_no?: string | null;
+  outcome?: CaseOutcome | null;
+  // Sub-national origin, e.g. "Kano", "Greater Accra".
+  origin_state?: string | null;
+  report_principles?: ReportPrinciple[];
+  statutes_cited?: StatuteCitedEdge[];
+  court_history?: CourtHistoryStep[];
   has_full_report?: boolean;
   full_report?: FullReport | null;
   similar_cases?: RelatedCase[] | null;
