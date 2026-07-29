@@ -2,6 +2,16 @@ import type { Case } from '@/types/case';
 import type { TrendingCaseDetailItem } from '@/types/trending';
 import { firstCitation, formatCaseName } from './case-name';
 
+/** A renderable ISO alpha-2 flag code from whichever field carries one. */
+export function toAlpha2(
+  ...candidates: (string | null | undefined)[]
+): string | null {
+  for (const candidate of candidates) {
+    if (candidate && candidate.length === 2) return candidate.toUpperCase();
+  }
+  return null;
+}
+
 /**
  * ONE row model, two sources.
  *
@@ -32,8 +42,12 @@ export interface CaseRowModel {
   /** The first report citation, or null. */
   citation: string | null;
   court: string | null;
-  /** A short country mark (`NG`, `GH`) — the abbreviation, else the code. */
-  countryMark: string | null;
+  /** ISO alpha-2 code for the flag, or null when the payload has none — the
+   *  flag replaced the "NG" text mark (owner, July 29: "why can't I see the
+   *  flag in the list"). */
+  countryCode: string | null;
+  /** The country's display name — the flag's accessible label. */
+  countryName: string | null;
   judgmentDate: string | null;
   /** The holding: the one line worth reading before opening the case. */
   holding: string | null;
@@ -50,7 +64,8 @@ export function browseRow(item: Case): CaseRowModel {
     rawTitle: raw,
     citation: firstCitation(item.citation),
     court: item.court?.name ?? null,
-    countryMark: item.country?.abbreviation || item.country?.code || null,
+    countryCode: toAlpha2(item.country?.code, item.country?.abbreviation),
+    countryName: item.country?.name ?? null,
     judgmentDate: item.judgment_date,
     holding: item.principles?.trim() || item.excerpt?.trim() || null,
     tags: item.tags ?? [],
@@ -67,11 +82,8 @@ export function trendingRow(item: TrendingCaseDetailItem): CaseRowModel {
     rawTitle: raw,
     citation: firstCitation(item.citation),
     court: item.court,
-    // The trending payload has no `abbreviation`, only `code` — so the mark is
-    // slightly less specific here. That is the API's shape, not a rendering
-    // choice, and it is better than showing a full country name in a row that
-    // reserves two characters for it.
-    countryMark: item.country?.code ?? null,
+    countryCode: toAlpha2(item.country?.code),
+    countryName: item.country?.name ?? null,
     judgmentDate: item.judgment_date,
     holding: item.principles?.trim() || null,
     tags: item.tags ?? [],

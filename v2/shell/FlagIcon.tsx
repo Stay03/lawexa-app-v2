@@ -35,15 +35,19 @@ export const FLAG_H = '1.05em';
 
 export function FlagIcon({
   code,
+  title,
   className,
 }: {
   /** ISO 3166-1 alpha-2 code, any case. */
   code: string;
+  /** Country name. When given, the flag is announced as an image with this
+   *  label (and shows it on hover); without one it is decorative. */
+  title?: string;
   className?: string;
 }) {
   return (
     <span
-      aria-hidden
+      {...(title ? { role: 'img', 'aria-label': title, title } : { 'aria-hidden': true })}
       className={cn(
         'relative inline-block shrink-0 overflow-hidden rounded-[2px] bg-muted align-middle',
         className,
@@ -51,6 +55,7 @@ export function FlagIcon({
       style={{ width: FLAG_W, height: FLAG_H }}
     >
       <span
+        aria-hidden
         className={cn('fi absolute inset-0', `fi-${code.toLowerCase()}`)}
         // The library sizes `.fi` by em; the reserved box is the authority here.
         style={{ width: '100%', height: '100%' }}

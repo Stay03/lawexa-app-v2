@@ -24,14 +24,13 @@ export const CASE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
 export function CaseDocumentSkeleton({ still = false }: { still?: boolean }) {
   const bar = still ? 'animate-none' : undefined;
   return (
-    <div aria-hidden className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
+    <div aria-hidden className="flex flex-col gap-9">
+      {/* The header silhouette: kicker · name · citation · outcome · actions. */}
+      <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
+        <Skeleton className={cn('h-3 w-48 rounded', bar)} />
         <Skeleton className={cn('h-8 w-4/5 rounded-lg md:h-9', bar)} />
-        <Skeleton className={cn('h-4 w-2/5 rounded', bar)} />
-        <div className="flex gap-1.5">
-          <Skeleton className={cn('h-7 w-20 rounded-full', bar)} />
-          <Skeleton className={cn('h-7 w-24 rounded-full', bar)} />
-        </div>
+        <Skeleton className={cn('h-3.5 w-2/5 rounded', bar)} />
+        <Skeleton className={cn('h-6 w-28 rounded-full', bar)} />
         <div className="flex gap-2">
           <Skeleton className={cn('h-9 w-24 rounded-full', bar)} />
           <Skeleton className={cn('h-9 w-24 rounded-full', bar)} />

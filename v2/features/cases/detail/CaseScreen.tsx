@@ -9,7 +9,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
-import { CaseAskDock, CaseChatsSection } from './CaseAsk';
+import { CaseAskDock } from './CaseAsk';
 import { CaseDocument } from './CaseDocument';
 import {
   CASE_COLUMN,
@@ -48,22 +48,26 @@ export function CaseScreen({ slug }: { slug: string }) {
 }
 
 function CaseBody({ slug }: { slug: string }) {
-  const { signedIn, userId, role } = useV2Session();
+  const { signedIn, userId } = useV2Session();
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get('q')?.trim() || undefined;
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
-  const name = detail ? formatCaseName(detail.display_title || detail.title) : null;
+  // The header centre gets the SHORT title (the July contract ships one —
+  // "Skye Bank Plc v Iwu") so a long multi-party name never truncates the bar.
+  const headerName = detail
+    ? formatCaseName(detail.short_title || detail.display_title || detail.title)
+    : null;
 
   // Publish the header title once it resolves, and clear it on the way out so
   // the next route never inherits this case's name. An external-store write, not
   // React state — which is what makes it legal in an effect under the React
   // Compiler lint.
   useEffect(() => {
-    if (!name) return;
-    setHeaderContext({ title: name, confidential: false });
-  }, [name]);
+    if (!headerName) return;
+    setHeaderContext({ title: headerName, confidential: false });
+  }, [headerName]);
   useEffect(() => () => clearHeaderContext(), []);
 
   if (query.isPending) {
@@ -98,21 +102,14 @@ function CaseBody({ slug }: { slug: string }) {
   }
 
   return (
-    // The tall column the sticky dock needs: content, then the dock pinned to
-    // the bottom edge. `.v2-case-doc` scopes the reading typography
-    // (case-document.css) over the document AND the chats section, so their
-    // headings match.
+    // The tall column the sticky dock needs: the document is the flow; the
+    // pill dock is pinned to the bottom edge and floats over the reading.
+    // `.v2-case-doc` scopes the reading typography (case-document.css).
     <div className="v2-case-doc mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
-      <div className="flex flex-col gap-10 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+      <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         <CaseDocument detail={detail} />
-        {signedIn ? <CaseChatsSection slug={slug} viewerId={userId} /> : null}
       </div>
-      <CaseAskDock
-        slug={slug}
-        title={name ?? detail.title}
-        signedIn={signedIn}
-        role={role}
-      />
+      <CaseAskDock slug={slug} signedIn={signedIn} viewerId={userId} />
     </div>
   );
 }

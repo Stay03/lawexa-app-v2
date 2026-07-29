@@ -1,43 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { MessageSquare } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowUp, Loader2, MessageSquare } from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
+import { extractApiError } from '@/lib/utils/api-error';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { UserRole } from '@/types/auth';
+import {
+  PromptInput,
+  PromptInputAction,
+  PromptInputTextarea,
+} from '@/components/ui/prompt-input';
+import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { HomeComposer } from '@/v2/shell/designs/HomeComposer';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
+import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
+import { startConversation } from '@/v2/features/conversations/start-conversation';
 import { casesQueries } from '../queries';
 
 /**
- * The case page's chat surface, in two pieces the screen composes:
+ * CaseAskDock — the case page's chat entry, rebuilt to the CONVERSATION PILL'S
+ * exact scale (owner, July 29: "I want the one in the message conversation
+ * page, that exact style — this one is too big, noisy and messy").
  *
- *  • {@link CaseAskDock} — the composer, FLOATING over the reading (owner,
- *    July 29: "the chat text area in the view case page is at the bottom of
- *    the page instead of floating on the page like it is in the message
- *    conversation page"). It rides the home tabs' proven sticky-dock mechanic
- *    (`sticky bottom-0` inside the shell's one scroll region + a gradient that
- *    dissolves content scrolling behind it), so the composer is reachable the
- *    whole read, on every breakpoint — never `position: fixed`.
- *  • {@link CaseChatsSection} — the reader's own prior threads about this case,
- *    in the document flow. This is the v1 feature the owner kept ("I need the
- *    features, it's the design I don't need"): v1 buried the list inside its
- *    floating panel's second chat engine; v2 lists the same threads as plain
- *    rows into the REAL conversation screen.
+ * ── AT REST: the pill, nothing else ─────────────────────────────────────────
+ * The same anatomy as `ConversationComposer`: `max-w-xs sm:max-w-md`, one
+ * `min-h-9` textarea row, a `size-8` round send button, the downward-biased
+ * shadow so no shade band climbs into the judgment. No furniture is visible —
+ * the reading stays clean to the pill's edge.
+ *
+ * ── ON FOCUS: the hub opens above it ────────────────────────────────────────
+ * v1 answered a click here by sliding out a right-hand sheet with its own chat
+ * engine inside. The owner wants "something like that but better and cleaner":
+ * focusing the pill expands a SOLID panel directly above it — the reader's
+ * recent chats about this case (the v1 feature, kept), three case-shaped
+ * openers, and the jurisdiction chip. It collapses on Escape or a click
+ * outside. The panel is a persistent-node grid collapse (the conversation
+ * composer's own pattern), so open and close both animate and the chats query
+ * mounts exactly once.
  *
  * ── ONE CHAT SYSTEM ─────────────────────────────────────────────────────────
- * Nothing about chat is reimplemented here. The dock submits through the same
- * `HomeComposer` → `startConversation` path as the home, tagged with
- * `references: [{ type: 'case' }]`, and hands the reader to `/c/{id}` — the
- * one conversation screen. The reference is also what makes the threads below
- * findable (`GET /cases/{slug}/conversations`).
+ * Submit goes through the same `startConversation` as everywhere else, tagged
+ * `references: [{ type: 'case' }]`, and lands on the REAL conversation screen.
+ * Deliberately absent from this surface: attachments, confidential/redacted,
+ * workflow — those are home-composer concerns; a reader who needs them starts
+ * from the home. That absence is what keeps the pill a pill.
  */
 
-/** Openers worth one tap. Deliberately few — a wall of chips is a menu. */
 const PROMPTS = [
   'Explain this case in plain language',
   'What is the ratio decidendi?',
@@ -46,140 +59,256 @@ const PROMPTS = [
 
 export function CaseAskDock({
   slug,
-  title,
   signedIn,
-  role,
+  viewerId,
 }: {
   slug: string;
-  /** The readable case name — the placeholder carries the context. */
-  title: string;
   signedIn: boolean;
-  role: UserRole | null;
+  viewerId: number | null;
 }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const dockRef = useRef<HTMLDivElement>(null);
+
   const [draft, setDraft] = useState('');
-  // Confidential is controlled by the parent everywhere this composer is used;
-  // on a case page there is no greeting to present it, so it lives here.
-  const [confidential, setConfidential] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [jurisdiction, setJurisdiction] = useState<JurisdictionChoice>({ mode: 'auto' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Collapse on a pointer-down outside the dock, and on Escape. Clicks inside
+  // PORTALED overlays (the jurisdiction popover renders into a Radix popper
+  // wrapper on <body>) are part of the dock's interaction and must not close
+  // it — the wrapper attribute is the discriminator. Listeners are attached
+  // only while open; setState inside a DOM event handler is compiler-clean.
+  useEffect(() => {
+    if (!expanded) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (!target) return;
+      if (dockRef.current?.contains(target)) return;
+      if (target.closest('[data-radix-popper-content-wrapper]')) return;
+      setExpanded(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpanded(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [expanded]);
+
+  const stop = (event: React.SyntheticEvent) => event.stopPropagation();
+
+  const fillPrompt = (prompt: string) => {
+    setDraft(prompt);
+    // Hand focus back to the field so the reader edits or sends immediately.
+    dockRef.current?.querySelector('textarea')?.focus();
+  };
+
+  const submit = async () => {
+    const message = draft.trim();
+    if (!message || isSubmitting) return;
+    if (!signedIn) {
+      router.push('/login');
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const result = await startConversation(
+        {
+          message,
+          attachments: [],
+          jurisdiction,
+          references: [{ type: 'case', id: slug }],
+        },
+        { queryClient },
+      );
+      setDraft('');
+      router.push(
+        result.status === 'existing'
+          ? `/c/${result.conversationId}`
+          : `/c/${result.conversationId}?init=1`,
+      );
+      // Keep `isSubmitting` true through navigation — no double-submit window.
+    } catch (err) {
+      setError(extractApiError(err).message);
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    // `mt-auto` pins the dock to the viewport bottom even on a short case;
-    // `sticky bottom-0` floats it while the judgment scrolls behind. The
-    // negative margin + padding pair lets the gradient bleed to the column
-    // edges, exactly like the home dock.
-    <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-8">
-      {/* Dissolve the text scrolling behind the pill instead of colliding with
-          it — every breakpoint, since the dock floats on all of them. */}
+    <div ref={dockRef} className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-8">
+      {/* Dissolve the judgment scrolling behind the pill. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent"
       />
 
-      {/* Case-shaped openers — one tap fills the composer, the reader edits or
-          sends. Desktop-only: on a phone the dock must stay one thumb-row tall. */}
-      <ul className="mb-2 hidden flex-wrap gap-1.5 sm:flex">
-        {PROMPTS.map((prompt) => (
-          <li key={prompt}>
-            <button
-              type="button"
-              onClick={() => setDraft(prompt)}
+      <div className="mx-auto w-full max-w-xs sm:max-w-md">
+        {/* ── The hub: a persistent-node collapse above the pill. ── */}
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+            expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+          )}
+        >
+          <div className="overflow-hidden">
+            <div
+              aria-hidden={!expanded}
+              inert={!expanded}
               className={cn(
-                'v2-interactive inline-flex min-h-8 items-center rounded-full border border-border bg-background px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-                FOCUS_RING,
+                'mb-2 flex flex-col gap-3 rounded-2xl border border-border bg-popover p-3 shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)] transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                expanded ? 'opacity-100' : 'opacity-0',
               )}
             >
-              {prompt}
-            </button>
-          </li>
-        ))}
-      </ul>
+              {signedIn ? <RecentCaseChats slug={slug} viewerId={viewerId} /> : null}
 
-      <HomeComposer
-        value={draft}
-        onValueChange={setDraft}
-        signedIn={signedIn}
-        role={role ?? undefined}
-        confidential={confidential}
-        onConfidentialChange={setConfidential}
-        references={[{ type: 'case', id: slug }]}
-        placeholder={`Ask about ${title}`}
-        textareaClassName="text-[15px]"
-        sendButtonClassName="md:size-9"
-      />
+              <div className="flex flex-col gap-1.5">
+                <p className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  Start with
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {PROMPTS.map((prompt) => (
+                    <li key={prompt}>
+                      <button
+                        type="button"
+                        onClick={() => fillPrompt(prompt)}
+                        className={cn(
+                          'v2-interactive inline-flex min-h-8 items-center rounded-full border border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+                          FOCUS_RING,
+                        )}
+                      >
+                        {prompt}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {signedIn ? (
+                <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+                  <JurisdictionField
+                    signedIn
+                    value={jurisdiction}
+                    onChange={setJurisdiction}
+                    disabled={isSubmitting}
+                    stop={stop}
+                  />
+                  <span className="text-[11px] text-muted-foreground/60">
+                    Opens a new chat
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {/* Error — quiet, above the pill, cleared on the next keystroke. */}
+        {error ? (
+          <div
+            role="alert"
+            className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          >
+            {error}
+          </div>
+        ) : null}
+
+        {/* ── The pill — the conversation composer's exact scale. ── */}
+        <PromptInput
+          value={draft}
+          onValueChange={(next) => {
+            setDraft(next);
+            if (error) setError(null);
+          }}
+          onSubmit={submit}
+          disabled={isSubmitting}
+          maxHeight={150}
+          className="shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]"
+        >
+          <div className="flex items-end gap-1.5">
+            <PromptInputTextarea
+              placeholder="Ask about this case"
+              className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
+              onFocus={() => setExpanded(true)}
+            />
+            <PromptInputAction tooltip="Send message">
+              <Button
+                type="button"
+                size="icon"
+                className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
+                onClick={submit}
+                disabled={!draft.trim() || isSubmitting}
+                aria-label="Send message"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="size-4" />
+                )}
+              </Button>
+            </PromptInputAction>
+          </div>
+        </PromptInput>
+      </div>
     </div>
   );
 }
 
 /**
- * The reader's own threads about this case. Owner-scoped on the server, and
- * viewer-partitioned in the cache for the same reason every other list is: a
- * shared device must never paint the previous account's chat titles.
- *
- * Renders NOTHING when there are none — the one place in v2 where an empty
- * region is allowed to vanish rather than show a designed empty state, because
- * it is not a promised slot: the dock below already says what to do, and an
- * empty "no chats yet" line would be pure noise. It is also the LAST block in
- * the flow, so nothing is yanked upward when it resolves empty.
+ * The reader's recent threads about this case, inside the hub. Owner-scoped on
+ * the server and viewer-partitioned in the cache; renders nothing when there
+ * are none (the hub's openers already say what to do) and fails quiet — the
+ * threads are still reachable from /conversations.
  */
-export function CaseChatsSection({
-  slug,
-  viewerId,
-}: {
-  slug: string;
-  viewerId: number | null;
-}) {
+function RecentCaseChats({ slug, viewerId }: { slug: string; viewerId: number | null }) {
   const query = useQuery(casesQueries.conversations(slug, { viewerId }));
   const [now] = useState(() => Date.now());
-  const rows = query.data?.data ?? [];
+  const rows = (query.data?.data ?? []).slice(0, 3);
 
   if (query.isPending) {
     return (
-      <div aria-hidden className="flex flex-col gap-2">
-        <Skeleton className="h-3 w-40 rounded" />
-        <Skeleton className="h-9 w-full rounded-lg" />
+      <div aria-hidden className="flex flex-col gap-1.5">
+        <Skeleton className="h-3 w-36 rounded" />
+        <Skeleton className="h-8 w-full rounded-lg" />
       </div>
     );
   }
-
-  // An error here is not worth a banner: the dock still works, and the threads
-  // are reachable from /conversations. Fail quiet, never fail loud on a
-  // secondary read.
   if (query.isError || rows.length === 0) return null;
 
   return (
-    <section
-      aria-label="Your chats about this case"
-      className="flex flex-col gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-    >
-      <div className="px-1">
-        <h2 className="doc-heading">Your chats about this case</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Pick one up where you left it, or ask something new below.
-        </p>
-      </div>
-      <ul className="flex flex-col divide-y divide-border/60">
+    <div className="flex flex-col gap-1">
+      <p className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+        Pick up where you left off
+      </p>
+      <ul className="flex flex-col">
         {rows.map((row) => (
           <li key={row.id}>
             <Link
               href={`/c/${row.id}`}
               className={cn(
-                'v2-interactive flex min-h-11 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary/50',
+                'v2-interactive flex min-h-9 items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-secondary/60',
                 FOCUS_RING,
               )}
             >
               <MessageSquare
                 aria-hidden
-                className="size-4 shrink-0 text-muted-foreground/70"
+                className="size-3.5 shrink-0 text-muted-foreground/70"
               />
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                 {stripPastedTags(row.title) || 'Untitled conversation'}
               </span>
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground/60">
+              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
                 {formatRelativeTime(row.updated_at, now)}
               </span>
             </Link>
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }

@@ -42,7 +42,11 @@ const VERSUS = /^(v|vs|vrs)\.?$/i;
  *  pinpoint citations ("…(PT. 75) 156 AT 177") surviving inside fused titles. */
 const CONNECTIVES = new Set(['OF', 'THE', 'AND', 'FOR', 'IN', 'AT']);
 
-/** Vowel-bearing abbreviations whose conventional casing is fixed (rule 6). */
+/** Vowel-bearing abbreviations whose conventional casing is fixed (rule 6).
+ *  The judicial honorifics are here because the vowel heuristic misreads the
+ *  ones that contain vowels — live data showed "MUHAMMAD JCA" rendering as
+ *  "Muhammad Jca" (A is a vowel, so JCA failed the acronym test) while JSC,
+ *  vowel-free, was correct. The map outranks the heuristic. */
 const KNOWN: Record<string, string> = {
   LTD: 'Ltd',
   'LTD.': 'Ltd.',
@@ -54,6 +58,15 @@ const KNOWN: Record<string, string> = {
   EX: 'Ex',
   PARTE: 'Parte',
   'PARTE:': 'Parte:',
+  // Judicial honorifics and post-nominals (Nigeria + Ghana benches).
+  JCA: 'JCA',
+  JSC: 'JSC',
+  CJN: 'CJN',
+  SAN: 'SAN',
+  OFR: 'OFR',
+  GCON: 'GCON',
+  ACJ: 'ACJ',
+  PCA: 'PCA',
 };
 
 /** Case one word-like segment (rule 8's inner step). */
@@ -91,10 +104,20 @@ function caseToken(token: string, atPartyStart: boolean): string {
     return core.toLowerCase() + trailing;
   }
 
-  // Rule 8 — an ordinary word, cased per hyphen/apostrophe segment.
+  // Rule 8 — an ordinary word, cased per hyphen segment. After an apostrophe,
+  // capitalize only when the prefix is a single letter (O'NEILL → O'Neill) —
+  // longer prefixes keep the rest lowercase (AKA'AHS → Aka'ahs, the publishers'
+  // form for such names).
   const cased = core
     .split('-')
-    .map((part) => part.split("'").map(caseSegment).join("'"))
+    .map((part) => {
+      const pieces = part.split("'");
+      return pieces
+        .map((piece, i) =>
+          i === 0 || pieces[i - 1].length === 1 ? caseSegment(piece) : piece.toLowerCase(),
+        )
+        .join("'");
+    })
     .join('-');
   return cased + trailing;
 }

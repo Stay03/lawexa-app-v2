@@ -7,6 +7,7 @@ import { formatTreatment, type RelatedCaseDisplay } from '@/lib/utils/related-ca
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatCaseName } from '../case-name';
 import { formatCaseDate } from '../case-row-model';
+import { SectionHeading } from './SectionHeading';
 
 /**
  * The three citation sets on a case page.
@@ -43,13 +44,8 @@ export function RelatedCaseList({
   if (cases.length === 0) return null;
 
   return (
-    <section aria-label={title} className="flex flex-col gap-1.5">
-      <div className="px-1">
-        <h2 className="doc-heading">{title}</h2>
-        {description ? (
-          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-        ) : null}
-      </div>
+    <section aria-label={title} className="flex flex-col gap-3">
+      <SectionHeading label={title} sub={description} />
       <ul className="flex flex-col divide-y divide-border/60">
         {cases.map((item) => (
           <li key={item.key}>

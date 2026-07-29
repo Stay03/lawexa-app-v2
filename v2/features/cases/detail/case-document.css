@@ -24,6 +24,22 @@
 
 /* ── The heading block ──────────────────────────────────────────────────── */
 
+/**
+ * The kicker — provenance before the name (court · date), in the LABEL VOICE:
+ * small uppercase tracked sans. The same voice marks every section heading
+ * below, which is the page's whole organizing system: sans caps = structure,
+ * serif = the law. Two voices, used consistently, instead of eight rows of
+ * equal-weight data.
+ */
+.v2-case-doc .doc-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
 .v2-case-doc .doc-title {
   font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
   font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
@@ -48,13 +64,20 @@
 
 /* ── Section headings inside the document ───────────────────────────────── */
 
+/**
+ * Section labels wear the SAME voice as the kicker — small caps-tracked sans.
+ * The serif they replaced competed with the prose (a serif label over serif
+ * text is two headlines); the caps label reads as SCAFFOLDING, not content,
+ * which is exactly what a section heading is. Rendered by `SectionHeading`,
+ * which pairs it with a hairline rule.
+ */
 .v2-case-doc .doc-heading {
-  font-family: var(--font-fraunces), Georgia, serif;
-  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 20;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
   font-weight: 600;
-  font-size: 1.0625rem;
-  letter-spacing: 0.01em;
-  color: var(--foreground);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }
 
 /* ── Body prose ─────────────────────────────────────────────────────────── */

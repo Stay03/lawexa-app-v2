@@ -12,43 +12,44 @@ import type {
   ReportPrinciple,
   StatuteCitedEdge,
 } from '@/types/case';
+import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatCaseName } from '../case-name';
-import { formatCaseDate } from '../case-row-model';
+import { formatCaseDate, toAlpha2 } from '../case-row-model';
 import { CaseActions } from './CaseActions';
 import { CaseText } from './case-text';
 import { RelatedCaseList } from './RelatedCases';
+import { SectionHeading } from './SectionHeading';
 import { ViewLimitNotice } from './states';
 import './case-document.css';
 
 /**
- * CaseDocument — THE case reading surface. Singular, on purpose (the July-25
- * study: v1 rendered one case three disagreeing ways; the toggle and both
- * alternates are gone — see the phase-4 plan for the full record).
+ * CaseDocument — THE case reading surface.
  *
- * ── THE JULY-29 REWORK (owner review + the backend's July contract) ─────────
- *  • THE HEADING IS A NAME, NOT A WALL. The all-caps title with the citation
- *    fused in is split: a mixed-case case name (`formatCaseName`, source form
- *    on hover), the citation on its own quiet line, and — new — the OUTCOME as
- *    a badge beside the meta, because "did the appeal succeed?" is the first
- *    question a lawyer asks and the API now answers it.
- *  • THE JUDGMENT'S OWN STRUCTURE RENDERS. The enrichment contract
- *    (case-structures-and-enrichment.md) always loads `report_principles`,
- *    `statutes_cited` and `court_history` on the show endpoint, so the page now
- *    has: verbatim principles with their tag / ratio-obiter mark / attributed
- *    judge (falling back to the flat `principles` string on the unenriched
- *    corpus), the procedural chain as an ordered history, and cited statutes
- *    beside cited cases.
- *  • THE CORAM CARRIES ITS ROLES — "(lead)", "(dissenting)" — and judge names
- *    are cased like names.
- *  • VIEW COUNTS ARE GONE everywhere on the reading surface (owner).
+ * ── THE JULY-29 FINESSE PASS (owner: "data scattered all over the place, no
+ *    finesse") ────────────────────────────────────────────────────────────────
+ * The honest criticism of the previous version: between the title and the first
+ * word of law sat SEVEN rows of near-equal-weight data — citation, meta,
+ * outcome, six tag chips, three buttons, a two-line bench, a topic line. Every
+ * row shouted the same, so nothing led. The fix is an editorial page's oldest
+ * discipline: the header carries ONLY what identifies the case, everything
+ * descriptive moves to the end, and the whole page speaks two voices —
  *
- * ── NO BOXES ────────────────────────────────────────────────────────────────
- * Sections are told apart by space and a quiet heading, never by a border — the
- * standing rule from the home redesign.
+ *   SANS CAPS  = structure (the kicker, every section label — one voice)
+ *   SERIF      = the law (the name, the principles, the summary)
+ *
+ * HEADER now: kicker (flag · court · date) → name → citation + suit → outcome
+ * badge → compact actions. Five quiet rows, each with one job.
+ * END now: "About this case" — the bench (with coram roles), topic,
+ * jurisdiction, tags — a definition list where reference data belongs. The
+ * reader who wants it scrolls past the judgment to it; the reader who wants
+ * the law meets it immediately.
+ *
+ * Everything else from the earlier rounds holds: structured principles with
+ * the flat-string fallback, the procedural timeline, statutes beside cases,
+ * treatment badges with the catch-all suppressed, text never rendered as HTML.
  */
 
-/** Human labels for the outcome enum. Unknown values title-case gracefully. */
 const OUTCOME_LABELS: Record<CaseOutcome, string> = {
   appeal_allowed: 'Appeal allowed',
   appeal_dismissed: 'Appeal dismissed',
@@ -85,6 +86,7 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   const name = formatCaseName(raw);
   const date = formatCaseDate(detail.judgment_date, 'long');
   const isLimited = detail.limit_exceeded === true;
+  const countryCode = toAlpha2(detail.country?.code, detail.country?.abbreviation);
 
   const similar = (detail.similar_cases ?? []).map(relatedToDisplay);
   const cited = (detail.cited_cases ?? []).map(citedEdgeToDisplay);
@@ -100,87 +102,56 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   // not been written up yet. Neither is invented when both are absent.
   const summary = detail.body?.trim() || detail.excerpt?.trim() || '';
 
-  /** The heading's meta line, in reading order, with the gaps closed up. */
-  const meta = [detail.court?.name, detail.country?.name, date].filter(
-    (part): part is string => Boolean(part),
-  );
-  /** The facts line: outcome rides as a BADGE; these ride as quiet text. */
-  const factParts = [
-    detail.suit_no ? `Suit ${detail.suit_no}` : null,
-    detail.origin_state || null,
-  ].filter((part): part is string => Boolean(part));
-
   return (
-    <article className="flex flex-col gap-8">
-      {/* ── Heading block ───────────────────────────────────────────────── */}
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="doc-title text-foreground" title={raw}>
-            {name}
-          </h1>
-          {detail.citation ? (
-            <p className="doc-citation">{detail.citation}</p>
+    <article className="flex flex-col gap-9">
+      {/* ── Heading block: identity only. ───────────────────────────────── */}
+      <header className="flex flex-col gap-3 border-b border-border/60 pb-6">
+        {/* Provenance first — where and when, in the label voice. */}
+        <p className="doc-kicker flex flex-wrap items-center gap-x-2 gap-y-1">
+          {countryCode ? (
+            <FlagIcon
+              code={countryCode}
+              title={detail.country?.name ?? undefined}
+              className="-mt-px"
+            />
           ) : null}
-        </div>
-
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-          {/* Keyed by POSITION, not by value: a court and a country can carry
-              the same string, and two identical keys in one list is a real bug
-              hiding behind an unlikely input. */}
-          {meta.map((part, index) => (
-            <span key={index} className="inline-flex items-center gap-2">
-              {index > 0 ? (
+          {detail.court?.name ? <span>{detail.court.name}</span> : null}
+          {date ? (
+            <>
+              {detail.court?.name ? (
                 <span aria-hidden className="text-muted-foreground/40">
                   ·
                 </span>
               ) : null}
-              {part}
-            </span>
-          ))}
+              <span className="tabular-nums">{date}</span>
+            </>
+          ) : null}
         </p>
 
-        {detail.outcome || factParts.length > 0 ? (
-          <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground">
+        <h1 className="doc-title text-foreground" title={raw}>
+          {name}
+        </h1>
+
+        {detail.citation || detail.suit_no ? (
+          <p className="doc-citation">
+            {[detail.citation, detail.suit_no ? `Suit ${detail.suit_no}` : null]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        ) : null}
+
+        {detail.outcome || detail.origin_state ? (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {detail.outcome ? (
-              // The disposition — the one fact a scanning lawyer wants first.
-              // Gold-tinted because it is THE answer, not a decoration; the
-              // tone is neutral on purpose (which side "won" depends on which
-              // side you were).
+              // The disposition — the first question a lawyer asks, answered
+              // before the reading starts. Gold because it is THE answer;
+              // neutral in tone because which side "won" depends on your side.
               <span className="inline-flex min-h-6 items-center rounded-full bg-primary/10 px-2.5 font-medium text-primary">
                 {outcomeLabel(detail.outcome)}
               </span>
             ) : null}
-            {factParts.map((part, index) => (
-              <span key={index} className="inline-flex items-center gap-2.5">
-                {index > 0 || detail.outcome ? (
-                  <span aria-hidden className="text-muted-foreground/40">
-                    ·
-                  </span>
-                ) : null}
-                {part}
-              </span>
-            ))}
+            {detail.origin_state ? <span>{detail.origin_state}</span> : null}
           </p>
-        ) : null}
-
-        {detail.tags && detail.tags.length > 0 ? (
-          <ul className="flex flex-wrap gap-1.5">
-            {detail.tags.map((tag) => (
-              <li key={tag}>
-                {/* A tag is a FILTER, so it is a real link to the filtered list —
-                    shareable, middle-clickable, and announced as a link. */}
-                <Link
-                  href={`/cases?tags=${encodeURIComponent(tag)}`}
-                  className={cn(
-                    'v2-interactive inline-flex min-h-7 items-center rounded-full bg-secondary px-2.5 text-xs text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground',
-                    FOCUS_RING,
-                  )}
-                >
-                  {tag}
-                </Link>
-              </li>
-            ))}
-          </ul>
         ) : null}
 
         <CaseActions
@@ -193,42 +164,12 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
         />
       </header>
 
-      {/* ── Bench and topic — one quiet line each, above the reading ────── */}
-      {detail.judges.length > 0 || detail.topic ? (
-        <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-          {detail.judges.length > 0 ? (
-            <p>
-              <span className="font-medium text-foreground">Before: </span>
-              {detail.judges.map((judge, index) => (
-                <span key={judge.id}>
-                  {index > 0 ? ', ' : ''}
-                  {formatCaseName(judge.name)}
-                  {judge.role ? (
-                    <span className="text-muted-foreground/70">
-                      {' '}
-                      ({ROLE_LABELS[judge.role]})
-                    </span>
-                  ) : null}
-                </span>
-              ))}
-            </p>
-          ) : null}
-          {detail.topic ? (
-            <p>
-              <span className="font-medium text-foreground">Topic: </span>
-              {detail.topic}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* ── The holding: structured principles when enriched, flat text on
-             the legacy corpus. Never both. ─────────────────────────────── */}
+      {/* ── The law. ────────────────────────────────────────────────────── */}
       {principles.length > 0 ? (
         <StructuredPrinciples principles={principles} />
       ) : detail.principles?.trim() ? (
-        <section aria-label="Legal principles" className="flex flex-col gap-2">
-          <h2 className="doc-heading">Legal principles</h2>
+        <section aria-label="Legal principles" className="flex flex-col gap-3">
+          <SectionHeading label="Legal principles" />
           <div className="doc-holding">
             <div className="doc-prose">
               <CaseText value={detail.principles} />
@@ -237,9 +178,9 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
         </section>
       ) : null}
 
-      {/* ── The summary, or the wall ────────────────────────────────────── */}
-      <section aria-label="Case summary" className="flex flex-col gap-2">
-        <h2 className="doc-heading">Case summary</h2>
+      {/* ── What happened. ──────────────────────────────────────────────── */}
+      <section aria-label="Case summary" className="flex flex-col gap-3">
+        <SectionHeading label="Case summary" />
         {isLimited ? (
           <ViewLimitNotice message={detail.limit_message} />
         ) : summary ? (
@@ -253,31 +194,114 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
         )}
       </section>
 
-      {/* ── The procedural chain ────────────────────────────────────────── */}
+      {/* ── Depth: the chain, the authorities. ──────────────────────────── */}
       {history.length > 0 ? <CaseHistory steps={history} /> : null}
 
-      {/* ── Authorities: statutes beside cases ──────────────────────────── */}
-      {statutes.length > 0 || similar.length > 0 || cited.length > 0 || citedBy.length > 0 ? (
-        <div className="flex flex-col gap-7">
-          {statutes.length > 0 ? <StatutesCited statutes={statutes} /> : null}
-          <RelatedCaseList
-            title="Cases cited"
-            description="Authorities this judgment relied on."
-            cases={cited}
-          />
-          <RelatedCaseList
-            title="Cited by"
-            description="Later judgments that cite this one."
-            cases={citedBy}
-          />
-          <RelatedCaseList
-            title="Similar cases"
-            description="Cases on comparable facts or points of law."
-            cases={similar}
-          />
-        </div>
-      ) : null}
+      {statutes.length > 0 ? <StatutesCited statutes={statutes} /> : null}
+      <RelatedCaseList
+        title="Cases cited"
+        description="Authorities this judgment relied on."
+        cases={cited}
+      />
+      <RelatedCaseList
+        title="Cited by"
+        description="Later judgments that cite this one."
+        cases={citedBy}
+      />
+      <RelatedCaseList
+        title="Similar cases"
+        description="Cases on comparable facts or points of law."
+        cases={similar}
+      />
+
+      {/* ── Reference data, where reference data belongs. ───────────────── */}
+      <AboutThisCase detail={detail} countryCode={countryCode} />
     </article>
+  );
+}
+
+/**
+ * The end-of-document reference block — everything that used to crowd the
+ * header (the bench, the topic, the jurisdiction, the tags), as a quiet
+ * definition list. A reader consults this; nobody should have to climb over it.
+ */
+function AboutThisCase({
+  detail,
+  countryCode,
+}: {
+  detail: CaseDetail;
+  countryCode: string | null;
+}) {
+  const hasBench = detail.judges.length > 0;
+  const hasTags = !!detail.tags && detail.tags.length > 0;
+  if (!hasBench && !detail.topic && !detail.country && !hasTags) return null;
+
+  return (
+    <section aria-label="About this case" className="flex flex-col gap-3">
+      <SectionHeading label="About this case" />
+      <dl className="flex flex-col gap-3">
+        {hasBench ? (
+          <AboutRow term={detail.judges.length === 1 ? 'Judge' : 'Coram'}>
+            {detail.judges.map((judge, index) => (
+              <span key={judge.id}>
+                {index > 0 ? ', ' : ''}
+                {formatCaseName(judge.name)}
+                {judge.role ? (
+                  <span className="text-muted-foreground">
+                    {' '}
+                    ({ROLE_LABELS[judge.role]})
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </AboutRow>
+        ) : null}
+
+        {detail.topic ? <AboutRow term="Topic">{detail.topic}</AboutRow> : null}
+
+        {detail.country ? (
+          <AboutRow term="Jurisdiction">
+            <span className="inline-flex items-center gap-1.5">
+              {countryCode ? <FlagIcon code={countryCode} /> : null}
+              {detail.country.name}
+              {detail.origin_state ? ` — ${detail.origin_state}` : ''}
+            </span>
+          </AboutRow>
+        ) : null}
+
+        {hasTags ? (
+          <AboutRow term="Tags">
+            <span className="flex flex-wrap gap-1.5">
+              {detail.tags!.map((tag) => (
+                <Link
+                  key={tag}
+                  href={`/cases?tags=${encodeURIComponent(tag)}`}
+                  className={cn(
+                    'v2-interactive inline-flex min-h-7 items-center rounded-full bg-secondary px-2.5 text-xs text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground',
+                    FOCUS_RING,
+                  )}
+                >
+                  {tag}
+                </Link>
+              ))}
+            </span>
+          </AboutRow>
+        ) : null}
+      </dl>
+    </section>
+  );
+}
+
+function AboutRow({ term, children }: { term: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 sm:flex-row sm:gap-4">
+      <dt className="w-24 shrink-0 pt-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+        {term}
+      </dt>
+      <dd className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
+        {children}
+      </dd>
+    </div>
   );
 }
 
@@ -292,8 +316,8 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
  */
 function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] }) {
   return (
-    <section aria-label="Legal principles" className="flex flex-col gap-2">
-      <h2 className="doc-heading">Legal principles</h2>
+    <section aria-label="Legal principles" className="flex flex-col gap-3">
+      <SectionHeading label="Legal principles" />
       <div className="doc-holding">
         <ol className="flex flex-col gap-5">
           {principles.map((principle) => (
@@ -308,7 +332,7 @@ function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] })
                   </span>
                 ) : null}
                 {principle.type ? (
-                  <span className="font-medium uppercase tracking-wide text-[10px] text-muted-foreground/80">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
                     {principle.type === 'ratio' ? 'Ratio' : 'Obiter'}
                   </span>
                 ) : null}
@@ -339,13 +363,11 @@ function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] })
  */
 function CaseHistory({ steps }: { steps: CourtHistoryStep[] }) {
   return (
-    <section aria-label="Case history" className="flex flex-col gap-1.5">
-      <div className="px-1">
-        <h2 className="doc-heading">Case history</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          How this case travelled through the courts.
-        </p>
-      </div>
+    <section aria-label="Case history" className="flex flex-col gap-3">
+      <SectionHeading
+        label="Case history"
+        sub="How this case travelled through the courts."
+      />
       <ol className="flex flex-col">
         {steps.map((step, index) => {
           const linked = step.related_case_id !== null && step.slug;
@@ -410,10 +432,8 @@ function CaseHistory({ steps }: { steps: CourtHistoryStep[] }) {
 /** Statutes this judgment cited — linked when resolved, text when not. */
 function StatutesCited({ statutes }: { statutes: StatuteCitedEdge[] }) {
   return (
-    <section aria-label="Statutes cited" className="flex flex-col gap-1.5">
-      <div className="px-1">
-        <h2 className="doc-heading">Statutes cited</h2>
-      </div>
+    <section aria-label="Statutes cited" className="flex flex-col gap-3">
+      <SectionHeading label="Statutes cited" />
       <ul className="flex flex-col divide-y divide-border/60">
         {statutes.map((edge) => {
           const text = edge.statute?.title || edge.raw || 'Unnamed statute';

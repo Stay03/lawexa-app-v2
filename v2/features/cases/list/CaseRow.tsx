@@ -4,6 +4,7 @@ import { memo } from 'react';
 import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
+import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { BookmarkButton } from '@/v2/features/bookmarks/BookmarkButton';
 import { caseHref, formatCaseDate, type CaseRowModel } from '../case-row-model';
@@ -43,13 +44,6 @@ export const CaseRow = memo(function CaseRow({
   index: number;
 }) {
   const date = formatCaseDate(row.judgmentDate);
-  const meta = [
-    row.citation,
-    row.countryMark && row.court
-      ? `${row.countryMark} · ${row.court}`
-      : row.countryMark || row.court,
-    date,
-  ].filter((part): part is string => Boolean(part));
 
   return (
     <li
@@ -73,21 +67,40 @@ export const CaseRow = memo(function CaseRow({
           </h3>
 
           {/* One quiet meta line: citation first (a lawyer reads name +
-              citation as one unit), then jurisdiction, then the date. */}
-          {meta.length > 0 ? (
+              citation as one unit), then the FLAG + court, then the date. The
+              flag replaced the "NG" text mark — same artwork as the composer's
+              jurisdiction chip, self-hosted. */}
+          {row.citation || row.court || row.countryCode || date ? (
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-              {meta.map((part, partIndex) => (
-                <span key={partIndex} className="inline-flex items-center gap-2">
-                  {partIndex > 0 ? (
+              {row.citation ? <span>{row.citation}</span> : null}
+              {row.countryCode || row.court ? (
+                <span className="inline-flex items-center gap-2">
+                  {row.citation ? (
                     <span aria-hidden className="text-muted-foreground/40">
                       ·
                     </span>
                   ) : null}
-                  <span className={part === date ? 'tabular-nums' : undefined}>
-                    {part}
+                  <span className="inline-flex items-center gap-1.5">
+                    {row.countryCode ? (
+                      <FlagIcon
+                        code={row.countryCode}
+                        title={row.countryName ?? undefined}
+                      />
+                    ) : null}
+                    {row.court ? <span>{row.court}</span> : null}
                   </span>
                 </span>
-              ))}
+              ) : null}
+              {date ? (
+                <span className="inline-flex items-center gap-2">
+                  {row.citation || row.countryCode || row.court ? (
+                    <span aria-hidden className="text-muted-foreground/40">
+                      ·
+                    </span>
+                  ) : null}
+                  <span className="tabular-nums">{date}</span>
+                </span>
+              ) : null}
             </p>
           ) : null}
 
