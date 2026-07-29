@@ -207,6 +207,33 @@ two-part body format). Everything below shipped in one round:
    `CourtHistoryStep`, and the new optional scalars on `CaseDetail` — all optional because
    the corpus is mixed and bot UAs get the lean payload.
 
+## Wave 1, owner review round 2 (July 29, `e6a0a17`) — "no finesse" answered
+
+The owner rejected round 1's case page outright: "still a sub-standard mess… data scattered
+all over the place, no finesse." The honest reading of that criticism: seven rows of
+equal-weight data between the title and the first word of law. This round's answer:
+
+- **Two voices.** Caps-tracked sans = structure (kicker + every `SectionHeading`, each with
+  a hairline rule to the margin); serif = the law. The header shrank to kicker (flag ·
+  court · date) → name → citation + suit → outcome badge → actions → hairline. Bench,
+  topic, jurisdiction and tags moved to an **"About this case"** definition list at the END.
+- **The pill dock.** The case page's composer is now the conversation composer's EXACT
+  scale (max-w-xs sm:max-w-md, min-h-9 row, size-8 send). Focusing it opens a solid HUB
+  panel above (grid-collapse, animated both ways): recent chats about this case + three
+  openers + the jurisdiction chip. Escape / outside click closes; clicks in portaled
+  popovers (`[data-radix-popper-content-wrapper]`) do not. This is v1's
+  click-opens-the-sheet flow rebuilt clean. Attachments/privacy/workflow deliberately
+  absent — home-composer concerns.
+- **Flags render in the list meta line and the case kicker** (the owner expected them
+  there, not just in the composer).
+- **Two live-data bugs fixed** (read prod with the owner's token): JCA-class honorifics
+  were mis-cased by the vowel heuristic (now in the known map); apostrophe casing now
+  follows the publishers' form (`O'Neill` but `Aka'ahs`). The header bar now uses the July
+  contract's `short_title`.
+
+**Note (ops):** the LOCAL dev machine hit 100% disk mid-build (457MB free). `.next` deletion
+freed enough to build; the machine needs real space cleared.
+
 **Open with the backend team**
 
 `backend-ask-2026-07-25-cases-read-endpoints.md` — every endpoint the reader uses, plus the
