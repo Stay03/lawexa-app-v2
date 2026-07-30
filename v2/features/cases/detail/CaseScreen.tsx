@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
@@ -63,21 +63,18 @@ function CaseBody({ slug }: { slug: string }) {
   // ── The side chat's URL state: `?chat={id}`. ──
   // OPEN is a PUSH (a new history entry), so the back button closes the panel
   // and returns to the reading — the navigation the owner asked for. CLOSE
-  // prefers `history.back()` when this session pushed the entry (keeping
-  // history clean); a direct load of a `?chat=` link has no entry of ours to
-  // pop, so the X strips the param in place instead of leaving the page.
+  // (the X / the scrim) strips the param IN PLACE with a client-side replace,
+  // never `history.back()`: a back() is a router-level RESTORE that remounts
+  // this component, wiping the exit holdover — the card vanished, repainted,
+  // and died again (the owner's "closes, pops open, closes again"). The cost
+  // is one leftover history entry whose URL equals the previous one — a
+  // single inert Back press — which is invisible next to a glitching close.
   const chatId = searchParams.get('chat');
-  const chatPushedRef = useRef(false);
   const openChat = useCallback((id: string) => {
-    if (pushUrlParams({ chat: id })) chatPushedRef.current = true;
+    pushUrlParams({ chat: id });
   }, []);
   const closeChat = useCallback(() => {
-    if (chatPushedRef.current) {
-      chatPushedRef.current = false;
-      window.history.back();
-    } else {
-      replaceUrlParams({ chat: null });
-    }
+    replaceUrlParams({ chat: null });
   }, []);
   // In-panel hops (back to the list, opening a listed thread, a new thread's
   // id arriving) REPLACE — the panel stays one history entry, so the browser's
