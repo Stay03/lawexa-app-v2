@@ -24,6 +24,7 @@ import {
   lawTypeLabel,
   normalizeBench,
   sentenceCase,
+  splitPrincipleStatements,
 } from './authorities';
 import { AuthorityList, type AuthorityItem } from './AuthorityList';
 import { CaseActions } from './CaseActions';
@@ -261,7 +262,10 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
 
       {/* ── The law. ────────────────────────────────────────────────────── */}
       {principles.length > 0 ? (
-        <StructuredPrinciples principles={principles} />
+        <StructuredPrinciples
+          principles={principles}
+          overview={detail.principles?.trim() || null}
+        />
       ) : detail.principles?.trim() ? (
         <FlatPrinciples text={detail.principles} />
       ) : null}
@@ -490,7 +494,30 @@ function AboutRow({ term, children }: { term: string; children: React.ReactNode 
  * them for everyone else), and they are BADGED rather than hidden — a reviewer
  * seeing unreviewed text unmarked would republish it by trusting it.
  */
-function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] }) {
+function StructuredPrinciples({
+  principles,
+  overview,
+}: {
+  principles: ReportPrinciple[];
+  overview: string | null;
+}) {
+  // The law-type filter exists only when the case actually spans more than
+  // one classification — a tab row with one real option is furniture. With
+  // the tabs on duty, the classification leaves every caption (owner, July
+  // 30: "kept neatly and not too dense"); without them, the single word in
+  // the caption is the only mention and stays.
+  const lawTypes = [...new Set(principles.flatMap((p) => p.law_type ?? []))];
+  const showTabs = lawTypes.length >= 2;
+  const [filter, setFilter] = useState('all');
+  const active = showTabs ? filter : 'all';
+
+  const entries = principles
+    .map((principle, index) => ({ principle, index }))
+    .filter(
+      ({ principle }) =>
+        active === 'all' || (principle.law_type ?? []).includes(active),
+    );
+
   return (
     <section
       id={SECTION.principles}
@@ -500,19 +527,108 @@ function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] })
       <SectionHeading
         label="Legal principles"
         count={principles.length}
-        sub="Verbatim from the judgment."
+        sub={overview ? undefined : 'Verbatim from the judgment.'}
       />
-      <ol className="flex flex-col gap-7">
-        {principles.map((principle, index) => (
+
+      {/* The editorial headnote — the flat `principles` field, which an
+          enriched case still carries. It reads as the section's lead (a lead
+          needs no label of its own); the inner label below marks where the
+          verbatim extracts begin. */}
+      {overview ? (
+        <>
+          <div className="doc-prose">
+            <CaseText value={overview} />
+          </div>
+          <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+            From the judgment
+          </p>
+        </>
+      ) : null}
+
+      {showTabs ? (
+        <LawTypeTabs
+          lawTypes={lawTypes}
+          principles={principles}
+          value={active}
+          onChange={setFilter}
+        />
+      ) : null}
+
+      {/* Keyed by the filter so a switch re-enters with a quiet fade instead
+          of rows snapping in place. Numerals are the ORIGINAL positions —
+          a principle keeps its number under any filter, because the number
+          is its identity, not its row. */}
+      <ol
+        key={active}
+        className="flex flex-col gap-7 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+      >
+        {entries.map(({ principle, index }) => (
           <NumberedPrinciple key={principle.id} index={index}>
             <div className="doc-prose">
               <CaseText value={principle.principle} />
             </div>
-            <PrincipleCaption principle={principle} />
+            <PrincipleCaption principle={principle} showLawType={!showTabs} />
           </NumberedPrinciple>
         ))}
       </ol>
     </section>
+  );
+}
+
+/** The law-type filter — the cases list's tab pattern at caption scale. */
+function LawTypeTabs({
+  lawTypes,
+  principles,
+  value,
+  onChange,
+}: {
+  lawTypes: string[];
+  principles: ReportPrinciple[];
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const tabs = [
+    { id: 'all', label: 'All', count: principles.length },
+    ...lawTypes.map((type) => ({
+      id: type,
+      label: sentenceCase(type),
+      count: principles.filter((p) => (p.law_type ?? []).includes(type)).length,
+    })),
+  ];
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Filter principles by law type"
+      className="inline-flex items-center gap-0.5 self-start rounded-full bg-secondary/60 p-0.5"
+    >
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={value === tab.id}
+          onClick={() => onChange(tab.id)}
+          className={cn(
+            'v2-interactive inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
+            value === tab.id
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+            FOCUS_RING,
+          )}
+        >
+          {tab.label}
+          <span
+            className={cn(
+              'tabular-nums',
+              value === tab.id ? 'text-muted-foreground' : 'text-muted-foreground/60',
+            )}
+          >
+            {tab.count}
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -522,11 +638,16 @@ function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] })
  * its own rendering:
  *
  *   several blank-line paragraphs  = one principle per paragraph (Mustapha v
- *                                    Abubakar ships five) → the SAME numbered
- *                                    entries as the structured list, minus the
- *                                    captions no metadata exists for;
- *   one continuous passage         = nothing to number (a lone "01" would be
- *                                    decoration) → the gold-rule block.
+ *                                    Abubakar shipped five) → the SAME
+ *                                    numbered entries as the structured list,
+ *                                    minus the captions no metadata exists for;
+ *   one continuous passage         = an eight-line serif wall (the owner's
+ *                                    July 30 screenshot). The conservative
+ *                                    statement split breaks it into breathing
+ *                                    statements inside the gold-rule block —
+ *                                    SPACED, not numbered, because machine-
+ *                                    guessed boundaries get air while only an
+ *                                    author's own blank lines earn numerals.
  *
  * So an unenriched case reads like an enriched one, and the day its
  * enrichment lands the page's shape barely moves.
@@ -546,7 +667,9 @@ function FlatPrinciples({ text }: { text: string }) {
           <SectionHeading label="Legal principles" />
           <div className="doc-holding">
             <div className="doc-prose">
-              <CaseText value={paragraphs[0]} />
+              <CaseText
+                value={splitPrincipleStatements(paragraphs[0]).join('\n\n')}
+              />
             </div>
           </div>
         </>
@@ -587,8 +710,16 @@ function NumberedPrinciple({
   );
 }
 
-/** The one caption line under a principle — its whole apparatus in one voice. */
-function PrincipleCaption({ principle }: { principle: ReportPrinciple }) {
+/** The one caption line under a principle — its whole apparatus in one voice.
+ *  `showLawType` is off when the section's filter tabs already carry the
+ *  classification, so the caption never repeats what the control above says. */
+function PrincipleCaption({
+  principle,
+  showLawType,
+}: {
+  principle: ReportPrinciple;
+  showLawType: boolean;
+}) {
   const parts: React.ReactNode[] = [];
 
   if (principle.type) {
@@ -604,7 +735,7 @@ function PrincipleCaption({ principle }: { principle: ReportPrinciple }) {
       ),
     );
   }
-  const lawType = lawTypeLabel(principle.law_type);
+  const lawType = showLawType ? lawTypeLabel(principle.law_type) : null;
   if (lawType) {
     parts.push(<span key="law">{lawType}</span>);
   }

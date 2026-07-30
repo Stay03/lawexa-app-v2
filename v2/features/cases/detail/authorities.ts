@@ -372,6 +372,46 @@ export function sentenceCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+/** Abbreviations whose trailing period does NOT end a legal sentence. */
+const NON_TERMINAL = new Set([
+  'v', 'vs', 'vrs', 'ltd', 'plc', 'co', 'inc', 'anor', 'ors',
+  'cap', 'no', 'nos', 'p', 'pp', 'pt', 'pts', 'art', 'arts',
+  's', 'ss', 'sec', 'secs', 'para', 'paras', 'ed', 'nig', 'op', 'cit', 'etc',
+]);
+
+/**
+ * Split a single-paragraph flat `principles` passage into its statements.
+ *
+ * WHY. The pre-enrichment corpus often fuses several holdings into ONE
+ * paragraph — an eight-line serif wall (the owner's July 30 screenshot,
+ * Dyktrude v Omnia). Editors write those as one sentence per holding, so a
+ * CONSERVATIVE sentence split turns the wall into air: split only after a
+ * period followed by a capital opening, and re-join whenever the previous
+ * chunk ends in a legal abbreviation ("Cap.", "No.", "Ltd.", "v."), an
+ * initial, or is too short to be a statement. A wrong re-join costs nothing
+ * (two holdings share a block); the split is never trusted with NUMBERS —
+ * only blank lines, an author's own boundaries, earn numerals.
+ */
+export function splitPrincipleStatements(text: string): string[] {
+  const candidates = text.split(/(?<=\.)\s+(?=[A-Z"“(])/);
+  const out: string[] = [];
+  for (const candidate of candidates) {
+    const part = candidate.trim();
+    if (!part) continue;
+    const prev = out[out.length - 1];
+    if (prev) {
+      const lastWord = prev.split(/\s+/).pop() ?? '';
+      const bare = lastWord.replace(/[.)"'”’]+$/g, '').toLowerCase();
+      if (NON_TERMINAL.has(bare) || bare.length <= 1 || prev.length < 60) {
+        out[out.length - 1] = `${prev} ${part}`;
+        continue;
+      }
+    }
+    out.push(part);
+  }
+  return out;
+}
+
 /** The `law_type` classifications, known by contract. */
 const LAW_TYPES: Record<string, string> = {
   substantive: 'Substantive',
