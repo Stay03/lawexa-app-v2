@@ -203,16 +203,9 @@ function CaseBody({ slug }: { slug: string }) {
             </div>
           </aside>
         ) : null}
-        {/* The ask pill yields while the chat is open — the chat carries the
-            composer, and two competing inputs is one too many. */}
-        {!chatId ? (
-          <CaseAskDock
-            slug={slug}
-            signedIn={signedIn}
-            viewerId={userId}
-            onOpenChat={openChat}
-          />
-        ) : null}
+        {/* The ask trigger yields while the chat is open — the chat surface
+            carries the one real composer. */}
+        {!chatId ? <CaseAskDock onOpenChat={openChat} /> : null}
 
         {/* The floating card lives in the pill's slot, INSIDE the column. */}
         {showFloating && renderedChat !== null ? (
