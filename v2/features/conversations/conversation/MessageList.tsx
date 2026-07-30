@@ -334,7 +334,7 @@ export function MessageList({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         {/* Bottom padding clears the FLOATING composer that ConversationScreen lays
             over this scroll region (the pill is absolute/out-of-flow, so the transcript

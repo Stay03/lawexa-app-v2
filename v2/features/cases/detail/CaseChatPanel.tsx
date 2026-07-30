@@ -22,10 +22,13 @@ import {
  *             the judgment stays visible, dimmed, behind it (owner, July 30:
  *             "just like 60% and some of the page show"), and tapping the
  *             scrim closes. Rides `--keyboard-inset`.
- *   DOCKED    ≥xl after the reader chooses the sidebar. The in-flow 26rem
- *             column with the clipped width reveal; the bar's icon floats it
- *             back. The choice persists (localStorage) so the chat reopens
- *             the way this reader likes it.
+ *   DOCKED    ≥xl after the reader chooses the sidebar: the SIDE PEEK — an
+ *             in-flow rail holding a rounded inset panel that stands clear of
+ *             the header, the screen edge, and the bottom (no seam, near-no
+ *             shadow), revealed by width so the reading column re-centres
+ *             continuously; the bar's icon floats it back. The choice
+ *             persists (localStorage) so the chat reopens the way this
+ *             reader likes it.
  *
  * The xl-floating presentation is `CaseAskDock` (CaseAsk.tsx) — same screen,
  * grown out of the resting pill.
@@ -108,7 +111,15 @@ export function CaseChatDocked({
       aria-label="Chat about this case"
       data-state={props.closing ? 'closed' : 'open'}
       className={cn(
-        'w-[26rem] shrink-0 overflow-x-clip border-l border-border/60 bg-popover shadow-[-24px_0_50px_-30px_rgba(0,0,0,0.55)]',
+        // The RAIL — transparent flow space (panel + right gutter). The
+        // visible chat is the inset PANEL below: a rounded card standing off
+        // the header, the screen edge, and the bottom (owner, July 31 — the
+        // edge-to-edge column met the header in a hard T of borders, and its
+        // big left shadow smeared the judgment; a card that touches nothing
+        // has no seam to blend and needs almost no shadow). The gaps also
+        // separate the transcript's scrollbar from the page's, so the two
+        // rails stop reading as "two sidebars".
+        'w-[calc(26rem+0.75rem)] shrink-0 overflow-x-clip',
         // The clipped width reveal — no translate past the viewport edge, so
         // no horizontal scrollbar; the reading column re-centres continuously.
         // The close shorthand carries its own `forwards`; `motion-reduce`
@@ -117,7 +128,11 @@ export function CaseChatDocked({
         'data-[state=closed]:motion-safe:animate-[v2-case-chat-close_200ms_ease-in_forwards] data-[state=closed]:motion-reduce:hidden',
       )}
     >
-      <div className="sticky top-0 flex h-[calc(100dvh-3.5rem)] w-[26rem] flex-col">
+      {/* 0.75rem gaps: sticky 0.75 below the header line, 100dvh − header
+          (3.5rem) − two gaps (1.5rem) tall, and the rail's spare 0.75rem
+          lands on the right. Panel stays 26rem — the family width — so the
+          pill inside matches the floating card's to the pixel. */}
+      <div className="sticky top-3 flex h-[calc(100dvh-5rem)] w-[26rem] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-[0_18px_48px_-24px_rgba(0,0,0,0.35)]">
         <CaseChatBody {...props} mode="docked" onFloat={onFloat} />
       </div>
     </aside>

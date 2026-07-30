@@ -144,6 +144,26 @@ html.v2-document-lock body {
 }
 
 /* -----------------------------------------------------------------------------
+   Quiet scrollbar (owner, July 31 — the docked chat's scrollbar next to the
+   page's read as "two sidebars"). For INNER scrollers that sit near the page's
+   own scrollbar: thin, trackless, and invisible until the reader hovers or
+   scrolls the region — so nested scroll areas stop competing with the page
+   rail. Standards-based (`scrollbar-width`/`scrollbar-color`, Chrome 121+ and
+   Firefox; Safari's overlay bars already auto-hide; older engines keep their
+   defaults — a degradation, never a break). Never applied to the page scroller
+   itself: the outermost rail must stay a system scrollbar.
+   -------------------------------------------------------------------------- */
+.v2-quiet-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.v2-quiet-scroll:hover,
+.v2-quiet-scroll:focus-within,
+.v2-quiet-scroll:active {
+  scrollbar-color: var(--border) transparent;
+}
+
+/* -----------------------------------------------------------------------------
    Collapsible height animation (fix round, owner #41/#42). v1's
    `animate-collapse-up/down` classes are DEAD — no matching @keyframes exist
    anywhere (architecture-audit.md Part 2 verified this), so every Radix
