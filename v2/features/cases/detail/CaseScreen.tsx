@@ -117,8 +117,10 @@ function CaseBody({ slug }: { slug: string }) {
   useEffect(() => {
     if (!chatClosing) return;
     // A shade past the 200ms exit animation, whose last frame is held by
-    // fill-mode:forwards — the unmount happens strictly AFTER the animation
-    // lands, so the closed panel can never flash back for a frame.
+    // `fill-mode-forwards` (the tw-animate-css VARIABLE mechanism — see the
+    // exit-animation note in CaseChatPanel; the arbitrary-property spelling
+    // silently never applied) — the unmount happens strictly AFTER the
+    // animation lands, and the held fill covers the gap between them.
     const timer = window.setTimeout(() => setRenderedChat(null), 240);
     return () => window.clearTimeout(timer);
   }, [chatClosing]);

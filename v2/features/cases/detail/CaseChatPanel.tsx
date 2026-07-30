@@ -47,6 +47,19 @@ import { CASE_PROMPTS, RecentCaseChats, useStartCaseChat } from './CaseAsk';
  * `bg-popover` (a step lighter than the page in dark mode), a border, and a
  * directional shadow — the demarcation the owner asked for.
  *
+ * ── EXIT ANIMATIONS MUST HOLD THROUGH THE UNMOUNT GAP ──────────────────────
+ * The host unmounts each surface ~40ms AFTER its 200ms exit animation ends.
+ * When an animation ends without a fill, the element snaps back to committed
+ * style — FULLY VISIBLE — for that gap (the owner's "closes, pops open,
+ * closes again"; ~one frame on a fast machine, ~100ms on a busy one).
+ * `[animation-fill-mode:forwards]` CANNOT fix this: `animate-out` is the
+ * `animation:` SHORTHAND ending in `var(--tw-animation-fill-mode, none)`,
+ * same specificity, later in the stylesheet — the shorthand resets the
+ * longhand. `fill-mode-forwards` (tw-animate-css) is the working mechanism:
+ * it sets the VARIABLE the shorthand reads, so the hold is part of the
+ * animation itself. `motion-reduce:hidden` covers the no-animation path,
+ * where the closed surface would otherwise sit fully visible until unmount.
+ *
  * URL semantics are the host's (`CaseScreen`): `?chat={id}` / `?chat=new`,
  * pushed once so Back closes, in-panel hops replacing.
  */
@@ -76,7 +89,7 @@ export function CaseChatSheet(props: CaseChatCommonProps) {
         className={cn(
           'fixed inset-0 z-30 bg-black/50',
           'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200 data-[state=closed]:[animation-fill-mode:forwards]',
+          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:hidden',
         )}
       />
       <aside
@@ -85,7 +98,7 @@ export function CaseChatSheet(props: CaseChatCommonProps) {
         className={cn(
           'fixed inset-x-0 z-40 flex h-[65dvh] min-h-80 flex-col overflow-hidden rounded-t-2xl border-t border-border/60 bg-popover shadow-[0_-24px_60px_-24px_rgba(0,0,0,0.65)]',
           'motion-safe:animate-in motion-safe:slide-in-from-bottom-full motion-safe:duration-300',
-          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-full data-[state=closed]:motion-safe:duration-200 data-[state=closed]:[animation-fill-mode:forwards]',
+          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-full data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:hidden',
         )}
         style={{ bottom: 'var(--keyboard-inset, 0px)' }}
       >
@@ -109,7 +122,7 @@ export function CaseChatFloating({
         // the text.
         'sticky bottom-3 z-20 mx-auto mt-auto w-full max-w-[26rem]',
         'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300',
-        'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:slide-out-to-bottom-4 data-[state=closed]:motion-safe:duration-200 data-[state=closed]:[animation-fill-mode:forwards]',
+        'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:slide-out-to-bottom-4 data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:hidden',
       )}
     >
       <aside
@@ -136,8 +149,10 @@ export function CaseChatDocked({
         'w-[26rem] shrink-0 overflow-x-clip border-l border-border/60 bg-popover shadow-[-24px_0_50px_-30px_rgba(0,0,0,0.55)]',
         // The clipped width reveal — no translate past the viewport edge, so
         // no horizontal scrollbar; the reading column re-centres continuously.
+        // The close shorthand carries its own `forwards`; `motion-reduce`
+        // still needs the instant hide for the no-animation hold gap.
         'motion-safe:animate-[v2-case-chat-open_280ms_cubic-bezier(0.32,0.72,0,1)]',
-        'data-[state=closed]:motion-safe:animate-[v2-case-chat-close_200ms_ease-in_forwards]',
+        'data-[state=closed]:motion-safe:animate-[v2-case-chat-close_200ms_ease-in_forwards] data-[state=closed]:motion-reduce:hidden',
       )}
     >
       <div className="sticky top-0 flex h-[calc(100dvh-3.5rem)] w-[26rem] flex-col">
