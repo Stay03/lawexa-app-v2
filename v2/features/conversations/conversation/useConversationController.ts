@@ -214,6 +214,14 @@ export interface ConversationController {
 export interface ConversationEmbed {
   /** Called instead of the home navigation when the conversation is deleted. */
   onDeleted: () => void;
+  /**
+   * `'external'` ⇒ the HOST owns the one composer element (the case chat's
+   * one-screen rule): `ConversationScreen` renders the transcript only and
+   * publishes its composer surface through `embedded-composer.ts`. Read by the
+   * screen, not the controller — it lives here because it is embed CONFIG, and
+   * the embed object already travels this path.
+   */
+  composer?: 'external';
 }
 
 export function useConversationController(

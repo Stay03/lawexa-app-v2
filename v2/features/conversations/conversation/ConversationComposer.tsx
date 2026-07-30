@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useImperativeHandle, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowUp,
@@ -49,9 +49,11 @@ import { usePastedContent } from './usePastedContent';
  * ConversationScreen.
  *
  * COMPACT PILL (owner-chosen v1 scale — the collapsed floating-prompt bar on the
- * case/note/statute pages). Width `max-w-xs sm:max-w-md` (≈448px cap), a `min-h-9` (36px)
- * textarea, and `size-8` round `+` / Send/Stop buttons — deliberately smaller than the
- * home hero. The textarea FONT is NOT shrunk (base stays 16px on mobile → no iOS zoom).
+ * case/note/statute pages). Width comes from the CONTAINER (the `/c/{id}` overlay
+ * carries the `max-w-xs sm:max-w-md` ≈448px cap; the case chat's card is its own
+ * constraint), with a `min-h-9` (36px) textarea and `size-8` round `+` / Send/Stop
+ * buttons — deliberately smaller than the home hero. The textarea FONT is NOT
+ * shrunk (base stays 16px on mobile → no iOS zoom).
  * The pill's own solid `bg-background` face carries a DOWNWARD-biased soft shadow so it
  * casts no shade band up into the transcript. (Owner note: this 28–32px control scale is
  * an explicit, owner-preferred deviation from the 44px touch-target rule.)
@@ -107,8 +109,21 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Imperative staging handle — hosts (the case chat's opener chips) fill the
+ *  draft through this so the composer keeps OWNING its input state. */
+export interface ConversationComposerHandle {
+  /** Replace the draft text (the "Start with" chips). Does not steal focus. */
+  stage: (text: string) => void;
+}
+
 export interface ConversationComposerProps {
-  conversationId: string;
+  /**
+   * Namespace for draft + pasted-content persistence. The `/c/{id}` page passes
+   * the conversation id (per-conversation drafts); an embedding surface passes
+   * its own stable scope (e.g. `case:{slug}`) so ONE draft survives that
+   * surface's list ⇄ conversation swaps.
+   */
+  draftScopeId: string;
   jurisdiction: JurisdictionChoice;
   onJurisdictionChange: (next: JurisdictionChoice) => void;
   isConfidential: boolean;
@@ -117,10 +132,29 @@ export interface ConversationComposerProps {
   isCancelling: boolean;
   onSubmit: (message: string, attachments: MessageAttachment[]) => Promise<void>;
   onStop: () => void;
+  /** Textarea placeholder — embedding surfaces brand it ("Ask about this case"). */
+  placeholder?: string;
+  /** False hides the jurisdiction meta row and disables its jurisdictions query
+   *  (guests). Default true — the `/c/{id}` composer only renders for owners. */
+  signedIn?: boolean;
+  /**
+   * Collapses the meta row (jurisdiction + redacted) via the same grid-collapse
+   * every other staged row uses — the case dock's CLOSED state, where only the
+   * pill shows. Staged attachments/pastes stay visible: armed state is honest.
+   */
+  showMeta?: boolean;
+  /** Extra hard-disable from the host (e.g. a conversation still wiring up). */
+  disabled?: boolean;
+  /** Focus the textarea on mount (the mobile sheet's opening gesture). */
+  autoFocus?: boolean;
+  /** Interactions that should open the host's panel (focus / click / typing). */
+  onEngage?: () => void;
+  /** The staging handle — see {@link ConversationComposerHandle}. */
+  stageRef?: React.Ref<ConversationComposerHandle>;
 }
 
 export function ConversationComposer({
-  conversationId,
+  draftScopeId,
   jurisdiction,
   onJurisdictionChange,
   isConfidential,
@@ -129,12 +163,19 @@ export function ConversationComposer({
   isCancelling,
   onSubmit,
   onStop,
+  placeholder = 'Ask a follow-up',
+  signedIn = true,
+  showMeta = true,
+  disabled = false,
+  autoFocus = false,
+  onEngage,
+  stageRef,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Draft persistence per conversation — lazy init + persist in the setter (React
+  // Draft persistence per scope — lazy init + persist in the setter (React
   // Compiler-clean, mirrors useComposerDraft).
-  const draftKey = `conversation_draft_${conversationId}`;
+  const draftKey = `conversation_draft_${draftScopeId}`;
   const [input, setInputState] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
     try {
@@ -158,8 +199,12 @@ export function ConversationComposer({
   );
 
   const { pastedItems, addPasted, removePasted, clearPasted } = usePastedContent(
-    `conversation_draft_pasted_${conversationId}`,
+    `conversation_draft_pasted_${draftScopeId}`,
   );
+
+  // The staging handle — `setInput` persists, so a staged opener survives a
+  // reload exactly like typed text. No focus steal (parity with the old chips).
+  useImperativeHandle(stageRef, () => ({ stage: setInput }), [setInput]);
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
   const [removing, setRemoving] = useState<Set<string>>(new Set());
   const [removingPasted, setRemovingPasted] = useState<Set<string>>(new Set());
@@ -183,7 +228,8 @@ export function ConversationComposer({
   const canSend =
     (input.trim().length > 0 || uploadedFiles.length > 0 || pastedItems.length > 0) &&
     !isUploading &&
-    !isSubmitting;
+    !isSubmitting &&
+    !disabled;
 
   const handleFilesAdded = async (newFiles: File[]) => {
     if (newFiles.length === 0) return;
@@ -302,7 +348,7 @@ export function ConversationComposer({
   };
 
   const handleSubmit = async () => {
-    if (isStreaming || isSubmitting || isUploading) return;
+    if (isStreaming || isSubmitting || isUploading || disabled) return;
     const fullMessage = serializePastedContent(pastedItems.map((i) => i.text), input);
     if (!fullMessage) return;
 
@@ -326,7 +372,10 @@ export function ConversationComposer({
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
   return (
-    <div className="mx-auto w-full max-w-xs px-4 pb-3 pt-2 sm:max-w-md">
+    // Width comes from the CONTAINER (the /c/{id} overlay carries the compact
+    // max-w; an embedding card is its own constraint) — so every host's pill
+    // fills the same gutters and no two states can disagree about size.
+    <div className="w-full px-4 pb-3 pt-2">
       <FileUpload onFilesAdded={handleFilesAdded} accept={ACCEPTED_FILE_TYPES} multiple>
         <input
           ref={fileInputRef}
@@ -345,25 +394,46 @@ export function ConversationComposer({
             the owner's floating-pill screenshot). Each block carries its own surface,
             so it stays legible on the transparent dock. ── */}
 
-        {/* Jurisdiction + redacted pill (meta row) — always present, so no entrance. */}
-        <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
-          <JurisdictionField
-            signedIn
-            value={jurisdiction}
-            onChange={onJurisdictionChange}
-            disabled={isStreaming || isSubmitting}
-            stop={stop}
-          />
-          {isRedacted && (
-            <div
-              className="bg-background flex items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
-              aria-label="Redacted mode is on for this conversation"
-            >
-              <VenetianMask className="h-3.5 w-3.5" />
-              <span className="font-medium">Redacted</span>
+        {/* Jurisdiction + redacted pill (meta row). Guests never see it (no row,
+            no jurisdictions query). `showMeta` collapses it with the same
+            grid-collapse every staged row uses — the case dock's closed state,
+            where the resting pill stands alone; `inert` keeps the collapsed
+            chip out of the tab order. */}
+        {signedIn ? (
+          <div
+            inert={!showMeta}
+            className={cn(
+              'grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+              showMeta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+            )}
+          >
+            <div className="overflow-hidden">
+              <div
+                className={cn(
+                  'mb-2 flex flex-wrap items-center gap-2 px-1 transition-opacity duration-200 motion-reduce:transition-none',
+                  showMeta ? 'opacity-100' : 'opacity-0',
+                )}
+              >
+                <JurisdictionField
+                  signedIn={signedIn}
+                  value={jurisdiction}
+                  onChange={onJurisdictionChange}
+                  disabled={isStreaming || isSubmitting || disabled}
+                  stop={stop}
+                />
+                {isRedacted && (
+                  <div
+                    className="bg-background flex items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
+                    aria-label="Redacted mode is on for this conversation"
+                  >
+                    <VenetianMask className="h-3.5 w-3.5" />
+                    <span className="font-medium">Redacted</span>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        ) : null}
 
         {/* Confidential file notice — a persistent-node collapse (grid-rows 0fr↔1fr +
             opacity) so it animates BOTH directions; the copy is static, so it fades +
@@ -496,11 +566,13 @@ export function ConversationComposer({
           onValueChange={(next) => {
             setInput(next);
             if (errorOpen) hideError();
+            onEngage?.();
           }}
           onSubmit={handleSubmit}
-          disabled={isStreaming || isSubmitting}
+          disabled={isStreaming || isSubmitting || disabled}
           maxHeight={150}
           variant={isConfidential ? 'confidential' : 'default'}
+          onClick={onEngage}
           // Downward-biased soft drop (not shadow-lg) so the floating pill casts NO
           // visible shade band UP into the transcript / jurisdiction chip (owner).
           className="shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]"
@@ -512,8 +584,11 @@ export function ConversationComposer({
                 <button
                   type="button"
                   aria-label="Attach files and privacy options"
-                  onClick={stop}
-                  disabled={isStreaming || isSubmitting}
+                  onClick={(event) => {
+                    stop(event);
+                    onEngage?.();
+                  }}
+                  disabled={isStreaming || isSubmitting || disabled}
                   className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="size-4" />
@@ -566,7 +641,9 @@ export function ConversationComposer({
             </DropdownMenu>
 
             <PromptInputTextarea
-              placeholder={pastedItems.length > 0 ? 'Add a message…' : 'Ask a follow-up'}
+              placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
+              autoFocus={autoFocus}
+              onFocus={onEngage}
               // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
               // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
               className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"

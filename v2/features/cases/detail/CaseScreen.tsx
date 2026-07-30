@@ -14,7 +14,8 @@ import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context'
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
-import { CaseAskDock, useStartCaseChat, type CaseComposerState } from './CaseAsk';
+import { CaseAskDock } from './CaseAsk';
+import { useStartCaseChat, type CaseChatStart } from './CaseChatCore';
 import { CaseChatDocked, CaseChatSheet } from './CaseChatPanel';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
@@ -145,29 +146,19 @@ function CaseBody({ slug }: { slug: string }) {
     }
   }, []);
 
-  // ── THE ONE COMPOSER's state, lifted here so the draft and jurisdiction
-  // survive presentation swaps (dock ⇄ sheet ⇄ docked column) and every
-  // surface renders the same submission state. ──
-  const [draft, setDraft] = useState('');
+  // ── The CREATE state, lifted here so every presentation shares one
+  // submission (a double submit is impossible across surfaces) and the list
+  // state's jurisdiction survives presentation swaps. The DRAFT is not here:
+  // the one composer owns it, persisted per case (`case:{slug}`), which is
+  // what lets the composer be the same element in every state. ──
   const [jurisdiction, setJurisdiction] = useState<JurisdictionChoice>({
     mode: 'auto',
   });
-  const start = useStartCaseChat(slug, signedIn, switchChat);
-  const composer: CaseComposerState = {
-    draft,
-    onDraftChange: (next) => {
-      setDraft(next);
-      if (start.error) start.clearError();
-    },
+  const startState = useStartCaseChat(slug, signedIn, switchChat, jurisdiction);
+  const start: CaseChatStart = {
+    ...startState,
     jurisdiction,
     onJurisdictionChange: setJurisdiction,
-    isSubmitting: start.isSubmitting,
-    error: start.error,
-    onSubmit: () => {
-      void start.submit(draft, jurisdiction).then((ok) => {
-        if (ok) setDraft('');
-      });
-    },
   };
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
@@ -271,7 +262,7 @@ function CaseBody({ slug }: { slug: string }) {
             slug={slug}
             signedIn={signedIn}
             viewerId={userId}
-            composer={composer}
+            start={start}
             view={floatingContext ? renderedChat : null}
             panelOpen={chat !== null && floatingContext}
             onEngage={() => {
@@ -291,7 +282,7 @@ function CaseBody({ slug }: { slug: string }) {
           slug={slug}
           signedIn={signedIn}
           viewerId={userId}
-          composer={composer}
+          start={start}
           onClose={closeChat}
           onSwitchChat={switchChat}
           onFloat={() => setDockedPref(false)}
@@ -304,7 +295,7 @@ function CaseBody({ slug }: { slug: string }) {
           slug={slug}
           signedIn={signedIn}
           viewerId={userId}
-          composer={composer}
+          start={start}
           onClose={closeChat}
           onSwitchChat={switchChat}
         />

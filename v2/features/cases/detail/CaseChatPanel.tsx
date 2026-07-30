@@ -1,22 +1,22 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowLeft, Maximize2, PanelRightClose, X } from 'lucide-react';
+import { useRef } from 'react';
+import { PanelRightClose } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { ConversationScreen } from '@/v2/features/conversations/conversation/ConversationScreen';
+import type { ConversationComposerHandle } from '@/v2/features/conversations/conversation/ConversationComposer';
 import {
-  CaseChatNewContent,
-  CaseComposer,
-  CaseComposerMeta,
-  type CaseComposerState,
-} from './CaseAsk';
+  CaseChatBar,
+  CaseChatComposerDock,
+  CaseChatMiddle,
+  type CaseChatStart,
+} from './CaseChatCore';
 
 /**
- * The case page's chat, in its three presentations — one shared body
- * (`CaseChatBody`), one mounted at a time (two would mean two live
- * controllers on one conversation):
+ * The case chat's other two presentations. Both render the SAME one screen
+ * (`CaseChatCore`: bar · middle · the one composer) — they only own their
+ * frames:
  *
  *   SHEET     below xl. A bottom sheet at ~65% of the viewport over a scrim —
  *             the judgment stays visible, dimmed, behind it (owner, July 30:
@@ -27,9 +27,8 @@ import {
  *             back. The choice persists (localStorage) so the chat reopens
  *             the way this reader likes it.
  *
- * The xl-floating presentation is NOT here: it is `CaseAskDock`'s one card —
- * closed pill, new-chat panel, and embedded conversation are three states of
- * the same element (the owner's "one complete unit").
+ * The xl-floating presentation is `CaseAskDock` (CaseAsk.tsx) — same screen,
+ * grown out of the resting pill.
  *
  * Every presentation is an ELEVATED LAYER, visibly apart from the page:
  * `bg-popover` (a step lighter than the page in dark mode), a border, and a
@@ -58,9 +57,8 @@ interface CaseChatCommonProps {
   slug: string;
   signedIn: boolean;
   viewerId: number | null;
-  /** The page's ONE composer state, lifted to `CaseBody` — the new-chat view
-   * renders the same `CaseComposer` the dock does, on the same draft. */
-  composer: CaseComposerState;
+  /** The lifted create bundle — ONE instance in `CaseScreen`, every surface. */
+  start: CaseChatStart;
   onClose: () => void;
   onSwitchChat: (chatId: string) => void;
 }
@@ -126,17 +124,14 @@ export function CaseChatDocked({
   );
 }
 
-/* ── The shared body: bar + views ────────────────────────────────────────── */
-
-const BAR_BUTTON =
-  'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
+/* ── The shared body: the one screen inside a frame ──────────────────────── */
 
 function CaseChatBody({
   chatId,
   slug,
   signedIn,
   viewerId,
-  composer,
+  start,
   onClose,
   onSwitchChat,
   mode,
@@ -145,87 +140,51 @@ function CaseChatBody({
   mode: 'sheet' | 'docked';
   onFloat?: () => void;
 }) {
-  const isNew = chatId === 'new';
+  const stageRef = useRef<ConversationComposerHandle | null>(null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* ── The bar: back · label · dock-toggle · expand · close. ── */}
-      <div className="flex min-h-12 shrink-0 items-center gap-1 border-b border-border/60 px-2">
-        {isNew ? (
-          <span aria-hidden className="size-8" />
-        ) : (
-          <button
-            type="button"
-            onClick={() => onSwitchChat('new')}
-            aria-label="Back to your chats about this case"
-            className={cn(BAR_BUTTON, FOCUS_RING)}
-          >
-            <ArrowLeft aria-hidden className="size-4" />
-          </button>
-        )}
-        <p className="flex-1 truncate px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-          Chat · this case
-        </p>
-        {mode === 'docked' && onFloat ? (
-          <button
-            type="button"
-            onClick={onFloat}
-            aria-label="Float the chat over the page"
-            title="Float over the page"
-            className={cn(BAR_BUTTON, FOCUS_RING)}
-          >
-            <PanelRightClose aria-hidden className="size-4" />
-          </button>
-        ) : null}
-        {!isNew ? (
-          <Link
-            href={`/c/${chatId}`}
-            aria-label="Open this chat in full"
-            title="Open in full"
-            className={cn(BAR_BUTTON, FOCUS_RING)}
-          >
-            <Maximize2 aria-hidden className="size-4" />
-          </Link>
-        ) : null}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close the chat"
-          className={cn(BAR_BUTTON, FOCUS_RING)}
-        >
-          <X aria-hidden className="size-4" />
-        </button>
-      </div>
-
-      {/* Keyed by view so list ⇄ conversation swaps ease in rather than
-          snapping. */}
-      <div
-        key={isNew ? 'new' : chatId}
-        className="min-h-0 flex-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-      >
-        {isNew ? (
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-              <CaseChatNewContent
-                slug={slug}
-                signedIn={signedIn}
-                viewerId={viewerId}
-                onOpenChat={onSwitchChat}
-                composer={composer}
-              />
-            </div>
-            {/* ── THE composer, pinned to the surface's bottom — the same
-                component, the same shared draft, and the same wrapper metrics
-                (`px-4 pb-3 pt-2` = ConversationComposer's) as everywhere. ── */}
-            <div className="shrink-0 px-4 pb-3 pt-2">
-              <CaseComposerMeta composer={composer} signedIn={signedIn} />
-              <CaseComposer composer={composer} autoFocus />
-            </div>
-          </div>
-        ) : (
-          <ConversationScreen conversationId={chatId} embed={{ onDeleted: onClose }} />
-        )}
-      </div>
+      <CaseChatBar
+        view={chatId}
+        onBack={() => onSwitchChat('new')}
+        onClose={onClose}
+        tall
+        presentationAction={
+          mode === 'docked' && onFloat ? (
+            <button
+              type="button"
+              onClick={onFloat}
+              aria-label="Float the chat over the page"
+              title="Float over the page"
+              className={cn(
+                'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+                FOCUS_RING,
+              )}
+            >
+              <PanelRightClose aria-hidden className="size-4" />
+            </button>
+          ) : undefined
+        }
+      />
+      <CaseChatMiddle
+        view={chatId}
+        slug={slug}
+        signedIn={signedIn}
+        viewerId={viewerId}
+        onOpenChat={onSwitchChat}
+        onClose={onClose}
+        onStage={(text) => stageRef.current?.stage(text)}
+      />
+      {/* THE composer — pinned to the frame's bottom; the sheet raises the
+          keyboard with it as it opens. */}
+      <CaseChatComposerDock
+        view={chatId}
+        slug={slug}
+        signedIn={signedIn}
+        start={start}
+        autoFocus={mode === 'sheet' && chatId === 'new'}
+        stageRef={stageRef}
+      />
     </div>
   );
 }

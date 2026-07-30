@@ -12,6 +12,7 @@ import { ConversationComposer } from './ConversationComposer';
 import { ComposerSkeleton } from './skeletons';
 import { ConfidentialBanner } from './ConfidentialBanner';
 import { V2ChatProvider } from './chat-context';
+import { clearEmbeddedComposer, publishEmbeddedComposer } from './embedded-composer';
 
 /**
  * ConversationScreen — the v2 `/c/[id]` client root. Mounts the controller (engine
@@ -82,6 +83,54 @@ export function ConversationScreen({
     error,
     retryLastMessage,
   } = stream;
+  // External-composer embedding (the case chat's ONE screen): the HOST owns the
+  // composer element, this screen owns the conversation — so it renders the
+  // transcript only and PUBLISHES its composer-facing surface through the
+  // embedded-composer store (the header-context idiom; effect-time writes).
+  const externalComposer = embed?.composer === 'external';
+  const {
+    jurisdiction,
+    setJurisdiction,
+    isConfidential,
+    isRedacted,
+    isOwner,
+    isOwnerResolved,
+    submit: controllerSubmit,
+    stop: controllerStop,
+  } = controller;
+  useEffect(() => {
+    if (!externalComposer) return;
+    publishEmbeddedComposer({
+      conversationId,
+      jurisdiction,
+      setJurisdiction,
+      isConfidential,
+      isRedacted,
+      isStreaming,
+      isCancelling,
+      isOwner,
+      isOwnerResolved,
+      submit: controllerSubmit,
+      stop: controllerStop,
+    });
+  }, [
+    externalComposer,
+    conversationId,
+    jurisdiction,
+    setJurisdiction,
+    isConfidential,
+    isRedacted,
+    isStreaming,
+    isCancelling,
+    isOwner,
+    isOwnerResolved,
+    controllerSubmit,
+    controllerStop,
+  ]);
+  useEffect(() => {
+    if (!externalComposer) return;
+    return () => clearEmbeddedComposer(conversationId);
+  }, [externalComposer, conversationId]);
   // NOT `stream.isLoadingHistory` — that flag only covers the device-owned
   // IndexedDB load. The controller's flag is the union of both history paths AND-ed
   // with "there is nothing to show yet", so a conversation served from the
@@ -92,9 +141,13 @@ export function ConversationScreen({
   // (and the jump-to-latest pill) reserve exactly enough bottom clearance — and
   // re-measure as staging grows/shrinks the pill. No setState: it only writes a CSS
   // custom property (React Compiler-clean, mirrors use-keyboard-inset.ts).
+  // With an EXTERNAL composer there is no overlay: the effect no-ops and the root
+  // pins the variable to 0px inline, so MessageList's pre-measure fallback (7rem)
+  // can never reserve clearance for a pill that lives below in flow.
   const screenRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (externalComposer) return;
     const dock = dockRef.current;
     const screen = screenRef.current;
     if (!dock || !screen) return;
@@ -108,7 +161,7 @@ export function ConversationScreen({
       observer.disconnect();
       screen.style.removeProperty('--v2-conv-dock-h');
     };
-  }, []);
+  }, [externalComposer]);
 
   // Inline result cards fire follow-up turns through this (no attachments).
   // Depends on the STABLE `controller.submit` (a useCallback), not the whole
@@ -140,6 +193,7 @@ export function ConversationScreen({
         data-v2-marker="V2-CONVERSATION"
         data-conversation-id={conversationId}
         className="relative flex h-full min-h-0 flex-col"
+        style={externalComposer ? { ['--v2-conv-dock-h' as string]: '0px' } : undefined}
       >
         {controller.isConfidential && (
           <ConfidentialBanner onDelete={controller.deleteConfidential} />
@@ -164,45 +218,55 @@ export function ConversationScreen({
             the transparent gaps pass touches/scroll through to the transcript behind;
             only the pill re-enables events. `z-10` keeps it above the transcript. No
             top fade/scrim: the transcript stays crisp right up to the pill (owner —
-            the fade read as a dim band above the bar). */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-          <div ref={dockRef} className="pointer-events-auto v2-safe-bottom">
-            {!controller.isOwnerResolved || isLoadingHistory ? (
-              // Ownership/history still resolving → the composer-shaped skeleton (same
-              // geometry as the real pill). NEVER the "shared" pill here: isOwner is
-              // false while the owner id is null, so it would misleadingly flash for
-              // owners on every direct-nav / reload / recents click.
-              //
-              // On a REVISIT neither term is ever true: the cached conversation record
-              // carries `user_id`, so ownership is resolved in the first render and the
-              // real composer paints immediately — this skeleton is now only the cold
-              // open, which is what it was always meant to be.
-              <ComposerSkeleton />
-            ) : controller.isOwner ? (
-              <ConversationComposer
-                conversationId={conversationId}
-                jurisdiction={controller.jurisdiction}
-                onJurisdictionChange={controller.setJurisdiction}
-                isConfidential={controller.isConfidential}
-                isRedacted={controller.isRedacted}
-                isStreaming={isStreaming}
-                isCancelling={isCancelling}
-                onSubmit={controller.submit}
-                onStop={controller.stop}
-              />
-            ) : (
-              <ViewOnlyPill />
-            )}
+            the fade read as a dim band above the bar). The compact width cap lives
+            HERE (the composer itself is container-width, so embedding hosts size it);
+            ComposerSkeleton/ViewOnlyPill carry their own identical caps — same
+            numbers, harmless nesting. Absent entirely with an EXTERNAL composer:
+            the host owns the one composer element below this screen in flow. */}
+        {!externalComposer && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+            <div
+              ref={dockRef}
+              className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md"
+            >
+              {!controller.isOwnerResolved || isLoadingHistory ? (
+                // Ownership/history still resolving → the composer-shaped skeleton (same
+                // geometry as the real pill). NEVER the "shared" pill here: isOwner is
+                // false while the owner id is null, so it would misleadingly flash for
+                // owners on every direct-nav / reload / recents click.
+                //
+                // On a REVISIT neither term is ever true: the cached conversation record
+                // carries `user_id`, so ownership is resolved in the first render and the
+                // real composer paints immediately — this skeleton is now only the cold
+                // open, which is what it was always meant to be.
+                <ComposerSkeleton />
+              ) : controller.isOwner ? (
+                <ConversationComposer
+                  draftScopeId={conversationId}
+                  jurisdiction={controller.jurisdiction}
+                  onJurisdictionChange={controller.setJurisdiction}
+                  isConfidential={controller.isConfidential}
+                  isRedacted={controller.isRedacted}
+                  isStreaming={isStreaming}
+                  isCancelling={isCancelling}
+                  onSubmit={controller.submit}
+                  onStop={controller.stop}
+                />
+              ) : (
+                <ViewOnlyPill />
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </V2ChatProvider>
   );
 }
 
 /** Read-only footer for a shared conversation the viewer doesn't own (§C KEEP).
- *  Matches the pill's compact width so the floating bar keeps one silhouette. */
-function ViewOnlyPill() {
+ *  Matches the pill's compact width so the floating bar keeps one silhouette.
+ *  Exported for external-composer hosts, which render it in their own dock. */
+export function ViewOnlyPill() {
   return (
     <div className="mx-auto w-full max-w-xs px-4 pb-3 pt-2 sm:max-w-md">
       <div className="bg-muted/80 text-muted-foreground flex items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-center text-sm backdrop-blur">
