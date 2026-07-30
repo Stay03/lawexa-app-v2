@@ -60,35 +60,54 @@ function CaseBody({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get('q')?.trim() || undefined;
 
-  // ── The side chat's URL state: `?chat={id}`. ──
-  // OPEN is a PUSH (a new history entry), so the back button closes the panel
-  // and returns to the reading — the navigation the owner asked for. CLOSE
-  // (the X / the scrim) strips the param IN PLACE with a client-side replace,
-  // never `history.back()`: a back() is a router-level RESTORE that remounts
-  // this component, wiping the exit holdover — the card vanished, repainted,
-  // and died again (the owner's "closes, pops open, closes again"). The cost
-  // is one leftover history entry whose URL equals the previous one — a
-  // single inert Back press — which is invisible next to a glitching close.
-  const chatId = searchParams.get('chat');
+  // ── The side chat: LOCAL STATE is the source of truth; the URL is a
+  // mirror and an entry point. ──
+  //
+  // The first implementation DERIVED the panel from `useSearchParams()`, so
+  // every open and close travelled through Next's patched history machinery
+  // (native write → internal sync → transition-priority re-render → react).
+  // That pipeline is proven for filtering a list; here it MOUNTS AND UNMOUNTS
+  // a heavy panel, and its quirks (restore repaints, transition interleaving,
+  // stale-segment reconciliation on a page the reader has been on for
+  // minutes) kept surfacing as the panel visibly closing, popping open, and
+  // closing again — un-reproducible in quick local tests, constant on prod.
+  //
+  // Now: `chat` changes ONLY on user action (open / close / switch / the
+  // browser's Back), so no router re-render can ever toggle the panel.
+  //  - state initialises from the URL once, on mount (direct `?chat=` links);
+  //  - open PUSHES the param (Back closes the panel — the owner's ask);
+  //  - close and in-panel hops REPLACE it (the panel stays ONE history
+  //    entry, so Back closes in one step and never walks internal hops);
+  //  - one popstate listener adopts the real URL on Back/Forward.
+  const [chat, setChat] = useState<string | null>(
+    () => searchParams.get('chat'),
+  );
   const openChat = useCallback((id: string) => {
+    setChat(id);
     pushUrlParams({ chat: id });
   }, []);
   const closeChat = useCallback(() => {
+    setChat(null);
     replaceUrlParams({ chat: null });
   }, []);
-  // In-panel hops (back to the list, opening a listed thread, a new thread's
-  // id arriving) REPLACE — the panel stays one history entry, so the browser's
-  // Back always closes it in one step.
   const switchChat = useCallback((id: string) => {
+    setChat(id);
     replaceUrlParams({ chat: id });
+  }, []);
+  useEffect(() => {
+    const onPopState = () => {
+      setChat(new URLSearchParams(window.location.search).get('chat'));
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   // ── Presence holdover: every chat presentation animates OUT before its
-  // unmount (200ms). The render-phase adopt of a new id is the sanctioned
+  // unmount. The render-phase adopt of a new id is the sanctioned
   // adjust-during-render reset. ──
-  const [renderedChat, setRenderedChat] = useState(chatId);
-  if (chatId !== null && chatId !== renderedChat) setRenderedChat(chatId);
-  const chatClosing = chatId === null && renderedChat !== null;
+  const [renderedChat, setRenderedChat] = useState(chat);
+  if (chat !== null && chat !== renderedChat) setRenderedChat(chat);
+  const chatClosing = chat === null && renderedChat !== null;
   useEffect(() => {
     if (!chatClosing) return;
     // A shade past the 200ms exit animation, whose last frame is held by
@@ -204,9 +223,9 @@ function CaseBody({ slug }: { slug: string }) {
           </aside>
         ) : null}
         {/* The ask trigger yields while the chat is open — the chat surface
-            carries the one real composer. It waits for renderedChat (not
-            chatId): mounting it during the exit animation shoved the layout
-            under the closing card (the owner's "glitchy" close). */}
+            carries the one real composer. It waits for the HOLDOVER to end:
+            mounting it during the exit animation shoved the layout under the
+            closing card. */}
         {renderedChat === null ? <CaseAskDock onOpenChat={openChat} /> : null}
 
         {/* The floating card lives in the pill's slot, INSIDE the column. */}
