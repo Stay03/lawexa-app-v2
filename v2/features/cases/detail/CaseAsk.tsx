@@ -1,9 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowUp, Loader2, MessageSquare, PanelRight, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowUp,
+  Loader2,
+  Maximize2,
+  MessageSquare,
+  PanelRight,
+  X,
+} from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
@@ -19,6 +28,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
 import { startConversation } from '@/v2/features/conversations/start-conversation';
+import { ConversationScreen } from '@/v2/features/conversations/conversation/ConversationScreen';
 import { casesQueries } from '../queries';
 
 /**
@@ -264,25 +274,39 @@ const BAR_BUTTON =
   'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
 
 /**
- * CaseAskDock — the composer's home on the page, and (on desktop) the chat's
- * floating new-chat surface: the panel grows out of the composer IN PLACE.
+ * CaseAskDock — THE ONE FLOATING UNIT (owner, July 31: "it should feel like
+ * one complete unit"). One card, one width, one composer geometry, three
+ * states of the SAME element:
  *
- *  - CLOSED: the bare composer pill over the gradient dissolve.
- *  - OPEN (`panelMounted`, ≥xl floating): the container gains the elevated
- *    card chrome and the panel (bar · recents · prompts · jurisdiction)
- *    expands ABOVE the composer via a grid-rows transition — a TRANSITION,
- *    not an animation, so the collapsed state is committed style and can
- *    never flash (the fill-mode lesson, structurally avoided).
- *  - The composer element itself is NEVER remounted by open/close: the panel
- *    slot renders `null` when closed, keeping the composer's tree position —
- *    and therefore its focus and caret — stable.
+ *  - CLOSED: the chrome is transparent; only the composer pill shows.
+ *  - NEW: the panel (bar · recents · openers · jurisdiction) grows above the
+ *    composer; the chrome fades in around both.
+ *  - CONVERSATION: the panel grows taller and hosts the real
+ *    `ConversationScreen`; the dock's composer row collapses away while the
+ *    conversation's own composer — the SAME 24rem pill, by construction —
+ *    fades in at the card's bottom edge.
+ *
+ * ── THE GEOMETRIC INVARIANTS, so no state change can ever resize anything —
+ * the fix for "the one on the page is bigger than the one in the popup" ──
+ *  1. The container is ALWAYS `max-w-[26rem]` (the docked column's width).
+ *  2. Every composer row is ALWAYS `px-4 pb-3 pt-2` inside it — which is
+ *     exactly `ConversationComposer`'s own wrapper, so the conversation's
+ *     pill lands on the dock pill to the pixel: 26rem − 2×1rem = 24rem.
+ *  3. All motion is TRANSITIONS on the one mounted element (grid-rows for
+ *     grow/collapse, height for the view morph, colors for the chrome) —
+ *     committed-style endpoints, so nothing can flash; and the view heights
+ *     are chosen so panel-growth and composer-collapse cancel out: the
+ *     card's top edge stays put while the views swap.
+ *  4. The composer element is never remounted by open/close: the panel slot
+ *     renders `null` when closed, keeping its tree position — and therefore
+ *     focus and caret — stable.
  */
 export function CaseAskDock({
   slug,
   signedIn,
   viewerId,
   composer,
-  panelMounted,
+  view,
   panelOpen,
   onEngage,
   onClose,
@@ -293,8 +317,9 @@ export function CaseAskDock({
   signedIn: boolean;
   viewerId: number | null;
   composer: CaseComposerState;
-  /** The floating new-chat panel is in the tree (open or animating out). */
-  panelMounted: boolean;
+  /** What the panel shows: nothing (closed), the new-chat view, or a
+   * conversation id — the HOLDOVER value, so exits can animate. */
+  view: string | null;
   /** The panel is expanded (false while collapsing toward unmount). */
   panelOpen: boolean;
   /** Open the chat for this width (sheet below xl, panel at xl). */
@@ -303,6 +328,9 @@ export function CaseAskDock({
   onDock: () => void;
   onOpenChat: (conversationId: string) => void;
 }) {
+  const panelMounted = view !== null;
+  const isConversation = panelMounted && view !== 'new';
+
   return (
     <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
       {/* The gradient dissolve — PERMANENT, whether the pill rests alone or
@@ -316,10 +344,12 @@ export function CaseAskDock({
         role={panelMounted ? 'complementary' : undefined}
         aria-label={panelMounted ? 'Chat about this case' : undefined}
         className={cn(
-          'mx-auto w-full max-w-xs rounded-3xl sm:max-w-md',
-          'transition-[background-color,box-shadow,border-color,max-width] duration-300 motion-reduce:transition-none',
-          panelMounted &&
-            'max-w-md border border-border bg-popover p-3 shadow-[0_28px_70px_-28px_rgba(0,0,0,0.75)] sm:max-w-md',
+          // INVARIANT 1: one width, every state.
+          'mx-auto w-full max-w-[26rem] rounded-2xl border',
+          'transition-[background-color,box-shadow,border-color] duration-300 motion-reduce:transition-none',
+          panelMounted
+            ? 'border-border bg-popover shadow-[0_28px_70px_-28px_rgba(0,0,0,0.75)]'
+            : 'border-transparent',
         )}
       >
         {/* The panel slot — `null` keeps the composer's tree position stable
@@ -331,10 +361,31 @@ export function CaseAskDock({
             className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[open=true]:grid-rows-[1fr] motion-reduce:transition-none"
           >
             <div className="min-h-0 overflow-hidden">
-              <div className="flex max-h-[min(24rem,calc(100dvh-16rem))] flex-col">
-                {/* ── The bar: label · dock · close. ── */}
-                <div className="flex min-h-10 shrink-0 items-center gap-1 border-b border-border/60 px-0.5">
-                  <span aria-hidden className="size-8" />
+              {/* INVARIANT 3: the conversation height = the new height + the
+                  composer row's ~4.6rem, so the card's top edge holds still
+                  while the composer row below collapses in step. */}
+              <div
+                className={cn(
+                  'flex flex-col transition-[height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+                  isConversation
+                    ? 'h-[min(34.6rem,calc(100dvh-9.4rem))]'
+                    : 'h-[min(30rem,calc(100dvh-14rem))]',
+                )}
+              >
+                {/* ── The bar: back? · label · dock · expand? · close. ── */}
+                <div className="flex min-h-10 shrink-0 items-center gap-1 border-b border-border/60 px-1.5">
+                  {isConversation ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenChat('new')}
+                      aria-label="Back to your chats about this case"
+                      className={cn(BAR_BUTTON, FOCUS_RING)}
+                    >
+                      <ArrowLeft aria-hidden className="size-4" />
+                    </button>
+                  ) : (
+                    <span aria-hidden className="size-8" />
+                  )}
                   <p className="flex-1 truncate px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
                     Chat · this case
                   </p>
@@ -347,6 +398,16 @@ export function CaseAskDock({
                   >
                     <PanelRight aria-hidden className="size-4" />
                   </button>
+                  {isConversation ? (
+                    <Link
+                      href={`/c/${view}`}
+                      aria-label="Open this chat in full"
+                      title="Open in full"
+                      className={cn(BAR_BUTTON, FOCUS_RING)}
+                    >
+                      <Maximize2 aria-hidden className="size-4" />
+                    </Link>
+                  ) : null}
                   <button
                     type="button"
                     onClick={onClose}
@@ -356,24 +417,58 @@ export function CaseAskDock({
                     <X aria-hidden className="size-4" />
                   </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3">
-                  <CaseChatNewContent
-                    slug={slug}
-                    signedIn={signedIn}
-                    viewerId={viewerId}
-                    onOpenChat={onOpenChat}
-                    composer={composer}
-                  />
-                </div>
-                <div className="shrink-0 pt-1">
-                  <CaseComposerMeta composer={composer} signedIn={signedIn} />
+
+                {/* Keyed by view so new ⇄ conversation eases in rather than
+                    snapping — the slick swap, inside ONE card. */}
+                <div
+                  key={isConversation ? view : 'new'}
+                  className="min-h-0 flex-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+                >
+                  {isConversation ? (
+                    <ConversationScreen
+                      conversationId={view}
+                      embed={{ onDeleted: onClose }}
+                    />
+                  ) : (
+                    <div className="flex h-full min-h-0 flex-col">
+                      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+                        <CaseChatNewContent
+                          slug={slug}
+                          signedIn={signedIn}
+                          viewerId={viewerId}
+                          onOpenChat={onOpenChat}
+                          composer={composer}
+                        />
+                      </div>
+                      <div className="shrink-0 px-4 pt-1">
+                        <CaseComposerMeta
+                          composer={composer}
+                          signedIn={signedIn}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         ) : null}
 
-        <CaseComposer composer={composer} onEngage={onEngage} />
+        {/* The dock's composer ROW — collapses away while a conversation owns
+            the card (its own composer is the same pill in the same clothes),
+            `inert` so the hidden textarea can never take a tab stop. */}
+        <div
+          data-shown={!isConversation}
+          inert={isConversation}
+          className="grid grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[shown=false]:grid-rows-[0fr] motion-reduce:transition-none"
+        >
+          <div className="min-h-0 overflow-hidden">
+            {/* INVARIANT 2: `ConversationComposer`'s exact wrapper metrics. */}
+            <div className="px-4 pb-3 pt-2">
+              <CaseComposer composer={composer} onEngage={onEngage} />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

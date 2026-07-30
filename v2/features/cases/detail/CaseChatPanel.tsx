@@ -1,13 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Maximize2,
-  PanelRight,
-  PanelRightClose,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, Maximize2, PanelRightClose, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -28,15 +22,14 @@ import {
  *             the judgment stays visible, dimmed, behind it (owner, July 30:
  *             "just like 60% and some of the page show"), and tapping the
  *             scrim closes. Rides `--keyboard-inset`.
- *   FLOATING  ≥xl, the default — CONVERSATIONS ONLY. The new-chat view at
- *             this width is NOT here: it is the dock's own panel, grown out
- *             of the page composer in place (`CaseAskDock` — the owner's
- *             "one composer"). This card takes over once a real conversation
- *             exists. The bar's panel icon docks it.
  *   DOCKED    ≥xl after the reader chooses the sidebar. The in-flow 26rem
  *             column with the clipped width reveal; the bar's icon floats it
  *             back. The choice persists (localStorage) so the chat reopens
  *             the way this reader likes it.
+ *
+ * The xl-floating presentation is NOT here: it is `CaseAskDock`'s one card —
+ * closed pill, new-chat panel, and embedded conversation are three states of
+ * the same element (the owner's "one complete unit").
  *
  * Every presentation is an ELEVATED LAYER, visibly apart from the page:
  * `bg-popover` (a step lighter than the page in dark mode), a border, and a
@@ -106,33 +99,6 @@ export function CaseChatSheet(props: CaseChatCommonProps) {
   );
 }
 
-/* ── Floating card (≥xl, the default) ────────────────────────────────────── */
-
-export function CaseChatFloating({
-  onDock,
-  ...props
-}: CaseChatCommonProps & { onDock: () => void }) {
-  return (
-    <div
-      data-state={props.closing ? 'closed' : 'open'}
-      className={cn(
-        // The dock pill's slot: bottom of the reading column, floating over
-        // the text.
-        'sticky bottom-3 z-20 mx-auto mt-auto w-full max-w-[26rem]',
-        'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300',
-        'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:slide-out-to-bottom-4 data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:hidden',
-      )}
-    >
-      <aside
-        aria-label="Chat about this case"
-        className="flex h-[min(34rem,calc(100dvh-8rem))] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-[0_28px_70px_-28px_rgba(0,0,0,0.75)]"
-      >
-        <CaseChatBody {...props} mode="floating" onDock={onDock} />
-      </aside>
-    </div>
-  );
-}
-
 /* ── Docked column (≥xl, by choice) ──────────────────────────────────────── */
 
 export function CaseChatDocked({
@@ -174,11 +140,9 @@ function CaseChatBody({
   onClose,
   onSwitchChat,
   mode,
-  onDock,
   onFloat,
 }: CaseChatCommonProps & {
-  mode: 'sheet' | 'floating' | 'docked';
-  onDock?: () => void;
+  mode: 'sheet' | 'docked';
   onFloat?: () => void;
 }) {
   const isNew = chatId === 'new';
@@ -202,17 +166,6 @@ function CaseChatBody({
         <p className="flex-1 truncate px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
           Chat · this case
         </p>
-        {mode === 'floating' && onDock ? (
-          <button
-            type="button"
-            onClick={onDock}
-            aria-label="Dock the chat to the side"
-            title="Dock to the side"
-            className={cn(BAR_BUTTON, FOCUS_RING)}
-          >
-            <PanelRight aria-hidden className="size-4" />
-          </button>
-        ) : null}
         {mode === 'docked' && onFloat ? (
           <button
             type="button"
@@ -262,8 +215,9 @@ function CaseChatBody({
               />
             </div>
             {/* ── THE composer, pinned to the surface's bottom — the same
-                component and the same shared draft as the page dock's. ── */}
-            <div className="shrink-0 px-4 pb-3 pt-1">
+                component, the same shared draft, and the same wrapper metrics
+                (`px-4 pb-3 pt-2` = ConversationComposer's) as everywhere. ── */}
+            <div className="shrink-0 px-4 pb-3 pt-2">
               <CaseComposerMeta composer={composer} signedIn={signedIn} />
               <CaseComposer composer={composer} autoFocus />
             </div>

@@ -15,7 +15,7 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
 import { CaseAskDock, useStartCaseChat, type CaseComposerState } from './CaseAsk';
-import { CaseChatDocked, CaseChatFloating, CaseChatSheet } from './CaseChatPanel';
+import { CaseChatDocked, CaseChatSheet } from './CaseChatPanel';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
 import { ReadingProgress } from './ReadingProgress';
@@ -221,17 +221,16 @@ function CaseBody({ slug }: { slug: string }) {
 
   const outline = buildCaseOutline(detail);
 
-  // The floating NEW view is the DOCK's own panel (the composer grows it in
-  // place); the floating CARD takes over only for real conversations.
+  // At xl-floating, the DOCK is the whole chat: closed pill, new-chat panel,
+  // and the embedded conversation are three states of ONE card. The separate
+  // presentations remain only where geometry demands them (sheet below xl,
+  // the docked column by choice).
   const floatingContext = isDesktopPanel === true && !docked;
-  const showFloating =
-    renderedChat !== null && renderedChat !== 'new' && floatingContext;
   const showDocked = renderedChat !== null && isDesktopPanel === true && docked;
   const showSheet = renderedChat !== null && isDesktopPanel === false;
-  const dockPanelMounted = renderedChat === 'new' && floatingContext;
-  // The dock stays mounted through closed ⇄ floating-new so the composer
-  // element is never remounted across that cycle (focus survives).
-  const showDock = renderedChat === null || dockPanelMounted;
+  // The dock stays mounted through every floating state so the composer
+  // element is never remounted across closed ⇄ open (focus survives).
+  const showDock = floatingContext || renderedChat === null;
 
   return (
     // With the side chat open (≥xl) this is a row: the reading column centres
@@ -264,39 +263,23 @@ function CaseBody({ slug }: { slug: string }) {
             </div>
           </aside>
         ) : null}
-        {/* THE composer's dock — and, at xl-floating, the chat's new-chat
-            surface growing out of it in place. It hides only while another
-            surface owns the composer (the sheet, the docked column, or a
-            conversation's own composer in the floating card). */}
+        {/* THE composer's dock — at xl-floating it is the entire chat (one
+            card, three states). It hides only while another surface owns the
+            composer (the sheet below xl, the docked column by choice). */}
         {showDock ? (
           <CaseAskDock
             slug={slug}
             signedIn={signedIn}
             viewerId={userId}
             composer={composer}
-            panelMounted={dockPanelMounted}
-            panelOpen={chat === 'new' && floatingContext}
+            view={floatingContext ? renderedChat : null}
+            panelOpen={chat !== null && floatingContext}
             onEngage={() => {
               if (chat === null) openChat('new');
             }}
             onClose={closeChat}
             onDock={() => setDockedPref(true)}
             onOpenChat={switchChat}
-          />
-        ) : null}
-
-        {/* The floating card lives in the pill's slot, INSIDE the column. */}
-        {showFloating && renderedChat !== null ? (
-          <CaseChatFloating
-            chatId={renderedChat}
-            closing={chatClosing}
-            slug={slug}
-            signedIn={signedIn}
-            viewerId={userId}
-            composer={composer}
-            onClose={closeChat}
-            onSwitchChat={switchChat}
-            onDock={() => setDockedPref(true)}
           />
         ) : null}
       </div>
