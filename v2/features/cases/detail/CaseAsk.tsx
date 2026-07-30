@@ -99,7 +99,10 @@ export function CaseAskDock({
   onOpenChat: (chatId: string) => void;
 }) {
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10">
+    // The fade-in matters on the SECOND mount: the trigger returns only after
+    // the chat surface finishes its exit, and easing in reads as the hand-off
+    // it is rather than a pop.
+    <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
       {/* Dissolve the judgment scrolling behind the pill — dense at the pill,
           gone by the top, so text fades out instead of running at full ink
           straight into the trigger. */}

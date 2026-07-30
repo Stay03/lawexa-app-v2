@@ -94,7 +94,10 @@ function CaseBody({ slug }: { slug: string }) {
   const chatClosing = chatId === null && renderedChat !== null;
   useEffect(() => {
     if (!chatClosing) return;
-    const timer = window.setTimeout(() => setRenderedChat(null), 200);
+    // A shade past the 200ms exit animation, whose last frame is held by
+    // fill-mode:forwards — the unmount happens strictly AFTER the animation
+    // lands, so the closed panel can never flash back for a frame.
+    const timer = window.setTimeout(() => setRenderedChat(null), 240);
     return () => window.clearTimeout(timer);
   }, [chatClosing]);
 
@@ -204,8 +207,10 @@ function CaseBody({ slug }: { slug: string }) {
           </aside>
         ) : null}
         {/* The ask trigger yields while the chat is open — the chat surface
-            carries the one real composer. */}
-        {!chatId ? <CaseAskDock onOpenChat={openChat} /> : null}
+            carries the one real composer. It waits for renderedChat (not
+            chatId): mounting it during the exit animation shoved the layout
+            under the closing card (the owner's "glitchy" close). */}
+        {renderedChat === null ? <CaseAskDock onOpenChat={openChat} /> : null}
 
         {/* The floating card lives in the pill's slot, INSIDE the column. */}
         {showFloating && renderedChat !== null ? (

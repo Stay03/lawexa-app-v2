@@ -76,7 +76,7 @@ export function CaseChatSheet(props: CaseChatCommonProps) {
         className={cn(
           'fixed inset-0 z-30 bg-black/50',
           'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200',
+          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200 data-[state=closed]:[animation-fill-mode:forwards]',
         )}
       />
       <aside
@@ -85,7 +85,7 @@ export function CaseChatSheet(props: CaseChatCommonProps) {
         className={cn(
           'fixed inset-x-0 z-40 flex h-[65dvh] min-h-80 flex-col overflow-hidden rounded-t-2xl border-t border-border/60 bg-popover shadow-[0_-24px_60px_-24px_rgba(0,0,0,0.65)]',
           'motion-safe:animate-in motion-safe:slide-in-from-bottom-full motion-safe:duration-300',
-          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-full data-[state=closed]:motion-safe:duration-200',
+          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-full data-[state=closed]:motion-safe:duration-200 data-[state=closed]:[animation-fill-mode:forwards]',
         )}
         style={{ bottom: 'var(--keyboard-inset, 0px)' }}
       >
@@ -109,7 +109,7 @@ export function CaseChatFloating({
         // the text.
         'sticky bottom-3 z-20 mx-auto mt-auto w-full max-w-[26rem]',
         'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300',
-        'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:slide-out-to-bottom-4 data-[state=closed]:motion-safe:duration-200',
+        'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:slide-out-to-bottom-4 data-[state=closed]:motion-safe:duration-200 data-[state=closed]:[animation-fill-mode:forwards]',
       )}
     >
       <aside
@@ -325,7 +325,7 @@ function CaseChatNew({
         ) : null}
 
         {signedIn ? (
-          <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="mb-2 flex items-center gap-2">
             <JurisdictionField
               signedIn
               value={jurisdiction}
@@ -333,9 +333,6 @@ function CaseChatNew({
               disabled={start.isSubmitting}
               stop={(event) => event.stopPropagation()}
             />
-            <span className="text-[11px] text-muted-foreground/60">
-              Opens a new chat
-            </span>
           </div>
         ) : null}
 
