@@ -17,7 +17,7 @@ import {
 
 /**
  * =============================================================================
- * HomeFallback — the v2 home's route-level loading UI (`app/v2/loading.tsx`)
+ * HomeFallback — the v2 home's route-level loading UI (`app/v2/(home)/loading.tsx`)
  * =============================================================================
  * THE COMPLAINT THIS ANSWERS (owner, verbatim): "the home skeleton is always the
  * same even when its landing on either of the 3 tabs and none of the design of

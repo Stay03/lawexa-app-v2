@@ -1,4 +1,4 @@
-import { V2Home } from './home';
+import { V2Home } from '../home';
 
 /**
  * v2 home (server shell). Renders the `'use client'` home surface and awaits

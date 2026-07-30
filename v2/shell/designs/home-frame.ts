@@ -3,7 +3,7 @@
  *
  * WHY THIS FILE EXISTS (owner: "the home skeleton is always the same even when
  * it's landing on either of the 3 tabs and none of the design of the tab match
- * the skeleton"). The route-level fallback (`app/v2/loading.tsx` → `HomeFallback`)
+ * the skeleton"). The route-level fallback (`app/v2/(home)/loading.tsx` → `HomeFallback`)
  * has to draw the SAME shape the real surface will occupy, or the hand-off is a
  * layout swap rather than content resolving into place. A hand-drawn fallback
  * diverges from the real surfaces within two design rounds — so the frame is

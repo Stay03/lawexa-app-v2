@@ -1,7 +1,11 @@
 import { HomeFallback } from '@/v2/shell/designs/HomeFallback';
 
 /**
- * Route-level loading boundary for the v2 root (`/` — the home).
+ * Route-level loading boundary for the home page — inside the `(home)` route
+ * group so the HOME's shape wraps ONLY the home. It used to sit at
+ * `app/v2/loading.tsx`, where it doubled as the fallback for every section
+ * switch and flashed the home skeleton on the way to other pages; see the
+ * skeleton-system note in `app/v2/loading.tsx`.
  *
  * Next compiles this file into the `fallback` of a real `<Suspense>` that wraps
  * `page.tsx` (and never the layout above it), so what it renders is the shape the
