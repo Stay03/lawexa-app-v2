@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { Check, Copy } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { formatTreatment, relatedToDisplay } from '@/lib/utils/related-cases';
@@ -19,12 +21,13 @@ import { formatCaseDate, toAlpha2 } from '../case-row-model';
 import {
   groupCitedCases,
   groupStatutes,
+  lawTypeLabel,
   normalizeBench,
   sentenceCase,
 } from './authorities';
 import { AuthorityList, type AuthorityItem } from './AuthorityList';
 import { CaseActions } from './CaseActions';
-import { CaseText } from './case-text';
+import { CaseText, caseTextParagraphs } from './case-text';
 import type { OutlineSection } from './CaseOutline';
 import { SectionHeading } from './SectionHeading';
 import { ViewLimitNotice } from './states';
@@ -161,8 +164,8 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
     }),
   );
 
-  const citedItems: AuthorityItem[] = groupCitedCases(detail.cited_cases ?? []).map(
-    (row) => ({
+  const citedItems: AuthorityItem[] = groupCitedCases(detail.cited_cases ?? [])
+    .map((row) => ({
       key: row.key,
       name: row.name,
       nameTitle: row.sourceTitle,
@@ -170,8 +173,12 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       href: row.href,
       searchHref: row.searchHref,
       badge: meaningfulTreatment(row.treatment),
-    }),
-  );
+    }))
+    // Rows whose treatment SAYS something (Distinguished, Overruled…) float
+    // above the fold — a verdict buried at row 40 of a folded sixty-row list
+    // is a verdict hidden. The sort is stable, so citation order holds within
+    // each band.
+    .sort((a, b) => Number(!!b.badge) - Number(!!a.badge));
 
   const citedByItems = (detail.cited_by ?? []).map(relatedToDisplay).map(toLibraryItem);
   const similarItems = (detail.similar_cases ?? [])
@@ -213,10 +220,14 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
         </h1>
 
         {detail.citation || detail.suit_no ? (
-          <p className="doc-citation">
-            {[detail.citation, detail.suit_no ? `Suit ${detail.suit_no}` : null]
-              .filter(Boolean)
-              .join(' · ')}
+          <p className="doc-citation flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {detail.citation ? <CopyCitation citation={detail.citation} /> : null}
+            {detail.citation && detail.suit_no ? (
+              <span aria-hidden className="text-muted-foreground/40">
+                ·
+              </span>
+            ) : null}
+            {detail.suit_no ? <span>Suit {detail.suit_no}</span> : null}
           </p>
         ) : null}
 
@@ -252,18 +263,7 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       {principles.length > 0 ? (
         <StructuredPrinciples principles={principles} />
       ) : detail.principles?.trim() ? (
-        <section
-          id={SECTION.principles}
-          aria-label="Legal principles"
-          className="flex scroll-mt-6 flex-col gap-3"
-        >
-          <SectionHeading label="Legal principles" />
-          <div className="doc-holding">
-            <div className="doc-prose">
-              <CaseText value={detail.principles} />
-            </div>
-          </div>
-        </section>
+        <FlatPrinciples text={detail.principles} />
       ) : null}
 
       {/* ── What happened. ──────────────────────────────────────────────── */}
@@ -325,6 +325,48 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
 function meaningfulTreatment(treatment: string | null) {
   if (!treatment || treatment === 'referred_to') return null;
   return formatTreatment(treatment);
+}
+
+/**
+ * The citation line as a one-click copy — the string a lawyer retypes into
+ * every brief. The confirmation lives IN the control (icon flips to a check
+ * for two seconds), the same rule as the Share action's "Link copied".
+ * Clipboard denial fails silent: the text is still selectable.
+ */
+function CopyCitation({ citation }: { citation: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(citation);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // No clipboard permission — nothing to report, the text selects fine.
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      aria-label={copied ? 'Citation copied' : 'Copy the citation'}
+      className={cn(
+        'v2-interactive group/copy inline-flex items-center gap-1.5 rounded-md py-0.5 text-left transition-colors hover:text-foreground',
+        FOCUS_RING,
+      )}
+    >
+      {citation}
+      {copied ? (
+        <Check aria-hidden className="size-3.5 shrink-0 text-primary" />
+      ) : (
+        <Copy
+          aria-hidden
+          className="size-3.5 shrink-0 text-muted-foreground/40 transition-colors group-hover/copy:text-muted-foreground"
+        />
+      )}
+    </button>
+  );
 }
 
 /** Map a library case (cited_by / similar — always linked) to the row model. */
@@ -462,21 +504,86 @@ function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] })
       />
       <ol className="flex flex-col gap-7">
         {principles.map((principle, index) => (
-          <li
-            key={principle.id}
-            className="grid grid-cols-[2.5rem_minmax(0,1fr)]"
-          >
-            <span aria-hidden className="doc-principle-num">
-              {String(index + 1).padStart(2, '0')}
-            </span>
+          <NumberedPrinciple key={principle.id} index={index}>
             <div className="doc-prose">
               <CaseText value={principle.principle} />
             </div>
             <PrincipleCaption principle={principle} />
-          </li>
+          </NumberedPrinciple>
         ))}
       </ol>
     </section>
+  );
+}
+
+/**
+ * The pre-enrichment fallback: a case whose principles are ONE flat editorial
+ * string. Measured on live rows the field comes in two shapes, and each gets
+ * its own rendering:
+ *
+ *   several blank-line paragraphs  = one principle per paragraph (Mustapha v
+ *                                    Abubakar ships five) → the SAME numbered
+ *                                    entries as the structured list, minus the
+ *                                    captions no metadata exists for;
+ *   one continuous passage         = nothing to number (a lone "01" would be
+ *                                    decoration) → the gold-rule block.
+ *
+ * So an unenriched case reads like an enriched one, and the day its
+ * enrichment lands the page's shape barely moves.
+ */
+function FlatPrinciples({ text }: { text: string }) {
+  const paragraphs = caseTextParagraphs(text);
+  if (paragraphs.length === 0) return null;
+
+  return (
+    <section
+      id={SECTION.principles}
+      aria-label="Legal principles"
+      className="flex scroll-mt-6 flex-col gap-3"
+    >
+      {paragraphs.length === 1 ? (
+        <>
+          <SectionHeading label="Legal principles" />
+          <div className="doc-holding">
+            <div className="doc-prose">
+              <CaseText value={paragraphs[0]} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <SectionHeading label="Legal principles" count={paragraphs.length} />
+          <ol className="flex flex-col gap-7">
+            {paragraphs.map((paragraph, index) => (
+              <NumberedPrinciple key={index} index={index}>
+                <div className="doc-prose">
+                  <CaseText value={paragraph} />
+                </div>
+              </NumberedPrinciple>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** One numbered holding — the hanging gold numeral beside the law. One
+ *  component, so the structured list and the flat fallback cannot drift. */
+function NumberedPrinciple({
+  index,
+  children,
+}: {
+  index: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <li className="grid grid-cols-[2.5rem_minmax(0,1fr)]">
+      <span aria-hidden className="doc-principle-num">
+        {String(index + 1).padStart(2, '0')}
+      </span>
+      {children}
+    </li>
   );
 }
 
@@ -496,6 +603,10 @@ function PrincipleCaption({ principle }: { principle: ReportPrinciple }) {
         </span>
       ),
     );
+  }
+  const lawType = lawTypeLabel(principle.law_type);
+  if (lawType) {
+    parts.push(<span key="law">{lawType}</span>);
   }
   if (principle.tag) {
     parts.push(<span key="tag">{sentenceCase(principle.tag)}</span>);

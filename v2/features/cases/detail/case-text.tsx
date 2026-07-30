@@ -63,8 +63,14 @@ function htmlToPlainText(value: string): string {
     .replace(/\n{3,}/g, '\n\n');
 }
 
-/** Split into paragraphs on blank lines, dropping empties. */
-function toParagraphs(value: string): string[] {
+/**
+ * Split into paragraphs on blank lines, dropping empties — exported because
+ * the flat `principles` fallback needs the SAME split to decide whether the
+ * field holds one passage or a paragraph-per-principle list (measured on live
+ * data: Mustapha v Abubakar's flat field is five blank-line paragraphs, one
+ * principle each). Legacy HTML degrades before splitting, same as rendering.
+ */
+export function caseTextParagraphs(value: string): string[] {
   const source = LOOKS_LIKE_HTML.test(value) ? htmlToPlainText(value) : value;
   return source
     .split(/\r?\n\s*\r?\n/)
@@ -81,7 +87,7 @@ function toParagraphs(value: string): string[] {
  * indentation that survives a copy-paste out of a PDF.
  */
 export function CaseText({ value }: { value: string }) {
-  const paragraphs = toParagraphs(value);
+  const paragraphs = caseTextParagraphs(value);
   if (paragraphs.length === 0) return null;
 
   return (

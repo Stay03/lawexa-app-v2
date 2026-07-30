@@ -371,3 +371,26 @@ export function normalizeBench(
 export function sentenceCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
+
+/** The `law_type` classifications, known by contract. */
+const LAW_TYPES: Record<string, string> = {
+  substantive: 'Substantive',
+  procedural: 'Procedural',
+};
+
+/**
+ * Label a principle's `law_type` array — "Substantive law", "Procedural law",
+ * or "Substantive & procedural law" when a principle is both (the contract
+ * allows it). The " law" suffix only attaches when every value is a known
+ * classification; an unknown future value renders sentence-cased as-is rather
+ * than gaining a suffix that may not fit it.
+ */
+export function lawTypeLabel(values: readonly string[] | null | undefined): string | null {
+  if (!values || values.length === 0) return null;
+  const allKnown = values.every((value) => LAW_TYPES[value] !== undefined);
+  const labels = values.map((value, index) => {
+    const label = LAW_TYPES[value] ?? sentenceCase(value);
+    return index === 0 ? label : label.toLowerCase();
+  });
+  return labels.join(' & ') + (allKnown ? ' law' : '');
+}
