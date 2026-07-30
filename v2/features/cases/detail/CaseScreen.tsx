@@ -1,15 +1,17 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
 import { extractViewLimitError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { pushUrlParams, replaceUrlParams } from '@/v2/runtime/url-params';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
 import { CaseAskDock } from './CaseAsk';
+import { CaseChatSurface } from './CaseChatPanel';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
 import { ReadingProgress } from './ReadingProgress';
@@ -53,6 +55,26 @@ function CaseBody({ slug }: { slug: string }) {
   const { signedIn, userId } = useV2Session();
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get('q')?.trim() || undefined;
+
+  // ── The side chat's URL state: `?chat={id}`. ──
+  // OPEN is a PUSH (a new history entry), so the back button closes the panel
+  // and returns to the reading — the navigation the owner asked for. CLOSE
+  // prefers `history.back()` when this session pushed the entry (keeping
+  // history clean); a direct load of a `?chat=` link has no entry of ours to
+  // pop, so the X strips the param in place instead of leaving the page.
+  const chatId = searchParams.get('chat');
+  const chatPushedRef = useRef(false);
+  const openChat = useCallback((id: string) => {
+    if (pushUrlParams({ chat: id })) chatPushedRef.current = true;
+  }, []);
+  const closeChat = useCallback(() => {
+    if (chatPushedRef.current) {
+      chatPushedRef.current = false;
+      window.history.back();
+    } else {
+      replaceUrlParams({ chat: null });
+    }
+  }, []);
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
@@ -106,28 +128,45 @@ function CaseBody({ slug }: { slug: string }) {
   const outline = buildCaseOutline(detail);
 
   return (
-    // The tall column the sticky dock needs: the document is the flow; the
-    // pill dock is pinned to the bottom edge and floats over the reading.
-    // `.v2-case-doc` scopes the reading typography (case-document.css).
-    // `relative` anchors the outline rail beside the column.
-    <div className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
-      <ReadingProgress />
-      <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-        <CaseDocument detail={detail} />
+    // With the side chat open (≥lg) this is a row: the reading column centres
+    // itself in the remaining space (auto margins in flex), the panel takes a
+    // fixed 26rem on the right. Closed, it is exactly the old layout.
+    <div className="flex min-h-full w-full">
+      {/* The tall column the sticky dock needs: the document is the flow; the
+          pill dock is pinned to the bottom edge and floats over the reading.
+          `.v2-case-doc` scopes the reading typography (case-document.css).
+          `relative` anchors the outline rail beside the column. */}
+      <div className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
+        <ReadingProgress />
+        <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+          <CaseDocument detail={detail} />
+        </div>
+        {/* The map, only when the document is long enough to need one (four or
+            more parts), only where the shell has true dead margin beside the
+            column (≥80rem: the shell is a single full-width scroll region, so
+            a 1280px viewport leaves 256px clear per side — the rail needs
+            216px), and only while the chat is CLOSED — open, that margin is
+            the panel's. */}
+        {outline.length >= 4 && !chatId ? (
+          <aside className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block">
+            <div className="sticky top-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+              <CaseOutline sections={outline} />
+            </div>
+          </aside>
+        ) : null}
+        {/* The ask pill yields while the chat is open — the panel carries the
+            composer, and two competing inputs is one too many. */}
+        {!chatId ? (
+          <CaseAskDock
+            slug={slug}
+            signedIn={signedIn}
+            viewerId={userId}
+            onOpenChat={openChat}
+          />
+        ) : null}
       </div>
-      {/* The map, only when the document is long enough to need one (four or
-          more parts) and only where the shell has true dead margin beside the
-          column (≥80rem: the shell is a single full-width scroll region, so a
-          1280px viewport leaves 256px clear per side — the rail needs 216px).
-          It must never compete with the reading measure. */}
-      {outline.length >= 4 ? (
-        <aside className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block">
-          <div className="sticky top-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-            <CaseOutline sections={outline} />
-          </div>
-        </aside>
-      ) : null}
-      <CaseAskDock slug={slug} signedIn={signedIn} viewerId={userId} />
+
+      <CaseChatSurface chatId={chatId} onClose={closeChat} />
     </div>
   );
 }

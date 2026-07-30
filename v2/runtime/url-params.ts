@@ -70,3 +70,38 @@ export function replaceUrlParams(
   );
   return true;
 }
+
+/**
+ * The PUSH twin of `replaceUrlParams` — same guarded merge, same load-bearing
+ * `null` state argument, but it ADDS a history entry. For state a user expects
+ * the back button to undo: opening the case page's side chat pushes
+ * `?chat={id}`, so Back closes the panel instead of leaving the page.
+ */
+export function pushUrlParams(updates: Record<string, string | null>): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const params = new URLSearchParams(window.location.search);
+  let changed = false;
+
+  for (const [key, value] of Object.entries(updates)) {
+    const next = value ?? '';
+    const current = params.get(key) ?? '';
+    if (current === next) continue;
+    if (next) params.set(key, next);
+    else params.delete(key);
+    changed = true;
+  }
+
+  if (!changed) return false;
+
+  const queryString = params.toString();
+  window.history.pushState(
+    // MUST be null — see the docblock. Never `window.history.state`.
+    null,
+    '',
+    queryString
+      ? `${window.location.pathname}?${queryString}`
+      : window.location.pathname,
+  );
+  return true;
+}

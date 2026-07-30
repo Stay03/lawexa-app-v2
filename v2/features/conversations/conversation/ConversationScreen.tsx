@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Eye, ShieldCheck } from 'lucide-react';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { useConversationController } from './useConversationController';
+import {
+  useConversationController,
+  type ConversationEmbed,
+} from './useConversationController';
 import { MessageList } from './MessageList';
 import { ConversationComposer } from './ConversationComposer';
 import { ComposerSkeleton } from './skeletons';
@@ -58,9 +61,17 @@ import { V2ChatProvider } from './chat-context';
  * still means "not the owner" — the strictly safe direction. The backend remains the
  * real authority: the transcript fetch is authorized independently and 401s on its own.
  */
-export function ConversationScreen({ conversationId }: { conversationId: string }) {
+export function ConversationScreen({
+  conversationId,
+  embed,
+}: {
+  conversationId: string;
+  /** Present when this screen lives inside another route (the case page's
+   *  side chat) — see `ConversationEmbed` on the controller. */
+  embed?: ConversationEmbed;
+}) {
   const { userId: serverUserId } = useV2Session();
-  const controller = useConversationController(conversationId, serverUserId);
+  const controller = useConversationController(conversationId, serverUserId, embed);
   const { stream } = controller;
   const {
     messages,

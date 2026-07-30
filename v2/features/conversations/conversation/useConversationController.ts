@@ -202,10 +202,33 @@ export interface ConversationController {
   deleteConfidential: () => Promise<void>;
 }
 
+/**
+ * Embedded mode (the case page's side chat). The controller is route-shaped by
+ * default — it publishes the shell header, rewrites the URL when consuming the
+ * create handoff, and navigates home after a confidential delete. Embedded in
+ * ANOTHER route's page, all three would trample the host: the case's header
+ * title, the case's `?chat=` URL, and the reader's place. `embed` suppresses
+ * them and delegates "this conversation is gone" to the host (which closes the
+ * panel). Everything else — engine, privacy resolvers, recovery — is identical.
+ */
+export interface ConversationEmbed {
+  /** Called instead of the home navigation when the conversation is deleted. */
+  onDeleted: () => void;
+}
+
 export function useConversationController(
   conversationId: string,
   serverUserId: number | null,
+  embed?: ConversationEmbed,
 ): ConversationController {
+  const embedded = embed !== undefined;
+  // The callback rides a ref so a host re-render can never churn the delete
+  // callback's identity (and the mount flow's) through a changed prop.
+  const embedRef = useRef(embed);
+  useEffect(() => {
+    embedRef.current = embed;
+  });
+
   const [localOwnerId, setLocalOwnerId] = useState<number | null>(null);
   const [jurisdiction, setJurisdictionState] = useState<JurisdictionChoice>({ mode: 'auto' });
   const [narration, setNarration] = useState<string | null>(null);
@@ -358,8 +381,10 @@ export function useConversationController(
       // creator is the owner (server-verified id threaded from the page).
       connectToStream(executionId, message, attachments);
       if (serverUserId != null) setLocalOwnerId(serverUserId);
-      // Drop the ?init=1 marker so a manual reload takes the recovery path.
-      if (typeof window !== 'undefined') {
+      // Drop the ?init=1 marker so a manual reload takes the recovery path —
+      // unless embedded, where the URL is the HOST's (`/cases/…?chat=…`, no
+      // init marker to drop) and rewriting it would hijack the reader's page.
+      if (!embedded && typeof window !== 'undefined') {
         window.history.replaceState({}, '', `/c/${conversationId}`);
       }
       return () => {
@@ -449,6 +474,7 @@ export function useConversationController(
     setConversationId,
     setError,
     recoverPendingState,
+    embedded,
   ]);
 
   // ── Bind a NEW confidential transcript to its creator. ──
@@ -506,11 +532,14 @@ export function useConversationController(
   // breadcrumb does. This is an external-store write (not React setState), so it is
   // React-Compiler-clean in an effect.
   useEffect(() => {
+    // Embedded, the header belongs to the HOST route (the case's title) —
+    // publishing here would clobber it.
+    if (embedded) return;
     setHeaderContext({
       title: conversationTitle ? stripPastedTags(conversationTitle) : null,
       confidential: isConfidential,
     });
-  }, [conversationTitle, isConfidential]);
+  }, [conversationTitle, isConfidential, embedded]);
 
   // ── Title upgrade → sidebar, no list refetch (wave-4 acceptance c). ──
   // When this conversation's title resolves or upgrades (the async AI-name generation,
@@ -529,10 +558,14 @@ export function useConversationController(
     }
   }, [conversationTitle, isConfidential, conversationId, queryClient]);
 
-  // Clear on unmount only (a separate empty-dep effect, so a title/flag change
+  // Clear on unmount only (a separate effect, so a title/flag change
   // republishes without a transient empty flash), so the next route never inherits
-  // this conversation's context.
-  useEffect(() => () => clearHeaderContext(), []);
+  // this conversation's context. Embedded, nothing was published — and clearing
+  // would wipe the HOST's title the moment the panel closes.
+  useEffect(() => {
+    if (embedded) return;
+    return () => clearHeaderContext();
+  }, [embedded]);
 
   // ── Title arrival for the fresh-create handoff (mirrors v1 first-hand). ──
   // A brand-new conversation reaches the screen via the streaming handoff with NO
@@ -620,6 +653,13 @@ export function useConversationController(
     queryClient.removeQueries({
       queryKey: [...conversationsQueries.details(), conversationId],
     });
+    // Route-shaped: drop the header and go home. Embedded: the host owns both
+    // the header and the URL — just tell it the conversation is gone.
+    const embedHandlers = embedRef.current;
+    if (embedHandlers) {
+      embedHandlers.onDeleted();
+      return;
+    }
     clearHeaderContext();
     router.push('/');
   }, [disconnect, conversationId, queryClient, router]);

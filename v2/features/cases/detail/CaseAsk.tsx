@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUp, Loader2, MessageSquare } from 'lucide-react';
@@ -61,10 +60,13 @@ export function CaseAskDock({
   slug,
   signedIn,
   viewerId,
+  onOpenChat,
 }: {
   slug: string;
   signedIn: boolean;
   viewerId: number | null;
+  /** Open a conversation in the case page's side chat (`?chat={id}`). */
+  onOpenChat: (conversationId: string) => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -129,12 +131,18 @@ export function CaseAskDock({
         { queryClient },
       );
       setDraft('');
-      router.push(
-        result.status === 'existing'
-          ? `/c/${result.conversationId}`
-          : `/c/${result.conversationId}?init=1`,
-      );
-      // Keep `isSubmitting` true through navigation — no double-submit window.
+      // Refresh "your chats about this case" so the new thread is in the hub
+      // the next time it opens (the queries doc: explicit invalidation here).
+      void queryClient.invalidateQueries({
+        queryKey: [...casesQueries.all, 'conversations', slug],
+      });
+      // Open the SIDE CHAT rather than leaving the judgment (owner: "check
+      // while still on the page"). The embedded controller consumes the same
+      // `conv_init` handoff `startConversation` just wrote, so the stream
+      // attaches inside the panel. Opening unmounts this dock — the panel
+      // carries the composer from here.
+      onOpenChat(result.conversationId);
+      // Keep `isSubmitting` true through the swap — no double-submit window.
     } catch (err) {
       setError(extractApiError(err).message);
       setIsSubmitting(false);
@@ -168,7 +176,13 @@ export function CaseAskDock({
                 expanded ? 'opacity-100' : 'opacity-0',
               )}
             >
-              {signedIn ? <RecentCaseChats slug={slug} viewerId={viewerId} /> : null}
+              {signedIn ? (
+                <RecentCaseChats
+                  slug={slug}
+                  viewerId={viewerId}
+                  onOpenChat={onOpenChat}
+                />
+              ) : null}
 
               <div className="flex flex-col gap-1.5">
                 <p className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
@@ -265,9 +279,18 @@ export function CaseAskDock({
  * The reader's recent threads about this case, inside the hub. Owner-scoped on
  * the server and viewer-partitioned in the cache; renders nothing when there
  * are none (the hub's openers already say what to do) and fails quiet — the
- * threads are still reachable from /conversations.
+ * threads are still reachable from /conversations. Rows open the SIDE CHAT
+ * (buttons, not links): resuming a thread about the case keeps the case.
  */
-function RecentCaseChats({ slug, viewerId }: { slug: string; viewerId: number | null }) {
+function RecentCaseChats({
+  slug,
+  viewerId,
+  onOpenChat,
+}: {
+  slug: string;
+  viewerId: number | null;
+  onOpenChat: (conversationId: string) => void;
+}) {
   const query = useQuery(casesQueries.conversations(slug, { viewerId }));
   const [now] = useState(() => Date.now());
   const rows = (query.data?.data ?? []).slice(0, 3);
@@ -290,10 +313,11 @@ function RecentCaseChats({ slug, viewerId }: { slug: string; viewerId: number | 
       <ul className="flex flex-col">
         {rows.map((row) => (
           <li key={row.id}>
-            <Link
-              href={`/c/${row.id}`}
+            <button
+              type="button"
+              onClick={() => onOpenChat(row.id)}
               className={cn(
-                'v2-interactive flex min-h-9 items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-secondary/60',
+                'v2-interactive flex w-full min-h-9 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition-colors hover:bg-secondary/60',
                 FOCUS_RING,
               )}
             >
@@ -307,7 +331,7 @@ function RecentCaseChats({ slug, viewerId }: { slug: string; viewerId: number | 
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
                 {formatRelativeTime(row.updated_at, now)}
               </span>
-            </Link>
+            </button>
           </li>
         ))}
       </ul>
