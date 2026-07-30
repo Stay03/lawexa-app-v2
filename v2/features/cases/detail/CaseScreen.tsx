@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
@@ -11,10 +11,14 @@ import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context'
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
 import { CaseAskDock } from './CaseAsk';
-import { CaseChatSurface } from './CaseChatPanel';
+import { CaseChatDocked, CaseChatFloating, CaseChatSheet } from './CaseChatPanel';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
 import { ReadingProgress } from './ReadingProgress';
+import { usePanelBreakpoint } from './use-panel-breakpoint';
+
+/** The reader's docked-vs-floating chat preference, remembered per device. */
+const DOCK_PREF_KEY = 'v2-case-chat-docked';
 import {
   CASE_COLUMN,
   CaseDocumentSkeleton,
@@ -82,6 +86,37 @@ function CaseBody({ slug }: { slug: string }) {
     replaceUrlParams({ chat: id });
   }, []);
 
+  // ── Presence holdover: every chat presentation animates OUT before its
+  // unmount (200ms). The render-phase adopt of a new id is the sanctioned
+  // adjust-during-render reset. ──
+  const [renderedChat, setRenderedChat] = useState(chatId);
+  if (chatId !== null && chatId !== renderedChat) setRenderedChat(chatId);
+  const chatClosing = chatId === null && renderedChat !== null;
+  useEffect(() => {
+    if (!chatClosing) return;
+    const timer = window.setTimeout(() => setRenderedChat(null), 200);
+    return () => window.clearTimeout(timer);
+  }, [chatClosing]);
+
+  // Which presentation: sheet below xl; floating card (default) or the docked
+  // column (the reader's persisted choice) at xl. A JS decision, not a CSS
+  // one — exactly ONE container may mount, or one conversation would run two
+  // live controllers.
+  const isDesktopPanel = usePanelBreakpoint();
+  const [docked, setDocked] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.localStorage.getItem(DOCK_PREF_KEY) === '1',
+  );
+  const setDockedPref = useCallback((next: boolean) => {
+    setDocked(next);
+    try {
+      window.localStorage.setItem(DOCK_PREF_KEY, next ? '1' : '0');
+    } catch {
+      // Preference only — losing it costs a click, never the chat.
+    }
+  }, []);
+
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
   // The header centre gets the SHORT title (the July contract ships one —
@@ -133,6 +168,10 @@ function CaseBody({ slug }: { slug: string }) {
 
   const outline = buildCaseOutline(detail);
 
+  const showFloating = renderedChat !== null && isDesktopPanel === true && !docked;
+  const showDocked = renderedChat !== null && isDesktopPanel === true && docked;
+  const showSheet = renderedChat !== null && isDesktopPanel === false;
+
   return (
     // With the side chat open (≥xl) this is a row: the reading column centres
     // itself in the remaining space (auto margins in flex), the panel takes a
@@ -154,16 +193,17 @@ function CaseBody({ slug }: { slug: string }) {
             more parts), only where the shell has true dead margin beside the
             column (≥80rem: the shell is a single full-width scroll region, so
             a 1280px viewport leaves 256px clear per side — the rail needs
-            216px), and only while the chat is CLOSED — open, that margin is
-            the panel's. */}
-        {outline.length >= 4 && !chatId ? (
+            216px), and not while the DOCKED chat holds that margin — the
+            floating card leaves the page's geometry alone, so the rail
+            stays. */}
+        {outline.length >= 4 && !showDocked ? (
           <aside className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block">
             <div className="sticky top-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
               <CaseOutline sections={outline} />
             </div>
           </aside>
         ) : null}
-        {/* The ask pill yields while the chat is open — the panel carries the
+        {/* The ask pill yields while the chat is open — the chat carries the
             composer, and two competing inputs is one too many. */}
         {!chatId ? (
           <CaseAskDock
@@ -173,16 +213,45 @@ function CaseBody({ slug }: { slug: string }) {
             onOpenChat={openChat}
           />
         ) : null}
+
+        {/* The floating card lives in the pill's slot, INSIDE the column. */}
+        {showFloating && renderedChat !== null ? (
+          <CaseChatFloating
+            chatId={renderedChat}
+            closing={chatClosing}
+            slug={slug}
+            signedIn={signedIn}
+            viewerId={userId}
+            onClose={closeChat}
+            onSwitchChat={switchChat}
+            onDock={() => setDockedPref(true)}
+          />
+        ) : null}
       </div>
 
-      <CaseChatSurface
-        chatId={chatId}
-        slug={slug}
-        signedIn={signedIn}
-        viewerId={userId}
-        onClose={closeChat}
-        onSwitchChat={switchChat}
-      />
+      {showDocked && renderedChat !== null ? (
+        <CaseChatDocked
+          chatId={renderedChat}
+          closing={chatClosing}
+          slug={slug}
+          signedIn={signedIn}
+          viewerId={userId}
+          onClose={closeChat}
+          onSwitchChat={switchChat}
+          onFloat={() => setDockedPref(false)}
+        />
+      ) : null}
+      {showSheet && renderedChat !== null ? (
+        <CaseChatSheet
+          chatId={renderedChat}
+          closing={chatClosing}
+          slug={slug}
+          signedIn={signedIn}
+          viewerId={userId}
+          onClose={closeChat}
+          onSwitchChat={switchChat}
+        />
+      ) : null}
     </div>
   );
 }

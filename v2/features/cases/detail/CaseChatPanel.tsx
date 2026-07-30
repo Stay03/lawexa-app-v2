@@ -1,8 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowUp, Loader2, Maximize2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowUp,
+  Loader2,
+  Maximize2,
+  PanelRight,
+  PanelRightClose,
+  X,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,165 +26,236 @@ import { ConversationScreen } from '@/v2/features/conversations/conversation/Con
 import { CASE_PROMPTS, RecentCaseChats, useStartCaseChat } from './CaseAsk';
 
 /**
- * CaseChatSurface — the case page's side chat: the REAL conversation screen
- * (engine, privacy resolvers, streaming, composer — the whole thing) docked
- * BESIDE the judgment, so reading and asking are one activity.
+ * The case page's chat, in its three presentations — one shared body
+ * (`CaseChatBody`), one mounted at a time (two would mean two live
+ * controllers on one conversation):
  *
- * ── TWO VIEWS, ONE URL PARAM ────────────────────────────────────────────────
- * `?chat={conversationId}` shows that conversation; `?chat=new` shows the
- * NEW-CHAT view — the reader's threads about this case, the openers, the
- * jurisdiction chip, and a composer. The bar's back arrow (owner, July 30:
- * "there is no back so I can see the list of conversations") returns from a
- * conversation to that view. In-panel navigation REPLACES the URL, so the
- * whole panel is ONE history entry: the browser's Back always closes it and
- * returns to the reading, never walks the panel's internal hops.
+ *   SHEET     below xl. A bottom sheet at ~65% of the viewport over a scrim —
+ *             the judgment stays visible, dimmed, behind it (owner, July 30:
+ *             "just like 60% and some of the page show"), and tapping the
+ *             scrim closes. Rides `--keyboard-inset`.
+ *   FLOATING  ≥xl, the default. The chat lives IN THE CARD above where the
+ *             pill sits (owner: "chat and all that inside that popup above
+ *             the textarea") — the reading keeps its full width. The bar's
+ *             panel icon docks it.
+ *   DOCKED    ≥xl after the reader chooses the sidebar. The in-flow 26rem
+ *             column with the clipped width reveal; the bar's icon floats it
+ *             back. The choice persists (localStorage) so the chat reopens
+ *             the way this reader likes it.
  *
- * ── ONE MOUNT ACROSS BREAKPOINTS ────────────────────────────────────────────
- * Desktop (≥xl — below that the sidebar + panel would squeeze the judgment to
- * ~350px) is an in-flow side column; narrower is a full overlay under the
- * h-14 header, its bottom riding `--keyboard-inset`. ONE responsive element,
- * never two: two would mean two live controllers on one conversation.
+ * Every presentation is an ELEVATED LAYER, visibly apart from the page:
+ * `bg-popover` (a step lighter than the page in dark mode), a border, and a
+ * directional shadow — the demarcation the owner asked for.
  *
- * ── PRESENCE, WITHOUT A HORIZONTAL SCROLLBAR ────────────────────────────────
- * The desktop panel animates its WIDTH (0 ⇄ 26rem, keyframes in
- * case-document.css) behind `overflow-x-clip`, so nothing ever extends past
- * the viewport edge — the first cut slid a translated panel in from outside
- * and flashed a horizontal scrollbar (owner). Width animation also moves the
- * reading column CONTINUOUSLY as the flex layout re-centres each frame,
- * instead of snapping. `overflow-x-clip`, not `overflow-hidden`: clip is not
- * a scroll container, so the inner `sticky` keeps working against the shell
- * scroller. Mobile keeps the slide-up sheet. Exit mirrors entry (200ms held
- * before unmount); the render-phase adopt of a new id is the sanctioned
- * adjust-during-render reset.
+ * URL semantics are the host's (`CaseScreen`): `?chat={id}` / `?chat=new`,
+ * pushed once so Back closes, in-panel hops replacing.
  */
-export function CaseChatSurface({
+
+interface CaseChatCommonProps {
+  chatId: string;
+  closing: boolean;
+  slug: string;
+  signedIn: boolean;
+  viewerId: number | null;
+  onClose: () => void;
+  onSwitchChat: (chatId: string) => void;
+}
+
+/* ── Sheet (below xl) ────────────────────────────────────────────────────── */
+
+export function CaseChatSheet(props: CaseChatCommonProps) {
+  const state = props.closing ? 'closed' : 'open';
+  return (
+    <>
+      {/* The scrim — the page stays visible behind the sheet, dimmed. A tap
+          on it closes, the standard sheet contract. */}
+      <div
+        aria-hidden
+        data-state={state}
+        onClick={props.onClose}
+        className={cn(
+          'fixed inset-0 z-30 bg-black/50',
+          'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200',
+        )}
+      />
+      <aside
+        aria-label="Chat about this case"
+        data-state={state}
+        className={cn(
+          'fixed inset-x-0 z-40 flex h-[65dvh] min-h-80 flex-col overflow-hidden rounded-t-2xl border-t border-border/60 bg-popover shadow-[0_-24px_60px_-24px_rgba(0,0,0,0.65)]',
+          'motion-safe:animate-in motion-safe:slide-in-from-bottom-full motion-safe:duration-300',
+          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-full data-[state=closed]:motion-safe:duration-200',
+        )}
+        style={{ bottom: 'var(--keyboard-inset, 0px)' }}
+      >
+        <CaseChatBody {...props} mode="sheet" />
+      </aside>
+    </>
+  );
+}
+
+/* ── Floating card (≥xl, the default) ────────────────────────────────────── */
+
+export function CaseChatFloating({
+  onDock,
+  ...props
+}: CaseChatCommonProps & { onDock: () => void }) {
+  return (
+    <div
+      data-state={props.closing ? 'closed' : 'open'}
+      className={cn(
+        // The dock pill's slot: bottom of the reading column, floating over
+        // the text.
+        'sticky bottom-3 z-20 mx-auto mt-auto w-full max-w-[26rem]',
+        'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300',
+        'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:slide-out-to-bottom-4 data-[state=closed]:motion-safe:duration-200',
+      )}
+    >
+      <aside
+        aria-label="Chat about this case"
+        className="flex h-[min(34rem,calc(100dvh-8rem))] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-[0_28px_70px_-28px_rgba(0,0,0,0.75)]"
+      >
+        <CaseChatBody {...props} mode="floating" onDock={onDock} />
+      </aside>
+    </div>
+  );
+}
+
+/* ── Docked column (≥xl, by choice) ──────────────────────────────────────── */
+
+export function CaseChatDocked({
+  onFloat,
+  ...props
+}: CaseChatCommonProps & { onFloat: () => void }) {
+  return (
+    <aside
+      aria-label="Chat about this case"
+      data-state={props.closing ? 'closed' : 'open'}
+      className={cn(
+        'w-[26rem] shrink-0 overflow-x-clip border-l border-border/60 bg-popover shadow-[-24px_0_50px_-30px_rgba(0,0,0,0.55)]',
+        // The clipped width reveal — no translate past the viewport edge, so
+        // no horizontal scrollbar; the reading column re-centres continuously.
+        'motion-safe:animate-[v2-case-chat-open_280ms_cubic-bezier(0.32,0.72,0,1)]',
+        'data-[state=closed]:motion-safe:animate-[v2-case-chat-close_200ms_ease-in_forwards]',
+      )}
+    >
+      <div className="sticky top-0 flex h-[calc(100dvh-3.5rem)] w-[26rem] flex-col">
+        <CaseChatBody {...props} mode="docked" onFloat={onFloat} />
+      </div>
+    </aside>
+  );
+}
+
+/* ── The shared body: bar + views ────────────────────────────────────────── */
+
+const BAR_BUTTON =
+  'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
+
+function CaseChatBody({
   chatId,
   slug,
   signedIn,
   viewerId,
   onClose,
   onSwitchChat,
-}: {
-  chatId: string | null;
-  slug: string;
-  signedIn: boolean;
-  viewerId: number | null;
-  onClose: () => void;
-  /** In-panel navigation: REPLACES `?chat=` (one history entry per panel). */
-  onSwitchChat: (chatId: string) => void;
+  mode,
+  onDock,
+  onFloat,
+}: CaseChatCommonProps & {
+  mode: 'sheet' | 'floating' | 'docked';
+  onDock?: () => void;
+  onFloat?: () => void;
 }) {
-  const [rendered, setRendered] = useState(chatId);
-  if (chatId !== null && chatId !== rendered) setRendered(chatId);
-  const closing = chatId === null && rendered !== null;
-
-  useEffect(() => {
-    if (!closing) return;
-    const timer = window.setTimeout(() => setRendered(null), 200);
-    return () => window.clearTimeout(timer);
-  }, [closing]);
-
-  if (rendered === null) return null;
-
-  const isNew = rendered === 'new';
+  const isNew = chatId === 'new';
 
   return (
-    <aside
-      aria-label="Chat about this case"
-      data-state={closing ? 'closed' : 'open'}
-      className={cn(
-        // Mobile: a full overlay under the shell header, riding the keyboard
-        // inset. Desktop: the in-flow right column beside the judgment.
-        'fixed inset-x-0 top-14 z-40 bg-background',
-        'xl:static xl:inset-auto xl:z-auto xl:w-[26rem] xl:shrink-0 xl:overflow-x-clip xl:border-l xl:border-border/60',
-        // Mobile enter/exit: the slide-up sheet, mirrored out.
-        'max-xl:motion-safe:animate-in max-xl:motion-safe:fade-in max-xl:motion-safe:slide-in-from-bottom-8 max-xl:motion-safe:duration-300',
-        'data-[state=closed]:max-xl:motion-safe:animate-out data-[state=closed]:max-xl:motion-safe:fade-out data-[state=closed]:max-xl:motion-safe:slide-out-to-bottom-8 data-[state=closed]:max-xl:motion-safe:duration-200',
-        // Desktop enter/exit: the clipped width reveal (no translate, no
-        // scrollbar), eased like a drawer.
-        'xl:motion-safe:animate-[v2-case-chat-open_280ms_cubic-bezier(0.32,0.72,0,1)]',
-        'data-[state=closed]:xl:motion-safe:animate-[v2-case-chat-close_200ms_ease-in_forwards]',
-      )}
-      style={{ bottom: 'var(--keyboard-inset, 0px)' }}
-    >
-      <div className="h-full xl:sticky xl:top-0 xl:h-[calc(100dvh-3.5rem)] xl:w-[26rem]">
-        <div className="flex h-full min-h-0 flex-col">
-          {/* ── The panel bar: back · label · expand · close. ── */}
-          <div className="flex min-h-12 shrink-0 items-center gap-1 border-b border-border/60 px-2">
-            {isNew ? (
-              <span aria-hidden className="size-8" />
-            ) : (
-              <button
-                type="button"
-                onClick={() => onSwitchChat('new')}
-                aria-label="Back to your chats about this case"
-                className={cn(
-                  'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-                  FOCUS_RING,
-                )}
-              >
-                <ArrowLeft aria-hidden className="size-4" />
-              </button>
-            )}
-            <p className="flex-1 truncate px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-              Chat · this case
-            </p>
-            {!isNew ? (
-              <Link
-                href={`/c/${rendered}`}
-                aria-label="Open this chat in full"
-                title="Open in full"
-                className={cn(
-                  'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-                  FOCUS_RING,
-                )}
-              >
-                <Maximize2 aria-hidden className="size-4" />
-              </Link>
-            ) : null}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close the chat"
-              className={cn(
-                'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-                FOCUS_RING,
-              )}
-            >
-              <X aria-hidden className="size-4" />
-            </button>
-          </div>
-
-          {/* Keyed by view so list ⇄ conversation swaps ease in rather than
-              snapping. */}
-          <div
-            key={isNew ? 'new' : rendered}
-            className="min-h-0 flex-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+    <div className="flex h-full min-h-0 flex-col">
+      {/* ── The bar: back · label · dock-toggle · expand · close. ── */}
+      <div className="flex min-h-12 shrink-0 items-center gap-1 border-b border-border/60 px-2">
+        {isNew ? (
+          <span aria-hidden className="size-8" />
+        ) : (
+          <button
+            type="button"
+            onClick={() => onSwitchChat('new')}
+            aria-label="Back to your chats about this case"
+            className={cn(BAR_BUTTON, FOCUS_RING)}
           >
-            {isNew ? (
-              <CaseChatNew
-                slug={slug}
-                signedIn={signedIn}
-                viewerId={viewerId}
-                onSwitchChat={onSwitchChat}
-              />
-            ) : (
-              <ConversationScreen
-                conversationId={rendered}
-                embed={{ onDeleted: onClose }}
-              />
-            )}
-          </div>
-        </div>
+            <ArrowLeft aria-hidden className="size-4" />
+          </button>
+        )}
+        <p className="flex-1 truncate px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+          Chat · this case
+        </p>
+        {mode === 'floating' && onDock ? (
+          <button
+            type="button"
+            onClick={onDock}
+            aria-label="Dock the chat to the side"
+            title="Dock to the side"
+            className={cn(BAR_BUTTON, FOCUS_RING)}
+          >
+            <PanelRight aria-hidden className="size-4" />
+          </button>
+        ) : null}
+        {mode === 'docked' && onFloat ? (
+          <button
+            type="button"
+            onClick={onFloat}
+            aria-label="Float the chat over the page"
+            title="Float over the page"
+            className={cn(BAR_BUTTON, FOCUS_RING)}
+          >
+            <PanelRightClose aria-hidden className="size-4" />
+          </button>
+        ) : null}
+        {!isNew ? (
+          <Link
+            href={`/c/${chatId}`}
+            aria-label="Open this chat in full"
+            title="Open in full"
+            className={cn(BAR_BUTTON, FOCUS_RING)}
+          >
+            <Maximize2 aria-hidden className="size-4" />
+          </Link>
+        ) : null}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close the chat"
+          className={cn(BAR_BUTTON, FOCUS_RING)}
+        >
+          <X aria-hidden className="size-4" />
+        </button>
       </div>
-    </aside>
+
+      {/* Keyed by view so list ⇄ conversation swaps ease in rather than
+          snapping. */}
+      <div
+        key={isNew ? 'new' : chatId}
+        className="min-h-0 flex-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+      >
+        {isNew ? (
+          <CaseChatNew
+            slug={slug}
+            signedIn={signedIn}
+            viewerId={viewerId}
+            onSwitchChat={onSwitchChat}
+          />
+        ) : (
+          <ConversationScreen conversationId={chatId} embed={{ onDeleted: onClose }} />
+        )}
+      </div>
+    </div>
   );
 }
 
 /**
- * The panel's NEW-CHAT view — the dock hub's content as a full surface: your
- * threads about this case, the openers, jurisdiction, and a composer. On
- * mobile this IS the entry (tapping the pill lands here); on desktop it is
- * the back arrow's destination.
+ * The NEW-CHAT view — the dock hub's content as a full surface: your threads
+ * about this case, the openers, jurisdiction, and a composer. On mobile this
+ * IS the entry (tapping the pill lands here); on desktop it is the back
+ * arrow's destination.
  */
 function CaseChatNew({
   slug,
@@ -234,7 +313,7 @@ function CaseChatNew({
         </div>
       </div>
 
-      {/* ── The composer, pinned to the sheet's bottom. ── */}
+      {/* ── The composer, pinned to the surface's bottom. ── */}
       <div className="shrink-0 px-4 pb-3 pt-1">
         {start.error ? (
           <div
