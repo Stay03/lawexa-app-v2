@@ -11,9 +11,10 @@ import {
   quietReplaceUrlParams,
 } from '@/v2/runtime/url-params';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
+import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
-import { CaseAskDock } from './CaseAsk';
+import { CaseAskDock, useStartCaseChat, type CaseComposerState } from './CaseAsk';
 import { CaseChatDocked, CaseChatFloating, CaseChatSheet } from './CaseChatPanel';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
@@ -144,6 +145,31 @@ function CaseBody({ slug }: { slug: string }) {
     }
   }, []);
 
+  // ── THE ONE COMPOSER's state, lifted here so the draft and jurisdiction
+  // survive presentation swaps (dock ⇄ sheet ⇄ docked column) and every
+  // surface renders the same submission state. ──
+  const [draft, setDraft] = useState('');
+  const [jurisdiction, setJurisdiction] = useState<JurisdictionChoice>({
+    mode: 'auto',
+  });
+  const start = useStartCaseChat(slug, signedIn, switchChat);
+  const composer: CaseComposerState = {
+    draft,
+    onDraftChange: (next) => {
+      setDraft(next);
+      if (start.error) start.clearError();
+    },
+    jurisdiction,
+    onJurisdictionChange: setJurisdiction,
+    isSubmitting: start.isSubmitting,
+    error: start.error,
+    onSubmit: () => {
+      void start.submit(draft, jurisdiction).then((ok) => {
+        if (ok) setDraft('');
+      });
+    },
+  };
+
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
   // The header centre gets the SHORT title (the July contract ships one —
@@ -195,9 +221,17 @@ function CaseBody({ slug }: { slug: string }) {
 
   const outline = buildCaseOutline(detail);
 
-  const showFloating = renderedChat !== null && isDesktopPanel === true && !docked;
+  // The floating NEW view is the DOCK's own panel (the composer grows it in
+  // place); the floating CARD takes over only for real conversations.
+  const floatingContext = isDesktopPanel === true && !docked;
+  const showFloating =
+    renderedChat !== null && renderedChat !== 'new' && floatingContext;
   const showDocked = renderedChat !== null && isDesktopPanel === true && docked;
   const showSheet = renderedChat !== null && isDesktopPanel === false;
+  const dockPanelMounted = renderedChat === 'new' && floatingContext;
+  // The dock stays mounted through closed ⇄ floating-new so the composer
+  // element is never remounted across that cycle (focus survives).
+  const showDock = renderedChat === null || dockPanelMounted;
 
   return (
     // With the side chat open (≥xl) this is a row: the reading column centres
@@ -230,11 +264,26 @@ function CaseBody({ slug }: { slug: string }) {
             </div>
           </aside>
         ) : null}
-        {/* The ask trigger yields while the chat is open — the chat surface
-            carries the one real composer. It waits for the HOLDOVER to end:
-            mounting it during the exit animation shoved the layout under the
-            closing card. */}
-        {renderedChat === null ? <CaseAskDock onOpenChat={openChat} /> : null}
+        {/* THE composer's dock — and, at xl-floating, the chat's new-chat
+            surface growing out of it in place. It hides only while another
+            surface owns the composer (the sheet, the docked column, or a
+            conversation's own composer in the floating card). */}
+        {showDock ? (
+          <CaseAskDock
+            slug={slug}
+            signedIn={signedIn}
+            viewerId={userId}
+            composer={composer}
+            panelMounted={dockPanelMounted}
+            panelOpen={chat === 'new' && floatingContext}
+            onEngage={() => {
+              if (chat === null) openChat('new');
+            }}
+            onClose={closeChat}
+            onDock={() => setDockedPref(true)}
+            onOpenChat={switchChat}
+          />
+        ) : null}
 
         {/* The floating card lives in the pill's slot, INSIDE the column. */}
         {showFloating && renderedChat !== null ? (
@@ -244,6 +293,7 @@ function CaseBody({ slug }: { slug: string }) {
             slug={slug}
             signedIn={signedIn}
             viewerId={userId}
+            composer={composer}
             onClose={closeChat}
             onSwitchChat={switchChat}
             onDock={() => setDockedPref(true)}
@@ -258,6 +308,7 @@ function CaseBody({ slug }: { slug: string }) {
           slug={slug}
           signedIn={signedIn}
           viewerId={userId}
+          composer={composer}
           onClose={closeChat}
           onSwitchChat={switchChat}
           onFloat={() => setDockedPref(false)}
@@ -270,6 +321,7 @@ function CaseBody({ slug }: { slug: string }) {
           slug={slug}
           signedIn={signedIn}
           viewerId={userId}
+          composer={composer}
           onClose={closeChat}
           onSwitchChat={switchChat}
         />
