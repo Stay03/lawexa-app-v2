@@ -1,20 +1,26 @@
-import { CasesFallback } from '@/v2/features/cases/list/CasesScreen';
+import { CaseFallback } from '@/v2/features/cases/detail/CaseScreen';
 
 /**
- * Route-level loading boundary for `/cases`.
+ * The `cases` SEGMENT boundary — the fallback for whatever child is being
+ * navigated INTO under `/cases`, and that child is always a CASE.
  *
- * It renders the SAME component as the page's own Suspense fallback, which is
- * the whole point: route boundary → Suspense fallback → live list is one
- * continuous shape, so nothing moves at either hand-off. A hand-drawn fallback
- * diverges from the real surface within two design rounds — the lesson
- * `home-frame.ts` exists to enforce, applied here to a list.
+ * WHY THIS RENDERS THE DOCUMENT SKELETON AND NOT THE LIST'S (owner, July 31 —
+ * "I first see the case list skeleton, then the case skeleton"): a segment's
+ * `loading.tsx` wraps its CHILD SLOT. When the reader clicks a case row, the
+ * slot swaps from the list to `[slug]`, and until the target's own shell
+ * arrives this boundary is everything the router can paint. Under the v2
+ * rewrite proxy the client cannot prefetch parameterised routes (its segment
+ * cache builds `/undefined` URLs — the same Next-16 defect behind the chat's
+ * quiet-write fix in `url-params.ts`), so this fallback shows on EVERY
+ * list→case click for a full server round trip. It must therefore be the
+ * DOCUMENT's shape: the reader then sees document skeleton → document
+ * skeleton (the `[slug]` boundary renders the identical component) → the
+ * case, and the hand-offs move nothing.
  *
- * Everything static inside it (the search field, the view tabs) is a STILL
- * RESERVED SHAPE, never a pulsing skeleton: those controls wait on no request
- * (standards §8i). Only the rows pulse, and even they hold still here — the
- * route fallback covers an RSC payload, and the query behind those rows is
- * usually already warm.
+ * The LIST'S own fallback lives beside the list page in `(library)/` — a
+ * route group, so the list no longer shares this boundary and each surface
+ * loads under its own shape. Do not "simplify" the two files back into one.
  */
-export default function CasesLoading() {
-  return <CasesFallback />;
+export default function CasesSegmentLoading() {
+  return <CaseFallback />;
 }
