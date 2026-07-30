@@ -75,6 +75,12 @@ function CaseBody({ slug }: { slug: string }) {
       replaceUrlParams({ chat: null });
     }
   }, []);
+  // In-panel hops (back to the list, opening a listed thread, a new thread's
+  // id arriving) REPLACE — the panel stays one history entry, so the browser's
+  // Back always closes it in one step.
+  const switchChat = useCallback((id: string) => {
+    replaceUrlParams({ chat: id });
+  }, []);
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
@@ -128,10 +134,13 @@ function CaseBody({ slug }: { slug: string }) {
   const outline = buildCaseOutline(detail);
 
   return (
-    // With the side chat open (≥lg) this is a row: the reading column centres
+    // With the side chat open (≥xl) this is a row: the reading column centres
     // itself in the remaining space (auto margins in flex), the panel takes a
     // fixed 26rem on the right. Closed, it is exactly the old layout.
-    <div className="flex min-h-full w-full">
+    // `overflow-x-clip` so the panel's width reveal can never mint a
+    // horizontal scrollbar (clip, not hidden — no scroll container, so the
+    // panel's sticky inner box still tracks the shell scroller).
+    <div className="flex min-h-full w-full overflow-x-clip">
       {/* The tall column the sticky dock needs: the document is the flow; the
           pill dock is pinned to the bottom edge and floats over the reading.
           `.v2-case-doc` scopes the reading typography (case-document.css).
@@ -166,7 +175,14 @@ function CaseBody({ slug }: { slug: string }) {
         ) : null}
       </div>
 
-      <CaseChatSurface chatId={chatId} onClose={closeChat} />
+      <CaseChatSurface
+        chatId={chatId}
+        slug={slug}
+        signedIn={signedIn}
+        viewerId={userId}
+        onClose={closeChat}
+        onSwitchChat={switchChat}
+      />
     </div>
   );
 }

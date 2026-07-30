@@ -155,5 +155,25 @@
   margin-top: 1.8em;
 }
 
+/* ── The side chat's desktop presence ───────────────────────────────────── */
+
+/**
+ * The panel opens by WIDTH behind `overflow-x-clip`, not by sliding in from
+ * outside the viewport — a translated entry poked past the right edge and
+ * flashed a horizontal scrollbar (owner, July 30). Width also moves the
+ * reading column continuously (flex re-centres every frame of the reveal).
+ */
+@keyframes v2-case-chat-open {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes v2-case-chat-close {
+  to {
+    width: 0;
+  }
+}
+
 /* Reduced motion is handled globally for the v2 tree (shell.css stills every
    `.animate-pulse` under `html.v2-document-lock`), so nothing is needed here. */

@@ -22,39 +22,88 @@ import { startConversation } from '@/v2/features/conversations/start-conversatio
 import { casesQueries } from '../queries';
 
 /**
- * CaseAskDock — the case page's chat entry, rebuilt to the CONVERSATION PILL'S
- * exact scale (owner, July 29: "I want the one in the message conversation
- * page, that exact style — this one is too big, noisy and messy").
+ * CaseAskDock — the case page's chat entry, at the CONVERSATION PILL'S exact
+ * scale (owner, July 29), plus the shared pieces the side chat's NEW-CHAT
+ * view reuses (`useStartCaseChat`, `RecentCaseChats`, `CASE_PROMPTS`).
  *
- * ── AT REST: the pill, nothing else ─────────────────────────────────────────
- * The same anatomy as `ConversationComposer`: `max-w-xs sm:max-w-md`, one
- * `min-h-9` textarea row, a `size-8` round send button, the downward-biased
- * shadow so no shade band climbs into the judgment. No furniture is visible —
- * the reading stays clean to the pill's edge.
- *
- * ── ON FOCUS: the hub opens above it ────────────────────────────────────────
- * v1 answered a click here by sliding out a right-hand sheet with its own chat
- * engine inside. The owner wants "something like that but better and cleaner":
- * focusing the pill expands a SOLID panel directly above it — the reader's
- * recent chats about this case (the v1 feature, kept), three case-shaped
- * openers, and the jurisdiction chip. It collapses on Escape or a click
- * outside. The panel is a persistent-node grid collapse (the conversation
- * composer's own pattern), so open and close both animate and the chats query
- * mounts exactly once.
+ * ── TWO ENTRY FLOWS, BY POINTER REAL ESTATE (owner, July 30) ────────────────
+ * DESKTOP (≥xl): focusing the pill expands the HUB above it — recent chats,
+ * openers, jurisdiction — and submitting opens the side chat with the answer
+ * streaming in. There is room for a popover next to a reading column.
+ * MOBILE: there is not. Tapping the pill skips the popup entirely and opens
+ * the chat sheet in its new-chat view ("it should just show the Chat · this
+ * case slide-up") — same content, one surface, no intermediate hop.
  *
  * ── ONE CHAT SYSTEM ─────────────────────────────────────────────────────────
- * Submit goes through the same `startConversation` as everywhere else, tagged
- * `references: [{ type: 'case' }]`, and lands on the REAL conversation screen.
- * Deliberately absent from this surface: attachments, confidential/redacted,
- * workflow — those are home-composer concerns; a reader who needs them starts
- * from the home. That absence is what keeps the pill a pill.
+ * Every submit goes through the same `startConversation` as everywhere else,
+ * tagged `references: [{ type: 'case' }]`, and lands in the REAL conversation
+ * screen (embedded in the panel, or full at /c/{id}). Deliberately absent
+ * here: attachments, confidential/redacted, workflow — home-composer
+ * concerns; their absence is what keeps the pill a pill.
  */
 
-const PROMPTS = [
+export const CASE_PROMPTS = [
   'Explain this case in plain language',
   'What is the ratio decidendi?',
   'How has this case been treated since?',
 ] as const;
+
+/** The xl media query — the same boundary the panel uses for column-vs-sheet. */
+const SIDE_PANEL_QUERY = '(min-width: 80rem)';
+
+/**
+ * The one way a case chat starts: draft + jurisdiction in, conversation out,
+ * with the "your chats about this case" query refreshed. Shared by the dock's
+ * pill (desktop) and the panel's new-chat view (mobile + in-panel back).
+ */
+export function useStartCaseChat(
+  slug: string,
+  signedIn: boolean,
+  onOpened: (conversationId: string) => void,
+) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (draft: string, jurisdiction: JurisdictionChoice) => {
+    const message = draft.trim();
+    if (!message || isSubmitting) return false;
+    if (!signedIn) {
+      router.push('/login');
+      return false;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const result = await startConversation(
+        {
+          message,
+          attachments: [],
+          jurisdiction,
+          references: [{ type: 'case', id: slug }],
+        },
+        { queryClient },
+      );
+      // Refresh "your chats about this case" so the new thread is listed the
+      // next time the hub or the panel's list opens.
+      void queryClient.invalidateQueries({
+        queryKey: [...casesQueries.all, 'conversations', slug],
+      });
+      // The embedded controller consumes the `conv_init` handoff
+      // `startConversation` just wrote, so the stream attaches in the panel.
+      onOpened(result.conversationId);
+      // `isSubmitting` stays true through the swap — no double-submit window.
+      return true;
+    } catch (err) {
+      setError(extractApiError(err).message);
+      setIsSubmitting(false);
+      return false;
+    }
+  };
+
+  return { submit, isSubmitting, error, clearError: () => setError(null) };
+}
 
 export function CaseAskDock({
   slug,
@@ -65,18 +114,15 @@ export function CaseAskDock({
   slug: string;
   signedIn: boolean;
   viewerId: number | null;
-  /** Open a conversation in the case page's side chat (`?chat={id}`). */
-  onOpenChat: (conversationId: string) => void;
+  /** Open the side chat: a conversation id, or 'new' for the new-chat view. */
+  onOpenChat: (chatId: string) => void;
 }) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const dockRef = useRef<HTMLDivElement>(null);
 
   const [draft, setDraft] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [jurisdiction, setJurisdiction] = useState<JurisdictionChoice>({ mode: 'auto' });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const start = useStartCaseChat(slug, signedIn, onOpenChat);
 
   // Collapse on a pointer-down outside the dock, and on Escape. Clicks inside
   // PORTALED overlays (the jurisdiction popover renders into a Radix popper
@@ -111,43 +157,9 @@ export function CaseAskDock({
     dockRef.current?.querySelector('textarea')?.focus();
   };
 
-  const submit = async () => {
-    const message = draft.trim();
-    if (!message || isSubmitting) return;
-    if (!signedIn) {
-      router.push('/login');
-      return;
-    }
-    setError(null);
-    setIsSubmitting(true);
-    try {
-      const result = await startConversation(
-        {
-          message,
-          attachments: [],
-          jurisdiction,
-          references: [{ type: 'case', id: slug }],
-        },
-        { queryClient },
-      );
-      setDraft('');
-      // Refresh "your chats about this case" so the new thread is in the hub
-      // the next time it opens (the queries doc: explicit invalidation here).
-      void queryClient.invalidateQueries({
-        queryKey: [...casesQueries.all, 'conversations', slug],
-      });
-      // Open the SIDE CHAT rather than leaving the judgment (owner: "check
-      // while still on the page"). The embedded controller consumes the same
-      // `conv_init` handoff `startConversation` just wrote, so the stream
-      // attaches inside the panel. Opening unmounts this dock — the panel
-      // carries the composer from here.
-      onOpenChat(result.conversationId);
-      // Keep `isSubmitting` true through the swap — no double-submit window.
-    } catch (err) {
-      setError(extractApiError(err).message);
-      setIsSubmitting(false);
-    }
-  };
+  const submit = () => void start.submit(draft, jurisdiction).then((ok) => {
+    if (ok) setDraft('');
+  });
 
   return (
     <div ref={dockRef} className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10">
@@ -160,7 +172,8 @@ export function CaseAskDock({
       />
 
       <div className="mx-auto w-full max-w-xs sm:max-w-md">
-        {/* ── The hub: a persistent-node collapse above the pill. ── */}
+        {/* ── The hub: a persistent-node collapse above the pill (≥xl only —
+            below that the pill opens the sheet instead). ── */}
         <div
           className={cn(
             'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
@@ -189,7 +202,7 @@ export function CaseAskDock({
                   Start with
                 </p>
                 <ul className="flex flex-wrap gap-1.5">
-                  {PROMPTS.map((prompt) => (
+                  {CASE_PROMPTS.map((prompt) => (
                     <li key={prompt}>
                       <button
                         type="button"
@@ -212,7 +225,7 @@ export function CaseAskDock({
                     signedIn
                     value={jurisdiction}
                     onChange={setJurisdiction}
-                    disabled={isSubmitting}
+                    disabled={start.isSubmitting}
                     stop={stop}
                   />
                   <span className="text-[11px] text-muted-foreground/60">
@@ -225,12 +238,12 @@ export function CaseAskDock({
         </div>
 
         {/* Error — quiet, above the pill, cleared on the next keystroke. */}
-        {error ? (
+        {start.error ? (
           <div
             role="alert"
             className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
           >
-            {error}
+            {start.error}
           </div>
         ) : null}
 
@@ -239,10 +252,10 @@ export function CaseAskDock({
           value={draft}
           onValueChange={(next) => {
             setDraft(next);
-            if (error) setError(null);
+            if (start.error) start.clearError();
           }}
           onSubmit={submit}
-          disabled={isSubmitting}
+          disabled={start.isSubmitting}
           maxHeight={150}
           className="shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]"
         >
@@ -250,7 +263,17 @@ export function CaseAskDock({
             <PromptInputTextarea
               placeholder="Ask about this case"
               className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
-              onFocus={() => setExpanded(true)}
+              onFocus={(event) => {
+                // No room for a popover next to the reading below xl — the tap
+                // goes straight to the chat sheet's new-chat view instead
+                // (owner: "it should just show the Chat · this case slide-up").
+                if (!window.matchMedia(SIDE_PANEL_QUERY).matches) {
+                  event.currentTarget.blur();
+                  onOpenChat('new');
+                  return;
+                }
+                setExpanded(true);
+              }}
             />
             <PromptInputAction tooltip="Send message">
               <Button
@@ -258,10 +281,10 @@ export function CaseAskDock({
                 size="icon"
                 className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
                 onClick={submit}
-                disabled={!draft.trim() || isSubmitting}
+                disabled={!draft.trim() || start.isSubmitting}
                 aria-label="Send message"
               >
-                {isSubmitting ? (
+                {start.isSubmitting ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <ArrowUp className="size-4" />
@@ -276,24 +299,26 @@ export function CaseAskDock({
 }
 
 /**
- * The reader's recent threads about this case, inside the hub. Owner-scoped on
- * the server and viewer-partitioned in the cache; renders nothing when there
- * are none (the hub's openers already say what to do) and fails quiet — the
- * threads are still reachable from /conversations. Rows open the SIDE CHAT
- * (buttons, not links): resuming a thread about the case keeps the case.
+ * The reader's recent threads about this case. Owner-scoped on the server and
+ * viewer-partitioned in the cache; renders nothing when there are none and
+ * fails quiet — the threads are still reachable from /conversations. Rows
+ * open the SIDE CHAT (buttons, not links): resuming a thread about the case
+ * keeps the case. Shared by the dock hub and the panel's new-chat view.
  */
-function RecentCaseChats({
+export function RecentCaseChats({
   slug,
   viewerId,
   onOpenChat,
+  limit = 3,
 }: {
   slug: string;
   viewerId: number | null;
   onOpenChat: (conversationId: string) => void;
+  limit?: number;
 }) {
   const query = useQuery(casesQueries.conversations(slug, { viewerId }));
   const [now] = useState(() => Date.now());
-  const rows = (query.data?.data ?? []).slice(0, 3);
+  const rows = (query.data?.data ?? []).slice(0, limit);
 
   if (query.isPending) {
     return (
