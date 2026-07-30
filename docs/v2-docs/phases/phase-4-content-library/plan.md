@@ -234,39 +234,39 @@ equal-weight data between the title and the first word of law. This round's answ
 **Note (ops):** the LOCAL dev machine hit 100% disk mid-build (457MB free). `.next` deletion
 freed enough to build; the machine needs real space cleared.
 
-## Wave 1, owner review round 3 (July 30, ) — the data becomes components
+## Wave 1, owner review round 3 (July 30, `075579a`) — the data becomes components
 
 The owner asked for a complete redesign of the case document: "look at the data in the
 page and how disorganised and not nicely rendered with beautiful components." Measured on
 the enriched Mbamalu case, the data WAS the problem: 27 statute rows for ~9 Acts, 63 raw
 fused case citations with duplicates, eight principles as one unbroken serif column.
 
-- ** (new)** — the shaping layer. Statutes group one-row-per-Act with
+- **`authorities.ts` (new)** — the shaping layer. Statutes group one-row-per-Act with
   provisions collected/sorted; year-variants merge when years don't conflict (three
   Constitutions → one row) and stay apart when they do (CAMA 2004 ≠ CAMA 2020): 27 → 6
   rows. Case citations split at the first year token into name + report reference and
   merge parallel citations ("Macfoy v. UAC — (1962) A.C. 158 · (1962) AC 150"), the
-  strongest treatment surviving: 63 → 61.  tolerates the lean bot-UA
+  strongest treatment surviving: 63 → 61. `normalizeBench` tolerates the lean bot-UA
   payload (judges as strings — the crash the loop found) and sorts the lead judge first.
-- ** (new)** — ONE row grammar for statutes/cited/cited-by/similar: name
+- **`AuthorityList` (new)** — ONE row grammar for statutes/cited/cited-by/similar: name
   line, reference line, badge only when meaningful, and a right-edge affordance — chevron
   = we hold it; magnifier = **click runs a pre-filled library search** (owner: "clicking
-  is like an auto search"; both list pages read  from the URL). Lists >10 rows
+  is like an auto search"; both list pages read `?search=` from the URL). Lists >10 rows
   fold behind "Show all N".
 - **Numbered principles** — hanging gold numeral + one caption line (Ratio/Obiter · tag ·
   Per Judge (role)). The flat-string fallback keeps the gold rule.
 - **Header** — topic is the subtitle now; origin_state lives only in About; every fact
   exactly once.
-- ** (new)** — the "On this page" rail ≥80rem with IntersectionObserver
+- **`CaseOutline` (new)** — the "On this page" rail ≥80rem with IntersectionObserver
   scroll-spy; renders only when the document has ≥4 parts.
 - **Name formatter, test-hardened on live data** — nullable input; lowercase "v." no
-  longer vetoes formatting ("OKAFOR v. NWEKE"); the  alternation bug
+  longer vetoes formatting ("OKAFOR v. NWEKE"); the `(v|vs|vrs)` alternation bug
   ("VS." → "vS.") fixed; "vs." normalizes to "v." even on cased names; vowel-bearing
   acronyms added (UAC, INEC, NAFDAC, CAC, EFCC, LPELR, PLC…).
 
 Verified with the screenshot loop against the LOCAL production build (rich + sparse case,
 desktop + mobile, folds expanded) before push. Queued next: the side-by-side case chat
-(real conversation engine in a right panel / mobile sheet,  URL state).
+(real conversation engine in a right panel / mobile sheet, `?chat={id}` URL state).
 
 **Open with the backend team**
 
