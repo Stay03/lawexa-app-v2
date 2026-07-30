@@ -50,6 +50,9 @@ const CONNECTIVES = new Set(['OF', 'THE', 'AND', 'FOR', 'IN', 'AT']);
 const KNOWN: Record<string, string> = {
   LTD: 'Ltd',
   'LTD.': 'Ltd.',
+  // PLC is vowel-free so rule 5 would keep it shouting; publishers write "Plc".
+  PLC: 'Plc',
+  'PLC.': 'Plc.',
   ORS: 'Ors',
   'ORS.': 'Ors.',
   ANOR: 'Anor',
@@ -67,6 +70,30 @@ const KNOWN: Record<string, string> = {
   GCON: 'GCON',
   ACJ: 'ACJ',
   PCA: 'PCA',
+  // Report-series abbreviations that carry a vowel (the vowel-free ones — NWLR,
+  // FWLR, SCNJ — already pass rule 5). Live data showed "Lpelr-13034".
+  LPELR: 'LPELR',
+  JELR: 'JELR',
+  LELR: 'LELR',
+  // Institutional acronyms that carry a vowel and appear as PARTIES in the
+  // corpus ("MACFOY V. UAC" rendered as "Macfoy v. Uac" on live data). The
+  // list is curated, not guessed: each is a household initialism in Nigerian
+  // reports and none is a plausible word in a case name.
+  UAC: 'UAC',
+  UBA: 'UBA',
+  NEPA: 'NEPA',
+  NDIC: 'NDIC',
+  INEC: 'INEC',
+  NAFDAC: 'NAFDAC',
+  CAC: 'CAC',
+  FIRS: 'FIRS',
+  NBA: 'NBA',
+  JAMB: 'JAMB',
+  WAEC: 'WAEC',
+  NECO: 'NECO',
+  ICPC: 'ICPC',
+  EFCC: 'EFCC',
+  NICON: 'NICON',
 };
 
 /** Case one word-like segment (rule 8's inner step). */
@@ -76,8 +103,11 @@ function caseSegment(segment: string): string {
 }
 
 function caseToken(token: string, atPartyStart: boolean): string {
-  // Rule 2 — the versus token. Trailing punctuation (rare "V.,") survives.
-  if (VERSUS.test(token)) return token.replace(/^(v|vs|vrs)/i, (m) => m.toLowerCase());
+  // Rule 2 — the versus token, normalized to "v" (keeping its dot if it had
+  // one, and any trailing punctuation — rare "V.," survives). Longest
+  // alternative FIRST: `(v|vs|vrs)` would match the bare "v" of "VS." and
+  // leave "vS." behind — a live bug this order fixes.
+  if (VERSUS.test(token)) return token.replace(/^(?:vrs|vs|v)/i, 'v');
 
   // Rule 3 — citations, years, numbers, bracketed report references.
   if (/[0-9()[\]]/.test(token)) return token;
@@ -122,12 +152,28 @@ function caseToken(token: string, atPartyStart: boolean): string {
   return cased + trailing;
 }
 
-export function formatCaseName(name: string): string {
-  const trimmed = name.trim();
+export function formatCaseName(name: string | null | undefined): string {
+  // Nullable by design: the lean bot-UA payload omits fields the full payload
+  // carries, and this formatter sits on nearly every render path — it must
+  // degrade to '' rather than throw (the first screenshot-loop run found the
+  // page crashing on exactly this).
+  const trimmed = (name ?? '').trim();
   if (trimmed.length === 0) return trimmed;
 
-  // Rule 1 — already mixed-case: hands off.
-  if (/[a-z]/.test(trimmed)) return trimmed;
+  // Rule 1 — already mixed-case: hands off, EXCEPT the versus token. Two
+  // subtleties, both from live rows:
+  //  - publishers write a lowercase "v." even in otherwise ALL-CAPS headings
+  //    ("OKAFOR v. NWEKE") — so the token is excluded from the probe, and one
+  //    lowercase letter cannot veto the transformation the rest needs;
+  //  - a cased name may still carry the "vs." variant ("Ibrahim vs. INEC"),
+  //    and normalizing THAT to "v." is safe on any name — so it applies even
+  //    on this verbatim path. A bare "v" is left alone here: cased titles from
+  //    the API use it as their house style, and re-dotting them is not ours to
+  //    do.
+  const probe = trimmed.replace(/\b(?:vs?|vrs)\.?(?=\s|$)/gi, '');
+  if (/[a-z]/.test(probe)) {
+    return trimmed.replace(/(\s)(?:vrs|vs)(\.?)(?=\s)/gi, '$1v$2');
+  }
 
   const tokens = trimmed.split(/\s+/);
   const out: string[] = [];

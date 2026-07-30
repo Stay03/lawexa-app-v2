@@ -142,11 +142,13 @@ export function CaseAskDock({
   };
 
   return (
-    <div ref={dockRef} className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-8">
-      {/* Dissolve the judgment scrolling behind the pill. */}
+    <div ref={dockRef} className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10">
+      {/* Dissolve the judgment scrolling behind the pill — dense at the pill,
+          gone by the top, so text fades out instead of running at full ink
+          straight into the composer (owner, July 30). */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background from-35% via-background/80 to-transparent"
       />
 
       <div className="mx-auto w-full max-w-xs sm:max-w-md">

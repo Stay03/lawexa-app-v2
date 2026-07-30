@@ -10,7 +10,8 @@ import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context'
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
 import { CaseAskDock } from './CaseAsk';
-import { CaseDocument } from './CaseDocument';
+import { buildCaseOutline, CaseDocument } from './CaseDocument';
+import { CaseOutline } from './CaseOutline';
 import {
   CASE_COLUMN,
   CaseDocumentSkeleton,
@@ -101,14 +102,29 @@ function CaseBody({ slug }: { slug: string }) {
     );
   }
 
+  const outline = buildCaseOutline(detail);
+
   return (
     // The tall column the sticky dock needs: the document is the flow; the
     // pill dock is pinned to the bottom edge and floats over the reading.
     // `.v2-case-doc` scopes the reading typography (case-document.css).
-    <div className="v2-case-doc mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
+    // `relative` anchors the outline rail beside the column.
+    <div className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         <CaseDocument detail={detail} />
       </div>
+      {/* The map, only when the document is long enough to need one (four or
+          more parts) and only where the shell has true dead margin beside the
+          column (≥80rem: the shell is a single full-width scroll region, so a
+          1280px viewport leaves 256px clear per side — the rail needs 216px).
+          It must never compete with the reading measure. */}
+      {outline.length >= 4 ? (
+        <aside className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block">
+          <div className="sticky top-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+            <CaseOutline sections={outline} />
+          </div>
+        </aside>
+      ) : null}
       <CaseAskDock slug={slug} signedIn={signedIn} viewerId={userId} />
     </div>
   );

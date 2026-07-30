@@ -3,22 +3,29 @@
 import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
-import { citedEdgeToDisplay, relatedToDisplay } from '@/lib/utils/related-cases';
+import { formatTreatment, relatedToDisplay } from '@/lib/utils/related-cases';
+import type { RelatedCaseDisplay } from '@/lib/utils/related-cases';
 import type {
   CaseDetail,
   CaseOutcome,
   CoramRole,
   CourtHistoryStep,
   ReportPrinciple,
-  StatuteCitedEdge,
 } from '@/types/case';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { formatCaseName } from '../case-name';
+import { firstCitation, formatCaseName } from '../case-name';
 import { formatCaseDate, toAlpha2 } from '../case-row-model';
+import {
+  groupCitedCases,
+  groupStatutes,
+  normalizeBench,
+  sentenceCase,
+} from './authorities';
+import { AuthorityList, type AuthorityItem } from './AuthorityList';
 import { CaseActions } from './CaseActions';
 import { CaseText } from './case-text';
-import { RelatedCaseList } from './RelatedCases';
+import type { OutlineSection } from './CaseOutline';
 import { SectionHeading } from './SectionHeading';
 import { ViewLimitNotice } from './states';
 import './case-document.css';
@@ -26,28 +33,34 @@ import './case-document.css';
 /**
  * CaseDocument — THE case reading surface.
  *
- * ── THE JULY-29 FINESSE PASS (owner: "data scattered all over the place, no
- *    finesse") ────────────────────────────────────────────────────────────────
- * The honest criticism of the previous version: between the title and the first
- * word of law sat SEVEN rows of near-equal-weight data — citation, meta,
- * outcome, six tag chips, three buttons, a two-line bench, a topic line. Every
- * row shouted the same, so nothing led. The fix is an editorial page's oldest
- * discipline: the header carries ONLY what identifies the case, everything
- * descriptive moves to the end, and the whole page speaks two voices —
+ * ── THE JULY-30 REDESIGN (owner: "a complete redesign… the components and
+ *    the design") ─────────────────────────────────────────────────────────────
+ * The two-voice system stays — caps-tracked sans for structure, the serif for
+ * the law — but the DATA now renders through designed components instead of
+ * bare rows:
  *
- *   SANS CAPS  = structure (the kicker, every section label — one voice)
- *   SERIF      = the law (the name, the principles, the summary)
+ *   PRINCIPLES   numbered entries with a hanging gold numeral and ONE caption
+ *                line (Ratio · tag · Per Judge). The law report's holdings
+ *                list, not an undifferentiated serif column.
+ *   STATUTES     grouped one-row-per-Act with provisions collected —
+ *                27 sentence-level edges become ~9 rows (`authorities.ts`).
+ *   CASES CITED  raw fused citations split into name + report reference,
+ *                parallel citations merged, sixty-row lists folded.
+ *   EVERY LIST   one row grammar (`AuthorityList`), and every row goes
+ *                somewhere: chevron = we hold it, search = pre-filled library
+ *                search (owner: "clicking is like an auto search").
  *
- * HEADER now: kicker (flag · court · date) → name → citation + suit → outcome
- * badge → compact actions. Five quiet rows, each with one job.
- * END now: "About this case" — the bench (with coram roles), topic,
- * jurisdiction, tags — a definition list where reference data belongs. The
- * reader who wants it scrolls past the judgment to it; the reader who wants
- * the law meets it immediately.
+ * THE HEADER carries identity ONLY, and each fact lives in exactly one place:
+ * provenance kicker (flag · court · date), the name, citation + suit, the
+ * TOPIC as the subtitle (it says what the case is about — that is identity,
+ * not reference), the outcome pill, actions. `origin_state` no longer floats
+ * beside the outcome; it lives in About's jurisdiction row. "About this case"
+ * keeps the bench (lead first), jurisdiction, tags.
  *
- * Everything else from the earlier rounds holds: structured principles with
- * the flat-string fallback, the procedural timeline, statutes beside cases,
- * treatment badges with the catch-all suppressed, text never rendered as HTML.
+ * Sections carry stable ids so the wide-screen outline rail (`CaseOutline`)
+ * can map and track them; `buildCaseOutline` below derives the rail's entries
+ * from the SAME data checks that gate each section, so the map can never name
+ * a part the page does not have.
  */
 
 const OUTCOME_LABELS: Record<CaseOutcome, string> = {
@@ -81,6 +94,51 @@ const ROLE_LABELS: Record<CoramRole, string> = {
   dissenting: 'dissenting',
 };
 
+/* ── Section identity — one table drives the page AND the outline rail. ──── */
+
+const SECTION = {
+  principles: 'case-principles',
+  summary: 'case-summary',
+  history: 'case-history',
+  statutes: 'case-statutes',
+  cited: 'case-cited',
+  citedBy: 'case-cited-by',
+  similar: 'case-similar',
+  about: 'case-about',
+} as const;
+
+/** The outline rail's entries, derived from the same checks that gate each
+ *  section below — `CaseScreen` renders the rail from this. */
+export function buildCaseOutline(detail: CaseDetail): OutlineSection[] {
+  const sections: OutlineSection[] = [];
+  const hasPrinciples =
+    (detail.report_principles?.length ?? 0) > 0 || !!detail.principles?.trim();
+  if (hasPrinciples) sections.push({ id: SECTION.principles, label: 'Principles' });
+  sections.push({ id: SECTION.summary, label: 'Summary' });
+  if ((detail.court_history?.length ?? 0) > 0)
+    sections.push({ id: SECTION.history, label: 'Case history' });
+  if (groupStatutes(detail.statutes_cited ?? []).length > 0)
+    sections.push({ id: SECTION.statutes, label: 'Statutes cited' });
+  if (groupCitedCases(detail.cited_cases ?? []).length > 0)
+    sections.push({ id: SECTION.cited, label: 'Cases cited' });
+  if ((detail.cited_by?.length ?? 0) > 0)
+    sections.push({ id: SECTION.citedBy, label: 'Cited by' });
+  if ((detail.similar_cases?.length ?? 0) > 0)
+    sections.push({ id: SECTION.similar, label: 'Similar cases' });
+  if (hasAbout(detail)) sections.push({ id: SECTION.about, label: 'About' });
+  return sections;
+}
+
+function hasAbout(detail: CaseDetail): boolean {
+  return (
+    normalizeBench(detail.judges).length > 0 ||
+    !!detail.country ||
+    (detail.tags?.length ?? 0) > 0
+  );
+}
+
+/* ── The document ────────────────────────────────────────────────────────── */
+
 export function CaseDocument({ detail }: { detail: CaseDetail }) {
   const raw = detail.display_title || detail.title;
   const name = formatCaseName(raw);
@@ -88,15 +146,37 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   const isLimited = detail.limit_exceeded === true;
   const countryCode = toAlpha2(detail.country?.code, detail.country?.abbreviation);
 
-  const similar = (detail.similar_cases ?? []).map(relatedToDisplay);
-  const cited = (detail.cited_cases ?? []).map(citedEdgeToDisplay);
-  const citedBy = (detail.cited_by ?? []).map(relatedToDisplay);
-
   const principles = [...(detail.report_principles ?? [])].sort(
     (a, b) => a.order - b.order,
   );
-  const statutes = detail.statutes_cited ?? [];
   const history = [...(detail.court_history ?? [])].sort((a, b) => a.order - b.order);
+
+  const statuteItems: AuthorityItem[] = groupStatutes(detail.statutes_cited ?? []).map(
+    (row) => ({
+      key: row.key,
+      name: row.name,
+      reference: row.provisions,
+      href: row.href,
+      searchHref: row.searchHref,
+    }),
+  );
+
+  const citedItems: AuthorityItem[] = groupCitedCases(detail.cited_cases ?? []).map(
+    (row) => ({
+      key: row.key,
+      name: row.name,
+      nameTitle: row.sourceTitle,
+      reference: row.refs.join(' · ') || null,
+      href: row.href,
+      searchHref: row.searchHref,
+      badge: meaningfulTreatment(row.treatment),
+    }),
+  );
+
+  const citedByItems = (detail.cited_by ?? []).map(relatedToDisplay).map(toLibraryItem);
+  const similarItems = (detail.similar_cases ?? [])
+    .map(relatedToDisplay)
+    .map(toLibraryItem);
 
   // The body is the summary; the excerpt is the honest fallback when a case has
   // not been written up yet. Neither is invented when both are absent.
@@ -104,7 +184,7 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
 
   return (
     <article className="flex flex-col gap-9">
-      {/* ── Heading block: identity only. ───────────────────────────────── */}
+      {/* ── Heading block: identity only, each fact exactly once. ────────── */}
       <header className="flex flex-col gap-3 border-b border-border/60 pb-6">
         {/* Provenance first — where and when, in the label voice. */}
         <p className="doc-kicker flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -140,17 +220,21 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
           </p>
         ) : null}
 
-        {detail.outcome || detail.origin_state ? (
-          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {detail.outcome ? (
-              // The disposition — the first question a lawyer asks, answered
-              // before the reading starts. Gold because it is THE answer;
-              // neutral in tone because which side "won" depends on your side.
-              <span className="inline-flex min-h-6 items-center rounded-full bg-primary/10 px-2.5 font-medium text-primary">
-                {outcomeLabel(detail.outcome)}
-              </span>
-            ) : null}
-            {detail.origin_state ? <span>{detail.origin_state}</span> : null}
+        {/* The topic — what the case is ABOUT, in one editorial line. */}
+        {detail.topic ? (
+          <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+            {sentenceCase(detail.topic)}
+          </p>
+        ) : null}
+
+        {detail.outcome ? (
+          <p>
+            {/* The disposition — the first question a lawyer asks, answered
+                before the reading starts. Gold because it is THE answer;
+                neutral in tone because which side "won" depends on your side. */}
+            <span className="inline-flex min-h-6 items-center rounded-full bg-primary/10 px-2.5 text-xs font-medium text-primary">
+              {outcomeLabel(detail.outcome)}
+            </span>
           </p>
         ) : null}
 
@@ -168,7 +252,11 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       {principles.length > 0 ? (
         <StructuredPrinciples principles={principles} />
       ) : detail.principles?.trim() ? (
-        <section aria-label="Legal principles" className="flex flex-col gap-3">
+        <section
+          id={SECTION.principles}
+          aria-label="Legal principles"
+          className="flex scroll-mt-6 flex-col gap-3"
+        >
           <SectionHeading label="Legal principles" />
           <div className="doc-holding">
             <div className="doc-prose">
@@ -179,7 +267,11 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       ) : null}
 
       {/* ── What happened. ──────────────────────────────────────────────── */}
-      <section aria-label="Case summary" className="flex flex-col gap-3">
+      <section
+        id={SECTION.summary}
+        aria-label="Case summary"
+        className="flex scroll-mt-6 flex-col gap-3"
+      >
         <SectionHeading label="Case summary" />
         {isLimited ? (
           <ViewLimitNotice message={detail.limit_message} />
@@ -197,21 +289,29 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       {/* ── Depth: the chain, the authorities. ──────────────────────────── */}
       {history.length > 0 ? <CaseHistory steps={history} /> : null}
 
-      {statutes.length > 0 ? <StatutesCited statutes={statutes} /> : null}
-      <RelatedCaseList
-        title="Cases cited"
-        description="Authorities this judgment relied on."
-        cases={cited}
+      <AuthorityList
+        id={SECTION.statutes}
+        label="Statutes cited"
+        sub="Legislation this judgment applied."
+        items={statuteItems}
       />
-      <RelatedCaseList
-        title="Cited by"
-        description="Later judgments that cite this one."
-        cases={citedBy}
+      <AuthorityList
+        id={SECTION.cited}
+        label="Cases cited"
+        sub="Authorities this judgment relied on."
+        items={citedItems}
       />
-      <RelatedCaseList
-        title="Similar cases"
-        description="Cases on comparable facts or points of law."
-        cases={similar}
+      <AuthorityList
+        id={SECTION.citedBy}
+        label="Cited by"
+        sub="Later judgments that cite this one."
+        items={citedByItems}
+      />
+      <AuthorityList
+        id={SECTION.similar}
+        label="Similar cases"
+        sub="Cases on comparable facts or points of law."
+        items={similarItems}
       />
 
       {/* ── Reference data, where reference data belongs. ───────────────── */}
@@ -220,10 +320,38 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   );
 }
 
+/** The badge earns its ink only when the treatment says more than "a citation
+ *  happened" — `referred_to` is the enum's catch-all and marks nothing. */
+function meaningfulTreatment(treatment: string | null) {
+  if (!treatment || treatment === 'referred_to') return null;
+  return formatTreatment(treatment);
+}
+
+/** Map a library case (cited_by / similar — always linked) to the row model. */
+function toLibraryItem(display: RelatedCaseDisplay): AuthorityItem {
+  const reference = [
+    firstCitation(display.citation),
+    display.court?.name,
+    formatCaseDate(display.judgmentDate, 'year'),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return {
+    key: display.key,
+    name: formatCaseName(display.title),
+    nameTitle: display.title,
+    reference: reference || null,
+    href: display.href,
+    searchHref: null,
+    badge: meaningfulTreatment(display.treatment),
+  };
+}
+
 /**
- * The end-of-document reference block — everything that used to crowd the
- * header (the bench, the topic, the jurisdiction, the tags), as a quiet
- * definition list. A reader consults this; nobody should have to climb over it.
+ * The end-of-document reference block — the bench (lead first, with coram
+ * roles), jurisdiction, tags — as a quiet definition list. A reader consults
+ * this; nobody should have to climb over it. The topic is NOT here: it is the
+ * header's subtitle, and a fact lives in one place.
  */
 function AboutThisCase({
   detail,
@@ -232,18 +360,22 @@ function AboutThisCase({
   detail: CaseDetail;
   countryCode: string | null;
 }) {
-  const hasBench = detail.judges.length > 0;
+  const bench = normalizeBench(detail.judges);
   const hasTags = !!detail.tags && detail.tags.length > 0;
-  if (!hasBench && !detail.topic && !detail.country && !hasTags) return null;
+  if (bench.length === 0 && !detail.country && !hasTags) return null;
 
   return (
-    <section aria-label="About this case" className="flex flex-col gap-3">
+    <section
+      id={SECTION.about}
+      aria-label="About this case"
+      className="flex scroll-mt-6 flex-col gap-3"
+    >
       <SectionHeading label="About this case" />
       <dl className="flex flex-col gap-3">
-        {hasBench ? (
-          <AboutRow term={detail.judges.length === 1 ? 'Judge' : 'Coram'}>
-            {detail.judges.map((judge, index) => (
-              <span key={judge.id}>
+        {bench.length > 0 ? (
+          <AboutRow term={bench.length === 1 ? 'Judge' : 'Coram'}>
+            {bench.map((judge, index) => (
+              <span key={judge.key}>
                 {index > 0 ? ', ' : ''}
                 {formatCaseName(judge.name)}
                 {judge.role ? (
@@ -256,8 +388,6 @@ function AboutThisCase({
             ))}
           </AboutRow>
         ) : null}
-
-        {detail.topic ? <AboutRow term="Topic">{detail.topic}</AboutRow> : null}
 
         {detail.country ? (
           <AboutRow term="Jurisdiction">
@@ -306,9 +436,13 @@ function AboutRow({ term, children }: { term: string; children: React.ReactNode 
 }
 
 /**
- * The enrichment-era holding: each principle VERBATIM from the judgment, with
- * its subject tag, its ratio/obiter mark, and — when attributed — the judge who
- * said it. One gold rule spans the set; entries separate by space.
+ * The enrichment-era holding, as a NUMBERED LIST — because that is what this
+ * data IS: the holdings list a law report prints before the judgment. Each
+ * entry is the verbatim principle with a hanging gold numeral in the margin
+ * and one caption line in one voice: Ratio/Obiter · the subject tag · the
+ * judge who said it. The numeral replaced the section-long gold bar — the
+ * bar made eight principles read as one continuous column with no boundaries
+ * (owner: "disorganised… not nicely rendered").
  *
  * `reviewed: false` rows only reach Researcher+ accounts (the server filters
  * them for everyone else), and they are BADGED rather than hidden — a reviewer
@@ -316,43 +450,85 @@ function AboutRow({ term, children }: { term: string; children: React.ReactNode 
  */
 function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] }) {
   return (
-    <section aria-label="Legal principles" className="flex flex-col gap-3">
-      <SectionHeading label="Legal principles" />
-      <div className="doc-holding">
-        <ol className="flex flex-col gap-5">
-          {principles.map((principle) => (
-            <li key={principle.id} className="flex flex-col gap-1.5">
-              <div className="doc-prose">
-                <CaseText value={principle.principle} />
-              </div>
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                {principle.tag ? (
-                  <span className="inline-flex min-h-5 items-center rounded-full bg-secondary px-2 text-[11px]">
-                    {principle.tag}
-                  </span>
-                ) : null}
-                {principle.type ? (
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
-                    {principle.type === 'ratio' ? 'Ratio' : 'Obiter'}
-                  </span>
-                ) : null}
-                {principle.judge ? (
-                  <span>
-                    Per {formatCaseName(principle.judge.name)}
-                    {principle.judge.role ? ` (${ROLE_LABELS[principle.judge.role]})` : ''}
-                  </span>
-                ) : null}
-                {!principle.reviewed ? (
-                  <span className="inline-flex min-h-5 items-center rounded-full bg-amber-500/15 px-2 text-[11px] font-medium text-amber-700 dark:text-amber-400">
-                    Unreviewed
-                  </span>
-                ) : null}
-              </p>
-            </li>
-          ))}
-        </ol>
-      </div>
+    <section
+      id={SECTION.principles}
+      aria-label="Legal principles"
+      className="flex scroll-mt-6 flex-col gap-3"
+    >
+      <SectionHeading
+        label="Legal principles"
+        count={principles.length}
+        sub="Verbatim from the judgment."
+      />
+      <ol className="flex flex-col gap-7">
+        {principles.map((principle, index) => (
+          <li
+            key={principle.id}
+            className="grid grid-cols-[2.5rem_minmax(0,1fr)]"
+          >
+            <span aria-hidden className="doc-principle-num">
+              {String(index + 1).padStart(2, '0')}
+            </span>
+            <div className="doc-prose">
+              <CaseText value={principle.principle} />
+            </div>
+            <PrincipleCaption principle={principle} />
+          </li>
+        ))}
+      </ol>
     </section>
+  );
+}
+
+/** The one caption line under a principle — its whole apparatus in one voice. */
+function PrincipleCaption({ principle }: { principle: ReportPrinciple }) {
+  const parts: React.ReactNode[] = [];
+
+  if (principle.type) {
+    parts.push(
+      principle.type === 'ratio' ? (
+        <span key="type" className="font-medium text-primary">
+          Ratio
+        </span>
+      ) : (
+        <span key="type" className="font-medium">
+          Obiter
+        </span>
+      ),
+    );
+  }
+  if (principle.tag) {
+    parts.push(<span key="tag">{sentenceCase(principle.tag)}</span>);
+  }
+  if (principle.judge?.name) {
+    parts.push(
+      <span key="judge">
+        Per {formatCaseName(principle.judge.name)}
+        {principle.judge.role ? ` (${ROLE_LABELS[principle.judge.role]})` : ''}
+      </span>,
+    );
+  }
+
+  if (parts.length === 0 && principle.reviewed) return null;
+
+  return (
+    <p className="col-start-2 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      {parts.flatMap((part, index) =>
+        index === 0
+          ? [part]
+          : [
+              <span key={`dot-${index}`} aria-hidden className="text-muted-foreground/40">
+                ·
+              </span>,
+              part,
+            ],
+      )}
+      {!principle.reviewed ? (
+        <span className="inline-flex min-h-5 items-center rounded-full bg-amber-500/15 px-2 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+          Unreviewed
+        </span>
+      ) : null}
+    </p>
   );
 }
 
@@ -363,7 +539,11 @@ function StructuredPrinciples({ principles }: { principles: ReportPrinciple[] })
  */
 function CaseHistory({ steps }: { steps: CourtHistoryStep[] }) {
   return (
-    <section aria-label="Case history" className="flex flex-col gap-3">
+    <section
+      id={SECTION.history}
+      aria-label="Case history"
+      className="flex scroll-mt-6 flex-col gap-3"
+    >
       <SectionHeading
         label="Case history"
         sub="How this case travelled through the courts."
@@ -425,49 +605,6 @@ function CaseHistory({ steps }: { steps: CourtHistoryStep[] }) {
           );
         })}
       </ol>
-    </section>
-  );
-}
-
-/** Statutes this judgment cited — linked when resolved, text when not. */
-function StatutesCited({ statutes }: { statutes: StatuteCitedEdge[] }) {
-  return (
-    <section aria-label="Statutes cited" className="flex flex-col gap-3">
-      <SectionHeading label="Statutes cited" />
-      <ul className="flex flex-col divide-y divide-border/60">
-        {statutes.map((edge) => {
-          const text = edge.statute?.title || edge.raw || 'Unnamed statute';
-          const body = (
-            <>
-              <span className="min-w-0 flex-1 text-sm text-foreground">{text}</span>
-              {edge.provision ? (
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {edge.provision}
-                </span>
-              ) : null}
-            </>
-          );
-          return (
-            <li key={edge.id}>
-              {edge.statute ? (
-                <Link
-                  href={`/statutes/${edge.statute.slug}`}
-                  className={cn(
-                    'v2-interactive flex min-h-11 items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/50',
-                    FOCUS_RING,
-                  )}
-                >
-                  {body}
-                </Link>
-              ) : (
-                <span className="flex min-h-11 items-center gap-3 px-2 py-2.5">
-                  {body}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }

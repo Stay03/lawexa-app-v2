@@ -111,6 +111,28 @@
 }
 
 /**
+ * The hanging numeral beside a structured principle — the entry boundary the
+ * old section-long gold bar could not draw. Gold, because the numerals ARE the
+ * "this is the law" mark now; tabular, so 01–12 align; padded down so the
+ * numeral sits on the first serif line's cap height rather than floating.
+ */
+.v2-case-doc .doc-principle-num {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--primary) 80%, var(--muted-foreground));
+  padding-top: 0.4375rem;
+}
+
+@media (min-width: 768px) {
+  .v2-case-doc .doc-principle-num {
+    padding-top: 0.5rem;
+  }
+}
+
+/**
  * The holding. Set apart by a rule and a slight lift rather than a card — the
  * standing "no box" rule applies to a judgment as much as to the home.
  *
