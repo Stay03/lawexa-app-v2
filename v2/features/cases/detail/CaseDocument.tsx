@@ -634,27 +634,21 @@ function LawTypeTabs({
 
 /**
  * The pre-enrichment fallback: a case whose principles are ONE flat editorial
- * string. Measured on live rows the field comes in two shapes, and each gets
- * its own rendering:
- *
- *   several blank-line paragraphs  = one principle per paragraph (Mustapha v
- *                                    Abubakar shipped five) → the SAME
- *                                    numbered entries as the structured list,
- *                                    minus the captions no metadata exists for;
- *   one continuous passage         = an eight-line serif wall (the owner's
- *                                    July 30 screenshot). The conservative
- *                                    statement split breaks it into breathing
- *                                    statements inside the gold-rule block —
- *                                    SPACED, not numbered, because machine-
- *                                    guessed boundaries get air while only an
- *                                    author's own blank lines earn numerals.
- *
- * So an unenriched case reads like an enriched one, and the day its
- * enrichment lands the page's shape barely moves.
+ * string. Whatever its shape — blank-line paragraphs (one principle each) or
+ * a single fused passage broken by the conservative statement split — it
+ * renders as the SAME numbered entries as an enriched case, minus the
+ * captions no metadata exists for. One design for the law, everywhere; the
+ * gold left rule is gone (owner, July 30). The numerals are page furniture
+ * (an entry's identity for reading and the outline), never the report's own
+ * paragraph numbers, so a conservative mis-split costs a boundary, not a
+ * citation. A passage too fused to split at all stays plain prose — a lone
+ * "01" would be decoration.
  */
 function FlatPrinciples({ text }: { text: string }) {
   const paragraphs = caseTextParagraphs(text);
   if (paragraphs.length === 0) return null;
+  const entries =
+    paragraphs.length > 1 ? paragraphs : splitPrincipleStatements(paragraphs[0]);
 
   return (
     <section
@@ -662,29 +656,25 @@ function FlatPrinciples({ text }: { text: string }) {
       aria-label="Legal principles"
       className="flex scroll-mt-6 flex-col gap-3"
     >
-      {paragraphs.length === 1 ? (
+      {entries.length > 1 ? (
         <>
-          <SectionHeading label="Legal principles" />
-          <div className="doc-holding">
-            <div className="doc-prose">
-              <CaseText
-                value={splitPrincipleStatements(paragraphs[0]).join('\n\n')}
-              />
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <SectionHeading label="Legal principles" count={paragraphs.length} />
+          <SectionHeading label="Legal principles" count={entries.length} />
           <ol className="flex flex-col gap-7">
-            {paragraphs.map((paragraph, index) => (
+            {entries.map((entry, index) => (
               <NumberedPrinciple key={index} index={index}>
                 <div className="doc-prose">
-                  <CaseText value={paragraph} />
+                  <CaseText value={entry} />
                 </div>
               </NumberedPrinciple>
             ))}
           </ol>
+        </>
+      ) : (
+        <>
+          <SectionHeading label="Legal principles" />
+          <div className="doc-prose">
+            <CaseText value={entries[0]} />
+          </div>
         </>
       )}
     </section>

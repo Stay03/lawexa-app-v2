@@ -12,6 +12,7 @@ import { formatCaseName } from '../case-name';
 import { CaseAskDock } from './CaseAsk';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
+import { ReadingProgress } from './ReadingProgress';
 import {
   CASE_COLUMN,
   CaseDocumentSkeleton,
@@ -110,6 +111,7 @@ function CaseBody({ slug }: { slug: string }) {
     // `.v2-case-doc` scopes the reading typography (case-document.css).
     // `relative` anchors the outline rail beside the column.
     <div className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
+      <ReadingProgress />
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         <CaseDocument detail={detail} />
       </div>

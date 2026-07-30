@@ -132,19 +132,10 @@
   }
 }
 
-/**
- * The holding. Set apart by a rule and a slight lift rather than a card — the
- * standing "no box" rule applies to a judgment as much as to the home.
- *
- * NOT italic (July 29). Principles are now routinely multi-paragraph — one
- * doctrine per paragraph, or several verbatim extracts — and italics are an
- * emphasis voice, not a reading voice; whole paragraphs of them measurably
- * slow reading. The gold rule alone carries the "this is the law" signal.
- */
-.v2-case-doc .doc-holding {
-  border-inline-start: 2px solid color-mix(in oklch, var(--primary) 55%, transparent);
-  padding-inline-start: 1rem;
-}
+/* The `.doc-holding` gold left rule is RETIRED (owner, July 30: "it has a
+   gold line on the left. I don't like that") — every principles shape now
+   renders as numbered entries, and the hanging gold numerals carry the
+   "this is the law" signal alone. */
 
 /**
  * A standalone part heading inside the summary ("Held:") — the July body

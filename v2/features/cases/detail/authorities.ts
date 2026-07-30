@@ -372,6 +372,119 @@ export function sentenceCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+/* ── Inline authorities — the citations INSIDE the prose ─────────────────── */
+
+/**
+ * A judgment's text is itself a web of authorities: "See Ohiaeri v. Yussuf
+ * (2009) 2 SCNJ 318, distinguished", "Section 598 of the Companies and Allied
+ * Matters Act". On the old page that was dead ink. `extractAuthorityRefs`
+ * finds those references so `CaseText` can render them as quiet library-search
+ * links — the same click-runs-a-search semantics as an unlinked authority row,
+ * now available mid-sentence. Sparse cases gain the most: they have no
+ * authority lists at all, but their principles cite cases in every line.
+ *
+ * PRECISION OVER RECALL. A missed citation is invisible; a mis-linked span of
+ * ordinary prose is broken typography. So a case reference must be CONFIRMED
+ * by a "(year)" after the parties, and a statute reference must be anchored
+ * on "section(s) … of the …" ending in an enactment word (Act, Constitution,
+ * Law, Code, Rules, Decree, Edict).
+ */
+export interface AuthorityRef {
+  kind: 'case' | 'statute';
+  /** Character span of the LINKED text inside the paragraph. */
+  start: number;
+  end: number;
+  href: string;
+}
+
+/** One word of a party name — allows initials, (Nig), R-Benkay, O'Neill. */
+const NAME_WORD = String.raw`\(?[A-Z0-9][A-Za-z0-9'’.&-]*\)?,?`;
+/** Lowercase words that legitimately sit INSIDE a party name. */
+const NAME_JOIN = String.raw`(?:of|and|the|&|de|da)`;
+const NAME_SEQ = String.raw`${NAME_WORD}(?:[ \t](?:${NAME_JOIN}|${NAME_WORD})){0,11}`;
+/** "A v. B" confirmed by a following (year). The versus token is matched in
+ *  any casing the clerks use — "v.", "Vs", "VS.", "vrs" — because raw text
+ *  carries all of them ("General & Aviation Services Ltd Vs Thahal (2000)"
+ *  was missed by a lowercase-only token on live data). */
+const CASE_REF = new RegExp(
+  String.raw`(${NAME_SEQ})[ \t](?:[Vv][Ss]?|VS|[Vv][Rr][Ss])\.?[ \t](${NAME_SEQ})(?=[ \t]*\((?:1[89]|20)\d{2}\))`,
+  'g',
+);
+/** Sentence-lead words the left party expansion must not swallow. Wide on
+ *  purpose: in ALL-CAPS judgment text every word looks like a name, so the
+ *  expansion grabs "IT WAS HELD IN MACFOY…" and these peel back to the party.
+ *  Only words that cannot OPEN a real party name belong here — "the" is safe
+ *  ("The State v. X" still searches as "State v. X"); "state" is not. */
+const LEAD_NOISE = new Set([
+  'see', 'in', 'also', 'cf', 'cf.', 'compare', 'held', 'and', 'or', 'but',
+  'the', 'a', 'an', 'of', 'however', 'thus', 'therefore', 'accordingly',
+  'applying', 'following', 'citing', 'distinguishing', 'per', 'vide', 'e.g.',
+  'i.e.', 'it', 'was', 'is', 'are', 'were', 'be', 'been', 'that', 'this',
+  'these', 'those', 'as', 'at', 'by', 'on', 'to', 'for', 'from', 'with',
+  'where', 'when', 'while', 'whether', 'because', 'since', 'so', 'if', 'then',
+  'than', 'such', 'said', 'stated', 'laid', 'down', 'decided', 'decision',
+  'case', 'authority', 'judgment', 'principle', 'rule',
+]);
+
+const STATUTE_REF = new RegExp(
+  String.raw`\b[Ss]ections?[ \t]+[\d][\d()A-Za-z]*(?:(?:,[ \t]*|[ \t]+and[ \t]+|[ \t]*&[ \t]*|[ \t]*[-–][ \t]*)[\d][\d()A-Za-z]*)*[ \t]+of[ \t]+the[ \t]+((?:(?:[A-Z][A-Za-z0-9'’&-]*|of|and|the)[ \t]+){0,10}(?:Act|Constitution|Law|Code|Rules|Decree|Edict))\b`,
+  'g',
+);
+
+export function extractAuthorityRefs(text: string): AuthorityRef[] {
+  const refs: AuthorityRef[] = [];
+
+  for (const match of text.matchAll(CASE_REF)) {
+    let start = match.index;
+    let left = match[1];
+    // Peel sentence-lead words the greedy expansion swallowed ("See Ohiaeri
+    // v. Yussuf" → link starts at "Ohiaeri").
+    for (;;) {
+      const firstWord = /^[^ \t]+[ \t]+/.exec(left);
+      if (!firstWord) break;
+      const bare = firstWord[0].trim().replace(/[.,]+$/, '').toLowerCase();
+      if (!LEAD_NOISE.has(bare)) break;
+      left = left.slice(firstWord[0].length);
+      start += firstWord[0].length;
+    }
+    if (!left) continue;
+    const end = match.index + match[0].length;
+    const span = text.slice(start, end).replace(/\s+/g, ' ');
+    refs.push({
+      kind: 'case',
+      start,
+      end,
+      href: `/cases?search=${encodeURIComponent(formatCaseName(span))}`,
+    });
+  }
+
+  for (const match of text.matchAll(STATUTE_REF)) {
+    let name = match[1];
+    const start = match.index + match[0].length - name.length;
+    let end = match.index + match[0].length;
+    // Names can CONTINUE past the enactment word — "Constitution of the
+    // Federal Republic of Nigeria" puts it first — so extend across a
+    // trailing capitalized "of …" run.
+    const tail = /^[ \t]of[ \t](?:the[ \t])?[A-Z][A-Za-z'’-]*(?:[ \t](?:[A-Z][A-Za-z'’-]*|of|the|and))*/.exec(
+      text.slice(end),
+    );
+    if (tail) {
+      end += tail[0].length;
+      name += tail[0];
+    }
+    // A statute name inside an already-linked case span would nest links.
+    if (refs.some((ref) => start < ref.end && end > ref.start)) continue;
+    refs.push({
+      kind: 'statute',
+      start,
+      end,
+      href: `/statutes?search=${encodeURIComponent(statuteSearchTerm(name))}`,
+    });
+  }
+
+  return refs.sort((a, b) => a.start - b.start);
+}
+
 /** Abbreviations whose trailing period does NOT end a legal sentence. */
 const NON_TERMINAL = new Set([
   'v', 'vs', 'vrs', 'ltd', 'plc', 'co', 'inc', 'anor', 'ors',

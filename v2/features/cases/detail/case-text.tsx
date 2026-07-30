@@ -1,4 +1,7 @@
 import { Fragment } from 'react';
+import Link from 'next/link';
+
+import { extractAuthorityRefs } from './authorities';
 
 /**
  * CaseText — the case body and the full judgment, rendered as TEXT.
@@ -31,6 +34,13 @@ import { Fragment } from 'react';
  * Nigerian judgment summaries lead paragraphs with `Held:`, `Facts:`, `Issue:`,
  * `Per Oputa JSC:` and so on. Those read as structure, so they are set apart —
  * as a real `<strong>` element, not by pasting `<strong>` into a string.
+ *
+ * ── INLINE AUTHORITIES (July 30) ────────────────────────────────────────────
+ * The prose cites cases and statutes in every other line, and on the old page
+ * that was dead ink. `extractAuthorityRefs` (authorities.ts — precision over
+ * recall, see its docblock) finds them, and they render as quiet dotted-gold
+ * links that open the library with the authority pre-filled as the search —
+ * the same click-runs-a-search semantics as an unlinked authority row.
  */
 
 /** Paragraph openers that mark a section of a judgment summary. */
@@ -79,6 +89,40 @@ export function caseTextParagraphs(value: string): string[] {
 }
 
 /**
+ * A passage with its inline authorities linked. The link keeps the serif's
+ * ink and marks itself with a dotted gold underline only — a reference mark,
+ * not a button — and the title says what a click does.
+ */
+function AuthorityLinkedText({ text }: { text: string }) {
+  const refs = extractAuthorityRefs(text);
+  if (refs.length === 0) return text;
+
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const ref of refs) {
+    if (ref.start > cursor) nodes.push(text.slice(cursor, ref.start));
+    nodes.push(
+      <Link
+        key={`${ref.kind}-${ref.start}`}
+        href={ref.href}
+        prefetch={false}
+        title={
+          ref.kind === 'case'
+            ? 'Find this case in the library'
+            : 'Find this statute in the library'
+        }
+        className="rounded-sm underline decoration-primary/45 decoration-dotted underline-offset-4 transition-colors hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        {text.slice(ref.start, ref.end)}
+      </Link>,
+    );
+    cursor = ref.end;
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return <>{nodes}</>;
+}
+
+/**
  * Render a plain-text legal passage.
  *
  * `whitespace-pre-line` preserves the author's SINGLE line breaks (numbered
@@ -97,7 +141,7 @@ export function CaseText({ value }: { value: string }) {
         if (!match) {
           return (
             <p key={index} className="whitespace-pre-line">
-              {paragraph}
+              <AuthorityLinkedText text={paragraph} />
             </p>
           );
         }
@@ -117,7 +161,8 @@ export function CaseText({ value }: { value: string }) {
         return (
           <p key={index} className="whitespace-pre-line">
             <strong>{match[1]}:</strong>
-            <Fragment> {rest}</Fragment>
+            <Fragment> </Fragment>
+            <AuthorityLinkedText text={rest} />
           </p>
         );
       })}

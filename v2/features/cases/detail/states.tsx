@@ -39,11 +39,15 @@ export function CaseDocumentSkeleton({ still = false }: { still?: boolean }) {
         </div>
       </div>
 
+      {/* The principles silhouette: numeral gutter + two lines of law. */}
       <div className="flex flex-col gap-2">
         <Skeleton className={cn('h-4 w-32 rounded', bar)} />
-        <div className="space-y-2 border-l-2 border-border/60 pl-4">
-          <Skeleton className={cn('h-4 w-full rounded', bar)} />
-          <Skeleton className={cn('h-4 w-11/12 rounded', bar)} />
+        <div className="flex gap-4">
+          <Skeleton className={cn('mt-1 h-3 w-6 shrink-0 rounded', bar)} />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className={cn('h-4 w-full rounded', bar)} />
+            <Skeleton className={cn('h-4 w-11/12 rounded', bar)} />
+          </div>
         </div>
       </div>
 
