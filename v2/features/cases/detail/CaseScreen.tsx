@@ -6,7 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 
 import { extractViewLimitError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { pushUrlParams, replaceUrlParams } from '@/v2/runtime/url-params';
+import {
+  quietPushUrlParams,
+  quietReplaceUrlParams,
+} from '@/v2/runtime/url-params';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
@@ -61,22 +64,25 @@ function CaseBody({ slug }: { slug: string }) {
   const searchQuery = searchParams.get('q')?.trim() || undefined;
 
   // ── The side chat: LOCAL STATE is the source of truth; the URL is a
-  // mirror and an entry point. ──
+  // mirror and an entry point, written QUIETLY. ──
   //
-  // The first implementation DERIVED the panel from `useSearchParams()`, so
-  // every open and close travelled through Next's patched history machinery
-  // (native write → internal sync → transition-priority re-render → react).
-  // That pipeline is proven for filtering a list; here it MOUNTS AND UNMOUNTS
-  // a heavy panel, and its quirks (restore repaints, transition interleaving,
-  // stale-segment reconciliation on a page the reader has been on for
-  // minutes) kept surfacing as the panel visibly closing, popping open, and
-  // closing again — un-reproducible in quick local tests, constant on prod.
+  // Two implementations died here; the autopsy is in `url-params.ts`. Short
+  // version: on a soft-navigated case page (served through the v2 rewrite
+  // proxy), ANY history write the App Router notices dispatches its Next-16
+  // restore machinery, whose segment walk trips over the rewritten `[slug]`
+  // param and spirals into an endless `/cases/undefined` refetch loop — and
+  // those background commits kept resurrecting the closing panel ("closes,
+  // pops open, closes again"). Deriving the panel from `useSearchParams()`
+  // (impl 1) made every loop commit re-toggle it; plain local state (impl 2)
+  // still re-initialised on the loop's remounts. The cure is upstream of
+  // both: the QUIET writes below change the URL without waking the router at
+  // all, so the loop never starts and nothing ever re-renders the panel but
+  // the reader.
   //
-  // Now: `chat` changes ONLY on user action (open / close / switch / the
-  // browser's Back), so no router re-render can ever toggle the panel.
+  //  - `chat` changes ONLY on user action (open / close / switch / Back);
   //  - state initialises from the URL once, on mount (direct `?chat=` links);
-  //  - open PUSHES the param (Back closes the panel — the owner's ask);
-  //  - close and in-panel hops REPLACE it (the panel stays ONE history
+  //  - open quiet-PUSHES the param (Back closes the panel);
+  //  - close and in-panel hops quiet-REPLACE it (the panel stays ONE history
   //    entry, so Back closes in one step and never walks internal hops);
   //  - one popstate listener adopts the real URL on Back/Forward.
   const [chat, setChat] = useState<string | null>(
@@ -84,15 +90,15 @@ function CaseBody({ slug }: { slug: string }) {
   );
   const openChat = useCallback((id: string) => {
     setChat(id);
-    pushUrlParams({ chat: id });
+    quietPushUrlParams({ chat: id });
   }, []);
   const closeChat = useCallback(() => {
     setChat(null);
-    replaceUrlParams({ chat: null });
+    quietReplaceUrlParams({ chat: null });
   }, []);
   const switchChat = useCallback((id: string) => {
     setChat(id);
-    replaceUrlParams({ chat: id });
+    quietReplaceUrlParams({ chat: id });
   }, []);
   useEffect(() => {
     const onPopState = () => {
