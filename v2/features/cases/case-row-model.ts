@@ -95,6 +95,11 @@ export function trendingRow(item: TrendingCaseDetailItem): CaseRowModel {
  * Deterministic date formatting for a row. `Date.parse` is pure, so it is safe
  * in render (unlike a zero-argument `new Date()`), and an unparseable value
  * yields '' rather than "Invalid Date".
+ *
+ * FORMATTED IN UTC, always: judgment dates are date-only strings
+ * ("2005-12-22"), which `Date.parse` reads as UTC midnight — rendering that
+ * instant in viewer-local time would show the PREVIOUS day to any reader west
+ * of UTC. A legal date must not depend on the reader's timezone.
  */
 export function formatCaseDate(
   iso: string | null,
@@ -109,6 +114,7 @@ export function formatCaseDate(
     day: 'numeric',
     month: style === 'long' ? 'long' : 'short',
     year: 'numeric',
+    timeZone: 'UTC',
   });
 }
 

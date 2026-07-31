@@ -38,13 +38,13 @@ export function BookmarkButton({
   variant?: 'icon' | 'full';
   className?: string;
 }) {
-  const toggle = useToggleCaseBookmark();
+  const toggle = useToggleCaseBookmark(caseId);
 
   const press = (event: React.MouseEvent) => {
     // A row is a link; the star inside it must not navigate.
     event.preventDefault();
     event.stopPropagation();
-    toggle.mutate({ id: caseId, next: !isBookmarked });
+    toggle.mutate({ next: !isBookmarked });
   };
 
   const label = isBookmarked ? 'Remove bookmark' : 'Save case';

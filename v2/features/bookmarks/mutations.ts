@@ -32,21 +32,23 @@ import { restoreBookmarkSnapshot, writeBookmarkEverywhere } from './cache';
  * ERRORS ride the global `MutationCache.onError` toast — one error channel for
  * every v2 mutation — after the snapshot is restored here.
  */
-export function useToggleCaseBookmark() {
+export function useToggleCaseBookmark(caseId: number) {
   const queryClient = useQueryClient();
 
   return useMutation<
     BookmarkToggleResponse,
     Error,
-    { id: number; next: boolean },
+    { next: boolean },
     { snapshot: ReturnType<typeof writeBookmarkEverywhere> }
   >({
-    mutationFn: ({ id }) => bookmarksApi.toggle({ type: 'case', id }),
-    // One scope per case: a burst of taps on the SAME star is serialized, so the
-    // last write is the last one the server sees. Different cases stay parallel.
-    scope: { id: 'bookmark-case' },
+    mutationFn: () => bookmarksApi.toggle({ type: 'case', id: caseId }),
+    // One scope PER CASE — the id is in the scope, so a burst of taps on the
+    // SAME star is serialized (the last write is the last one the server sees)
+    // while stars on different cases stay parallel. The id lives on the hook,
+    // not the variables, precisely so the scope can carry it.
+    scope: { id: `bookmark-case-${caseId}` },
     meta: { invalidates: [bookmarksQueries.lists()] },
-    onMutate: async ({ id, next }) => {
+    onMutate: async ({ next }) => {
       // Stop in-flight CASE reads before writing: a response already on the wire
       // was built before the POST, so letting it land would revert the star.
       // Cancelling a next-page fetch is the cost, and it recovers on its own —
@@ -57,7 +59,7 @@ export function useToggleCaseBookmark() {
         queryClient.cancelQueries({ queryKey: casesQueries.lists() }),
         queryClient.cancelQueries({ queryKey: casesQueries.details() }),
       ]);
-      return { snapshot: writeBookmarkEverywhere(queryClient, id, next) };
+      return { snapshot: writeBookmarkEverywhere(queryClient, caseId, next) };
     },
     onError: (_error, _variables, context) => {
       if (context) restoreBookmarkSnapshot(queryClient, context.snapshot);
