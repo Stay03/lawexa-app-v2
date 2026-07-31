@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Check, Copy } from 'lucide-react';
+import { Check, ChevronDown, Copy } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { formatTreatment, relatedToDisplay } from '@/lib/utils/related-cases';
@@ -222,7 +222,9 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
 
         {detail.citation || detail.suit_no ? (
           <p className="doc-citation flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            {detail.citation ? <CopyCitation citation={detail.citation} /> : null}
+            {detail.citation ? (
+              <CopyCitation name={name} citation={detail.citation} />
+            ) : null}
             {detail.citation && detail.suit_no ? (
               <span aria-hidden className="text-muted-foreground/40">
                 ·
@@ -332,17 +334,20 @@ function meaningfulTreatment(treatment: string | null) {
 }
 
 /**
- * The citation line as a one-click copy — the string a lawyer retypes into
- * every brief. The confirmation lives IN the control (icon flips to a check
- * for two seconds), the same rule as the Share action's "Link copied".
- * Clipboard denial fails silent: the text is still selectable.
+ * The citation line as a one-click copy — but what lands on the clipboard is
+ * the FULL reference a lawyer retypes into a brief: "{name} {citation}"
+ * (owner, July 31 — a bare citation still has to be reunited with its case
+ * name by hand). The control shows the citation alone; the confirmation lives
+ * IN it (icon flips to a check for two seconds), the same rule as the Share
+ * action's "Link copied". Clipboard denial fails silent: the text is still
+ * selectable.
  */
-function CopyCitation({ citation }: { citation: string }) {
+function CopyCitation({ name, citation }: { name: string; citation: string }) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(citation);
+      await navigator.clipboard.writeText(`${name} ${citation}`);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -354,7 +359,7 @@ function CopyCitation({ citation }: { citation: string }) {
     <button
       type="button"
       onClick={() => void copy()}
-      aria-label={copied ? 'Citation copied' : 'Copy the citation'}
+      aria-label={copied ? 'Case name and citation copied' : 'Copy the case name and citation'}
       className={cn(
         'v2-interactive group/copy inline-flex items-center gap-1.5 rounded-md py-0.5 text-left transition-colors hover:text-foreground',
         FOCUS_RING,
@@ -564,9 +569,7 @@ function StructuredPrinciples({
       >
         {entries.map(({ principle, index }) => (
           <NumberedPrinciple key={principle.id} index={index}>
-            <div className="doc-prose">
-              <CaseText value={principle.principle} />
-            </div>
+            <PrincipleBody text={principle.principle} />
             <PrincipleCaption principle={principle} showLawType={!showTabs} />
           </NumberedPrinciple>
         ))}
@@ -662,9 +665,7 @@ function FlatPrinciples({ text }: { text: string }) {
           <ol className="flex flex-col gap-7">
             {entries.map((entry, index) => (
               <NumberedPrinciple key={index} index={index}>
-                <div className="doc-prose">
-                  <CaseText value={entry} />
-                </div>
+                <PrincipleBody text={entry} />
               </NumberedPrinciple>
             ))}
           </ol>
@@ -672,12 +673,76 @@ function FlatPrinciples({ text }: { text: string }) {
       ) : (
         <>
           <SectionHeading label="Legal principles" />
-          <div className="doc-prose">
-            <CaseText value={entries[0]} />
-          </div>
+          <PrincipleBody text={entries[0]} />
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * A single principle can run to a full screen of verbatim judgment (owner,
+ * July 31: "it can get too long sometimes"). Past this many characters —
+ * roughly twelve rendered lines, comfortably more than the clamp shows — the
+ * body clamps to ~7 lines behind a fade, and the reader opens the rest on
+ * purpose. A LENGTH threshold, not a measurement: deterministic, SSR-stable,
+ * and no post-render measuring loop. Short principles never clamp, so the
+ * fade can never sit over text that already fits.
+ */
+const PRINCIPLE_CLAMP_CHARS = 900;
+
+/**
+ * A principle's text, clamped when long. `interpolate-size` lets supporting
+ * engines animate the clamp ⇄ full-height change (max-height: max-content);
+ * everywhere else the toggle is instant — a degradation, never a break.
+ */
+function PrincipleBody({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  if (text.length <= PRINCIPLE_CLAMP_CHARS) {
+    return (
+      <div className="doc-prose">
+        <CaseText value={text} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      <div
+        className={cn(
+          'relative w-full overflow-hidden [interpolate-size:allow-keywords] transition-[max-height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+          expanded ? 'max-h-max' : 'max-h-56',
+        )}
+      >
+        <div className="doc-prose">
+          <CaseText value={text} />
+        </div>
+        {/* The fade — the honest "there is more" signal; dissolves on expand. */}
+        <div
+          aria-hidden
+          data-shown={!expanded}
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent transition-opacity duration-300 data-[shown=false]:opacity-0 motion-reduce:transition-none"
+        />
+      </div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          'v2-interactive inline-flex min-h-8 items-center gap-1 rounded-full text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
+          FOCUS_RING,
+        )}
+      >
+        {expanded ? 'See less' : 'See more'}
+        <ChevronDown
+          aria-hidden
+          className={cn(
+            'size-3.5 transition-transform duration-200 motion-reduce:transition-none',
+            expanded && 'rotate-180',
+          )}
+        />
+      </button>
+    </div>
   );
 }
 
