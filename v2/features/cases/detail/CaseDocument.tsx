@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Check, ChevronDown, Copy } from 'lucide-react';
 
@@ -681,67 +681,97 @@ function FlatPrinciples({ text }: { text: string }) {
 }
 
 /**
- * A single principle can run to a full screen of verbatim judgment (owner,
- * July 31: "it can get too long sometimes"). Past this many characters —
- * roughly twelve rendered lines, comfortably more than the clamp shows — the
- * body clamps to ~7 lines behind a fade, and the reader opens the rest on
- * purpose. A LENGTH threshold, not a measurement: deterministic, SSR-stable,
- * and no post-render measuring loop. Short principles never clamp, so the
- * fade can never sit over text that already fits.
+ * A numbered report principle can run long (owner, July 31 — and the first
+ * cut of this missed him: it clamped past ~900 characters, "roughly twelve
+ * lines", but REAL principles measure 96–587 characters, so no real case
+ * ever showed a See more). Character counts cannot decide this — the same
+ * 500 characters are seven desktop lines and thirteen mobile lines — so the
+ * MEASUREMENT decides: a principle whose rendered height genuinely exceeds
+ * the clamp gets the fade + See more; one that fits renders untouched. The
+ * fade can therefore never sit over text that already fits, at any width.
  */
-const PRINCIPLE_CLAMP_CHARS = 900;
+
+/** Below this many characters a principle cannot exceed the clamp even at
+ *  the narrowest width — skipped entirely, no observer spent on it. */
+const PRINCIPLE_CLAMP_CANDIDATE_CHARS = 280;
+/** The clamp: ~7 reading lines. Keep in step with `max-h-56` below. */
+const PRINCIPLE_CLAMP_PX = 224;
+/** Ignore overflow smaller than a line — a fade hiding 10px is a lie. */
+const PRINCIPLE_CLAMP_SLACK_PX = 24;
 
 /**
- * A principle's text, clamped when long. `interpolate-size` lets supporting
- * engines animate the clamp ⇄ full-height change (max-height: max-content);
- * everywhere else the toggle is instant — a degradation, never a break.
+ * A principle's text, clamped when it measurably overflows. The overflow
+ * check rides a ResizeObserver (its initial delivery replaces any effect-time
+ * setState, and width changes re-decide honestly). Pre-measure, a candidate
+ * renders height-capped with NO fade/button — a fitting principle is capped
+ * invisibly and released; a long one gains the fade one paint later.
+ * `interpolate-size` lets supporting engines animate clamp ⇄ full height
+ * (max-height: max-content); elsewhere the toggle is instant.
  */
 function PrincipleBody({ text }: { text: string }) {
+  const candidate = text.length > PRINCIPLE_CLAMP_CANDIDATE_CHARS;
   const [expanded, setExpanded] = useState(false);
-  if (text.length <= PRINCIPLE_CLAMP_CHARS) {
-    return (
-      <div className="doc-prose">
-        <CaseText value={text} />
-      </div>
-    );
-  }
+  // null = candidate awaiting measurement; false = fits; true = clamps.
+  const [overflowing, setOverflowing] = useState<boolean | null>(
+    candidate ? null : false,
+  );
+  const proseRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!candidate) return;
+    const prose = proseRef.current;
+    if (!prose) return;
+    const observer = new ResizeObserver(() => {
+      setOverflowing(
+        prose.scrollHeight > PRINCIPLE_CLAMP_PX + PRINCIPLE_CLAMP_SLACK_PX,
+      );
+    });
+    observer.observe(prose);
+    return () => observer.disconnect();
+  }, [candidate]);
+
+  const clamped = overflowing !== false && !expanded;
 
   return (
     <div className="flex flex-col items-start gap-1.5">
       <div
         className={cn(
-          'relative w-full overflow-hidden [interpolate-size:allow-keywords] transition-[max-height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
-          expanded ? 'max-h-max' : 'max-h-56',
+          'relative w-full [interpolate-size:allow-keywords] transition-[max-height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+          clamped ? 'max-h-56 overflow-hidden' : 'max-h-max',
         )}
       >
-        <div className="doc-prose">
+        <div ref={proseRef} className="doc-prose">
           <CaseText value={text} />
         </div>
-        {/* The fade — the honest "there is more" signal; dissolves on expand. */}
-        <div
-          aria-hidden
-          data-shown={!expanded}
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent transition-opacity duration-300 data-[shown=false]:opacity-0 motion-reduce:transition-none"
-        />
+        {overflowing ? (
+          // The fade — the honest "there is more" signal; dissolves on expand.
+          <div
+            aria-hidden
+            data-shown={clamped}
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent transition-opacity duration-300 data-[shown=false]:opacity-0 motion-reduce:transition-none"
+          />
+        ) : null}
       </div>
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
-        className={cn(
-          'v2-interactive inline-flex min-h-8 items-center gap-1 rounded-full text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
-          FOCUS_RING,
-        )}
-      >
-        {expanded ? 'See less' : 'See more'}
-        <ChevronDown
-          aria-hidden
+      {overflowing ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
           className={cn(
-            'size-3.5 transition-transform duration-200 motion-reduce:transition-none',
-            expanded && 'rotate-180',
+            'v2-interactive inline-flex min-h-8 items-center gap-1 rounded-full text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
+            FOCUS_RING,
           )}
-        />
-      </button>
+        >
+          {expanded ? 'See less' : 'See more'}
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              'size-3.5 transition-transform duration-200 motion-reduce:transition-none',
+              expanded && 'rotate-180',
+            )}
+          />
+        </button>
+      ) : null}
     </div>
   );
 }
