@@ -1,0 +1,208 @@
+/**
+ * The radar-report reading surface — the v2 reading grammar (the case
+ * document's two-voice system: caps-tracked sans for structure, the Fraunces
+ * serif for the content), re-expressed for an AI-authored markdown report.
+ *
+ * Scoped to `.v2-radar-report`, beside the component that renders it — the
+ * same reasoning as `case-document.css`: descendant rules are the honest tool
+ * for text the component does not emit element-by-element (everything inside
+ * react-markdown), and the v2 tree never reaches into v1 styling.
+ *
+ * The report's OWN headings (`##` in the markdown) render in the label voice
+ * so the document reads as one system with the case page; the body carries
+ * the serif reading voice at the same measure.
+ */
+
+.v2-radar-report {
+  --report-measure: 68ch;
+}
+
+/* ── The header block ───────────────────────────────────────────────────── */
+
+.v2-radar-report .report-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.v2-radar-report .report-title {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
+  font-weight: 600;
+  font-size: clamp(1.375rem, 1.1rem + 1.4vw, 1.875rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* ── The report body ────────────────────────────────────────────────────── */
+
+.v2-radar-report .report-prose {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 30, 'WONK' 0, 'opsz' 14;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: color-mix(in oklch, var(--foreground) 92%, transparent);
+  font-feature-settings: 'kern', 'liga', 'calt', 'onum';
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  max-width: var(--report-measure);
+  overflow-wrap: break-word;
+}
+
+@media (min-width: 768px) {
+  .v2-radar-report .report-prose {
+    font-size: 1.125rem;
+    line-height: 1.8;
+  }
+}
+
+.v2-radar-report .report-prose > * + * {
+  margin-top: 1.1em;
+}
+
+.v2-radar-report .report-prose strong {
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+.v2-radar-report .report-prose em {
+  font-style: italic;
+}
+
+/* Markdown headings wear the LABEL voice — structure, not content. The
+   report's h1 is reserved for the page title, so the body starts at h2. */
+.v2-radar-report .report-prose h1,
+.v2-radar-report .report-prose h2 {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-top: 2.2em;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* The hairline running to the margin — the case page's section rule. */
+.v2-radar-report .report-prose h1::after,
+.v2-radar-report .report-prose h2::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: color-mix(in oklch, var(--border) 60%, transparent);
+}
+
+.v2-radar-report .report-prose h3,
+.v2-radar-report .report-prose h4 {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+  margin-top: 1.8em;
+}
+
+.v2-radar-report .report-prose ul,
+.v2-radar-report .report-prose ol {
+  padding-inline-start: 1.4em;
+}
+
+.v2-radar-report .report-prose ul {
+  list-style: disc;
+}
+
+.v2-radar-report .report-prose ol {
+  list-style: decimal;
+}
+
+.v2-radar-report .report-prose li + li {
+  margin-top: 0.45em;
+}
+
+.v2-radar-report .report-prose li::marker {
+  color: color-mix(in oklch, var(--primary) 80%, var(--muted-foreground));
+  font-family: var(--font-sans);
+  font-size: 0.8em;
+}
+
+.v2-radar-report .report-prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--primary) 40%, transparent);
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 150ms;
+}
+
+.v2-radar-report .report-prose a:hover {
+  text-decoration-color: var(--primary);
+}
+
+.v2-radar-report .report-prose blockquote {
+  border-inline-start: 2px solid color-mix(in oklch, var(--primary) 50%, transparent);
+  padding-inline-start: 1em;
+  color: var(--muted-foreground);
+}
+
+.v2-radar-report .report-prose code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+  background: var(--muted);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+}
+
+.v2-radar-report .report-prose pre {
+  background: var(--muted);
+  border-radius: 0.75rem;
+  padding: 0.9em 1em;
+  overflow-x: auto;
+}
+
+.v2-radar-report .report-prose pre code {
+  background: none;
+  padding: 0;
+}
+
+.v2-radar-report .report-prose hr {
+  border: 0;
+  height: 1px;
+  background: color-mix(in oklch, var(--border) 60%, transparent);
+  margin-block: 2em;
+}
+
+/* Tables scroll INSIDE their wrapper (`.report-table`, emitted by the
+   renderer) — the page body never scrolls horizontally. */
+.v2-radar-report .report-table {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.v2-radar-report .report-prose table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.v2-radar-report .report-prose th,
+.v2-radar-report .report-prose td {
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  padding: 0.5em 0.75em;
+  text-align: start;
+  vertical-align: top;
+}
+
+.v2-radar-report .report-prose th {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--secondary) 60%, transparent);
+}

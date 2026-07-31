@@ -96,7 +96,9 @@ function formatTime(hour: number, minute: number): string {
   return `${displayHour}:${displayMinute} ${period}`;
 }
 
-function ordinal(day: number): string {
+/** "1st" / "2nd" / "23rd" — exported for the schedule pickers' month-day
+ *  labels, so the copy here and in `describeCron` cannot drift. */
+export function ordinal(day: number): string {
   const mod100 = day % 100;
   if (mod100 >= 11 && mod100 <= 13) return `${day}th`;
   switch (day % 10) {
