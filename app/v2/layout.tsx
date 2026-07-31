@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { HydrationBoundary } from '@tanstack/react-query';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -12,6 +13,7 @@ import { V2Drawer } from '@/v2/shell/V2Drawer';
 import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
+import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
 import { SessionSync } from './session-sync';
@@ -145,6 +147,15 @@ export default async function V2Layout({
           on soft-nav away) — the document-scroll lock must follow the shell's
           lifecycle because React never unloads the stylesheet. */}
       <DocumentLock />
+      {/* Back/Forward + reload scroll restoration for the shell's ONE scroll
+          container — the div is invisible to both native restoration and the
+          router, so it restores itself. Push scroll stays Next's (see the
+          ownership contract in the module). Renders null; the Suspense is the
+          `useSearchParams` requirement (its settle effect re-stamps entries
+          after loud filter writes), never a visual boundary. */}
+      <Suspense fallback={null}>
+        <ScrollMemory />
+      </Suspense>
       <V2QueryProvider>
         {/* PRIVACY BOUNDARY — drops the whole v2 cache whenever the verified viewer
             changes. The v2 QueryClient is a module singleton and v1's sign-out clears
