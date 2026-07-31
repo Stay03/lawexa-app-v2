@@ -7,6 +7,7 @@ import {
   MessageSquare,
   NotebookPen,
   PenSquare,
+  Radar,
   Scale,
   BookText,
   type LucideIcon,
@@ -55,6 +56,7 @@ export const v2NewChat: V2NavLeaf = {
  */
 export const v2NavItems: V2NavItem[] = [
   { label: 'Conversations', href: '/conversations', icon: MessageSquare },
+  { label: 'Radar', href: '/radars', icon: Radar },
   {
     label: 'Library',
     href: '/cases',

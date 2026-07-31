@@ -30,6 +30,14 @@
  * v2 pages ship their metadata and OG cards now, and flipping the audience is a
  * separate, reversible decision.
  */
+/**
+ * `/statutes/*` is the second public library surface (list + AKN reader), on the
+ * same audience argument as `/cases/*`. `/radars/*` is private (list, create,
+ * detail, scan reports); the scan-report leaf can be opened by a share link, and
+ * v1's separate `/settings` and `/scan-log` sub-routes intentionally do NOT come
+ * along — v2 folds both into the detail screen, and an old link falls through
+ * this same wildcard to the v2 detail's not-found handling rather than to v1.
+ */
 export const V2_ROUTES = [
   '/',
   '/work',
@@ -37,6 +45,8 @@ export const V2_ROUTES = [
   '/c/*',
   '/conversations',
   '/cases/*',
+  '/statutes/*',
+  '/radars/*',
 ] as const;
 
 export type V2Route = (typeof V2_ROUTES)[number];
