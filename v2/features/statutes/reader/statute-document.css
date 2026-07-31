@@ -1,0 +1,291 @@
+/**
+ * The v2 statute reading surface — `.v2-statute-doc`, the case-document
+ * grammar (`v2/features/cases/detail/case-document.css`) re-expressed for
+ * legislation.
+ *
+ * WHY CSS AND NOT TAILWIND CLASSES: everything here styles text the renderer
+ * does not emit element-by-element — the paragraphs inside provisions, the
+ * cells inside schedule tables. Descendant rules are the honest tool, and
+ * they keep `AknNode.tsx` about STRUCTURE.
+ *
+ * WHY IT REPLACES v1's `.statute-document` (globals.css) rather than reusing
+ * it: that block is v1's, global, hardcodes oklch colours (broken against
+ * theme changes), justifies + hyphenates text (both rejected by the v2
+ * reading system), and centres headings. This file is scoped, sits beside its
+ * renderer, and speaks only theme tokens — correct in light and dark by
+ * construction.
+ *
+ * The two-voice system holds: caps-tracked sans for SCAFFOLDING (kickers,
+ * part numbers, provision numbers), the Fraunces serif for THE LAW. `WONK 0`,
+ * low `SOFT`, pinned `opsz` per role — editorial, not whimsical.
+ */
+
+.v2-statute-doc {
+  --doc-measure: 68ch;
+}
+
+/* ── The heading block (shared voices with the case document) ───────────── */
+
+.v2-statute-doc .doc-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.v2-statute-doc .doc-title {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 1.2rem + 1.6vw, 2.125rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/** The short designation ("Act 459", "Cap C23") — a reference string, set in
+ *  the UI sans so it never reads as part of the serif name. */
+.v2-statute-doc .doc-citation {
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+  color: var(--muted-foreground);
+}
+
+/* ── The document body ──────────────────────────────────────────────────── */
+
+/**
+ * The serif reading voice, set ONCE on the document container — every
+ * provision paragraph inherits it. Same metrics as the case page's
+ * `.doc-prose`, so a reader moving between a judgment and the Act it applied
+ * reads one typographic system. No `text-align: justify`, no `hyphens` —
+ * both v1 habits the v2 reading system rejects.
+ */
+.v2-statute-doc .akn-doc {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 30, 'WONK' 0, 'opsz' 14;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: color-mix(in oklch, var(--foreground) 92%, transparent);
+  font-feature-settings: 'kern', 'liga', 'calt', 'onum';
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  max-width: var(--doc-measure);
+}
+
+@media (min-width: 768px) {
+  .v2-statute-doc .akn-doc {
+    font-size: 1.125rem;
+    line-height: 1.8;
+  }
+}
+
+/* ── Block rhythm ───────────────────────────────────────────────────────── */
+
+/**
+ * `content-visibility: auto` is the big-document lever: offscreen provision
+ * blocks skip layout and paint entirely, so a 719-node Act scrolls at the
+ * cost of the screenful in view. `contain-intrinsic-size: auto 18rem` gives
+ * an unrendered block an honest placeholder height (and `auto` remembers the
+ * real height once rendered, so scrollbar drift self-corrects as you read).
+ * Applied ONLY to body blocks (`.akn-cv`) — division headings are cheap and
+ * staying laid out keeps outline jumps exact.
+ */
+.v2-statute-doc .akn-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 18rem;
+}
+
+/** Every anchored block clears the top edge when jumped to. */
+.v2-statute-doc .akn-block {
+  scroll-margin-top: 1.5rem;
+}
+
+.v2-statute-doc .akn-block + .akn-block {
+  margin-top: 1.75rem;
+}
+
+.v2-statute-doc .akn-block + .akn-division {
+  margin-top: 3.5rem;
+}
+
+.v2-statute-doc .akn-block + .akn-crossheading {
+  margin-top: 2.25rem;
+}
+
+/* ── Divisions (part / chapter / schedule headings) ─────────────────────── */
+
+/** The division number ("PART I") — the label voice, gold-warmed. */
+.v2-statute-doc .akn-division-num {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--primary) 75%, var(--muted-foreground));
+}
+
+.v2-statute-doc .akn-division-heading {
+  margin-top: 0.375rem;
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 28;
+  font-weight: 600;
+  font-size: 1.375rem;
+  line-height: 1.3;
+  color: var(--foreground);
+  text-wrap: balance;
+}
+
+/** Source headings often arrive ALL-CAPS; small-caps tracking would fight
+ *  them — leave case alone, scale carries the hierarchy. */
+.v2-statute-doc .akn-division[data-depth='1'] .akn-division-heading {
+  font-size: 1.1875rem;
+}
+
+.v2-statute-doc .akn-division-sub {
+  margin-top: 0.25rem;
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+}
+
+/** Crossheadings — the sub-group label between sections. */
+.v2-statute-doc .akn-crossheading {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--foreground);
+}
+
+/* ── Sections and provisions ────────────────────────────────────────────── */
+
+.v2-statute-doc .akn-section-heading {
+  font-weight: 600;
+  font-size: 1.0625em;
+  line-height: 1.4;
+  color: var(--foreground);
+  margin-bottom: 0.625rem;
+}
+
+.v2-statute-doc .akn-section-num {
+  color: color-mix(in oklch, var(--primary) 80%, var(--muted-foreground));
+}
+
+/** An inner heading that surfaces outside the section grammar. */
+.v2-statute-doc .akn-inner-heading {
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0.75rem 0 0.375rem;
+}
+
+/**
+ * The provision grid: num in the gutter, body in the column. `max-content`
+ * lets a wide num — "(viii)" — take its width instead of wrapping; the
+ * minimum keeps short nums — "(1)" — on one shared axis.
+ */
+.v2-statute-doc .akn-numbered {
+  display: grid;
+  grid-template-columns: minmax(2.25rem, max-content) minmax(0, 1fr);
+  column-gap: 0.625rem;
+  margin: 0.625rem 0;
+}
+
+.v2-statute-doc .akn-num {
+  font-weight: 500;
+  color: color-mix(in oklch, var(--foreground) 80%, transparent);
+}
+
+.v2-statute-doc .akn-unnumbered {
+  margin: 0.625rem 0;
+}
+
+.v2-statute-doc .akn-p + .akn-p {
+  margin-top: 0.75em;
+}
+
+.v2-statute-doc .akn-p strong {
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+/** The enacting formula ("AN ACT to …") — the document's opening breath. */
+.v2-statute-doc .akn-longtitle {
+  font-style: italic;
+  color: color-mix(in oklch, var(--foreground) 78%, transparent);
+}
+
+.v2-statute-doc .akn-proviso {
+  font-style: italic;
+}
+
+/** Editorial annotations — "[As substituted by …]" — quiet, never loud. */
+.v2-statute-doc .akn-remark {
+  font-size: 0.8125em;
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+/* ── Lists ──────────────────────────────────────────────────────────────── */
+
+/** Source lists carry their own "(a)" markers in the text — no double marks. */
+.v2-statute-doc .akn-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.v2-statute-doc .akn-list-item {
+  margin: 0.375rem 0;
+}
+
+/* ── Tables (schedules, fee tables) ─────────────────────────────────────── */
+
+/** The mobile fix: the TABLE scrolls inside its wrapper; the page never
+ *  scrolls horizontally. */
+.v2-statute-doc .akn-table-wrap {
+  overflow-x: auto;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+.v2-statute-doc .akn-table {
+  width: 100%;
+  min-width: 32rem;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.v2-statute-doc .akn-table-caption {
+  caption-side: top;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.v2-statute-doc .akn-table th,
+.v2-statute-doc .akn-table td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.v2-statute-doc .akn-table th {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: color-mix(in oklch, var(--secondary) 60%, transparent);
+}
+
+/** Cell paragraphs are dense rows, not prose paragraphs. */
+.v2-statute-doc .akn-table .akn-p + .akn-p {
+  margin-top: 0.5em;
+}

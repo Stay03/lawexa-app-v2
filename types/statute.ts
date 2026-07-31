@@ -7,6 +7,16 @@ import type { Country, PaginationMeta, PaginationLinks } from './case';
 // Statute status values
 export type StatuteStatus = 'active' | 'repealed' | 'amended';
 
+// What repealed a repealed statute (verified live on list + show payloads,
+// July 31, 2026 — present on repealed rows, null otherwise).
+export interface StatuteRepealedBy {
+  title: string;
+  // ISO date of the repeal.
+  date: string | null;
+  // FRBR work URI of the repealing instrument, e.g. "/akn/gh/act/2020/1023".
+  uri: string | null;
+}
+
 // Statute creator (embedded in responses)
 export interface StatuteCreator {
   id: number;
@@ -40,12 +50,31 @@ export interface Statute {
   bookmarks_count: number;
   created_at: string;
   updated_at: string;
+  // ── Fields the API ships that predate this file (verified against prod,
+  // July 31, 2026 — present on both the list and show payloads). Optional so
+  // no existing consumer's expectations change.
+  /** The enacting formula ("AN ACT to …"), usually mirrored by `preamble`. */
+  long_title?: string | null;
+  /** AKN document type, e.g. `"act"`. */
+  document_type?: string | null;
+  /** FRBR work URI, e.g. `"/akn/gh/act/1993/459"`. */
+  frbr_uri?: string | null;
+  /** Date of assent (ISO date). */
+  assent_date?: string | null;
+  /** Consolidation window ("as at" dates), when the text is a consolidation. */
+  as_at_date?: string | null;
+  as_at_date_end?: string | null;
+  /** The repealing instrument, on repealed statutes. */
+  repealed_by?: StatuteRepealedBy | null;
 }
 
 // Full statute detail (from GET /api/statutes/{slug})
 export interface StatuteDetail extends Statute {
   root_nodes_count: number;
   nodes_count: number;
+  /** Amendment records (verified live: `[]` today; shape not yet published). */
+  amendments?: unknown[];
+  amendments_count?: number;
 }
 
 // Valid node types (AKN 3.0 standard)
