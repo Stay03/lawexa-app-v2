@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Check, ChevronDown, Copy } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { formatTreatment, relatedToDisplay } from '@/lib/utils/related-cases';
@@ -559,21 +559,22 @@ function StructuredPrinciples({
         />
       ) : null}
 
-      {/* Keyed by the filter so a switch re-enters with a quiet fade instead
-          of rows snapping in place. Numerals are the ORIGINAL positions —
-          a principle keeps its number under any filter, because the number
-          is its identity, not its row. */}
-      <ol
+      {/* Keyed by the filter so a switch re-enters with a quiet fade (and a
+          fresh fold — each view starts collapsed). Numerals are the ORIGINAL
+          positions — a principle keeps its number under any filter, because
+          the number is its identity, not its row. */}
+      <FoldedPrincipleList
         key={active}
-        className="flex flex-col gap-7 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-      >
-        {entries.map(({ principle, index }) => (
-          <NumberedPrinciple key={principle.id} index={index}>
-            <PrincipleBody text={principle.principle} />
+        items={entries}
+        renderItem={({ principle, index }, _listIndex, revealClass) => (
+          <NumberedPrinciple key={principle.id} index={index} className={revealClass}>
+            <div className="doc-prose">
+              <CaseText value={principle.principle} />
+            </div>
             <PrincipleCaption principle={principle} showLawType={!showTabs} />
           </NumberedPrinciple>
-        ))}
-      </ol>
+        )}
+      />
     </section>
   );
 }
@@ -662,18 +663,23 @@ function FlatPrinciples({ text }: { text: string }) {
       {entries.length > 1 ? (
         <>
           <SectionHeading label="Legal principles" count={entries.length} />
-          <ol className="flex flex-col gap-7">
-            {entries.map((entry, index) => (
-              <NumberedPrinciple key={index} index={index}>
-                <PrincipleBody text={entry} />
+          <FoldedPrincipleList
+            items={entries}
+            renderItem={(entry, listIndex, revealClass) => (
+              <NumberedPrinciple key={listIndex} index={listIndex} className={revealClass}>
+                <div className="doc-prose">
+                  <CaseText value={entry} />
+                </div>
               </NumberedPrinciple>
-            ))}
-          </ol>
+            )}
+          />
         </>
       ) : (
         <>
           <SectionHeading label="Legal principles" />
-          <PrincipleBody text={entries[0]} />
+          <div className="doc-prose">
+            <CaseText value={entries[0]} />
+          </div>
         </>
       )}
     </section>
@@ -681,112 +687,103 @@ function FlatPrinciples({ text }: { text: string }) {
 }
 
 /**
- * A numbered report principle can run long (owner, July 31 — and the first
- * cut of this missed him: it clamped past ~900 characters, "roughly twelve
- * lines", but REAL principles measure 96–587 characters, so no real case
- * ever showed a See more). Character counts cannot decide this — the same
- * 500 characters are seven desktop lines and thirteen mobile lines — so the
- * MEASUREMENT decides: a principle whose rendered height genuinely exceeds
- * the clamp gets the fade + See more; one that fits renders untouched. The
- * fade can therefore never sit over text that already fits, at any width.
+ * THE LIST FOLDS, not the principle (owner, July 31 — two misses before this
+ * landed: a per-principle text clamp was never the ask; "the report
+ * principles can get long — up to 30 different report principles — put the
+ * see more where they are LISTED"). A real judgment can carry dozens of
+ * numbered holdings; the first {@link PRINCIPLES_COLLAPSED_COUNT} show and
+ * the rest sit behind the fold — the exact `AuthorityList` grammar ("Show
+ * all N" / "Show fewer", fold only when it hides at least three, revealed
+ * rows ease in), so the page has ONE disclosure language. Principles are
+ * paragraphs rather than rows, so the shown count is smaller than the
+ * authority lists' eight.
  */
-
-/** Below this many characters a principle cannot exceed the clamp even at
- *  the narrowest width — skipped entirely, no observer spent on it. */
-const PRINCIPLE_CLAMP_CANDIDATE_CHARS = 280;
-/** The clamp: ~7 reading lines. Keep in step with `max-h-56` below. */
-const PRINCIPLE_CLAMP_PX = 224;
-/** Ignore overflow smaller than a line — a fade hiding 10px is a lie. */
-const PRINCIPLE_CLAMP_SLACK_PX = 24;
+const PRINCIPLES_COLLAPSED_COUNT = 5;
+/** Fold only when it would hide at least this many entries (AuthorityList's
+ *  rule): a button hiding one entry is worse than the entry. */
+const PRINCIPLES_FOLD_MIN_HIDDEN = 3;
 
 /**
- * A principle's text, clamped when it measurably overflows. The overflow
- * check rides a ResizeObserver (its initial delivery replaces any effect-time
- * setState, and width changes re-decide honestly). Pre-measure, a candidate
- * renders height-capped with NO fade/button — a fitting principle is capped
- * invisibly and released; a long one gains the fade one paint later.
- * `interpolate-size` lets supporting engines animate clamp ⇄ full height
- * (max-height: max-content); elsewhere the toggle is instant.
+ * The numbered list behind one fold. Owns its `showAll`, so a host that
+ * remounts it (the law-type filter keys it) starts each view folded.
  */
-function PrincipleBody({ text }: { text: string }) {
-  const candidate = text.length > PRINCIPLE_CLAMP_CANDIDATE_CHARS;
-  const [expanded, setExpanded] = useState(false);
-  // null = candidate awaiting measurement; false = fits; true = clamps.
-  const [overflowing, setOverflowing] = useState<boolean | null>(
-    candidate ? null : false,
-  );
-  const proseRef = useRef<HTMLDivElement>(null);
+function FoldedPrincipleList<T>({
+  items,
+  renderItem,
+}: {
+  items: T[];
+  /** `revealClass` is set on entries "Show all" just revealed — put it on the
+   *  entry's own `li` (an `ol` accepts no wrapper elements). */
+  renderItem: (
+    item: T,
+    listIndex: number,
+    revealClass: string | undefined,
+  ) => React.ReactNode;
+}) {
+  const [showAll, setShowAll] = useState(false);
 
-  useEffect(() => {
-    if (!candidate) return;
-    const prose = proseRef.current;
-    if (!prose) return;
-    const observer = new ResizeObserver(() => {
-      setOverflowing(
-        prose.scrollHeight > PRINCIPLE_CLAMP_PX + PRINCIPLE_CLAMP_SLACK_PX,
-      );
-    });
-    observer.observe(prose);
-    return () => observer.disconnect();
-  }, [candidate]);
-
-  const clamped = overflowing !== false && !expanded;
+  const foldable =
+    items.length >= PRINCIPLES_COLLAPSED_COUNT + PRINCIPLES_FOLD_MIN_HIDDEN;
+  const visible =
+    foldable && !showAll ? items.slice(0, PRINCIPLES_COLLAPSED_COUNT) : items;
 
   return (
-    <div className="flex flex-col items-start gap-1.5">
-      <div
-        className={cn(
-          'relative w-full [interpolate-size:allow-keywords] transition-[max-height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
-          clamped ? 'max-h-56 overflow-hidden' : 'max-h-max',
+    <>
+      <ol className="flex flex-col gap-7 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+        {visible.map((item, listIndex) =>
+          renderItem(
+            item,
+            listIndex,
+            // Entries revealed by "Show all" ease in; the first page renders
+            // plain — AuthorityList's exact reveal.
+            showAll && listIndex >= PRINCIPLES_COLLAPSED_COUNT
+              ? 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200'
+              : undefined,
+          ),
         )}
-      >
-        <div ref={proseRef} className="doc-prose">
-          <CaseText value={text} />
-        </div>
-        {overflowing ? (
-          // The fade — the honest "there is more" signal; dissolves on expand.
-          <div
-            aria-hidden
-            data-shown={clamped}
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent transition-opacity duration-300 data-[shown=false]:opacity-0 motion-reduce:transition-none"
-          />
-        ) : null}
-      </div>
-      {overflowing ? (
+      </ol>
+      {foldable ? (
         <button
           type="button"
-          aria-expanded={expanded}
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => setShowAll((prev) => !prev)}
+          aria-expanded={showAll}
           className={cn(
-            'v2-interactive inline-flex min-h-8 items-center gap-1 rounded-full text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
+            'v2-interactive inline-flex min-h-9 items-center gap-1.5 self-start rounded-full px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
             FOCUS_RING,
           )}
         >
-          {expanded ? 'See less' : 'See more'}
-          <ChevronDown
-            aria-hidden
-            className={cn(
-              'size-3.5 transition-transform duration-200 motion-reduce:transition-none',
-              expanded && 'rotate-180',
-            )}
-          />
+          {showAll ? (
+            <>
+              <ChevronUp aria-hidden className="size-3.5" />
+              Show fewer
+            </>
+          ) : (
+            <>
+              <ChevronDown aria-hidden className="size-3.5" />
+              Show all {items.length}
+            </>
+          )}
         </button>
       ) : null}
-    </div>
+    </>
   );
 }
 
 /** One numbered holding — the hanging gold numeral beside the law. One
- *  component, so the structured list and the flat fallback cannot drift. */
+ *  component, so the structured list and the flat fallback cannot drift.
+ *  `className` is the fold's reveal animation (the li must carry it — an
+ *  `ol` accepts only `li` children, so no wrapper may exist). */
 function NumberedPrinciple({
   index,
   children,
+  className,
 }: {
   index: number;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <li className="grid grid-cols-[2.5rem_minmax(0,1fr)]">
+    <li className={cn('grid grid-cols-[2.5rem_minmax(0,1fr)]', className)}>
       <span aria-hidden className="doc-principle-num">
         {String(index + 1).padStart(2, '0')}
       </span>
