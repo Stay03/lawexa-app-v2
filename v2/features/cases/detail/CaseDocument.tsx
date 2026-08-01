@@ -15,6 +15,7 @@ import type {
   ReportPrinciple,
 } from '@/types/case';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
+import { TabRow } from '@/v2/shell/TabRow';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { firstCitation, formatCaseName } from '../case-name';
 import { formatCaseDate, toAlpha2 } from '../case-row-model';
@@ -579,7 +580,9 @@ function StructuredPrinciples({
   );
 }
 
-/** The law-type filter — the cases list's tab pattern at caption scale. */
+/** The law-type filter — the cases list's tab pattern at caption scale, on
+ *  the shared `TabRow` primitive (full APG tablist contract; see its
+ *  docblock). */
 function LawTypeTabs({
   lawTypes,
   principles,
@@ -601,38 +604,35 @@ function LawTypeTabs({
   ];
 
   return (
-    <div
-      role="tablist"
-      aria-label="Filter principles by law type"
+    <TabRow
+      tabs={tabs}
+      value={value}
+      onChange={onChange}
+      ariaLabel="Filter principles by law type"
       className="inline-flex items-center gap-0.5 self-start rounded-full bg-secondary/60 p-0.5"
+      tabClassName={(selected) =>
+        cn(
+          'v2-interactive inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
+          selected
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground',
+        )
+      }
     >
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          aria-selected={value === tab.id}
-          onClick={() => onChange(tab.id)}
-          className={cn(
-            'v2-interactive inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
-            value === tab.id
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-            FOCUS_RING,
-          )}
-        >
+      {(tab, selected) => (
+        <>
           {tab.label}
           <span
             className={cn(
               'tabular-nums',
-              value === tab.id ? 'text-muted-foreground' : 'text-muted-foreground/60',
+              selected ? 'text-muted-foreground' : 'text-muted-foreground/60',
             )}
           >
             {tab.count}
           </span>
-        </button>
-      ))}
-    </div>
+        </>
+      )}
+    </TabRow>
   );
 }
 

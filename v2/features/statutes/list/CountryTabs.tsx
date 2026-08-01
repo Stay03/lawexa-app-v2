@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { TabRow } from '@/v2/shell/TabRow';
 import type { StatuteCountries } from '../queries';
 import { toAlpha2 } from '../statute-row-model';
 
@@ -11,9 +11,9 @@ import { toAlpha2 } from '../statute-row-model';
  * tab per country that has statutes, each with its flag and its count.
  *
  * What changed from v1's `StatuteCountryTabs` (the keep/drop study):
- *  - `AnimatedTabs` (no tablist roles, no keyboard semantics) → the v2 tab
- *    grammar (cases `ViewTabs` / `LawTypeTabs`): a real `role="tablist"`,
- *    `aria-selected`, colour cross-fade instead of a sliding pill;
+ *  - `AnimatedTabs` (no tablist roles, no keyboard semantics) → the shared
+ *    `TabRow` primitive: a real `role="tablist"` with the full APG keyboard
+ *    contract (see its docblock), colour cross-fade instead of a sliding pill;
  *  - counts are SHOWN when the facets are LIVE — v1 fetched `statute_count`
  *    and never displayed it (seeded facets render label-only; see below);
  *  - the value is the country SLUG (what the URL carries), never the numeric
@@ -22,7 +22,8 @@ import { toAlpha2 } from '../statute-row-model';
  * Static chrome: the facets resolve from the seed placeholder on the first
  * frame (the caller supplies it), so the tab row never flashes in after the
  * list. On narrow screens the row scrolls horizontally, bleeding to the
- * screen edge so the scroll affordance is visible.
+ * screen edge so the scroll affordance is visible — which is why the
+ * scroller wraps the tablist here instead of living on it.
  */
 export function CountryTabs({
   facets,
@@ -42,13 +43,15 @@ export function CountryTabs({
   const counted = facets.source === 'live';
   const tabs = [
     {
-      slug: '',
+      // The empty slug is the All tab's honest id — it is exactly what
+      // `onChange` writes to the URL for "no country filter".
+      id: '',
       label: 'All',
       code: null as string | null,
       count: counted ? facets.total : null,
     },
     ...facets.countries.map((facet) => ({
-      slug: facet.country.slug,
+      id: facet.country.slug,
       label: facet.country.name,
       code: toAlpha2(facet.country.code, facet.country.abbreviation),
       count: counted ? facet.statute_count : null,
@@ -56,37 +59,34 @@ export function CountryTabs({
   ];
   // An unknown slug in the URL selects nothing here — the browser resolves it
   // to no id, so the list genuinely shows All and the All tab says so.
-  const active = tabs.some((tab) => tab.slug === value) ? value : '';
+  const active = tabs.some((tab) => tab.id === value) ? value : '';
 
   return (
     <div className="-mx-4 overflow-x-auto px-4">
-      <div
-        role="tablist"
-        aria-label="Filter statutes by country"
+      <TabRow
+        tabs={tabs}
+        value={active}
+        onChange={onChange}
+        ariaLabel="Filter statutes by country"
         className="inline-flex items-center gap-0.5 rounded-full bg-secondary/60 p-0.5"
+        tabClassName={(selected) =>
+          cn(
+            'v2-interactive inline-flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
+            selected
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+          )
+        }
       >
-        {tabs.map((tab) => (
-          <button
-            key={tab.slug || 'all'}
-            type="button"
-            role="tab"
-            aria-selected={active === tab.slug}
-            onClick={() => onChange(tab.slug)}
-            className={cn(
-              'v2-interactive inline-flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
-              active === tab.slug
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-              FOCUS_RING,
-            )}
-          >
+        {(tab, selected) => (
+          <>
             {tab.code ? <FlagIcon code={tab.code} /> : null}
             {tab.label}
             {tab.count !== null ? (
               <span
                 className={cn(
                   'tabular-nums',
-                  active === tab.slug
+                  selected
                     ? 'text-muted-foreground'
                     : 'text-muted-foreground/60',
                 )}
@@ -94,9 +94,9 @@ export function CountryTabs({
                 {tab.count}
               </span>
             ) : null}
-          </button>
-        ))}
-      </div>
+          </>
+        )}
+      </TabRow>
     </div>
   );
 }

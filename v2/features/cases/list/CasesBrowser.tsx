@@ -12,6 +12,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlSearch } from '@/v2/runtime/use-url-search';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { SearchField } from '@/v2/shell/SearchField';
+import { TabRow } from '@/v2/shell/TabRow';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
@@ -290,9 +291,10 @@ export function CasesBrowser() {
 }
 
 /**
- * The view switch. Static chrome — it renders on the first frame and never waits
- * on data (v1 hid its tabs behind the list's loading state, which is exactly
- * what standards §8i forbids).
+ * The view switch — the shared `TabRow` primitive (full APG tablist contract;
+ * see its docblock). Static chrome — it renders on the first frame and never
+ * waits on data (v1 hid its tabs behind the list's loading state, which is
+ * exactly what standards §8i forbids).
  *
  * The active state is a background that cross-fades on the tab itself, NOT a
  * sliding indicator pill. A sliding pill has to know each tab's width, and these
@@ -313,29 +315,22 @@ function ViewTabs({
   ];
 
   return (
-    <div
-      role="tablist"
-      aria-label="Case list view"
+    <TabRow
+      tabs={tabs}
+      value={value}
+      onChange={onChange}
+      ariaLabel="Case list view"
       className="inline-flex items-center gap-0.5 rounded-full bg-secondary/60 p-0.5"
+      tabClassName={(selected) =>
+        cn(
+          'v2-interactive min-h-8 rounded-full px-3.5 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
+          selected
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground',
+        )
+      }
     >
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          aria-selected={value === tab.id}
-          onClick={() => onChange(tab.id)}
-          className={cn(
-            'v2-interactive min-h-8 rounded-full px-3.5 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
-            value === tab.id
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-            FOCUS_RING,
-          )}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+      {(tab) => tab.label}
+    </TabRow>
   );
 }
