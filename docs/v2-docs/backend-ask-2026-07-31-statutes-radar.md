@@ -19,18 +19,32 @@ We ask for two things:
 - A simple list of all statutes (slug + last update date) that works without
   a token. We use it to build the sitemap file for Google.
 
-## 2. One question about export-akn
+## 2. Statute text: keep the full export, and plan an AKN piece-by-piece read
 
-`export-akn` gave us the FULL document in our tests (275 KB for one act,
-881 KB for the 1999 Constitution). Will it stay uncapped? If you plan to add
-a size cap, please tell us first. Our reader depends on getting the whole
-document in one response.
+Today the reader gets the full document from
+`GET /statutes/{slug}/export-akn` in one response (measured: 275 KB for one
+act, 881 KB for the 1999 Constitution). Two things:
 
-(For reference, the reader gets its data from three endpoints: the list from
-`GET /statutes`, one statute's summary from `GET /statutes/{slug}`, and the
-full text from `GET /statutes/{slug}/export-akn`. The table of contents is
-built in the browser from the full text, so we do not need an outline
-endpoint.)
+**a) Please keep `export-akn` uncapped.** If you plan to add a size cap, tell
+us first — the reader depends on getting the whole document in one response.
+
+**b) For the future piece-by-piece read, we want it AKN-based — NOT the
+`/nodes` endpoint.** `/nodes` returns flattened records and loses the AKN
+structure our reader is built on. What we would consume instead:
+
+- An outline call: the document's skeleton — every part, chapter, and
+  section with its `eId`, its number, and its heading, in document order.
+  No body text. Small and fast.
+- A fragment call: given one `eId`, return that element's complete AKN XML
+  subtree — exactly the same XML that element has inside the full export.
+
+The one hard rule: the `eId`s must be the SAME ones the full export carries.
+They are our anchors — deep links, the contents list, and scroll tracking
+all key on them. If outline + fragments carry the same `eId`s, our existing
+reader consumes fragments with no redesign.
+
+No urgency: the full export works today. This is the agreed direction for
+when documents outgrow one file.
 
 ## 3. Bad characters and one bad record in the statute data
 
