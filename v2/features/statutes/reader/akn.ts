@@ -90,6 +90,14 @@ export function collapsedText(el: Element | null): string {
   return el?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
+/** Anchor id from an element's backend `eId` — the `akn-` prefix every deep
+ *  link keys on — or `null` when there is none (the renderer never invents an
+ *  id nobody can address; only the block walk falls back to a serial). */
+export function aknAnchorId(el: Element): string | null {
+  const eId = el.getAttribute('eId');
+  return eId ? `akn-${eId}` : null;
+}
+
 /* ── Vocabulary ──────────────────────────────────────────────────────────── */
 
 /**
@@ -128,9 +136,16 @@ const SKIPPED = new Set(['meta', 'coverpage', 'components']);
  * play the same role in constitutions and subsidiary legislation (they are
  * in the backend's own `StatuteNodeType` union). They earn an outline entry
  * only when they surface at hierarchy level — one nested inside a section's
- * subtree never reaches this walk.
+ * subtree never reaches this walk. Exported for `provision.ts`, whose section
+ * index must mean exactly what this walk means by "section".
  */
-const SECTION_GRADE = new Set(['section', 'article', 'rule', 'regulation', 'clause']);
+export const SECTION_GRADE = new Set([
+  'section',
+  'article',
+  'rule',
+  'regulation',
+  'clause',
+]);
 
 /* ── Parsing ─────────────────────────────────────────────────────────────── */
 
@@ -184,8 +199,8 @@ class ModelBuilder {
 
   /** Anchor id from the backend's stable `eId`, or a per-parse serial. */
   private anchorId(el: Element): string {
-    const eId = el.getAttribute('eId');
-    if (eId) return `akn-${eId}`;
+    const id = aknAnchorId(el);
+    if (id) return id;
     this.serial += 1;
     return `akn-x${this.serial}`;
   }

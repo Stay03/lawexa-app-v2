@@ -102,6 +102,15 @@
   scroll-margin-top: 1.5rem;
 }
 
+/** Nested provision anchors (a subsection landed by `section-54-2`, a nested
+ *  section) clear the top edge exactly like blocks — a landed subsection must
+ *  not sit glued to the viewport's top line. */
+.v2-statute-doc .akn-numbered,
+.v2-statute-doc .akn-unnumbered,
+.v2-statute-doc .akn-section {
+  scroll-margin-top: 1.5rem;
+}
+
 .v2-statute-doc .akn-block + .akn-block {
   margin-top: 1.75rem;
 }
@@ -177,6 +186,83 @@
   font-weight: 600;
   color: var(--foreground);
   margin: 0.75rem 0 0.375rem;
+}
+
+/* ── The section copy-link affordance (SectionLink.tsx) ─────────────────── */
+
+/**
+ * The slot reserves its width IN the heading line, permanently — revealing
+ * the icon can never shift a glyph. The button centres in the slot with a
+ * ~28px hit target around a 14px icon. The copied confirmation lives IN the
+ * control (the gold check held on a soft pill for the reset timer's beat) and
+ * nothing may float outside it: body blocks run under `content-visibility:
+ * auto`, whose paint containment clips any descendant painting outside the
+ * block's box — a chip above the first section's heading paints as nothing.
+ */
+.v2-statute-doc .akn-copy-slot {
+  position: relative;
+  display: inline-block;
+  width: 1.75rem;
+  height: 1em;
+  /* Optical: drop the 1em box an eighth so the centred icon sits on the
+     text's visual centre, not the cap-height's. */
+  vertical-align: -0.125em;
+}
+
+.v2-statute-doc .akn-copy {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  opacity: 0.65;
+  transition: opacity 150ms ease, color 150ms ease, background-color 150ms ease;
+}
+
+.v2-statute-doc .akn-copy:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+/** While the copied check shows, the control stays fully present — held on
+ *  the soft pill even after the pointer moves on, so the confirmation is
+ *  watchable to its end. */
+.v2-statute-doc .akn-copy[data-copied] {
+  opacity: 1;
+  background: var(--secondary);
+}
+
+/**
+ * Hover-capable fine pointers get the docs-site reveal: invisible until the
+ * heading is hovered or holds focus. Touch keeps the quiet always-on icon
+ * above — a long-press mint is not reliably implementable (iOS claims the
+ * press for text selection), so visible-but-quiet is the honest affordance.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .v2-statute-doc .akn-copy {
+    opacity: 0;
+  }
+  .v2-statute-doc .akn-section-heading:hover .akn-copy,
+  .v2-statute-doc .akn-section-heading:focus-within .akn-copy,
+  .v2-statute-doc .akn-copy[data-copied] {
+    opacity: 1;
+  }
+}
+
+.v2-statute-doc .akn-copy:focus-visible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-statute-doc .akn-copy {
+    transition: none;
+  }
 }
 
 /**

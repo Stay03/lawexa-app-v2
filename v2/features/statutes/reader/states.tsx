@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, Landmark, WifiOff, type LucideIcon } from 'lucide-react';
+import { Clock, Landmark, WifiOff, X, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /** The reading column every statute surface shares — heading, document, states. */
 export const STATUTE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
@@ -269,5 +270,45 @@ export function DocumentEmptyState() {
       title="No text yet"
       description="The full text of this statute hasn't been added to the library yet."
     />
+  );
+}
+
+/**
+ * The quiet word when a citation link (`/statutes/{slug}/section-…`) points
+ * at a provision this document does not have. NOT a toast (a toast leaves
+ * before a reader who is scanning the text ever looks up) and NOT an alert
+ * wall (the statute rendered fine — nothing failed): a slim dismissible pill,
+ * sticky at the top of the reading column so it is still there when the miss
+ * landed the reader mid-document (the subsection-fallback case). `role=
+ * "status"` announces it politely; dismissal is instant — nothing to watch
+ * leave.
+ */
+export function ProvisionNotice({
+  message,
+  onDismiss,
+}: {
+  message: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="pointer-events-none sticky top-3 z-10 flex justify-center">
+      <div
+        role="status"
+        className="pointer-events-auto flex min-h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-background/95 py-1 pl-4 pr-1.5 shadow-md backdrop-blur motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-300"
+      >
+        <span className="min-w-0 text-xs text-muted-foreground">{message}</span>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className={cn(
+            'v2-interactive flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+            FOCUS_RING,
+          )}
+        >
+          <X aria-hidden className="size-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }

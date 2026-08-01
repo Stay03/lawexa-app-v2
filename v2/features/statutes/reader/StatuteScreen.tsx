@@ -36,8 +36,18 @@ import {
  * SIGNED-OUT: measured July 31, 2026, both statute reads 401 without a bearer
  * token — the queries are gated and the visitor gets the designed sign-in
  * state (guests hold real tokens and read normally).
+ *
+ * `provision` is the citation path segment (`/statutes/{slug}/section-54-2`
+ * → "section-54-2"), carried through untouched: resolving it needs the parsed
+ * document, which only `StatuteDocument` holds.
  */
-export function StatuteScreen({ slug }: { slug: string }) {
+export function StatuteScreen({
+  slug,
+  provision,
+}: {
+  slug: string;
+  provision: string | null;
+}) {
   const { signedIn } = useV2Session();
 
   const query = useQuery({
@@ -109,7 +119,7 @@ export function StatuteScreen({ slug }: { slug: string }) {
             block count would mount the entire second document in ONE
             synchronous commit — the exact jank the progressive mount exists
             to prevent — and skip its deep link. The key resets the engine. */}
-        <StatuteDocument key={slug} slug={slug} />
+        <StatuteDocument key={slug} slug={slug} provision={provision} />
       </article>
     </div>
   );

@@ -8,6 +8,19 @@ import { statutesQueries } from '../queries';
 import { parseAkn, type AknBlock, type AknOutlineDivision } from './akn';
 import { AknBlockView } from './AknNode';
 import {
+  displayNum,
+  formatProvisionLabel,
+  holderBlockIndex,
+  indexSections,
+  parseProvisionSegment,
+  resolveCitation,
+} from './provision';
+import {
+  SectionLinkContext,
+  type SectionLinkContextValue,
+  type SectionLinkInfo,
+} from './SectionLink';
+import {
   StatuteContentsSheet,
   StatuteOutlineRail,
   useStatuteScrollSpy,
@@ -17,6 +30,7 @@ import {
   DocumentErrorState,
   DocumentMountingTail,
   DocumentUnreadableState,
+  ProvisionNotice,
   isRateLimited,
 } from './states';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,8 +39,10 @@ import './statute-document.css';
 /**
  * StatuteDocument — fetches the AKN XML, parses it ONCE, and renders it
  * progressively. Owns everything downstream of the XML: the block sequence,
- * the outline (rail + mobile contents sheet), the scroll-spy, jumps, and
- * `#anchor` deep links. The metadata header above it is the screen's.
+ * the outline (rail + mobile contents sheet), the scroll-spy, jumps, and the
+ * arrival deep links — both `#akn-{eId}` hashes and the citation path the
+ * route hands down (`/statutes/{slug}/section-54-2` → `provision`). The
+ * metadata header above it is the screen's.
  *
  * ── WHY THE XML IS A CLIENT FETCH, NOT AN RSC PREFETCH ─────────────────────
  * Dehydrating this query would serialize the ENTIRE XML string (275 KB
@@ -73,7 +89,14 @@ const MOUNT_YIELD_MS = 16;
 const NO_BLOCKS: AknBlock[] = [];
 const NO_OUTLINE: AknOutlineDivision[] = [];
 
-export function StatuteDocument({ slug }: { slug: string }) {
+export function StatuteDocument({
+  slug,
+  provision,
+}: {
+  slug: string;
+  /** The citation path segment from the URL (`section-54-2`), or null. */
+  provision: string | null;
+}) {
   const query = useQuery(statutesQueries.akn(slug));
 
   // ONE parse per document string (see docblock). `parseAkn` returns null for
@@ -145,38 +168,93 @@ export function StatuteDocument({ slug }: { slug: string }) {
     });
   };
 
+  /* ── Arrival deep links: `#akn-…` hash, or the citation path ──────────── */
+
   // The URL hash on arrival — a client-only value, read once via the lazy
   // initializer (the sanctioned pattern; SSR sees ''). Never re-read: later
-  // hash changes are this page's own jumps.
-  const [initialHash] = useState(() =>
-    typeof window === 'undefined' ? '' : window.location.hash.slice(1),
+  // hash changes are this page's own jumps. The snapshot also remembers WHICH
+  // provision it arrived beside: a later provision change (an in-app citation
+  // navigation into this same document instance) retires the hash's claim —
+  // it belonged to the previous arrival, and letting it keep winning would
+  // pin every subsequent citation jump to the first URL's fragment.
+  const [arrivalClaim] = useState(() => ({
+    hash: typeof window === 'undefined' ? '' : window.location.hash.slice(1),
+    provision,
+  }));
+  const initialHash =
+    arrivalClaim.provision === provision ? arrivalClaim.hash : '';
+
+  // The citation path, resolved against the parsed document: `section-54-2`
+  // → the subsection's `akn-{eId}` anchor inside section 54's block. The
+  // index is also what the copy affordance mints from (context below), so a
+  // link can only be minted where this resolution would land it.
+  const citation = useMemo(
+    () => (provision ? parseProvisionSegment(provision) : null),
+    [provision],
   );
-  const hashHandled = useRef(false);
+  const sectionIndex = useMemo(() => indexSections(blocks), [blocks]);
+  const provisionTarget = useMemo(
+    () => (citation ? resolveCitation(sectionIndex, citation) : null),
+    [sectionIndex, citation],
+  );
+
+  // ONE arrival target, with the precedence rule: an explicit hash BEATS the
+  // citation path (the hash is the more specific claim — it names an exact
+  // element). A hash that points inside a block (a subsection anchor) mounts
+  // through its holder; a hash that resolves to nothing falls through to the
+  // citation path rather than dead-ending the arrival.
+  const arrival = useMemo<{ index: number; anchorId: string } | null>(() => {
+    if (blocks.length === 0) return null;
+    if (initialHash) {
+      const direct = blockIndexById.get(initialHash);
+      if (direct !== undefined) return { index: direct, anchorId: initialHash };
+      const holder = holderBlockIndex(blocks, initialHash);
+      if (holder !== null) return { index: holder, anchorId: initialHash };
+    }
+    if (provisionTarget && provisionTarget.matched !== 'none') {
+      const index = blockIndexById.get(provisionTarget.blockId);
+      if (index !== undefined) {
+        return { index, anchorId: provisionTarget.anchorId };
+      }
+    }
+    return null;
+  }, [blocks, blockIndexById, initialHash, provisionTarget]);
+
+  // WHICH provision value the arrival jump already ran for — `undefined`
+  // before any arrival, so a provision CHANGE re-arms by construction (the
+  // stored value no longer matches) while a post-jump re-run of this effect
+  // (an XML refetch swapping `blocks` identity, provision unchanged) still
+  // bails and can never yank the reader back to the target mid-read.
+  const arrivalHandledFor = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (hashHandled.current || blocks.length === 0 || !initialHash) return;
-    const index = blockIndexById.get(initialHash);
-    if (index === undefined) return;
+    if (arrivalHandledFor.current === provision || !arrival) return;
+    // Only the FIRST arrival is a page entry with competing claims; a
+    // provision-change jump is the reader's own navigation and scrolls
+    // unconditionally, exactly like an outline jump.
+    const firstArrival = arrivalHandledFor.current === undefined;
     // The latch is set ONLY when the jump actually runs, and a cleanup that
     // arrives first clears the still-pending timer — so StrictMode's
     // mount→cleanup→remount (and any real remount) re-schedules instead of
-    // permanently disarming the deep link, while a post-jump re-run of this
-    // effect (an XML refetch swapping `blocks` identity) still bails on the
-    // latch and can never yank the reader back to the hash target mid-read.
+    // permanently disarming the deep link.
     let ran = false;
     const timer = window.setTimeout(() => {
       ran = true;
-      hashHandled.current = true;
-      setMountedCount((prev) => Math.max(prev, index + 1));
+      arrivalHandledFor.current = provision;
+      setMountedCount((prev) => Math.max(prev, arrival.index + 1));
       requestAnimationFrame(() => {
         // Yield to anyone with a better claim: if the reader (or
         // ScrollMemory's reload restore) has already moved the scroller,
-        // this deep link does not fight them.
-        const scroller = document.getElementById(V2_SHELL_CONTENT_ID);
-        if (scroller && scroller.scrollTop > 0) return;
-        document.getElementById(initialHash)?.scrollIntoView({ block: 'start' });
+        // the page-entry deep link does not fight them.
+        if (firstArrival) {
+          const scroller = document.getElementById(V2_SHELL_CONTENT_ID);
+          if (scroller && scroller.scrollTop > 0) return;
+        }
+        document
+          .getElementById(arrival.anchorId)
+          ?.scrollIntoView({ block: 'start' });
         requestAnimationFrame(() => {
           document
-            .getElementById(initialHash)
+            .getElementById(arrival.anchorId)
             ?.scrollIntoView({ block: 'start' });
         });
       });
@@ -184,7 +262,71 @@ export function StatuteDocument({ slug }: { slug: string }) {
     return () => {
       if (!ran) window.clearTimeout(timer);
     };
-  }, [blocks, blockIndexById, initialHash]);
+  }, [arrival, provision]);
+
+  // The honest word when the citation path did not (fully) land. Suppressed
+  // when an explicit hash won the arrival — the reader stands where the link's
+  // minter pointed, and a "not found" would contradict the landing.
+  const provisionNotice = useMemo<string | null>(() => {
+    if (!provision || blocks.length === 0) return null;
+    if (initialHash && arrival?.anchorId === initialHash) return null;
+    if (!citation) {
+      return 'This link does not point to a provision of this statute.';
+    }
+    if (!provisionTarget || provisionTarget.matched === 'none') {
+      return `${formatProvisionLabel(citation)} was not found in this statute.`;
+    }
+    if (provisionTarget.matched === 'section' && citation.subsection) {
+      return `${formatProvisionLabel(citation)} was not found. Showing section ${displayNum(citation.section)}.`;
+    }
+    return null;
+  }, [provision, blocks.length, initialHash, arrival, citation, provisionTarget]);
+  // Dismissal is scoped to the provision it dismissed — a NEW citation
+  // navigation gets its own notice without any reset effect.
+  const [noticeDismissedFor, setNoticeDismissedFor] = useState<string | null>(
+    null,
+  );
+  const noticeDismissed =
+    provision !== null && noticeDismissedFor === provision;
+
+  // The ONE polite live region the copy affordances speak through (a region
+  // per section heading would be hundreds of empty live regions). The clear
+  // timer re-arms per announcement — and emptying the region after the beat
+  // is what lets the NEXT identical "Link copied" read as a fresh change.
+  const [copyAnnouncement, setCopyAnnouncement] = useState('');
+  const announceTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (announceTimerRef.current !== null) {
+        window.clearTimeout(announceTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  // What the copy affordance needs (SectionLink) — the slug, the citable map
+  // derived from the SAME index the resolver reads (so a minted link and its
+  // landing can never disagree), and the shared announcer.
+  const sectionLinks = useMemo<SectionLinkContextValue>(() => {
+    const links = new Map<string, SectionLinkInfo>();
+    for (const target of sectionIndex.values()) {
+      links.set(target.anchorId, { path: target.path, label: target.label });
+    }
+    return {
+      slug,
+      links,
+      announce: (message: string) => {
+        setCopyAnnouncement(message);
+        if (announceTimerRef.current !== null) {
+          window.clearTimeout(announceTimerRef.current);
+        }
+        announceTimerRef.current = window.setTimeout(() => {
+          announceTimerRef.current = null;
+          setCopyAnnouncement('');
+        }, 2000);
+      },
+    };
+  }, [slug, sectionIndex]);
 
   /* ── States ───────────────────────────────────────────────────────────── */
 
@@ -213,12 +355,25 @@ export function StatuteDocument({ slug }: { slug: string }) {
 
   return (
     <>
-      <div className="akn-doc motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-        {blocks.slice(0, visibleCount).map((block) => (
-          <AknBlockView key={block.key} block={block} />
-        ))}
-        {mounting ? <DocumentMountingTail /> : null}
-      </div>
+      {provisionNotice && !noticeDismissed ? (
+        <ProvisionNotice
+          message={provisionNotice}
+          onDismiss={() => setNoticeDismissedFor(provision)}
+        />
+      ) : null}
+
+      <span aria-live="polite" className="sr-only">
+        {copyAnnouncement}
+      </span>
+
+      <SectionLinkContext.Provider value={sectionLinks}>
+        <div className="akn-doc motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+          {blocks.slice(0, visibleCount).map((block) => (
+            <AknBlockView key={block.key} block={block} />
+          ))}
+          {mounting ? <DocumentMountingTail /> : null}
+        </div>
+      </SectionLinkContext.Provider>
 
       {showContents ? (
         <StatuteContentsSheet outline={outline} activeId={activeId} onJump={jump} />

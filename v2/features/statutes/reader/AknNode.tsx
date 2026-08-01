@@ -2,7 +2,8 @@
 
 import { memo, type ReactNode } from 'react';
 
-import { childByLocal, localName, type AknBlock } from './akn';
+import { aknAnchorId, childByLocal, localName, type AknBlock } from './akn';
+import { SectionCopyLink } from './SectionLink';
 
 /**
  * AknNode — the hardened rewrite of v1's `AknElementRenderer`.
@@ -114,7 +115,7 @@ export const AknBlockView = memo(function AknBlockView({
       // and keeping them laid out makes outline jumps land exactly.
       className="akn-block akn-cv"
     >
-      {renderElement(block.element, 0)}
+      {renderElement(block.element, 0, true)}
     </div>
   );
 });
@@ -151,7 +152,18 @@ function DivisionHeading({
 
 /* ── Element recursion ───────────────────────────────────────────────────── */
 
-function renderElement(element: Element, keyIndex: number): ReactNode {
+/**
+ * `blockRoot` is true ONLY for the element a block wrapper renders directly:
+ * the wrapper already carries that element's `akn-{eId}` id (the spy's and the
+ * jump machinery's target), so the root must not stamp it again — a duplicate
+ * DOM id. Every NESTED provision (a subsection under its section) stamps its
+ * own eId anchor instead, which is what lets a deep link land on it.
+ */
+function renderElement(
+  element: Element,
+  keyIndex: number,
+  blockRoot = false,
+): ReactNode {
   const tag = localName(element);
   const key = keyIndex;
 
@@ -166,7 +178,9 @@ function renderElement(element: Element, keyIndex: number): ReactNode {
     );
   }
 
-  if (tag === 'section') return <SectionView key={key} element={element} />;
+  if (tag === 'section') {
+    return <SectionView key={key} element={element} blockRoot={blockRoot} />;
+  }
 
   if (NUMBERED.has(tag)) {
     // An article/rule with a HEADING is playing the section role (a
@@ -174,9 +188,9 @@ function renderElement(element: Element, keyIndex: number): ReactNode {
     // section grammar; a bare-numbered one is a provision and gets the
     // gutter grid.
     if (childByLocal(element, 'heading')) {
-      return <SectionView key={key} element={element} />;
+      return <SectionView key={key} element={element} blockRoot={blockRoot} />;
     }
-    return <NumberedBlock key={key} element={element} />;
+    return <NumberedBlock key={key} element={element} blockRoot={blockRoot} />;
   }
 
   if (tag === 'p') {
@@ -257,7 +271,7 @@ function renderElement(element: Element, keyIndex: number): ReactNode {
     // container clothing (some exporters hang the num on an `hcontainer`) —
     // give it the gutter grammar instead of letting the num float loose.
     if (childByLocal(element, 'num')) {
-      return <NumberedBlock key={key} element={element} />;
+      return <NumberedBlock key={key} element={element} blockRoot={blockRoot} />;
     }
     return <Fragmented key={key}>{renderBlockChildren(element)}</Fragmented>;
   }
@@ -266,7 +280,7 @@ function renderElement(element: Element, keyIndex: number): ReactNode {
      a `num` child makes it a numbered block; element children make it a
      container; bare text becomes a paragraph. */
   if (childByLocal(element, 'num')) {
-    return <NumberedBlock key={key} element={element} />;
+    return <NumberedBlock key={key} element={element} blockRoot={blockRoot} />;
   }
   if (element.children.length > 0) {
     return <Fragmented key={key}>{renderBlockChildren(element)}</Fragmented>;
@@ -284,17 +298,40 @@ function Fragmented({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** A numbered section: "1. Heading" as one hanging heading, then content. */
-function SectionView({ element }: { element: Element }) {
+/**
+ * A numbered section: "1. Heading" as one hanging heading, then content. A
+ * block-root section leaves its anchor id to the block wrapper; a nested one
+ * carries its own. The heading hosts the copy-link affordance — which renders
+ * only when the document host indexed this section as unambiguously citable
+ * (see `SectionLink`).
+ */
+function SectionView({
+  element,
+  blockRoot = false,
+}: {
+  element: Element;
+  blockRoot?: boolean;
+}) {
+  const anchorId = aknAnchorId(element);
   const num = childByLocal(element, 'num');
   const heading = childByLocal(element, 'heading');
 
   return (
-    <div className="akn-section">
+    <div
+      id={blockRoot ? undefined : (anchorId ?? undefined)}
+      className="akn-section"
+    >
       {num || heading ? (
         <h3 className="akn-section-heading">
           {num ? <span className="akn-section-num">{num.textContent} </span> : null}
           {heading ? renderInlineChildren(heading) : null}
+          {/* DELIBERATE: mint-coverage ⊂ resolve-coverage. A section without
+              an eId resolves through its serial block anchor but mints no
+              affordance (no stable id to key the citable map on), and a
+              headingless numbered unit resolves but never reaches this
+              heading at all. Real exports (all nodes carry eIds, sections
+              carry headings) hit neither gap — do not widen this. */}
+          {anchorId ? <SectionCopyLink anchorId={anchorId} /> : null}
         </h3>
       ) : null}
       {renderBlockChildren(element, ['num', 'heading'])}
@@ -306,16 +343,32 @@ function SectionView({ element }: { element: Element }) {
  * A numbered provision — subsection "(1)", paragraph "(a)", item "(i)" — as a
  * real two-column grid: the num in the gutter, the whole body (intro,
  * content, nested provisions, wrap-up) in the column. Nesting indents
- * naturally, one gutter per level.
+ * naturally, one gutter per level. A nested provision with an eId carries its
+ * `akn-{eId}` anchor, so a subsection deep link (`section-54-2`, or the raw
+ * `#akn-…` hash) has something to land on; a block-root one leaves the id to
+ * its wrapper.
  */
-function NumberedBlock({ element }: { element: Element }) {
+function NumberedBlock({
+  element,
+  blockRoot = false,
+}: {
+  element: Element;
+  blockRoot?: boolean;
+}) {
+  const anchorId = blockRoot ? null : aknAnchorId(element);
   const num = childByLocal(element, 'num');
   const body = renderBlockChildren(element, ['num']);
 
-  if (!num) return <div className="akn-unnumbered">{body}</div>;
+  if (!num) {
+    return (
+      <div id={anchorId ?? undefined} className="akn-unnumbered">
+        {body}
+      </div>
+    );
+  }
 
   return (
-    <div className="akn-numbered">
+    <div id={anchorId ?? undefined} className="akn-numbered">
       <span className="akn-num">{num.textContent}</span>
       <div className="akn-numbered-body">{body}</div>
     </div>
