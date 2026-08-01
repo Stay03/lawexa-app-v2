@@ -116,6 +116,14 @@ export const statutesQueries = {
       queryFn: async (): Promise<StatuteCountries> => {
         try {
           const res = await statutesApi.getCountryFacets();
+          // SHAPE-CHECK a 200 before trusting it: these facets feed
+          // `facets.countries.map(...)` in the tab row, so a well-formed
+          // error page or a drifted payload answering 200 would crash the
+          // whole list screen. A response without a countries ARRAY is not
+          // facets — fall back to the seed exactly like a failed request.
+          if (!Array.isArray(res.data?.countries)) {
+            return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
+          }
           return { ...res.data, source: 'live' };
         } catch {
           return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
