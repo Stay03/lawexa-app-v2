@@ -38,6 +38,18 @@
  * along — v2 folds both into the detail screen, and an old link falls through
  * this same wildcard to the v2 detail's not-found handling rather than to v1.
  */
+/**
+ * `/bookmarks` is EXACT, not a wildcard — the page has no sub-routes, and any
+ * deeper path should keep falling through to v1 rather than 404 in v2. It is a
+ * private, per-account surface (noindex; guests included — guest bookmarks are
+ * real and writable). `/quiz/*` covers the hub, player, results, history and
+ * stats; private and role-gated in the UI (researcher/admin/superadmin), with
+ * the server-side lock a pending backend ask. v1's `/quiz/play?s=` query-param
+ * route shape deliberately dies here: the wildcard claims `/quiz/play` too,
+ * where the `[sessionUuid]` segment treats "play" as an unknown session and the
+ * player renders its designed error state — the same one-way door as radar's
+ * `/settings`.
+ */
 export const V2_ROUTES = [
   '/',
   '/work',
@@ -47,6 +59,8 @@ export const V2_ROUTES = [
   '/cases/*',
   '/statutes/*',
   '/radars/*',
+  '/bookmarks',
+  '/quiz/*',
 ] as const;
 
 export type V2Route = (typeof V2_ROUTES)[number];
