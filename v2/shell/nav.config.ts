@@ -15,6 +15,7 @@ import {
 
 import type { UserRole } from '@/types/auth';
 import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
+import { canAccessSpaces } from '@/lib/utils/spaces-access';
 
 /**
  * v2 shell navigation — the SINGLE source of truth for both the desktop sidebar
@@ -32,10 +33,10 @@ import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
  * prevent. An item with no predicate is visible to everyone, so adding a row
  * stays a one-line change.
  *
- * The predicate is a REUSED pure helper (`canAccessQuizPlayer`), never a role
- * list re-declared here: the audience is defined once, in
- * `lib/utils/quiz-access.ts`, and widening it later is still the one-line change
- * that module promises.
+ * A predicate is always a REUSED pure helper (`canAccessQuizPlayer`,
+ * `canAccessSpaces`), never a role list re-declared here: each audience is
+ * defined once, in its `lib/utils/*-access.ts` module, and widening it later is
+ * still the one-line change those modules promise.
  *
  * NOT A SECURITY BOUNDARY. Hiding a link hides an entry point; the route's own
  * gate (`v2/features/quiz/access.tsx`) and the backend decide access. A user who
@@ -91,7 +92,17 @@ export const v2NavItems: V2NavItem[] = [
     ],
   },
   { label: 'Bookmarks', href: '/bookmarks', icon: Bookmark },
-  { label: 'Spaces', href: '/spaces', icon: Boxes },
+  {
+    label: 'Spaces',
+    href: '/spaces',
+    icon: Boxes,
+    // Spaces still lives in v1 behind its own soft-launch gate, and that gate
+    // REDIRECTS outsiders to home. With the v2 preview open to every registered
+    // account (Aug 3, 2026), an ungated row would send most users into that
+    // bounce — so the row shares the feature's audience helper until the
+    // phase-5 rebuild replaces the redirect with a designed state.
+    canAccess: canAccessSpaces,
+  },
   {
     label: 'Quiz',
     href: '/quiz',

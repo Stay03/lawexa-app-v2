@@ -39,10 +39,11 @@ import { useMounted } from './use-mounted';
  * developer flags (the v2-preview cookie, the streaming style) were unreachable
  * from inside v2. This row is the one path to them. It is gated by
  * `canAccessV2Preview` on the SERVER-VERIFIED role from `useV2Session`, exactly
- * like the v1 nav link and the `/settings/developer` page's own fallback, so
- * ordinary users never see it. `/settings/developer` still lives in v1, so this
- * is a genuine cross-experience link — a real `<Link>`/anchor, so it is
- * middle-clickable and copyable rather than a JS-only jump.
+ * like the v1 nav link and the `/settings/developer` page's own fallback — since
+ * Aug 3, 2026 that audience is every registered account, so only guests/bots
+ * miss the row. `/settings/developer` still lives in v1, so this is a genuine
+ * cross-experience link — a real `<Link>`/anchor, so it is middle-clickable and
+ * copyable rather than a JS-only jump.
  */
 export function V2HeaderMenu() {
   const mounted = useMounted();

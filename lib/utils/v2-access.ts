@@ -1,16 +1,18 @@
 import type { UserRole } from '@/types/auth';
 
 /**
- * Roles allowed to see and use the v2 interface preview during the frontend
- * overhaul's dark launch. Everyone else gets no Developer nav link and a quiet
- * "not available" state on the route — mirrors the Spaces gating in
- * `spaces-access.ts`.
+ * Roles allowed to see and use the v2 interface preview. Opened from the
+ * privileged-only dark launch to EVERY registered account by the owner on
+ * August 3, 2026 — v2 stays opt-in (the Developer toggle sets the cookie;
+ * nothing is forced), but the choice now belongs to every real user. Guests
+ * and bots stay outside: a guest is a view-only pre-registration identity,
+ * not someone choosing an interface.
  *
- * Opening the preview to more testers later is a one-line change: widen (or
- * drop) this list. The `satisfies` clause guarantees every entry is a real
- * role, so a typo fails the build.
+ * Widening (or dropping) this list remains a one-line change. The `satisfies`
+ * clause guarantees every entry is a real role, so a typo fails the build.
  */
 export const V2_PREVIEW_ROLES = [
+  'user',
   'researcher',
   'admin',
   'superadmin',

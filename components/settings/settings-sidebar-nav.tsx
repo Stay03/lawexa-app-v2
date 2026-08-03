@@ -92,8 +92,9 @@ const navItems = [
 export function SettingsSidebarNav() {
   const pathname = usePathname();
   const role = useAuthStore((s) => s.user?.role);
-  // Organization is part of the soft-launched Spaces feature; Developer is the
-  // v2-preview toggle — both are gated to privileged roles.
+  // Organization is part of the soft-launched Spaces feature (privileged roles
+  // only). Developer holds the v2-preview toggle — open to every registered
+  // account since Aug 3, 2026; only guests/bots are filtered out.
   const canSpaces = canAccessSpaces(role);
   const canV2Preview = canAccessV2Preview(role);
   const items = navItems.filter((item) => {
