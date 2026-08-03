@@ -46,7 +46,7 @@ import {
   useRadarDetail,
   useRadarNamePending,
 } from '../naming';
-import { RADAR_STATUS, radarMetaParts } from '../model';
+import { RADAR_STATUS, agoLabel, radarMetaParts } from '../model';
 import { RadarTabs, type RadarTab } from '../RadarTabs';
 import { useRadarScans } from '../use-radar-scans';
 import {
@@ -59,6 +59,7 @@ import {
   RadarDetailSkeleton,
   RadarErrorState,
   RadarNotFoundState,
+  ScanGapNotice,
   ScanListEmptyState,
   ScanListErrorState,
   ScanListSkeleton,
@@ -283,6 +284,34 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
   const statusConfig = RADAR_STATUS[radar.status];
   const meta = radarMetaParts(radar, now);
 
+  // ── THE LOUD FAILURE (owner, August 3 2026) ───────────────────────────────
+  // Derived from the ALWAYS-MOUNTED inbox data, so it speaks on every tab.
+  // Newest-by-created_at rather than trusting page order; the banner shows
+  // only when that newest scan ended without running. Two guards keep it
+  // honest: an in-flight newest scan (the retry) silences it by construction,
+  // and `last_scan_at` must not be newer than the failed run — the one case
+  // where the inbox's newest row is NOT the radar's newest scan is a newer
+  // SUCCESS already triaged out of the inbox, and `last_scan_at` carries that
+  // success's time, so the stale banner is suppressed (60s skew tolerance).
+  const inboxScans =
+    inboxQuery.data?.pages.flatMap((page) => page.data) ?? ([] as RadarScan[]);
+  const newestScan = inboxScans.reduce<RadarScan | null>(
+    (best, scan) =>
+      best === null || Date.parse(scan.created_at) > Date.parse(best.created_at)
+        ? scan
+        : best,
+    null,
+  );
+  const scanGap =
+    newestScan !== null &&
+    (newestScan.status === 'failed' ||
+      newestScan.status === 'skipped_no_balance') &&
+    (radar.last_scan_at === null ||
+      Date.parse(newestScan.started_at ?? newestScan.created_at) >=
+        Date.parse(radar.last_scan_at) - 60_000)
+      ? newestScan
+      : null;
+
   const allScans =
     activeQuery.data?.pages.flatMap((page) => page.data) ?? ([] as RadarScan[]);
   // Client-side re-application of each tab's filter, so optimistically
@@ -469,6 +498,18 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
             </div>
           ) : null}
         </header>
+
+        {scanGap ? (
+          <div className="mt-4">
+            <ScanGapNotice
+              status={
+                scanGap.status === 'failed' ? 'failed' : 'skipped_no_balance'
+              }
+              when={agoLabel(scanGap.started_at ?? scanGap.created_at, now)}
+              radarPaused={radar.status !== 'active'}
+            />
+          </div>
+        ) : null}
 
         {/* ── Workflow tabs + the one scan panel ─────────────────────────── */}
         <div className="mt-4">

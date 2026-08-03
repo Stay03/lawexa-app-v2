@@ -7,6 +7,7 @@ import {
   FileSearch,
   ListChecks,
   Radar as RadarIcon,
+  TriangleAlert,
   WifiOff,
   type LucideIcon,
 } from 'lucide-react';
@@ -51,6 +52,61 @@ function PageState({
         </p>
       </div>
       {action}
+    </div>
+  );
+}
+
+/**
+ * ScanGapNotice — the LOUD failure banner (owner decision, August 3 2026).
+ *
+ * A radar's whole promise is "you are covered without looking", so a failure
+ * used to be the one event this page kept quietest: failed scans render only
+ * under "All activity", and a radar could fail for days while its owner
+ * believed they were covered. This banner is the correction: whenever the
+ * NEWEST scan ended without running (failed, or skipped because the account
+ * was out of scan credit), the radar says so above its inbox, on every tab.
+ *
+ * It disappears on its own the moment a newer scan exists — including the
+ * retry the user just dispatched, since an in-flight newest scan is by
+ * definition not a failed newest scan. When the radar is PAUSED the copy stops
+ * promising a retry that will never fire and says what to do instead.
+ */
+export function ScanGapNotice({
+  status,
+  when,
+  radarPaused,
+}: {
+  status: 'failed' | 'skipped_no_balance';
+  /** `agoLabel` of the failed run, or '' when the timestamp is absent. */
+  when: string;
+  radarPaused: boolean;
+}) {
+  const title =
+    status === 'failed'
+      ? 'The last scan could not run.'
+      : 'The last scan was skipped.';
+  const cause =
+    status === 'failed'
+      ? `Something went wrong${when ? ` ${when}` : ''}.`
+      : `Your account was out of scan credit${when ? ` ${when}` : ''}.`;
+  const onward = radarPaused
+    ? 'This radar is paused, so nothing will retry until you resume it.'
+    : status === 'failed'
+      ? 'The next try runs on schedule — or use Scan now.'
+      : 'Scans continue on schedule once credit is available.';
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+      <TriangleAlert
+        aria-hidden
+        className="mt-0.5 size-4 shrink-0 text-destructive"
+      />
+      <div className="space-y-0.5 text-sm">
+        <p className="font-medium text-foreground">{title}</p>
+        <p className="text-muted-foreground">
+          {cause} {onward}
+        </p>
+      </div>
     </div>
   );
 }
