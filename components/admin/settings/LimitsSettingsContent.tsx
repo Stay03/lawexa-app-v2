@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,6 +26,16 @@ import {
   FormItem,
   FormLabel,
 } from '@/components/ui/form';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import { useAdminSettings, useUpdateAdminSettings } from '@/lib/hooks/useAdmin';
 import { extractApiError } from '@/lib/utils/api-error';
@@ -77,6 +87,19 @@ const THROTTLE_RESOURCES: ThrottleResource[] = [
 const KNOWN_THROTTLE_KEYS = new Set<string>(
   THROTTLE_RESOURCES.flatMap((r) => [r.enabledKey, r.perMinuteKey, r.perHourKey])
 );
+
+// Statute paywall settings (backend, Aug 2 2026): the master switch and the
+// excerpt size. Rendered as their own card — this is a revenue switch, not a
+// throttle — and saving a change to the switch asks for confirmation first,
+// because it takes effect for every free user the moment it saves.
+const PAYWALL_ENABLED_KEY = 'statute_paywall_enabled';
+const PAYWALL_SECTIONS_KEY = 'statute_paywall_free_sections';
+
+const EXPLICITLY_RENDERED_KEYS = new Set<string>([
+  ...KNOWN_THROTTLE_KEYS,
+  PAYWALL_ENABLED_KEY,
+  PAYWALL_SECTIONS_KEY,
+]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -327,6 +350,93 @@ function ThrottleCard({
 }
 
 // ---------------------------------------------------------------------------
+// Statute paywall card
+// ---------------------------------------------------------------------------
+
+interface PaywallCardProps {
+  settingsByKey: Map<string, AdminSetting>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  control: any;
+  enabled: boolean;
+}
+
+function StatutePaywallCard({ settingsByKey, control, enabled }: PaywallCardProps) {
+  const enabledSetting = settingsByKey.get(PAYWALL_ENABLED_KEY);
+  const sectionsSetting = settingsByKey.get(PAYWALL_SECTIONS_KEY);
+
+  if (!enabledSetting || !sectionsSetting) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Statute paywall</CardTitle>
+        <CardDescription>
+          When ON, free users and guests read only the first sections of a
+          statute, with an upgrade card. Paid users always get the full text.
+          Changes apply the moment you save.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <FormField
+          control={control}
+          name={PAYWALL_ENABLED_KEY}
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <FormLabel className="text-sm font-medium cursor-pointer">
+                  Paywall enabled
+                </FormLabel>
+                <FormDescription className="text-xs">
+                  {enabledSetting.description ||
+                    'The master switch. Saving a change here asks you to confirm.'}
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
+          name={PAYWALL_SECTIONS_KEY}
+          render={({ field }) => (
+            <FormItem
+              className={`flex items-center justify-between gap-x-6 rounded-lg border p-3 ${enabled ? '' : 'opacity-50'}`}
+            >
+              <div className="space-y-0.5">
+                <FormLabel className="text-sm font-medium">
+                  Free sections
+                </FormLabel>
+                <FormDescription className="text-xs">
+                  {sectionsSetting.description ||
+                    'How many sections the free excerpt includes. Minimum 1.'}
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Input
+                  type="number"
+                  min={1}
+                  className="w-28 shrink-0"
+                  disabled={!enabled}
+                  value={field.value ?? ''}
+                  onChange={(e) =>
+                    field.onChange(
+                      e.target.value === '' ? 1 : parseInt(e.target.value, 10)
+                    )
+                  }
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Loading skeleton
 // ---------------------------------------------------------------------------
 
@@ -367,7 +477,7 @@ export function LimitsSettingsContent() {
   }, [allSettings]);
 
   const otherSettings = useMemo(
-    () => allSettings.filter((s) => !KNOWN_THROTTLE_KEYS.has(s.key)),
+    () => allSettings.filter((s) => !EXPLICITLY_RENDERED_KEYS.has(s.key)),
     [allSettings]
   );
 
@@ -380,7 +490,12 @@ export function LimitsSettingsContent() {
           shape[setting.key] = z.boolean();
           break;
         case 'integer':
-          shape[setting.key] = z.number().int();
+          // The paywall excerpt must include at least one section — the
+          // backend enforces the same minimum.
+          shape[setting.key] =
+            setting.key === PAYWALL_SECTIONS_KEY
+              ? z.number().int().min(1)
+              : z.number().int();
           break;
         case 'string':
         case 'json':
@@ -422,25 +537,24 @@ export function LimitsSettingsContent() {
     });
     return map;
   }, [watched]);
+  const paywallEnabled = !!form.watch(PAYWALL_ENABLED_KEY);
 
   const updateMutation = useUpdateAdminSettings();
 
-  const onSubmit = useCallback(
-    (data: Record<string, unknown>) => {
-      const dirtyFields = form.formState.dirtyFields;
-      const changed: Record<string, string | number | boolean> = {};
+  // A pending save that includes the paywall master switch. Saving is the
+  // moment the change becomes real for every free user, so THAT is where the
+  // confirmation sits — not on the toggle, which only edits the form.
+  const [paywallConfirm, setPaywallConfirm] = useState<{
+    changed: Record<string, string | number | boolean>;
+    data: Record<string, unknown>;
+    turningOn: boolean;
+  } | null>(null);
 
-      for (const key of Object.keys(dirtyFields)) {
-        if (dirtyFields[key]) {
-          changed[key] = data[key] as string | number | boolean;
-        }
-      }
-
-      if (Object.keys(changed).length === 0) {
-        toast.info('No changes to save.');
-        return;
-      }
-
+  const commitSave = useCallback(
+    (
+      changed: Record<string, string | number | boolean>,
+      data: Record<string, unknown>
+    ) => {
       updateMutation.mutate(
         { settings: changed },
         {
@@ -467,6 +581,38 @@ export function LimitsSettingsContent() {
       );
     },
     [form, updateMutation]
+  );
+
+  const onSubmit = useCallback(
+    (data: Record<string, unknown>) => {
+      const dirtyFields = form.formState.dirtyFields;
+      const changed: Record<string, string | number | boolean> = {};
+
+      for (const key of Object.keys(dirtyFields)) {
+        if (dirtyFields[key]) {
+          changed[key] = data[key] as string | number | boolean;
+        }
+      }
+
+      if (Object.keys(changed).length === 0) {
+        toast.info('No changes to save.');
+        return;
+      }
+
+      // The paywall master switch changes what every free user sees, the
+      // instant it saves. Hold the save behind a confirmation.
+      if (PAYWALL_ENABLED_KEY in changed) {
+        setPaywallConfirm({
+          changed,
+          data,
+          turningOn: changed[PAYWALL_ENABLED_KEY] === true,
+        });
+        return;
+      }
+
+      commitSave(changed, data);
+    },
+    [form, commitSave]
   );
 
   const isLoading = limitsQuery.isLoading;
@@ -524,6 +670,12 @@ export function LimitsSettingsContent() {
             onSubmit={form.handleSubmit(onSubmit)}
             className="max-w-3xl space-y-6"
           >
+            <StatutePaywallCard
+              settingsByKey={settingsByKey}
+              control={form.control}
+              enabled={paywallEnabled}
+            />
+
             {THROTTLE_RESOURCES.map((resource) => (
               <ThrottleCard
                 key={resource.prefix}
@@ -582,6 +734,45 @@ export function LimitsSettingsContent() {
           </form>
         </Form>
       )}
+
+      {/* The paywall save confirmation — the switch changes what every free
+          user sees the instant it saves, so the save is what gets confirmed. */}
+      <AlertDialog
+        open={paywallConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setPaywallConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {paywallConfirm?.turningOn
+                ? 'Turn the statute paywall ON?'
+                : 'Turn the statute paywall OFF?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {paywallConfirm?.turningOn
+                ? `Every free user and guest will see only the first ${
+                    paywallConfirm?.data[PAYWALL_SECTIONS_KEY] ?? ''
+                  } sections of a statute, with an upgrade card. Paid users are not affected. This takes effect immediately when saved.`
+                : 'Every free user and guest will get the full statute text again. This takes effect immediately when saved.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (paywallConfirm) {
+                  commitSave(paywallConfirm.changed, paywallConfirm.data);
+                }
+                setPaywallConfirm(null);
+              }}
+            >
+              {paywallConfirm?.turningOn ? 'Turn paywall on' : 'Turn paywall off'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
