@@ -66,6 +66,14 @@ export interface Statute {
   as_at_date_end?: string | null;
   /** The repealing instrument, on repealed statutes. */
   repealed_by?: StatuteRepealedBy | null;
+  /**
+   * Real-reader view count (backend, Aug 2 2026: 30-minute per-user cooldown,
+   * bots excluded; verified live on list and detail). Counting began mid-July
+   * 2026, so numbers are younger than the statutes themselves. Not displayed
+   * anywhere yet — that is an owner decision (the case pages deliberately
+   * dropped their view displays).
+   */
+  views_count?: number;
 }
 
 // Full statute detail (from GET /api/statutes/{slug})
