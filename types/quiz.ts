@@ -49,9 +49,26 @@ export interface QuizQuestion {
   options: QuizOption[];
 }
 
+/**
+ * The owning account, as embedded in a session payload.
+ *
+ * VERIFIED against the live API (2026-08-03 probe): `POST /quizzes` and
+ * `POST /quizzes/{uuid}/answers` return the session with a nested
+ * `user: { id, name }`. It is absent from the `/end` and `/results` payloads,
+ * so the field is optional. The player never renders it — every session
+ * belongs to the caller — but it is typed so the shape is described honestly
+ * rather than silently dropped.
+ */
+export interface QuizSessionUser {
+  id: number;
+  name: string;
+}
+
 /** The session object returned across start / current / answer / list / results. */
 export interface QuizSession {
   uuid: string;
+  /** Present on start / answer only — see {@link QuizSessionUser}. */
+  user?: QuizSessionUser;
   status: QuizSessionStatus;
   served_count: number;
   answered_count: number;
@@ -97,6 +114,19 @@ export interface QuizResultQuestion {
   explanation: string | null;
   difficulty: QuizDifficulty;
   difficulty_label: string;
+  /**
+   * The subject this question was drawn from, e.g. "Law of Torts".
+   *
+   * VERIFIED against the live API (2026-08-03 probe): `GET /quizzes/{uuid}/results`
+   * carries `topic` + `topic_key` on every question. They are NOT served during
+   * play (the played question payload has neither), which is why they live here
+   * and not on {@link QuizQuestion}. Optional because the field was undocumented
+   * when this type was written and an older payload may omit it — read
+   * defensively, never assume a label exists.
+   */
+  topic?: string | null;
+  /** Slug form of {@link QuizResultQuestion.topic}, e.g. "law-of-torts". */
+  topic_key?: string | null;
   options: QuizResultOption[];
 }
 
@@ -226,12 +256,30 @@ export interface QuizStatsSessions {
   correct: number;
 }
 
+/**
+ * ZERO-VS-NULL DRIFT — read before rendering any of these.
+ *
+ * VERIFIED against the live API (2026-08-03 probe, empty account): the backend
+ * returns `avg_score: 0` and `avg_time_per_question_ms: 0` for an account with
+ * NOTHING completed and NOTHING answered — only `accuracy` and
+ * `completion_rate` actually arrive as `null`. So a `0` in either of those two
+ * fields is ambiguous: it means "genuinely averaged zero" OR "no data at all",
+ * and rendering it as "0%" tells a new user they scored zero.
+ *
+ * The union keeps `| null` because the documented contract says null and a
+ * backend fix must not become a type error. The disambiguation is DERIVED from
+ * the counts that produced the mean, not from the value: see
+ * `v2/features/quiz/model.ts` (`readStats`), which reads `avg_score` only when
+ * `engagement.completed > 0` and `avg_time_per_question_ms` only when
+ * `sessions.answered > 0`. A real 0% average with completed sessions therefore
+ * still renders "0%".
+ */
 export interface QuizStatsPerformance {
-  /** Mean of finalized session scores; null before any are completed. */
+  /** Mean of finalized session scores. `null` — OR `0` — before any complete. */
   avg_score: number | null;
   /** correct ÷ answered, as a %; null if nothing answered yet. */
   accuracy: number | null;
-  /** Mean think-time over answered questions, in ms; null if none. */
+  /** Mean think-time over answered questions, in ms. `null` — OR `0` — if none. */
   avg_time_per_question_ms: number | null;
   score_trend: QuizScoreTrendPoint[];
 }

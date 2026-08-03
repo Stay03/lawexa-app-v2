@@ -27,7 +27,7 @@ import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
-import { v2NavItems, v2NewChat, type V2NavItem } from './nav.config';
+import { v2NewChat, visibleNavItems, type V2NavItem } from './nav.config';
 
 /**
  * V2Drawer — the mobile navigation drawer (Nav D, locked). ChatGPT-style
@@ -147,6 +147,9 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
 
   const NewChatIcon = v2NewChat.icon;
   const recents = recentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  // Same filter, same source, same server-verified role as the rail — see
+  // `visibleNavItems`. The two surfaces cannot drift on what exists.
+  const navItems = visibleNavItems(user?.role ?? null);
 
   return (
     <Sheet open={openMobile} onOpenChange={setOpenMobile}>
@@ -220,7 +223,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
               <span className="truncate">{v2NewChat.label}</span>
             </Link>
 
-            {v2NavItems.map((item) => {
+            {navItems.map((item) => {
               // Expandable group (Library) — a collapsible matching the rail
               // (owner #42): toggle row + chevron + animated height both ways.
               if (item.items && item.items.length > 0) {

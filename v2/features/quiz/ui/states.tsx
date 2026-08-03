@@ -1,0 +1,189 @@
+import Link from 'next/link';
+import { GraduationCap, WifiOff } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { QuizMessage } from './QuizMessage';
+
+/**
+ * states.tsx — the quiz feature's SHARED loading shapes and the panels more than
+ * one screen needs. Screen-specific states live beside their screen; anything
+ * two surfaces both render lives here so the two cannot drift.
+ *
+ * The verify-email panel is the one exception: it needs `useRouter` for its
+ * re-check affordance, so it lives in its own `'use client'` module
+ * (`VerifyEmailState.tsx`) rather than pulling every skeleton in this file into
+ * the client bundle behind it.
+ *
+ * `still` on every skeleton follows the house rule: a PULSE promises a request
+ * is in flight. A route-level fallback waits on an RSC payload while the query
+ * behind it is often already warm, so it reserves the shape without the pulse;
+ * a live `isPending` query pulses.
+ */
+
+/* ── Session rows ───────────────────────────────────────────────────────── */
+
+/** One skeleton row, shaped exactly like `SessionRow` (dot + status / meta). */
+function SessionRowSkeleton({ still = false }: { still?: boolean }) {
+  const bar = still ? 'animate-none' : undefined;
+  return (
+    <div className="flex min-h-11 items-center gap-3 px-2 py-3">
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className={cn('size-2 shrink-0 rounded-full', bar)} />
+          <Skeleton className={cn('h-4 w-28 rounded', bar)} />
+        </div>
+        <Skeleton className={cn('h-3 w-2/3 rounded', bar)} />
+      </div>
+      <Skeleton className={cn('h-3 w-12 shrink-0 rounded', bar)} />
+    </div>
+  );
+}
+
+/**
+ * The session-list loading shape — progressive opacity down the stack, the one
+ * loading language every v2 list surface speaks. `rows` defaults to a realistic
+ * MEDIAN (standards §8iv: reserve near the middle, never at the page cap).
+ */
+export function SessionListSkeleton({
+  rows = 5,
+  still = false,
+}: {
+  rows?: number;
+  still?: boolean;
+}) {
+  return (
+    <div aria-hidden className="flex flex-col">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.16) }}>
+          <SessionRowSkeleton still={still} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The next-page skeleton shown at the infinite sentinel while a page loads. */
+export function SessionNextPageSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="flex flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+    >
+      <SessionRowSkeleton />
+      <div style={{ opacity: 0.5 }}>
+        <SessionRowSkeleton />
+      </div>
+    </div>
+  );
+}
+
+/* ── Shared panels ──────────────────────────────────────────────────────── */
+
+/** Load failure — visually distinct from empty, with a real in-place retry. */
+export function QuizErrorState({
+  title = "Couldn't load this",
+  description = 'Something went wrong on our side. Please try again.',
+  onRetry,
+}: {
+  title?: string;
+  description?: string;
+  onRetry: () => void;
+}) {
+  return (
+    <QuizMessage
+      icon={WifiOff}
+      tone="alert"
+      title={title}
+      description={description}
+      action={
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Try again
+        </Button>
+      }
+    />
+  );
+}
+
+/* ── The `/quiz` segment fallback ───────────────────────────────────────── */
+
+/**
+ * The `/quiz` SEGMENT boundary (`app/v2/quiz/loading.tsx`) — deliberately EMPTY.
+ *
+ * A segment's `loading.tsx` wraps its CHILD SLOT, so this one covers hub →
+ * player, hub → history and hub → stats. Those three destinations do not share
+ * a body shape (a question with four options, a row list, a card grid), and
+ * `app/v2/loading.tsx` states the house rule for exactly that case: a
+ * segment-level boundary whose children DON'T share a shape must be neutral,
+ * and neutral means empty — the persistent shell already frames the wait, the
+ * destination's own boundary takes over the moment its shell arrives, and any
+ * silhouette here would be a lie about where the reader is going.
+ *
+ * Each child route carries its own precise, page-shaped `loading.tsx`; this is
+ * only the quiet beat before one of them arrives.
+ */
+export function QuizSegmentFallback() {
+  return (
+    <>
+      <span role="status" className="sr-only">
+        Loading quiz
+      </span>
+      <div aria-hidden className="min-h-full" />
+    </>
+  );
+}
+
+/* ── Access panels ──────────────────────────────────────────────────────── */
+
+/**
+ * EARLY ACCESS — what an ineligible account sees at any `/quiz/*` URL.
+ *
+ * v1 redirected these users home without a word (`QuizGuard`). The owner
+ * replaced that with the truth (August 3): quiz is a real feature that is not
+ * open yet, and a silent bounce reads as a broken link. So the panel says what
+ * is happening, why, and offers two ways onward — never a dead end.
+ *
+ * Honest about the boundary too: this is OUR gate. The backend does not enforce
+ * the researcher/admin soft-launch list (verified live, 2026-08-03), so the copy
+ * promises nothing about security — it describes a product state, which is
+ * exactly what it is.
+ */
+export function QuizEarlyAccessState() {
+  return (
+    <QuizMessage
+      icon={GraduationCap}
+      tone="accent"
+      title="Quiz is in early access"
+      description="Practice sessions are open to research accounts while we finish testing them. Your account doesn't have access yet."
+      action={
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button asChild size="sm">
+            <Link href="/">Back to home</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/cases">Browse case law</Link>
+          </Button>
+        </div>
+      }
+      footnote="It opens to everyone once the question bank is ready."
+    />
+  );
+}
+
+/** Signed out — the queries are gated off, so this replaces a 401 screen. */
+export function QuizSignedOutState() {
+  return (
+    <QuizMessage
+      icon={GraduationCap}
+      tone="accent"
+      title="Sign in to practise"
+      description="Quiz turns your study conversations into multiple-choice practice, and keeps your score history. Sign in to start a session."
+      action={
+        <Button asChild size="sm">
+          <Link href="/login">Sign in</Link>
+        </Button>
+      }
+    />
+  );
+}

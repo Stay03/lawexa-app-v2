@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useMemo } from 'react';
-import type { UserRole } from '@/types/auth';
+import type { AuthProvider, UserRole } from '@/types/auth';
 
 /**
  * The v2 session CONTEXT — the client-side read path for the server-verified
@@ -49,7 +49,7 @@ import type { UserRole } from '@/types/auth';
  */
 
 /**
- * The client-readable session snapshot. Four primitives, all resolved on the
+ * The client-readable session snapshot. Six primitives, all resolved on the
  * server before this provider mounts — there is no pending state, so no consumer
  * ever has to render a "session still resolving" branch.
  */
@@ -66,6 +66,21 @@ export interface V2SessionSnapshot {
   readonly name: string | null;
   /** Server-verified role, or `null` when signed out. */
   readonly role: UserRole | null;
+  /**
+   * Whether the backend has verified this account's email. `false` when signed
+   * out. NOT a capability — it is a PRESENTATION fact, so a surface the backend
+   * gates on verification (every `/quizzes/*` endpoint 403s for an unverified
+   * registered account) can render a designed "verify your email" panel instead
+   * of an error screen. The backend stays the authority: a stale snapshot still
+   * meets a real 403, which the surfaces handle as the same state.
+   */
+  readonly isVerified: boolean;
+  /**
+   * How this account signs in, or `null` when signed out. Paired with
+   * {@link V2SessionSnapshot.isVerified}: only `'email'` signups ever need to
+   * verify, so gating on `isVerified` alone would nag every Google account.
+   */
+  readonly authProvider: AuthProvider | null;
 }
 
 /**
@@ -90,11 +105,13 @@ export function V2SessionProvider({
   userId,
   name,
   role,
+  isVerified,
+  authProvider,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
-    () => ({ signedIn, userId, name, role }),
-    [signedIn, userId, name, role],
+    () => ({ signedIn, userId, name, role, isVerified, authProvider }),
+    [signedIn, userId, name, role, isVerified, authProvider],
   );
 
   return (

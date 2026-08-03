@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import type { ApiResponse } from '@/types/api';
-import type { User, UserRole } from '@/types/auth';
+import type { AuthProvider, User, UserRole } from '@/types/auth';
 import { apiFetch } from './api-server';
 import { getSessionToken } from './session-token';
 
@@ -32,6 +32,19 @@ export interface SessionUser {
   role: UserRole;
   /** Public avatar URL (safe to render); `null` when unset. */
   avatar_url: string | null;
+  /**
+   * Whether the backend considers this address verified. A safe primitive, not
+   * a capability: every quiz endpoint 403s server-side for an unverified
+   * REGISTERED account, and this is what lets the quiz surfaces render a
+   * designed "verify your email" panel instead of an error screen.
+   */
+  is_verified: boolean;
+  /**
+   * How the account signs in. Paired with {@link SessionUser.is_verified}
+   * because only `email` signups ever need to verify — an OAuth account
+   * arrives verified, so gating on `is_verified` alone would nag Google users.
+   */
+  auth_provider: AuthProvider;
 }
 
 export interface SessionDTO {
@@ -65,6 +78,8 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
         email: user.email,
         role: user.role,
         avatar_url: user.avatar_url ?? null,
+        is_verified: user.is_verified,
+        auth_provider: user.auth_provider,
       },
     };
   } catch {

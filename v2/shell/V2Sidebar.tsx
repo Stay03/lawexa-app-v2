@@ -34,7 +34,7 @@ import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
-import { v2NavItems, v2NewChat, type V2NavItem } from './nav.config';
+import { v2NewChat, visibleNavItems, type V2NavItem } from './nav.config';
 
 /**
  * V2Sidebar — the desktop navigation rail, built on the shadcn sidebar
@@ -164,6 +164,10 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
 
   const NewChatIcon = v2NewChat.icon;
   const recents = recentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  // Role-gated rows (Quiz's research-account soft launch) are filtered from the
+  // ONE config, with the SERVER-verified role the layout already threaded in —
+  // so the rail and the drawer can never disagree about what exists.
+  const navItems = visibleNavItems(user?.role ?? null);
 
   return (
     <Sidebar
@@ -198,7 +202,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
               </SidebarMenuButton>
             </SidebarMenuItem>
 
-            {v2NavItems.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
 
               // Expandable group (Library) — its own component so it can hold the

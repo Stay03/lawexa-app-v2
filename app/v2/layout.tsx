@@ -176,6 +176,12 @@ export default async function V2Layout({
           userId={user?.id ?? null}
           name={user?.name ?? null}
           role={user?.role ?? null}
+          // Verification state travels with identity because the quiz surfaces
+          // need it to render a designed "verify your email" panel rather than
+          // an error screen — every `/quizzes/*` endpoint 403s for an
+          // unverified registered account. Signed out ⇒ `false` / `null`.
+          isVerified={user?.is_verified ?? false}
+          authProvider={user?.auth_provider ?? null}
         >
           {/* Seed the browser query cache with the server-prefetched recents — BOTH the
               sidebar/drawer infinite list and the home's single-page peek, which are

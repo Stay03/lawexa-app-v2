@@ -13,16 +13,33 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import type { UserRole } from '@/types/auth';
+import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
+
 /**
  * v2 shell navigation — the SINGLE source of truth for both the desktop sidebar
  * (`V2Sidebar`) and the mobile drawer (`V2Drawer`). Overhaul-plan §1: the shell
  * reads ONE config so the two surfaces can never drift.
  *
- * This wave is UI-only: static config, no role gating (every item is shown to
- * everyone). Role-aware filtering (v1's `canAccessQuiz` / `canAccessSpaces` /
- * lawyer-verification) lands with the phase-3 data wiring. Hrefs point at their
- * canonical future `/v2/*` paths; those feature routes are built in later phases,
- * so following them 404s until then — expected for a shell-only wave.
+ * Hrefs point at their canonical CLEAN paths; unmigrated routes fall through the
+ * proxy to the v1 page — the intended strangler experience.
+ *
+ * ── ROLE GATING LIVES HERE, NOT IN THE SURFACES ─────────────────────────────
+ * An item may declare {@link V2NavItem.canAccess}, a predicate over the
+ * SERVER-VERIFIED role. Both nav surfaces filter through {@link visibleNavItems}
+ * with the role the v2 layout already resolved, so a gated row can never appear
+ * in one surface and not the other — the exact drift `nav.config.ts` exists to
+ * prevent. An item with no predicate is visible to everyone, so adding a row
+ * stays a one-line change.
+ *
+ * The predicate is a REUSED pure helper (`canAccessQuizPlayer`), never a role
+ * list re-declared here: the audience is defined once, in
+ * `lib/utils/quiz-access.ts`, and widening it later is still the one-line change
+ * that module promises.
+ *
+ * NOT A SECURITY BOUNDARY. Hiding a link hides an entry point; the route's own
+ * gate (`v2/features/quiz/access.tsx`) and the backend decide access. A user who
+ * types the URL meets a designed panel, not a broken page.
  */
 
 /** A terminal nav destination (leaf row or a Library child). */
@@ -40,6 +57,11 @@ export interface V2NavLeaf {
 /** A top-level nav row; `items` makes it an expandable group (e.g. Library). */
 export interface V2NavItem extends V2NavLeaf {
   items?: V2NavLeaf[];
+  /**
+   * Optional visibility predicate over the server-verified role (`null` when
+   * signed out). Omitted ⇒ visible to everyone. See the module docblock.
+   */
+  canAccess?: (role: UserRole | null) => boolean;
 }
 
 /** The gold primary action pinned at the top of the sidebar / bottom of the drawer. */
@@ -70,5 +92,21 @@ export const v2NavItems: V2NavItem[] = [
   },
   { label: 'Bookmarks', href: '/bookmarks', icon: Bookmark },
   { label: 'Spaces', href: '/spaces', icon: Boxes },
-  { label: 'Quiz', href: '/quiz', icon: GraduationCap },
+  {
+    label: 'Quiz',
+    href: '/quiz',
+    icon: GraduationCap,
+    // Quiz is in soft launch for research accounts (docs/quiz/main-plan.md §2),
+    // so everyone else gets no entry point — the same "no trace" rule v1's
+    // sidebar applies, expressed through the shared audience helper.
+    canAccess: canAccessQuizPlayer,
+  },
 ];
+
+/**
+ * The nav rows THIS viewer may see. Both surfaces call it with the role the v2
+ * layout resolved, so the desktop rail and the mobile drawer always agree.
+ */
+export function visibleNavItems(role: UserRole | null): V2NavItem[] {
+  return v2NavItems.filter((item) => item.canAccess?.(role) ?? true);
+}

@@ -1,6 +1,11 @@
+'use client';
+
 import { GraduationCap, Landmark, NotebookPen, Scale } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
+import type { UserRole } from '@/types/auth';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from './modules';
 import { CHAT_QUICK_JUMP, CHAT_QUICK_JUMP_ITEM } from './home-frame';
 
@@ -17,25 +22,51 @@ import { CHAT_QUICK_JUMP, CHAT_QUICK_JUMP_ITEM } from './home-frame';
  * Sharing the one component makes the reserved row and the real row identical by
  * construction.
  *
- * This is STATIC CHROME — fixed labels, fixed routes, zero data. Per the v2
- * loading convention it therefore NEVER gets a skeleton: the fallback renders
- * this very component, just inert.
+ * ── WHY IT READS THE SESSION ITSELF (it used to be hook-free) ───────────────
+ * Quiz is in soft launch for research accounts, so its pill must not appear for
+ * anyone else — the same "no trace" rule the sidebar and drawer apply through
+ * `visibleNavItems`. The obvious implementation, a `role` PROP, would have
+ * broken the geometry contract above: `ChatHome` has a role to pass but
+ * `HomeFallback` has none (it is drawn while the session is still resolving), so
+ * the reserved row and the real row would disagree by one pill — exactly the
+ * one-vs-two-line wrap this component exists to prevent.
  *
- * Presentational and hook-free, so both the client surface and the fallback can
- * import it.
+ * Reading `useV2Session()` removes the divergence at the source: the snapshot is
+ * published by `app/v2/layout.tsx`, which sits ABOVE both the page and its
+ * `loading.tsx`, and it is already resolved on the server before either renders.
+ * So the fallback and the surface ask the same question and get the same answer,
+ * on the first frame, in both directions — no prop threading, no drift, no
+ * flash. (This is also why the component may now be `'use client'`: its only two
+ * consumers, `ChatHome` and `HomeFallback`, already are.)
+ *
+ * NOT A SECURITY BOUNDARY — it hides an entry point. The route's own gate
+ * (`v2/features/quiz/access.tsx`) and the backend decide access.
  */
 
-const QUICK_ACTIONS = [
+interface QuickAction {
+  href: string;
+  label: string;
+  Icon: typeof Scale;
+  /** Omitted ⇒ visible to everyone (the same contract as `nav.config.ts`). */
+  canAccess?: (role: UserRole | null) => boolean;
+}
+
+const QUICK_ACTIONS: readonly QuickAction[] = [
   { href: '/cases', label: 'Cases', Icon: Scale },
   { href: '/statutes', label: 'Statutes', Icon: Landmark },
   { href: '/notes', label: 'Notes', Icon: NotebookPen },
-  { href: '/quiz', label: 'Quiz', Icon: GraduationCap },
-] as const;
+  { href: '/quiz', label: 'Quiz', Icon: GraduationCap, canAccess: canAccessQuizPlayer },
+];
 
 export function HomeQuickJump() {
+  const { role } = useV2Session();
+  const actions = QUICK_ACTIONS.filter(
+    (action) => action.canAccess?.(role) ?? true,
+  );
+
   return (
     <nav aria-label="Quick links" className={CHAT_QUICK_JUMP}>
-      {QUICK_ACTIONS.map(({ href, label, Icon }) => (
+      {actions.map(({ href, label, Icon }) => (
         <a
           key={href}
           href={href}
