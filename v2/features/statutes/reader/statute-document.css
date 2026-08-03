@@ -312,6 +312,107 @@
   color: var(--muted-foreground);
 }
 
+/* ── The paywall: excerpt fade + upgrade card (StatutePaywall.tsx) ──────── */
+
+/**
+ * The fade is REAL text dissolving: the wrapper pulls itself up over the last
+ * lines of the rendered excerpt (negative margin = the fade's own height) and
+ * the gradient runs to the page background, so the law visibly trails off
+ * into the card — no fabricated blurred lines, nothing fake underneath.
+ * `pointer-events: none` on the wrapper keeps the overlapped text selectable;
+ * the card alone re-arms events.
+ *
+ * The wrapper mirrors `.akn-doc`'s font metrics EXACTLY (family, size,
+ * variation): `--doc-measure` is in `ch`, which resolves against the
+ * element's own font — matching metrics is what makes the fade and card span
+ * precisely the text column they follow. The card resets to the sans base;
+ * its text roles then speak for themselves.
+ */
+.v2-statute-doc .akn-paywall {
+  position: relative;
+  margin-top: -7rem;
+  max-width: var(--doc-measure);
+  pointer-events: none;
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 30, 'WONK' 0, 'opsz' 14;
+  font-size: 1.0625rem;
+}
+
+@media (min-width: 768px) {
+  .v2-statute-doc .akn-paywall {
+    font-size: 1.125rem;
+  }
+}
+
+.v2-statute-doc .akn-paywall-fade {
+  height: 7rem;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in oklch, var(--background) 55%, transparent) 55%,
+    var(--background) 100%
+  );
+}
+
+/**
+ * The card, in the division-heading grammar it stands in for (see the
+ * component docblock): gold-warmed chrome — the "invitation, not failure"
+ * voice — over theme tokens only, correct in light and dark by construction.
+ */
+.v2-statute-doc .akn-paywall-card {
+  pointer-events: auto;
+  border: 1px solid color-mix(in oklch, var(--primary) 30%, var(--border));
+  border-radius: 1.25rem;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--primary) 7%, transparent),
+    color-mix(in oklch, var(--primary) 3%, transparent)
+  );
+  padding: 1.75rem 1.5rem;
+  scroll-margin-top: 1.5rem;
+  /* Reset from the wrapper's measure-matching serif — the card's own text
+     roles (kicker, title, copy, action) each declare their voice. */
+  font-family: var(--font-sans);
+  font-variation-settings: normal;
+  font-size: 1rem;
+}
+
+/** The label voice, gold-warmed — exactly `.akn-division-num`'s mix. */
+.v2-statute-doc .akn-paywall-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--primary) 75%, var(--muted-foreground));
+}
+
+/** The serif headline at the division-heading scale — the card speaks about
+ *  the law, so it borrows the law's heading voice, not an app-widget one. */
+.v2-statute-doc .akn-paywall-title {
+  margin-top: 0.5rem;
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 28;
+  font-weight: 600;
+  font-size: 1.375rem;
+  line-height: 1.3;
+  color: var(--foreground);
+  text-wrap: balance;
+}
+
+/** The one honest sans line — scaffolding, quiet. */
+.v2-statute-doc .akn-paywall-copy {
+  margin-top: 0.5rem;
+  max-width: 34rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
+
 /* ── Lists ──────────────────────────────────────────────────────────────── */
 
 /** Source lists carry their own "(a)" markers in the text — no double marks. */

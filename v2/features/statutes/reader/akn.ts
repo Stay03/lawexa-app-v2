@@ -57,11 +57,19 @@ export interface AknBlock {
 export interface AknOutlineSection {
   id: string;
   label: string;
+  /**
+   * True when this entry lies beyond a partial document's free excerpt — set
+   * ONLY by the server-outline mapping (`server-outline.ts`). The client walk
+   * never sets it: everything it walks is, by definition, rendered.
+   */
+  locked?: boolean;
 }
 
 export interface AknOutlineDivision {
   id: string;
   label: string;
+  /** Same contract as {@link AknOutlineSection.locked}. */
+  locked?: boolean;
   sections: AknOutlineSection[];
 }
 
@@ -104,8 +112,11 @@ export function aknAnchorId(el: Element): string | null {
  * Hierarchical containers whose heading is lifted into a `division` block and
  * whose content continues the flat sequence. The AKN hierarchy names, per the
  * OASIS vocabulary and the `StatuteNodeType` union our backend emits.
+ * Exported for `server-outline.ts`, whose division mapping must mean exactly
+ * what this walk means by "division" (attachments/schedules are the one
+ * addition there — this walk handles them via the `attachment` branch).
  */
-const STRUCTURAL = new Set([
+export const STRUCTURAL = new Set([
   'part',
   'chapter',
   'subpart',

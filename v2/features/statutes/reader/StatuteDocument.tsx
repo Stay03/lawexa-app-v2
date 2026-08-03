@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { useV2Session } from '@/v2/runtime/session-context';
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 import { statutesQueries } from '../queries';
 import { parseAkn, type AknBlock, type AknOutlineDivision } from './akn';
 import { AknBlockView } from './AknNode';
+import { buildServerOutline, findLockedCitation } from './server-outline';
+import { STATUTE_PAYWALL_ID, StatutePaywall } from './StatutePaywall';
 import {
   displayNum,
   formatProvisionLabel,
@@ -76,6 +79,30 @@ import './statute-document.css';
  * string and runs exactly once per document per session — the akn query's
  * `static` staleTime exists so a background refetch can never re-run it under
  * the reader.
+ *
+ * ── THE PAYWALL (partial documents) ─────────────────────────────────────────
+ * When the export-akn response carries the partial marker (headers — see
+ * `lib/api/statutes.ts`), the server has cut the XML after the free excerpt.
+ * Everything above renders EXACTLY as for a full document (the eIds are
+ * unchanged, the excerpt is just shorter); this component adds, and ONLY
+ * then:
+ *
+ *  - the excerpt's tail fading into the upgrade card (`StatutePaywall`);
+ *  - the SERVER outline (`aknOutline`, fetched only on a partial document)
+ *    swapped into the rail/sheet — the full map with locked reaches marked;
+ *    clicking a locked entry scrolls to the upgrade card. If that fetch
+ *    fails, the client-derived outline stands, exactly as today;
+ *  - locked ARRIVALS: a citation path or `#akn-…` hash pointing beyond the
+ *    cut lands on the upgrade card with an honest notice ("Section 54 is in
+ *    the full statute…") instead of the not-found lie; while the outline is
+ *    still resolving, the not-found notice is withheld — absence is not
+ *    provable on a partial document until the outline has answered.
+ *
+ * No marker → none of this exists: no outline fetch, no card, no branch
+ * taken — the full-document path is byte-identical to the pre-paywall
+ * reader. That inertness is a hard requirement (the backend switch is OFF in
+ * production), and it is also the automatic degradation for headers the
+ * browser cannot see.
  */
 
 /** First slice: enough blocks to fill a couple of screens on any viewport. */
@@ -97,16 +124,36 @@ export function StatuteDocument({
   /** The citation path segment from the URL (`section-54-2`), or null. */
   provision: string | null;
 }) {
+  const { role } = useV2Session();
   const query = useQuery(statutesQueries.akn(slug));
+  const xml = query.data?.xml ?? null;
+  /** The paywall marker — null is "full document", the only state a paid
+   *  reader, a small statute, or the off switch can ever produce. */
+  const partial = query.data?.partial ?? null;
 
   // ONE parse per document string (see docblock). `parseAkn` returns null for
   // unparseable XML — rendered as the designed "can't be displayed" state.
-  const model = useMemo(
-    () => (query.data ? parseAkn(query.data) : null),
-    [query.data],
-  );
+  const model = useMemo(() => (xml !== null ? parseAkn(xml) : null), [xml]);
   const blocks = model?.blocks ?? NO_BLOCKS;
   const outline = model?.outline ?? NO_OUTLINE;
+
+  /* ── The server outline (partial documents only — see docblock) ───────── */
+
+  const outlineQuery = useQuery({
+    ...statutesQueries.aknOutline(slug),
+    // The call-site gate IS the inertness guarantee: a full document never
+    // issues this request, so the switch-off state stays request-identical.
+    enabled: partial !== null,
+  });
+  const outlineData = partial !== null ? (outlineQuery.data ?? null) : null;
+  const serverOutline = useMemo(() => {
+    if (!outlineData || outlineData.outline.length === 0) return null;
+    const built = buildServerOutline(outlineData);
+    // A payload whose entries map to ZERO divisions (drift beyond what the
+    // shape guard can see) must not replace a working client outline with an
+    // empty rail — no map beats a wrong map, same spirit as the shape guard.
+    return built.divisions.length > 0 ? built : null;
+  }, [outlineData]);
 
   /* ── Progressive mounting ─────────────────────────────────────────────── */
 
@@ -154,8 +201,32 @@ export function StatuteDocument({
    * satisfies reduced-motion by construction. The second same-frame-after
    * pass re-lands the scroll once `content-visibility` estimates around the
    * target settle into real heights.
+   *
+   * A LOCKED id (a server-outline entry beyond a partial document's cut) has
+   * no text to scroll to — it routes to the upgrade card instead: the card
+   * IS where that provision's story continues.
    */
+  const jumpToPaywall = () => {
+    // Mount the whole (small) excerpt so the card's geometry is final before
+    // landing on it — the mounting tail otherwise shifts it downward.
+    setMountedCount(blocks.length);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(STATUTE_PAYWALL_ID)
+        ?.scrollIntoView({ block: 'center' });
+      requestAnimationFrame(() => {
+        document
+          .getElementById(STATUTE_PAYWALL_ID)
+          ?.scrollIntoView({ block: 'center' });
+      });
+    });
+  };
+
   const jump = (id: string) => {
+    if (serverOutline?.lockedAnchorIds.has(id)) {
+      jumpToPaywall();
+      return;
+    }
     const index = blockIndexById.get(id);
     if (index !== undefined) {
       setMountedCount((prev) => Math.max(prev, index + 1));
@@ -203,22 +274,62 @@ export function StatuteDocument({
   // element). A hash that points inside a block (a subsection anchor) mounts
   // through its holder; a hash that resolves to nothing falls through to the
   // citation path rather than dead-ending the arrival.
-  const arrival = useMemo<{ index: number; anchorId: string } | null>(() => {
+  //
+  // On a PARTIAL document, either claim can point beyond the cut: a hash
+  // whose eId the server outline lists as locked, or a citation whose section
+  // the outline holds locked (checked only after the rendered excerpt failed
+  // to resolve it — the excerpt always wins the num). Those become `paywall`
+  // arrivals: land on the upgrade card, and say honestly where the provision
+  // is. The memo re-answers when the outline resolves, so a locked arrival
+  // simply fires a moment later than a rendered one.
+  const arrival = useMemo<
+    | { kind: 'anchor'; index: number; anchorId: string }
+    | { kind: 'paywall'; message: string }
+    | null
+  >(() => {
     if (blocks.length === 0) return null;
     if (initialHash) {
       const direct = blockIndexById.get(initialHash);
-      if (direct !== undefined) return { index: direct, anchorId: initialHash };
+      if (direct !== undefined) {
+        return { kind: 'anchor', index: direct, anchorId: initialHash };
+      }
       const holder = holderBlockIndex(blocks, initialHash);
-      if (holder !== null) return { index: holder, anchorId: initialHash };
+      if (holder !== null) {
+        return { kind: 'anchor', index: holder, anchorId: initialHash };
+      }
+      if (serverOutline?.lockedAnchorIds.has(initialHash)) {
+        return {
+          kind: 'paywall',
+          message:
+            'This provision is in the full statute — upgrade to read it.',
+        };
+      }
     }
     if (provisionTarget && provisionTarget.matched !== 'none') {
       const index = blockIndexById.get(provisionTarget.blockId);
       if (index !== undefined) {
-        return { index, anchorId: provisionTarget.anchorId };
+        return { kind: 'anchor', index, anchorId: provisionTarget.anchorId };
+      }
+    }
+    if (citation && outlineData) {
+      const locked = findLockedCitation(outlineData, citation);
+      if (locked) {
+        return {
+          kind: 'paywall',
+          message: `${locked.label} is in the full statute — upgrade to read it.`,
+        };
       }
     }
     return null;
-  }, [blocks, blockIndexById, initialHash, provisionTarget]);
+  }, [
+    blocks,
+    blockIndexById,
+    initialHash,
+    provisionTarget,
+    citation,
+    serverOutline,
+    outlineData,
+  ]);
 
   // WHICH provision value the arrival jump already ran for — `undefined`
   // before any arrival, so a provision CHANGE re-arms by construction (the
@@ -240,7 +351,16 @@ export function StatuteDocument({
     const timer = window.setTimeout(() => {
       ran = true;
       arrivalHandledFor.current = provision;
-      setMountedCount((prev) => Math.max(prev, arrival.index + 1));
+      // Mount through the target — for a paywall arrival that is the whole
+      // (short) excerpt, so the card's geometry is final before landing.
+      setMountedCount((prev) =>
+        Math.max(prev, arrival.kind === 'anchor' ? arrival.index + 1 : blocks.length),
+      );
+      const anchorId =
+        arrival.kind === 'anchor' ? arrival.anchorId : STATUTE_PAYWALL_ID;
+      // The card centres (it is a destination, not a heading to read under);
+      // text anchors keep their top-edge landing.
+      const align = arrival.kind === 'anchor' ? 'start' : 'center';
       requestAnimationFrame(() => {
         // Yield to anyone with a better claim: if the reader (or
         // ScrollMemory's reload restore) has already moved the scroller,
@@ -249,45 +369,67 @@ export function StatuteDocument({
           const scroller = document.getElementById(V2_SHELL_CONTENT_ID);
           if (scroller && scroller.scrollTop > 0) return;
         }
-        document
-          .getElementById(arrival.anchorId)
-          ?.scrollIntoView({ block: 'start' });
+        document.getElementById(anchorId)?.scrollIntoView({ block: align });
         requestAnimationFrame(() => {
-          document
-            .getElementById(arrival.anchorId)
-            ?.scrollIntoView({ block: 'start' });
+          document.getElementById(anchorId)?.scrollIntoView({ block: align });
         });
       });
     }, 0);
     return () => {
       if (!ran) window.clearTimeout(timer);
     };
-  }, [arrival, provision]);
+  }, [arrival, provision, blocks.length]);
 
-  // The honest word when the citation path did not (fully) land. Suppressed
-  // when an explicit hash won the arrival — the reader stands where the link's
-  // minter pointed, and a "not found" would contradict the landing.
+  // The honest word when an arrival did not (fully) land. Suppressed when an
+  // explicit hash won the arrival — the reader stands where the link's minter
+  // pointed, and a "not found" would contradict the landing. A PAYWALL
+  // arrival speaks its own message (hash- or citation-shaped alike); and on a
+  // partial document a not-found claim is WITHHELD while the outline is still
+  // resolving — until it answers, absence is not provable, and flashing "not
+  // found" over what becomes "is in the full statute" would be a lie in
+  // transit. (If the outline fetch fails outright, the existing not-found
+  // copy stands: it is the same best effort the reader had before.)
   const provisionNotice = useMemo<string | null>(() => {
-    if (!provision || blocks.length === 0) return null;
-    if (initialHash && arrival?.anchorId === initialHash) return null;
+    if (blocks.length === 0) return null;
+    if (arrival?.kind === 'paywall') return arrival.message;
+    if (!provision) return null;
+    if (
+      initialHash &&
+      arrival?.kind === 'anchor' &&
+      arrival.anchorId === initialHash
+    ) {
+      return null;
+    }
     if (!citation) {
       return 'This link does not point to a provision of this statute.';
     }
     if (!provisionTarget || provisionTarget.matched === 'none') {
+      if (partial !== null && outlineQuery.isPending) return null;
       return `${formatProvisionLabel(citation)} was not found in this statute.`;
     }
     if (provisionTarget.matched === 'section' && citation.subsection) {
       return `${formatProvisionLabel(citation)} was not found. Showing section ${displayNum(citation.section)}.`;
     }
     return null;
-  }, [provision, blocks.length, initialHash, arrival, citation, provisionTarget]);
-  // Dismissal is scoped to the provision it dismissed — a NEW citation
-  // navigation gets its own notice without any reset effect.
+  }, [
+    blocks.length,
+    arrival,
+    provision,
+    initialHash,
+    citation,
+    provisionTarget,
+    partial,
+    outlineQuery.isPending,
+  ]);
+  // Dismissal is scoped to the CLAIM it dismissed — the citation path when
+  // there is one, else the arrival hash (a hash-shaped locked arrival has no
+  // `provision`) — so a NEW navigation gets its own notice without any reset
+  // effect.
+  const noticeKey = provision ?? (initialHash ? `#${initialHash}` : null);
   const [noticeDismissedFor, setNoticeDismissedFor] = useState<string | null>(
     null,
   );
-  const noticeDismissed =
-    provision !== null && noticeDismissedFor === provision;
+  const noticeDismissed = noticeKey !== null && noticeDismissedFor === noticeKey;
 
   // The ONE polite live region the copy affordances speak through (a region
   // per section heading would be hundreds of empty live regions). The clear
@@ -351,14 +493,20 @@ export function StatuteDocument({
     return <DocumentEmptyState />;
   }
 
-  const showContents = spyIds.length >= 4;
+  // The rendered excerpt's outline is the floor; the SERVER outline (partial
+  // documents, once resolved) replaces it with the full map. `showContents`
+  // therefore also honours a server outline whose excerpt alone would be too
+  // short to earn the affordance — the full list of what lies beyond the cut
+  // is exactly what a paywalled reader needs to see.
+  const railOutline = serverOutline?.divisions ?? outline;
+  const showContents = serverOutline !== null || spyIds.length >= 4;
 
   return (
     <>
       {provisionNotice && !noticeDismissed ? (
         <ProvisionNotice
           message={provisionNotice}
-          onDismiss={() => setNoticeDismissedFor(provision)}
+          onDismiss={() => setNoticeDismissedFor(noticeKey)}
         />
       ) : null}
 
@@ -375,8 +523,29 @@ export function StatuteDocument({
         </div>
       </SectionLinkContext.Provider>
 
+      {/* Where the excerpt ends on a partial document: the fade over our own
+          last rendered lines, then the upgrade card. The headline count
+          prefers the headers, then the outline's total, then no number. */}
+      {partial !== null ? (
+        <StatutePaywall
+          viewer={role === 'guest' ? 'guest' : 'member'}
+          totalSections={
+            partial.totalSections ?? serverOutline?.totalSections ?? null
+          }
+          includedSections={partial.includedSections}
+        />
+      ) : null}
+
       {showContents ? (
-        <StatuteContentsSheet outline={outline} activeId={activeId} onJump={jump} />
+        <StatuteContentsSheet
+          outline={railOutline}
+          activeId={activeId}
+          onJump={jump}
+          // The pill fades in ONLY when it owes its existence to the late
+          // server outline; on the full-document path the prop is false and
+          // the DOM is exactly what it was before the paywall existed.
+          entrance={spyIds.length < 4}
+        />
       ) : null}
 
       {/* The contents rail, in the dead margin beside the column — shown only
@@ -396,8 +565,19 @@ export function StatuteDocument({
           breakpoint mirrors this one). */}
       {showContents ? (
         <aside className="absolute inset-y-0 left-full ml-10 hidden w-48 min-[102rem]:w-60 min-[96rem]:block">
-          <div className="sticky top-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-            <StatuteOutlineRail outline={outline} activeId={activeId} onJump={jump} />
+          {/* Keyed by outline source: when the server outline replaces the
+              client one (a partial document's map growing to full size), the
+              rail re-enters on its own fade instead of snapping — on a full
+              document the key never changes and nothing re-animates. */}
+          <div
+            key={serverOutline !== null ? 'server' : 'client'}
+            className="sticky top-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+          >
+            <StatuteOutlineRail
+              outline={railOutline}
+              activeId={activeId}
+              onJump={jump}
+            />
           </div>
         </aside>
       ) : null}

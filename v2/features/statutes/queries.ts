@@ -1,5 +1,5 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
-import { statutesApi } from '@/lib/api/statutes';
+import { statutesApi, type StatuteOutlineData } from '@/lib/api/statutes';
 import { STATUTE_COUNTRIES_FALLBACK } from '@/lib/constants/statute-countries';
 import type { StatuteCountriesData, StatuteListParams } from '@/types/statute';
 import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
@@ -145,11 +145,16 @@ export const statutesQueries = {
     }),
 
   /**
-   * The full AKN 3.0 XML — the reader's document source
-   * (`GET /statutes/{slug}/export-akn`, uncapped; measured 275 KB / 719 nodes
-   * for courts-act-1993). Kept OUTSIDE `details()` on purpose: a blanket
-   * detail invalidation must not re-download a quarter-megabyte of XML to
-   * refresh a bookmark count.
+   * The AKN 3.0 document — the reader's source
+   * (`GET /statutes/{slug}/export-akn`, measured 275 KB / 719 nodes for
+   * courts-act-1993). The entry is `{ xml, partial }`: the XML string plus
+   * the paywall marker parsed from the response headers (`X-Statute-Partial`
+   * et al. — `null` means full document, which is also the switch-off and
+   * headers-not-exposed state, so the reader degrades to today's behavior by
+   * construction). Consumers memoize the parse on the `xml` STRING, exactly
+   * as before. Kept OUTSIDE `details()` on purpose: a blanket detail
+   * invalidation must not re-download a quarter-megabyte of XML to refresh a
+   * bookmark count.
    *
    * STATIC tier, deliberately stronger than the rest of the feature: a
    * statute's text changes only when the law is re-imported, and a background
@@ -159,12 +164,51 @@ export const statutesQueries = {
    * document; the reference gcTime still bounds memory to the last few
    * documents read, and the error state's retry uses `refetch()`, which a
    * static staleTime does not block.
+   *
+   * KEY COLLISION, SAFE TODAY: v1's `statuteKeys.akn(slug)` is this exact key
+   * caching a DIFFERENT shape (the raw XML string). The two never meet only
+   * because v1 and v2 run separate QueryClients — any future client
+   * unification must migrate one side or the reader would read an
+   * unreadable string.
    */
   akn: (slug: string) =>
     queryOptions({
       queryKey: [...statutesQueries.all, 'akn', slug] as const,
-      queryFn: () => statutesApi.exportAkn(slug),
+      queryFn: () => statutesApi.getAknDocument(slug),
       staleTime: STALE_TIMES.static,
+      gcTime: GC_TIMES.reference,
+    }),
+
+  /**
+   * The AKN outline — every element in reading order with per-entry `locked`
+   * flags and the true section count, no body text. The reader consumes it
+   * ONLY when the document arrived partial (`enabled` is the call site's, per
+   * the file rule): it is what lets the contents rail show the FULL map of a
+   * cut document, locked reaches marked. On a full document the client-parsed
+   * outline is already complete, so fetching this would buy nothing — and not
+   * fetching is also what keeps the paywall build inert while the backend
+   * switch is off.
+   *
+   * The PUBLIC route, deliberately: the authenticated twin returns the same
+   * response, but the outline holds nothing viewer-scoped (the locked flags
+   * describe the free tier, and free-tier callers are the only ones who ever
+   * fetch it — a paid caller never sees the partial marker that enables the
+   * query), and the public path can never turn wayfinding into a 401 mid-read.
+   *
+   * Reference tier like the rest of the feature; a 200 whose payload is not
+   * outline-shaped resolves `null` (treated as "no server outline" — the rail
+   * falls back to the client-derived outline) rather than crashing a `.map`
+   * or retrying a drift that will not heal.
+   */
+  aknOutline: (slug: string) =>
+    queryOptions({
+      queryKey: [...statutesQueries.all, 'akn-outline', slug] as const,
+      queryFn: async (): Promise<StatuteOutlineData | null> => {
+        const res = await statutesApi.getAknOutline(slug);
+        if (!Array.isArray(res.data?.outline)) return null;
+        return res.data;
+      },
+      staleTime: STALE_TIMES.reference,
       gcTime: GC_TIMES.reference,
     }),
 };

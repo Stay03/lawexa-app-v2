@@ -17,9 +17,10 @@ import { statutesQueries } from '../queries';
  * re-render), counts are MOVED by ±1 and clamped, never invented, and the
  * fan-out and the rollback snapshot cover exactly the same set of entries.
  *
- * The AKN entry (`statutesQueries.akn`) is a raw XML string with no bookmark
- * flag, and it lives outside `lists()`/`details()` — the fan-out never touches
- * it, so a star press can never dirty a quarter-megabyte document.
+ * The AKN entry (`statutesQueries.akn`) is `{ xml, partial }` — the document
+ * string plus the paywall marker, no bookmark flag — and it lives outside
+ * `lists()`/`details()`: the fan-out never touches it, so a star press can
+ * never dirty a quarter-megabyte document.
  */
 
 type StatuteCache =

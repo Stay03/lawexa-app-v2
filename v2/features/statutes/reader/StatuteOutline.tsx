@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { TableOfContents } from 'lucide-react';
+import { Lock, TableOfContents } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -47,6 +47,20 @@ import type { AknOutlineDivision } from './akn';
  * routinely travels dozens of screens, and animating that is disorienting
  * motion for its own sake — which also means there is nothing extra to still
  * under `prefers-reduced-motion`.
+ *
+ * ── LOCKED ENTRIES (partial documents) ──────────────────────────────────────
+ * On a paywalled excerpt the host swaps in the SERVER outline — the full map
+ * of the document, `locked` marking every entry beyond the cut. Locked rows
+ * render a quiet lock mark (plus screen-reader text; never colour-only) and
+ * still jump: the host's `onJump` routes them to the upgrade card, because
+ * there is no text to scroll to. They can never be `aria-current` — the spy
+ * observes only rendered blocks, so a locked id never becomes active.
+ *
+ * ONLY locked rows change shape: they opt into a flex row so the mark can
+ * trail the label. Unlocked rows keep the exact pre-paywall markup and class
+ * strings — a full document (no locked entries anywhere) therefore renders
+ * DOM byte-identical to before the paywall existed, which is the feature's
+ * inertness requirement, enforced here per row rather than per document.
  */
 
 export interface OutlineHandle {
@@ -54,6 +68,19 @@ export interface OutlineHandle {
   outline: AknOutlineDivision[];
   activeId: string | null;
   onJump: (id: string) => void;
+}
+
+/** The locked mark: a quiet glyph for sighted readers, words for the rest. */
+function LockMark({ className }: { className?: string }) {
+  return (
+    <>
+      <Lock
+        aria-hidden
+        className={cn('shrink-0 text-muted-foreground/70', className)}
+      />
+      <span className="sr-only"> — in the full statute</span>
+    </>
+  );
 }
 
 /* ── The spy hook (owned by the document host, shared by rail + sheet) ───── */
@@ -174,14 +201,25 @@ export function StatuteOutlineRail({ outline, activeId, onJump }: OutlineHandle)
                 onClick={() => onJump(division.id)}
                 aria-current={divisionCurrent ? 'location' : undefined}
                 className={cn(
-                  'v2-interactive block w-full rounded-r-md py-1.5 pl-3.5 pr-2 text-left text-xs transition-colors',
+                  division.locked
+                    ? 'v2-interactive flex w-full items-center gap-1.5 rounded-r-md py-1.5 pl-3.5 pr-2 text-left text-xs transition-colors'
+                    : 'v2-interactive block w-full rounded-r-md py-1.5 pl-3.5 pr-2 text-left text-xs transition-colors',
                   isActiveDivision
                     ? 'font-medium text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
                   FOCUS_RING,
                 )}
               >
-                <span className="line-clamp-2">{division.label}</span>
+                {division.locked ? (
+                  <>
+                    <span className="min-w-0 flex-1 line-clamp-2">
+                      {division.label}
+                    </span>
+                    <LockMark className="size-3" />
+                  </>
+                ) : (
+                  <span className="line-clamp-2">{division.label}</span>
+                )}
               </button>
 
               {/* The active division's sections, expanded in place. Quiet
@@ -198,14 +236,25 @@ export function StatuteOutlineRail({ outline, activeId, onJump }: OutlineHandle)
                           onClick={() => onJump(section.id)}
                           aria-current={sectionCurrent ? 'location' : undefined}
                           className={cn(
-                            'v2-interactive block w-full rounded-r-md py-1 pl-6 pr-2 text-left text-[11px] leading-snug transition-colors',
+                            section.locked
+                              ? 'v2-interactive flex w-full items-center gap-1.5 rounded-r-md py-1 pl-6 pr-2 text-left text-[11px] leading-snug transition-colors'
+                              : 'v2-interactive block w-full rounded-r-md py-1 pl-6 pr-2 text-left text-[11px] leading-snug transition-colors',
                             sectionCurrent
                               ? 'font-medium text-foreground'
                               : 'text-muted-foreground/80 hover:text-foreground',
                             FOCUS_RING,
                           )}
                         >
-                          <span className="line-clamp-2">{section.label}</span>
+                          {section.locked ? (
+                            <>
+                              <span className="min-w-0 flex-1 line-clamp-2">
+                                {section.label}
+                              </span>
+                              <LockMark className="size-3" />
+                            </>
+                          ) : (
+                            <span className="line-clamp-2">{section.label}</span>
+                          )}
                         </button>
                       </li>
                     );
@@ -231,7 +280,20 @@ function ActiveBar() {
 
 /* ── The mobile affordance: floating pill + full-tree sheet ──────────────── */
 
-export function StatuteContentsSheet({ outline, activeId, onJump }: OutlineHandle) {
+export function StatuteContentsSheet({
+  outline,
+  activeId,
+  onJump,
+  entrance = false,
+}: OutlineHandle & {
+  /**
+   * True when this affordance appeared AFTER the document painted (a partial
+   * document whose contents only became showable once the server outline
+   * resolved) — it fades in instead of popping. False (the default) keeps the
+   * full-document path's DOM byte-identical to before the paywall existed.
+   */
+  entrance?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const activeDivision = activeDivisionOf(outline, activeId);
   // The full tree is long; when the sheet opens, start the reader at the
@@ -259,7 +321,13 @@ export function StatuteContentsSheet({ outline, activeId, onJump }: OutlineHandl
           computes from sidebar + column + gutter + rail widths (see the
           arithmetic in StatuteDocument), so the handoff is truthful: at
           every width exactly one contents affordance exists. */}
-      <div className="pointer-events-none sticky bottom-6 z-10 -mx-1 flex justify-end min-[96rem]:hidden">
+      <div
+        className={cn(
+          'pointer-events-none sticky bottom-6 z-10 -mx-1 flex justify-end min-[96rem]:hidden',
+          entrance &&
+            'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+        )}
+      >
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -294,14 +362,23 @@ export function StatuteContentsSheet({ outline, activeId, onJump }: OutlineHandl
                     onClick={() => select(division.id)}
                     aria-current={activeId === division.id ? 'location' : undefined}
                     className={cn(
-                      'v2-interactive block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-secondary',
+                      division.locked
+                        ? 'v2-interactive flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-secondary'
+                        : 'v2-interactive block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-secondary',
                       activeId === division.id
                         ? 'font-medium text-primary'
                         : 'text-foreground',
                       FOCUS_RING,
                     )}
                   >
-                    {division.label}
+                    {division.locked ? (
+                      <>
+                        <span className="min-w-0 flex-1">{division.label}</span>
+                        <LockMark className="size-3.5" />
+                      </>
+                    ) : (
+                      division.label
+                    )}
                   </button>
                   {division.sections.length > 0 ? (
                     <ul className="flex flex-col gap-0.5 pb-1">
@@ -314,14 +391,25 @@ export function StatuteContentsSheet({ outline, activeId, onJump }: OutlineHandl
                               activeId === section.id ? 'location' : undefined
                             }
                             className={cn(
-                              'v2-interactive block w-full rounded-lg py-1.5 pl-7 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary',
+                              section.locked
+                                ? 'v2-interactive flex w-full items-center gap-2 rounded-lg py-1.5 pl-7 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary'
+                                : 'v2-interactive block w-full rounded-lg py-1.5 pl-7 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary',
                               activeId === section.id
                                 ? 'font-medium text-primary'
                                 : 'text-muted-foreground',
                               FOCUS_RING,
                             )}
                           >
-                            {section.label}
+                            {section.locked ? (
+                              <>
+                                <span className="min-w-0 flex-1">
+                                  {section.label}
+                                </span>
+                                <LockMark className="size-3.5" />
+                              </>
+                            ) : (
+                              section.label
+                            )}
                           </button>
                         </li>
                       ))}
