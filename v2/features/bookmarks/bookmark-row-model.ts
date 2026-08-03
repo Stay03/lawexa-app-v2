@@ -48,7 +48,14 @@ interface BookmarkRowBase {
   href: string | null;
   /** The row's primary line. */
   title: string;
-  /** When it was saved — the list's sort key, rendered as a relative time. */
+  /**
+   * When it was saved — the list's sort key, rendered as a relative time.
+   *
+   * THE ONE FACT EVERY TYPE SHARES, which is why the row gives it the meta
+   * line's TRAIL: right-anchored, it reads down the column as the sorted
+   * sequence it actually is, while each type's own facts fill the lead. The
+   * per-type fields below are lead material, in declaration order.
+   */
   savedAt: string;
   /** Always true on this list; carried so the star reads from the row model. */
   isBookmarked: boolean;

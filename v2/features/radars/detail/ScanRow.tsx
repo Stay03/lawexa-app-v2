@@ -119,23 +119,34 @@ export const ScanRow = memo(function ScanRow({
         ) : null}
       </span>
 
+      {/* The meta line, in the v2 row grammar's TWO ZONES: what triggered the
+          scan leads (and is the only part whose width is not fixed); WHEN it
+          ran and how long it took are right-anchored at the text block's edge,
+          under the badges the title line already right-anchors. The clock facts
+          therefore read down a column instead of shifting by the width of
+          whatever preceded them. Never wraps. */}
       <span
         className={cn(
-          'mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground',
+          'mt-0.5 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground',
           context === 'workflow' && 'pl-4',
         )}
       >
-        {when ? <span title={exactTime(timestamp)}>{when}</span> : null}
-        {scan.triggered_by === 'manual' ? (
-          <MetaBadge>Manual</MetaBadge>
-        ) : context === 'activity' ? (
-          <MetaBadge>Schedule</MetaBadge>
-        ) : null}
-        {scan.duration_ms !== null ? (
-          <span className="tabular-nums">
-            {formatScanDuration(scan.duration_ms)}
-          </span>
-        ) : null}
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          {scan.triggered_by === 'manual' ? (
+            <MetaBadge>Manual</MetaBadge>
+          ) : context === 'activity' ? (
+            <MetaBadge>Schedule</MetaBadge>
+          ) : null}
+        </span>
+
+        <span className="flex shrink-0 items-center gap-2">
+          {when ? <span title={exactTime(timestamp)}>{when}</span> : null}
+          {scan.duration_ms !== null ? (
+            <span className="tabular-nums">
+              {formatScanDuration(scan.duration_ms)}
+            </span>
+          ) : null}
+        </span>
       </span>
 
       {showError ? (
@@ -199,7 +210,7 @@ export const ScanRow = memo(function ScanRow({
 
 function MetaBadge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex min-h-5 items-center rounded-full border border-border px-1.5 text-[10px] font-medium">
+    <span className="inline-flex min-h-5 shrink-0 items-center rounded-full border border-border px-1.5 text-[10px] font-medium">
       {children}
     </span>
   );

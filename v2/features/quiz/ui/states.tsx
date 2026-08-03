@@ -24,7 +24,13 @@ import { QuizMessage } from './QuizMessage';
 
 /* ── Session rows ───────────────────────────────────────────────────────── */
 
-/** One skeleton row, shaped exactly like `SessionRow` (dot + status / meta). */
+/**
+ * One skeleton row, shaped exactly like `SessionRow` (dot + status / meta) —
+ * including the meta line's TWO ZONES: the counts bar on the left and a short
+ * bar right-anchored INSIDE the text block for the date, which is where the
+ * resolved row puts it (the Resume/Review affordance is the separate bar
+ * outside).
+ */
 function SessionRowSkeleton({ still = false }: { still?: boolean }) {
   const bar = still ? 'animate-none' : undefined;
   return (
@@ -34,7 +40,10 @@ function SessionRowSkeleton({ still = false }: { still?: boolean }) {
           <Skeleton className={cn('size-2 shrink-0 rounded-full', bar)} />
           <Skeleton className={cn('h-4 w-28 rounded', bar)} />
         </div>
-        <Skeleton className={cn('h-3 w-2/3 rounded', bar)} />
+        <div className="flex items-center gap-2">
+          <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
+          <Skeleton className={cn('ml-auto h-3 w-16 shrink-0 rounded', bar)} />
+        </div>
       </div>
       <Skeleton className={cn('h-3 w-12 shrink-0 rounded', bar)} />
     </div>

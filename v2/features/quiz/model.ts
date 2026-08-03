@@ -60,33 +60,43 @@ export function sessionHref(session: QuizSession): string {
 }
 
 /**
- * The meta line under a session row — the counts, the date, and the wall-clock
- * duration when there is one. One builder for the hub's recent list and the
- * history page, so the two can never drift.
+ * The meta line under a session row, in the v2 row grammar's TWO ZONES.
+ *
+ * `lead`  what the attempt did — the counts. Left-aligned under the status
+ *         dot, which is fixed-width and therefore already aligned.
+ * `trail` WHEN it happened, and how long it took. Right-anchored, so the dates
+ *         read straight down the list instead of starting wherever the counts
+ *         happened to stop ("3 of 10 correct" and "12 of 20 correct" are not
+ *         the same width, and the date used to move with them).
+ *
+ * One builder for the hub's recent list and the history page, so the two can
+ * never drift.
  *
  * An ACTIVE session shows what it has answered so far and nothing about score:
  * the score of a session still in progress is a moving number, and putting it
  * beside a "Resume" affordance reads as a verdict on an unfinished attempt.
  */
-export function sessionMetaParts(session: QuizSession): string[] {
-  const parts: string[] = [];
+export interface SessionMetaZones {
+  lead: string;
+  /** Date first, then the wall-clock duration when there is one. */
+  trail: string[];
+}
 
-  if (isResumable(session)) {
-    parts.push(
-      session.answered_count === 1
-        ? '1 answered'
-        : `${session.answered_count} answered`,
-    );
-  } else {
-    parts.push(`${session.correct_count} of ${session.answered_count} correct`);
-  }
+export function sessionMetaZones(session: QuizSession): SessionMetaZones {
+  const lead = isResumable(session)
+    ? session.answered_count === 1
+      ? '1 answered'
+      : `${session.answered_count} answered`
+    : `${session.correct_count} of ${session.answered_count} correct`;
 
-  parts.push(formatSessionDate(session.completed_at ?? session.started_at));
+  const trail: string[] = [
+    formatSessionDate(session.completed_at ?? session.started_at),
+  ];
 
   const duration = sessionDurationMs(session.started_at, session.completed_at);
-  if (duration !== null) parts.push(formatDurationMs(duration));
+  if (duration !== null) trail.push(formatDurationMs(duration));
 
-  return parts;
+  return { lead, trail };
 }
 
 /**

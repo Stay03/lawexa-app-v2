@@ -10,7 +10,7 @@ import {
   finalScoreLabel,
   isResumable,
   sessionHref,
-  sessionMetaParts,
+  sessionMetaZones,
 } from '@/v2/features/quiz/model';
 
 /**
@@ -22,9 +22,15 @@ import {
  *
  * WHAT THE ROW LEADS WITH is the OUTCOME, because that is what a reader scans a
  * history for: the finished score, or — for the one open session — the fact
- * that it is still going. `sessionMetaParts` deliberately withholds a score
+ * that it is still going. `sessionMetaZones` deliberately withholds a score
  * from an active session: a moving number beside a "Resume" affordance reads as
  * a verdict on an unfinished attempt.
+ *
+ * THE META LINE IS TWO ZONES (owner, August 3): the counts lead, under the
+ * fixed-width status dot; the date and duration are right-anchored at the TEXT
+ * BLOCK's edge — inside it, so they form their own column and the Resume/Review
+ * affordance keeps its own, farther right. The line never wraps: a squeezed row
+ * truncates the counts and leaves the times where they are.
  *
  * `memo` because the history list can grow past a hundred rows and the sentinel
  * re-renders the list on every page.
@@ -40,7 +46,7 @@ export const SessionRow = memo(function SessionRow({
   const status = QUIZ_SESSION_STATUS[session.status];
   const resumable = isResumable(session);
   const score = finalScoreLabel(session);
-  const meta = sessionMetaParts(session);
+  const meta = sessionMetaZones(session);
 
   return (
     <li
@@ -70,22 +76,29 @@ export const SessionRow = memo(function SessionRow({
             ) : null}
           </span>
 
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-            {/* Keyed by POSITION, not by text: the meta parts are a fixed,
-                ordered tuple (counts · date · duration) and two of them can
-                legitimately be the same string — "1 answered" beside a
-                one-second duration would collide on a text key. Position is
-                stable because the tuple's order never varies. */}
-            {meta.map((part, partIndex) => (
-              <span key={partIndex} className="inline-flex items-center gap-2">
-                {partIndex > 0 ? (
-                  <span aria-hidden className="text-muted-foreground/40">
-                    ·
-                  </span>
-                ) : null}
-                {part}
-              </span>
-            ))}
+          <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+            {/* LEAD — the counts. */}
+            <span className="min-w-0 flex-1 truncate">{meta.lead}</span>
+
+            {/* TRAIL — date, then duration, right-anchored and `tabular-nums`
+                so the digits line up between rows as well as along them.
+
+                Keyed by POSITION, not by text: the trail is a fixed, ordered
+                tuple (date · duration) and the two can legitimately be the same
+                string, which would collide on a text key. Position is stable
+                because the tuple's order never varies. */}
+            <span className="flex shrink-0 items-center gap-2 tabular-nums">
+              {meta.trail.map((part, partIndex) => (
+                <span key={partIndex} className="inline-flex items-center gap-2">
+                  {partIndex > 0 ? (
+                    <span aria-hidden className="text-muted-foreground/40">
+                      ·
+                    </span>
+                  ) : null}
+                  {part}
+                </span>
+              ))}
+            </span>
           </span>
         </span>
 

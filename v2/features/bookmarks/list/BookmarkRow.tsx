@@ -36,13 +36,21 @@ import { BOOKMARK_TYPE_NOUN, type BookmarkRowModel } from '../bookmark-row-model
  *  3. THE WHOLE ROW WAS THE LINK, so its accessible name swallowed the
  *     preview and the counts. The link now wraps the identity block only.
  *
- * ── ONE ROW, FOUR META GRAMMARS ─────────────────────────────────────────────
+ * ── ONE ROW, FOUR META GRAMMARS, TWO ZONES ──────────────────────────────────
  * The identity line is identical for every type (tile, title, "saved N ago"),
  * because the reader is scanning ONE collection and a shared shape is what
- * makes it scannable. Only the middle of the meta line differs, and it says
- * the thing that type is actually identified by: a case by its citation and
+ * makes it scannable. Only the LEAD of the meta line differs, and it says the
+ * thing that type is actually identified by: a case by its citation and
  * judgment date, a statute by its short designation, year and status, a note
  * by its author, a folder by what is inside it.
+ *
+ * "SAVED N AGO" IS THE TRAIL, ON EVERY TYPE (owner, August 3). It used to sit
+ * at the END of the per-type meta, so it landed wherever that type's facts
+ * happened to stop — a different x on every row, for the one fact this list is
+ * SORTED by. It is now right-anchored at the text block's edge, so the save
+ * times read straight down the column while each type's own facts fill the
+ * lead. The line never wraps: under pressure the lead truncates and the trail
+ * stays put.
  *
  * `memo` matters here for the same reason as `CaseRow`: the toggle fans out
  * across every cached case/statute surface, so an unmemoised row would
@@ -121,23 +129,28 @@ export const BookmarkRow = memo(function BookmarkRow({
       </span>
 
       <span className="min-w-0 flex-1">
+        {/* The cases-list title treatment, exactly: one truncating line, with
+            the full string on the `title` attribute so nothing a bookmark is
+            named can become unreadable. */}
         <span
           className={cn(
             'block truncate text-[15px] font-medium text-foreground transition-colors',
             row.href && 'group-hover:text-primary',
           )}
-          title={row.type === 'case' ? row.rawTitle : undefined}
+          title={row.type === 'case' ? row.rawTitle : row.title}
         >
           {row.title}
         </span>
 
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-          <RowMeta row={row} />
+        <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+          {/* LEAD — what this TYPE is identified by. */}
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <RowMetaLead row={row} />
+          </span>
+
+          {/* TRAIL — the list's sort key, right-anchored on every type. */}
           {saved ? (
-            <>
-              <Dot />
-              <span className="tabular-nums">saved {saved}</span>
-            </>
+            <span className="shrink-0 tabular-nums">saved {saved}</span>
           ) : null}
         </span>
 
@@ -174,7 +187,22 @@ export const BookmarkRow = memo(function BookmarkRow({
       // Capped at 14 so a deep page never staggers into a visible delay.
       style={exiting ? undefined : { animationDelay: `${Math.min(index, 14) * 25}ms` }}
     >
-      <div className={cn('group relative flex items-start gap-2', exiting && 'overflow-hidden')}>
+      {/* `min-w-0` IS THE FIX FOR THE OVERSIZED ROW, and it belongs on THIS
+          element specifically. The `<li>` above is a GRID (that is how the exit
+          collapse interpolates), and a grid item's automatic minimum size is its
+          CONTENT's minimum — which, for a row whose title is `whitespace-nowrap`
+          truncated, is the full untruncated title. The single implicit column
+          therefore grew to fit an absurdly long bookmark name, the row spilled
+          past the reading column, and its star was carried out of the shared
+          right edge while every other row's stayed put. Zeroing the minimum lets
+          the track resolve to the column's width, so truncation happens where it
+          was always meant to. */}
+      <div
+        className={cn(
+          'group relative flex min-w-0 items-start gap-2',
+          exiting && 'overflow-hidden',
+        )}
+      >
         {row.href ? (
           <Link
             href={row.href}
@@ -202,16 +230,26 @@ export const BookmarkRow = memo(function BookmarkRow({
   );
 });
 
-/** The type-specific middle of the meta line. Exhaustive over the union. */
-function RowMeta({ row }: { row: BookmarkRowModel }) {
+/**
+ * The type-specific LEAD of the meta line. Exhaustive over the union.
+ *
+ * ONE SHRINK RULE across the four branches: the part whose length has no
+ * ceiling (citation, designation, author) carries `min-w-0 truncate` and every
+ * fixed-shape part carries `shrink-0`. So a narrow viewport eats the variable
+ * reference and never the year, the status or the counts — and never the
+ * trail.
+ */
+function RowMetaLead({ row }: { row: BookmarkRowModel }) {
   switch (row.type) {
     case 'case': {
       const date = formatCaseDate(row.judgmentDate);
       return (
         <>
-          {row.citation ? <span>{row.citation}</span> : null}
+          {row.citation ? (
+            <span className="min-w-0 truncate">{row.citation}</span>
+          ) : null}
           {row.citation && date ? <Dot /> : null}
-          {date ? <span className="tabular-nums">{date}</span> : null}
+          {date ? <span className="shrink-0 tabular-nums">{date}</span> : null}
         </>
       );
     }
@@ -221,25 +259,29 @@ function RowMeta({ row }: { row: BookmarkRowModel }) {
         <>
           {row.shortTitle ? (
             <>
-              <span>{row.shortTitle}</span>
+              <span className="min-w-0 truncate">{row.shortTitle}</span>
               <Dot />
             </>
           ) : null}
-          <span className="tabular-nums">{row.year}</span>
+          <span className="shrink-0 tabular-nums">{row.year}</span>
           <Dot />
-          <StatuteStatusMark
-            tone={statuteStatusTone(row.status)}
-            label={row.statusLabel}
-          />
+          <span className="shrink-0">
+            <StatuteStatusMark
+              tone={statuteStatusTone(row.status)}
+              label={row.statusLabel}
+            />
+          </span>
         </>
       );
 
     case 'note':
-      return row.author ? <span>{row.author}</span> : null;
+      return row.author ? (
+        <span className="min-w-0 truncate">{row.author}</span>
+      ) : null;
 
     case 'folder':
       return (
-        <span className="tabular-nums">
+        <span className="min-w-0 truncate tabular-nums">
           {row.itemsCount} {row.itemsCount === 1 ? 'item' : 'items'}
           {row.childrenCount > 0
             ? ` · ${row.childrenCount} ${row.childrenCount === 1 ? 'subfolder' : 'subfolders'}`
@@ -321,9 +363,11 @@ function UnsaveButton({
   );
 }
 
+/** The meta line's separator — decorative, so it never reaches a screen
+ *  reader as a word. `shrink-0` so it can never be the thing that collapses. */
 function Dot() {
   return (
-    <span aria-hidden className="text-muted-foreground/40">
+    <span aria-hidden className="shrink-0 text-muted-foreground/40">
       ·
     </span>
   );

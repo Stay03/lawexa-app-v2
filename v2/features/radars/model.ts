@@ -81,24 +81,51 @@ export function upcomingLabel(
   return `in ${Math.round(days / 365)}y`;
 }
 
-/** The meta line under a radar's name — schedule first, then the two scan
- *  facts, each present only when it says something. One builder for the list
- *  row and the detail header. */
-export function radarMetaParts(radar: RadarListItem, now: number): string[] {
-  const parts: string[] = [scheduleSummary(radar.schedule_cron)];
+/**
+ * The meta line under a radar's name, in the v2 row grammar's TWO ZONES.
+ *
+ * `lead`  the SCHEDULE — what this radar is set up to do. Variable in length
+ *         ("Every day at 09:00" against "Hourly"), so it is the part that
+ *         truncates when a row is squeezed.
+ * `trail` the CLOCK facts — when it last ran, when it runs next, or that it is
+ *         paused. Right-anchored in the list row, so the scan times read down
+ *         a column instead of starting wherever the schedule text ended.
+ *
+ * Each part is present only when it says something. One builder for the list
+ * row and the detail header.
+ */
+export interface RadarMetaZones {
+  lead: string;
+  trail: string[];
+}
 
+export function radarMetaZones(
+  radar: RadarListItem,
+  now: number,
+): RadarMetaZones {
   const last = agoLabel(radar.last_scan_at, now);
-  parts.push(last ? `Last scan ${last}` : 'Never scanned');
+  const trail: string[] = [last ? `Last scan ${last}` : 'Never scanned'];
 
   if (radar.status === 'active' && radar.next_scan_at) {
     const next = upcomingLabel(radar.next_scan_at, now);
-    if (next) parts.push(`Next scan ${next}`);
+    if (next) trail.push(`Next scan ${next}`);
   }
   if (radar.status === 'paused') {
-    parts.push('Paused — no scans scheduled');
+    trail.push('Paused — no scans scheduled');
   }
 
-  return parts;
+  return { lead: scheduleSummary(radar.schedule_cron), trail };
+}
+
+/**
+ * The same facts as ONE ordered list, for the detail header — a single
+ * paragraph under a page title, with no column of rows to align against and so
+ * nothing to right-anchor to. Derived from the zones rather than rebuilt, so
+ * the header and the row can never disagree about what a radar's meta says.
+ */
+export function radarMetaParts(radar: RadarListItem, now: number): string[] {
+  const { lead, trail } = radarMetaZones(radar, now);
+  return [lead, ...trail];
 }
 
 /** Exact wall-clock rendering for hover titles, so the compact relative label

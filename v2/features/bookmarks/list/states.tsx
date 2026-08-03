@@ -73,6 +73,9 @@ function PageState({
  * and folders are two lines and only notes add a preview. Reserving at the tall
  * end would defend against a settle that rarely happens while making the common
  * one — collapsing onto a two-line row — worse (standards §8iv).
+ *
+ * The meta line mirrors the row's TWO ZONES: a lead bar on the left and a
+ * short, right-anchored bar for the "saved N ago" trail every type carries.
  */
 function BookmarkRowSkeleton({ still = false }: { still?: boolean }) {
   // Threaded explicitly rather than switched off by a `[&_*]` descendant
@@ -86,7 +89,10 @@ function BookmarkRowSkeleton({ still = false }: { still?: boolean }) {
         <Skeleton className={cn('mt-0.5 size-9 shrink-0 rounded-lg', bar)} />
         <div className="min-w-0 flex-1 space-y-1.5">
           <Skeleton className={cn('h-4 w-3/5 rounded', bar)} />
-          <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
+          <div className="flex items-center gap-2">
+            <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
+            <Skeleton className={cn('ml-auto h-3 w-14 shrink-0 rounded', bar)} />
+          </div>
         </div>
       </div>
       <Skeleton className={cn('mt-3.5 size-9 shrink-0 rounded-full', bar)} />

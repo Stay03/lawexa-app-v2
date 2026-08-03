@@ -43,14 +43,22 @@ function PageState({
   );
 }
 
-/** One skeleton row, shaped exactly like `StatuteRow` (title / meta / clamp). */
+/**
+ * One skeleton row, shaped exactly like `StatuteRow` (title / meta / clamp) —
+ * including the meta line's TWO ZONES: a lead bar on the left and a short,
+ * right-anchored bar for the year + status, so the silhouette settles onto the
+ * resolved row rather than sliding a bar across it.
+ */
 function StatuteRowSkeleton({ still = false }: { still?: boolean }) {
   const bar = still ? 'animate-none' : undefined;
   return (
     <div className="flex items-start gap-2 px-2 py-3">
       <div className="min-w-0 flex-1 space-y-1.5">
         <Skeleton className={cn('h-4 w-1/2 rounded', bar)} />
-        <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
+        <div className="flex items-center gap-2">
+          <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
+          <Skeleton className={cn('ml-auto h-3 w-20 shrink-0 rounded', bar)} />
+        </div>
         <div className="space-y-1 pt-0.5">
           <Skeleton className={cn('h-3.5 w-full rounded', bar)} />
           <Skeleton className={cn('h-3.5 w-3/4 rounded', bar)} />

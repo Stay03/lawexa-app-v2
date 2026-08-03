@@ -25,7 +25,7 @@ import type { RadarListItem } from '@/types/radar';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { usePauseRadar, useResumeRadar, useScanNow } from '../actions';
 import { ArchiveRadarDialog } from '../ArchiveRadarDialog';
-import { RADAR_STATUS, radarMetaParts } from '../model';
+import { RADAR_STATUS, radarMetaZones } from '../model';
 
 /**
  * RadarRow — one radar in the list.
@@ -43,6 +43,12 @@ import { RADAR_STATUS, radarMetaParts } from '../model';
  * The unread badge is the row's one loud element — a gold "N new" pill — and
  * it sits at the row's right edge where every v2 list puts its signal.
  *
+ * THE META LINE IS TWO ZONES (owner, August 3, the cross-list alignment pass):
+ * the schedule leads and truncates; the clock facts — last scan, next scan, or
+ * the paused sentence — are right-anchored, so they read down a column rather
+ * than starting wherever each row's schedule text happened to end. The line
+ * never wraps.
+ *
  * `memo`: the triage mutation patches unread counts across cached lists, so
  * an unmemoised row would re-render the whole list per patch.
  */
@@ -58,7 +64,7 @@ export const RadarRow = memo(function RadarRow({
   now: number;
 }) {
   const status = RADAR_STATUS[radar.status];
-  const meta = radarMetaParts(radar, now);
+  const meta = radarMetaZones(radar, now);
 
   return (
     <li
@@ -101,17 +107,23 @@ export const RadarRow = memo(function RadarRow({
             </span>
           ) : null}
 
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-            {meta.map((part, partIndex) => (
-              <span key={part} className="inline-flex items-center gap-2">
-                {partIndex > 0 ? (
-                  <span aria-hidden className="text-muted-foreground/40">
-                    ·
-                  </span>
-                ) : null}
-                {part}
-              </span>
-            ))}
+          <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+            {/* LEAD — the schedule. */}
+            <span className="min-w-0 flex-1 truncate">{meta.lead}</span>
+
+            {/* TRAIL — the clock facts, right-anchored. */}
+            <span className="flex shrink-0 items-center gap-2">
+              {meta.trail.map((part, partIndex) => (
+                <span key={part} className="inline-flex items-center gap-2">
+                  {partIndex > 0 ? (
+                    <span aria-hidden className="text-muted-foreground/40">
+                      ·
+                    </span>
+                  ) : null}
+                  {part}
+                </span>
+              ))}
+            </span>
           </span>
         </Link>
 

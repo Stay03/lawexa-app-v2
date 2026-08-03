@@ -4,7 +4,7 @@ import { memo } from 'react';
 import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
-import { FlagIcon } from '@/v2/shell/FlagIcon';
+import { FLAG_W, FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { BookmarkButton } from '@/v2/features/bookmarks/BookmarkButton';
 import { caseHref, formatCaseDate, type CaseRowModel } from '../case-row-model';
@@ -27,6 +27,20 @@ import { caseHref, formatCaseDate, type CaseRowModel } from '../case-row-model';
  *     case page and the filter chip.
  *  4. THE VIEW COUNT IS GONE (owner, July 29) — a popularity number on every
  *     row is ranking data, and the Trending view is where ranking lives.
+ *
+ * ── THE META LINE IS TWO ZONES, NOT A SENTENCE (owner, August 3) ────────────
+ * It used to read `citation · flag court · date`, and because citations vary in
+ * length from "(2019) LPELR-46927(SC)" to a three-report string, the flag, the
+ * court and the date landed at a DIFFERENT x on every row — the eye had to
+ * re-find each fact per row instead of reading down a column.
+ *
+ * Now: a LEAD zone (left) and a TRAIL zone (right), one line, never wrapping.
+ * The lead opens with the flag — a fixed-width mark, so it is pixel-aligned
+ * down the whole list — then the court, then the citation LAST, because the
+ * citation is the only part whose length has no ceiling. It sits in the
+ * flexible slot and truncates before it can move anything. The trail carries
+ * the one time fact, right-anchored at the text block's edge, so the judgment
+ * dates form their own column.
  *
  * `memo` matters here specifically: the bookmark mutation fans out across every
  * cached case surface, so an unmemoised row would re-render the whole visible
@@ -66,40 +80,38 @@ export const CaseRow = memo(function CaseRow({
             {row.title}
           </h3>
 
-          {/* One quiet meta line: citation first (a lawyer reads name +
-              citation as one unit), then the FLAG + court, then the date. The
-              flag replaced the "NG" text mark — same artwork as the composer's
-              jurisdiction chip, self-hosted. */}
+          {/* One quiet meta line, in two zones. The flag replaced the "NG" text
+              mark — same artwork as the composer's jurisdiction chip,
+              self-hosted. */}
           {row.citation || row.court || row.countryCode || date ? (
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-              {row.citation ? <span>{row.citation}</span> : null}
-              {row.countryCode || row.court ? (
-                <span className="inline-flex items-center gap-2">
-                  {row.citation ? (
-                    <span aria-hidden className="text-muted-foreground/40">
-                      ·
-                    </span>
-                  ) : null}
-                  <span className="inline-flex items-center gap-1.5">
-                    {row.countryCode ? (
-                      <FlagIcon
-                        code={row.countryCode}
-                        title={row.countryName ?? undefined}
-                      />
-                    ) : null}
-                    {row.court ? <span>{row.court}</span> : null}
-                  </span>
-                </span>
-              ) : null}
+            <p className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+              {/* LEAD — flag, court, citation. */}
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                {row.countryCode ? (
+                  <FlagIcon
+                    code={row.countryCode}
+                    title={row.countryName ?? undefined}
+                  />
+                ) : (
+                  // The mark's footprint, held OPEN. A case whose payload
+                  // carries no country code would otherwise start its court one
+                  // flag-width to the left of every other row — the same drift
+                  // the two zones exist to kill.
+                  <span aria-hidden className="shrink-0" style={{ width: FLAG_W }} />
+                )}
+                {row.court ? <span className="truncate">{row.court}</span> : null}
+                {row.court && row.citation ? <Dot /> : null}
+                {/* `flex-1` (basis 0) is what makes the CITATION give up its
+                    width first: with nothing to shrink from, the court keeps its
+                    natural size until the citation has nowhere left to go. */}
+                {row.citation ? (
+                  <span className="min-w-0 flex-1 truncate">{row.citation}</span>
+                ) : null}
+              </span>
+
+              {/* TRAIL — the one time fact, right-anchored. */}
               {date ? (
-                <span className="inline-flex items-center gap-2">
-                  {row.citation || row.countryCode || row.court ? (
-                    <span aria-hidden className="text-muted-foreground/40">
-                      ·
-                    </span>
-                  ) : null}
-                  <span className="tabular-nums">{date}</span>
-                </span>
+                <span className="shrink-0 tabular-nums">{date}</span>
               ) : null}
             </p>
           ) : null}
@@ -122,3 +134,13 @@ export const CaseRow = memo(function CaseRow({
     </li>
   );
 });
+
+/** The meta line's separator — decorative, so it never reaches a screen
+ *  reader as a word. `shrink-0` so it can never be the thing that collapses. */
+function Dot() {
+  return (
+    <span aria-hidden className="shrink-0 text-muted-foreground/40">
+      ·
+    </span>
+  );
+}

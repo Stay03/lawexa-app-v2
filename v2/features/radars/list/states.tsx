@@ -55,7 +55,11 @@ function PageState({
   );
 }
 
-/** One skeleton row, shaped exactly like `RadarRow` (dot + name / meta line). */
+/**
+ * One skeleton row, shaped exactly like `RadarRow` (dot + name / meta line) —
+ * including the meta line's TWO ZONES: the schedule bar on the left and a
+ * right-anchored bar for the clock facts.
+ */
 function RadarRowSkeleton({ still = false }: { still?: boolean }) {
   const bar = still ? 'animate-none' : undefined;
   return (
@@ -65,7 +69,10 @@ function RadarRowSkeleton({ still = false }: { still?: boolean }) {
           <Skeleton className={cn('size-2 shrink-0 rounded-full', bar)} />
           <Skeleton className={cn('h-4 w-1/2 rounded', bar)} />
         </div>
-        <Skeleton className={cn('h-3 w-3/4 rounded', bar)} />
+        <div className="flex items-center gap-2">
+          <Skeleton className={cn('h-3 w-1/3 rounded', bar)} />
+          <Skeleton className={cn('ml-auto h-3 w-24 shrink-0 rounded', bar)} />
+        </div>
       </div>
       <Skeleton className={cn('mt-1 size-8 shrink-0 rounded-full', bar)} />
     </div>

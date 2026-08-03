@@ -55,7 +55,9 @@ function PageState({
   );
 }
 
-/** One scan-row silhouette (dot + title / meta line + menu stub). */
+/** One scan-row silhouette (dot + title / two-zone meta line + menu stub) —
+ *  the resolved row right-anchors its clock facts, so the short meta bar sits
+ *  at the text block's right edge here too. */
 export function ScanRowSkeleton({ still = false }: { still?: boolean }) {
   const bar = still ? 'animate-none' : undefined;
   return (
@@ -63,7 +65,10 @@ export function ScanRowSkeleton({ still = false }: { still?: boolean }) {
       <Skeleton className={cn('size-2 shrink-0 rounded-full', bar)} />
       <div className="min-w-0 flex-1 space-y-1.5">
         <Skeleton className={cn('h-4 w-3/5 rounded', bar)} />
-        <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
+        <div className="flex items-center gap-2">
+          <Skeleton className={cn('h-3 w-1/5 rounded', bar)} />
+          <Skeleton className={cn('ml-auto h-3 w-16 shrink-0 rounded', bar)} />
+        </div>
       </div>
       <Skeleton className={cn('size-8 shrink-0 rounded-full', bar)} />
     </div>

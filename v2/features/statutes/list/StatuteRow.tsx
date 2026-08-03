@@ -4,7 +4,7 @@ import { memo } from 'react';
 import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
-import { FlagIcon } from '@/v2/shell/FlagIcon';
+import { FLAG_W, FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { StatuteBookmarkButton } from '../bookmark/StatuteBookmarkButton';
 import {
@@ -27,6 +27,18 @@ import {
  *   3. the STATUS — a dot + label, because "repealed" changes whether you may
  *      rely on the text at all. Dot AND word: never colour-only. `active` is
  *      the unremarkable default and stays muted; amended/repealed are tinted.
+ *
+ * ── THE META LINE IS TWO ZONES, NOT A SENTENCE (owner, August 3) ────────────
+ * The designation used to lead, and since some Acts carry one ("Act 521",
+ * "N.R.C.D. 64") and some carry none, the flag started at the left edge on
+ * SOME rows and a designation-width further in on others — with the year and
+ * the status dragged along behind it.
+ *
+ * Now, exactly as `CaseRow`: a LEAD zone opening with the fixed-width flag (so
+ * the mark is pixel-aligned down the list), then the country, then the
+ * designation LAST in the flexible slot where it truncates before it can move
+ * anything; and a TRAIL zone — year, then status — right-anchored, so both
+ * columns read straight down.
  *
  * `memo` matters here for the same reason as `CaseRow`: the bookmark mutation
  * fans out across every cached statute surface, so an unmemoised row would
@@ -89,33 +101,43 @@ export const StatuteRow = memo(function StatuteRow({
             {row.title}
           </h3>
 
-          {/* One quiet meta line: the short designation first (a lawyer reads
-              "Courts Act, 1993 · Act 459" as one citation unit), then flag +
-              country, the year, and the status mark. */}
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-            {row.shortTitle ? (
-              <>
-                <span>{row.shortTitle}</span>
-                <Dot />
-              </>
-            ) : null}
-            {row.countryCode || row.countryName ? (
-              <>
-                <span className="inline-flex items-center gap-1.5">
-                  {row.countryCode ? (
-                    <FlagIcon
-                      code={row.countryCode}
-                      title={row.countryName ?? undefined}
-                    />
-                  ) : null}
-                  {row.countryName ? <span>{row.countryName}</span> : null}
-                </span>
-                <Dot />
-              </>
-            ) : null}
-            <span className="tabular-nums">{row.year}</span>
-            <Dot />
-            <StatuteStatusMark tone={tone} label={row.statusLabel} />
+          {/* One quiet meta line, in two zones. */}
+          <p className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+            {/* LEAD — flag, country, designation. */}
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="flex min-w-0 items-center gap-1.5">
+                {row.countryCode ? (
+                  <FlagIcon
+                    code={row.countryCode}
+                    title={row.countryName ?? undefined}
+                  />
+                ) : (
+                  // The mark's footprint, held OPEN — a statute with no country
+                  // code must not start its line a flag-width to the left of
+                  // its neighbours.
+                  <span aria-hidden className="shrink-0" style={{ width: FLAG_W }} />
+                )}
+                {row.countryName ? (
+                  <span className="truncate">{row.countryName}</span>
+                ) : null}
+              </span>
+              {/* `flex-1` (basis 0) is what makes the DESIGNATION give up its
+                  width first: the country name only shrinks once this has
+                  nowhere left to go. */}
+              {row.shortTitle ? (
+                <>
+                  <Dot />
+                  <span className="min-w-0 flex-1 truncate">{row.shortTitle}</span>
+                </>
+              ) : null}
+            </span>
+
+            {/* TRAIL — year, then status, right-anchored. */}
+            <span className="flex shrink-0 items-center gap-2">
+              <span className="tabular-nums">{row.year}</span>
+              <Dot />
+              <StatuteStatusMark tone={tone} label={row.statusLabel} />
+            </span>
           </p>
 
           {row.preview ? (
@@ -138,9 +160,11 @@ export const StatuteRow = memo(function StatuteRow({
   );
 });
 
+/** The meta line's separator — decorative, so it never reaches a screen
+ *  reader as a word. `shrink-0` so it can never be the thing that collapses. */
 function Dot() {
   return (
-    <span aria-hidden className="text-muted-foreground/40">
+    <span aria-hidden className="shrink-0 text-muted-foreground/40">
       ·
     </span>
   );
