@@ -3,17 +3,22 @@
 For the backend team. Two asks about the quiz. Both describe what we want.
 You choose how to build it.
 
-## 1. Lock the quiz on the server
+Update, same day: the owner opened the quiz to ALL registered accounts.
+So the lock we need is smaller than first written — it only has to keep
+guest accounts out.
 
-- Our app shows the quiz only to researchers, admins, and superadmins.
-- But that rule lives only in the app. The server does not check roles.
-- We tested this on August 3. A guest account with no email started a quiz,
+## 1. Block guest accounts from the quiz on the server
+
+- The quiz is now for every registered account.
+- Guest accounts (the view-only accounts people get before they sign up)
+  should not be able to play.
+- Today they can: we tested it on August 3. A guest token started a quiz,
   answered a question, ended the session, and read the results — straight
   against the API.
-- We want: the quiz endpoints accept only researcher, admin, and superadmin
-  accounts. Everyone else gets a clear "no access" error.
-- Tell us what that error looks like (status code and message). The app will
-  show the right screen for it.
+- We want: the quiz endpoints refuse guest accounts with a clear "no
+  access" error.
+- Tell us what that error looks like (status code and message). The app
+  will show the right screen for it.
 
 ## 2. Practice missed questions
 

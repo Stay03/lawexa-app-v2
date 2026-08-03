@@ -137,36 +137,39 @@ export function QuizSegmentFallback() {
 /* ── Access panels ──────────────────────────────────────────────────────── */
 
 /**
- * EARLY ACCESS — what an ineligible account sees at any `/quiz/*` URL.
+ * CREATE AN ACCOUNT — what a GUEST sees at any `/quiz/*` URL.
  *
- * v1 redirected these users home without a word (`QuizGuard`). The owner
- * replaced that with the truth (August 3): quiz is a real feature that is not
- * open yet, and a silent bounce reads as a broken link. So the panel says what
- * is happening, why, and offers two ways onward — never a dead end.
+ * Quiz is open to every registered account (owner decision, August 3 2026 —
+ * this panel replaced the same-day "early access" one when the audience
+ * widened). The only signed-in identity outside the audience is now a guest —
+ * a view-only pre-registration account — so the honest answer is a
+ * registration nudge, not a "not open yet" story that is no longer true.
+ * v1 redirected these users home without a word; a silent bounce reads as a
+ * broken link, so the panel says what quiz is and offers the two real doors.
  *
- * Honest about the boundary too: this is OUR gate. The backend does not enforce
- * the researcher/admin soft-launch list (verified live, 2026-08-03), so the copy
- * promises nothing about security — it describes a product state, which is
- * exactly what it is.
+ * Honest about the boundary too: this is OUR gate. The backend does not block
+ * guest tokens (verified live, 2026-08-03; the server-side block is a pending
+ * backend ask), so the copy promises nothing about security — it describes a
+ * product boundary, which is exactly what it is.
  */
-export function QuizEarlyAccessState() {
+export function QuizCreateAccountState() {
   return (
     <QuizMessage
       icon={GraduationCap}
       tone="accent"
-      title="Quiz is in early access"
-      description="Practice sessions are open to research accounts while we finish testing them. Your account doesn't have access yet."
+      title="Create a free account to practise"
+      description="Quiz turns your study conversations into multiple-choice practice and keeps your score history. It's part of the registered experience — create an account to play."
       action={
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button asChild size="sm">
-            <Link href="/">Back to home</Link>
+            <Link href="/register">Create free account</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/cases">Browse case law</Link>
+            <Link href="/login">Sign in</Link>
           </Button>
         </div>
       }
-      footnote="It opens to everyone once the question bank is ready."
+      footnote="Everything you can already browse stays free to browse."
     />
   );
 }

@@ -3,7 +3,7 @@
 import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { QuizEarlyAccessState, QuizSignedOutState } from './ui/states';
+import { QuizCreateAccountState, QuizSignedOutState } from './ui/states';
 
 /**
  * QuizAccessGate — the ONE audience gate for every `/quiz/*` surface. Mounted
@@ -20,19 +20,21 @@ import { QuizEarlyAccessState, QuizSignedOutState } from './ui/states';
  * No skeleton, no flash, no redirect.
  *
  * ── WHAT IT IS NOT ──────────────────────────────────────────────────────────
- * NOT a security boundary, and it does not pretend to be one. The soft-launch
- * audience (researcher / admin / superadmin — `canAccessQuizPlayer`) is a
- * FRONTEND product decision: the backend does not enforce it, verified live on
- * 2026-08-03 when a guest token played a full session end to end. The only
- * server-side gate is verified-email, which the screens below handle as its own
- * designed state. A separate backend ask covers the real lock; until it lands,
- * this gate is the UX and is described as exactly that in the panel's copy.
+ * NOT a security boundary, and it does not pretend to be one. The audience —
+ * EVERY registered account, guests and bots excluded (`canAccessQuizPlayer`;
+ * widened from the researcher/admin soft launch by the owner on August 3
+ * 2026) — is a FRONTEND product decision: the backend does not block guest
+ * tokens, verified live on 2026-08-03 when one played a full session end to
+ * end. The only server-side gate is verified-email, which the screens below
+ * handle as its own designed state. A separate backend ask covers the guest
+ * block; until it lands, this gate is the UX and is described as exactly that
+ * in the panel's copy.
  *
  * ── THE TWO REFUSALS ARE DIFFERENT ANSWERS ──────────────────────────────────
- * Signed out → "sign in", because the door is open once you do. Signed in but
- * outside the audience (including guests, who are view-only pre-registration)
- * → the early-access panel, because signing in again changes nothing. Both are
- * designed states with a way onward; neither is a redirect.
+ * Signed out → "sign in", because the door is open once you do. A guest —
+ * view-only pre-registration, the only signed-in identity outside the
+ * audience — → the create-an-account panel, because registering IS the door.
+ * Both are designed states with a way onward; neither is a redirect.
  */
 export function QuizAccessGate({ children }: { children: React.ReactNode }) {
   const { signedIn, role } = useV2Session();
@@ -48,7 +50,7 @@ export function QuizAccessGate({ children }: { children: React.ReactNode }) {
   if (!canAccessQuizPlayer(role)) {
     return (
       <div className={LIST_COLUMN}>
-        <QuizEarlyAccessState />
+        <QuizCreateAccountState />
       </div>
     );
   }
