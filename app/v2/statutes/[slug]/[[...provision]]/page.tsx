@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { SEO, getAppUrl } from '@/lib/constants/seo';
-import { fetchStatuteForMetadata } from '@/v2/features/statutes/server';
+import { fetchStatuteForMetadata } from '@/lib/api/server';
 import {
   formatProvisionLabel,
   parseProvisionSegment,
@@ -23,13 +23,14 @@ import { StatuteScreen } from '@/v2/features/statutes/reader/StatuteScreen';
  * the statute renders normally and the reader says, quietly, that the cited
  * provision was not found. Deeper paths are nobody's citation and 404.
  *
- * THE METADATA READ IS SESSION-AUTHENTICATED, unlike the case page's — it has
- * to be: `GET /statutes/{slug}` answers 401 without a bearer token (measured
- * July 31, 2026), so there is no unauthenticated read to shared-cache. A
- * signed-in hard load gets full metadata; a crawler or signed-out visitor
- * gets the site-default card — which is honest, since the data is auth-walled
- * for them anyway. `fetchStatuteForMetadata` carries the full note, including
- * why its response must never enter Next's shared data cache.
+ * THE METADATA READ IS PUBLIC — the cases pattern exactly, since the backend
+ * shipped `GET /api/public/statutes/{slug}` (verified August 2, 2026): an
+ * unauthenticated, shared-cache read that gives crawlers and signed-out hard
+ * loads real statute cards. `fetchStatuteForMetadata` in `lib/api/server.ts`
+ * carries the caching note (daily revalidate against the public group's
+ * 60 req/min rate limit). The canonical is built from OUR app URL, never the
+ * backend's `meta.canonical` — the API's idea of the site origin is not
+ * authoritative for the frontend (the cases page's argument, verbatim).
  */
 interface StatutePageProps {
   params: Promise<{ slug: string; provision?: string[] }>;
@@ -74,9 +75,14 @@ export async function generateMetadata({
   // one document, and a fragment URL must consolidate into — never compete
   // with — the statute page in search.
   const canonical = `${appUrl}/statutes/${slug}`;
-  const statuteTitle = detail.shortTitle
-    ? `${detail.title} (${detail.shortTitle})`
-    : detail.title;
+  const ogImageUrl = `${appUrl}/api/og/statutes/${slug}`;
+
+  // Prefer the backend's SEO title when it supplies one (the cases pattern);
+  // otherwise compose one that carries the designation — "Courts Act, 1993
+  // (Act 459)".
+  const statuteTitle =
+    detail.meta?.title ||
+    (detail.shortTitle ? `${detail.title} (${detail.shortTitle})` : detail.title);
   // A citation-shaped arrival names its target in the title —
   // "Section 54 — Courts Act, 1993 (Act 459)". The server cannot know whether
   // the document holds that section; the reader answers that honestly.
@@ -85,6 +91,7 @@ export async function generateMetadata({
     ? `${formatProvisionLabel(citation)} — ${statuteTitle}`
     : statuteTitle;
   const description =
+    detail.meta?.description ||
     detail.summary ||
     [detail.country, detail.year].filter(Boolean).join(' · ') ||
     SEO.defaultDescription;
@@ -100,15 +107,21 @@ export async function generateMetadata({
       siteName: SEO.siteName,
       type: 'article',
       locale: SEO.locale,
+      images: [
+        {
+          url: ogImageUrl,
+          width: SEO.ogImageWidth,
+          height: SEO.ogImageHeight,
+          alt: statuteTitle,
+        },
+      ],
     },
     twitter: {
-      // `summary`, not `summary_large_image` — no statutes OG image exists
-      // yet (backend-asks list), and a large-image card with no image in the
-      // chain renders worse than the plain card.
-      card: 'summary',
+      card: 'summary_large_image',
       title,
       description,
       site: SEO.twitterHandle,
+      images: [ogImageUrl],
     },
     robots: { index: true, follow: true },
   };

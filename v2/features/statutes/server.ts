@@ -3,8 +3,6 @@ import { dehydrate, type DehydratedState } from '@tanstack/react-query';
 import { STATUTE_COUNTRIES_FALLBACK } from '@/lib/constants/statute-countries';
 import type {
   StatuteCountriesData,
-  StatuteDetail,
-  StatuteDetailResponse,
   StatuteFacetsResponse,
   StatuteListParams,
   StatuteListResponse,
@@ -16,12 +14,21 @@ import { STATUTES_PAGE_SIZE, statutesQueries } from './queries';
 import { resolveCountryId } from './statute-row-model';
 
 /**
- * statutes — the server half of the feature: the list prefetch and the SEO
- * read. Same shape and same reasoning as `v2/features/cases/server.ts` (the
- * server-fetch gap: `statutesQueries.*` fetch through the axios client, whose
- * interceptor reads the browser's localStorage token — it cannot run in an
- * RSC — so this module fetches the same resources over the server DAL and
- * hydrates the EXACT same query keys with the EXACT same shapes).
+ * statutes — the server half of the feature: the list prefetch. Same shape and
+ * same reasoning as `v2/features/cases/server.ts` (the server-fetch gap:
+ * `statutesQueries.*` fetch through the axios client, whose interceptor reads
+ * the browser's localStorage token — it cannot run in an RSC — so this module
+ * fetches the same resources over the server DAL and hydrates the EXACT same
+ * query keys with the EXACT same shapes).
+ *
+ * THE SEO READ USED TO LIVE HERE and no longer does. While `GET
+ * /statutes/{slug}` was auth-walled, `generateMetadata` had to read through
+ * the session DAL from this module. The backend shipped
+ * `GET /api/public/statutes/{slug}` (verified August 2, 2026), so the metadata
+ * read is now `fetchStatuteForMetadata` in `lib/api/server.ts` — beside the
+ * cases one, and for the cases reason: the OG route
+ * (`app/api/og/statutes/[slug]`) sits outside the v2 tree, and the import
+ * boundary forbids it reaching in.
  */
 
 /** Bound on each prefetch call's TTFB cost — a slow API must not stall the route. */
@@ -119,78 +126,5 @@ export async function prefetchStatutesListState({
     return dehydrate(queryClient);
   } catch {
     return undefined;
-  }
-}
-
-/* ──────────────────────────── the SEO read ──────────────────────────────── */
-
-/** The statute fields `generateMetadata` actually uses. */
-export interface StatuteMetadata {
-  title: string;
-  shortTitle: string | null;
-  country: string | null;
-  year: number;
-  status: StatuteDetail['status'];
-  /** One-line description material, already collapsed and capped. */
-  summary: string;
-}
-
-/** Collapse whitespace to a plain single-line blurb, capped for a card. */
-function toBlurb(value: string | null | undefined, max: number): string {
-  if (!value) return '';
-  const text = value.replace(/\s+/g, ' ').trim();
-  if (text.length <= max) return text;
-  return `${text.slice(0, max).replace(/\s+\S*$/, '').trimEnd()}…`;
-}
-
-/**
- * Server-side statute fetcher for `generateMetadata`.
- *
- * UNLIKE `fetchCaseForMetadata`, this read goes through the session DAL
- * (`apiFetch`, `cache: 'no-store'`) and NOT an unauthenticated shared-cache
- * fetch — because it cannot: `GET /statutes/{slug}` answers 401 without a
- * bearer token (measured July 31, 2026). The consequences are accepted and
- * honest:
- *
- *  - a signed-in (or guest-cookied) reader's hard load emits full metadata;
- *  - a crawler or signed-out visitor gets the site-default card — which is
- *    exactly what they could read anyway, since the data is auth-walled;
- *  - the response is per-session and is therefore NEVER placed in Next's
- *    shared data cache (a per-user payload cached across users would be the
- *    privacy defect the cases note warns about).
- *
- * A public statute read is on the backend-asks list; the day it ships, this
- * function switches to the cases pattern and crawlers get real cards.
- *
- * Returns `null` for anything that is not a readable statute (404, 401,
- * timeout, network failure) so callers fall back to the site default.
- */
-export async function fetchStatuteForMetadata(
-  slug: string,
-): Promise<StatuteMetadata | null> {
-  try {
-    const res = await apiFetch<StatuteDetailResponse>(
-      `/statutes/${encodeURIComponent(slug)}`,
-      { signal: AbortSignal.timeout(PREFETCH_TIMEOUT_MS) },
-    );
-    const data = res.data;
-    if (!res.success || !data) return null;
-
-    return {
-      title: data.title,
-      shortTitle:
-        data.short_title && data.short_title !== data.title
-          ? data.short_title
-          : null,
-      country: data.country?.name ?? null,
-      year: data.year,
-      status: data.status,
-      summary: toBlurb(
-        data.description || data.long_title || data.preamble,
-        300,
-      ),
-    };
-  } catch {
-    return null;
   }
 }

@@ -1,5 +1,6 @@
 import { getApiUrl } from '@/lib/constants/seo';
 import type { CaseDetail } from '@/types/case';
+import type { StatuteStatus } from '@/types/statute';
 
 export interface SeoMeta {
   title: string;
@@ -116,6 +117,9 @@ export async function fetchCaseForMetadata(
       {
         headers: { Accept: 'application/json' },
         next: { revalidate: 300 },
+        // Bounded: a hung upstream must not stall `generateMetadata` (and with
+        // it the whole page render) — the card degrades to the site default.
+        signal: AbortSignal.timeout(5000),
       }
     );
 
@@ -226,6 +230,183 @@ export async function fetchCaseSitemapEntries(): Promise<CaseSitemapEntry[]> {
           slug: row.slug,
           lastModified: row.judgment_date ?? '',
         });
+      }
+
+      const pagination = json?.pagination;
+      if (!pagination || pagination.current_page >= pagination.last_page) break;
+    } catch {
+      break;
+    }
+  }
+
+  return entries;
+}
+
+/** The statute fields `generateMetadata` and the OG card actually use. */
+export interface StatuteMetadata {
+  title: string;
+  /** The designation ("Act 459"), only when it adds to the title. */
+  shortTitle: string | null;
+  country: string | null;
+  year: number;
+  status: StatuteStatus;
+  /** AKN document type, e.g. `"act"` — lowercase as the API ships it. */
+  documentType: string | null;
+  /** One-line description material, already collapsed and capped. */
+  summary: string;
+  /** The backend's SEO block. `canonical` is NEVER used — ours wins. */
+  meta: SeoMeta | null;
+}
+
+/**
+ * The public statute summary, as `GET /api/public/statutes/{slug}` ships it
+ * (verified against prod, August 2, 2026). Deliberately never the document
+ * text — the endpoint exists so crawlers can read a card, not the statute.
+ */
+interface PublicStatuteSummary {
+  title: string;
+  short_title: string | null;
+  slug: string;
+  year: number;
+  status: StatuteStatus;
+  status_label: string;
+  document_type: string | null;
+  country: { name: string; code: string } | null;
+  description: string | null;
+  meta: SeoMeta | null;
+}
+
+/**
+ * Server-side statute fetcher for metadata generation — the statute page's
+ * `<head>` tags and its OG card both read through this one function, so an
+ * unfurl and the tags beside it can never disagree, and the pair costs one
+ * upstream request rather than two (same URL, same options, one shared data
+ * cache entry).
+ *
+ * DELIBERATELY UNAUTHENTICATED — the cases argument, verbatim: the response is
+ * identical for every caller, which is what makes it legal to put in Next's
+ * SHARED data cache, so this must never grow an `Authorization` header.
+ *
+ * REVALIDATED DAILY, and the window is load-bearing rather than taste: the
+ * whole `/api/public/*` group is rate-limited to 60 requests/min per IP, and
+ * our server is one IP. At `revalidate: 86400` each statute costs at most one
+ * upstream request per day, shared by the tags and the card — ~1,004 statutes
+ * ≈ 0.7 requests/min even if a crawler sweeps the entire catalog cold. A 429
+ * during such a sweep returns `null` here, that render falls back to the
+ * site-default card, and the next successful read caches for a day.
+ *
+ * Returns `null` for anything that is not a readable statute — 404, 429, a
+ * network failure — so callers fall back to the site-wide card rather than
+ * emitting a broken one.
+ */
+export async function fetchStatuteForMetadata(
+  slug: string
+): Promise<StatuteMetadata | null> {
+  const apiUrl = getApiUrl().replace(/\/$/, '');
+
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/public/statutes/${encodeURIComponent(slug)}`,
+      {
+        headers: { Accept: 'application/json' },
+        next: { revalidate: 86400 },
+        // Bounded: a hung upstream must not stall `generateMetadata` or the OG
+        // route — the card degrades to the site default.
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const json = (await response.json()) as {
+      success?: boolean;
+      data?: PublicStatuteSummary | null;
+    };
+    const data = json?.data;
+
+    if (!json?.success || !data) {
+      return null;
+    }
+
+    return {
+      title: data.title,
+      shortTitle:
+        data.short_title && data.short_title !== data.title
+          ? data.short_title
+          : null,
+      country: data.country?.name ?? null,
+      year: data.year,
+      status: data.status,
+      documentType: data.document_type ?? null,
+      summary: toBlurb(data.description, 300),
+      meta: data.meta ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** One statute in the sitemap: the slug and when it last changed. */
+export interface StatuteSitemapEntry {
+  slug: string;
+  lastModified: string;
+}
+
+/**
+ * The page size and page count the statute sitemap enumerates.
+ *
+ * Unlike the cases walk above, this one reads a REAL sitemap feed:
+ * `GET /api/public/statutes` returns only `slug` + `updated_at` per row, no
+ * token, `per_page` up to 1000. The catalog is ~1,004 statutes (measured
+ * August 2, 2026), so the whole walk is two requests; five pages of 1,000 is
+ * generous headroom before a statute could fall off the sitemap, and it keeps
+ * the loop bounded the same way the cases walk is — an unbounded loop at
+ * build time turns a misbehaving upstream into a failed deploy.
+ */
+const STATUTE_SITEMAP_PER_PAGE = 1000;
+const STATUTE_SITEMAP_MAX_PAGES = 5;
+
+/**
+ * Enumerate statutes for `sitemap.xml`.
+ *
+ * LIVE, unlike `fetchCaseSitemapEntries` — the public feed shipped August 2,
+ * 2026 and answers without a token. `updated_at` reflects body edits too
+ * (confirmed with the backend), so it is an honest `lastmod` as-is.
+ *
+ * Revalidated daily: at most `STATUTE_SITEMAP_MAX_PAGES` (5) upstream requests
+ * per day against the 60/min public-group rate limit — noise.
+ *
+ * NEVER THROWS. `sitemap.ts` runs at build time; an upstream failure must
+ * degrade to whatever was gathered rather than fail the build, so every error
+ * (including a 429 from the shared rate limit) ends the walk.
+ */
+export async function fetchStatuteSitemapEntries(): Promise<StatuteSitemapEntry[]> {
+  const apiUrl = getApiUrl().replace(/\/$/, '');
+  const entries: StatuteSitemapEntry[] = [];
+
+  for (let page = 1; page <= STATUTE_SITEMAP_MAX_PAGES; page += 1) {
+    try {
+      const response = await fetch(
+        `${apiUrl}/api/public/statutes?page=${page}&per_page=${STATUTE_SITEMAP_PER_PAGE}`,
+        {
+          headers: { Accept: 'application/json' },
+          next: { revalidate: 86400 },
+        }
+      );
+      if (!response.ok) break;
+
+      const json = (await response.json()) as {
+        data?: { slug?: string; updated_at?: string | null }[];
+        pagination?: { current_page: number; last_page: number };
+      };
+      const rows = json?.data ?? [];
+      if (rows.length === 0) break;
+
+      for (const row of rows) {
+        if (!row?.slug) continue;
+        entries.push({ slug: row.slug, lastModified: row.updated_at ?? '' });
       }
 
       const pagination = json?.pagination;
