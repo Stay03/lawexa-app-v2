@@ -35,6 +35,27 @@ export interface ViewerScoped {
   viewerId: number | null;
 }
 
+/**
+ * THE BASELINE LIST PARAMS — the ONE param shape the spine's badge query and
+ * the `/spaces` screen's unfiltered tab both pass, so they resolve to the SAME
+ * cache entry.
+ *
+ * WHY THIS CONSTANT EXISTS (W4 fix round, 2026-08-04). The two call sites drifted
+ * the moment they were written independently: the spine mounted `list({ viewerId })`
+ * while the screen asked for `list({ viewerId, per_page: 50 })`. TanStack hashes the
+ * params object into the key, so those are two ENTRIES — every arrival at `/spaces`
+ * skeletoned over an already-warm list and fired a second identical-in-spirit request,
+ * which is exactly the cache-first paint the owner feel directive is about. Sharing a
+ * constant makes the divergence impossible to reintroduce silently: change it here and
+ * both move together.
+ *
+ * `per_page` is deliberately absent — the API's own default (30) is the baseline, and
+ * naming a number here would only be a second place to keep in sync. A FILTERED tab
+ * (Work / Study) still gets its own entry, which is correct: it is a different
+ * question with a different answer.
+ */
+export const SPACES_BASELINE_PARAMS: SpaceListParams = {};
+
 export const spacesQueries = {
   all: ['spaces'] as const,
 

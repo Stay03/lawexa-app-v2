@@ -16,7 +16,7 @@ import {
   invalidateSpaceRollups,
   sumSpaceMentions,
 } from '@/v2/features/spaces/cache';
-import { spacesQueries } from '@/v2/features/spaces/queries';
+import { SPACES_BASELINE_PARAMS, spacesQueries } from '@/v2/features/spaces/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { resetAppBadge, setAppMentionBadge } from './app-badge';
 import { dispatchChannelUnread, type ResolvedChannelContext } from './dispatcher';
@@ -165,7 +165,7 @@ export function RealtimeSpine() {
 
   // Baseline 1 — the badge's source of truth (and W4's warm spaces list).
   const badgeQuery = useQuery({
-    ...spacesQueries.list({ viewerId }),
+    ...spacesQueries.list({ ...SPACES_BASELINE_PARAMS, viewerId }),
     enabled: eligible,
     select: sumSpaceMentions,
   });
