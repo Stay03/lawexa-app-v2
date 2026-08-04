@@ -1,0 +1,66 @@
+/**
+ * quiz-game.css — the two motions a live game needs that a utility class
+ * cannot express. Feature-local and imported by the overlay, exactly like
+ * `cases/detail/case-document.css`.
+ *
+ * MOTION BUDGET, JUSTIFIED (design-research §11 caps ordinary UI motion at
+ * ~200ms; the W6 brief allows longer PURPOSEFUL sequences here and asks for
+ * each to be justified):
+ *
+ *  1. `v2-quiz-beat` — one pulse per second under the countdown digit. It
+ *     marks the beat of a shared count-in; a still number would leave the
+ *     lobby wondering whether the screen had frozen. The cycle IS the second,
+ *     so its duration is data, not decoration.
+ *  2. `v2-quiz-rise` — 420ms podium columns. A result deserves an arrival, and
+ *     this is the only celebratory motion in the product. It runs once, on a
+ *     screen with nothing else moving.
+ *
+ * The question timer is deliberately NOT here: it is a transform driven by the
+ * game clock's tick with a one-tick linear transition (see `QuestionTimer` in
+ * `./ui.tsx` for why a keyframe animation could not work on a component that
+ * re-renders five times a second).
+ *
+ * Both are disabled under `prefers-reduced-motion`, where the same information
+ * is fully present: the digit still counts down and the columns still render
+ * at their final heights.
+ */
+
+@keyframes v2-quiz-beat {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1.06);
+    opacity: 0.92;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes v2-quiz-rise {
+  from {
+    transform: scaleY(0.02);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.v2-quiz-beat {
+  animation: v2-quiz-beat 1000ms ease-in-out infinite;
+}
+
+.v2-quiz-rise {
+  transform-origin: bottom center;
+  animation: v2-quiz-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-quiz-beat,
+  .v2-quiz-rise {
+    animation: none !important;
+  }
+}

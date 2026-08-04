@@ -13,6 +13,16 @@ import type {
   SlimUser,
   TaskList,
 } from '@/types/collab';
+import type {
+  QuizAnswerProgressPayload,
+  QuizCancelledPayload,
+  QuizCountdownPayload,
+  QuizFinishedPayload,
+  QuizGameLivePayload,
+  QuizPlayerJoinedPayload,
+  QuizQuestionClosedPayload,
+  QuizQuestionOpenedPayload,
+} from '@/types/channel-quiz';
 import { getV2Echo } from '@/v2/runtime/realtime/echo';
 import { presenceChannelName } from '@/v2/runtime/realtime/protocol';
 import {
@@ -37,6 +47,8 @@ import {
   upsertListCaches,
 } from './lists-files-cache';
 import { channelsQueries } from './queries';
+import { publishQuizGameEvent } from './quiz/game-bus';
+import { channelQuizQueries } from './quiz/queries';
 
 /**
  * useChannelRoom — the ONE presence-room subscription for an open channel
@@ -76,12 +88,20 @@ import { channelsQueries } from './queries';
  *  - `.ai.turn_started` / `.ai.turn_failed` → the responding-row machine
  *    (`./lawexa/turns.ts` holds the rules and the reasoning).
  *
- * STILL DELIBERATE NO-OPS:
+ * W6 BOUND THE LIVE-QUIZ SEAM (2026-08-04). The eight `.quiz.game.*` events
+ * ride THIS room (digest §B — no second subscription exists or may exist), so
+ * the room listens for them and republishes them on `./quiz/game-bus.ts`,
+ * where whichever quiz surface is mounted picks them up. The room itself keeps
+ * no game state: the game's authority is `GET /api/quiz-games/{game}` and the
+ * events are a fast path over it. The three events that change whether a game
+ * is live (`live`, `finished`, `cancelled`) also invalidate the channel's
+ * live-game probe, so the quiz cards sitting in the feed tell the truth
+ * without a screen being open.
+ *
+ * STILL A DELIBERATE NO-OP:
  *  - `.read.updated` → IGNORED for UI by decision D2 (no read-state display);
  *    the caller's own multi-device badge sync rides `.channel.unread` on the
  *    user channel, which the spine already owns.
- *  - `.quiz.game.*` (8 events) → the live-quiz screens (W6); the FEED needs
- *    nothing from them — quiz system cards arrive as ordinary messages.
  */
 
 const TYPING_TTL_MS = 10_000;
@@ -294,6 +314,44 @@ export function useChannelRoom(
         }
       },
     );
+
+    /* ── Live quiz (W6) ─────────────────────────────────────────────────── */
+
+    /** A game going live, ending or being cancelled changes the answer to
+     *  "is a quiz running here?" — which every quiz card in the feed reads. */
+    const invalidateLiveProbe = () => {
+      void queryClient.invalidateQueries({
+        queryKey: channelQuizQueries.activeGameOf(channelUuid),
+      });
+    };
+
+    room.listen('.quiz.game.live', (payload: QuizGameLivePayload) => {
+      publishQuizGameEvent(channelUuid, { type: 'live', payload });
+      invalidateLiveProbe();
+    });
+    room.listen('.quiz.game.player_joined', (payload: QuizPlayerJoinedPayload) => {
+      publishQuizGameEvent(channelUuid, { type: 'player_joined', payload });
+    });
+    room.listen('.quiz.game.countdown', (payload: QuizCountdownPayload) => {
+      publishQuizGameEvent(channelUuid, { type: 'countdown', payload });
+    });
+    room.listen('.quiz.game.question_opened', (payload: QuizQuestionOpenedPayload) => {
+      publishQuizGameEvent(channelUuid, { type: 'question_opened', payload });
+    });
+    room.listen('.quiz.game.answer_progress', (payload: QuizAnswerProgressPayload) => {
+      publishQuizGameEvent(channelUuid, { type: 'answer_progress', payload });
+    });
+    room.listen('.quiz.game.question_closed', (payload: QuizQuestionClosedPayload) => {
+      publishQuizGameEvent(channelUuid, { type: 'question_closed', payload });
+    });
+    room.listen('.quiz.game.finished', (payload: QuizFinishedPayload) => {
+      publishQuizGameEvent(channelUuid, { type: 'finished', payload });
+      invalidateLiveProbe();
+    });
+    room.listen('.quiz.game.cancelled', (payload: QuizCancelledPayload) => {
+      publishQuizGameEvent(channelUuid, { type: 'cancelled', payload });
+      invalidateLiveProbe();
+    });
 
     room.listenForWhisper('typing', (payload: TypingUser) => {
       if (!payload?.uuid || payload.uuid === myUuid) return;

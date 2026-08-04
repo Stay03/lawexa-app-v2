@@ -153,6 +153,9 @@ export interface ChannelFeedProps {
   onFocusComposer: () => void;
   /** Open the sessions sheet on one session (screen-owned surface). */
   onViewAiSession: (sessionUuid: string) => void;
+  /** Open the channel's live-quiz mode on a game (screen-owned `?game=`) —
+   *  the quiz system cards' Join / results action (W6). */
+  onOpenGame: (gameUuid: string) => void;
 }
 
 export function ChannelFeed({
@@ -168,6 +171,7 @@ export function ChannelFeed({
   onStartReply,
   onFocusComposer,
   onViewAiSession,
+  onOpenGame,
   ref,
 }: ChannelFeedProps) {
   const {
@@ -778,7 +782,15 @@ export function ChannelFeed({
                   case 'unread':
                     return <UnreadDivider key={item.key} />;
                   case 'quiz-card':
-                    return <QuizGameCard key={item.key} message={item.message} />;
+                    return (
+                      <QuizGameCard
+                        key={item.key}
+                        message={item.message}
+                        channelUuid={channel.uuid}
+                        viewerId={viewerId}
+                        onOpenGame={onOpenGame}
+                      />
+                    );
                   case 'responding':
                     return (
                       <RespondingRow

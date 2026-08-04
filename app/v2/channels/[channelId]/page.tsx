@@ -12,9 +12,9 @@ import { parseChannelTab } from '@/v2/features/channels/model';
  * client cache (warmed by the spine's baselines and retained by
  * `GC_TIMES.list`) is the right first paint, not a per-request server fetch.
  *
- * URL STATE, THREADED AS NAVIGATION-TIME PROPS: `?tab=` / `?list=` / `?m=`
- * are read here (the page is already dynamic — the v2 layout reads cookies)
- * and handed to the screen as INITIAL values. In-app changes are quiet
+ * URL STATE, THREADED AS NAVIGATION-TIME PROPS: `?tab=` / `?list=` / `?m=` /
+ * `?game=` (the W6 live-quiz mode) are read here (the page is already dynamic
+ * — the v2 layout reads cookies) and handed to the screen as INITIAL values. In-app changes are quiet
  * history writes owned by the screen; a real navigation (a shared link, the
  * dispatcher's mention toast) re-renders this page and the new props re-arm
  * the screen's deep-link/tab state. `loading.tsx` takes no params, which is
@@ -58,6 +58,7 @@ export default async function V2ChannelPage({
       channelUuid={channelId}
       initialTab={parseChannelTab(firstParam(search.tab))}
       initialListUuid={firstParam(search.list)}
+      initialGameUuid={firstParam(search.game)}
       targetMessageUuid={firstParam(search.m)}
     />
   );

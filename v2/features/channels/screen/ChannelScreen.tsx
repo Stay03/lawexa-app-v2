@@ -17,6 +17,7 @@ import {
   Pin,
   Sparkles,
   Trash2,
+  Trophy,
   Users,
 } from 'lucide-react';
 
@@ -46,7 +47,10 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Message, NotifyLevel } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
-import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
+import {
+  quietPushUrlParams,
+  quietReplaceUrlParams,
+} from '@/v2/runtime/url-params';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { TabRow } from '@/v2/shell/TabRow';
@@ -74,6 +78,9 @@ import { FilesTab } from '../files/FilesTab';
 import { ListsTab } from '../lists/ListsTab';
 import { ChannelMembersSheet } from '../members/ChannelMembersSheet';
 import { ChannelEditDialog } from '../dialogs/ChannelEditDialog';
+import { GameOverlay } from '../quiz/GameOverlay';
+import { LiveQuizBar } from '../quiz/LiveQuizBar';
+import { QuizLibrarySheet } from '../quiz/QuizLibrarySheet';
 import { EnablePushNudge } from './EnablePushNudge';
 import {
   ChannelAccessDeniedState,
@@ -113,16 +120,29 @@ import {
  * `channelId`, so tab/reply/dialog state, scroll baselines and the feed's
  * unread anchor can never leak from one channel into another (v1 keyed its
  * body the same way).
+ *
+ * GAME MODE (W6). A live quiz is a MODE over this screen, not a route away
+ * from it: `?game={uuid}` mounts `GameOverlay` across the whole channel — over
+ * the identity header and the tab strip as well as the panes — so nothing
+ * underneath reflows and the chat keeps its scroll, its history and its
+ * presence room while the game runs. `?game=` uses the same quiet history
+ * writers as `?tab=`, with ONE difference: opening a game PUSHES an entry
+ * (Back leaves the game and lands back in the chat, the mobile expectation)
+ * while closing REPLACES, so the mode is never a walk through history. A
+ * `popstate` listener adopts whatever the URL really says, which is what makes
+ * Back, Forward and a shared link all agree.
  */
 export function ChannelScreen({
   channelUuid,
   initialTab,
   initialListUuid,
+  initialGameUuid,
   targetMessageUuid,
 }: {
   channelUuid: string;
   initialTab: ChannelTab;
   initialListUuid: string | null;
+  initialGameUuid: string | null;
   targetMessageUuid: string | null;
 }) {
   const session = useV2Session();
@@ -169,6 +189,51 @@ export function ChannelScreen({
    *  the sheet has two entrances (the menu, and any AI message's "view this
    *  conversation"), and controlling it removes any need to sync inside. */
   const [sessionUuid, setSessionUuid] = useState<string | null>(null);
+
+  /* ── Game mode (W6). Same URL-as-mirror contract as `?tab=`, with a PUSH on
+        open so Back leaves the game. Initialised from the LIVE URL for the
+        same reason the tab is: a Back/Forward restore can serve stale props
+        while the address bar is current. ─────────────────────────────────── */
+  const [gameUuid, setGameUuid] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return initialGameUuid;
+    return new URLSearchParams(window.location.search).get('game') ?? initialGameUuid;
+  });
+  const [quizzesOpen, setQuizzesOpen] = useState(false);
+
+  const openGame = useCallback((nextGameUuid: string) => {
+    // IDEMPOTENT AT THE SOURCE. Three affordances open a game (the live bar,
+    // a transcript card, the library sheet) and each can be double-tapped; two
+    // pushes would mean two history entries, so Back would take two presses to
+    // leave one game. The live URL is the truth, so it is what gets checked.
+    if (
+      new URLSearchParams(window.location.search).get('game') === nextGameUuid
+    ) {
+      return;
+    }
+    setGameUuid(nextGameUuid);
+    quietPushUrlParams({ game: nextGameUuid });
+  }, []);
+
+  const closeGame = useCallback(() => {
+    setGameUuid(null);
+    quietReplaceUrlParams({ game: null });
+  }, []);
+
+  // Back/Forward re-derives EVERY value this screen mirrors into the URL, not
+  // just the one W6 added. `?game=` is the first PUSH on this route, so a Back
+  // out of a game now restores an entry whose `?tab=` may differ from the tab
+  // on screen — reading only `game` here would leave the strip pointing at
+  // Lists while the chat is shown. (`?list=` is owned by `ListsTab`'s own
+  // state, which re-reads it on mount; it is not this listener's to restore.)
+  useEffect(() => {
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setGameUuid(params.get('game'));
+      setTab(parseChannelTab(params.get('tab')));
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const router = useRouter();
   const joinMutation = useJoinChannel(channelUuid);
@@ -405,6 +470,10 @@ export function ChannelScreen({
                     <Sparkles aria-hidden className="size-4" />
                     Lawexa sessions
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setQuizzesOpen(true)}>
+                    <Trophy aria-hidden className="size-4" />
+                    Quizzes
+                  </DropdownMenuItem>
                   {canManage && (
                     <DropdownMenuItem onClick={() => setEditOpen(true)}>
                       <Pencil aria-hidden className="size-4" />
@@ -496,109 +565,160 @@ export function ChannelScreen({
   }
 
   /* ── Member: tabs + panes ─────────────────────────────────────────────── */
+  const gameOpen = gameUuid !== null;
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {identityHeader}
+    <div className="relative flex h-full min-h-0 flex-col">
+      {/* EVERYTHING THE GAME MODE COVERS lives inside this one wrapper so it
+          can be made `inert` in one place. Covering the channel visually is
+          not enough: without this, Shift+Tab out of the game walks straight
+          into the composer, the tab strip and the live bar's Join — controls
+          the reader cannot see, one of which would push another history
+          entry — and a screen reader would read the whole chat underneath as
+          if the game were not there. `inert` removes the subtree from focus,
+          hit-testing and the accessibility tree together, which is exactly the
+          promise the overlay is making visually.
 
-      {/* The earned moment for closed-app push (W5). Members only — it sits
-          inside this branch, so a non-member reading a public channel is
-          never asked. Renders a zero-height inert row when there is nothing
-          to ask. */}
-      <EnablePushNudge />
+          The wrapper is a column flex child (`min-h-0 flex-1`), so the header/
+          tabs/panes geometry inside it is byte-identical to before. */}
+      <div className="flex min-h-0 flex-1 flex-col" inert={gameOpen}>
+        {identityHeader}
 
-      <div className="shrink-0 border-b px-4">
-        <div className="mx-auto w-full max-w-3xl">
-          <TabRow
-            tabs={CHANNEL_TABS}
-            value={tab}
-            onChange={selectTab}
-            ariaLabel="Channel sections"
-            className="flex w-fit items-center gap-4"
-            tabClassName={(selected) =>
-              cn(
-                'v2-interactive relative flex min-h-10 items-center gap-1.5 rounded-none px-0.5 text-sm font-medium',
-                'transition-colors duration-150 motion-reduce:transition-none',
-                selected
-                  ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary'
-                  : 'text-muted-foreground hover:text-foreground',
-              )
-            }
-          >
-            {(item) => item.label}
-          </TabRow>
-        </div>
-      </div>
+        {/* The earned moment for closed-app push (W5). Members only — it sits
+            inside this branch, so a non-member reading a public channel is
+            never asked. Renders a zero-height inert row when there is nothing
+            to ask. */}
+        <EnablePushNudge />
 
-      {/* The pane region: every pane fills the same box (absolute stacking).
-          Chat KEEPS ITS MOUNT and, when inactive, is hidden with
-          `visibility: hidden` + `inert` — NOT `display: none`, which destroys
-          the browser's rendering state and with it the feed's scroll position
-          (the exact thing the forceMount contract exists to preserve).
-          Lists/Files mount per visit and restore from cache + URL. */}
-      <div className="relative min-h-0 flex-1">
-        <div
-          role="tabpanel"
-          aria-label="Chat"
-          inert={tab !== 'chat'}
-          className={cn(
-            'absolute inset-0 flex min-h-0 flex-col',
-            tab !== 'chat' && 'invisible',
-          )}
-        >
-          <ChannelFeed
-            ref={feedRef}
-            channel={channel}
-            viewerId={viewerId}
-            viewerUuid={viewerUuid}
-            reporter={reporter}
-            active={tab === 'chat'}
-            targetMessageUuid={targetMessageUuid}
-            typingUsers={room.typingUsers}
-            respondingTurns={room.respondingTurns}
-            onStartReply={handleStartReply}
-            onFocusComposer={focusComposer}
-            onViewAiSession={openAiSession}
-            composer={
-              <ChannelComposer
-                ref={composerRef}
-                channel={channel}
-                viewerId={viewerId}
-                replyTo={replyTo}
-                onCancelReply={() => setReplyTo(null)}
-                onTyping={room.notifyTyping}
-                onSentSuccess={handleSentSuccess}
-              />
-            }
-          />
+        {/* The standing door into a running game (W6) — renders nothing at all
+            when no quiz is live here, so the channel's geometry is unchanged
+            the rest of the time. */}
+        <LiveQuizBar
+          channelUuid={channel.uuid}
+          viewerId={viewerId}
+          onOpenGame={openGame}
+        />
+
+        <div className="shrink-0 border-b px-4">
+          <div className="mx-auto w-full max-w-3xl">
+            <TabRow
+              tabs={CHANNEL_TABS}
+              value={tab}
+              onChange={selectTab}
+              ariaLabel="Channel sections"
+              className="flex w-fit items-center gap-4"
+              tabClassName={(selected) =>
+                cn(
+                  'v2-interactive relative flex min-h-10 items-center gap-1.5 rounded-none px-0.5 text-sm font-medium',
+                  'transition-colors duration-150 motion-reduce:transition-none',
+                  selected
+                    ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary'
+                    : 'text-muted-foreground hover:text-foreground',
+                )
+              }
+            >
+              {(item) => item.label}
+            </TabRow>
+          </div>
         </div>
 
-        {tab === 'lists' && (
+        {/* The pane region: every pane fills the same box (absolute stacking).
+            Chat KEEPS ITS MOUNT and, when inactive, is hidden with
+            `visibility: hidden` + `inert` — NOT `display: none`, which destroys
+            the browser's rendering state and with it the feed's scroll position
+            (the exact thing the forceMount contract exists to preserve).
+            Lists/Files mount per visit and restore from cache + URL. */}
+        <div className="relative min-h-0 flex-1">
           <div
             role="tabpanel"
-            aria-label="Lists"
-            className="absolute inset-0 flex min-h-0 flex-col"
+            aria-label="Chat"
+            inert={tab !== 'chat'}
+            className={cn(
+              'absolute inset-0 flex min-h-0 flex-col',
+              tab !== 'chat' && 'invisible',
+            )}
           >
-            <ListsTab
+            <ChannelFeed
+              ref={feedRef}
               channel={channel}
               viewerId={viewerId}
               viewerUuid={viewerUuid}
-              initialListUuid={initialListUuid}
+              reporter={reporter}
+              active={tab === 'chat'}
+              targetMessageUuid={targetMessageUuid}
+              typingUsers={room.typingUsers}
+              respondingTurns={room.respondingTurns}
+              onStartReply={handleStartReply}
+              onFocusComposer={focusComposer}
+              onViewAiSession={openAiSession}
+              onOpenGame={openGame}
+              composer={
+                <ChannelComposer
+                  ref={composerRef}
+                  channel={channel}
+                  viewerId={viewerId}
+                  replyTo={replyTo}
+                  onCancelReply={() => setReplyTo(null)}
+                  onTyping={room.notifyTyping}
+                  onSentSuccess={handleSentSuccess}
+                />
+              }
             />
           </div>
-        )}
 
-        {tab === 'files' && (
-          <div
-            role="tabpanel"
-            aria-label="Files"
-            className="absolute inset-0 flex min-h-0 flex-col"
-          >
-            <FilesTab channel={channel} viewerId={viewerId} />
-          </div>
-        )}
+          {tab === 'lists' && (
+            <div
+              role="tabpanel"
+              aria-label="Lists"
+              className="absolute inset-0 flex min-h-0 flex-col"
+            >
+              <ListsTab
+                channel={channel}
+                viewerId={viewerId}
+                viewerUuid={viewerUuid}
+                initialListUuid={initialListUuid}
+              />
+            </div>
+          )}
+
+          {tab === 'files' && (
+            <div
+              role="tabpanel"
+              aria-label="Files"
+              className="absolute inset-0 flex min-h-0 flex-col"
+            >
+              <FilesTab channel={channel} viewerId={viewerId} />
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* ── Game mode ───────────────────────────────────────────────────
+          Covers the WHOLE screen, header and tabs included: a live game is a
+          mode, and nothing under it may reflow while it runs. The chat stays
+          mounted behind, so leaving the game is instant and lands exactly
+          where the reader was. */}
+      {gameUuid && (
+        <GameOverlay
+          key={gameUuid}
+          channelUuid={channel.uuid}
+          gameUuid={gameUuid}
+          viewerId={viewerId}
+          viewerUuid={viewerUuid}
+          onClose={closeGame}
+        />
+      )}
+
       {/* ── Sheets & dialogs ────────────────────────────────────────────── */}
+      <QuizLibrarySheet
+        channel={channel}
+        viewerId={viewerId}
+        viewerUuid={viewerUuid}
+        open={quizzesOpen}
+        onOpenChange={setQuizzesOpen}
+        onOpenGame={openGame}
+      />
+
       <PinnedMessagesSheet
         channel={channel}
         viewerId={viewerId}

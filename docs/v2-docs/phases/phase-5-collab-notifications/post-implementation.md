@@ -206,11 +206,25 @@ over ws with a browser Origin; script preserved in the session scratchpad as
   The 1-second badge exit criterion is verified in code + fixtures but NOT yet
   on the live wire — re-run the probe when the backend replies.
 
-**Film — FOR THE COORDINATOR TO FILL.**
-> Desktop + mobile shots of: the channel with the push nudge, the blocked
-> variant of that bar, the bell's list view and its settings view (four
-> switches, and the paused state), a mention alert, `/channels`, `/spaces`,
-> `/invitations`, `/organization`.
+**Film — RUN 2026-08-04 (fixture rig, `.playwright-mcp/shots/` 01–30).**
+30 shots across W2–W6: the feed (light/dark/mobile, unread divider, mention
+wash, quote replies, reactions, rendered AI markdown), lists + files (zip note),
+`/spaces`, space detail (muted-with-mention showcase), `/invitations`,
+`/organization`, `/channels` index, the quiz question/reveal/lobby phases, and
+the bell's delivery-settings view. Not yet filmed: the push nudge states and a
+mention toast (need permission UI / live events) — they ride the on-device pass.
+
+**W6 RECORD (2026-08-04).** Live channel quiz shipped: `types/channel-quiz.ts` +
+`lib/api/channel-quiz.ts` (additive), `v2/features/channels/quiz/` (model,
+queries w/ ordering-guarded polling authority, mutations, game-bus, monotonic
+game-clock, use-game state machine, ui, GamePhases, GameOverlay w/ inert'd
+underlay, LiveQuizBar, QuizLibrarySheet, QuizFormDialog), quiz cards wired,
+`?game=` mode on quiet history writes, `quiz_host_policy` in channel edit,
+`quiz-answer` throttle family. Audit: SHIP AFTER FIXES, zero blockers — H1
+(dual-authority ordering guard), H2 (inert), H3 (sr-only reveal verdicts), M1–M5
++ cleanup all applied; one auditor suggestion improved (double-tap guard at the
+URL source). Playable with zero events via the polling authority — built during
+the prod emission outage, by design.
 
 **On-device — FOR THE OWNER/TESTERS.** `w5-device-verification.md`, 52 steps,
 iOS Safari (installed PWA) + Android Chrome.

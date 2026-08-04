@@ -32,8 +32,14 @@ import { AxiosError } from 'axios';
  * `ai-reset` is 10/min — much tighter, and much easier to trip by pressing a
  * confirm dialog twice, which is exactly why it belongs here rather than in an
  * error banner (api-digest §C).
+ *
+ * `quiz-answer` (W6) joins them for a different reason: the live quiz's answer
+ * endpoint carries no documented ceiling, but it is a large tap target on a
+ * timed screen where a player under pressure WILL hammer it. If the server
+ * ever answers 429, the honest response is the same one reactions get — the
+ * option grid goes quiet for a beat — and never an error over a running game.
  */
-export type ThrottleKind = 'reaction' | 'bookmark' | 'ai-reset';
+export type ThrottleKind = 'reaction' | 'bookmark' | 'ai-reset' | 'quiz-answer';
 
 /** Used when the response carries no `Retry-After`. Long enough to be felt as
  *  "slow down", short enough that nobody thinks the feature broke. */

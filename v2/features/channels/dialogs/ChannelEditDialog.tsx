@@ -24,18 +24,29 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { extractApiError } from '@/lib/utils/api-error';
+import type { QuizHostPolicy } from '@/types/channel-quiz';
 import type { Channel, ChannelVisibility } from '@/types/collab';
 import { useUpdateChannel } from '../membership-mutations';
+import { readQuizHostPolicy } from '../quiz/model';
 
 /**
  * ChannelEditDialog — owner/admin channel settings: name, visibility,
  * description, and the `ai_mentions_notify` switch (Ruling B's channel-side
  * knob — OFF by default so Lawexa can't ping everyone; digest §D). A v2 port
  * of v1's `ChannelFormDialog` in EDIT mode only — creation belongs to the W4
- * space screen. `quiz_host_policy` joins this dialog with W6 (the setting
- * exists server-side; surfacing a control before the quiz UI exists would be
- * a dead knob). Failures surface inline (`silentError` mutation). Phase-5
- * W2, study A3 KEEP — 2026-08-04.
+ * space screen. Failures surface inline (`silentError` mutation). Phase-5 W2,
+ * study A3 KEEP — 2026-08-04.
+ *
+ * W6 ADDED `quiz_host_policy` (`all_members` | `admins_only`), the channel
+ * setting that gates BOTH writing a quiz and putting one live. It waited for
+ * this wave on purpose: a knob with no feature behind it is a dead control.
+ * Unknown values behave as `all_members` server-side, and `readQuizHostPolicy`
+ * mirrors that exactly, so a channel whose settings predate the feature opens
+ * this dialog on the true default rather than on a guess.
+ *
+ * BOTH SWITCHES RIDE THE UNTYPED `settings` BAG, which is why every save
+ * SPREADS the channel's existing settings first: this dialog must never drop a
+ * key it doesn't know about.
  */
 export function ChannelEditDialog({
   channel,
@@ -54,6 +65,9 @@ export function ChannelEditDialog({
   const [aiMentionsNotify, setAiMentionsNotify] = useState<boolean>(
     Boolean(channel.settings?.ai_mentions_notify),
   );
+  const [quizHostPolicy, setQuizHostPolicy] = useState<QuizHostPolicy>(() =>
+    readQuizHostPolicy(channel.settings),
+  );
   const [error, setError] = useState<string | null>(null);
 
   const submitting = updateChannel.isPending;
@@ -70,6 +84,7 @@ export function ChannelEditDialog({
         settings: {
           ...(channel.settings ?? {}),
           ai_mentions_notify: aiMentionsNotify,
+          quiz_host_policy: quizHostPolicy,
         },
       },
       {
@@ -146,6 +161,30 @@ export function ChannelEditDialog({
               checked={aiMentionsNotify}
               onCheckedChange={setAiMentionsNotify}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="channel-quiz-host-policy">Who can run quizzes</Label>
+            <Select
+              value={quizHostPolicy}
+              onValueChange={(value) =>
+                setQuizHostPolicy(value as QuizHostPolicy)
+              }
+            >
+              <SelectTrigger id="channel-quiz-host-policy" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all_members">
+                  Anyone in the channel
+                </SelectItem>
+                <SelectItem value="admins_only">Admins only</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Covers both writing a quiz and starting a live game. Everyone can
+              play either way.
+            </p>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
