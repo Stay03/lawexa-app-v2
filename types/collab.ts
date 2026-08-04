@@ -240,13 +240,48 @@ export interface MessageMention {
 }
 
 /** A message's kind. Absent is treated as `'text'`. `ai_divider` is a Lawexa
- *  session-boundary separator, rendered inline rather than as a chat bubble. */
-export type MessageType = 'text' | 'ai_divider';
+ *  session-boundary separator, rendered inline rather than as a chat bubble.
+ *  `quiz_game_live` / `quiz_game_finished` (2026-08-03 surface) are
+ *  Lawexa-authored system cards announcing a live channel quiz / its results;
+ *  they already occur in prod feeds. Renderers MUST fall back to plain text on
+ *  any unrecognised value — the backend states that fallback is contractual. */
+export type MessageType =
+  | 'text'
+  | 'ai_divider'
+  | 'quiz_game_live'
+  | 'quiz_game_finished';
 
 export interface MessageMetadata {
   mentions: MessageMention[];
   lawexa_mentioned: boolean;
   /** Present on Lawexa-authored messages; absent (⇒ `'text'`) on human ones. */
+  type?: MessageType;
+  /** Quiz system cards only (`quiz_game_live` / `quiz_game_finished`): the
+   *  live game and its parent quiz — the W6 Join / Results actions' handles. */
+  game_uuid?: string;
+  quiz_uuid?: string;
+  /** On every AI-authored message since 2026-08-03 (no backfill — `null` on
+   *  older history and on human messages). Equals the summon's
+   *  `execution_id` exactly; the responding pill clears on the FIRST match. */
+  execution_id?: string | null;
+  /** The AI session behind an AI bubble (same 2026-08-03 null rules) — feed it
+   *  to `GET /channels/{uuid}/ai/sessions/{session}` for the full transcript. */
+  session_uuid?: string | null;
+}
+
+/**
+ * The quoted-message context riding a reply (`reply_to`, phase 3b). The
+ * preview is a LIVE READ server-side: editing the target updates it, deleting
+ * the target sets `is_deleted: true` and nulls the preview. Same AI/deleted
+ * disambiguation rule as messages: key on `is_ai`, never on `author === null`.
+ */
+export interface MessageReplyTo {
+  uuid: string;
+  is_ai: boolean;
+  author: SlimUser | null;
+  /** ~200-char plaintext preview of the target; `null` once it is deleted. */
+  content_preview: string | null;
+  is_deleted: boolean;
   type?: MessageType;
 }
 
@@ -265,6 +300,9 @@ export interface Message {
   content: string;
   metadata: MessageMetadata;
   parent_message_uuid: string | null;
+  /** Reply context (3b): `null`/absent when the message is not a reply. Rides
+   *  REST history AND the `message.created`/`updated` broadcasts. */
+  reply_to?: MessageReplyTo | null;
   edited_at: string | null;
   created_at: string;
 }
@@ -354,18 +392,25 @@ export interface MemberListParams {
 export interface SendMessagePayload {
   content: string;
   parent_message_uuid?: string;
+  /** Reply target (3b): must be a live message in the SAME channel (else 422).
+   *  The current wire name — `parent_message_uuid` above predates it. */
+  reply_to_uuid?: string;
 }
 
 export interface UpdateMessagePayload {
   content: string;
 }
 
-/** Result of advancing the read pointer (`POST /channels/{uuid}/read`). */
+/** Result of advancing the read pointer (`POST /channels/{uuid}/read`).
+ *  `last_read_message_uuid` — the server ships the uuid (member-surface
+ *  uuid-only pass, Jul 25 2026); the old `last_read_message_id: number` field
+ *  in this type was stale and never read by any consumer (verified 2026-08-04,
+ *  phase-5 W1 audit note N6). */
 export interface MarkReadResponse {
   success: boolean;
   message: string;
   data: {
-    last_read_message_id: number;
+    last_read_message_uuid: string;
     unread_count: number;
   };
 }

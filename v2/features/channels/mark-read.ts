@@ -110,8 +110,19 @@ export function useChannelReadPointer(
   const fire = useCallback(
     (messageUuid: string) => {
       if (lastMarkedRef.current === messageUuid) return;
+      // Guard is set BEFORE the POST (suppresses duplicate triggers while it
+      // flies) and RESET on failure — a silent-error mark must stay
+      // retryable by the next trigger for the same uuid, or one dropped
+      // request would pin the badge until a newer message arrives
+      // (phase-5 W2 audit, L10).
       lastMarkedRef.current = messageUuid;
-      mutate(messageUuid);
+      mutate(messageUuid, {
+        onError: () => {
+          if (lastMarkedRef.current === messageUuid) {
+            lastMarkedRef.current = null;
+          }
+        },
+      });
     },
     [mutate],
   );

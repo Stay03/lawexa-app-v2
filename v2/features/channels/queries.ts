@@ -1,5 +1,11 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
-import { channelsApi, messagesApi, spacesApi } from '@/lib/api/collab';
+import {
+  channelFilesApi,
+  channelListsApi,
+  channelsApi,
+  messagesApi,
+  spacesApi,
+} from '@/lib/api/collab';
 import type {
   ChannelListParams,
   MemberListParams,
@@ -187,6 +193,58 @@ export const channelsQueries = {
         }),
       initialPageParam: null as string | null,
       getNextPageParam: (lastPage) => lastPage.pagination.next_cursor ?? undefined,
+      staleTime: STALE_TIMES.realtime,
+      gcTime: GC_TIMES.list,
+    }),
+
+  /* ── Task lists & files (phase-5 W2, audit note N3) ────────────────────────
+     The v2 keys the ported `.list.changed` / `.file.changed` snapshot writers
+     (`./lists-files-cache.ts`) fan over. Named `taskLists*` because `lists()`
+     above is already this factory's CHANNEL-ROW list prefix — the two key
+     families must never collide. Same tier reasoning as `messages`: REALTIME
+     (`staleTime: Infinity`) because the presence-room events are the
+     staleness signal while the screen is open, and the room hook reconciles
+     once per (re)join for the events missed while away (`./room.ts`) — a
+     timed refetch would only race the writers. Single page of 50, v1 parity
+     (LF pagination out of scope for this wave). */
+
+  /** Invalidation/write handle for one channel's task-list INDEX (summaries). */
+  taskListsOf: (channelUuid: string) =>
+    [...channelsQueries.all, 'task-lists', channelUuid] as const,
+
+  /** A channel's task lists — INDEX shape (`TaskListSummary`: counts, NO items). */
+  taskLists: ({ channelUuid, viewerId }: MessagesOptions) =>
+    queryOptions({
+      queryKey: [...channelsQueries.taskListsOf(channelUuid), { viewerId }] as const,
+      queryFn: () => channelListsApi.getList(channelUuid, { per_page: 50 }),
+      staleTime: STALE_TIMES.realtime,
+      gcTime: GC_TIMES.list,
+    }),
+
+  /** Invalidation/write handle for one list's DETAIL (all viewer variants).
+   *  Lists are globally addressable by uuid (`GET /lists/{uuid}`), so the
+   *  detail key is channel-independent — exactly v1's key geometry. */
+  taskListDetailOf: (listUuid: string) =>
+    [...channelsQueries.all, 'task-list-detail', listUuid] as const,
+
+  /** One list with its items — DETAIL shape (`TaskList`: items, NO counts). */
+  taskListDetail: (listUuid: string, { viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...channelsQueries.taskListDetailOf(listUuid), { viewerId }] as const,
+      queryFn: () => channelListsApi.show(listUuid),
+      staleTime: STALE_TIMES.realtime,
+      gcTime: GC_TIMES.list,
+    }),
+
+  /** Invalidation/write handle for one channel's file library. */
+  filesOf: (channelUuid: string) =>
+    [...channelsQueries.all, 'files', channelUuid] as const,
+
+  /** A channel's file library (completed uploads only; files use integer id). */
+  files: ({ channelUuid, viewerId }: MessagesOptions) =>
+    queryOptions({
+      queryKey: [...channelsQueries.filesOf(channelUuid), { viewerId }] as const,
+      queryFn: () => channelFilesApi.getList(channelUuid, { per_page: 50 }),
       staleTime: STALE_TIMES.realtime,
       gcTime: GC_TIMES.list,
     }),

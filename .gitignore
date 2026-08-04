@@ -46,3 +46,6 @@ res.txt
 res-stream.txt
 *.stackdump
 !.env.example
+
+# Playwright MCP working dir (film shots, console logs)
+.playwright-mcp/
