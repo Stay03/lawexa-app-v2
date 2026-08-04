@@ -43,12 +43,19 @@
  * deeper path should keep falling through to v1 rather than 404 in v2. It is a
  * private, per-account surface (noindex; guests included — guest bookmarks are
  * real and writable). `/quiz/*` covers the hub, player, results, history and
- * stats; private and role-gated in the UI (researcher/admin/superadmin), with
- * the server-side lock a pending backend ask. v1's `/quiz/play?s=` query-param
+ * stats; private, open to every registered account in the UI (guests and bots
+ * excluded), with the guest block on the server a pending backend ask. v1's `/quiz/play?s=` query-param
  * route shape deliberately dies here: the wildcard claims `/quiz/play` too,
  * where the `[sessionUuid]` segment treats "play" as an unknown session and the
  * player renders its designed error state — the same one-way door as radar's
  * `/settings`.
+ */
+/**
+ * `/notes/*` covers the library, the note page, and authoring (`/create`,
+ * `/{slug}/edit`); `/notes/mine` is claimed too and redirects into the
+ * library's My Notes tab. The marketplace surfaces are NOT rebuilt — note
+ * selling is out of scope for now — so they are carved out below and keep
+ * falling through to v1.
  */
 export const V2_ROUTES = [
   '/',
@@ -61,6 +68,27 @@ export const V2_ROUTES = [
   '/radars/*',
   '/bookmarks',
   '/quiz/*',
+  '/notes/*',
+] as const;
+
+/**
+ * Carve-outs from the wildcards above: a path matching an entry here falls
+ * through to v1 even though a `V2_ROUTES` wildcard covers it. Exclusions
+ * support one extra pattern form — a lone `*` segment matches exactly ONE
+ * path segment (so the third entry below matches `/notes/foo/publish` but
+ * not `/notes/publish` or `/notes/a/b/publish`; the star sequence cannot be
+ * quoted here without closing this comment). Trailing `/*` keeps its
+ * subtree meaning.
+ *
+ * The notes carve-outs are the v1 marketplace: publish flows, purchases, and
+ * the export-docx trigger page (v2's reader exports with a button instead of
+ * a route). Remove them when the marketplace is rebuilt or retired.
+ */
+export const V2_ROUTE_EXCLUSIONS = [
+  '/notes/publish',
+  '/notes/purchases',
+  '/notes/*/publish',
+  '/notes/*/export-docx',
 ] as const;
 
 export type V2Route = (typeof V2_ROUTES)[number];
@@ -68,20 +96,33 @@ export type V2Route = (typeof V2_ROUTES)[number];
 /**
  * Whether `pathname` has been migrated to v2. Exact entries match the path
  * verbatim; `'/prefix/*'` entries match the prefix and everything below it.
+ * Exclusions are checked first and always win over inclusions.
  */
 export function isMigratedToV2(pathname: string): boolean {
+  if (V2_ROUTE_EXCLUSIONS.some((pattern) => matchesRoute(pattern, pathname))) {
+    return false;
+  }
   return V2_ROUTES.some((pattern) => matchesRoute(pattern, pathname));
 }
 
 /**
  * Match a single manifest pattern against a pathname. A trailing `/*` turns the
  * entry into a prefix match (covering the prefix itself and any descendant);
- * every other entry — including `'/'` — is an exact match.
+ * a lone `*` SEGMENT matches exactly one path segment; every other entry —
+ * including `'/'` — is an exact match.
  */
 function matchesRoute(pattern: string, pathname: string): boolean {
   if (pattern.endsWith('/*')) {
     const prefix = pattern.slice(0, -2); // drop the trailing '/*'
     return pathname === prefix || pathname.startsWith(`${prefix}/`);
+  }
+  if (pattern.includes('/*/')) {
+    const patternSegments = pattern.split('/');
+    const pathSegments = pathname.split('/');
+    if (patternSegments.length !== pathSegments.length) return false;
+    return patternSegments.every(
+      (segment, i) => segment === '*' || segment === pathSegments[i],
+    );
   }
   return pathname === pattern;
 }

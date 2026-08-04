@@ -1,0 +1,271 @@
+/**
+ * The note reading surface.
+ *
+ * WHY CSS AND NOT TAILWIND CLASSES. `NoteContent` creates the body's elements
+ * from a sanitised tree and gives them NO attributes at all — that is the
+ * structural half of the invisible-text fix, and it means the paragraphs,
+ * headings, lists and quotes inside a note cannot carry classes. Descendant
+ * rules are the honest tool for styling text a component does not emit
+ * element-by-element (the `case-document.css` argument, applied to a document
+ * whose markup is author-supplied rather than API-supplied).
+ *
+ * WHY THE BODY CLASS IS `v2-note-body` AND NOT `note-prose` (review F1). v1
+ * owns `.v2-note-body` in `app/globals.css` — a ~190-line global, unlayered
+ * block written to tame markup that was being injected wholesale. Reusing the
+ * name does not merge the two sheets; it hands v1 every property THIS file
+ * does not happen to declare, and unlayered global rules beat both Tailwind
+ * utilities and these ones. Measured on the first build under that name:
+ * ordered lists double-numbered ("1. 01"), bullets became chevrons, demoted
+ * headings came back uppercase Comfortaa (the caps-sans voice this file
+ * deliberately avoids for author headings), the dotted-gold link mark was
+ * erased by v1's `a:not(.case-mention) { text-decoration: none }`, and `hr`
+ * collapsed to a centred 4rem stub. `case-document.css` and
+ * `statute-document.css` avoided all of that by picking names v1 does not own,
+ * and this file now does the same: v2 never inherits v1 styling any more than
+ * it imports v1 components.
+ *
+ * Everything here is scoped to `.v2-note-doc` and lives beside the component
+ * that renders it — and it styles a tree already reduced to twenty known tags,
+ * so it can be a typography sheet rather than a defence.
+ *
+ * THE TWO VOICES are the case page's, so a reader moving between a judgment
+ * and their own notes stays in one system: caps-tracked sans for structure
+ * (the kicker, the byline), Fraunces for the reading. `WONK 0` and a low
+ * `SOFT` keep the serif editorial rather than whimsical; `opsz` is pinned per
+ * role so a heading and a paragraph do not drift apart at different widths.
+ */
+
+.v2-note-doc {
+  --doc-measure: 68ch;
+}
+
+/* ── The heading block ──────────────────────────────────────────────────── */
+
+/** Provenance before the title — author · updated — in the label voice. */
+.v2-note-doc .doc-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.v2-note-doc .doc-title {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 1.2rem + 1.6vw, 2.125rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/**
+ * An untitled note wears the fallback in a quieter ink than a real title.
+ * The word "Untitled" is not the note's name — it is the reader being told
+ * there isn't one — and setting it at full title weight would claim otherwise.
+ */
+.v2-note-doc .doc-title-untitled {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+/* ── The body ───────────────────────────────────────────────────────────── */
+
+.v2-note-doc .v2-note-body {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 30, 'WONK' 0, 'opsz' 14;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: color-mix(in oklch, var(--foreground) 92%, transparent);
+  font-feature-settings: 'kern', 'liga', 'calt', 'onum';
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  max-width: var(--doc-measure);
+  /**
+   * A long unbroken token (a pasted URL, a citation with no spaces) breaks
+   * rather than pushing the measure past the column.
+   *
+   * WHITESPACE IS LEFT AT ITS HTML DEFAULT, deliberately. `pre-line` was the
+   * obvious choice and is wrong here: this body is HTML, and pretty-printed
+   * HTML carries a newline between every pair of block tags — under `pre-line`
+   * each of those becomes a visible blank line, so a note pasted in from
+   * anywhere but our own editor would render double-spaced. A note stored as
+   * PLAIN text does need its single line breaks, and it gets them
+   * structurally: `note-html.ts` turns them into real `<br>` nodes, which
+   * needs no CSS and cannot be undone by a later rule.
+   */
+  overflow-wrap: break-word;
+}
+
+@media (min-width: 768px) {
+  .v2-note-doc .v2-note-body {
+    font-size: 1.125rem;
+    line-height: 1.8;
+  }
+}
+
+.v2-note-doc .v2-note-body > * + * {
+  margin-top: 1.1em;
+}
+
+/* ── Headings inside the body ───────────────────────────────────────────── */
+
+/**
+ * Author headings arrive DEMOTED by one level (`note-html.ts`) so the note's
+ * own title keeps the page's only `h1`. They are set in the serif at
+ * decreasing scale — structure inside the reading, not scaffolding around it,
+ * which is why they do not take the caps-sans section voice the case page
+ * gives its API-defined parts.
+ */
+.v2-note-doc .v2-note-body h2,
+.v2-note-doc .v2-note-body h3,
+.v2-note-doc .v2-note-body h4,
+.v2-note-doc .v2-note-body h5,
+.v2-note-doc .v2-note-body h6 {
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 24;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--foreground);
+  text-wrap: balance;
+}
+
+.v2-note-doc .v2-note-body > h2 + *,
+.v2-note-doc .v2-note-body > h3 + *,
+.v2-note-doc .v2-note-body > h4 + *,
+.v2-note-doc .v2-note-body > h5 + *,
+.v2-note-doc .v2-note-body > h6 + * {
+  margin-top: 0.55em;
+}
+
+.v2-note-doc .v2-note-body > * + h2,
+.v2-note-doc .v2-note-body > * + h3,
+.v2-note-doc .v2-note-body > * + h4,
+.v2-note-doc .v2-note-body > * + h5,
+.v2-note-doc .v2-note-body > * + h6 {
+  margin-top: 1.9em;
+}
+
+.v2-note-doc .v2-note-body h2 {
+  font-size: 1.35em;
+}
+
+.v2-note-doc .v2-note-body h3 {
+  font-size: 1.18em;
+}
+
+.v2-note-doc .v2-note-body h4,
+.v2-note-doc .v2-note-body h5,
+.v2-note-doc .v2-note-body h6 {
+  font-size: 1.05em;
+}
+
+/* ── Marks ──────────────────────────────────────────────────────────────── */
+
+.v2-note-doc .v2-note-body strong {
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+.v2-note-doc .v2-note-body em {
+  font-style: italic;
+}
+
+/** Underline and strikethrough are both kept (owner decision 4). The offset
+ *  is what stops an underline colliding with the serif's descenders. */
+.v2-note-doc .v2-note-body u {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: from-font;
+}
+
+.v2-note-doc .v2-note-body s {
+  text-decoration: line-through;
+  color: var(--muted-foreground);
+}
+
+.v2-note-doc .v2-note-body sub,
+.v2-note-doc .v2-note-body sup {
+  font-size: 0.72em;
+  line-height: 0;
+}
+
+/* ── Lists ──────────────────────────────────────────────────────────────── */
+
+.v2-note-doc .v2-note-body ul,
+.v2-note-doc .v2-note-body ol {
+  padding-left: 1.4em;
+}
+
+.v2-note-doc .v2-note-body ul {
+  list-style: disc;
+}
+
+.v2-note-doc .v2-note-body ol {
+  list-style: decimal;
+}
+
+.v2-note-doc .v2-note-body li + li {
+  margin-top: 0.35em;
+}
+
+.v2-note-doc .v2-note-body li > ul,
+.v2-note-doc .v2-note-body li > ol {
+  margin-top: 0.35em;
+}
+
+.v2-note-doc .v2-note-body li::marker {
+  color: var(--muted-foreground);
+}
+
+/* ── Quote ──────────────────────────────────────────────────────────────── */
+
+/**
+ * A quotation in someone's note is almost always the authority they were
+ * reading, so it gets a real left rule and a step down in ink — visibly a
+ * passage held at arm's length rather than the author's own sentence.
+ */
+.v2-note-doc .v2-note-body blockquote {
+  border-left: 2px solid color-mix(in oklch, var(--primary) 45%, transparent);
+  padding-left: 1em;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+/* ── Code ───────────────────────────────────────────────────────────────── */
+
+.v2-note-doc .v2-note-body code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.875em;
+  font-style: normal;
+  background: var(--secondary);
+  border-radius: 0.375rem;
+  padding: 0.1em 0.35em;
+}
+
+.v2-note-doc .v2-note-body pre {
+  background: var(--secondary);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  /* A code block keeps EVERY space it was written with. */
+  white-space: pre;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.v2-note-doc .v2-note-body pre code {
+  background: none;
+  padding: 0;
+  font-size: 1em;
+}
+
+/* ── Rules ──────────────────────────────────────────────────────────────── */
+
+.v2-note-doc .v2-note-body hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin-top: 2em;
+  margin-bottom: 2em;
+}

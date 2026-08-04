@@ -132,3 +132,45 @@ export function quietReplaceUrlParams(
   window.history.replaceState(window.history.state, '', url);
   return true;
 }
+
+/**
+ * Quietly rewrite the current entry's PATH — same mechanism as the quiet twins
+ * above (the current `history.state` passed straight through, so the App
+ * Router's patched `replaceState` early-returns to the native call and no
+ * restore action, segment-cache walk or `useSearchParams` sync is triggered).
+ * The live query string is preserved; only the path changes.
+ *
+ * WHAT IT IS FOR. Exactly one shape: a surface whose ADDRESS becomes known
+ * after the fact, where the component already holds the state and a navigation
+ * would destroy it. The note editor is that surface — a new note has no slug
+ * until its first autosave creates it, and `router.replace('/notes/x/edit')`
+ * would unmount the editor mid-typing (losing the selection, the undo history
+ * and the focus) to render a screen that is already on screen. The quiet write
+ * makes the URL honest without moving anything.
+ *
+ * THE CAVEAT IS PART OF THE CONTRACT, AND SO IS ITS GUARD. Unlike the
+ * query-string twins, this changes which ROUTE the URL names while the entry's
+ * stored Next tree still describes the old one. A Back/Forward that lands back
+ * on this entry therefore restores the tree Next saved for the PREVIOUS path —
+ * for the editor, `/notes/create` rendering under a `/notes/{slug}/edit` URL.
+ *
+ * That is not cosmetic. The restored screen mounts as if no note existed, so
+ * the next keystroke would create a DUPLICATE — and this helper's own
+ * unchanged-path guard would then decline to move the URL again, leaving the
+ * duplicate invisible until it surfaced in the reader's list.
+ *
+ * So a caller MUST pair this with a mismatch guard on the origin route: on
+ * mount, compare `window.location.pathname` (never a router hook — the router
+ * was deliberately not told) against the path that route owns, and
+ * `router.replace` to the real one when they differ. `CreateNoteScreen` carries
+ * the reference implementation. Use this helper only with that pairing in
+ * place; the alternative — a real navigation on every first save, unmounting a
+ * live editor mid-sentence — is the worse trade, but it is not a free one.
+ */
+export function quietReplaceUrlPath(pathname: string): boolean {
+  if (typeof window === 'undefined') return false;
+  if (pathname === window.location.pathname) return false;
+  const url = `${pathname}${window.location.search}`;
+  window.history.replaceState(window.history.state, '', url);
+  return true;
+}
