@@ -242,6 +242,17 @@ W3/W4 can swap or parallelize; W5 closes the phase.
 
 ## Part C — Decisions for the owner
 
+> **ALL LOCKED (owner, 2026-08-04): "go with your recommendation" — every decision
+> below takes the recommended option.** D1=b (every registered account at ship),
+> D2=a (no read-state UI), D3=a (live quiz = its own wave W6, after core),
+> D4=a (full message kit in the first channel build), D5=yes (one `/invitations`),
+> D6=yes (`/channels` index), D7=a (`/organization` top-level), D8=a (sound off by
+> default). The owner also confirmed live quiz in channels is a separate product
+> from the solo `/quiz` — the two never share screens or code.
+> Additional owner directive, same date: web-research clean group-messaging design
+> BEFORE drawing the v2 channel screens (research report delivered as an artifact;
+> findings feed the W2+ design briefs).
+
 | # | Question | Options | Recommendation |
 |---|---|---|---|
 | D1 | v2 Spaces audience at ship | (a) keep researcher/admin soft launch, widen later · (b) every registered account at phase-5 ship | **(b)** — the rebuild is the moment; the backend gate is membership anyway, and the create-account panel handles guests. The nav row gate added Aug 3 then simply comes off. |
