@@ -153,3 +153,56 @@ builders; `url-params.ts` addition is Builder B's ONLY shared-file touch).
 Then: adversarial checker per builder (re-derive claims against the wire
 contract; transpile pure modules and run them on fixtures), fix rounds,
 central `V2_ENABLED=true` build, mock-API film (recipe v2), commit, report.
+
+## 7. Post-implementation record (August 4, 2026)
+
+Shipped in commit `580c078` (63 files). Both checkers said SHIP AFTER
+FIXES; every finding was fixed and re-proved:
+
+- Reading: the sanitizer survived ~75 independent hostile fixtures in
+  Chrome, then 58 more after the fix round. Three HIGH fixes: the
+  `.note-prose` class collision with v1's global stylesheet (renamed
+  `v2-note-body`), a backslash URL bypass of the off-site guard, and a
+  probe gate that skipped the parser for unlisted-tag content.
+- Writing: the autosave machine survived an independent 57-assertion
+  attack, then 76 after the fix round. The HIGH fix: the mention parse
+  rule needed `priority: 60` because ProseMirror runs all MARK rules
+  before NODE rules — without it the Link mark consumed every mention on
+  load. Proved at rule-ordering level AND live on film (mention survives
+  editor reload).
+- Film: 22 scripted checks, desktop + mobile, light + dark, all passing;
+  the v1 invisible-text sentence is readable on light, the script tag is
+  dead, autosave create → save-by-id → quiet URL move observed on the
+  wire, guest panels on every writing surface.
+- Build: the commit builds green standalone (verified in an isolated
+  worktree; the shared worktree carried a parallel session's in-flight
+  phase-5 edits, which stayed untouched and uncommitted).
+
+**Same-day hotfix (`5d9c6a0`):** the owner hit an empty All notes tab on
+prod. Probed with a guest token: the library has 494 free notes and the
+free filter works — but LIST rows carry no `status`/`is_paid`/
+`is_private`/`updated_at`/`content`, and the belt filter's
+`status === 'published'` read the absence as "not published", dropping
+every real row. A locked paid detail also OMITS the `content` key (not
+`null`) and carries `has_access`. Fixed: proof-based gates everywhere,
+trail falls back to `created_at`, reader lock keys on `has_access`.
+Films missed it because the mock served fuller rows than prod — the mock
+now serializes the probed per-payload shapes. Rule: a gate over an
+optional wire field tests proof; a mock serializes the probe, not the
+type.
+
+Known follow-ups, deliberately left:
+1. `v2/features/bookmarks/mutations.ts` `writeContentCaches` has a no-op
+   `note` branch — a star pressed on `/bookmarks` does not repaint an
+   open notes list. One-line fix calling `writeNoteBookmarkEverywhere`
+   when someone owns that file next.
+2. Note pages are `noindex` — every notes read still 401s tokenless
+   (probed Aug 4). Backend-ask candidate if the owner wants notes on
+   Google: public reads for published free notes; then both routes take
+   the cases metadata treatment in one edit each.
+3. The DOCX download names the file `{slug}.docx` (axios blob drops
+   Content-Disposition). Cosmetic.
+4. Long-note (multi-MB) parse performance untimed; parse is one memoised
+   pass.
+5. The segment `loading.tsx` paints the reader silhouette before the
+   editor's on a cold `/edit` load — documented deviation, brief beat.
