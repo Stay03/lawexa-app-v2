@@ -61,6 +61,35 @@ space rollup, and the app title within one second, with zero refetch loops; mute
 channels stay silent except a personal @you; toasts never fire for the visible
 channel.
 
+**W1 RECORD (2026-08-04) — BUILT, AUDITED, FIXED.** Fable implementer (22 files:
+`v2/runtime/realtime/{spine,echo,protocol,dispatcher,preferences,active-channel,sound,app-badge}`,
+channels/spaces key factories + reference-stable cache writers, `mark-read.ts`,
+`v2/features/collab/` gate + panels, `lib/utils/collab-audience.ts`, the two
+`app/v2/{spaces,channels}/layout.tsx` gates, spine mount in `app/v2/layout.tsx`).
+Adversarial audit verdict: SHIP AFTER FIXES — zero blockers; four MEDIUM findings,
+all fixed same day: (M1) the dispatcher's preference read now re-reads storage when
+no React subscriber holds the cross-tab listener; (M2) the mute oracle fires for
+found-but-unstamped rows (`notifyLevel === null`, not `!found`); (M3) the
+cold-cache rollup throttle is per-space, so a muted-channel @you can't be starved
+by another space's event; (M4) the title observer re-attaches when the `<title>`
+ELEMENT is replaced (head-level childList watcher). Gates green after fixes:
+tsc, eslint, `V2_ENABLED=true next build` (routes confirmed dark).
+**Carry-forwards into W2/W4 briefs (audit notes):**
+- N1: the W2+ notify-level mutation MUST assign `my_notify_level` into cached
+  channel rows AND invalidate space rollups (stale level breaks Ruling A deltas).
+- N2: room hooks must re-acquire the Echo instance on the viewer edge —
+  `disconnectV2Echo()` nulls the singleton.
+- N3: lists/files cache writers deliberately deferred to W2 (no v2 keys to write
+  onto yet) — W2 owns them.
+- N4: `channelsQueries.mine` viewer-partitioning is a follow-up owned by the next
+  wave that touches the home section.
+- N5: the toast's `?m=` link is inert on v1's channel screen — W2 makes it land.
+- N6: `MarkReadResponse.last_read_message_id` in `types/collab.ts` is stale
+  (server ships `last_read_message_uuid`) — fix in a wave touching that file.
+- Film-pass items (couldn't be verified statically): title/favicon behavior under
+  real App Router navigations, the live `.channel.unread` wire incl. Ruling B,
+  and the 1-second row→space→title path end to end.
+
 ### W2 — Channel screen, chat core
 
 1. Routes: `/channels/[channelId]` (+ `?tab=`, `?m=`, `?list=`) as thin server

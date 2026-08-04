@@ -16,6 +16,7 @@ import { DocumentLock } from '@/v2/shell/document-lock';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
+import { RealtimeSpine } from '@/v2/runtime/realtime/spine';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
 
@@ -183,6 +184,16 @@ export default async function V2Layout({
           isVerified={user?.is_verified ?? false}
           authProvider={user?.auth_provider ?? null}
         >
+          {/* THE NOTIFICATION SPINE (phase-5 W1) — v2's one app-wide realtime
+              mount: the users.{uuid} socket, the `.channel.unread` writers, the
+              toast/sound dispatcher, and the title/favicon/OS-badge rollups.
+              Renders null. It sits here — not in the collab segment layouts —
+              because notifications are app-wide by contract (a mention must
+              badge the title while the user reads a case), and it needs both
+              the query client above and this session provider. Its socket
+              lifecycle keys on the viewer, tearing down on the same identity
+              edge V2CacheIdentityGuard clears the cache on. */}
+          <RealtimeSpine />
           {/* Seed the browser query cache with the server-prefetched recents — BOTH the
               sidebar/drawer infinite list and the home's single-page peek, which are
               different query keys — so signed-in first paint is real rows rather than a

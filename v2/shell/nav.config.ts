@@ -107,9 +107,9 @@ export const v2NavItems: V2NavItem[] = [
     label: 'Quiz',
     href: '/quiz',
     icon: GraduationCap,
-    // Quiz is in soft launch for research accounts (docs/quiz/main-plan.md §2),
-    // so everyone else gets no entry point — the same "no trace" rule v1's
-    // sidebar applies, expressed through the shared audience helper.
+    // Quiz is open to every registered account (owner, Aug 3 2026); the shared
+    // helper excludes only guests and bots, who get a register nudge at the
+    // route gate instead of a dead entry point here.
     canAccess: canAccessQuizPlayer,
   },
 ];
