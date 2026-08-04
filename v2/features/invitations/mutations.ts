@@ -123,7 +123,13 @@ interface RemovedInvitation {
   row: { id: number };
 }
 
-type InvitationInbox = LengthAwareResponse<{ id: number }>;
+/** The inbox envelope as prod actually ships it: the shared
+ *  `LengthAwareResponse` type promises `pagination`, but the three invitation
+ *  endpoints omit it (measured 2026-08-04) — optional here so every reader
+ *  handles both truths. */
+type InvitationInbox = Omit<LengthAwareResponse<{ id: number }>, 'pagination'> & {
+  pagination?: LengthAwareResponse<{ id: number }>['pagination'];
+};
 
 /**
  * Drop the row from every cached variant of one inbox and decrement that
@@ -153,10 +159,17 @@ function removeInvitationRow(
       return {
         ...data,
         data: [...data.data.slice(0, index), ...data.data.slice(index + 1)],
-        pagination: {
-          ...data.pagination,
-          total: Math.max(0, data.pagination.total - 1),
-        },
+        // Prod ships these inboxes WITHOUT a pagination block (measured
+        // 2026-08-04); when absent the badge counts data.length, which the
+        // row removal above already moved.
+        ...(data.pagination
+          ? {
+              pagination: {
+                ...data.pagination,
+                total: Math.max(0, data.pagination.total - 1),
+              },
+            }
+          : null),
       };
     });
   }
@@ -178,7 +191,9 @@ function reinsertInvitationRow(
       return {
         ...data,
         data: [...data.data.slice(0, index), entry.row, ...data.data.slice(index)],
-        pagination: { ...data.pagination, total: data.pagination.total + 1 },
+        ...(data.pagination
+          ? { pagination: { ...data.pagination, total: data.pagination.total + 1 } }
+          : null),
       };
     });
   }

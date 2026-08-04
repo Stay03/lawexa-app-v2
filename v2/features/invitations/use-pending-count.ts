@@ -42,9 +42,15 @@ export function usePendingInvitationCount({
   const spaces = useQuery({ ...invitationsQueries.spaces({ viewerId }), enabled });
   const channels = useQuery({ ...invitationsQueries.channels({ viewerId }), enabled });
 
+  // MEASURED 2026-08-04: the three invitation endpoints ship `{success,
+  // message, data}` with NO pagination block, despite the shared type claiming
+  // LengthAwareResponse — reading `.total` off the missing block crashed the
+  // whole /spaces screen on real data (the fixtures had the block, prod does
+  // not). Count the page when the block is absent; with no pagination the page
+  // IS the inbox.
   return (
-    (organizations.data?.pagination.total ?? 0) +
-    (spaces.data?.pagination.total ?? 0) +
-    (channels.data?.pagination.total ?? 0)
+    (organizations.data?.pagination?.total ?? organizations.data?.data.length ?? 0) +
+    (spaces.data?.pagination?.total ?? spaces.data?.data.length ?? 0) +
+    (channels.data?.pagination?.total ?? channels.data?.data.length ?? 0)
   );
 }
