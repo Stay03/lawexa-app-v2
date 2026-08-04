@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { UserPlus } from 'lucide-react';
 
@@ -14,6 +14,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Channel, InviteMemberPayload, Member } from '@/types/collab';
 import { spacesQueries } from '@/v2/features/spaces/queries';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
   useInviteChannelMember,
   useRemoveChannelMember,
@@ -49,7 +50,12 @@ export function ChannelMembersSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const canManage = canManageChannel(channel);
+  /** Its own param, not a value of the screen's `?panel=`: invite opens ON TOP
+   *  of this sheet, and one param holds one value. The URL reads
+   *  `?panel=members&invite=1`, so Back closes invite, then the roster. Gated on
+   *  the same `canManage` the button is. */
+  const invitePanel = useUrlOverlay('invite', { canOpen: canManage });
 
   const membersQuery = useQuery({
     ...channelsQueries.members(channel.uuid, { viewerId }),
@@ -57,7 +63,7 @@ export function ChannelMembersSheet({
   });
   const spaceMembersQuery = useQuery({
     ...spacesQueries.members(channel.space.uuid, { viewerId }),
-    enabled: open && inviteOpen,
+    enabled: open && invitePanel.open,
   });
 
   const invite = useInviteChannelMember(channel.uuid);
@@ -68,7 +74,6 @@ export function ChannelMembersSheet({
     () => membersQuery.data?.data ?? [],
     [membersQuery.data],
   );
-  const canManage = canManageChannel(channel);
 
   // Space members not yet in this channel — addable directly by uuid
   // (invitees must be active space members, digest §F.15).
@@ -110,7 +115,7 @@ export function ChannelMembersSheet({
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => setInviteOpen(true)}
+              onClick={() => invitePanel.show()}
             >
               <UserPlus aria-hidden className="size-4" />
               Invite people
@@ -150,9 +155,14 @@ export function ChannelMembersSheet({
         </div>
       </SheetContent>
 
+      {/* Keyed like every other form dialog: Back closes this by flipping the
+          `open` PROP, which fires no `onOpenChange`, so a close-path reset would
+          never run and the last address, error and throttle rest would survive
+          into the next opening. The remount is what clears them. */}
       <InviteMemberDialog
-        open={inviteOpen}
-        onOpenChange={setInviteOpen}
+        key={invitePanel.keyFor()}
+        open={invitePanel.open}
+        onOpenChange={invitePanel.setOpen}
         title={`Invite to ${channel.name}`}
         description="Add someone from this space, or invite a new person by email."
         onInvite={handleInvite}

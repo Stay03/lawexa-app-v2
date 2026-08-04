@@ -4,13 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
-import { Button } from '@/components/ui/button';
 import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
+import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { InvitationRow } from './InvitationRow';
+import { InvitationCard } from './InvitationCard';
 import {
   usePendingInvitationResponses,
   useRespondToInvitation,
@@ -78,7 +78,7 @@ const SECTIONS: readonly { kind: InvitationKind; label: string }[] = [
 const NO_ROWS: readonly InvitationRowModel[] = [];
 
 /** Module-level so the holdover's `beginExit` stays referentially stable,
- *  which is what keeps `InvitationRow`'s `memo` holding. */
+ *  which is what keeps `InvitationCard`'s `memo` holding. */
 const rowKey = (row: InvitationRowModel): string => row.key;
 
 export function InvitationsScreen() {
@@ -140,7 +140,7 @@ export function InvitationsScreen() {
 
   // `respond.mutate` is referentially stable across renders (TanStack binds it
   // once); depending on the whole mutation RESULT would rebuild this callback
-  // on every status tick and bust `InvitationRow`'s `memo` for the entire list.
+  // on every status tick and bust `InvitationCard`'s `memo` for the entire list.
   const respondMutate = respond.mutate;
 
   const handleRespond = useCallback(
@@ -188,9 +188,10 @@ export function InvitationsScreen() {
 
   return (
     <div className={LIST_COLUMN}>
-      <p className="mb-4 text-xs text-muted-foreground">
-        Answer invitations to organizations, spaces and channels.
-      </p>
+      {/* No intro sentence. The header already says "Invitations", and every
+          card below states in words who is asking and what for — a line of
+          12px grey explaining the page to someone already reading it is the
+          chrome the redesign is removing. */}
 
       {/* The ONE live region for this surface: the loading state and the
           "joined" confirmation, both derived from render values so neither can
@@ -219,12 +220,14 @@ export function InvitationsScreen() {
               if (sectionRows.length === 0) return null;
               return (
                 <section key={section.kind}>
-                  <h2 className="mb-1 px-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                  <h2 className="mb-2 px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                     {section.label}
                   </h2>
-                  <ul className="flex flex-col divide-y divide-border/60">
+                  {/* No `gap`: the 8px lives on each card so it collapses with
+                      the card that is leaving. See `InvitationCard`. */}
+                  <ul className="flex flex-col">
                     {sectionRows.map(({ row, exiting }, index) => (
-                      <InvitationRow
+                      <InvitationCard
                         key={row.key}
                         row={row}
                         now={now}
@@ -245,26 +248,25 @@ export function InvitationsScreen() {
   );
 }
 
-/** One of the three inboxes failed — say so quietly, keep the rest rendered. */
+/** One of the three inboxes failed — say so quietly, keep the rest rendered.
+ *  `notice`, not `failure`: the reader is not blocked, and a red strip over
+ *  working content would overstate what happened. */
 function PartialFailureNote({ onRetry }: { onRetry: () => void }) {
   return (
-    <div
-      role="alert"
-      className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-    >
-      <span>Some invitations couldn&rsquo;t be checked just now.</span>
-      <Button variant="outline" size="sm" className="shrink-0" onClick={onRetry}>
-        Try again
-      </Button>
-    </div>
+    <CollabFailure
+      className="mb-4"
+      tone="notice"
+      message="Some invitations couldn’t be checked just now."
+      onRetry={onRetry}
+    />
   );
 }
 
 /**
- * Route fallback — the intro line as a STILL reserved shape over the real
- * skeleton. `app/v2/invitations/loading.tsx` renders this so the boundary and
- * the live screen are one continuous shape. `aria-hidden` + `inert`: a
- * fallback is deleted rather than reconciled, so nothing focusable lives here.
+ * Route fallback — the real skeleton, nothing else. `app/v2/invitations/
+ * loading.tsx` renders this so the boundary and the live screen are one
+ * continuous shape. `aria-hidden` + `inert`: a fallback is deleted rather than
+ * reconciled, so nothing focusable lives here.
  */
 export function InvitationsFallback() {
   return (
@@ -273,7 +275,6 @@ export function InvitationsFallback() {
         Checking for invitations
       </span>
       <div aria-hidden inert className={LIST_COLUMN}>
-        <div className="mb-4 h-4 w-72 max-w-full rounded bg-secondary/60" />
         <InvitationsSkeleton still />
       </div>
     </>

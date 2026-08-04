@@ -25,6 +25,7 @@ import {
   RosterSkeleton,
 } from '@/v2/features/collab/membership/RosterRow';
 import { memberCountLabel } from '@/v2/features/spaces/model';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
   useInviteOrganizationMember,
   useLeaveMyOrganization,
@@ -62,7 +63,8 @@ export function OrganizationMembersSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [inviteOpen, setInviteOpen] = useState(false);
+  /** Leaving stays OUT of the URL — a destructive confirmation carrying the
+   *  server's sentence from the last failed attempt. */
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
@@ -81,6 +83,12 @@ export function OrganizationMembersSheet({
   const members = membersQuery.data?.data ?? organization.members ?? [];
   const myRole = members.find((member) => member.user.uuid === viewerUuid)?.role ?? null;
   const canManage = myRole === 'owner' || myRole === 'admin';
+
+  /** Its own param, not a value of the screen's `?panel=`: invite opens ON TOP
+   *  of this sheet, and one param holds one value. `?panel=members&invite=1`
+   *  unwinds in the order the two were opened. Gated on the same `canManage`
+   *  the button is, so a copied `?invite=1` cannot open it for anyone else. */
+  const invitePanel = useUrlOverlay('invite', { canOpen: canManage });
 
   const handleInvite = (payload: InviteMemberPayload) =>
     new Promise<void>((resolve, reject) => {
@@ -128,7 +136,7 @@ export function OrganizationMembersSheet({
           <Button
             variant="outline"
             className="v2-interactive w-full"
-            onClick={() => setInviteOpen(true)}
+            onClick={() => invitePanel.show()}
           >
             <UserPlus aria-hidden className="size-4" />
             Invite people
@@ -169,9 +177,15 @@ export function OrganizationMembersSheet({
         </div>
       </MembersSheetFrame>
 
+      {/* KEYED LIKE EVERY OTHER FORM DIALOG: this dialog resets its fields, its
+          error line and its throttle rest inside its own close path, which Back
+          never reaches — an external `open` prop change fires no
+          `onOpenChange`. Without the remount, a 429 dismissed with Back came
+          straight back on the next opening. */}
       <InvitePeopleDialog
-        open={inviteOpen}
-        onOpenChange={setInviteOpen}
+        key={invitePanel.keyFor()}
+        open={invitePanel.open}
+        onOpenChange={invitePanel.setOpen}
         title={`Invite to ${organization.name}`}
         description="They get an invitation they can accept from their own Invitations page."
         onInvite={handleInvite}

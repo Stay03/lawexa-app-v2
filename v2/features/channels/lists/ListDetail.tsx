@@ -50,6 +50,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Channel } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
   useAddListItem,
   useDeleteList,
@@ -88,7 +89,20 @@ export function ListDetail({
   const deleteList = useDeleteList(channel.uuid, listUuid);
   const reorder = useReorderListItems(channel.uuid, listUuid);
 
-  const [renameOpen, setRenameOpen] = useState(false);
+  // Derived above the three-state branches: the panel gate needs it, and hooks
+  // cannot run after a return. Re-used verbatim by the menu below.
+  const list = detailQuery.data?.data ?? null;
+  const canManage = list ? canManageList(list, channel, viewerUuid) : false;
+
+  /** `?rename=1` — its own param because it is the only overlay this component
+   *  owns, and each param needs exactly one owner. Back closes it, and the gate
+   *  is the same `canManage` the menu item is behind, so a copied link cannot
+   *  open the rename form for someone who may not rename. */
+  const renamePanel = useUrlOverlay('rename', {
+    canOpen: list ? canManage : undefined,
+  });
+  /** Delete stays OUT of the URL: a link that re-opens "Delete this list?" on
+   *  every refresh is an armed trigger. */
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Pointer: an 8px activation distance so plain clicks never start a drag;
@@ -102,7 +116,7 @@ export function ListDetail({
     return <ListDetailSkeleton />;
   }
 
-  if (detailQuery.isError || !detailQuery.data) {
+  if (detailQuery.isError || !list) {
     const status = detailQuery.isError
       ? extractApiError(detailQuery.error).status
       : 0;
@@ -138,9 +152,7 @@ export function ListDetail({
     );
   }
 
-  const list = detailQuery.data.data;
   const checkedCount = list.items.filter((item) => item.is_checked).length;
-  const canManage = canManageList(list, channel, viewerUuid);
 
   const orderedUuids = list.items.map((item) => item.uuid);
   const dragDisabled = orderedUuids.some(isLocalItemUuid);
@@ -187,7 +199,7 @@ export function ListDetail({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setRenameOpen(true)}>
+                    <DropdownMenuItem onClick={() => renamePanel.show()}>
                       <Pencil aria-hidden className="size-4" />
                       Rename
                     </DropdownMenuItem>
@@ -253,15 +265,16 @@ export function ListDetail({
 
       <AddItemComposer channelUuid={channel.uuid} listUuid={list.uuid} />
 
-      {renameOpen && (
-        <ListFormDialog
-          open={renameOpen}
-          onOpenChange={setRenameOpen}
-          channelUuid={channel.uuid}
-          viewerId={viewerId}
-          list={list}
-        />
-      )}
+      {/* Keyed on `openKey` so it stays mounted through its closing transition
+          and re-derives its fields from the current list on every opening. */}
+      <ListFormDialog
+        key={renamePanel.keyFor()}
+        open={renamePanel.open}
+        onOpenChange={renamePanel.setOpen}
+        channelUuid={channel.uuid}
+        viewerId={viewerId}
+        list={list}
+      />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>

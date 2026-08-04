@@ -158,6 +158,71 @@ html.v2-document-lock body {
 }
 
 /* -----------------------------------------------------------------------------
+   Touch-and-hold target (owner, Aug 4: "i like the hold to show message options
+   on mobile but on some devices when it comes up it also triggers the text
+   selector which highlights the text which is very messy").
+
+   For an element whose OWN long-press gesture is the product's — the message
+   row, whose hold opens the actions sheet. Without this, iOS runs its native
+   touch-and-hold in parallel with our 450ms timer, so the sheet slides up over
+   a blue selection and a magnifier loupe.
+
+   IT HAS TO BE STATIC, NOT ARMED AT THE 450ms MARK. iOS decides whether the
+   text under a finger is selectable at the START of the gesture, so a property
+   flipped when the timer fires is already too late. The `contextmenu` swallow
+   in `use-long-press.ts` covers Android, where the callout is an event; on iOS
+   it is governed by CSS alone, which is why the rule lives here.
+
+   BOTH PROPERTIES ARE LOAD-BEARING, AND THEY ARE SCOPED DIFFERENTLY.
+   `-webkit-touch-callout: none` removes the share/lookup action sheet but
+   leaves the loupe; `user-select: none` removes the selection and the loupe
+   with it. Tailwind's `select-none` emits only the second — it has no
+   `-webkit-touch-callout` utility at all — so this cannot be a class list on
+   the row.
+
+   THE CALLOUT RULE IS UNCONDITIONAL, and that is the iPad fix. iPadOS reports
+   `hover: hover` and `pointer: fine` the moment a trackpad or keyboard is
+   attached, so a coarse-pointer guard drops out from under exactly the readers
+   who still touch the screen — and the selection-under-the-sheet bug comes
+   back. `-webkit-touch-callout` is inert on every engine outside Apple's touch
+   stack, and the callout is never something a mouse user wants, so it costs
+   nothing to apply everywhere.
+
+   `user-select` STAYS behind the coarse guard: a fine pointer selects text
+   precisely and should keep doing so. On an iPad with a trackpad the reader
+   therefore keeps selection and loses only the callout menu.
+
+   `touch-action` is unconditional for the same reason as the callout — it
+   governs touch and pen gestures only, so it is inert for a mouse, and a
+   touchscreen device that reports a fine pointer still needs it.
+   `pan-y pinch-zoom` lets a vertical scroll win at the browser level instead of
+   relying only on the hook's 10px cancel; `pinch-zoom` is kept explicitly,
+   because `pan-y` alone would drop it and take page zoom away from low-vision
+   readers on Chrome (WCAG 1.4.4).
+
+   IT DOES NOT TRAP A LAWEXA ANSWER'S WIDE CONTENT. A markdown reply renders
+   `<pre>` and `<table>` as their own `overflow-x-auto` scrollers, and the
+   browser intersects `touch-action` only from the touched element UP TO the
+   element that implements the gesture — the first containing scrolling element.
+   For a horizontal drag inside a code block that is the `<pre>` itself, so this
+   rule is never in that chain and swiping a wide table sideways still works.
+
+   Scoped to the ROW, never the feed, so the composer, the header and every
+   panel stay selectable everywhere.
+   -------------------------------------------------------------------------- */
+.v2-touch-hold {
+  -webkit-touch-callout: none;
+  touch-action: pan-y pinch-zoom;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .v2-touch-hold {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* -----------------------------------------------------------------------------
    Quiet scrollbar (owner, July 31 — the docked chat's scrollbar next to the
    page's read as "two sidebars"). For INNER scrollers that sit near the page's
    own scrollbar: thin, trackless, and invisible until the reader hovers or

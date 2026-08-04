@@ -138,10 +138,11 @@ export function QuizLibrarySheet({
   // would send the reader looking for a game that ended.
   if (liveError !== null && liveGame === null) setLiveError(null);
 
-  const openGame = (gameUuid: string) => {
-    onOpenChange(false);
-    onOpenGame(gameUuid);
-  };
+  // NOTE: this sheet does NOT close itself on the way into a game. The screen
+  // closes it, because closing is now a history move: dismissing this sheet
+  // pops the entry it was opened on, and a `?game=` push issued in the same
+  // handler would land on that doomed entry and be undone. `ChannelScreen`'s
+  // `openGame` closes the panel IN PLACE first, then pushes.
 
   return (
     <>
@@ -159,7 +160,7 @@ export function QuizLibrarySheet({
             {liveGame && (
               <button
                 type="button"
-                onClick={() => openGame(liveGame.uuid)}
+                onClick={() => onOpenGame(liveGame.uuid)}
                 className="v2-interactive flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-left transition-colors duration-150 hover:bg-primary/10 motion-reduce:transition-none"
               >
                 <span
@@ -289,7 +290,7 @@ export function QuizLibrarySheet({
                       setFormOpen(true);
                     }}
                     onDelete={() => setDeleting(quiz)}
-                    onLive={openGame}
+                    onLive={onOpenGame}
                     onLiveRefused={setLiveError}
                   />
                 ))}

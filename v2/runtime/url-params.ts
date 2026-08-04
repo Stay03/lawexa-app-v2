@@ -110,16 +110,60 @@ export function replaceUrlParams(
  * quiet writes are only for a mirror of state React already owns.
  */
 
-/** Quietly ADD a history entry with the merged URL — Back returns to the
- * current entry. For the side chat's open, so Back closes the panel. */
+/**
+ * Is this history state one the App Router will hand straight to the native
+ * call? Verified against next@16.2.12 `app-router.js:255` — the patched
+ * `pushState`/`replaceState` early-return when `data.__NA` or `data._N` is
+ * truthy, and `__NA` is set on every entry the router itself creates
+ * (`app-router.js:56`).
+ */
+function isRouterOwnedState(state: unknown): state is Record<string, unknown> {
+  if (typeof state !== 'object' || state === null) return false;
+  const record = state as Record<string, unknown>;
+  return Boolean(record.__NA) || Boolean(record._N);
+}
+
+/**
+ * Quietly ADD a history entry with the merged URL — Back returns to the
+ * current entry. For the side chat's open, so Back closes the panel.
+ *
+ * `stamp` writes extra keys onto the NEW entry's state, on top of the current
+ * entry's. It is how a caller can later recognise an entry as one it pushed —
+ * {@link useUrlOverlay} uses it so closing can walk back over its own entry
+ * instead of leaving a duplicate behind.
+ *
+ * THE STAMP IS DROPPED RATHER THAN RISK A LOUD WRITE. The quiet contract rests
+ * entirely on the state carrying Next's own marker; a state without one must be
+ * passed through untouched, because merging keys into it could not make it
+ * quiet and cloning it would only strip the internals Back needs. Callers must
+ * treat the stamp as best-effort: a Next navigation rebuilds the entry's state
+ * from its own keys alone (`copyNextJsInternalHistoryState`), so a stamp can
+ * also disappear later. Every caller needs a correct fallback for its absence.
+ */
 export function quietPushUrlParams(
   updates: Record<string, string | null>,
+  stamp?: Record<string, string>,
 ): boolean {
   if (typeof window === 'undefined') return false;
   const url = mergeSearch(updates);
   if (url === null) return false;
-  window.history.pushState(window.history.state, '', url);
+  const current: unknown = window.history.state;
+  window.history.pushState(
+    stamp && isRouterOwnedState(current) ? { ...current, ...stamp } : current,
+    '',
+    url,
+  );
   return true;
+}
+
+/** Read a key written by {@link quietPushUrlParams}'s `stamp` off the CURRENT
+ *  entry. `null` whenever the entry was not stamped, or the stamp was lost. */
+export function readHistoryStamp(key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  const current: unknown = window.history.state;
+  if (typeof current !== 'object' || current === null) return null;
+  const value = (current as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value : null;
 }
 
 /** Quietly rewrite the current history entry's URL in place. */

@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ListChecks, Plus } from 'lucide-react';
 
@@ -9,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Channel, TaskListSummary } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
-import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { channelsQueries } from '../queries';
 import { RelativeTime } from '../ui/RelativeTime';
@@ -27,6 +26,16 @@ import { ListFormDialog } from './ListFormDialog';
  * left zone, relative time right-anchored (exact on hover). Realtime
  * `.list.changed` keeps everything live through the N3 writers; the tab
  * itself just reads the cache. Phase-5 W2, 2026-08-04.
+ *
+ * BOTH URL VALUES RUN ON `useUrlOverlay` (owner round, Aug 4). `?list=` had the
+ * quiet-write half of that pattern but no `popstate` adopter, so a Back that
+ * restored an entry with a different selection left the wrong list on screen;
+ * the hook supplies the listener. It keeps REPLACE for the selection — index
+ * and detail are one stop, so Back leaves the tab rather than walking the
+ * lists a reader opened — while `?new-list=` PUSHES, because the create dialog
+ * IS an overlay and Back must close it. Its own key, not a value of the
+ * channel's `?panel=`: one component must own each param, and the channel
+ * screen owns that one.
  */
 export function ListsTab({
   channel,
@@ -39,21 +48,13 @@ export function ListsTab({
   viewerUuid: string | null;
   initialListUuid: string | null;
 }) {
-  // The LIVE URL wins over the navigation-time prop: this tab remounts per
-  // visit, and the screen's quiet `?list=` writes never reach the router's
-  // cached searchParams — so a return visit (or a Back restore) must read
-  // the address bar, not a stale prop. SSR falls back to the prop, which on
-  // a hard load IS the URL — no hydration divergence possible.
-  const [selectedListUuid, setSelectedListUuid] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return initialListUuid;
-    return new URLSearchParams(window.location.search).get('list') ?? null;
-  });
-  const [createOpen, setCreateOpen] = useState(false);
-
-  const select = useCallback((listUuid: string | null) => {
-    setSelectedListUuid(listUuid);
-    quietReplaceUrlParams({ list: listUuid });
-  }, []);
+  // The SSR fallback is real here, unlike a pure overlay's: this value swaps
+  // index for detail IN TREE, so the server render and the hydration render
+  // have to agree. Both derive from the same navigation URL.
+  const selection = useUrlOverlay('list', { ssrValue: initialListUuid });
+  const createPanel = useUrlOverlay('new-list');
+  const selectedListUuid = selection.value;
+  const { swap: selectList } = selection;
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -64,27 +65,35 @@ export function ListsTab({
             viewerId={viewerId}
             viewerUuid={viewerUuid}
             listUuid={selectedListUuid}
-            onBack={() => select(null)}
+            onBack={() => selectList(null)}
           />
         ) : (
           <ListsIndex
             channel={channel}
             viewerId={viewerId}
-            onSelect={select}
-            onCreate={() => setCreateOpen(true)}
+            onSelect={selectList}
+            onCreate={() => createPanel.show()}
           />
         )}
       </div>
 
-      {createOpen && (
-        <ListFormDialog
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          channelUuid={channel.uuid}
-          viewerId={viewerId}
-          onCreated={select}
-        />
-      )}
+      {/* Keyed on `openKey` so it stays mounted through its closing transition
+          and re-derives its fields on every opening. */}
+      <ListFormDialog
+        key={createPanel.keyFor()}
+        open={createPanel.open}
+        onOpenChange={createPanel.setOpen}
+        channelUuid={channel.uuid}
+        viewerId={viewerId}
+        onCreated={(listUuid) => {
+          // Success is a MOVE, not a dismissal: the dialog's own entry is
+          // rewritten into the new list's selection. Closing it the ordinary
+          // way would pop that entry, and the `?list=` write on the next line
+          // would go with it — leaving the reader back on the index.
+          createPanel.closeInPlace();
+          selectList(listUuid);
+        }}
+      />
     </div>
   );
 }

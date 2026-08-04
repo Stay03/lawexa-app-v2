@@ -59,7 +59,8 @@ export function ListFormDialog({
   viewerId: number | null;
   /** Presence switches to edit mode (title + description only). */
   list?: TaskList;
-  /** Called with the new list's uuid after a successful create. */
+  /** Called with the new list's uuid after a successful create. Passing it also
+   *  takes over the close — see the create branch of `handleSubmit`. */
   onCreated?: (listUuid: string) => void;
 }) {
   const isEdit = !!list;
@@ -105,8 +106,16 @@ export function ListFormDialog({
       },
       {
         onSuccess: (response) => {
+          // ON CREATE THE CALLER OWNS THE CLOSE, because it also owns where the
+          // reader lands. Closing here is a history move (`useUrlOverlay`): it
+          // pops the entry this dialog was opened on, and the `?list=` write
+          // that follows would land on that doomed entry and be undone. The
+          // caller closes IN PLACE and selects in one handler instead.
+          if (onCreated) {
+            onCreated(response.data.uuid);
+            return;
+          }
           onOpenChange(false);
-          onCreated?.(response.data.uuid);
         },
         onError,
       },

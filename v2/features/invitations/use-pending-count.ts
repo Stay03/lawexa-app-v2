@@ -4,12 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { invitationsQueries } from './queries';
 
 /**
- * usePendingInvitationCount — the number on the "Invitations" entry button on
- * `/spaces`, summed across the three inboxes.
+ * usePendingInvitationCount — what `/spaces` renders its `PendingPill` from,
+ * summed across the three inboxes. Zero means the pill does not exist at all.
  *
  * IT IS THE SAME THREE CACHE ENTRIES THE `/invitations` SCREEN READS, which is
- * the point: the badge and the screen can never disagree, and following the
- * button paints the inbox from an already-warm cache with no skeleton at all
+ * the point: the pill and the screen can never disagree, and following the
+ * pill paints the inbox from an already-warm cache with no skeleton at all
  * (the owner feel directive — fluidity is cache-first paints). Answering an
  * invitation drops this number in the same frame the row leaves, because the
  * optimistic removal decrements `pagination.total`, which is what this counts.
@@ -22,9 +22,9 @@ import { invitationsQueries } from './queries';
  * honest price of a live count — there is no aggregate endpoint — and the
  * standard tier means a second visit inside the minute pays nothing.
  *
- * Returns 0 while the queries are pending or gated off, so the badge is never
- * a flash of a wrong number; the entry button renders without it and the badge
- * fades in when the count resolves. Phase-5 W4, 2026-08-04.
+ * Returns 0 while the queries are pending or gated off, so the pill is never a
+ * flash of a wrong number: it is simply absent until the count resolves, and
+ * then fades in. Phase-5 W4, 2026-08-04.
  */
 export function usePendingInvitationCount({
   viewerId,

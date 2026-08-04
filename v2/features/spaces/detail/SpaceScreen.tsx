@@ -39,6 +39,7 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
@@ -53,7 +54,6 @@ import {
 } from '../model';
 import { useDeleteSpace } from '../mutations';
 import { spacesQueries } from '../queries';
-import { useDialog } from '../use-dialog';
 import { SpaceChannelRow } from './SpaceChannelRow';
 import { SpaceMembersSheet } from './SpaceMembersSheet';
 import {
@@ -108,12 +108,10 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   // no `Date.now()` runs in render (React Compiler lint).
   const [now] = useState(() => Date.now());
 
-  const [membersOpen, setMembersOpen] = useState(false);
-  // Form dialogs stay MOUNTED so their closing transition plays, and remount on
-  // each opening so their fields are re-derived from the current space (see
-  // `useDialog`). The confirm `AlertDialog`s below are already unconditional.
-  const createChannelDialog = useDialog();
-  const editDialog = useDialog();
+  /** Deliberately NOT in the URL. A shareable, refresh-surviving link that
+   *  re-opens "Delete this space?" is an armed trigger, and this dialog carries
+   *  the server's sentence from the last failed attempt — state a restored URL
+   *  cannot reproduce. */
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -137,6 +135,42 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   });
 
   const space = spaceQuery.data?.data;
+
+  // The freshest roster available, then the row's own stamp: the fetched member
+  // list wins once it lands, and the roster the DETAIL response already carries
+  // covers the window before it — which is what stops a space's creator seeing
+  // the non-creator empty state seconds after creating it. Same one-liner as
+  // `OrganizationScreen`, deliberately. Derived ABOVE the three-state branches
+  // because the panel gate below needs it and hooks cannot run after a return.
+  const effectiveRole = {
+    my_role:
+      space?.my_role ??
+      roleInRoster(membersQuery.data?.data ?? space?.members ?? [], viewerUuid),
+  };
+  const canManage = canManageSpace(effectiveRole);
+  const isOwner = isSpaceOwner(effectiveRole);
+
+  /**
+   * Every non-destructive overlay on this screen lives in `?panel=` — Back
+   * closes it, a refresh re-opens it, and a link can point at it. One param for
+   * all three because they are mutually exclusive: opening the roster over the
+   * edit dialog was never a thing this screen did.
+   *
+   * `canOpen` carries the SAME `canManage` the two buttons are gated on, so a
+   * copied `?panel=edit` link cannot hand a plain member the admin form that
+   * the menu never offered them. It is `undefined` until the space lands: the
+   * pending screen renders no panels, and gating on a role that has not
+   * resolved would strip a real admin's deep link before it could work.
+   *
+   * `keyFor` is spread as each form dialog's `key`, so a dialog stays mounted
+   * while it closes (its exit animation plays) and remounts on every opening
+   * with its fields re-derived from the current space. Per PANEL, so cancelling
+   * New channel and immediately tapping Members cannot cut the first one's
+   * exit short.
+   */
+  const panel = useUrlOverlay('panel', {
+    canOpen: space ? { edit: canManage, 'new-channel': canManage } : undefined,
+  });
 
   // Publish the space name into the shell header's centre slot.
   const spaceName = space?.name ?? null;
@@ -167,19 +201,6 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
       </div>
     );
   }
-
-  // The freshest roster available, then the row's own stamp: the fetched member
-  // list wins once it lands, and the roster the DETAIL response already carries
-  // covers the window before it — which is what stops a space's creator seeing
-  // the non-creator empty state seconds after creating it. Same one-liner as
-  // `OrganizationScreen`, deliberately.
-  const rosterRole = roleInRoster(
-    membersQuery.data?.data ?? space.members ?? [],
-    viewerUuid,
-  );
-  const effective = { my_role: space.my_role ?? rosterRole };
-  const canManage = canManageSpace(effective);
-  const isOwner = isSpaceOwner(effective);
 
   const TypeIcon = space.type === 'study' ? GraduationCap : Briefcase;
   const channels = channelsQuery.data?.data ?? [];
@@ -214,7 +235,7 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
             <Dot />
             <button
               type="button"
-              onClick={() => setMembersOpen(true)}
+              onClick={() => panel.show('members')}
               className={cn(
                 'v2-interactive inline-flex items-center gap-1 rounded transition-colors duration-150 hover:text-foreground motion-reduce:transition-none',
                 FOCUS_RING,
@@ -255,7 +276,7 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={editDialog.show}>
+              <DropdownMenuItem onClick={() => panel.show('edit')}>
                 <Pencil aria-hidden className="size-4" />
                 Edit space
               </DropdownMenuItem>
@@ -295,7 +316,7 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
               variant="ghost"
               size="sm"
               className="v2-interactive"
-              onClick={createChannelDialog.show}
+              onClick={() => panel.show('new-channel')}
             >
               <Plus aria-hidden className="size-4" />
               New channel
@@ -314,7 +335,7 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
         ) : channels.length === 0 ? (
           <ChannelsEmptyState
             canCreate={canManage}
-            onCreate={createChannelDialog.show}
+            onCreate={() => panel.show('new-channel')}
           />
         ) : (
           <ul className="flex flex-col divide-y divide-border/60">
@@ -334,23 +355,27 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
         space={space}
         viewerId={viewerId}
         viewerUuid={viewerUuid}
-        open={membersOpen}
-        onOpenChange={setMembersOpen}
+        {...panel.bind('members')}
       />
 
       <ChannelFormDialog
-        key={`channel-${createChannelDialog.openKey}`}
-        open={createChannelDialog.open}
-        onOpenChange={createChannelDialog.setOpen}
+        key={panel.keyFor('new-channel')}
         spaceUuid={space.uuid}
+        onCreated={(channelUuid) => {
+          // Success is a MOVE. The dialog's entry is rewritten rather than
+          // popped, so the navigation below is not racing a queued
+          // `history.back()` that would land the reader back on this space.
+          panel.closeInPlace();
+          router.push(`/channels/${channelUuid}`);
+        }}
+        {...panel.bind('new-channel')}
       />
 
       <SpaceFormDialog
-        key={`space-${editDialog.openKey}`}
-        open={editDialog.open}
-        onOpenChange={editDialog.setOpen}
+        key={panel.keyFor('edit')}
         space={space}
         viewerId={viewerId}
+        {...panel.bind('edit')}
       />
 
       <AlertDialog

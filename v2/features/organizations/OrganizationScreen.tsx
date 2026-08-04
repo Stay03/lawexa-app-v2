@@ -38,8 +38,8 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { roleInRoster } from '@/v2/features/spaces/model';
-import { useDialog } from '@/v2/features/spaces/use-dialog';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { OrganizationFormDialog } from './OrganizationFormDialog';
@@ -83,12 +83,9 @@ export function OrganizationScreen() {
   // Frozen at mount for the relative verification dates (React Compiler lint).
   const [now] = useState(() => Date.now());
 
-  // Form dialogs stay MOUNTED so their closing transition plays, and remount on
-  // each opening so their fields are re-derived (see `useDialog`).
-  const createDialog = useDialog();
-  const editDialog = useDialog();
-  const verifyDialog = useDialog();
-  const [membersOpen, setMembersOpen] = useState(false);
+  /** Deliberately NOT in the URL: a link that re-opens "Delete this
+   *  organization?" on every refresh is an armed trigger, and the dialog holds
+   *  the server's sentence from the last failed attempt. */
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   /**
@@ -119,6 +116,41 @@ export function OrganizationScreen() {
 
   const deleteOrganization = useDeleteOrganization(organization?.uuid ?? '');
 
+  // Governance comes from the roster (the payload carries no `my_role`).
+  // Derived ABOVE the four-answer branches because the panel gate needs it and
+  // hooks cannot run after a return.
+  const myRole = roleInRoster(
+    membersQuery.data?.data ?? organization?.members ?? [],
+    viewerUuid,
+  );
+  const isOwner = myRole === 'owner';
+  const canManage = isOwner || myRole === 'admin';
+
+  /**
+   * All four non-destructive overlays on this screen ride one `?panel=` key —
+   * `create`, `edit`, `verify`, `members` — so Back closes whichever is open and
+   * a refresh re-opens it.
+   *
+   * `canOpen` carries the same conditions the affordances do, so a copied
+   * `?panel=edit` or `?panel=verify` link cannot hand a plain member the admin
+   * forms the menu never offered. `create` is gated on there being NO
+   * organization, which is also what retires the param when the create dialog's
+   * whole branch disappears — an organization arriving from a background
+   * refetch or another tab would otherwise leave `?panel=create` in the URL
+   * with nothing bound to it. The map is `undefined` until the query settles,
+   * so a deep link is never stripped on the strength of an unresolved answer.
+   */
+  const panel = useUrlOverlay('panel', {
+    canOpen: organizationQuery.isSuccess
+      ? {
+          create: !organization,
+          edit: canManage,
+          verify: canManage,
+          members: !!organization,
+        }
+      : undefined,
+  });
+
   if (organizationQuery.isPending) {
     return <OrganizationScreenFrame />;
   }
@@ -142,21 +174,16 @@ export function OrganizationScreen() {
   if (!organization) {
     return (
       <div className={LIST_COLUMN}>
-        <NoOrganizationState onCreate={createDialog.show} />
+        <NoOrganizationState onCreate={() => panel.show('create')} />
         <OrganizationFormDialog
-          key={`create-${createDialog.openKey}`}
-          open={createDialog.open}
-          onOpenChange={createDialog.setOpen}
+          key={panel.keyFor('create')}
           viewerId={viewerId}
+          {...panel.bind('create')}
         />
       </div>
     );
   }
 
-  const myRole =
-    roleInRoster(membersQuery.data?.data ?? organization.members ?? [], viewerUuid);
-  const isOwner = myRole === 'owner';
-  const canManage = isOwner || myRole === 'admin';
   const place = [organization.city, organization.country].filter(Boolean).join(', ');
 
   const handleDelete = () => {
@@ -237,7 +264,7 @@ export function OrganizationScreen() {
             variant="outline"
             size="sm"
             className="v2-interactive"
-            onClick={() => setMembersOpen(true)}
+            onClick={() => panel.show('members')}
           >
             <Users aria-hidden className="size-4" />
             Members
@@ -255,7 +282,7 @@ export function OrganizationScreen() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={editDialog.show}>
+                <DropdownMenuItem onClick={() => panel.show('edit')}>
                   <Pencil aria-hidden className="size-4" />
                   Edit organization
                 </DropdownMenuItem>
@@ -286,7 +313,7 @@ export function OrganizationScreen() {
           canManage={canManage}
           now={now}
           justSubmitted={justSubmittedVerification}
-          onRequest={verifyDialog.show}
+          onRequest={() => panel.show('verify')}
         />
       </div>
 
@@ -294,26 +321,23 @@ export function OrganizationScreen() {
         organization={organization}
         viewerId={viewerId}
         viewerUuid={viewerUuid}
-        open={membersOpen}
-        onOpenChange={setMembersOpen}
+        {...panel.bind('members')}
       />
 
       <OrganizationFormDialog
-        key={`edit-${editDialog.openKey}`}
-        open={editDialog.open}
-        onOpenChange={editDialog.setOpen}
+        key={panel.keyFor('edit')}
         organization={organization}
         viewerId={viewerId}
+        {...panel.bind('edit')}
       />
 
       <RequestVerificationDialog
-        key={`verify-${verifyDialog.openKey}`}
-        open={verifyDialog.open}
-        onOpenChange={verifyDialog.setOpen}
+        key={panel.keyFor('verify')}
         organizationUuid={organization.uuid}
         organizationName={organization.name}
         viewerId={viewerId}
         onSubmitted={() => setJustSubmittedVerification(true)}
+        {...panel.bind('verify')}
       />
 
       <AlertDialog

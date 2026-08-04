@@ -1,7 +1,10 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import {
   Bookmark,
+  Check,
+  Copy,
   CornerUpLeft,
   Pencil,
   Pin,
@@ -33,9 +36,17 @@ import { ReactionTrayRow } from './reactions';
  * THE REACTION TRAY LEADS. It is the most-used action and the one that wants
  * the least ceremony, so it sits at the top as a row of thumb-sized keys
  * (44px, the HIG floor) and closes the sheet on pick — one gesture in, one
- * gesture out. Everything below it is the same list W2 shipped, in the same
- * order as the desktop cluster so the two input worlds never disagree about
- * where an action lives.
+ * gesture out. The verbs below it hold the desktop cluster's order, so the two
+ * input worlds agree about where a SHARED action lives.
+ *
+ * COPY TEXT IS THE ONE ACTION THAT IS TOUCH-ONLY, and it is not a nicety
+ * (owner round, Aug 4). `.v2-touch-hold` suppresses the callout and — on coarse
+ * pointers — the selection itself, so a finger can no longer drag across a
+ * message to copy part of it; this hands that back at the top of the list,
+ * whole rather than partial, which is the trade every messaging app makes.
+ * A fine pointer never lost drag-to-copy, so the desktop cluster does NOT get a
+ * matching glyph: adding a seventh grey square to buy back something the mouse
+ * already does would cost the row more than it gained.
  */
 export function MessageActionsSheet({
   message,
@@ -98,6 +109,10 @@ export function MessageActionsSheet({
               />
             </div>
 
+            {/* Keyed by uuid so the "Copied" confirmation can never survive
+                into the next message's sheet — the sheet itself is one per feed
+                and stays mounted. */}
+            <CopyTextAction key={message.uuid} content={message.content} onDone={onClose} />
             <SheetAction
               label="Reply"
               onClick={() => {
@@ -181,6 +196,68 @@ export function MessageActionsSheet({
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** How long "Copied" stays on screen before the sheet dismisses itself. Long
+ *  enough to read, short enough that it never feels like a stuck sheet. */
+const COPIED_HOLD_MS = 700;
+
+/**
+ * Copy the message's RAW `content` — never the rendered text. A Lawexa answer
+ * is markdown, and pasting it into a note or a document should arrive as
+ * markdown, not as prose with its headings and lists flattened out.
+ *
+ * Its own component so the confirmation state lives on one row instead of
+ * re-rendering the whole sheet, and so the call site's `key` can reset it.
+ */
+function CopyTextAction({
+  content,
+  onDone,
+}: {
+  content: string;
+  onDone: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+    } catch {
+      // Clipboard refused (insecure context, or permission denied). Close
+      // without claiming a copy that did not happen — the same silent path the
+      // conversation and case copy affordances take. Nothing to surface: the
+      // reader can still select the text on a pointer-fine device.
+      onDone();
+      return;
+    }
+    setCopied(true);
+    timerRef.current = setTimeout(onDone, COPIED_HOLD_MS);
+  };
+
+  return (
+    <SheetAction
+      label={copied ? 'Copied' : 'Copy text'}
+      // NOT `disabled` while confirming: the sheet's disabled style is a 50%
+      // dim, and dimming the confirmation is the opposite of confirming it.
+      onClick={() => {
+        if (!copied) void copy();
+      }}
+    >
+      {copied ? (
+        <Check aria-hidden className="size-4 text-primary" />
+      ) : (
+        <Copy aria-hidden className="size-4" />
+      )}
+    </SheetAction>
   );
 }
 

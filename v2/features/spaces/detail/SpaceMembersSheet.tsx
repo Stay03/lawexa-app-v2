@@ -25,6 +25,7 @@ import {
   RosterRow,
   RosterSkeleton,
 } from '@/v2/features/collab/membership/RosterRow';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
   isOwnerMustTransferError,
   memberCountLabel,
@@ -83,7 +84,9 @@ export function SpaceMembersSheet({
 }) {
   const router = useRouter();
 
-  const [inviteOpen, setInviteOpen] = useState(false);
+  /** Leave and transfer stay OUT of the URL: both are destructive confirmations
+   *  holding a target and an error from the last attempt, and a link that
+   *  re-opens "Make X the owner?" on refresh is an armed trigger. */
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [transferTarget, setTransferTarget] = useState<Member | null>(null);
   const [transferError, setTransferError] = useState<string | null>(null);
@@ -108,6 +111,17 @@ export function SpaceMembersSheet({
   const myRole = roleInRoster(members, viewerUuid) ?? space.my_role ?? null;
   const isOwner = myRole === 'owner';
   const canManage = isOwner || myRole === 'admin';
+
+  /**
+   * Invite gets its OWN param rather than a value of the screen's `?panel=`,
+   * because it opens ON TOP of this sheet and one param holds one value. The
+   * URL reads `?panel=members&invite=1`, and Back unwinds them in the order
+   * they were opened: invite first, then the roster.
+   *
+   * Gated on the same `canManage` the button is, so `?invite=1` in a copied
+   * link cannot open the invite form for someone who may not invite.
+   */
+  const invitePanel = useUrlOverlay('invite', { canOpen: canManage });
 
   const handleInvite = (payload: InviteMemberPayload) =>
     new Promise<void>((resolve, reject) => {
@@ -178,7 +192,7 @@ export function SpaceMembersSheet({
           <Button
             variant="outline"
             className="v2-interactive w-full"
-            onClick={() => setInviteOpen(true)}
+            onClick={() => invitePanel.show()}
           >
             <UserPlus aria-hidden className="size-4" />
             Invite people
@@ -233,9 +247,16 @@ export function SpaceMembersSheet({
         </div>
       </MembersSheetFrame>
 
+      {/* KEYED LIKE EVERY OTHER FORM DIALOG, and it must be. This dialog resets
+          its fields, its error line and its throttle rest inside its own close
+          path — which Radix never reaches when Back closes it, because an
+          external `open` prop change fires no `onOpenChange`. Without the
+          remount, a 429 dismissed with Back came straight back on the next
+          opening, address and all. */}
       <InvitePeopleDialog
-        open={inviteOpen}
-        onOpenChange={setInviteOpen}
+        key={invitePanel.keyFor()}
+        open={invitePanel.open}
+        onOpenChange={invitePanel.setOpen}
         title={`Invite to ${space.name}`}
         description="They get an invitation they can accept from their own Invitations page."
         onInvite={handleInvite}

@@ -1,42 +1,73 @@
 'use client';
 
 import Link from 'next/link';
-import { MailOpen, WifiOff } from 'lucide-react';
+import { MailOpen } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
+import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 
 /**
  * The `/invitations` states. Same three-state contract and the same `still`
- * rule as every other v2 list surface. Phase-5 W4, study A7 — 2026-08-04.
+ * rule as every other v2 list surface, with the empty/failure split the kit
+ * introduced: an empty inbox is a calm, teaching panel; a failed inbox is a
+ * one-line strip with a retry.
  */
 
-/** One skeleton row at `InvitationRow`'s exact geometry — tile, title, meta,
- *  and the two action buttons reserved on the right so nothing shifts when the
- *  real pair arrives. */
-function InvitationRowSkeleton({ still }: { still: boolean }) {
+/**
+ * One skeleton card at {@link import('./InvitationCard').InvitationCard}'s
+ * real geometry — INCLUDING the way that card reflows on a phone, which a
+ * flat skeleton gets wrong three times over at the route fallback.
+ *
+ * The card's own measurements, and what each one costs here:
+ *  - The HEADLINE is a wrapping sentence ("Ada Nwosu invited you to ⬛ Firm HQ")
+ *    with a 24px crest inline, so its line box is ~24px and it runs to TWO
+ *    lines below `sm` and one at `sm` and up. Reserving a single 16px bar
+ *    under-reserved it by ~30px on every phone.
+ *  - The ACTION ROW is `flex-wrap` with a `w-full sm:w-auto` button wrapper, so
+ *    below `sm` the buttons take a row of their own (32px) UNDER the role chip
+ *    (~21px) plus the 8px `gap-y`. A single 32px line under-reserved it by
+ *    another ~29px.
+ *  - Every bar in the old action row was `shrink-0` with no wrap, so at 320px
+ *    it demanded ~288px inside a ~256px box and pushed the card sideways.
+ * This mirrors the card's actual flex rules instead of guessing their result,
+ * which is why it cannot drift again: `flex-wrap`, `w-full sm:w-auto`, and the
+ * Accept bar taking the remaining width exactly as the button does.
+ */
+function InvitationCardSkeleton({ still }: { still: boolean }) {
   const bar = still ? 'animate-none' : undefined;
   return (
-    <div className="flex flex-col gap-3 px-2 py-3 sm:flex-row sm:items-center">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <Skeleton className={cn('mt-0.5 size-9 shrink-0 rounded-lg', bar)} />
-        <div className="min-w-0 flex-1 space-y-2">
-          <Skeleton className={cn('h-4 w-2/5 rounded', bar)} />
-          <Skeleton className={cn('h-3 w-3/5 rounded', bar)} />
+    <div className="mb-2 rounded-xl border border-border p-4">
+      <div className="flex items-start gap-3">
+        <Skeleton className={cn('mt-0.5 size-10 shrink-0 rounded-full', bar)} />
+        <div className="min-w-0 flex-1">
+          {/* Headline: two ~24px lines on a phone, one from `sm`. */}
+          <div className="space-y-1">
+            <Skeleton className={cn('h-[22px] w-4/5 rounded', bar)} />
+            <Skeleton className={cn('h-[22px] w-2/5 rounded sm:hidden', bar)} />
+          </div>
+          {/* The facts meta line. */}
+          <Skeleton className={cn('mt-1.5 h-4 w-3/5 rounded', bar)} />
         </div>
       </div>
-      <div className="flex shrink-0 items-center justify-end gap-2 pl-12 sm:pl-0">
-        <Skeleton className={cn('h-8 w-20 rounded-md', bar)} />
-        <Skeleton className={cn('h-8 w-20 rounded-md', bar)} />
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 sm:ml-13">
+        <Skeleton className={cn('h-[21px] w-16 shrink-0 rounded-full', bar)} />
+        <Skeleton className={cn('h-3 w-6 shrink-0 rounded', bar)} />
+        <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+          <Skeleton className={cn('h-8 w-20 shrink-0 rounded-md', bar)} />
+          <Skeleton className={cn('h-8 flex-1 rounded-md sm:w-20 sm:flex-none', bar)} />
+        </div>
       </div>
     </div>
   );
 }
 
-/** The initial-load skeleton — three rows under one section heading bar, which
- *  is the median inbox (most people have one or two invitations, never ten). */
+/** The initial-load skeleton — three cards under one section heading bar, which
+ *  is the median inbox (most people have one or two invitations, never ten).
+ *  The 8px between cards is the card's own bottom margin, exactly as in the
+ *  live list. */
 export function InvitationsSkeleton({
   rows = 3,
   still = false,
@@ -47,12 +78,36 @@ export function InvitationsSkeleton({
   const bar = still ? 'animate-none' : undefined;
   return (
     <div aria-hidden className="flex flex-col">
-      <Skeleton className={cn('mb-2 h-3 w-24 rounded', bar)} />
+      <Skeleton className={cn('mb-2 h-4 w-24 rounded', bar)} />
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.2) }}>
-          <InvitationRowSkeleton still={still} />
+          <InvitationCardSkeleton still={still} />
         </div>
       ))}
+    </div>
+  );
+}
+
+/** The ghost the empty inbox carries — one silent card at the real geometry,
+ *  so the panel shows the kind of thing that lands here rather than only
+ *  naming it. Never pulses: nothing is loading. */
+function InvitationCardGhost() {
+  return (
+    <div className="rounded-xl border border-border p-4">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 size-10 shrink-0 rounded-full bg-secondary" />
+        <div className="min-w-0 flex-1">
+          <div className="h-[22px] w-4/5 rounded bg-secondary" />
+          <div className="mt-1.5 h-4 w-3/5 rounded bg-secondary/70" />
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <div className="h-[21px] w-16 shrink-0 rounded-full bg-secondary/70" />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="h-8 w-20 rounded-md bg-secondary/70" />
+          <div className="h-8 w-20 rounded-md bg-secondary" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -64,11 +119,12 @@ export function InvitationsSkeleton({
  */
 export function InvitationsEmptyState() {
   return (
-    <CollabMessage
+    <CollabEmpty
       icon={MailOpen}
       tone="neutral"
       title="No invitations"
       description="Nothing is waiting for you. Ask a colleague to invite you to their organization, space or channel — it lands here the moment they do."
+      ghost={<InvitationCardGhost />}
       action={
         <Button asChild variant="outline" size="sm">
           <Link href="/spaces">Back to your spaces</Link>
@@ -80,22 +136,19 @@ export function InvitationsEmptyState() {
 }
 
 /**
- * All three inboxes failed. A partial failure is NOT this state — one inbox
- * failing leaves the other two rendered, with a quiet line saying that some
- * invitations couldn't be loaded (see `InvitationsScreen`).
+ * All three inboxes failed, so the screen is otherwise blank — which is the
+ * one case `CollabFailure` renders as a PANEL rather than a strip (its
+ * docblock holds the rule). A partial failure is NOT this state: one inbox
+ * failing leaves the other two rendered, and gets the quiet notice strip in
+ * `InvitationsScreen` instead.
  */
 export function InvitationsErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <CollabMessage
-      icon={WifiOff}
-      tone="alert"
-      title="Couldn't load your invitations"
-      description="Something went wrong while checking for invitations. Please try again."
-      action={
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          Try again
-        </Button>
-      }
+    <CollabFailure
+      presentation="panel"
+      title="Couldn’t load your invitations"
+      message="Something went wrong while checking for invitations."
+      onRetry={onRetry}
     />
   );
 }

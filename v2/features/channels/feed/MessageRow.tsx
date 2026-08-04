@@ -134,6 +134,18 @@ export const MessageRow = memo(function MessageRow({
         'group/msg relative -mx-2 rounded-md px-2 py-0.5',
         'transition-colors duration-200 motion-reduce:transition-none',
         '[@media(hover:hover)_and_(pointer:fine)]:hover:bg-muted/40',
+        // THE ROW OWNS THE TOUCH-AND-HOLD GESTURE (owner, Aug 4). It suppresses
+        // iOS's own callout + selection loupe, which used to come up UNDER the
+        // actions sheet, and lets a vertical scroll win at the browser level.
+        // The rule is static because iOS decides selectability when the finger
+        // lands, and it is split by pointer type — a mouse keeps ordinary
+        // selection, a finger gets the sheet's "Copy text" instead. See
+        // `shell.css` for which half applies where.
+        'v2-touch-hold',
+        // Armed-hold feedback: `use-long-press` stamps this attribute straight
+        // onto the node (no React state — the row is memoised), and the
+        // `transition-colors` above fades it both ways.
+        'data-holding:bg-muted/60',
         // Self-mention wash: quiet gold tint + a gold left edge (DIRECTION 2;
         // the audit's missing v1 affordance).
         mentioned && 'bg-primary/5',

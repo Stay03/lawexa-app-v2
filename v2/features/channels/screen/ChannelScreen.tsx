@@ -47,10 +47,8 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Message, NotifyLevel } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
-import {
-  quietPushUrlParams,
-  quietReplaceUrlParams,
-} from '@/v2/runtime/url-params';
+import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { TabRow } from '@/v2/shell/TabRow';
@@ -125,12 +123,21 @@ import {
  * from it: `?game={uuid}` mounts `GameOverlay` across the whole channel — over
  * the identity header and the tab strip as well as the panes — so nothing
  * underneath reflows and the chat keeps its scroll, its history and its
- * presence room while the game runs. `?game=` uses the same quiet history
- * writers as `?tab=`, with ONE difference: opening a game PUSHES an entry
- * (Back leaves the game and lands back in the chat, the mobile expectation)
- * while closing REPLACES, so the mode is never a walk through history. A
- * `popstate` listener adopts whatever the URL really says, which is what makes
- * Back, Forward and a shared link all agree.
+ * presence room while the game runs.
+ *
+ * EVERY OVERLAY ANSWERS BACK (owner round, Aug 4). `?game=` and the `?panel=`
+ * family — edit, members, pinned, saved, quizzes and the Lawexa sessions sheet
+ * — all run on the shared {@link useUrlOverlay}, which W6's hand-rolled block
+ * here was the prototype for: open PUSHes one entry, re-targeting REPLACES,
+ * dismissal walks back over that entry, and one `popstate` adopter settles it
+ * all. Two params rather than one because a game is a MODE that can be running
+ * while a panel is open, so they must be able to coexist; the six panels are
+ * mutually exclusive and share one.
+ *
+ * THE SESSIONS SHEET IS THE `swap()` CASE. Its two levels live in one value —
+ * `ai` is the list, `ai:{uuid}` is one transcript — so drilling in costs no
+ * history entry and Back leaves the sheet rather than walking back up through
+ * it. Its own back chevron is what returns to the list.
  */
 export function ChannelScreen({
   channelUuid,
@@ -171,65 +178,79 @@ export function ChannelScreen({
     );
   });
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [membersOpen, setMembersOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  /** Both are destructive confirmations, so both stay OUT of the URL: a
+   *  refresh-surviving link that re-opens "Delete this channel?" is an armed
+   *  trigger, and neither dialog's meaning survives a restore. */
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [membershipActionError, setMembershipActionError] = useState<string | null>(null);
   const composerRef = useRef<ChannelComposerHandle>(null);
   const feedRef = useRef<ChannelFeedHandle>(null);
 
-  /* ── W3 side surfaces. All three are LENSES over this channel, so they open
-        as sheets over the transcript and hand the reader back to it — never a
-        second place to read messages (design-research DIRECTION 14). ─────── */
-  const [pinnedOpen, setPinnedOpen] = useState(false);
-  const [savedOpen, setSavedOpen] = useState(false);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
-  /** The session the sheet is showing; `null` = its list. Owned here because
-   *  the sheet has two entrances (the menu, and any AI message's "view this
-   *  conversation"), and controlling it removes any need to sync inside. */
-  const [sessionUuid, setSessionUuid] = useState<string | null>(null);
+  // Derived here, above the three-state branches, because the panel gate needs
+  // both and hooks cannot run after a return. `canManage` is re-used verbatim
+  // by the header menu below, so the gate and the affordance cannot drift.
+  const canManage = channel ? canManageChannel(channel) : false;
 
-  /* ── Game mode (W6). Same URL-as-mirror contract as `?tab=`, with a PUSH on
-        open so Back leaves the game. Initialised from the LIVE URL for the
-        same reason the tab is: a Back/Forward restore can serve stale props
-        while the address bar is current. ─────────────────────────────────── */
-  const [gameUuid, setGameUuid] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return initialGameUuid;
-    return new URLSearchParams(window.location.search).get('game') ?? initialGameUuid;
+  /**
+   * Every panel over this channel — the edit dialog, the roster, the pinned and
+   * saved lenses, the quiz library and the Lawexa sessions sheet — is one value
+   * of `?panel=`. They are lenses over the SAME channel (design-research
+   * DIRECTION 14), never a second place to read messages, so only one is ever
+   * open and one param carries them all.
+   *
+   * `canOpen` matters more here than anywhere: this screen RENDERS for a
+   * non-member of a `space_public` channel (the join panel), so without a gate
+   * `?panel=edit` in a copied link would hand a stranger the admin form
+   * prefilled with the channel's name, description and visibility, and
+   * `?panel=members` would open a sheet whose query only 403s. Gate keys are
+   * panel FAMILIES, so `ai` covers `ai:{uuid}` as well. `undefined` until the
+   * channel lands: the pending screen renders no panels, and refusing on an
+   * unresolved role would strip a real admin's deep link.
+   */
+  const panel = useUrlOverlay('panel', {
+    canOpen: channel
+      ? {
+          edit: canManage,
+          members: isMember,
+          pinned: isMember,
+          saved: isMember,
+          quizzes: isMember,
+          ai: isMember,
+        }
+      : undefined,
   });
-  const [quizzesOpen, setQuizzesOpen] = useState(false);
+  /** The Lawexa sheet's two levels ride one value: `ai` is the session list,
+   *  `ai:{uuid}` is one transcript. Deriving them here means the sheet needs no
+   *  syncing effect for its two entrances (the channel menu, and "view this
+   *  conversation" on any Lawexa reply). */
+  const aiSessionUuid = panel.value?.startsWith(AI_PANEL_PREFIX)
+    ? panel.value.slice(AI_PANEL_PREFIX.length)
+    : null;
+  const aiOpen = panel.value === 'ai' || aiSessionUuid !== null;
 
-  const openGame = useCallback((nextGameUuid: string) => {
-    // IDEMPOTENT AT THE SOURCE. Three affordances open a game (the live bar,
-    // a transcript card, the library sheet) and each can be double-tapped; two
-    // pushes would mean two history entries, so Back would take two presses to
-    // leave one game. The live URL is the truth, so it is what gets checked.
-    if (
-      new URLSearchParams(window.location.search).get('game') === nextGameUuid
-    ) {
-      return;
-    }
-    setGameUuid(nextGameUuid);
-    quietPushUrlParams({ game: nextGameUuid });
-  }, []);
+  /* ── Game mode (W6). Its OWN param, not a `?panel=` value: a game is a mode
+        that covers the screen, and a panel may be open behind it. The SSR
+        fallback is real here because `GameOverlay` renders IN TREE — an overlay
+        that only ever portals can hydrate from the URL alone. ─────────────── */
+  const game = useUrlOverlay('game', {
+    ssrValue: initialGameUuid,
+    // Values are bare uuids, so the gate is the whole param: only a member
+    // reaches the branch that renders `GameOverlay` at all.
+    canOpen: channel ? isMember : undefined,
+  });
+  const closeGame = game.close;
+  const gameUuid = game.value;
 
-  const closeGame = useCallback(() => {
-    setGameUuid(null);
-    quietReplaceUrlParams({ game: null });
-  }, []);
-
-  // Back/Forward re-derives EVERY value this screen mirrors into the URL, not
-  // just the one W6 added. `?game=` is the first PUSH on this route, so a Back
-  // out of a game now restores an entry whose `?tab=` may differ from the tab
-  // on screen — reading only `game` here would leave the strip pointing at
-  // Lists while the chat is shown. (`?list=` is owned by `ListsTab`'s own
-  // state, which re-reads it on mount; it is not this listener's to restore.)
+  // `?tab=` is not an overlay — it is a persistent view selector written with
+  // REPLACE — but it still has to be re-adopted here, because a Back OUT of a
+  // panel or a game restores an entry whose `?tab=` may differ from the tab on
+  // screen; reading only the overlay params would leave the strip pointing at
+  // Lists while the chat is shown. (`?list=` belongs to `ListsTab`, which
+  // adopts it through its own hook.)
   useEffect(() => {
     const onPopState = () => {
-      const params = new URLSearchParams(window.location.search);
-      setGameUuid(params.get('game'));
-      setTab(parseChannelTab(params.get('tab')));
+      setTab(parseChannelTab(new URLSearchParams(window.location.search).get('tab')));
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -257,23 +278,54 @@ export function ChannelScreen({
     });
   }, []);
 
-  /** Land on a message from a panel: back to Chat (through the ONE tab writer,
-   *  so the URL stays in step), then let the feed resolve it — it pulls older
-   *  pages when the message isn't loaded, and gives up silently when it can't
-   *  be reached. The Chat pane keeps its mount across tabs, so the imperative
-   *  handle is live even when the reader was on Lists or Files. */
+  // The hook's dispatchers are stable; the hook OBJECT is not, so the
+  // dispatchers are what the callbacks below depend on — the same rule the
+  // composer/feed callbacks follow, and what keeps the memoised rows still.
+  const { show: showPanel, swap: swapPanel, closeInPlace: closePanel } = panel;
+  const { show: showGame } = game;
+
+  /** Land on a message from a panel: close the panel and go back to Chat, then
+   *  let the feed resolve it — it pulls older pages when the message isn't
+   *  loaded, and gives up silently when it can't be reached. The Chat pane keeps
+   *  its mount across tabs, so the imperative handle is live even when the
+   *  reader was on Lists or Files.
+   *
+   *  IN PLACE, not a dismissal: the panel's entry is rewritten rather than
+   *  popped, because the `?tab=` write on the next line would otherwise land on
+   *  an entry a queued `history.back()` is about to discard — and the reader
+   *  would be returned to the tab and the panel they just left. */
   const jumpToMessage = useCallback(
     (messageUuid: string) => {
+      closePanel();
       selectTab('chat');
       feedRef.current?.jumpToMessage(messageUuid);
     },
-    [selectTab],
+    [closePanel, selectTab],
   );
 
-  const openAiSession = useCallback((nextSessionUuid: string) => {
-    setSessionUuid(nextSessionUuid);
-    setSessionsOpen(true);
-  }, []);
+  /** Enter game mode. Any panel over the channel — in practice the quiz library
+   *  the reader started from — closes IN PLACE for the same reason: the `?game=`
+   *  push below has to land on an entry that survives. */
+  const openGame = useCallback(
+    (nextGameUuid: string) => {
+      closePanel();
+      showGame(nextGameUuid);
+    },
+    [closePanel, showGame],
+  );
+  const openAiSession = useCallback(
+    (nextSessionUuid: string) => showPanel(`${AI_PANEL_PREFIX}${nextSessionUuid}`),
+    [showPanel],
+  );
+  /** Move between the sheet's list and one transcript WITHOUT a history entry —
+   *  the whole sheet is one stop, so Back leaves it rather than walking up. */
+  const selectAiSession = useCallback(
+    (nextSessionUuid: string | null) =>
+      swapPanel(
+        nextSessionUuid === null ? 'ai' : `${AI_PANEL_PREFIX}${nextSessionUuid}`,
+      ),
+    [swapPanel],
+  );
 
   const handleStartReply = useCallback((message: Message) => {
     setReplyTo(message);
@@ -317,7 +369,6 @@ export function ChannelScreen({
   }
 
   const VisibilityIcon = channel.visibility === 'private' ? Lock : Hash;
-  const canManage = canManageChannel(channel);
   const notifyLevel: NotifyLevel = channel.my_notify_level ?? 'all';
 
   const identityHeader = (
@@ -348,7 +399,7 @@ export function ChannelScreen({
               {isMember ? (
                 <button
                   type="button"
-                  onClick={() => setMembersOpen(true)}
+                  onClick={() => panel.show('members')}
                   className="v2-interactive inline-flex items-center gap-1 rounded transition-colors duration-150 hover:text-foreground motion-reduce:transition-none"
                 >
                   <Users aria-hidden className="size-3.5" />
@@ -405,7 +456,7 @@ export function ChannelScreen({
                   className="size-8"
                   aria-label="Pinned messages"
                   title="Pinned messages"
-                  onClick={() => setPinnedOpen(true)}
+                  onClick={() => panel.show('pinned')}
                 >
                   <Pin aria-hidden className="size-4" />
                 </Button>
@@ -415,7 +466,7 @@ export function ChannelScreen({
                   className="size-8"
                   aria-label="Saved messages"
                   title="Saved messages (private to you)"
-                  onClick={() => setSavedOpen(true)}
+                  onClick={() => panel.show('saved')}
                 >
                   <Bookmark aria-hidden className="size-4" />
                 </Button>
@@ -457,25 +508,20 @@ export function ChannelScreen({
                     </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setMembersOpen(true)}>
+                  <DropdownMenuItem onClick={() => panel.show('members')}>
                     <Users aria-hidden className="size-4" />
                     Members
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setSessionUuid(null);
-                      setSessionsOpen(true);
-                    }}
-                  >
+                  <DropdownMenuItem onClick={() => panel.show('ai')}>
                     <Sparkles aria-hidden className="size-4" />
                     Lawexa sessions
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setQuizzesOpen(true)}>
+                  <DropdownMenuItem onClick={() => panel.show('quizzes')}>
                     <Trophy aria-hidden className="size-4" />
                     Quizzes
                   </DropdownMenuItem>
                   {canManage && (
-                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                    <DropdownMenuItem onClick={() => panel.show('edit')}>
                       <Pencil aria-hidden className="size-4" />
                       Edit channel
                     </DropdownMenuItem>
@@ -714,52 +760,53 @@ export function ChannelScreen({
         channel={channel}
         viewerId={viewerId}
         viewerUuid={viewerUuid}
-        open={quizzesOpen}
-        onOpenChange={setQuizzesOpen}
         onOpenGame={openGame}
+        {...panel.bind('quizzes')}
       />
 
       <PinnedMessagesSheet
         channel={channel}
         viewerId={viewerId}
-        open={pinnedOpen}
-        onOpenChange={setPinnedOpen}
         onJumpToMessage={jumpToMessage}
+        {...panel.bind('pinned')}
       />
 
       <SavedMessagesSheet
         channel={channel}
         viewerId={viewerId}
-        open={savedOpen}
-        onOpenChange={setSavedOpen}
         onJumpToMessage={jumpToMessage}
+        {...panel.bind('saved')}
       />
 
+      {/* Not `bind`: this sheet answers to TWO values (`ai` and `ai:{uuid}`),
+          so its open test is a prefix rather than an equality. */}
       <ChannelAiSessionsSheet
         channelUuid={channel.uuid}
         channelName={channel.name}
         viewerId={viewerId}
-        open={sessionsOpen}
-        onOpenChange={setSessionsOpen}
-        sessionUuid={sessionUuid}
-        onSelectSession={setSessionUuid}
+        open={aiOpen}
+        onOpenChange={(next) => {
+          if (!next) panel.close();
+        }}
+        sessionUuid={aiSessionUuid}
+        onSelectSession={selectAiSession}
       />
 
       <ChannelMembersSheet
         channel={channel}
         viewerId={viewerId}
         viewerUuid={viewerUuid}
-        open={membersOpen}
-        onOpenChange={setMembersOpen}
+        {...panel.bind('members')}
       />
 
-      {editOpen && (
-        <ChannelEditDialog
-          channel={channel}
-          open={editOpen}
-          onOpenChange={setEditOpen}
-        />
-      )}
+      {/* Mounted unconditionally now, keyed on `openKey`: it stays through its
+          closing transition and remounts on each opening, so its fields
+          re-derive from the current channel (the house dialog contract). */}
+      <ChannelEditDialog
+        key={panel.keyFor('edit')}
+        channel={channel}
+        {...panel.bind('edit')}
+      />
 
       <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
         <AlertDialogContent>
@@ -833,6 +880,10 @@ export function ChannelScreen({
     </div>
   );
 }
+
+/** `?panel=ai` is the Lawexa session list; `?panel=ai:{uuid}` is one transcript
+ *  inside it. A uuid never contains `:`, so the split is unambiguous. */
+const AI_PANEL_PREFIX = 'ai:';
 
 const CHANNEL_TABS: readonly { id: ChannelTab; label: string }[] = [
   { id: 'chat', label: 'Chat' },

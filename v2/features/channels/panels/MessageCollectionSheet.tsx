@@ -44,6 +44,12 @@ import { RelativeTime } from '../ui/RelativeTime';
  * MOUNTS ON OPEN. Both queries are `enabled: open`, so a channel nobody has
  * asked about pays nothing, and the pins list is only invalidated by a
  * `.message.pinned` event when it is already cached (the room's rule).
+ *
+ * THE JUMP DOES NOT CLOSE THIS SHEET; the screen does, and it must. Closing is
+ * a history move now (`useUrlOverlay`): a dismissal POPS the entry the sheet
+ * was opened on, so the `?tab=` write that `ChannelScreen.jumpToMessage` makes
+ * in the same handler would land on an entry about to be discarded and be
+ * undone the moment the popstate arrived. The screen closes IN PLACE instead.
  */
 
 type CollectionKind = 'pins' | 'saved';
@@ -82,10 +88,7 @@ export function PinnedMessagesSheet({
       isError={query.isError}
       onRetry={() => void query.refetch()}
       rows={query.data?.data ?? []}
-      onJumpToMessage={(uuid) => {
-        onOpenChange(false);
-        onJumpToMessage(uuid);
-      }}
+      onJumpToMessage={onJumpToMessage}
       removeLabel="Unpin"
       removeIcon={PinOff}
       onRemove={(message) => pinMutate({ messageUuid: message.uuid, pinned: false })}
@@ -128,10 +131,7 @@ export function SavedMessagesSheet({
       isError={query.isError}
       onRetry={() => void query.refetch()}
       rows={query.data?.data ?? []}
-      onJumpToMessage={(uuid) => {
-        onOpenChange(false);
-        onJumpToMessage(uuid);
-      }}
+      onJumpToMessage={onJumpToMessage}
       removeLabel="Remove from saved"
       removeIcon={BookmarkX}
       removeDisabled={throttled}

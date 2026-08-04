@@ -54,12 +54,13 @@ export function SpacesFallback() {
         Loading your spaces
       </span>
       <div aria-hidden inert className={LIST_COLUMN}>
+        {/* Only "New space" is reserved on the right: the invitations pill is
+            conditional chrome and is absent for nearly every reader, so
+            holding a slot for it would be reserving a shape that usually
+            never arrives. */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Skeleton className="h-9 w-44 animate-none rounded-full" />
-          <div className="ml-auto flex items-center gap-2">
-            <Skeleton className="h-8 w-28 animate-none rounded-md" />
-            <Skeleton className="h-8 w-28 animate-none rounded-md" />
-          </div>
+          <Skeleton className="ml-auto h-8 w-28 animate-none rounded-md" />
         </div>
         <SpacesListSkeleton still />
       </div>
