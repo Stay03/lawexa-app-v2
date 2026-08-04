@@ -51,7 +51,8 @@ export interface NoteRowModel {
   author: string | null;
   /** PLAIN text only — nothing in this feature is handed to the browser as HTML. */
   preview: string | null;
-  status: NoteStatus;
+  /** Present only when the payload carries it (detail and my-notes rows). */
+  status: NoteStatus | undefined;
   /** The lead candidate My notes uses: an honest draft/published mark. */
   isDraft: boolean;
   /** The meta TRAIL, on both tabs. */
@@ -69,8 +70,11 @@ export function noteRow(note: NoteRecord): NoteRowModel {
     author: note.user?.name?.trim() || null,
     preview: notePreviewText(note.content_preview, note.content_preview_html),
     status: note.status,
-    isDraft: note.status !== 'published',
-    updatedAt: note.updated_at,
+    // On PROOF only — `status` is absent from list payloads, and reading the
+    // absence as "not published" would stamp a draft mark on every real row.
+    isDraft: note.status === 'draft',
+    // List rows carry only `created_at`; a trail must never go blank.
+    updatedAt: note.updated_at ?? note.created_at,
     isBookmarked: note.is_bookmarked,
   };
 }
@@ -93,5 +97,13 @@ export function noteRow(note: NoteRecord): NoteRowModel {
  * reader owns is theirs to read whatever its price field says.
  */
 export function isLibraryListable(note: NoteRecord): boolean {
-  return note.status === 'published' && !note.is_paid;
+  // Drop only on PROOF. List rows carry neither `status` nor `is_paid`
+  // (probed Aug 4 2026), and the original `status === 'published'` test read
+  // that absence as "not published" — which filtered out every real row and
+  // emptied the library the day it went live. The server already scopes the
+  // library request to published free notes; this belt catches only a row
+  // that AFFIRMS it does not belong.
+  if (note.is_paid === true || note.is_free === false) return false;
+  if (note.status !== undefined && note.status !== 'published') return false;
+  return true;
 }

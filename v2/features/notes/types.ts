@@ -26,24 +26,45 @@ import type { PaginationLinks, PaginationMeta } from '@/types/case';
  *  - Saves (create + update combined) are limited to 60/min per user, a
  *    notes-only bucket; a 429 WITH `Retry-After` is the rate limit, a 429
  *    WITHOUT it (create only) is the plan's note-creation quota.
+ *
+ * ── LIST ROWS AND DETAILS ARE DIFFERENT PAYLOADS (probed on prod, Aug 4
+ * 2026 — this type lying about it emptied the whole library once). A LIST row
+ * carries ONLY: id, slug, title, content_preview(_html), is_free, price
+ * fields (untyped here), tags, thumbnail_url, user, created_at,
+ * is_bookmarked, bookmarks_count, views_count (untyped — never displayed,
+ * owner's call). `status`, `is_paid`, `is_private`, `updated_at`, `content`
+ * and `has_access` exist ONLY on detail payloads, so every one of them is
+ * optional, and NO consumer may treat their absence as a value: a gate that
+ * needs one must gate on PROOF (`=== true`, `!== undefined`), never on
+ * `undefined` falling through a comparison.
  */
 export interface NoteRecord {
   id: number;
   title: string | null;
   slug: string;
-  /** Full HTML body. `null` on list rows and on paid notes the viewer cannot read. */
-  content: string | null;
+  /**
+   * Full HTML body — DETAIL only. A readable note carries a string (possibly
+   * empty). A locked paid note OMITS the key entirely (not `null` — probed).
+   * List rows never carry it.
+   */
+  content?: string | null;
   content_preview: string;
   content_preview_html?: string;
-  is_private: boolean;
+  /** Detail only. */
+  is_private?: boolean;
   tags: string[] | null;
   is_free: boolean;
-  is_paid: boolean;
-  status: NoteStatus;
+  /** Detail only — list rows signal paid via `is_free: false`. */
+  is_paid?: boolean;
+  /** Detail only (and, per v1's mine screens, my-notes rows). */
+  status?: NoteStatus;
+  /** Detail only — the authoritative "may this viewer read the body" signal. */
+  has_access?: boolean;
   thumbnail_url: string | null;
   user: NoteUser;
   created_at: string;
-  updated_at: string;
+  /** Detail only — list rows carry only `created_at`. */
+  updated_at?: string;
   is_bookmarked: boolean;
   bookmarks_count: number;
 }

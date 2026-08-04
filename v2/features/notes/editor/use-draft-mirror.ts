@@ -183,7 +183,10 @@ export function pickRestoreCandidate(
   }
 
   const mirrorAt = Date.parse(mirror.updated_at);
-  const recordAt = Date.parse(record.updated_at);
+  // Editor records are detail payloads, which do carry `updated_at`; the type
+  // keeps it optional for the list shape, so fall back to the created stamp
+  // rather than asserting.
+  const recordAt = Date.parse(record.updated_at ?? record.created_at);
   if (Number.isNaN(mirrorAt) || Number.isNaN(recordAt)) return null;
   // Two different clocks — see CLOCK_SKEW_TOLERANCE_MS for why the comparison
   // leans toward offering rather than toward silence.

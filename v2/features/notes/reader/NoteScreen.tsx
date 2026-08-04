@@ -39,8 +39,10 @@ import {
  *   403 / 404             not found — see `isNoteUnavailable` for why a
  *                         refusal and an absence get the SAME answer
  *   any other failure     the error state, with a retry that can succeed
- *   `content: null`       "not available" — the paid-note payload. No price,
- *                         no purchase: v2 does not sell notes (owner 1)
+ *   locked body           "not available" — `has_access: false`, or a payload
+ *                         whose `content` is not a string (the locked paid
+ *                         note omits the key entirely). No price, no
+ *                         purchase: v2 does not sell notes (owner 1)
  *   otherwise             the document
  */
 export function NoteScreen({ slug }: { slug: string }) {
@@ -101,9 +103,12 @@ export function NoteScreen({ slug }: { slug: string }) {
 
   // A readable note always carries a `content` STRING (empty for a note with
   // nothing in it yet, which the document handles as its own quiet state).
-  // `null` is the payload for a body the viewer may not have — today that is
-  // exactly the paid note, which v2 hides entirely.
-  if (note.content === null) {
+  // A body the viewer may not have is signalled by `has_access: false`, and
+  // the locked payload OMITS the `content` key entirely — not `null`, as this
+  // gate originally assumed (probed on prod, Aug 4 2026). Both tests, so a
+  // payload that drops `has_access` someday still cannot render a bodyless
+  // document.
+  if (note.has_access === false || typeof note.content !== 'string') {
     return (
       <div className={NOTE_COLUMN}>
         <NoteUnavailableState />
