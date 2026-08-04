@@ -46,6 +46,20 @@ html.v2-document-lock body {
   overflow: hidden;
 }
 
+/* The WIDTH twin of the `min-height: 0` note below, learned the hard way: a
+   grid item's automatic minimum size is its content's min-content in BOTH
+   axes. The first wide dock child (the notes editor's 16-button formatting
+   bar, ~605px of max-content) inflated the shell's single column track past
+   the viewport — header at 605px on a 390px phone, bell and menu off-screen,
+   title adrift — because its inner `overflow-x-auto` scroller can only
+   scroll once an ancestor actually constrains the width. Every row opts out
+   of content-driven width so no future slot content can widen the shell. */
+.v2-shell__header,
+.v2-shell__content,
+.v2-shell__dock {
+  min-width: 0;
+}
+
 /* Header row (grid-row 1). Neutral solid background so the safe-area strip under
    the notch is filled by the bar rather than showing through — correct mobile
    behaviour. Neutral token; phase-2 restyles the real header chrome. */
