@@ -18,9 +18,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { InviteMemberPayload, Member, Space } from '@/types/collab';
-import { InvitePeopleDialog } from '../membership/InvitePeopleDialog';
-import { MembersSheetFrame } from '../membership/MembersSheetFrame';
-import { RosterErrorState, RosterRow, RosterSkeleton } from '../membership/RosterRow';
+import { InvitePeopleDialog } from '@/v2/features/collab/membership/InvitePeopleDialog';
+import { MembersSheetFrame } from '@/v2/features/collab/membership/MembersSheetFrame';
+import {
+  RosterErrorState,
+  RosterRow,
+  RosterSkeleton,
+} from '@/v2/features/collab/membership/RosterRow';
 import {
   isOwnerMustTransferError,
   memberCountLabel,

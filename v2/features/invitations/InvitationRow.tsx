@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { MemberAvatar } from '@/v2/features/spaces/membership/MemberAvatar';
+import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
 import { formatRelativeTime } from '@/v2/shell/designs/modules';
 import type { InvitationAction } from './mutations';
 import type { InvitationRowModel } from './row-model';

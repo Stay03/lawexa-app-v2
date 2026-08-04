@@ -1,4 +1,4 @@
-import { MyChannelsFallback } from '@/v2/features/spaces/my-channels/MyChannelsScreen';
+import { MyChannelsFallback } from '@/v2/features/channels/my-channels/MyChannelsScreen';
 
 /**
  * Route-level loading boundary for `/channels` — inside the `(index)` route

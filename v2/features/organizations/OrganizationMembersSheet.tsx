@@ -17,13 +17,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { InviteMemberPayload, Organization } from '@/types/collab';
-import { InvitePeopleDialog } from '@/v2/features/spaces/membership/InvitePeopleDialog';
-import { MembersSheetFrame } from '@/v2/features/spaces/membership/MembersSheetFrame';
+import { InvitePeopleDialog } from '@/v2/features/collab/membership/InvitePeopleDialog';
+import { MembersSheetFrame } from '@/v2/features/collab/membership/MembersSheetFrame';
 import {
   RosterErrorState,
   RosterRow,
   RosterSkeleton,
-} from '@/v2/features/spaces/membership/RosterRow';
+} from '@/v2/features/collab/membership/RosterRow';
 import { memberCountLabel } from '@/v2/features/spaces/model';
 import {
   useInviteOrganizationMember,

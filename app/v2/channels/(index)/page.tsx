@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { MyChannelsScreen } from '@/v2/features/spaces/my-channels/MyChannelsScreen';
+import { MyChannelsScreen } from '@/v2/features/channels/my-channels/MyChannelsScreen';
 
 /**
  * v2 `/channels` — the "My channels" index (owner decision D6). In v1 this URL
@@ -22,7 +22,8 @@ import { MyChannelsScreen } from '@/v2/features/spaces/my-channels/MyChannelsScr
  * quiz `(hub)` precedent, and exactly what the phase plan asks for
  * ("route-group `loading.tsx` shaped like the channel").
  *
- * ROUTES STAY DARK: no `v2/routes.manifest.ts` entry until W5.
+ * LIVE SINCE W5 (manifest entry `/channels/*`). The URL that 404'd in v1 is
+ * now a real screen for opted-in readers.
  */
 export function generateMetadata(): Metadata {
   return {
