@@ -67,6 +67,24 @@ const PROSE_CLASS = cn(
   '[&_.lawexa-mention[data-self]]:bg-primary/20 [&_.lawexa-mention[data-self]]:text-foreground',
 );
 
+/** The prose shell both entry points render through — one visual definition of
+ *  "a Lawexa answer", whatever resolved the mentions in it. */
+function LawexaProse({
+  content,
+  rehypePlugins,
+}: {
+  content: string;
+  rehypePlugins?: PluginList;
+}) {
+  return (
+    <div className={PROSE_CLASS}>
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={rehypePlugins}>
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 export function LawexaMessageContent({
   content,
   metadata,
@@ -78,9 +96,11 @@ export function LawexaMessageContent({
   viewerUuid: string | null;
 }) {
   const rehypePlugins = useMemo<PluginList>(() => {
+    // Same rule as `buildMentionHandleMap`: a payload without `mentions`
+    // degrades to "nobody was mentioned", it never takes the feed down.
     const selfLabels = new Set(
       viewerUuid
-        ? metadata.mentions
+        ? (metadata.mentions ?? [])
             .filter((mention) => mention.uuid === viewerUuid)
             .map((mention) => mention.name)
         : [],
@@ -88,11 +108,16 @@ export function LawexaMessageContent({
     return [rehypeChannelMentions(buildMentionHandleMap(metadata), selfLabels)];
   }, [metadata, viewerUuid]);
 
-  return (
-    <div className={PROSE_CLASS}>
-      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={rehypePlugins}>
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
+  return <LawexaProse content={content} rehypePlugins={rehypePlugins} />;
+}
+
+/**
+ * The same answer, rendered for a resource that carries NO resolved mention
+ * list — the AI session transcript, whose rows are conversation rows rather
+ * than messages (`AiTranscriptMessage`). Without the server's resolution there
+ * is nothing to highlight, and the "never guess a mention" rule forbids
+ * inventing one, so `@tokens` stay literal text inside the markdown.
+ */
+export function LawexaMarkdown({ content }: { content: string }) {
+  return <LawexaProse content={content} />;
 }

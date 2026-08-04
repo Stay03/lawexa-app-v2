@@ -183,6 +183,17 @@ produce up to five of those calls, two of them from a shared link's preview.
 
 ---
 
+## Related — Spaces/Channels round 2 (August 4, 2026)
+
+Phase 5 shipped and the owner tested it. Six things the screens need cannot be built from
+the current API: a new space starting with one channel, a reply notifying the person replied
+to, reading a public channel before joining, notifications agreeing with the channel read
+pointer (and carrying their own words), four live-quiz gaps, and the AI transcript returning
+the person's own question instead of the assembled prompt. All six are in
+[`backend-ask-2026-08-04-spaces-channels-round-2.md`](backend-ask-2026-08-04-spaces-channels-round-2.md).
+
+---
+
 ## Related — a second backend exchange (July 18, 2026)
 
 Separate from the three notification-spine asks above, a second backend coordination round — the

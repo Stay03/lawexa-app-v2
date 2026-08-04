@@ -5,7 +5,14 @@ import type { MessageMetadata } from '@/types/collab';
 
 interface MessageContentProps {
   content: string;
-  metadata: MessageMetadata;
+  /**
+   * REQUIRED, and explicitly `null` for resources that carry NO resolved
+   * mention list — the AI session transcript returns conversation rows, not
+   * messages (`AiTranscriptMessage`). Null renders the text with no chips,
+   * because the server's "never guess" rule leaves nothing to resolve. Not
+   * optional: forgetting it must fail the build, not silently drop mentions.
+   */
+  metadata: MessageMetadata | null;
 }
 
 /**
@@ -14,7 +21,10 @@ interface MessageContentProps {
  */
 export function MessageContent({ content, metadata }: MessageContentProps) {
   const segments = useMemo(
-    () => parseMessageContent(content, metadata),
+    () =>
+      metadata
+        ? parseMessageContent(content, metadata)
+        : [{ type: 'text' as const, value: content }],
     [content, metadata]
   );
 

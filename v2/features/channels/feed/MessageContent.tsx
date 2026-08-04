@@ -21,6 +21,10 @@ import type { MessageMetadata } from '@/types/collab';
  * branches on `is_ai` at the ROW, not here — this component stays the one
  * human-text renderer either way.
  */
+/** One definition of human body text, shared by both entry points below. */
+const BODY_CLASS =
+  'text-[0.9375rem] leading-relaxed break-words whitespace-pre-wrap text-foreground';
+
 export function MessageContent({
   content,
   metadata,
@@ -38,15 +42,17 @@ export function MessageContent({
 
   const selfNames = useMemo(() => {
     if (!viewerUuid) return new Set<string>();
+    // Same rule as `buildMentionHandleMap`: a payload without `mentions`
+    // degrades to "nobody was mentioned", it never takes the feed down.
     return new Set(
-      metadata.mentions
+      (metadata.mentions ?? [])
         .filter((mention) => mention.uuid === viewerUuid)
         .map((mention) => mention.name),
     );
   }, [metadata.mentions, viewerUuid]);
 
   return (
-    <div className="text-[0.9375rem] leading-relaxed break-words whitespace-pre-wrap text-foreground">
+    <div className={BODY_CLASS}>
       {segments.map((segment, index) =>
         segment.type === 'mention' ? (
           <span
@@ -66,4 +72,14 @@ export function MessageContent({
       )}
     </div>
   );
+}
+
+/**
+ * The same body text for a resource that carries NO resolved mention list — the
+ * AI session transcript, whose rows are conversation rows rather than messages
+ * (`AiTranscriptMessage`). Nothing is parsed, because the server's "never
+ * guess" rule leaves nothing to resolve: every `@token` is literal text.
+ */
+export function PlainMessageContent({ content }: { content: string }) {
+  return <div className={BODY_CLASS}>{content}</div>;
 }

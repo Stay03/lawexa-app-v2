@@ -29,12 +29,6 @@ export interface DayItem {
   label: string;
 }
 
-export interface AiDividerItem {
-  kind: 'ai-divider';
-  key: string;
-  label: string;
-}
-
 /** A quiz system card renders as its own quiet card, never inside an author
  *  run (digest §E: Lawexa-authored, `metadata.game_uuid`/`quiz_uuid`). */
 export interface QuizCardItem {
@@ -59,7 +53,6 @@ export interface RespondingItem {
 export type FeedItem =
   | MessageGroupItem
   | DayItem
-  | AiDividerItem
   | QuizCardItem
   | UnreadDividerItem
   | RespondingItem;
@@ -99,10 +92,14 @@ export function unreadAnchorUuid(
 }
 
 /**
- * Shape the chronological list into render items. The unread divider is
- * spliced immediately before `anchorUuid`'s message (and breaks its group, so
- * the first unseen message re-states its author header under the line — the
- * reader always knows who wrote the first new thing).
+ * Shape the chronological list into render items. Not every message becomes
+ * one: a session reset is dropped, so the item list can be shorter than the
+ * transcript and can even be empty while messages exist.
+ *
+ * The unread divider is spliced immediately before the first item that renders
+ * at or after `anchorUuid` (and breaks its group, so the first unseen message
+ * re-states its author header under the line — the reader always knows who
+ * wrote the first new thing).
  *
  * `respondingByMessage` (phase-5 W3) splices a "Lawexa is responding" row
  * immediately AFTER the message that summoned it and closes the author run, so
@@ -118,34 +115,54 @@ export function buildFeedItems(
 ): FeedItem[] {
   const items: FeedItem[] = [];
   let group: MessageGroupItem | null = null;
+  /* BOTH SEPARATORS WAIT FOR SOMETHING TO SEPARATE. Not every message reaches
+     the screen (a session reset is dropped below), so a label or a line placed
+     the moment its message is seen can end up standing over empty space. The
+     worst case is the unread line: a reset makes the divider the newest
+     message and therefore the unread anchor, so the reader would be scrolled
+     to a gold "New" pill promising a message that does not exist — the exact
+     confusion this feed is meant to end. Held here, flushed day-then-line by
+     the first item that actually renders; if nothing follows, neither
+     appears. */
+  let pendingDay: DayItem | null = null;
+  let pendingUnread = false;
+  const flushSeparators = () => {
+    if (pendingDay !== null) {
+      items.push(pendingDay);
+      pendingDay = null;
+    }
+    if (pendingUnread) {
+      items.push({ kind: 'unread', key: 'unread-divider' });
+      pendingUnread = false;
+    }
+  };
 
   for (let i = 0; i < messages.length; i += 1) {
     const message = messages[i];
     const prev = i > 0 ? messages[i - 1] : null;
 
     if (!prev || !isSameCalendarDay(prev.created_at, message.created_at)) {
-      items.push({
+      pendingDay = {
         kind: 'day',
         key: `day-${message.uuid}`,
         label: formatDayLabel(message.created_at),
-      });
+      };
       group = null;
     }
 
     if (anchorUuid !== null && message.uuid === anchorUuid) {
-      items.push({ kind: 'unread', key: 'unread-divider' });
+      pendingUnread = true;
       group = null;
     }
 
     const type = message.metadata.type;
 
-    // A Lawexa session boundary is a separator, not a bubble (study A9 KEEP).
+    // A Lawexa session boundary carries no news for the reader: the backend
+    // posts it as a real message ("Lawexa started a new conversation.") and on
+    // screen its gold pill was mistaken for the unread line. It is dropped from
+    // the feed but still CLOSES the run — the messages either side of a reset
+    // belong to different conversations and must not merge into one group.
     if (type === 'ai_divider') {
-      items.push({
-        kind: 'ai-divider',
-        key: `ai-divider-${message.uuid}`,
-        label: message.content,
-      });
       group = null;
       continue;
     }
@@ -153,6 +170,7 @@ export function buildFeedItems(
     // Quiz system cards render as their own designed cards (W2: render-only;
     // W6 wires Join/Results). They break grouping like a divider does.
     if (type === 'quiz_game_live' || type === 'quiz_game_finished') {
+      flushSeparators();
       items.push({ kind: 'quiz-card', key: `quiz-${message.uuid}`, message });
       group = null;
       continue;
@@ -177,6 +195,7 @@ export function buildFeedItems(
     if (group && sameAuthor && withinWindow && !isReply) {
       group.messages.push(message);
     } else {
+      flushSeparators();
       group = {
         kind: 'group',
         key: message.uuid,

@@ -21,19 +21,34 @@ export function getInitials(name: string): string {
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
+/**
+ * date-fns `format` and `formatDistanceToNow` THROW `RangeError: Invalid time
+ * value` on an unparseable date, and every caller below runs inside render —
+ * so one malformed timestamp from the wire takes down the whole screen rather
+ * than blanking one line. These formatters are therefore total: an unreadable
+ * date renders as nothing.
+ */
+function parseServerDate(iso: string): Date | null {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /** Short clock time for a message bubble, e.g. "10:32 AM". */
 export function formatMessageTime(iso: string): string {
-  return format(new Date(iso), 'h:mm a');
+  const date = parseServerDate(iso);
+  return date === null ? '' : format(date, 'h:mm a');
 }
 
 /** Full timestamp for tooltips, e.g. "Jul 12, 2026, 10:32 AM". */
 export function formatFullTimestamp(iso: string): string {
-  return format(new Date(iso), 'MMM d, yyyy, h:mm a');
+  const date = parseServerDate(iso);
+  return date === null ? '' : format(date, 'MMM d, yyyy, h:mm a');
 }
 
 /** Human day separator: "Today", "Yesterday", or a dated label. */
 export function formatDayLabel(iso: string): string {
-  const date = new Date(iso);
+  const date = parseServerDate(iso);
+  if (date === null) return '';
   if (isToday(date)) return 'Today';
   if (isYesterday(date)) return 'Yesterday';
   if (isSameYear(date, new Date())) return format(date, 'EEEE, MMMM d');
@@ -42,7 +57,8 @@ export function formatDayLabel(iso: string): string {
 
 /** Compact relative age, e.g. "5 minutes ago". Used on list cards / detail. */
 export function formatRelativeTime(iso: string): string {
-  return formatDistanceToNow(new Date(iso), { addSuffix: true });
+  const date = parseServerDate(iso);
+  return date === null ? '' : formatDistanceToNow(date, { addSuffix: true });
 }
 
 /** Whether two ISO timestamps fall on the same calendar day. */
@@ -90,7 +106,10 @@ export function buildMentionHandleMap(
   metadata: MessageMetadata
 ): Map<string, string> {
   const handles = new Map<string, string>();
-  for (const mention of metadata.mentions) {
+  // `mentions` is contractual on a channel message, but this map is the last
+  // stop before a render: a payload that omits it must degrade to "no
+  // mentions", never take the surface down.
+  for (const mention of metadata.mentions ?? []) {
     for (const form of handleForms(mention.name)) {
       handles.set(form, mention.name);
     }

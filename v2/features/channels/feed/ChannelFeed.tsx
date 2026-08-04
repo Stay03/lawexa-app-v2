@@ -45,7 +45,7 @@ import { MessageGroupRow } from './MessageGroupRow';
 import type { MessageRowActions } from './MessageRow';
 import { QuizGameCard } from './QuizGameCard';
 import { RespondingRow } from './RespondingRow';
-import { AiDivider, DaySeparator, UnreadDivider } from './separators';
+import { DaySeparator, UnreadDivider } from './separators';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -745,7 +745,14 @@ export function ChannelFeed({
             <ChannelFeedSkeleton />
           ) : isError ? (
             <FeedErrorState onRetry={() => void refetch()} />
-          ) : messages.length === 0 ? (
+          ) : /* WHAT RENDERS, NOT WHAT LOADED. A message can exist and still
+                 draw nothing (a session reset is dropped from the feed), so a
+                 channel whose only message is a reset must still offer the
+                 write-the-first-message state instead of an empty column. The
+                 state also CLAIMS there is no history, so it waits until there
+                 is none left to fetch — with older pages outstanding the feed
+                 branch renders, carrying its "Load older messages" button. */
+          renderItems.length === 0 && !hasNextPage ? (
             <FeedEmptyState
               channelName={channel.name}
               description={channel.description}
@@ -777,8 +784,6 @@ export function ChannelFeed({
                 switch (item.kind) {
                   case 'day':
                     return <DaySeparator key={item.key} label={item.label} />;
-                  case 'ai-divider':
-                    return <AiDivider key={item.key} label={item.label} />;
                   case 'unread':
                     return <UnreadDivider key={item.key} />;
                   case 'quiz-card':

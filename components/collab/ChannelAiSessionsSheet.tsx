@@ -31,7 +31,11 @@ import {
 } from '@/lib/hooks/useCollab';
 import { cn } from '@/lib/utils';
 import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
-import type { AiSession, AiSessionStatus, Message } from '@/types/collab';
+import type {
+  AiSession,
+  AiSessionStatus,
+  AiTranscriptMessage,
+} from '@/types/collab';
 
 import { LawexaAvatar } from './LawexaAvatar';
 import { LawexaMessageContent } from './LawexaMessageContent';
@@ -365,7 +369,7 @@ function TranscriptView({
               </div>
             )}
             {messages.map((message) => (
-              <TranscriptRow key={message.uuid} message={message} />
+              <TranscriptRow key={message.id} message={message} />
             ))}
           </div>
         )}
@@ -375,48 +379,43 @@ function TranscriptView({
 }
 
 interface TranscriptRowProps {
-  message: Message;
+  message: AiTranscriptMessage;
 }
 
 /**
  * A lean, read-only transcript row. Deliberately NOT the editable `MessageRow`
- * (which carries edit/delete affordances) — history is immutable here. Lawexa
- * (`is_ai`) renders as markdown; a human renders as plain text with mentions.
+ * (which carries edit/delete affordances) — history is immutable here.
+ *
+ * A transcript row is NOT a message: the endpoint reads the agent's own
+ * conversation, so there is no `is_ai`, no `author` and no resolved mention
+ * list ({@link AiTranscriptMessage}). Authorship is `role` alone — `assistant`
+ * is Lawexa's markdown answer, anything else is the human turn as plain text —
+ * and bodies render with no mention chips because none were resolved.
  */
 function TranscriptRow({ message }: TranscriptRowProps) {
-  const name = message.is_ai
-    ? 'Lawexa'
-    : message.author?.name ?? 'Deleted user';
+  const isLawexa = message.role === 'assistant';
 
   return (
     <div className="flex gap-3">
-      {message.is_ai ? (
+      {isLawexa ? (
         <LawexaAvatar size="sm" className="mt-0.5 shrink-0" />
       ) : (
-        <MemberAvatar
-          user={message.author}
-          size="sm"
-          className="mt-0.5 shrink-0"
-        />
+        <MemberAvatar user={null} size="sm" className="mt-0.5 shrink-0" />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-foreground">{name}</span>
+          <span className="text-sm font-medium text-foreground">
+            {isLawexa ? 'Lawexa' : 'Someone'}
+          </span>
           <span className="text-xs text-muted-foreground">
             {formatMessageTime(message.created_at)}
           </span>
         </div>
         <div className="mt-0.5">
-          {message.is_ai ? (
-            <LawexaMessageContent
-              content={message.content}
-              metadata={message.metadata}
-            />
+          {isLawexa ? (
+            <LawexaMessageContent content={message.content} metadata={null} />
           ) : (
-            <MessageContent
-              content={message.content}
-              metadata={message.metadata}
-            />
+            <MessageContent content={message.content} metadata={null} />
           )}
         </div>
       </div>

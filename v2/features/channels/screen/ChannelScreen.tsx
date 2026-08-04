@@ -739,7 +739,6 @@ export function ChannelScreen({
         channelUuid={channel.uuid}
         channelName={channel.name}
         viewerId={viewerId}
-        viewerUuid={viewerUuid}
         open={sessionsOpen}
         onOpenChange={setSessionsOpen}
         sessionUuid={sessionUuid}

@@ -14,14 +14,18 @@ import { channelsQueries } from '../queries';
  * RESET IS THE ONLY WRITE. Everything else about Lawexa in a channel is either
  * a message (the composer's `@lawexa`) or a read.
  *
- * NO OPTIMISM HERE, DELIBERATELY. The visible effect of a reset is a new
- * `ai_divider` message, and that message arrives through the presence room like
- * any other — so the honest sequence is: ask, wait, and let the divider land
- * itself. Faking a divider would put a line in the transcript that the server
- * had not agreed to, and a failed reset would then have to un-say it.
+ * NO OPTIMISM HERE, DELIBERATELY. The server's `ai_divider` message is no
+ * longer drawn in the feed — its gold pill read as the unread line, so the feed
+ * drops that row (`../feed-model.ts`) — which leaves the SESSION LIST as the
+ * one place a reset shows: the active session becomes a closed one, and a fresh
+ * active session appears with the next summon. So the honest sequence is
+ * unchanged: ask, wait, and let the server's own state say it happened.
+ * Anticipating that state would claim a reset the server had not agreed to, and
+ * a failed reset would then have to un-say it.
  *
- * The session INDEX is invalidated on settle: the active session just became a
- * closed one, and the sheet must not keep calling it live.
+ * The session INDEX is therefore invalidated on settle — it is both the
+ * confirmation and the correctness fix, since the sheet must not keep calling a
+ * closed session live.
  *
  * FAILURE STAYS ON THIS SCREEN (`meta.silentError`, the W2 house rule). The
  * endpoint is 10/min — tight enough that a double-pressed confirm can trip it —

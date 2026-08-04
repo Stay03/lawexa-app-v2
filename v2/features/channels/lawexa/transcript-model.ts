@@ -51,13 +51,12 @@ const MACHINERY_TYPES = new Set(['tool', 'tool_call', 'tool_result']);
 /**
  * Is this row part of the readable conversation?
  *
- * A row with NO `role` at all is always dialogue: that is every transcript row
- * the API returned before the machinery shipped, and it is exactly what v1
- * rendered.
+ * `metadata` is optional on the resource, and its absence says nothing about
+ * the row — an unmarked row is dialogue if its role is.
  */
 export function isDialogueRow(message: AiTranscriptMessage): boolean {
-  if (message.role !== undefined && !DIALOGUE_ROLES.has(message.role)) return false;
-  const type: string | undefined = message.metadata.type;
+  if (!DIALOGUE_ROLES.has(message.role)) return false;
+  const type = message.metadata?.type;
   if (type !== undefined && MACHINERY_TYPES.has(type)) return false;
   return true;
 }
@@ -86,9 +85,11 @@ export function shapeTranscript(
 }
 
 /** A short label for a machinery row's badge — the agent's own word for what
- *  it was doing, tidied for display, never invented. */
+ *  it was doing, tidied for display, never invented. `role` is required by a
+ *  type WE inferred from measured rows, not by a published contract, so the
+ *  chain still ends in a literal: a row without one must get a dull badge, not
+ *  a TypeError inside the "Show everything" view. */
 export function machineryLabel(message: AiTranscriptMessage): string {
-  const type: string | undefined = message.metadata.type;
-  const raw = type ?? message.role ?? 'step';
+  const raw = message.metadata?.type ?? message.role ?? 'step';
   return raw.replace(/[_-]+/g, ' ');
 }

@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -36,11 +43,12 @@ import type { AiSession, AiSessionStatus, AiTranscriptMessage } from '@/types/co
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useEngagementThrottled } from '../engagement-throttle';
-import { LawexaMessageContent } from '../feed/LawexaMessageContent';
-import { MessageContent } from '../feed/MessageContent';
+import { LawexaMarkdown } from '../feed/LawexaMessageContent';
+import { PlainMessageContent } from '../feed/MessageContent';
 import { channelsQueries } from '../queries';
 import { LawexaAvatar, MemberAvatar } from '../ui/avatars';
 import { RelativeTime } from '../ui/RelativeTime';
+import { recoverHumanQuestion } from './human-turn';
 import { useResetChannelAi } from './mutations';
 import { isDialogueRow, machineryLabel, shapeTranscript } from './transcript-model';
 
@@ -69,11 +77,19 @@ import { isDialogueRow, machineryLabel, shapeTranscript } from './transcript-mod
  * request.
  *
  * ROW GRAMMAR IS THE CHANNEL'S, NOT THE CONVERSATION SCREEN'S. A channel
- * session has MANY human authors, so rows keep the feed's avatar + name + time
+ * session has MANY human askers, so rows keep the feed's avatar + name + time
  * identity header rather than the conversation's single-user right-aligned
  * bubble, which would erase who asked what. Lawexa's own body renders through
- * the same {@link LawexaMessageContent} the feed uses, so an answer reads
- * identically in both places.
+ * the feed's markdown prose, so an answer reads identically in both places.
+ *
+ * THE TRANSCRIPT IS NOT THE MESSAGES TABLE. Its rows come from the agent's own
+ * conversation and carry no `uuid`, no `is_ai`, no `author` and no resolved
+ * mention list ({@link AiTranscriptMessage}), so this view keys on `id`, takes
+ * authorship from `role` alone, and renders bodies through the mention-free
+ * renderers — handing a transcript row to the feed's mention-aware ones threw.
+ * A human row's `content` is the assembled prompt rather than what was typed;
+ * {@link recoverHumanQuestion} recovers the question, and the questioner stays
+ * unnamed because the only name on the wire is one any member can forge.
  */
 
 /** `useLayoutEffect` in the browser, `useEffect` on the server — a layout
@@ -94,7 +110,6 @@ export function ChannelAiSessionsSheet({
   channelUuid,
   channelName,
   viewerId,
-  viewerUuid,
   open,
   onOpenChange,
   sessionUuid,
@@ -103,7 +118,6 @@ export function ChannelAiSessionsSheet({
   channelUuid: string;
   channelName: string;
   viewerId: number | null;
-  viewerUuid: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** `null` = show the session list. */
@@ -118,7 +132,6 @@ export function ChannelAiSessionsSheet({
             channelUuid={channelUuid}
             sessionUuid={sessionUuid}
             viewerId={viewerId}
-            viewerUuid={viewerUuid}
             open={open}
             onBack={() => onSelectSession(null)}
           />
@@ -392,14 +405,12 @@ function TranscriptView({
   channelUuid,
   sessionUuid,
   viewerId,
-  viewerUuid,
   open,
   onBack,
 }: {
   channelUuid: string;
   sessionUuid: string;
   viewerId: number | null;
-  viewerUuid: string | null;
   open: boolean;
   onBack: () => void;
 }) {
@@ -528,7 +539,7 @@ function TranscriptView({
               </div>
             )}
             {rows.map((row) => (
-              <TranscriptRow key={row.uuid} message={row} viewerUuid={viewerUuid} />
+              <TranscriptRow key={row.id} message={row} />
             ))}
           </div>
         )}
@@ -538,26 +549,18 @@ function TranscriptView({
 }
 
 /**
- * One transcript row. Read-only by construction — history is not editable, so
+ * One transcript row, in three shapes off `role`: machinery, Lawexa's answer,
+ * the human's question. Read-only by construction — history is not editable, so
  * this is deliberately NOT the feed's `MessageRow` with its action cluster.
  * Machinery rows (only visible under "Show everything") wear a quiet marker and
  * a monospace body: they are a record of what the agent did, not something to
- * read as prose.
+ * read as prose, so they show their content raw, prompt scaffolding and all.
  */
-function TranscriptRow({
-  message,
-  viewerUuid,
-}: {
-  message: AiTranscriptMessage;
-  viewerUuid: string | null;
-}) {
+function TranscriptRow({ message }: { message: AiTranscriptMessage }) {
   // THE SAME PREDICATE THE FILTER USES — never a second copy. A row that the
   // dialogue view hid must render as machinery when "Show everything" reveals
   // it; two definitions would let a hidden row come back dressed as prose.
-  const machinery = !isDialogueRow(message);
-  const name = message.is_ai ? 'Lawexa' : (message.author?.name ?? 'Deleted member');
-
-  if (machinery) {
+  if (!isDialogueRow(message)) {
     return (
       <div className="flex gap-3">
         <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -581,43 +584,62 @@ function TranscriptRow({
     );
   }
 
+  if (message.role === 'assistant') {
+    return (
+      <DialogueRow
+        avatar={<LawexaAvatar size="sm" className="mt-0.5 shrink-0" />}
+        name="Lawexa"
+        createdAt={message.created_at}
+      >
+        <LawexaMarkdown content={message.content} />
+      </DialogueRow>
+    );
+  }
+
+  // NEUTRAL BY NECESSITY, not by omission: the row carries no author, and the
+  // name inside the prompt is attacker-controllable (see `./human-turn.ts`),
+  // so no transcript question is ever attributed to a person.
+  return (
+    <DialogueRow
+      avatar={<MemberAvatar user={null} size="sm" className="mt-0.5 shrink-0" />}
+      name="Someone in this channel"
+      unnamed
+      createdAt={message.created_at}
+    >
+      <PlainMessageContent content={recoverHumanQuestion(message.content)} />
+    </DialogueRow>
+  );
+}
+
+/** The identity header + body shared by both dialogue rows — the feed's row
+ *  grammar, so an answer reads the same here as it does in the channel. */
+function DialogueRow({
+  avatar,
+  name,
+  unnamed = false,
+  createdAt,
+  children,
+}: {
+  avatar: ReactNode;
+  name: string;
+  /** The name is a stand-in, not an attribution — draw it quietly. */
+  unnamed?: boolean;
+  createdAt: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex gap-3">
-      {message.is_ai ? (
-        <LawexaAvatar size="sm" className="mt-0.5 shrink-0" />
-      ) : (
-        <MemberAvatar user={message.author} size="sm" className="mt-0.5 shrink-0" />
-      )}
+      {avatar}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <span
-            className={cn(
-              'text-sm font-medium',
-              !message.is_ai && !message.author && 'text-muted-foreground',
-            )}
+            className={cn('text-sm font-medium', unnamed && 'text-muted-foreground')}
           >
             {name}
           </span>
-          <RelativeTime
-            iso={message.created_at}
-            className="text-xs text-muted-foreground"
-          />
+          <RelativeTime iso={createdAt} className="text-xs text-muted-foreground" />
         </div>
-        <div className="mt-0.5">
-          {message.is_ai ? (
-            <LawexaMessageContent
-              content={message.content}
-              metadata={message.metadata}
-              viewerUuid={viewerUuid}
-            />
-          ) : (
-            <MessageContent
-              content={message.content}
-              metadata={message.metadata}
-              viewerUuid={viewerUuid}
-            />
-          )}
-        </div>
+        <div className="mt-0.5">{children}</div>
       </div>
     </div>
   );

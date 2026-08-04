@@ -84,12 +84,16 @@ import {
  * leaves the identity header standing (and vice versa). Each region owns its
  * own three states.
  *
- * ── PERMISSIONS ARE READ TWICE, ON PURPOSE ─────────────────────────────────
+ * ── PERMISSIONS ARE READ FROM EVERY SOURCE, ON PURPOSE ─────────────────────
  * `my_role` is stamped on list rows but `GET /spaces/{uuid}` MAY omit it, so
- * governance falls back to the caller's row in the roster once the members
- * sheet has loaded it. Neither source alone is reliable; together they are,
- * and a missing answer degrades to "no manage actions" rather than to a
- * button that 403s.
+ * governance falls back to the caller's row in the roster — the fetched member
+ * list when it has landed, otherwise the roster the DETAIL response already
+ * carries. That second roster is what keeps the answer inside the first
+ * response: waiting for the members request left a space's creator looking at
+ * the "an owner or admin has to create one" empty state, with no button, in
+ * the seconds after they created it. No source alone is reliable; together
+ * they are, and a missing answer degrades to "no manage actions" rather than
+ * to a button that 403s.
  */
 export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   const session = useV2Session();
@@ -164,7 +168,15 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
     );
   }
 
-  const rosterRole = roleInRoster(membersQuery.data?.data ?? [], viewerUuid);
+  // The freshest roster available, then the row's own stamp: the fetched member
+  // list wins once it lands, and the roster the DETAIL response already carries
+  // covers the window before it — which is what stops a space's creator seeing
+  // the non-creator empty state seconds after creating it. Same one-liner as
+  // `OrganizationScreen`, deliberately.
+  const rosterRole = roleInRoster(
+    membersQuery.data?.data ?? space.members ?? [],
+    viewerUuid,
+  );
   const effective = { my_role: space.my_role ?? rosterRole };
   const canManage = canManageSpace(effective);
   const isOwner = isSpaceOwner(effective);

@@ -408,20 +408,17 @@ export interface AiSession {
 }
 
 /**
- * A row of an AI session transcript (`GET /channels/{uuid}/ai/sessions/{s}`).
+ * The role on a row of an AI session transcript
+ * (`GET /channels/{uuid}/ai/sessions/{s}`) — the ONLY authorship signal that
+ * resource carries. `assistant` is Lawexa, `user` is the human turn, and
+ * everything else is the tool/system machinery behind them (api-digest §C:
+ * distinguish by `role` + `metadata.type`, then filter for a dialogue view).
  *
- * The transcript is the COMPLETE conversation — the dialogue turns that were
- * posted to the channel AND the tool/system machinery behind them — so rows
- * carry an extra `role` the channel feed's messages never have. The backend's
- * instruction is to distinguish by `role` + `metadata.type` and filter for a
- * dialogue view (api-digest §C).
- *
- * `role` is typed OPEN on purpose (`(string & {})` keeps the known values in
- * autocomplete while accepting anything): the machinery vocabulary is the
- * agent's, it can grow without a frontend release, and the contractual rule for
- * unrecognised values is "fall back", never "crash". Consumers must therefore
- * classify with an allow-list of DIALOGUE roles, never a deny-list of
- * machinery ones.
+ * Typed OPEN on purpose (`(string & {})` keeps the known values in autocomplete
+ * while accepting anything): the machinery vocabulary is the agent's, it can
+ * grow without a frontend release, and the contractual rule for unrecognised
+ * values is "fall back", never "crash". Consumers must therefore classify with
+ * an allow-list of DIALOGUE roles, never a deny-list of machinery ones.
  */
 export type AiTranscriptRole =
   | 'user'
@@ -430,9 +427,43 @@ export type AiTranscriptRole =
   | 'system'
   | (string & {});
 
-export interface AiTranscriptMessage extends Message {
-  /** Absent on older rows — then authorship falls back to `is_ai` (§F.3). */
-  role?: AiTranscriptRole;
+/**
+ * A transcript row's metadata. Measured against production (2026-08-04) it
+ * carries `execution_id` alone — NOT `mentions`, NOT `lawexa_mentioned`, so a
+ * transcript body can never be handed to a renderer that expects
+ * {@link MessageMetadata}'s resolved mention list. Nothing reads
+ * `execution_id`, so it is not declared here; the row's rule is that only
+ * consumed fields are.
+ *
+ * `type` is the documented machinery discriminator (api-digest §C) and stays an
+ * open string: that vocabulary belongs to the agent, not to
+ * {@link MessageType}. It is optional, and so is the object, because the
+ * measurement covers the rows seen so far rather than a contract — every read
+ * must survive their absence.
+ */
+export interface AiTranscriptMetadata {
+  type?: string;
+}
+
+/**
+ * A row of an AI session transcript — NOT a {@link Message}. The endpoint reads
+ * the AI conversation table, not the channel messages table, so the row has
+ * none of a message's identity: no `uuid`, no `channel_uuid`, no `is_ai`, no
+ * `author`, no `parent_message_uuid`, no `edited_at`. Measured row keys
+ * (2026-08-04) are `id`, `conversation_id`, `conversation`, `agent_id`, `role`,
+ * `content`, `metadata`, `created_at`; only the consumed ones are declared.
+ *
+ * A `user` row's `content` is the ASSEMBLED PROMPT — a `<channel_context>`
+ * block followed by `[timestamp] Request from <name>: …` — not what the person
+ * typed, so a reader-facing surface must unwrap it before display.
+ */
+export interface AiTranscriptMessage {
+  /** The row identity, and the render key: the resource ships no uuid. */
+  id: number;
+  role: AiTranscriptRole;
+  content: string;
+  metadata?: AiTranscriptMetadata | null;
+  created_at: string;
 }
 
 /******************************************************************************
@@ -821,9 +852,8 @@ export type MessageResponse = ItemResponse<Message>;
 export type SentMessage = Message & { ai?: AiDispatch };
 export type SendMessageResponse = ItemResponse<SentMessage>;
 export type AiSessionListResponse = LengthAwareResponse<AiSession>;
-/** WIDENED (phase-5 W3): rows may carry the machinery `role` — see
- *  {@link AiTranscriptMessage}. Every field a `Message` consumer reads is still
- *  present, so this stays assignable everywhere it was before. */
+/** Rows here are AI-conversation rows, NOT messages: no uuid, no author, no
+ *  mention list — see {@link AiTranscriptMessage}. */
 export type AiSessionTranscriptResponse = CursorResponse<AiTranscriptMessage>;
 
 /* ── Engagement (phase-5 W3) ─────────────────────────────────────────────── */

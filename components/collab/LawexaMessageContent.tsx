@@ -12,7 +12,14 @@ import type { MessageMetadata } from '@/types/collab';
 
 interface LawexaMessageContentProps {
   content: string;
-  metadata: MessageMetadata;
+  /**
+   * REQUIRED, and explicitly `null` for resources that carry NO resolved
+   * mention list — the AI session transcript returns conversation rows, not
+   * messages (`AiTranscriptMessage`). Null renders the markdown with no chips,
+   * because the server's "never guess" rule leaves nothing to resolve. Not
+   * optional: forgetting it must fail the build, not silently drop mentions.
+   */
+  metadata: MessageMetadata | null;
   /**
    * When true, the top-level markdown blocks fade in with a small stagger
    * (`.reveal-blocks`) — used only for a Lawexa reply that has just arrived in
@@ -50,7 +57,8 @@ export function LawexaMessageContent({
   animateReveal = false,
 }: LawexaMessageContentProps) {
   const rehypePlugins = useMemo<PluginList>(
-    () => [rehypeLawexaMentions(buildMentionHandleMap(metadata))],
+    () =>
+      metadata ? [rehypeLawexaMentions(buildMentionHandleMap(metadata))] : [],
     [metadata]
   );
 
