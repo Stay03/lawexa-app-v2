@@ -19,6 +19,7 @@ import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import {
   CancelledStage,
   CountdownStage,
+  FinalAnswerStage,
   LobbyStage,
   PodiumStage,
   QuestionStage,
@@ -61,21 +62,26 @@ import './quiz-game.css';
 
 /** One coarse sentence per phase for the polite live region. Question and
  *  reveal name their INDEX, because "question" alone would announce the same
- *  word ten times and tell a screen-reader user nothing about progress. */
+ *  word ten times and tell a screen-reader user nothing about progress — and
+ *  the last one says so, which is the whole point of `is_final`: a reader who
+ *  cannot see the screen learns the game is ending before it ends. */
 function announce(game: ReturnType<typeof useLiveGame>): string {
   const state = game.state;
   if (!state) return '';
-  const index = (state.current_question?.index ?? 0) + 1;
+  if (game.closingAnswer) return 'The game is over — this was the last answer';
+  const current = state.current_question;
+  const index = (current?.index ?? 0) + 1;
   const total = state.game.question_count;
+  const last = current?.is_final === true ? ', the last one' : '';
   switch (game.phase) {
     case 'lobby':
       return `Quiz lobby: ${state.game.quiz.title}`;
     case 'countdown':
       return 'The game is about to start';
     case 'question':
-      return `Question ${index} of ${total}`;
+      return `Question ${index} of ${total}${last}`;
     case 'reveal':
-      return `Answer revealed for question ${index}`;
+      return `Answer revealed for question ${index}${last}`;
     case 'cancelled':
       return 'This game was cancelled';
     default:
@@ -91,6 +97,10 @@ const PHASE_CAPTION = {
   finished: 'Final scores',
   cancelled: 'Cancelled',
 } as const;
+
+/** The caption for the beat where the game is over but its last question is
+ *  still being closed on screen. */
+const LAST_ANSWER_CAPTION = 'Last answer';
 
 export function GameOverlay({
   channelUuid,
@@ -122,17 +132,28 @@ export function GameOverlay({
   const state = game.state;
   const title = state?.game.quiz.title ?? 'Live quiz';
   const phase = game.phase;
-  // The hold keeps the last reveal on screen while the server has already
-  // finished — say "Answer", not "Final scores", until it really is.
-  const caption = game.holdingFinalReveal
-    ? PHASE_CAPTION.reveal
-    : PHASE_CAPTION[phase];
+  // AN ENDING HOLD IS THE ONE TIME `phase` LAGS THE SERVER on purpose: the game
+  // is finished, the screen is still on its last question. Everything in this
+  // frame that speaks about "now" reads the hold first, so the header never
+  // says "Final scores" over a question, and no affordance offers a move
+  // (cancel, join) into a game that is already over.
+  const ending = game.holdingFinalReveal || game.closingAnswer !== null;
+  const caption = game.closingAnswer
+    ? LAST_ANSWER_CAPTION
+    : game.holdingFinalReveal
+      ? PHASE_CAPTION.reveal
+      : PHASE_CAPTION[phase];
 
   const canCancel =
-    game.isHost && state !== null && phase !== 'finished' && phase !== 'cancelled';
+    game.isHost &&
+    state !== null &&
+    !ending &&
+    phase !== 'finished' &&
+    phase !== 'cancelled';
   const showJoinBar =
     state !== null &&
     !game.isPlaying &&
+    !ending &&
     phase !== 'lobby' &&
     canJoinNow(state) &&
     game.joinErrorStatus !== 403;
@@ -167,7 +188,19 @@ export function GameOverlay({
             <p className="truncate text-sm font-semibold text-foreground">
               {title}
             </p>
-            <p className="text-xs text-muted-foreground">{caption}</p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {caption}
+              {/* The quiet half of the failed-read rule (see `GameBody`): the
+                  game stays exactly where it is, and this is the only thing
+                  that changes. No panel, no interruption — the recovery beat is
+                  already asking again. */}
+              {game.readFailing && (
+                <span className="inline-flex items-center gap-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+                  <WifiOff aria-hidden className="size-3" />
+                  Reconnecting…
+                </span>
+              )}
+            </p>
           </div>
           {canCancel && (
             <Button
@@ -278,7 +311,17 @@ function GameBody({
 }) {
   if (game.isPending) return <GameStageSkeleton />;
 
-  if (game.isError || !game.state) {
+  // A FAILED READ NEVER TAKES THE GAME OFF THE SCREEN.
+  //
+  // React Query keeps `data` when a REFETCH fails, so a single 500 or timeout
+  // mid-question used to replace the whole game — question, tiles, timer,
+  // locked answer — with an error card, and the recovery beat then flipped the
+  // screen back and forth every few seconds. It also made the player unable to
+  // answer for as long as it lasted. The read that exists to unfreeze the room
+  // must never be the thing that blanks it: the designed refusals below are for
+  // a game we have NOTHING to show for; while a snapshot is in hand the game
+  // plays on and the frame header carries a quiet "reconnecting" mark.
+  if (!game.state) {
     if (game.errorStatus === 403) {
       return (
         <GameStage>
@@ -353,6 +396,20 @@ function GameBody({
   }
 
   const gameUuid = game.state.game.uuid;
+
+  // The game is over, but its last question never had a reveal — close that
+  // question from the results before the podium (see `FinalAnswerStage`).
+  if (game.closingAnswer) {
+    return (
+      <FinalAnswerStage
+        closing={game.closingAnswer}
+        gameUuid={gameUuid}
+        viewerId={viewerId}
+        isPlaying={game.isPlaying}
+        onContinue={game.skipToScores}
+      />
+    );
+  }
 
   switch (game.phase) {
     case 'lobby':

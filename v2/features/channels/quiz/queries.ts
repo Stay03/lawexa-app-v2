@@ -1,10 +1,12 @@
 import { queryOptions, replaceEqualDeep } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 
 import { channelQuizApi, quizGamesApi } from '@/lib/api/channel-quiz';
+import { extractApiError } from '@/lib/utils/api-error';
 import type { QuizGameStateResponse } from '@/types/channel-quiz';
 import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
 import type { ViewerScoped } from '../queries';
-import { isOlderSnapshot, pollDelayMs, POLL_MS } from './model';
+import { isOlderSnapshot, pollDelayMs, POLL_MS, recoveryDelayMs } from './model';
 
 /**
  * channel-quiz query factory — the authoring library, the "is a game live
@@ -24,6 +26,32 @@ import { isOlderSnapshot, pollDelayMs, POLL_MS } from './model';
  * silent cross-account leak. It matters here — `your_answer` and the author
  * view's `is_correct` are both per-viewer.
  */
+
+/**
+ * The three statuses that END a game's polling. Everything else — including a
+ * bodyless 5xx, a timeout and a rate limit — is a condition that can pass.
+ */
+const REFUSALS = new Set([401, 403, 404]);
+
+/** How many times a `409` on results is re-asked, and how long apart — sized
+ *  for the finish race described on {@link channelQuizQueries.results}, not for
+ *  a server that is down. */
+const RESULTS_RACE_RETRIES = 2;
+const RESULTS_RACE_DELAY_MS = 800;
+
+/**
+ * The HTTP status behind a failed read, or `0` when there was no response.
+ *
+ * NOT `extractApiError` ALONE, and the difference matters here: that helper
+ * reads the status off the response BODY's envelope and reports `0` when a
+ * response carries no JSON — so a bodyless 403 or 404 from a proxy or an edge
+ * would look like a network error and earn an eternal retry beat. The transport
+ * knows the status even when the body is empty, so ask the transport first.
+ */
+function httpStatus(error: unknown): number {
+  if (isAxiosError(error) && error.response) return error.response.status;
+  return extractApiError(error).status;
+}
 
 export interface ChannelScoped extends ViewerScoped {
   channelUuid: string;
@@ -99,10 +127,14 @@ export const channelQuizQueries = {
    * broadcast emission returns. A game going live is announced by two events
    * this client cannot currently receive (`message.created` for the chat card,
    * `.quiz.game.live` for the probe), so without a beat a member sitting in
-   * the channel would never learn a game had started. Thirty seconds costs two
-   * requests a minute per open channel — nothing beside the game's own
-   * cadence — and it pauses with the tab
-   * (`refetchIntervalInBackground` stays false).
+   * the channel would never learn a game had started.
+   *
+   * ITS REAL COST, STATED HONESTLY: the CACHE entry is shared, but the interval
+   * is not — every observer of this query owns its own timer, so a feed holding
+   * N quiz cards plus the live bar makes up to N+1 staggered reads per 30s
+   * rather than one. They are cheap (`active=1` returns at most one row) and
+   * they pause with the tab (`refetchIntervalInBackground` stays false), and
+   * the whole beat disappears with the outage that justifies it.
    */
   activeGame: ({ channelUuid, viewerId }: ChannelScoped) =>
     queryOptions({
@@ -131,6 +163,13 @@ export const channelQuizQueries = {
    * automatically while the tab is hidden (`refetchIntervalInBackground`
    * defaults to false) and the focus refetch catches the reader up on return.
    *
+   * SINCE 2026-08-04 THIS BEAT IS ALSO THE GAME'S RECOVERY. The server runs any
+   * overdue transition on a state read (5s past the published deadline), so a
+   * game that has stalled — including one stuck on its final question — is
+   * unstuck by the next request this query makes. Nothing here may back off or
+   * give up while a game is non-terminal; that is why the error branch below
+   * distinguishes a refusal from weather.
+   *
    * TWO WRITERS, ONE ORDER (`structuralSharing`). This entry is written by BOTH
    * the poll and the event merges in `./use-game.ts`, and a request already in
    * flight when an event lands would otherwise overwrite it with an older
@@ -156,10 +195,28 @@ export const channelQuizQueries = {
         return replaceEqualDeep(before, next);
       },
       refetchInterval: (query) => {
-        // A refused or missing game (403/404) must NOT become a heartbeat
-        // against the API — the screen shows its designed refusal and offers a
-        // manual retry.
-        if (query.state.status === 'error') return false;
+        // A REFUSAL is an answer, and re-asking cannot change it: a game this
+        // viewer may not watch (403), one that does not exist (404), or a
+        // session that is no longer signed in (401). None of those may become a
+        // heartbeat against the API — the screen shows its designed state and
+        // offers a manual retry.
+        //
+        // ANY OTHER FAILURE IS WEATHER, and giving up on it would be the worst
+        // possible moment to stop: the game is still running on the server, and
+        // since the round-2 reply our read is ALSO what drives an overdue game
+        // forward. A screen that stopped polling after one bad response would
+        // freeze the room it was supposed to unfreeze. So it keeps a beat that
+        // widens with each consecutive failure (`recoveryDelayMs`) — quick
+        // enough for a blip, bounded enough that a dead backend is asked twice
+        // a minute rather than twelve times.
+        if (query.state.status === 'error') {
+          const status = httpStatus(query.state.error);
+          if (REFUSALS.has(status)) return false;
+          return recoveryDelayMs(
+            query.state.fetchFailureCount,
+            status === 429,
+          );
+        }
         const snapshot = query.state.data;
         // No snapshot yet: keep the tightest sensible beat rather than giving
         // up — the game may already be mid-question.
@@ -175,8 +232,19 @@ export const channelQuizQueries = {
   /**
    * A finished game's full results — podium, ranking, per-question stats.
    * Immutable once it exists (a finished game is history), so it is cached on
-   * the reference tier; a 409 here means the game is still running or was
-   * cancelled, which the podium screen renders as a designed state.
+   * the reference tier.
+   *
+   * THE `409` IS RETRIED, AND ONLY THE `409`. This read now fires at the exact
+   * instant a game finishes (the closing card asks for it the moment the status
+   * flips), which is the one moment the server can still answer "not finished"
+   * — a race, not a verdict. Left alone, that answer would be cached for ten
+   * minutes and the screen would tell a player who just played to the end that
+   * their game kept no scores. Two quick re-asks cost nothing and turn the race
+   * into a non-event; a genuinely cancelled game answers 409 three times, which
+   * is still the truth, and the screen says so with a way to ask again.
+   *
+   * Every other status keeps `retry: false` — a 403/404 will not improve, and
+   * the podium's error state offers the retry.
    */
   results: ({ gameUuid, viewerId }: GameScoped) =>
     queryOptions({
@@ -184,6 +252,8 @@ export const channelQuizQueries = {
       queryFn: () => quizGamesApi.results(gameUuid),
       staleTime: STALE_TIMES.reference,
       gcTime: GC_TIMES.reference,
-      retry: false,
+      retry: (failureCount, error) =>
+        httpStatus(error) === 409 && failureCount < RESULTS_RACE_RETRIES,
+      retryDelay: RESULTS_RACE_DELAY_MS,
     }),
 };

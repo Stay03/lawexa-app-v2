@@ -1,4 +1,5 @@
-import type { AiTranscriptMessage } from '@/types/collab';
+import type { AiTranscriptMessage, SlimUser } from '@/types/collab';
+import { recoverHumanQuestion } from './human-turn';
 
 /**
  * transcript-model — the pure lens that turns a COMPLETE AI session transcript
@@ -82,6 +83,56 @@ export function shapeTranscript(
 
   const rows = chronological.filter(isDialogueRow);
   return { rows, hiddenCount: chronological.length - rows.length };
+}
+
+/* ── The human side of a turn ─────────────────────────────────────────────── */
+
+/** One user turn, resolved from whichever of the two eras its row belongs to. */
+export interface HumanTurn {
+  /** What the person asked. */
+  text: string;
+  /**
+   * Who asked, when the SERVER says so. `null` on every turn recorded before
+   * 2026-08-04 — and `null` is not "unknown enough to guess": see below.
+   */
+  askedBy: SlimUser | null;
+  /** The channel message that summoned this turn, when the row carries it. */
+  channelMessageUuid: string | null;
+}
+
+/**
+ * Resolve a `role: "user"` transcript row into what to show.
+ *
+ * ── TWO ERAS, ONE FUNCTION ────────────────────────────────────────────────
+ * Since 2026-08-04 the server sends `user_content` — exactly what the person
+ * typed — alongside the assembled prompt in `content`. Rows written before
+ * that deploy have only `content`, and there is no backfill, so the fallback
+ * parse in {@link recoverHumanQuestion} still runs for them and only for them.
+ * `user_content` wins whenever it is there and non-empty; an empty string is
+ * treated as absent, because a turn with no words is a row we should read the
+ * old way rather than render as blank.
+ *
+ * ── WHY ATTRIBUTION IS `asked_by` OR NOTHING ──────────────────────────────
+ * The assembled prompt contains a name (`Request from <name>:`), and that name
+ * is worthless as an identity: the prompt is built out of channel messages any
+ * member can write, so any member can put any name in it. We refused to show a
+ * questioner for exactly that reason. `asked_by` is stamped by the server from
+ * the authenticated summoner, so it is the first attribution that has ever been
+ * safe to print — and it is the ONLY one. A row without it keeps the neutral
+ * treatment. Do not "improve" this by falling back to the parsed name: that
+ * would let one member publish words under another member's name in a legal
+ * product, which is the whole reason the parse discards it.
+ */
+export function humanTurn(message: AiTranscriptMessage): HumanTurn {
+  const typed = message.user_content?.trim();
+  return {
+    text:
+      typed !== undefined && typed !== ''
+        ? typed
+        : recoverHumanQuestion(message.content),
+    askedBy: message.asked_by ?? null,
+    channelMessageUuid: message.metadata?.channel_message_uuid ?? null,
+  };
 }
 
 /** A short label for a machinery row's badge — the agent's own word for what

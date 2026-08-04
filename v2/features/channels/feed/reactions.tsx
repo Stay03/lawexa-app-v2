@@ -34,6 +34,22 @@ import { REACTION_TRAY } from '../model';
  * those are worth a second signal in a transcript people read for work.
  */
 
+/** The chip's own surface — shared by the toggle and the read-only reading, so
+ *  a reaction looks identical whether or not the viewer may cast one. */
+const CHIP_SHELL =
+  'inline-flex min-h-6 items-center gap-1 rounded-full border px-1.5 text-xs leading-none';
+
+function ChipBody({ reaction }: { reaction: MessageReaction }) {
+  return (
+    <>
+      <span aria-hidden className="text-[0.8125rem] leading-none">
+        {reaction.emoji}
+      </span>
+      <span className="tabular-nums font-medium">{reaction.count}</span>
+    </>
+  );
+}
+
 /** One chip. Memo-free on purpose: it is three DOM nodes, and its parent row is
  *  already inside a `memo`'d message row. */
 function ReactionChip({
@@ -59,7 +75,8 @@ function ReactionChip({
       }
       title={disabled ? 'Reacting again in a moment…' : undefined}
       className={cn(
-        'v2-interactive inline-flex min-h-6 items-center gap-1 rounded-full border px-1.5 text-xs leading-none',
+        'v2-interactive',
+        CHIP_SHELL,
         'transition-[background-color,border-color,transform] duration-150',
         'motion-reduce:transition-none active:scale-[0.96]',
         mine
@@ -70,11 +87,28 @@ function ReactionChip({
         FOCUS_RING,
       )}
     >
-      <span aria-hidden className="text-[0.8125rem] leading-none">
-        {reaction.emoji}
-      </span>
-      <span className="tabular-nums font-medium">{reaction.count}</span>
+      <ChipBody reaction={reaction} />
     </button>
+  );
+}
+
+/**
+ * The same chip for a viewer who may not react — a SPAN, not a disabled
+ * button.
+ *
+ * A permanently disabled control says "not right now", which is the throttle's
+ * meaning and would be a lie here: reacting is not unavailable, it is not
+ * theirs to do until they join. So the count stays readable (it is content —
+ * what the room thought of a message) and the affordance is simply absent.
+ */
+function ReactionCount({ reaction }: { reaction: MessageReaction }) {
+  return (
+    <span
+      aria-label={`${reaction.count} reacted with ${reaction.emoji}`}
+      className={cn(CHIP_SHELL, 'border-border bg-background text-muted-foreground')}
+    >
+      <ChipBody reaction={reaction} />
+    </span>
   );
 }
 
@@ -195,12 +229,17 @@ export function ReactionTrayPopover({
  * The chips under a message. Renders nothing at all when there are no
  * reactions — an empty rail under every row would be exactly the per-row
  * clutter the no-list forbids.
+ *
+ * `readOnly` is the feed's read-only mode: the chips still read, they just
+ * stop being controls.
  */
 export function ReactionChips({
   reactions,
+  readOnly,
   onToggle,
 }: {
   reactions: readonly MessageReaction[] | undefined;
+  readOnly: boolean;
   onToggle: (emoji: string) => void;
 }) {
   const throttled = useEngagementThrottled('reaction');
@@ -208,14 +247,18 @@ export function ReactionChips({
 
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1">
-      {reactions.map((reaction) => (
-        <ReactionChip
-          key={reaction.emoji}
-          reaction={reaction}
-          disabled={throttled}
-          onToggle={onToggle}
-        />
-      ))}
+      {reactions.map((reaction) =>
+        readOnly ? (
+          <ReactionCount key={reaction.emoji} reaction={reaction} />
+        ) : (
+          <ReactionChip
+            key={reaction.emoji}
+            reaction={reaction}
+            disabled={throttled}
+            onToggle={onToggle}
+          />
+        ),
+      )}
     </div>
   );
 }

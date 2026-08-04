@@ -57,12 +57,21 @@ type CollectionKind = 'pins' | 'saved';
 export function PinnedMessagesSheet({
   channel,
   viewerId,
+  canUnpin,
   open,
   onOpenChange,
   onJumpToMessage,
 }: {
   channel: Channel;
   viewerId: number | null;
+  /**
+   * False for a space member previewing a `space_public` channel they never
+   * joined: the pins LIST is open to them, unpinning is not. The list keeps
+   * every other affordance — the jump especially, which is the whole point of
+   * the panel — and simply loses the verb, rather than showing a control that
+   * only 403s.
+   */
+  canUnpin: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onJumpToMessage: (messageUuid: string) => void;
@@ -82,7 +91,11 @@ export function PinnedMessagesSheet({
       title="Pinned messages"
       subtitle={`Kept by everyone in ${channel.name}`}
       emptyTitle="Nothing pinned yet"
-      emptyDescription="Pin a message to keep the decision, the link or the deadline where the whole channel can find it."
+      emptyDescription={
+        canUnpin
+          ? 'Pin a message to keep the decision, the link or the deadline where the whole channel can find it.'
+          : 'Nobody has pinned anything in this channel yet.'
+      }
       errorDescription="We couldn't load this channel's pins. Please try again."
       isPending={query.isPending}
       isError={query.isError}
@@ -91,7 +104,11 @@ export function PinnedMessagesSheet({
       onJumpToMessage={onJumpToMessage}
       removeLabel="Unpin"
       removeIcon={PinOff}
-      onRemove={(message) => pinMutate({ messageUuid: message.uuid, pinned: false })}
+      onRemove={
+        canUnpin
+          ? (message) => pinMutate({ messageUuid: message.uuid, pinned: false })
+          : undefined
+      }
     />
   );
 }
@@ -177,7 +194,9 @@ function CollectionSheet({
   removeLabel: string;
   removeIcon: React.ComponentType<{ className?: string }>;
   removeDisabled?: boolean;
-  onRemove: (message: Message) => void;
+  /** Absent = the collection is READ-ONLY for this viewer and rows carry no
+   *  remove button at all (never a disabled one — see `PinnedMessagesSheet`). */
+  onRemove?: (message: Message) => void;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -230,7 +249,7 @@ function CollectionSheet({
                   removeLabel={removeLabel}
                   removeIcon={RemoveIcon}
                   removeDisabled={removeDisabled}
-                  onRemove={() => onRemove(message)}
+                  onRemove={onRemove ? () => onRemove(message) : undefined}
                 />
               ))}
             </ul>
@@ -260,7 +279,9 @@ function CollectionRow({
   removeLabel: string;
   removeIcon: React.ComponentType<{ className?: string }>;
   removeDisabled: boolean;
-  onRemove: () => void;
+  /** Absent = read-only row: no remove button, and the jump gets the full
+   *  width back (`pr-12` reserved space for a control that isn't there). */
+  onRemove?: () => void;
 }) {
   const authorName = message.is_ai
     ? 'Lawexa'
@@ -276,8 +297,9 @@ function CollectionRow({
         type="button"
         onClick={onJump}
         className={cn(
-          'v2-interactive flex w-full items-start gap-3 px-4 py-3 pr-12 text-left',
+          'v2-interactive flex w-full items-start gap-3 px-4 py-3 text-left',
           'transition-colors duration-150 hover:bg-muted/60 motion-reduce:transition-none',
+          onRemove ? 'pr-12' : 'pr-4',
           FOCUS_RING,
         )}
       >
@@ -322,27 +344,29 @@ function CollectionRow({
         />
       </button>
 
-      <button
-        type="button"
-        aria-label={removeLabel}
-        title={removeLabel}
-        disabled={removeDisabled}
-        onClick={onRemove}
-        className={cn(
-          'v2-interactive absolute top-3 right-3 rounded-md p-1.5 text-muted-foreground',
-          'transition-[color,background-color,opacity] duration-150 motion-reduce:transition-none',
-          'hover:bg-muted hover:text-foreground',
-          // Reachable on touch (always visible there), quiet on pointer devices
-          // until the row is hovered or the button itself is focused.
-          '[@media(hover:hover)_and_(pointer:fine)]:opacity-0',
-          '[@media(hover:hover)_and_(pointer:fine)]:group-hover/row:opacity-100',
-          'focus-visible:opacity-100',
-          removeDisabled && 'pointer-events-none opacity-50',
-          FOCUS_RING,
-        )}
-      >
-        <RemoveIcon className="size-4" />
-      </button>
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={removeLabel}
+          title={removeLabel}
+          disabled={removeDisabled}
+          onClick={onRemove}
+          className={cn(
+            'v2-interactive absolute top-3 right-3 rounded-md p-1.5 text-muted-foreground',
+            'transition-[color,background-color,opacity] duration-150 motion-reduce:transition-none',
+            'hover:bg-muted hover:text-foreground',
+            // Reachable on touch (always visible there), quiet on pointer devices
+            // until the row is hovered or the button itself is focused.
+            '[@media(hover:hover)_and_(pointer:fine)]:opacity-0',
+            '[@media(hover:hover)_and_(pointer:fine)]:group-hover/row:opacity-100',
+            'focus-visible:opacity-100',
+            removeDisabled && 'pointer-events-none opacity-50',
+            FOCUS_RING,
+          )}
+        >
+          <RemoveIcon className="size-4" />
+        </button>
+      )}
     </li>
   );
 }

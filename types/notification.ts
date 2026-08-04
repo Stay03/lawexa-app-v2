@@ -16,6 +16,16 @@ export interface Notification {
   icon: string | null;
   read_at: string | null;
   created_at: string;
+  /**
+   * Subject ids, added 2026-08-04 so a bell row can be matched to the thing it
+   * points at without parsing `action_url`. Stamped only when the notification
+   * has them, and ABSENT on every row created before that deploy — which is the
+   * same deploy that started filling `title`/`message`/`icon` for channel
+   * notifications, so an old row is both wordless and unidentified.
+   */
+  channel_uuid?: string | null;
+  message_uuid?: string | null;
+  space_uuid?: string | null;
 }
 
 // GET /api/notifications/{id} response

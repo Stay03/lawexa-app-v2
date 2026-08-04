@@ -181,6 +181,32 @@ export interface Space {
   mention_count?: number;
   /** Roster present on `show`. */
   members?: Member[];
+  /**
+   * The channel the server creates with the space, so a creator can be put
+   * straight into a room that works instead of an empty list. Present on the
+   * CREATE response only — never on list or show.
+   *
+   * MEASURED 2026-08-04 against production: it is a REDUCED channel, not the
+   * full `Channel` the backend reply describes. The viewer-scoped fields
+   * (`is_member`, `my_role`, `my_notify_level`, `unread_count`,
+   * `mention_count`), `active_members_count` and `space` are all ABSENT, so it
+   * is typed as what the wire actually sends. Use it for the uuid and the name;
+   * read the channel itself for anything viewer-scoped.
+   */
+  default_channel?: DefaultChannelRef;
+  created_at: string;
+  updated_at: string;
+}
+
+/** The reduced channel stamped on a space CREATE response. See
+ *  {@link Space.default_channel} for why this is not a `Channel`. */
+export interface DefaultChannelRef {
+  uuid: string;
+  name: string;
+  description: string | null;
+  visibility: ChannelVisibility;
+  visibility_label: string;
+  last_message_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -443,6 +469,9 @@ export type AiTranscriptRole =
  */
 export interface AiTranscriptMetadata {
   type?: string;
+  /** The channel message that summoned this turn (backend, 2026-08-04).
+   *  Absent on turns recorded before that deploy. */
+  channel_message_uuid?: string | null;
 }
 
 /**
@@ -455,13 +484,21 @@ export interface AiTranscriptMetadata {
  *
  * A `user` row's `content` is the ASSEMBLED PROMPT — a `<channel_context>`
  * block followed by `[timestamp] Request from <name>: …` — not what the person
- * typed, so a reader-facing surface must unwrap it before display.
+ * typed. Since 2026-08-04 the server also sends `user_content` and `asked_by`,
+ * which are the truth and must be preferred; `content` remains the prompt.
+ * Turns recorded BEFORE that deploy carry neither, which is why both are
+ * optional and the text recovery stays as the fallback for old sessions.
  */
 export interface AiTranscriptMessage {
   /** The row identity, and the render key: the resource ships no uuid. */
   id: number;
   role: AiTranscriptRole;
   content: string;
+  /** What the person actually typed. Absent on pre-2026-08-04 turns. */
+  user_content?: string | null;
+  /** Who asked — the resource's only trustworthy attribution. The name inside
+   *  `content` is member-writable and must never be shown as an identity. */
+  asked_by?: SlimUser | null;
   metadata?: AiTranscriptMetadata | null;
   created_at: string;
 }

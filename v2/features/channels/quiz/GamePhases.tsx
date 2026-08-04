@@ -11,10 +11,12 @@ import {
   Timer,
   Trophy,
   Users,
+  WifiOff,
   X,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { extractApiError } from '@/lib/utils/api-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { QuizGameState, QuizRankingRow } from '@/types/channel-quiz';
@@ -23,11 +25,14 @@ import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
 import {
+  AnswersInRail,
   CountdownDial,
   GameStage,
   GameStageSkeleton,
   Leaderboard,
+  NextQuestionCountdown,
   OptionTile,
+  PhaseRow,
   PlayerChip,
   QuestionTimer,
   RankRow,
@@ -36,14 +41,16 @@ import {
   type OptionState,
 } from './ui';
 import {
+  answersIn,
   canJoinNow,
   isRevealedQuestion,
   LOBBY_IDLE_LIMIT_MINUTES,
+  nextQuestionOpensAt,
   questionNumber,
   SPEED_SCORING_NOTE,
   totalPicks,
 } from './model';
-import type { LiveGame } from './use-game';
+import type { AnswerStanding, FinalAnswerClose, LiveGame } from './use-game';
 
 /**
  * GamePhases — the six things a live game can look like: lobby, count-in,
@@ -225,8 +232,21 @@ export function QuestionStage({
   if (!state || !current) return <GameStageSkeleton />;
 
   const revealed = isRevealedQuestion(current);
-  const myPick = state.your_answer?.option_id ?? game.pendingOptionId;
-  const answered = myPick !== null && myPick !== undefined;
+  const standing = game.answerStanding;
+  // TWO DIFFERENT QUESTIONS, TWO DIFFERENT ANSWERS.
+  //
+  // "Is this reader done here?" locks the grid, and a local tap settles it —
+  // the second tap must not leave the device even while the first is in flight.
+  //
+  // "Which option gets the verdict?" may only ever be answered by the SERVER.
+  // A question can close early while a POST is in flight, so the reveal can
+  // land before the refusal does; painting the tapped tile would then put an
+  // emerald tick — and a screen-reader "Correct answer" — on an answer this
+  // player never actually gave, two rows above `RevealResult` saying they
+  // didn't answer at all.
+  const answered = standing.kind !== 'none' || game.pendingOptionId !== null;
+  const judgedPick = standing.kind === 'answered' ? standing.optionId : null;
+  const lockedPick = judgedPick ?? game.pendingOptionId;
   const picks = totalPicks(current.option_counts, current.no_answer_count);
   const countFor = (optionId: number) =>
     current.option_counts?.find((entry) => entry.option_id === optionId)?.count;
@@ -239,19 +259,24 @@ export function QuestionStage({
             Question {questionNumber(current, state.game.question_count)} of{' '}
             {state.game.question_count}
           </StageKicker>
-          {revealed && (
-            <span className="text-xs text-muted-foreground">
-              {picks} {picks === 1 ? 'answer' : 'answers'} in
+          {/* THE SCREEN STOPS BEING SILENT ABOUT WHAT COMES NEXT. `is_final`
+              rides the state read in both question phases, so the last question
+              can say so while it is still being answered — and the podium then
+              arrives as the ending everyone was told about rather than as a
+              jump. Gold, because it is the one thing on this screen worth
+              marking. */}
+          {current.is_final && (
+            <span className="shrink-0 text-xs font-medium text-primary">
+              Last question
             </span>
           )}
         </div>
 
         {revealed ? (
-          // The rail keeps its height so the reveal doesn't shift the question.
-          <div className="flex h-[1.375rem] items-center gap-2 text-sm text-muted-foreground">
-            <Check aria-hidden className="size-4 text-emerald-600 dark:text-emerald-400" />
-            Answer revealed
-          </div>
+          <NextQuestionCountdown
+            opensAt={nextQuestionOpensAt(state)}
+            isFinal={current.is_final}
+          />
         ) : (
           <QuestionTimer deadline={current.ends_at} opensAt={current.opens_at} />
         )}
@@ -274,7 +299,11 @@ export function QuestionStage({
               key={option.id}
               index={index}
               content={option.content}
-              state={optionState(option.id, myPick ?? null, current.correct_option_id)}
+              state={optionState(
+                option.id,
+                revealed ? judgedPick : lockedPick,
+                current.correct_option_id,
+              )}
               share={revealed && picks > 0 ? (count ?? 0) / picks : undefined}
               count={revealed ? (count ?? 0) : undefined}
               disabled={answered || throttled || game.answering}
@@ -288,10 +317,18 @@ export function QuestionStage({
         })}
       </div>
 
+      {/* Who is in, and how fast — the same beat as everything else on this
+          screen, straight off `current_question.answers_in`. */}
+      <AnswersInRail answers={answersIn(current)} />
+
       {/* ── The line under the grid: one honest sentence per situation ─── */}
       <div className="min-h-10">
         {revealed ? (
-          <RevealResult state={state} isPlaying={game.isPlaying} />
+          <RevealResult
+            state={state}
+            standing={standing}
+            isPlaying={game.isPlaying}
+          />
         ) : !game.isPlaying ? (
           <WatchingNote />
         ) : game.answerNote ? (
@@ -300,18 +337,18 @@ export function QuestionStage({
           <p className="text-sm text-muted-foreground">
             Answers are coming in faster than we allow — one moment.
           </p>
+        ) : game.answering ? (
+          // The tap is locked but the server has not confirmed it yet — say
+          // what is actually happening rather than claiming it is in.
+          <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Loader2 aria-hidden className="size-4 animate-spin" />
+            Sending your answer…
+          </p>
         ) : answered ? (
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <Check aria-hidden className="size-4 text-primary" />
-              Answer locked in
-            </span>
-            {game.progress && (
-              <span className="tabular-nums">
-                {game.progress.answered} of {game.progress.total} answered
-              </span>
-            )}
-          </div>
+          <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Check aria-hidden className="size-4 text-primary" />
+            Answer locked in
+          </p>
         ) : (
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Timer aria-hidden className="size-4" />
@@ -342,9 +379,11 @@ export function QuestionStage({
  *  only once the server has revealed it. */
 function RevealResult({
   state,
+  standing,
   isPlaying,
 }: {
   state: QuizGameState;
+  standing: AnswerStanding;
   isPlaying: boolean;
 }) {
   const answer = state.your_answer;
@@ -352,9 +391,18 @@ function RevealResult({
   if (!isPlaying) return <WatchingNote />;
 
   if (!answer) {
+    // NOTHING IN THE READ IS NOT THE SAME AS NOTHING SENT. An answer the server
+    // took but this read has not caught up with holds the row's shape; a tap
+    // whose fate we never learned says exactly that; only a reader who really
+    // sent nothing is told they sent nothing.
+    if (standing.kind === 'answered') {
+      return <Skeleton className="h-6 w-40 rounded" />;
+    }
     return (
       <p className="text-sm text-muted-foreground">
-        No answer from you this time.
+        {standing.kind === 'unknown'
+          ? "We never heard back about your answer — the scores have the last word."
+          : 'No answer from you this time.'}
       </p>
     );
   }
@@ -401,6 +449,167 @@ function WatchingNote() {
   );
 }
 
+/* ── The last question, when the game ended instead of revealing it ───────── */
+
+/**
+ * THE ENDING THE WIRE DOES NOT SEND.
+ *
+ * A question closes the moment every eligible player has answered. On the LAST
+ * question that means the game goes straight from `question_open` to
+ * `finished`: `current_question` becomes `null`, no reveal is ever published,
+ * and a player who has just answered would learn only their total score —
+ * never whether the answer they just gave was right. Measured in production on
+ * 2026-08-04; it is the normal path, not an edge case.
+ *
+ * NOTHING HERE IS INVENTED. This screen joins two things the server did send:
+ *  - the question as the screen last held it (its text and its options), and
+ *    what the server says this reader did with it ({@link AnswerStanding}) —
+ *    a receipt or a `your_answer`, never an assumption that a tap became an
+ *    answer, and never "you didn't answer" when the truth is "we never
+ *    learned";
+ *  - the finished game's results, whose per-question stats carry the correct
+ *    option, the room's distribution and the no-answer count.
+ * Their equality is the verdict. There is no fabricated reveal payload, no
+ * guessed points (the results publish no per-question score, so this says
+ * nothing about points), and if the results cannot be read it says that
+ * plainly and moves on.
+ *
+ * IT CONTINUES THE QUESTION RATHER THAN REPLACING IT. The kicker, the question
+ * and the four tiles stay exactly where they were — the reader's pick still
+ * gold — and resolve into the verdict when the results land, so there is no
+ * skeleton flash and no second screen to re-read. Then the podium, on its own,
+ * after `FINAL_ANSWER_HOLD_MS` (`./model.ts`) or the moment the reader asks.
+ *
+ * THE ANSWERING RAIL DOES NOT COME WITH IT, deliberately. The arrival list was
+ * captured from the last state read BEFORE the game ended — and on this
+ * question, the reader's own answer is usually what ended it — so it would be
+ * one name short of the room while presenting itself as the whole of it. The
+ * results' distribution below the tiles is the complete version of the same
+ * fact, and it is right there.
+ */
+export function FinalAnswerStage({
+  closing,
+  gameUuid,
+  viewerId,
+  isPlaying,
+  onContinue,
+}: {
+  closing: FinalAnswerClose;
+  gameUuid: string;
+  viewerId: number | null;
+  isPlaying: boolean;
+  onContinue: () => void;
+}) {
+  const query = useQuery(channelQuizQueries.results({ gameUuid, viewerId }));
+  const question = closing.question.question;
+  const stats =
+    query.data?.data.questions.find((row) => row.uuid === question.uuid) ?? null;
+
+  const standing = closing.standing;
+  const myPick = standing.kind === 'answered' ? standing.optionId : null;
+  const correctId = stats?.correct_option.id ?? null;
+  const picks = stats ? totalPicks(stats.option_counts, stats.no_answer_count) : 0;
+  const countFor = (optionId: number) =>
+    stats?.option_counts.find((entry) => entry.option_id === optionId)?.count;
+
+  return (
+    <GameStage>
+      <div className="flex flex-col gap-3">
+        <StageKicker>Last question</StageKicker>
+        <PhaseRow>
+          <Trophy aria-hidden className="size-4 shrink-0 text-primary" />
+          <span className="text-sm text-muted-foreground">
+            That answer ended the game — final scores next
+          </span>
+        </PhaseRow>
+      </div>
+
+      <h2 className="text-xl leading-snug font-semibold text-balance text-foreground sm:text-2xl">
+        {question.question}
+      </h2>
+
+      <div
+        className={cn('grid gap-3', question.options.length > 2 && 'sm:grid-cols-2')}
+      >
+        {question.options.map((option, index) => {
+          const count = countFor(option.id);
+          return (
+            <OptionTile
+              key={option.id}
+              index={index}
+              content={option.content}
+              state={optionState(option.id, myPick, correctId)}
+              share={stats && picks > 0 ? (count ?? 0) / picks : undefined}
+              count={stats ? (count ?? 0) : undefined}
+              disabled
+            />
+          );
+        })}
+      </div>
+
+      <div className="flex min-h-10 flex-wrap items-center gap-3">
+        {!isPlaying ? (
+          <WatchingNote />
+        ) : query.isPending ? (
+          // The verdict is the one thing not yet known — hold its shape.
+          <Skeleton className="h-6 w-40 rounded" />
+        ) : stats ? (
+          <VerdictChip
+            standing={standing}
+            correct={myPick !== null && myPick === correctId}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            We couldn&rsquo;t read how this question went — the final scores are
+            next.
+          </p>
+        )}
+        <Button variant="outline" size="sm" onClick={onContinue}>
+          See final scores
+        </Button>
+      </div>
+    </GameStage>
+  );
+}
+
+/** Right, wrong, never sent, or never confirmed — the same four sentences the
+ *  reveal uses, minus the points, which nothing published for this question. */
+function VerdictChip({
+  standing,
+  correct,
+}: {
+  standing: AnswerStanding;
+  correct: boolean;
+}) {
+  if (standing.kind !== 'answered') {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {standing.kind === 'unknown'
+          ? "We never heard back about your last answer — the final scores below have it either way."
+          : 'No answer from you this time.'}
+      </p>
+    );
+  }
+  return (
+    <p
+      className={cn(
+        'inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium',
+        // `emerald-700` in light — see RevealResult for why.
+        correct
+          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+          : 'bg-destructive/10 text-destructive',
+      )}
+    >
+      {correct ? (
+        <Check aria-hidden className="size-4" />
+      ) : (
+        <X aria-hidden className="size-4" />
+      )}
+      {correct ? 'Correct' : 'Not this time'}
+    </p>
+  );
+}
+
 /* ── Podium ───────────────────────────────────────────────────────────────── */
 
 const PODIUM_HEIGHT = ['h-24', 'h-16', 'h-12'];
@@ -432,15 +641,38 @@ export function PodiumStage({
   }
 
   if (query.isError || !results) {
-    // 409 here means "running or cancelled" — both are honest answers, and
-    // both are already visible from the game's own status.
+    // TWO DIFFERENT TRUTHS, AND THEY MUST NOT SHARE A SENTENCE. A `409` is the
+    // server's answer — this game was cancelled or is somehow still running, so
+    // there are no scores and there never will be. Anything else is a failed
+    // read of scores that DO exist, and telling that reader their game kept no
+    // scores would be a lie with no way back from it.
+    const refused = extractApiError(query.error).status === 409;
     return (
       <GameStage>
         <CollabMessage
-          icon={Trophy}
-          tone="neutral"
-          title="No final scores for this game"
-          description="Results are kept for games that ran to the end. A game that was cancelled leaves none."
+          icon={refused ? Trophy : WifiOff}
+          tone={refused ? 'neutral' : 'alert'}
+          title={
+            refused
+              ? 'No final scores for this game'
+              : "Couldn't load the final scores"
+          }
+          description={
+            refused
+              ? 'Results are kept for games that ran to the end. A game that was cancelled leaves none.'
+              : 'The scores are safe on our side — this screen just lost touch with them.'
+          }
+          action={
+            refused ? undefined : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void query.refetch()}
+              >
+                Try again
+              </Button>
+            )
+          }
         />
       </GameStage>
     );

@@ -1,4 +1,4 @@
-import { Lock, MessagesSquare, WifiOff } from 'lucide-react';
+import { Eye, Loader2, Lock, LogIn, MessagesSquare, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -86,8 +86,18 @@ export function FeedErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-/** The designed empty channel — teaches (name + purpose) and acts (focus the
- *  composer). Never a blank pane (DIRECTION 13). */
+/**
+ * The designed empty channel — teaches (name + purpose) and acts (focus the
+ * composer). Never a blank pane (DIRECTION 13).
+ *
+ * `onWriteFirstMessage` IS OPTIONAL BECAUSE THE ACT IS. A space member
+ * previewing a public channel they have not joined can read this room and not
+ * write in it, so the same empty state has to be able to teach WITHOUT
+ * offering a button that would only 403 — {@link ChannelPreviewDock} already
+ * carries the one way forward, and a second, broken one here would be worse
+ * than none. The title changes with it: an unjoined room is not "ready" for
+ * you yet.
+ */
 export function FeedEmptyState({
   channelName,
   description,
@@ -95,37 +105,121 @@ export function FeedEmptyState({
 }: {
   channelName: string;
   description: string | null;
-  onWriteFirstMessage: () => void;
+  onWriteFirstMessage?: () => void;
 }) {
   return (
     <CollabMessage
       icon={MessagesSquare}
       tone="neutral"
-      title={`${channelName} is ready`}
+      title={onWriteFirstMessage ? `${channelName} is ready` : 'Nothing here yet'}
       description={
         description?.trim() ||
-        'No messages yet. Whatever your group is working on, this is where it starts.'
+        (onWriteFirstMessage
+          ? 'No messages yet. Whatever your group is working on, this is where it starts.'
+          : `Nobody has written in ${channelName} yet.`)
       }
       action={
-        <Button size="sm" onClick={onWriteFirstMessage}>
-          Write the first message
-        </Button>
+        onWriteFirstMessage ? (
+          <Button size="sm" onClick={onWriteFirstMessage}>
+            Write the first message
+          </Button>
+        ) : undefined
       }
     />
   );
 }
 
+/**
+ * ChannelPreviewDock — what stands where the composer stands for a space
+ * member reading a `space_public` channel they have not joined.
+ *
+ * THE ABSENCE IS THE POINT, AND SO IS ITS PLACE. Reading is open here and
+ * replying is not, so the honest surface is the one the reply would have come
+ * from: the dock keeps the composer's exact column and cap
+ * (`max-w-xs` / `sm:max-w-md`), so it sits on the transcript's own axis and the
+ * reader meets a way IN rather than a control that fails.
+ *
+ * IT IS NOT THE COMPOSER'S HEIGHT. It is a taller bordered card, and its
+ * sentence wraps to two or three lines on a narrow phone with a long channel
+ * name. Nothing has to be reserved for that here: the feed measures whatever
+ * occupies this slot (`--v2-chan-dock-h`, a live `ResizeObserver`) and gives
+ * the transcript exactly that much clearance, wrapping included.
+ *
+ * IT IS THE ONLY JOIN ON THE SCREEN. The header carries no second button: two
+ * would be the same action twice, and a failure raised at the top would print
+ * its sentence at the bottom. Everything about the attempt — the press, the
+ * pending spinner, the server's words — happens in this one place.
+ *
+ * Hook-free: the screen owns the mutation, the pending flag and the error, so
+ * this stays a presentational panel like the rest of this file.
+ */
+export function ChannelPreviewDock({
+  channelName,
+  onJoin,
+  isJoining,
+  error,
+}: {
+  channelName: string;
+  onJoin: () => void;
+  isJoining: boolean;
+  /** The server's own sentence from the last failed attempt, or `null`. */
+  error: string | null;
+}) {
+  return (
+    <div className="mx-auto w-full max-w-xs px-4 pb-3 sm:max-w-md">
+      <div className="rounded-2xl border bg-background/95 px-3 py-2.5 shadow-lg backdrop-blur">
+        <div className="flex items-center gap-2.5">
+          <Eye aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+            You&rsquo;re reading {channelName}.{' '}
+            <span className="text-foreground">Join to reply.</span>
+          </p>
+          <Button size="sm" className="shrink-0" onClick={onJoin} disabled={isJoining}>
+            {isJoining ? (
+              <Loader2 aria-hidden className="size-4 animate-spin" />
+            ) : (
+              <LogIn aria-hidden className="size-4" />
+            )}
+            Join
+          </Button>
+        </div>
+        {error && (
+          <p role="alert" className="mt-1.5 text-xs font-medium text-destructive">
+            {error}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Screen-level refusals ────────────────────────────────────────────────── */
 
-/** 403 — a POLICY refusal (usually "not a member of this private channel"),
- *  never auto-mapped to verify-email (collab model's rule). */
+/**
+ * 403 — a POLICY refusal, never auto-mapped to verify-email (collab model's
+ * rule).
+ *
+ * THE COPY DELIBERATELY DOES NOT NAME THE WALL. Since preview landed, a 403
+ * here has two possible meanings and we have measured neither: the reader is
+ * outside the SPACE (certain), or the channel is PRIVATE and the server refuses
+ * its detail to a space member who never joined (unknown — see the open
+ * question in `v2/features/collab/access.tsx`). Naming either one would tell
+ * half the readers something false: a colleague opening a link to a private
+ * channel in a space they are already in must not be told they are not in that
+ * space and asked to be invited to it.
+ *
+ * So it says what is true in both cases, and the way forward is true in both
+ * too — someone on the other side of whichever wall this is can let you
+ * through. Restore a specific sentence only when the shape has been measured
+ * with two accounts in one space.
+ */
 export function ChannelAccessDeniedState() {
   return (
     <CollabMessage
       icon={Lock}
       tone="neutral"
-      title="This channel is private"
-      description="You don't have access to this channel. Ask a member to invite you, or pick another channel from your spaces."
+      title="You don't have access to this channel"
+      description="This channel isn't open to you. Ask someone already in it to invite you, or pick a channel from your own spaces."
     />
   );
 }

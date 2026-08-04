@@ -2,13 +2,24 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { ArrowLeft, Bell, CheckCheck, Settings2 } from 'lucide-react';
 import {
+  ArrowLeft,
+  AtSign,
+  Bell,
+  CheckCheck,
+  Reply,
+  Settings2,
+  Trash2,
+  UserPlus,
+  type LucideIcon,
+} from 'lucide-react';
+import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
+  type InfiniteData,
 } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
@@ -30,14 +41,20 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import {
+  presentNotification,
+  type NotificationDestination,
+  type NotificationMark,
+  type NotificationPresentation,
+} from '@/v2/features/notifications/presentation';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
 import { optimisticMutation } from '@/v2/runtime/mutations';
 import { NotificationDeliveryControls } from './NotificationDeliveryControls';
 import type {
+  DeleteNotificationResponse,
   MarkAllReadResponse,
   MarkReadResponse,
   Notification,
-  NotificationListParams,
   NotificationListResponse,
   UnreadCountResponse,
 } from '@/types/notification';
@@ -56,12 +73,19 @@ import type {
  * The panel is TWO views behind one gear: the list, and the spine's delivery
  * switches (`NotificationDeliveryControls` — see that module for why they
  * belong here). They swap rather than stack, so the panel's height is the
- * same either way and the footer link is never pushed out of reach.
+ * same either way and the list keeps one height whichever view is showing.
+ *
+ * ── THIS PANEL IS THE WHOLE INBOX (2026-08-04) ────────────────────────────
+ * It used to end in a "View all notifications" link to `/notifications`. That
+ * path is not in `v2/routes.manifest.ts`, so following it left the v2 shell
+ * and landed on v1's page — v1 chrome, v1 header, a full document load. A
+ * link out of the experience is not a feature, so the link is gone and the
+ * list PAGINATES IN PLACE instead: ten rows on open, "Show older" for the
+ * rest. Nothing is unreachable, and the reader never leaves v2. A real v2
+ * `/notifications` route (manifest entry + `app/v2/notifications`) is the
+ * follow-up for whoever owns those files; this panel needs no change when it
+ * arrives.
  */
-
-/** The single list variant the panel reads; a module constant so its query key
- *  is identical between the panel's `useQuery` and the mutations that patch it. */
-const LIST_PARAMS: NotificationListParams = { per_page: 10 };
 
 /** Optimistic `read_at` stamp. Module-level (not a component/hook) so the
  *  `new Date()` is outside render and never trips the React Compiler lint; it's
@@ -76,6 +100,38 @@ function nowIso(): string {
 function relativeTime(iso: string): string {
   return formatDistanceToNow(parseISO(iso), { addSuffix: true });
 }
+
+/**
+ * Flatten the loaded pages, dropping any row already seen.
+ *
+ * Offset pagination over a LIVE inbox repeats itself: a notification that
+ * arrives between "page 1" and "page 2" pushes the boundary row down into the
+ * next page, which would then render twice under the same React key. The first
+ * copy wins, so the newest page's version of a row is the one kept.
+ */
+function uniqueById(rows: readonly Notification[]): Notification[] {
+  const seen = new Set<string>();
+  const unique: Notification[] = [];
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    unique.push(row);
+  }
+  return unique;
+}
+
+/**
+ * One glyph per kind, so the list is scannable at a glance — and ONLY a glyph.
+ * Gold is the single accent in this product and it already means "unread"
+ * here, so a mention is not additionally coloured: colour carries read state,
+ * shape carries kind, and the two never compete.
+ */
+const MARK_ICONS: Readonly<Record<NotificationMark, LucideIcon>> = {
+  mention: AtSign,
+  reply: Reply,
+  invite: UserPlus,
+  general: Bell,
+};
 
 export function V2NotificationBell({ signedIn }: { signedIn: boolean }) {
   const isMobile = useIsMobile();
@@ -128,7 +184,7 @@ export function V2NotificationBell({ signedIn }: { signedIn: boolean }) {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>{trigger}</SheetTrigger>
         {/* The CONTAINER owns the height cap and the panel flexes inside it,
-            so the footer link stays on screen on a short phone (audit L3). */}
+            so the list can scroll on a short phone (audit L3). */}
         <SheetContent
           side="bottom"
           showCloseButton={false}
@@ -180,36 +236,76 @@ function NotificationPanel({
   const router = useRouter();
   const queryClient = useQueryClient();
   // The panel has TWO views behind one surface (audit L4). Settings SWAP with
-  // the list instead of stacking under it: stacked, they pushed the footer
-  // link off a short viewport and read as something bolted on the end. Swapped,
-  // the panel keeps one height and the gear is an ordinary destination.
+  // the list instead of stacking under it: stacked, they pushed the rest of the
+  // panel off a short viewport and read as something bolted on the end.
+  // Swapped, the panel keeps one height and the gear is an ordinary destination.
   const [showSettings, setShowSettings] = useState(false);
 
-  const listQuery = useQuery(notificationsQueries.list(LIST_PARAMS));
-  const notifications = listQuery.data?.data ?? [];
+  const listQuery = useInfiniteQuery(notificationsQueries.infiniteList());
+  const notifications = uniqueById(
+    listQuery.data?.pages.flatMap((page) => page.data) ?? [],
+  );
 
   // Mark one read: optimistically flip the row in the LIST, then invalidate the
   // COUNT so the badge reconciles. The patched key stays out of `invalidates`.
   const markRead = useMutation(
-    optimisticMutation<MarkReadResponse, string, NotificationListResponse>(
-      queryClient,
-      {
-        mutationFn: (id) => notificationsApi.markAsRead(id),
-        queryKey: notificationsQueries.list(LIST_PARAMS).queryKey,
-        optimisticUpdate: (previous, id) =>
-          previous
-            ? {
-                ...previous,
-                data: previous.data.map((item) =>
+    optimisticMutation<
+      MarkReadResponse,
+      string,
+      InfiniteData<NotificationListResponse>
+    >(queryClient, {
+      mutationFn: (id) => notificationsApi.markAsRead(id),
+      queryKey: notificationsQueries.infiniteList().queryKey,
+      optimisticUpdate: (previous, id) =>
+        previous
+          ? {
+              ...previous,
+              pages: previous.pages.map((page) => ({
+                ...page,
+                data: page.data.map((item) =>
                   item.id === id
                     ? { ...item, read_at: item.read_at ?? nowIso() }
                     : item,
                 ),
-              }
-            : previous,
-        meta: { invalidates: [notificationsQueries.unreadCount().queryKey] },
-      },
-    ),
+              })),
+            }
+          : previous,
+      meta: { invalidates: [notificationsQueries.unreadCount().queryKey] },
+    }),
+  );
+
+  // Delete one: drop the row from the LIST immediately, then invalidate the
+  // COUNT (deleting an unread row lowers it). It shares `markRead`'s default
+  // mutation key — both patch this one list entry — so a burst of row edits
+  // reconciles once at the end rather than once each.
+  //
+  // THIS IS WHY THE PANEL HAS A DELETE AT ALL: v1 offered it on its
+  // `/notifications` page, and that page is no longer reachable from the v2
+  // shell. Dropping the ejecting link was right; dropping the capability with
+  // it was not, so it has a home here instead. There is no restore endpoint,
+  // hence no undo to offer — which is why the control is a small, muted,
+  // deliberate target at the row's edge rather than anything the eye lands on
+  // first.
+  const remove = useMutation(
+    optimisticMutation<
+      DeleteNotificationResponse,
+      string,
+      InfiniteData<NotificationListResponse>
+    >(queryClient, {
+      mutationFn: (id) => notificationsApi.delete(id),
+      queryKey: notificationsQueries.infiniteList().queryKey,
+      optimisticUpdate: (previous, id) =>
+        previous
+          ? {
+              ...previous,
+              pages: previous.pages.map((page) => ({
+                ...page,
+                data: page.data.filter((item) => item.id !== id),
+              })),
+            }
+          : previous,
+      meta: { invalidates: [notificationsQueries.unreadCount().queryKey] },
+    }),
   );
 
   // Mark all read: optimistically zero the COUNT (the most visible feedback),
@@ -227,20 +323,42 @@ function NotificationPanel({
     ),
   );
 
-  const handleSelect = (notification: Notification) => {
+  /**
+   * A click does two independent things: it settles the row (mark read) and it
+   * follows the row's destination. They are separate on purpose, because a row
+   * may have only the first.
+   *
+   * `internal` is a client-side `router.push`, which keeps a channel deep link
+   * (`/channels/{uuid}?m={message_uuid}` — a mention's shape and now a reply's)
+   * inside the v2 shell; `/channels/*` is in the v2 manifest, so it resolves to
+   * the v2 screen and the `?m=` anchor rides along untouched.
+   *
+   * `external` opens a new tab rather than navigating this one away — an
+   * absolute URL is not ours and must not replace the app.
+   *
+   * `none` navigates NOWHERE. v1 sends such a row to `/notifications/{id}`,
+   * which has no v2 route and would eject the reader into v1. Marking it read
+   * is then the entire interaction, and the row visibly settles (the dot goes,
+   * the tint goes), so the click is still answered.
+   */
+  const handleSelect = (
+    notification: Notification,
+    destination: NotificationDestination,
+  ) => {
     if (!notification.read_at) markRead.mutate(notification.id);
+    if (destination.kind === 'none') return;
     onNavigate();
-    const target =
-      notification.action_url && notification.action_url.startsWith('/')
-        ? notification.action_url
-        : `/notifications/${notification.id}`;
-    router.push(target);
+    if (destination.kind === 'internal') {
+      router.push(destination.href);
+      return;
+    }
+    window.open(destination.href, '_blank', 'noopener,noreferrer');
   };
 
   return (
     // `min-h-0` on the body row is what lets the panel bound its own height:
-    // the header and the footer link keep their size and the SCROLLING region
-    // gives way, so the footer is reachable on any viewport (audit L3).
+    // the header keeps its size and the SCROLLING region gives way, so the
+    // panel fits any viewport (audit L3).
     <div className="flex min-h-0 flex-col">
       <div className="flex items-center justify-between gap-2 px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">
@@ -290,36 +408,52 @@ function NotificationPanel({
           <NotificationDeliveryControls />
         ) : listQuery.isLoading ? (
           <PanelSkeleton />
-        ) : listQuery.isError ? (
-          <PanelError onRetry={() => listQuery.refetch()} />
         ) : notifications.length === 0 ? (
-          <PanelEmpty />
+          // The error state belongs to an EMPTY panel only. Once rows are on
+          // screen they stay: a failed refetch (or a failed older page) must
+          // not swallow notifications the reader can already see — the retry
+          // then lives on the button at the end of the stream.
+          listQuery.isError ? (
+            <PanelError onRetry={() => void listQuery.refetch()} />
+          ) : (
+            <PanelEmpty />
+          )
         ) : (
-          <ul className="divide-y divide-border">
-            {notifications.map((notification) => (
-              <li key={notification.id}>
-                <NotificationRow
-                  notification={notification}
-                  onSelect={handleSelect}
-                />
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="divide-y divide-border">
+              {notifications.map((notification) => (
+                <li key={notification.id}>
+                  <NotificationRow
+                    notification={notification}
+                    onSelect={handleSelect}
+                    onDelete={(id) => remove.mutate(id)}
+                  />
+                </li>
+              ))}
+            </ul>
+            {/* Older pages load INTO the stream, so the affordance lives at the
+                end of the list rather than in a fixed footer — when the last
+                page arrives it simply stops being part of the scroll, with no
+                chrome appearing or vanishing around the panel. */}
+            {listQuery.hasNextPage ? (
+              <div className="p-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs text-muted-foreground"
+                  onClick={() => void listQuery.fetchNextPage()}
+                  disabled={listQuery.isFetchingNextPage}
+                >
+                  {listQuery.isFetchingNextPage
+                    ? 'Loading older…'
+                    : listQuery.isFetchNextPageError
+                      ? 'Try again'
+                      : 'Show older'}
+                </Button>
+              </div>
+            ) : null}
+          </>
         )}
-      </div>
-
-      <Separator />
-
-      <div className="shrink-0 p-2">
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="w-full text-xs text-muted-foreground"
-          onClick={onNavigate}
-        >
-          <Link href="/notifications">View all notifications</Link>
-        </Button>
       </div>
     </div>
   );
@@ -327,25 +461,94 @@ function NotificationPanel({
 
 /* -------------------------------------------------------------------------- */
 
+/**
+ * One inbox row. Everything it says comes from
+ * `v2/features/notifications/presentation.ts` — see that module for how a
+ * pre-deploy wordless row degrades to its own kind instead of to the bare word
+ * "Notification".
+ *
+ * A row with NOTHING to do — no destination and already read — is not a
+ * button. Rendering a dead control that answers a click with nothing is worse
+ * than rendering plain text, so the same body is emitted either interactively
+ * or inert, and the affordance always matches what a click will actually do.
+ *
+ * Delete is a SIBLING control, never nested inside the row's button (invalid
+ * HTML, and an unreachable target for the keyboard). On a pointer device it
+ * fades in with the row's hover; on touch, where there is no hover, it is
+ * simply always there — a capability that only works with a mouse is not a
+ * capability. Its space is reserved either way, so nothing shifts.
+ */
 function NotificationRow({
   notification,
   onSelect,
+  onDelete,
 }: {
   notification: Notification;
-  onSelect: (notification: Notification) => void;
+  onSelect: (
+    notification: Notification,
+    destination: NotificationDestination,
+  ) => void;
+  onDelete: (id: string) => void;
 }) {
   const isUnread = !notification.read_at;
-  const title = notification.title || 'Notification';
+  const presentation = presentNotification(notification);
+  const isActionable = presentation.destination.kind !== 'none' || isUnread;
+
+  const body = (
+    <NotificationRowBody
+      presentation={presentation}
+      isUnread={isUnread}
+      createdAt={notification.created_at}
+    />
+  );
+  const bodyClasses = 'flex min-w-0 flex-1 items-start gap-3 py-3 pl-4 text-left';
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(notification)}
+    <div
       className={cn(
-        'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50',
+        'group relative flex items-start transition-colors duration-150 hover:bg-muted/50 motion-reduce:transition-none',
         isUnread && 'bg-primary/5',
       )}
     >
+      {isActionable ? (
+        <button
+          type="button"
+          onClick={() => onSelect(notification, presentation.destination)}
+          className={bodyClasses}
+        >
+          {body}
+        </button>
+      ) : (
+        <div className={bodyClasses}>{body}</div>
+      )}
+      <div className="flex shrink-0 items-center py-3 pl-1 pr-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Delete notification"
+          onClick={() => onDelete(notification.id)}
+          className="size-7 text-muted-foreground/60 transition-opacity duration-150 hover:text-foreground focus-visible:opacity-100 motion-reduce:transition-none md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function NotificationRowBody({
+  presentation,
+  isUnread,
+  createdAt,
+}: {
+  presentation: NotificationPresentation;
+  isUnread: boolean;
+  createdAt: string;
+}) {
+  const MarkIcon = MARK_ICONS[presentation.mark];
+
+  return (
+    <>
       <span
         className={cn(
           'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg',
@@ -355,7 +558,7 @@ function NotificationRow({
         )}
         aria-hidden="true"
       >
-        <Bell className="size-4" />
+        <MarkIcon className="size-4" />
       </span>
 
       <span className="min-w-0 flex-1">
@@ -363,10 +566,12 @@ function NotificationRow({
           <span
             className={cn(
               'min-w-0 flex-1 truncate text-sm',
-              isUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground',
+              isUnread
+                ? 'font-semibold text-foreground'
+                : 'font-medium text-foreground',
             )}
           >
-            {title}
+            {presentation.title}
           </span>
           {isUnread ? (
             <span
@@ -375,16 +580,18 @@ function NotificationRow({
             />
           ) : null}
         </span>
-        {notification.message ? (
+        {/* No preview, no placeholder. A pre-deploy row carries no message and
+            must not be given one — its title already states what it is. */}
+        {presentation.preview ? (
           <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
-            {notification.message}
+            {presentation.preview}
           </span>
         ) : null}
         <span className="mt-1 block text-xs text-muted-foreground/70">
-          {relativeTime(notification.created_at)}
+          {relativeTime(createdAt)}
         </span>
       </span>
-    </button>
+    </>
   );
 }
 

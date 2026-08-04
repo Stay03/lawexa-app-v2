@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { channelsApi } from '@/lib/api/collab';
+import { settleNotificationsAfterChannelRead } from '@/v2/features/notifications/settle';
 import { applySpaceRollupDeltas } from '@/v2/features/spaces/cache';
 import {
   registerActiveChannel,
@@ -104,6 +105,15 @@ export function useChannelReadPointer(
           application.deltas,
         );
       }
+      // THE BELL AGREES WITH THE CHANNEL (backend, 2026-08-04). This same POST
+      // marks read every unread mention/reply notification pointing into this
+      // channel at or before the marked message — server-side, and without
+      // saying so in the response. The bell would otherwise keep counting
+      // notifications the server has already cleared until the next refocus.
+      // It takes the channel because it decides per channel whether a request
+      // could change anything; see `notifications/settle.ts` for the four
+      // gates that keep a constantly-advancing read pointer off the wire.
+      settleNotificationsAfterChannelRead(queryClient, channelUuid);
     },
   });
 

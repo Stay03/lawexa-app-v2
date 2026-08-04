@@ -1,6 +1,7 @@
 import type { Channel } from '@/types/collab';
 import type {
   ChannelQuizSettings,
+  QuizAnswerIn,
   QuizCurrentQuestion,
   QuizGamePlayer,
   QuizGameState,
@@ -129,10 +130,17 @@ export function isTerminalPhase(phase: QuizGamePhase): boolean {
  * The server timestamp the current phase counts down to, or `null` when the
  * phase has no published deadline.
  *
- * THE REVEAL HAS NONE, and that is contractual: the backend publishes
- * `countdown_ends_at` and the question's `opens_at`/`ends_at` and nothing for
- * the reveal window. So the reveal shows no countdown at all rather than a
- * guessed one — the next question's arrival is the only honest signal.
+ * THE REVEAL HAS ONE SINCE 2026-08-04. It used to have none — the backend
+ * published `countdown_ends_at` and the question's `opens_at`/`ends_at` and
+ * nothing for the gap between questions — so this function returned `null` for
+ * `reveal` and the screen deliberately drew no countdown rather than a guessed
+ * one. That reasoning is spent: `next_opens_at` (mirrored on the game as
+ * `next_question_opens_at`) now publishes exactly that instant on the same
+ * clock, so the reveal counts down like every other phase.
+ *
+ * A FINAL reveal still has none, and correctly so: nothing opens after it. The
+ * screen says "final scores next" there instead of counting to a moment the
+ * server never named.
  */
 export function phaseDeadline(state: QuizGameState): string | null {
   switch (state.game.status) {
@@ -140,20 +148,27 @@ export function phaseDeadline(state: QuizGameState): string | null {
       return state.game.countdown_ends_at;
     case 'question_open':
       return state.current_question?.ends_at ?? state.game.question_ends_at;
+    case 'reveal':
+      return nextQuestionOpensAt(state);
     default:
       return null;
   }
 }
 
-/** The phase's start timestamp — paired with {@link phaseDeadline} it gives a
- *  SKEW-FREE duration (both values come from the same server clock). */
-export function phaseStart(state: QuizGameState): string | null {
-  switch (state.game.status) {
-    case 'question_open':
-      return state.current_question?.opens_at ?? state.game.question_opens_at;
-    default:
-      return null;
-  }
+/**
+ * When the next question opens, or `null` when no such moment is published —
+ * which is every phase except a NON-FINAL reveal.
+ *
+ * The question carries it and the game mirrors it; both are read because the
+ * mirror is the only source for a client whose `current_question` arrived by
+ * broadcast merge rather than by state read.
+ */
+export function nextQuestionOpensAt(state: QuizGameState): string | null {
+  return (
+    state.current_question?.next_opens_at ??
+    state.game.next_question_opens_at ??
+    null
+  );
 }
 
 /**
@@ -172,29 +187,40 @@ export function isRevealedQuestion(
   return question?.correct_option_id != null;
 }
 
-/** The same predicate against a whole snapshot. */
-export function isRevealed(state: QuizGameState): boolean {
-  return isRevealedQuestion(state.current_question);
+/**
+ * THE ANSWERING LIST, TOTAL. `answers_in` is measured on the state read and
+ * typed optional (see the type) because the join/start envelopes that write the
+ * same cache entry were never measured — so this is the ONE place the field is
+ * touched, and a payload without it reads as "nobody yet" instead of throwing
+ * inside a cache write.
+ */
+export function answersIn(
+  question: QuizCurrentQuestion | null | undefined,
+): readonly QuizAnswerIn[] {
+  return question?.answers_in ?? EMPTY_ANSWERS;
 }
+
+/** One shared empty array, so an absent list keeps a stable identity and never
+ *  re-renders the rail by itself. */
+const EMPTY_ANSWERS: readonly QuizAnswerIn[] = [];
 
 /**
  * WHICH QUESTION THE HEADER SAYS THIS IS.
  *
- * The contract does not settle the base of the question fields: its example
- * envelope shows `"index": 1` beside a question `"position": 1`, while an
- * OPTION's `position` is plainly 0-based in the same example. Both readings
- * therefore survive the document, so this derives the answer from the two
- * fields TOGETHER rather than guessing:
+ * THE BASE IS NOW MEASURED, NOT INFERRED. A real two-question game on
+ * 2026-08-04 reported `is_final: false` at `index: 0` and `is_final: true` at
+ * `index: 1`, which can only be a 0-based index — so the human number is
+ * `index + 1` and the live-pass check this docblock used to owe is paid.
  *
+ * The `position` reading is kept as the primary source anyway, because it costs
+ * nothing and covers the one case the measurement cannot: a server that ever
+ * starts numbering questions from 1 would keep this header right.
  *  - `position === index + 1` can only mean a 1-based position over a 0-based
  *    index, so the position is the human number — use it;
  *  - anything else falls back to `index + 1`.
  *
  * Both are then clamped into `1..question_count`, so no combination of bases
  * can ever put "Question 0 of 10" or "Question 11 of 10" on screen.
- *
- * LIVE-PASS CHECK (owed, cannot be settled statically): play a three-question
- * game and confirm the first question reads "Question 1 of 3".
  */
 export function questionNumber(
   current: QuizCurrentQuestion,
@@ -249,12 +275,24 @@ export function gameProgress(state: QuizGameState): GameProgress {
 /**
  * Would adopting `candidate` move the game BACKWARDS from `current`?
  *
- * Two regressions count. The obvious one is a lower point on the timeline. The
- * subtler one is losing an answer at the SAME point: the reader's own
- * `your_answer` is one-shot and immutable server-side, so a frame that drops
- * it for a question we already hold one for can only be a stale read — never
- * news. (A genuinely new question changes the index, which the tuple catches
- * first.)
+ * THE TIMELINE COMES FIRST: a lower point on it is the obvious regression, and
+ * the tuple settles it.
+ *
+ * TWO MORE REGRESSIONS ARE POSSIBLE AT THE SAME POINT, and both are only ever
+ * stale reads because the facts they drop are append-only WITHIN A QUESTION:
+ * the reader's `your_answer` is one-shot and immutable, and `answers_in` only
+ * grows (an answer cannot be withdrawn). Without them a poll that overtook an
+ * `answer_progress` merge would make a face already on screen blink out and
+ * back.
+ *
+ * THEY APPLY ONLY WHILE THE SAME QUESTION IS ON BOTH SIDES, and that guard is
+ * load-bearing rather than tidy. At the boundary into `finished` the server
+ * legitimately drops both facts — `current_question` becomes `null` and
+ * `your_answer` with it — while a `finished` EVENT merge keeps the question it
+ * was holding. Those two compare equal on the timeline tuple, so without the
+ * guard the authoritative finished read would lose on both counts and be
+ * rejected forever, freezing `finished_at`, `player_count` and the final
+ * standings on a merged half-truth.
  */
 export function isOlderSnapshot(
   candidate: QuizGameState,
@@ -265,7 +303,13 @@ export function isOlderSnapshot(
   for (let i = 0; i < next.length; i += 1) {
     if (next[i] !== previous[i]) return next[i] < previous[i];
   }
-  return current.your_answer != null && candidate.your_answer == null;
+
+  const before = current.current_question;
+  const after = candidate.current_question;
+  if (!before || !after || before.index !== after.index) return false;
+
+  if (current.your_answer != null && candidate.your_answer == null) return true;
+  return answersIn(after).length < answersIn(before).length;
 }
 
 /* ── Players ──────────────────────────────────────────────────────────────── */
@@ -310,6 +354,17 @@ export function canJoinNow(state: QuizGameState): boolean {
  * transport rather than a workaround — and when events return they simply
  * arrive first and the poll finds nothing new.
  *
+ * POLLING IS ALSO THE RECOVERY (backend round-2 reply, 2026-08-04). Any state
+ * read drives an OVERDUE transition forward — an overdue countdown opens the
+ * first question, an overdue question closes into its reveal, an overdue reveal
+ * opens the next one, and a stalled final question finishes the game with its
+ * scores intact. The server waits 5s past the published deadline before it
+ * recovers anything, so recovery never races the healthy timers. Two rules follow, and
+ * both are load-bearing: this function must NEVER stop or slow down while a
+ * game is non-terminal, and a passed deadline must keep the tight cadence
+ * rather than back off — the request that looks pointless is the one that
+ * unfreezes the room.
+ *
  * THE CADENCE, AND WHY EACH NUMBER:
  *  - `lobby` 4s — nothing is at stake but a player list; slow is fine.
  *  - `countdown` 1.5s — 30 seconds long, and the question after it is timed:
@@ -319,6 +374,9 @@ export function canJoinNow(state: QuizGameState): boolean {
  *  - `reveal` 1.5s — the reveal window is only ~5s; missing its end by 2s
  *    would eat a fifth of the next question.
  *  - terminal — nothing. A finished or cancelled game never changes again.
+ *  - a failed read — {@link recoveryDelayMs}, wired in `./queries.ts`: a
+ *    refusal stops the beat, anything else keeps a widening one, because a game
+ *    that is still running must not lose its heartbeat over a blip.
  *
  * DEADLINE TIGHTENING. When a phase deadline is known, the next poll is
  * scheduled for just after it ({@link POLL_DEADLINE_GRACE_MS}) instead of the
@@ -331,7 +389,40 @@ export const POLL_MS = {
   countdown: 1500,
   question: 2000,
   reveal: 1500,
+  /** The FIRST beat after a read that failed for any reason but a refusal. */
+  recovering: 5000,
 } as const;
+
+/** The recovery beat's ceiling. A game we cannot read is still worth asking
+ *  about — but once a minute, not twelve times. */
+export const RECOVERY_MAX_MS = 30_000;
+
+/**
+ * How long to wait before re-reading a game whose last read failed.
+ *
+ * IT WIDENS, AND IT STOPS WIDENING. Each consecutive failure adds one
+ * {@link POLL_MS.recovering} step up to {@link RECOVERY_MAX_MS}, so a blip is
+ * answered in seconds — which is what a running game deserves — while an
+ * overlay left open on a dead backend settles at two reads a minute instead of
+ * drumming at five seconds forever.
+ *
+ * `consecutiveFailures` COUNTS ATTEMPTS, NOT ROUNDS: the query client retries
+ * once by default, so an ordinary failed round arrives here as two. That is
+ * deliberate — the retry has already re-asked a second ago, and the ladder is
+ * measured from what actually hit the network.
+ *
+ * A THROTTLE IS NOT A BLIP. `429` means the server has already told us to slow
+ * down, so it starts at the ceiling rather than climbing to it — answering a
+ * rate limit with a fast beat is how a client stays rate-limited.
+ */
+export function recoveryDelayMs(
+  consecutiveFailures: number,
+  throttled: boolean,
+): number {
+  if (throttled) return RECOVERY_MAX_MS;
+  const steps = Math.max(1, consecutiveFailures);
+  return Math.min(POLL_MS.recovering * steps, RECOVERY_MAX_MS);
+}
 
 /** How long after a published deadline the tightened poll fires. */
 export const POLL_DEADLINE_GRACE_MS = 400;
@@ -385,9 +476,72 @@ export function pollDelayMs(
  */
 export const FINAL_REVEAL_HOLD_MS = 3500;
 
+/**
+ * How long the LAST QUESTION'S CLOSING CARD is held before the podium.
+ *
+ * Longer than the reveal hold above, because the two beats are not the same
+ * job. That one holds a reveal the reader has already read — it only has to
+ * stop the podium landing in the same frame. This one carries information the
+ * reader has never seen: a final question that, in practice, has no reveal at
+ * all (see {@link QuizGameState} — early close takes the last question straight
+ * to `finished`). Five seconds is a read, not a glance, and the card carries an
+ * explicit way past it so nobody is ever held.
+ */
+export const FINAL_ANSWER_HOLD_MS = 5000;
+
+/**
+ * How long a passed deadline may sit silent before the screen admits it is
+ * waiting. Inside the server's own 5s recovery grace, so the reader learns that
+ * something is late at roughly the moment the server starts acting on it —
+ * early enough to be honest, late enough that an ordinary ±1s handover never
+ * produces the word.
+ *
+ * THE WORD IS ABOUT US, NOT THE SERVER ("catching up", not "the server is
+ * late"), which is what keeps it true when the cause is a device clock rather
+ * than a stall: either way this screen is waiting for a state it does not have.
+ */
+export const CATCH_UP_AFTER_MS = 2500;
+
+/**
+ * The longest gap the between-questions countdown will print.
+ *
+ * WHY A CAP EXISTS AT ALL. That countdown has an end stamp and no start stamp
+ * (a question can close the instant its last answer lands, so the gap has no
+ * published beginning), which means it is the one clock here with no
+ * same-server-clock duration to clamp against — and a device whose wall clock
+ * is a minute behind would print "next question in 65s" for a five-second gap.
+ * The cap bounds that: a skewed device counts down from at most this, and the
+ * poll behind the screen moves it on when the real question opens.
+ *
+ * FIFTEEN SECONDS is three times the reveal window the contract describes
+ * (~5s), so a genuine gap is never truncated by it.
+ */
+export const NEXT_QUESTION_CAP_MS = 15_000;
+
 /** A lobby nobody starts auto-cancels server-side after this long. Stated in
  *  the lobby so an abandoned game reads as a rule, not a failure. */
 export const LOBBY_IDLE_LIMIT_MINUTES = 10;
+
+/* ── The answering list ───────────────────────────────────────────────────── */
+
+/**
+ * How many faces the answering rail shows at once. Past this the OLDEST
+ * arrivals fold into a single "+N" mark, so a room of forty keeps the same
+ * fixed-height rail a room of four has — and the newest answer, the one worth
+ * seeing, is always the one in view.
+ */
+export const ANSWERS_RAIL_VISIBLE = 8;
+
+/**
+ * A response time as a player reads it: `1.4s`, `12s`. One decimal under ten
+ * seconds because that is where the difference between two answers lives, none
+ * above it because nobody cares about the tenth second of a slow answer.
+ */
+export function formatResponseTime(responseMs: number): string {
+  if (!Number.isFinite(responseMs) || responseMs < 0) return '—';
+  const seconds = responseMs / 1000;
+  return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`;
+}
 
 /* ── Scoring vocabulary ───────────────────────────────────────────────────── */
 

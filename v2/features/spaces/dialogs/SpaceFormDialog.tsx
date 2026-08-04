@@ -48,12 +48,25 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * moment the space was created. So the preview shows the neutral ground with
  * the live monogram, and the colour arrives with the object.
  *
+ * ── THE STARTER CHANNEL IS THE SERVER'S, NOT OURS ──────────────────────────
+ * The open question here was whether creating `general` from the client would
+ * duplicate a channel the backend already makes. It is answered: `POST
+ * /api/spaces` creates a starter channel in the same transaction and returns it
+ * as `default_channel`, so this dialog creates no channels and instead hands
+ * the new channel's uuid to its host, which is what turns "create a space" into
+ * "land in a room that works".
+ *
+ * MEASURED, NOT DOCUMENTED: `default_channel` is a REDUCED channel
+ * ({@link Space.default_channel}) — no `is_member`, no `my_role`, no counts.
+ * The uuid is all this flow takes from it, and the channel screen reads the
+ * channel itself for everything viewer-scoped. It is also OPTIONAL, so a
+ * response without it falls back to the space — an older API, a transaction
+ * that made the space but not the channel, and any future shape change all
+ * degrade to the behaviour that shipped before, never to a broken navigation.
+ *
  * ── WHAT IS DELIBERATELY NOT HERE ──────────────────────────────────────────
- * The brief's second step — starter channels and an invite list in the same
- * submit — is not in this pass. It depends on whether the backend already
- * creates a default channel with a space, and creating `general` blindly would
- * either duplicate one or leave the reader in an empty room. It waits on that
- * answer, not on this dialog.
+ * The brief's second step — an invite list in the same submit — is not in this
+ * pass.
  *
  * THE OWNING ORGANIZATION IS IMMUTABLE, which is why that fork only exists in
  * create mode: `PUT /spaces/{uuid}` takes no `organization_uuid`, so offering
@@ -66,16 +79,45 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * produced it.
  *
  * ── CREATE REPORTS, IT DOES NOT NAVIGATE ───────────────────────────────────
- * The reader's next move after creating a space is always into it, but the
- * dialog raises {@link onCreated} and the SCREEN performs the move. The URL
+ * The reader's next move after creating a space is always INTO the room, but
+ * the dialog raises {@link onCreated} and the SCREEN performs the move. The URL
  * overlay contract requires it: a dialog closing as part of a move must
  * rewrite its history entry (`closeInPlace`) rather than pop it, or the
  * navigation lands on the entry the pop is about to discard. Only the screen
  * holds that overlay handle. An EDIT save is a dismissal, not a move, so it
  * closes through `onOpenChange` exactly as Cancel does.
+ *
+ * `onCreated` therefore carries BOTH halves of the destination — the space and
+ * its starter channel — and {@link spaceCreationHref} turns them into the one
+ * URL a host should push, so no caller has to re-derive the fallback rule.
  */
 
 type Privacy = 'private' | 'open';
+
+/**
+ * Where a freshly created space lands its creator: THE ROOM when the server
+ * made one, the space page otherwise.
+ *
+ * `defaultChannelUuid` is the starter channel `POST /api/spaces` creates in the
+ * same transaction, and the creator is already its active owner — so they
+ * arrive somewhere that works, with a composer, instead of at a channel list.
+ *
+ * The space page is now the FALLBACK rather than the destination. It stays
+ * because `default_channel` is optional on the wire (an older API, a response
+ * shape that moves, a transaction that made the space but not the channel), and
+ * a space that exists is always a better landing than a broken navigation.
+ *
+ * Exported because the HOST navigates, not this dialog (see the note above), and
+ * the rule must not be re-derived at each call site.
+ */
+export function spaceCreationHref(
+  spaceUuid: string,
+  defaultChannelUuid: string | null,
+): string {
+  return defaultChannelUuid
+    ? `/channels/${defaultChannelUuid}`
+    : `/spaces/${spaceUuid}`;
+}
 
 const TYPE_CHOICES: readonly Choice<SpaceType>[] = [
   {
@@ -119,9 +161,15 @@ export function SpaceFormDialog({
   /** Presence switches the dialog into edit mode. */
   space?: Space;
   viewerId: number | null;
-  /** CREATE MODE ONLY: the space exists, and the host closes in place and
-   *  navigates. Absent (the edit mounts), a successful create just closes. */
-  onCreated?: (spaceUuid: string) => void;
+  /**
+   * CREATE MODE ONLY: the space exists, and the host closes in place and
+   * navigates. Absent (the edit mounts), a successful create just closes.
+   *
+   * Both halves of the destination are handed over — the space, and the starter
+   * channel the server created with it (`null` when the response carried none).
+   * Feed them to {@link spaceCreationHref} for the URL to push.
+   */
+  onCreated?: (spaceUuid: string, defaultChannelUuid: string | null) => void;
 }) {
   const isEdit = !!space;
   const uid = useId();
@@ -212,8 +260,10 @@ export function SpaceFormDialog({
       },
       {
         onSuccess: (response) => {
-          if (onCreated) onCreated(response.data.uuid);
-          else onOpenChange(false);
+          const created = response.data;
+          if (onCreated) {
+            onCreated(created.uuid, created.default_channel?.uuid ?? null);
+          } else onOpenChange(false);
         },
         onError: (failure) => setError(extractApiError(failure).message),
       },

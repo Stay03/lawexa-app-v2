@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { extractApiError } from '@/lib/utils/api-error';
-import type { QuizGameState, QuizGameStateResponse } from '@/types/channel-quiz';
+import type {
+  QuizCurrentQuestion,
+  QuizGameState,
+  QuizGameStateResponse,
+} from '@/types/channel-quiz';
 import type { SlimUser } from '@/types/collab';
 import {
   eventGameUuid,
@@ -12,12 +16,15 @@ import {
   type QuizGameEvent,
 } from './game-bus';
 import {
+  answersIn,
+  FINAL_ANSWER_HOLD_MS,
   FINAL_REVEAL_HOLD_MS,
   gamePhase,
   isHost as isHostOf,
   isOlderSnapshot,
   isPlaying as isPlayingIn,
-  isRevealed,
+  isRevealedQuestion,
+  isTerminalPhase,
   type QuizGamePhase,
 } from './model';
 import { useCancelGame, useJoinGame, useStartGame, useSubmitAnswer } from './mutations';
@@ -44,21 +51,40 @@ import { channelQuizQueries } from './queries';
  * next poll finds nothing new.
  *
  * ── WHAT AN EVENT CANNOT CARRY ──────────────────────────────────────────────
- * Two facts are per-viewer and never ride the room's broadcasts:
- *  - `your_answer.is_correct` / `points` — so `question_closed` merges the
- *    SHARED half of the reveal (correct option, distribution, leaderboard) and
- *    immediately refetches for the reader's own result;
- *  - `answer_progress` has no home in the state envelope at all, so it is held
- *    as local state and simply DOES NOT RENDER when no event delivered it —
- *    an honest absence beats an invented meter.
+ * `your_answer.is_correct` / `points` are per-viewer and never ride the room's
+ * broadcasts, so `question_closed` merges the SHARED half of the reveal
+ * (correct option, distribution, leaderboard) and immediately refetches for the
+ * reader's own result.
  *
- * ── THE FINAL REVEAL HOLD ───────────────────────────────────────────────────
- * `quiz.game.finished` arrives immediately after the last `question_closed`
- * (documented gap, digest §E), so the podium would otherwise replace the last
- * answer within a frame. The hook keeps rendering the reveal it was showing
- * for {@link FINAL_REVEAL_HOLD_MS} and only then adopts the finished snapshot.
- * It holds ONLY when it actually saw that reveal: opening a game that finished
- * an hour ago goes straight to the podium.
+ * Everything else an event carries now has a home in the state envelope,
+ * including who has answered: `answer_progress` extends
+ * `current_question.answers_in` when it happens to arrive, and the poll behind
+ * it carries the same fact when it does not — which is what makes the answering
+ * rail work today, with emission down.
+ *
+ * ONE broadcast-only fact remains, and it is a name rather than a state: WHO
+ * cancelled a game (`cancelledBy`). The envelope reports that a game was
+ * cancelled and nothing about by whom, so with no event the screen says less
+ * instead of guessing.
+ *
+ * ── THE TWO ENDINGS ─────────────────────────────────────────────────────────
+ * A game can end in two shapes, and each gets one held beat before the podium
+ * so the last thing the reader saw is not replaced within a frame:
+ *
+ *  - AFTER A REVEAL. `quiz.game.finished` arrives immediately after the last
+ *    `question_closed` (documented gap, digest §E), so the reveal is held for
+ *    {@link FINAL_REVEAL_HOLD_MS}.
+ *  - WITHOUT ONE, which is the normal path. A question closes as soon as every
+ *    eligible player has answered, so the last question goes straight from
+ *    `question_open` to `finished` and its reveal is never published at all
+ *    (measured, 2026-08-04). The hook keeps the question it was showing and
+ *    hands it to `FinalAnswerStage`, which closes the loop from the RESULTS —
+ *    see that component for what is real and what is deliberately not claimed.
+ *
+ * Both hold ONLY what this screen actually watched: opening a game that
+ * finished an hour ago goes straight to the podium. A hold ends by adopting the
+ * snapshot it deferred, which is also what stops it re-arming itself the
+ * instant it releases.
  *
  * ── STATE DISCIPLINE ────────────────────────────────────────────────────────
  * Every derived reset here is a RENDER-PHASE adjust (React's sanctioned
@@ -153,11 +179,53 @@ function mergeQuizEvent(
           current_question_index: index,
           question_opens_at: opens_at,
           question_ends_at: ends_at,
+          next_question_opens_at: null,
         },
         // A fresh question carries NO reveal keys — that is what makes it a
-        // question rather than an answer.
-        current_question: { index, question, opens_at, ends_at },
+        // question rather than an answer — and nobody has answered it yet.
+        //
+        // `is_final` is the one field the state read has and this broadcast
+        // does not, so it is derived from the two numbers the payload DOES
+        // carry rather than left out: the index is 0-based (measured), so the
+        // last question is `question_count - 1`. That is arithmetic on server
+        // values, not a guess, and the poll behind this merge replaces the
+        // whole object with the server's own answer within its cadence anyway.
+        current_question: {
+          index,
+          question,
+          opens_at,
+          ends_at,
+          is_final: index === question_count - 1,
+          answers_in: [],
+          next_opens_at: null,
+        },
         your_answer: null,
+      };
+    }
+
+    case 'answer_progress': {
+      // AN ACCELERATOR, NEVER THE SOURCE. The list itself lives in the state
+      // read; this only puts a face on screen a beat earlier when the event
+      // happens to carry one. The three fields are typed optional because no
+      // wire has ever delivered them (emission is down), so an event without
+      // them changes nothing at all rather than half-writing a row.
+      const { index, player, response_ms, answered_at } = event.payload;
+      const current = state.current_question;
+      if (!current || current.index !== index) return state;
+      if (!player || response_ms === undefined || answered_at === undefined) {
+        return state;
+      }
+      const arrivals = answersIn(current);
+      if (arrivals.some((entry) => entry.user.uuid === player.uuid)) {
+        return state;
+      }
+      return {
+        ...state,
+        current_question: {
+          ...current,
+          // Arrival order: the event IS the arrival.
+          answers_in: [...arrivals, { user: player, answered_at, response_ms }],
+        },
       };
     }
 
@@ -178,6 +246,13 @@ function mergeQuizEvent(
           correct_option_id: event.payload.correct_option_id,
           option_counts: event.payload.option_counts,
           no_answer_count: event.payload.no_answer_count,
+          // The server's own word about the last question, which replaces the
+          // value `question_opened` had to derive.
+          is_final: event.payload.is_final,
+          // The gap's deadline, when the payload carries it — the same
+          // accelerator rule as `answer_progress`: absent, the state read
+          // supplies it; present, the countdown starts a beat earlier.
+          next_opens_at: event.payload.next_opens_at ?? current.next_opens_at,
         },
       };
     }
@@ -235,15 +310,111 @@ function answerRefusalCopy(error: unknown): string | null {
       // it twice would be noise.
       return null;
     default:
-      return "Your answer didn't reach the server, so nothing was recorded.";
+      // A failure with no response is the one case where we know NOTHING: the
+      // request may have been recorded and the answer lost on the way back.
+      // Claiming "nothing was recorded" would be a guess the scoreboard can
+      // contradict a minute later.
+      return "We didn't hear back about that answer — if it reached us, it still counts.";
   }
+}
+
+/* ── What the server says this reader did ─────────────────────────────────── */
+
+/**
+ * THE READER'S OWN ANSWER TO THE QUESTION ON SCREEN, as far as the SERVER is
+ * concerned. Three states, and the third is the one that matters:
+ *
+ *  - `answered` — the server has it. Either a state read stamped `your_answer`
+ *    or the answer endpoint returned a receipt for THIS question. This is the
+ *    only value a screen may judge right or wrong.
+ *  - `none` — nothing was sent for this question, or what was sent was refused
+ *    outright (joined too late, foreign option, throttled). Saying "no answer
+ *    from you" is true.
+ *  - `unknown` — a tap whose fate we never learned: still in flight, lost to
+ *    the network, or refused with the one status that cannot tell an accepted
+ *    answer from a rejected one (`409` covers both "already answered" and "too
+ *    late"). The server may well have scored it, so the screen must not claim
+ *    the reader did nothing.
+ *
+ * WHY THE DISTINCTION EARNS ITS KEEP. A locally tapped option is enough to lock
+ * a grid, but it is NOT enough to paint a green tick: if the question closes
+ * early while the POST is in flight, the reveal can arrive before the refusal,
+ * and a screen keyed off the tap would show a correct answer the player never
+ * gave. And at the end of a game, treating "we never learned" as "you did not
+ * answer" tells a player they skipped a question the podium then scores for
+ * them five seconds later.
+ */
+export type AnswerStanding =
+  | { kind: 'answered'; optionId: number }
+  | { kind: 'unknown' }
+  | { kind: 'none' };
+
+/** Statuses that mean the answer definitively never reached the scoreboard —
+ *  the server refused it outright rather than ambiguously. */
+const REJECTED_STATUSES = new Set([403, 422, 429]);
+
+function readAnswerStanding(
+  yourAnswerOptionId: number | null,
+  submission: {
+    /** Does the in-hand mutation name the question on screen? */
+    mine: boolean;
+    isPending: boolean;
+    receiptOptionId: number | null;
+    errorStatus: number | null;
+  },
+): AnswerStanding {
+  if (yourAnswerOptionId !== null) {
+    return { kind: 'answered', optionId: yourAnswerOptionId };
+  }
+  if (!submission.mine) return { kind: 'none' };
+  if (submission.receiptOptionId !== null) {
+    return { kind: 'answered', optionId: submission.receiptOptionId };
+  }
+  if (submission.isPending) return { kind: 'unknown' };
+  if (submission.errorStatus !== null) {
+    return REJECTED_STATUSES.has(submission.errorStatus)
+      ? { kind: 'none' }
+      : { kind: 'unknown' };
+  }
+  return { kind: 'none' };
 }
 
 /* ── The hook ─────────────────────────────────────────────────────────────── */
 
-export interface AnswerProgress {
-  answered: number;
-  total: number;
+/**
+ * The last question, kept because the game finished without ever revealing it.
+ * Handed to `FinalAnswerStage`, which closes it from the results.
+ */
+export interface FinalAnswerClose {
+  /** The question as the screen last held it — never revealed. */
+  question: QuizCurrentQuestion;
+  /** What the server says this reader did with it. */
+  standing: AnswerStanding;
+}
+
+/**
+ * A deferred ending: what the screen is still showing, and the snapshot it will
+ * adopt when the beat is over. Holding the deferred snapshot HERE is what makes
+ * the release final — the hold cannot re-arm itself against a state it has
+ * already adopted.
+ */
+type EndingHold =
+  | { kind: 'reveal'; next: QuizGameState }
+  | { kind: 'final-answer'; next: QuizGameState; question: QuizCurrentQuestion };
+
+/** Which ending, if any, the arrival of `incoming` starts. */
+function endingHoldFor(
+  shown: QuizGameState | null,
+  incoming: QuizGameState,
+): EndingHold | null {
+  if (incoming.game.status !== 'finished') return null;
+  const current = shown?.current_question;
+  // No question on screen means nothing to hold: a reader who opened a game
+  // that was already over goes straight to the podium.
+  if (!current) return null;
+  return isRevealedQuestion(current)
+    ? { kind: 'reveal', next: incoming }
+    : { kind: 'final-answer', next: incoming, question: current };
 }
 
 export interface LiveGame {
@@ -252,28 +423,39 @@ export interface LiveGame {
   isError: boolean;
   /** HTTP status of the load failure (`403` = not a member of the channel). */
   errorStatus: number;
+  /**
+   * A BACKGROUND read failed while a game is still on screen. Not an error
+   * state: the game keeps playing, the frame says so quietly, and the recovery
+   * beat is already asking again.
+   */
+  readFailing: boolean;
   retry: () => void;
 
-  /** What the screen must draw — the authoritative snapshot, except during the
-   *  final-reveal hold when it is deliberately one step behind. */
+  /** What the screen must draw — the authoritative snapshot, except during an
+   *  ending hold when it is deliberately one step behind. */
   state: QuizGameState | null;
   phase: QuizGamePhase;
   /** True while the last reveal is being held before the podium. */
   holdingFinalReveal: boolean;
+  /** Non-null while the last question is being closed from the results because
+   *  the game finished without revealing it. */
+  closingAnswer: FinalAnswerClose | null;
+  /** End the current hold now — the reader asked for the scores. */
+  skipToScores: () => void;
 
   isHost: boolean;
   isPlaying: boolean;
 
-  /** The option this reader tapped, locked the moment they tapped it. */
+  /** The option this reader tapped, locked the moment they tapped it. Good for
+   *  locking a grid; NEVER good enough to judge — see {@link AnswerStanding}. */
   pendingOptionId: number | null;
+  /** What the SERVER says this reader did with the question on screen. */
+  answerStanding: AnswerStanding;
   /** A designed explanation for a refused answer — never a toast. */
   answerNote: string | null;
   answering: boolean;
   submitAnswer: (optionId: number) => void;
 
-  /** Live answer count for the open question — `null` when no broadcast
-   *  delivered it (currently the norm: emission is down). */
-  progress: AnswerProgress | null;
   /** Who cancelled — only known when the broadcast delivered it; `null` may
    *  mean the idle-lobby auto-cancel OR simply "not known here". */
   cancelledBy: SlimUser | null;
@@ -302,29 +484,39 @@ export function useLiveGame({
   const query = useQuery(channelQuizQueries.gameState({ gameUuid, viewerId }));
   const snapshot = query.data?.data ?? null;
 
-  /* ── The final-reveal hold (see the docblock) ───────────────────────────── */
+  /* ── The ending holds (see the docblock) ────────────────────────────────── */
   const [shown, setShown] = useState<QuizGameState | null>(snapshot);
-  const [holding, setHolding] = useState(false);
+  const [hold, setHold] = useState<EndingHold | null>(null);
 
-  if (snapshot !== null && snapshot !== shown && !holding) {
-    // Render-phase adopt. The ONE exception is the moment a game we watched
-    // reveal its last answer reports itself finished.
-    if (
-      snapshot.game.status === 'finished' &&
-      shown !== null &&
-      isRevealed(shown)
-    ) {
-      setHolding(true);
-    } else {
-      setShown(snapshot);
-    }
+  if (snapshot !== null && snapshot !== shown && hold === null) {
+    // Render-phase adopt. The ONE exception is a game reporting itself finished
+    // while a question of it is still on this screen.
+    const ending = endingHoldFor(shown, snapshot);
+    if (ending) setHold(ending);
+    else setShown(snapshot);
   }
 
   useEffect(() => {
-    if (!holding) return;
-    const timer = setTimeout(() => setHolding(false), FINAL_REVEAL_HOLD_MS);
+    if (!hold) return;
+    const timer = setTimeout(
+      () => {
+        // Releasing ADOPTS the snapshot the hold deferred, in the same commit
+        // that clears the hold. Clearing alone would re-enter it forever: the
+        // condition that started it is a fact about `shown`, which would not
+        // have moved.
+        setShown(hold.next);
+        setHold(null);
+      },
+      hold.kind === 'reveal' ? FINAL_REVEAL_HOLD_MS : FINAL_ANSWER_HOLD_MS,
+    );
     return () => clearTimeout(timer);
-  }, [holding]);
+  }, [hold]);
+
+  const skipToScores = useCallback(() => {
+    if (!hold) return;
+    setShown(hold.next);
+    setHold(null);
+  }, [hold]);
 
   /* ── The reader's one answer, reset per question ────────────────────────── */
   const questionUuid = shown?.current_question?.question.uuid ?? null;
@@ -341,9 +533,10 @@ export function useLiveGame({
   }
 
   /* ── Broadcast-only facts ──────────────────────────────────────────────── */
-  const [progress, setProgress] = useState<
-    (AnswerProgress & { index: number }) | null
-  >(null);
+  /** WHO cancelled has no home in the state envelope — a cancelled game reports
+   *  that it was cancelled and nothing about by whom — so this is the one fact
+   *  in the hook that only an event can supply, and the screen says less rather
+   *  than guessing when no event arrived. */
   const [cancelledBy, setCancelledBy] = useState<SlimUser | null>(null);
 
   /* ── Mutations ─────────────────────────────────────────────────────────── */
@@ -358,15 +551,6 @@ export function useLiveGame({
 
     return subscribeToQuizGameEvents(channelUuid, (event) => {
       if (eventGameUuid(event) !== gameUuid) return;
-
-      if (event.type === 'answer_progress') {
-        setProgress({
-          index: event.payload.index,
-          answered: event.payload.answered_count,
-          total: event.payload.player_count,
-        });
-        return;
-      }
 
       if (event.type === 'cancelled') {
         setCancelledBy(event.payload.cancelled_by);
@@ -395,7 +579,48 @@ export function useLiveGame({
 
   /* ── Derived ───────────────────────────────────────────────────────────── */
   const phase: QuizGamePhase = shown ? gamePhase(shown) : 'lobby';
-  const currentIndex = shown?.current_question?.index ?? null;
+
+  /**
+   * A game that has reached its end is no longer the channel's live game, and
+   * the bar under the channel header is the affordance that would rot: its
+   * probe is on a 30-second beat, so without this the chat would keep offering
+   * a way into a game that is over. One read, once, on the way out — not a
+   * second poll of anything.
+   */
+  const ended = isTerminalPhase(phase);
+  useEffect(() => {
+    if (!ended) return;
+    void queryClient.invalidateQueries({
+      queryKey: channelQuizQueries.activeGameOf(channelUuid),
+    });
+  }, [ended, channelUuid, queryClient]);
+
+  /**
+   * WHAT THE SERVER SAYS THIS READER DID with the question on screen.
+   *
+   * Two sources of truth, in order of authority: a state read that stamped
+   * `your_answer`, or the receipt the answer endpoint returned for THIS
+   * question (`variables.question` names which one it was for). The locally
+   * tapped option is deliberately not one of them — see {@link AnswerStanding}
+   * for the two ways that would put a false claim on screen.
+   */
+  const submissionQuestion = answerMutation.variables?.question ?? null;
+  const answerStanding = readAnswerStanding(shown?.your_answer?.option_id ?? null, {
+    mine: submissionQuestion !== null && submissionQuestion === questionUuid,
+    isPending: answerMutation.isPending,
+    receiptOptionId: answerMutation.data?.data.option_id ?? null,
+    errorStatus: answerMutation.isError
+      ? extractApiError(answerMutation.error).status
+      : null,
+  });
+
+  // The closing card judges the SAME question this standing is about: the hold
+  // keeps `shown` on it, so the two can never drift apart.
+  const closingQuestion = hold?.kind === 'final-answer' ? hold.question : null;
+  const closingAnswer: FinalAnswerClose | null =
+    closingQuestion === null
+      ? null
+      : { question: closingQuestion, standing: answerStanding };
 
   const submitAnswer = useCallback(
     (optionId: number) => {
@@ -436,16 +661,23 @@ export function useLiveGame({
     isPending: query.isPending,
     isError: query.isError,
     errorStatus: query.isError ? extractApiError(query.error).status : 0,
+    // A failed REFETCH keeps `data` (React Query v5 sets `status: 'error'`
+    // beside it), so this is the difference between "we cannot show you the
+    // game" and "the game is right here and one read of it failed".
+    readFailing: query.isError && shown !== null,
     retry: () => void query.refetch(),
 
     state: shown,
     phase,
-    holdingFinalReveal: holding,
+    holdingFinalReveal: hold?.kind === 'reveal',
+    closingAnswer,
+    skipToScores,
 
     isHost: shown ? isHostOf(shown, viewerUuid) : false,
     isPlaying: shown ? isPlayingIn(shown, viewerUuid) : false,
 
     pendingOptionId,
+    answerStanding,
     // The 409 resolution (L12): a "too late" note standing over a snapshot
     // that DOES hold an answer for this question can only be the
     // already-answered case — say so instead of telling a player who answered
@@ -457,11 +689,6 @@ export function useLiveGame({
     answering: answerMutation.isPending,
     submitAnswer,
 
-    // A meter from a previous question would be a lie about this one.
-    progress:
-      progress && currentIndex !== null && progress.index === currentIndex
-        ? { answered: progress.answered, total: progress.total }
-        : null,
     cancelledBy,
 
     join,

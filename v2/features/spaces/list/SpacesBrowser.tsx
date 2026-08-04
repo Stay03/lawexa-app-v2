@@ -15,7 +15,10 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { SpaceFormDialog } from '../dialogs/SpaceFormDialog';
+import {
+  SpaceFormDialog,
+  spaceCreationHref,
+} from '../dialogs/SpaceFormDialog';
 import { parseSpaceFilter, type SpaceFilter } from '../model';
 import { SPACES_BASELINE_PARAMS, spacesQueries } from '../queries';
 import { PendingPill } from './PendingPill';
@@ -222,12 +225,12 @@ export function SpacesBrowser() {
         open={createDialog.open}
         onOpenChange={createDialog.onOpenChange}
         viewerId={viewerId}
-        onCreated={(spaceUuid) => {
+        onCreated={(spaceUuid, defaultChannelUuid) => {
           // Success is a MOVE. The dialog's entry is rewritten rather than
           // popped, so the push below is not racing a queued `history.back()`
           // that would land the reader back on the list.
           panel.closeInPlace();
-          router.push(`/spaces/${spaceUuid}`);
+          router.push(spaceCreationHref(spaceUuid, defaultChannelUuid));
         }}
       />
     </PageShell>

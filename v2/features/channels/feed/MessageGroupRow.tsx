@@ -44,6 +44,7 @@ export const MessageGroupRow = memo(function MessageGroupRow({
   setsize,
   virtualize,
   viewerUuid,
+  canEngage,
   isChannelAdmin,
   editingUuid,
   actions,
@@ -55,6 +56,9 @@ export const MessageGroupRow = memo(function MessageGroupRow({
   setsize: number;
   virtualize: boolean;
   viewerUuid: string | null;
+  /** False in the feed's read-only mode — a plain boolean rather than the
+   *  access object, so the row's `memo` still holds across re-renders. */
+  canEngage: boolean;
   isChannelAdmin: boolean;
   editingUuid: string | null;
   actions: MessageRowActions;
@@ -115,6 +119,7 @@ export const MessageGroupRow = memo(function MessageGroupRow({
               <MessageRow
                 key={message.uuid}
                 message={message}
+                canEngage={canEngage}
                 canEdit={isMine}
                 canDelete={isMine || isChannelAdmin}
                 viewerUuid={viewerUuid}

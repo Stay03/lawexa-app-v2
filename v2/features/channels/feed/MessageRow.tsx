@@ -59,6 +59,10 @@ import { useLongPress } from './use-long-press';
  *    private — a badge would leak it to a shoulder).
  */
 
+/** The empty handler set a read-only row spreads instead of the hold gesture.
+ *  Module-scoped so it is one object for the whole feed. */
+const NO_LONG_PRESS = {} as const;
+
 export interface MessageRowActions {
   onStartReply: (message: Message) => void;
   onStartDelete: (message: Message) => void;
@@ -89,6 +93,7 @@ export interface MessageRowActions {
 
 export const MessageRow = memo(function MessageRow({
   message,
+  canEngage,
   canEdit,
   canDelete,
   viewerUuid,
@@ -96,6 +101,18 @@ export const MessageRow = memo(function MessageRow({
   actions,
 }: {
   message: Message;
+  /**
+   * May the viewer act on this message at all? False in the feed's read-only
+   * mode (a space member previewing a `space_public` channel they never
+   * joined), where react, reply, save, pin, edit and delete are all refused
+   * server-side.
+   *
+   * IT TAKES BOTH INPUT WORLDS AWAY, which is the point: hiding the hover
+   * cluster alone would leave the long-press seam opening a sheet full of
+   * verbs that 403. The reply QUOTE stays tappable — jumping to a quoted
+   * message is a read.
+   */
+  canEngage: boolean;
   canEdit: boolean;
   canDelete: boolean;
   viewerUuid: string | null;
@@ -114,12 +131,18 @@ export const MessageRow = memo(function MessageRow({
   // Only AI replies have a session behind them, and only since 2026-08-03
   // (older history carries `null` — digest §F.6). No id, no affordance.
   const sessionUuid = message.is_ai ? (message.metadata.session_uuid ?? null) : null;
-  // Reply is universal, so every REAL (server-acknowledged) row acts; a row
-  // still in the outbox has nothing actionable but Retry/Discard below.
-  const canAct = sendState === null;
+  // Reply is universal, so every REAL (server-acknowledged) row acts — for a
+  // viewer who may act at all; a row still in the outbox has nothing
+  // actionable but Retry/Discard below.
+  const canAct = canEngage && sendState === null;
   const longPress = useLongPress(() => {
     if (!sendState && !editing) actions.onOpenActions(message);
   });
+  /** THE GESTURE IS ONLY ATTACHED WHERE IT LEADS SOMEWHERE. In read-only mode
+   *  there is no sheet to open, and an attached hold would still tint the row,
+   *  buzz the phone and clear the reader's selection on the way to doing
+   *  nothing. */
+  const holdHandlers = canEngage ? longPress : NO_LONG_PRESS;
 
   if (editing) {
     // Keyed by uuid so the draft state initialises fresh per edit session.
@@ -129,7 +152,7 @@ export const MessageRow = memo(function MessageRow({
   return (
     <div
       data-message-uuid={message.uuid}
-      {...longPress}
+      {...holdHandlers}
       className={cn(
         'group/msg relative -mx-2 rounded-md px-2 py-0.5',
         'transition-colors duration-200 motion-reduce:transition-none',
@@ -141,7 +164,12 @@ export const MessageRow = memo(function MessageRow({
         // lands, and it is split by pointer type — a mouse keeps ordinary
         // selection, a finger gets the sheet's "Copy text" instead. See
         // `shell.css` for which half applies where.
-        'v2-touch-hold',
+        //
+        // ONLY WHERE THE SHEET EXISTS TO REPLACE IT. The trade is "finger
+        // selection for a menu with Copy text"; in read-only mode there is no
+        // menu, so taking selection away would leave a previewer on a phone
+        // unable to copy anything at all. They keep the browser's own gesture.
+        canEngage && 'v2-touch-hold',
         // Armed-hold feedback: `use-long-press` stamps this attribute straight
         // onto the node (no React state — the row is memoised), and the
         // `transition-colors` above fades it both ways.
@@ -202,20 +230,37 @@ export const MessageRow = memo(function MessageRow({
 
       <ReactionChips
         reactions={message.reactions}
+        readOnly={!canEngage}
         onToggle={(emoji) => actions.onToggleReaction(message, emoji)}
       />
 
+      {/* THE SEND LADDER'S LAST RUNG, and the one place a write can outlive the
+          right to make it. A row reaches `failed` while the viewer was a
+          member; membership can end between the failure and the next glance —
+          removed by an admin, the detail refetch flips `is_member`, and the
+          outbox row is still merged into the transcript because a failed send
+          is never silently dropped.
+
+          RETRY IS THE VERB THAT GOES. It would re-POST straight into a 403,
+          turning "not sent" into "not sent, twice, for a reason we didn't
+          explain". DISCARD STAYS, and it must: the row is the reader's own
+          unsent words, it is the only thing on screen that can remove them,
+          and a stranded row with no way to clear it would sit in the
+          transcript forever. So the honest offer to someone who can no longer
+          post is exactly one: let it go. */}
       {failed && (
         <div className="mt-1 flex items-center gap-2 text-xs font-medium text-destructive">
           <AlertCircle aria-hidden className="size-3.5 shrink-0" />
           <span>Not sent</span>
-          <button
-            type="button"
-            onClick={() => actions.onRetrySend(message)}
-            className={cn('rounded underline underline-offset-2', FOCUS_RING)}
-          >
-            Retry
-          </button>
+          {canEngage && (
+            <button
+              type="button"
+              onClick={() => actions.onRetrySend(message)}
+              className={cn('rounded underline underline-offset-2', FOCUS_RING)}
+            >
+              Retry
+            </button>
+          )}
           <button
             type="button"
             onClick={() => actions.onDiscardFailed(message.uuid)}

@@ -23,6 +23,9 @@ import { playMentionChime } from './sound';
  * THE LADDER, AS IMPLEMENTED (top rule wins):
  *  1. Plain arrival (`is_mention: false` — includes own-pointer echoes and
  *     delete recounts) → nothing. Toast-for-arrivals is banned outright.
+ *     `is_mention` is read as "the server says this message is personally
+ *     addressed to me" — see THE REPLY QUESTION below for why that reading,
+ *     and not "an @mention specifically", is the one the ladder needs.
  *  2. Paused → nothing.
  *  3. The event's channel is OPEN and the document VISIBLE → nothing (inline
  *     rendering is the notification).
@@ -37,6 +40,50 @@ import { playMentionChime } from './sound';
  * resolution failed): DELIVER. A missed personal mention is the worst failure
  * a comms tool has; an extra toast on a transient network error is a shrug.
  * The trade is deliberate and this line is where to reverse it.
+ *
+ * ── THE REPLY QUESTION, ANSWERED WITHOUT GUESSING (2026-08-04) ─────────────
+ * The backend shipped reply notifications and called them "full mention
+ * parity". Read precisely, the parity they claim is over the NOTIFICATION
+ * surface — the row appears in the inbox list, it moves the bell count, its
+ * `action_url` deep-links — and they say nothing whatever about
+ * `.channel.unread`, which is the event this dispatcher reads. Two readings
+ * are therefore live, and the wire cannot settle it today (events are down in
+ * production):
+ *
+ *   A. A reply leaves `is_mention: false`. Digest §D says the flag is `true`
+ *      "only for mentioned members", and `mention_count` is defined as unread
+ *      messages that @mention me — a reply creates no mention row. This is the
+ *      documented reading and the likelier one.
+ *   B. A reply sets `is_mention: true`, taking "mention parity" literally.
+ *
+ * WHAT IS CORRECT UNDER BOTH: leave the ladder's SHAPE alone. Rule 1 already
+ * keys on the server's own judgement of "this is personally yours", and that
+ * predicate is the set {mention} under A and {mention, reply} under B — either
+ * way it is exactly the set that deserves an interruption. Nothing structural
+ * needs to change, and nothing here may synthesise a reply signal: the event
+ * carries no reply field, and inferring one (e.g. from a `mention_count` that
+ * did not move) would put a fabricated label on a real alert.
+ *
+ * THE COPY STAYS PRECISE. Hedging it ("mentioned or replied to") would degrade
+ * every real alert under reading A — the documented and likelier one, where
+ * every toast this ladder raises IS a mention — to insure a case we judge
+ * improbable, and the toast would still give the reader nothing to resolve the
+ * ambiguity with. So the title asserts what the contract says, and the open
+ * question is where an open question belongs: asked of the people who know.
+ * It is filed in `docs/v2-docs/backend-ask-2026-08-04-spaces-channels-round-2.md`
+ * ("Follow-up ask", 2026-08-04) — does a reply set `is_mention`, and does it
+ * move `mention_count`. {@link PERSONAL_ALERT_TITLE} is the single line to
+ * change if the answer comes back B.
+ *
+ * WHAT DELIBERATELY DID NOT HAPPEN: no toast was added on the `.notification`
+ * broadcast. It is the one payload that would name a reply outright, and
+ * raising alerts from it would break the rule that one message never produces
+ * two — a mention broadcasts BOTH events, so it would ring twice — and would
+ * escape Ruling B, since `.channel.unread`'s `is_mention` is the only signal
+ * with the `ai_mentions_notify` rule already applied server-side. Under
+ * reading A the consequence is honest and stated: a reply moves the bell and
+ * the inbox list (the spine invalidates on `.notification`) but raises no
+ * toast, and while the app is closed push still delivers it.
  *
  * ── PUSH DEDUP: THE SOUND ONLY, NEVER THE TOAST (W5, audit H1/M1) ──────────
  * The two delivery paths divide the world by DOCUMENT VISIBILITY:
@@ -100,6 +147,16 @@ export function decideInterruption(input: InterruptionInput): InterruptionDecisi
   };
 }
 
+/**
+ * The toast's title. It states what the contract says `is_mention: true` means
+ * — an @mention — rather than hedging over a reply reading the backend has not
+ * confirmed (THE REPLY QUESTION in the module docblock; the ask is filed in
+ * `docs/v2-docs/backend-ask-2026-08-04-spaces-channels-round-2.md`). If the
+ * answer comes back "a reply sets the flag too", this one line becomes the
+ * fix, and nothing else in the ladder moves.
+ */
+const PERSONAL_ALERT_TITLE = 'You were mentioned';
+
 /** What the spine resolved about the event's channel before dispatching. */
 export interface ResolvedChannelContext {
   notifyLevel: NotifyLevel | null;
@@ -143,7 +200,7 @@ export function dispatchChannelUnread(
   });
 
   if (decision.toast) {
-    toast('You were mentioned', {
+    toast(PERSONAL_ALERT_TITLE, {
       id: `collab-mention-${event.channel_uuid}`,
       description: resolved.channelName
         ? `In ${resolved.channelName}`

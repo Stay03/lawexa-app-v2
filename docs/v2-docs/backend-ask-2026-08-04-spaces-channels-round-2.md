@@ -152,6 +152,58 @@ is fragile.
 
 ---
 
-## Response
+## Response — ALL SIX DELIVERED (backend team, 2026-08-04)
 
-*(pending)*
+Reply: `Stay03/lawexa-api-v3` → `docs/frontend-replies/reply-2026-08-04-spaces-channels-round-2.md`.
+Verified live against production the same day with a real account.
+
+| # | Answer |
+|---|---|
+| 1 | `POST /spaces` creates a starter channel in the same transaction; `default_channel` on the create response. `study-notes` for a study space, `general` otherwise. |
+| 2 | Replies notify the target author. Type `channel_reply`, mention parity, no self-notify, muted stays silent, a reply that also @mentions sends only the mention. |
+| 3 | **Yes for space members, no for outsiders.** A space member may read a `space_public` channel's history, pins, roster and AI transcripts before joining. Every write, the file list, and the read pointer stay 403. Private channels unchanged. Spaces themselves stay invite-only, so discovery is still a no. |
+| 4 | Both halves. `POST /channels/{uuid}/read` also clears notifications pointing into that channel at or before the marked message. And rows now carry real `title`/`message`/`icon` plus `channel_uuid`, `message_uuid`, `space_uuid`. Rows created before the deploy stay wordless. |
+| 5 | All four. The state read is now the watchdog — an overdue transition is driven forward by any `GET /quiz-games/{game}`, including finishing a stalled final question with scores intact. `current_question.is_final`, `current_question.answers_in`, and `next_question_opens_at` / `current_question.next_opens_at` all shipped. Early close on all-answered shipped. |
+| 6 | `user_content` + `asked_by` on user turns, plus `metadata.channel_message_uuid`. Turns before the deploy have none of it. |
+
+Bonus, same deploy: every brand-new user gets a personal starter space on first
+visit to the spaces area (private Study "My Studies" with `study-notes` for
+students, private Work "My Workspace" with `general` otherwise). Guests excluded.
+Confirmed: our film account, which belonged to nothing, now owns "My Workspace".
+
+### Measured against production — two things the reply gets wrong
+
+**`default_channel` is NOT "the full ChannelResource shape".** Measured keys:
+`uuid`, `name`, `description`, `visibility`, `visibility_label`, `last_message_at`,
+`created_at`, `updated_at`. Every viewer-scoped field is absent — no `is_member`,
+`my_role`, `my_notify_level`, `unread_count`, `mention_count` — and so are
+`active_members_count` and `space`. Typed as `DefaultChannelRef`, not `Channel`.
+This is the second time in two days that a documented "full X" was a reduced X;
+the standing rule holds — measure, then type.
+
+**Early close means the final reveal never happens.** Playing a real 2-question
+game: answering the last question moved the status straight from `question_open`
+to `finished`, with `current_question` and `answers_in` both null. So a player
+never learns whether their final answer was right. This is the defect our own W6
+notes predicted, now made certain rather than merely likely by the new early
+close. Raised as a follow-up below.
+
+## Follow-up ask (2026-08-04, after the round-2 delivery)
+
+**Does a reply set `is_mention` on `.channel.unread`?** That flag is the only
+signal our client has for deciding whether a new message is personally for the
+reader, and it is what raises an alert instead of a silent badge. Your reply says
+replies have full mention parity, but it describes the notification list, not that
+event. We cannot measure it ourselves — server events still are not reaching
+clients in production. Tell us which it is, and whether a reply also moves
+`mention_count`. Until then our alert has to be worded to cover both, which is
+clumsier than it should be.
+
+**The last question has no reveal.** When the final answer closes a question, the
+game goes straight to finished, so the player who just answered never sees the
+right answer or whether they got it. We want the last question to be revealed like
+every other one before the podium arrives. If the game must finish immediately,
+then we want the finished state to carry the last question's outcome for the
+viewer — what the answer was, and whether theirs was right — so we can show it
+without inventing it.
+

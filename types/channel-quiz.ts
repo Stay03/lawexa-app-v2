@@ -3,7 +3,27 @@
  *
  * Mirrors `docs/api/channel-quiz.md` in the backend repo (fetched 2026-08-04),
  * condensed in `docs/v2-docs/phases/phase-5-collab-notifications/api-digest.md`
- * §B (the 8 `.quiz.game.*` events) / §C (endpoints) / §E (lifecycle + gaps).
+ * §B (the 8 `.quiz.game.*` events) / §C (endpoints) / §E (lifecycle + gaps),
+ * plus the round-2 additions of 2026-08-04 (`reply-2026-08-04-spaces-channels-
+ * round-2.md` §5: the watchdog, `is_final`, `answers_in`, `next_opens_at`).
+ *
+ * MEASURED BEATS DOCUMENTED. Every field added in that round was checked against
+ * a real production game on 2026-08-04 before it was typed here, because a
+ * backend "full X shape" has been wrong before. What the wire actually sent, and
+ * what this file therefore encodes:
+ *  - `current_question` carries `index`, `is_final`, `next_opens_at`, `opens_at`,
+ *    `ends_at`, `answers_in`, `question` in BOTH question phases, and gains
+ *    `correct_option_id` / `option_counts` / `no_answer_count` at the reveal;
+ *  - `answers_in` is `[]` (never absent) until the first answer lands — on
+ *    `GET /quiz-games/{game}`, the one endpoint that was measured; see the
+ *    field for why it is nonetheless typed optional;
+ *  - `next_opens_at` is `null` while a question is open and an ISO stamp during
+ *    a non-final reveal;
+ *  - `index` is 0-BASED: `is_final` was `false` on index 0 of a 2-question game
+ *    and `true` on index 1. That also settles the question-number base.
+ * The event payload additions of the same round could NOT be measured — server
+ * broadcasts are not reaching clients in production — so they are typed
+ * optional and marked as such.
  *
  * NOT the solo `/quiz` product (`types/quiz.ts`, `/api/quizzes`). The two share
  * a word and nothing else — no shapes, no screens, no code. Kept in its own
@@ -155,6 +175,12 @@ export interface QuizGame {
   countdown_ends_at: string | null;
   question_opens_at: string | null;
   question_ends_at: string | null;
+  /** Mirror of {@link QuizCurrentQuestion.next_opens_at} on the game itself —
+   *  an ISO stamp only while a NON-FINAL question is in its reveal, `null` at
+   *  every other moment (measured 2026-08-04; column added the same day, so a
+   *  game that was already running at that deploy reads `null` until its first
+   *  reveal after it). */
+  next_question_opens_at: string | null;
   started_at: string | null;
   finished_at: string | null;
   cancelled_at: string | null;
@@ -173,15 +199,48 @@ export interface QuizOptionCount {
 }
 
 /**
+ * One player's answer arriving, as the state read publishes it. It names WHO
+ * and HOW FAST and nothing else — never the option they picked, never whether
+ * they were right, in either phase.
+ */
+export interface QuizAnswerIn {
+  user: SlimUser;
+  answered_at: string;
+  response_ms: number;
+}
+
+/**
  * The question currently on screen. `null` outside the question phases.
  * `correct_option_id` / `option_counts` / `no_answer_count` appear ONLY during
  * the reveal — their presence IS the reveal signal in the envelope.
  */
 export interface QuizCurrentQuestion {
+  /** 0-BASED (measured) — the human number is `index + 1`. */
   index: number;
   question: QuizQuestion;
   opens_at: string;
   ends_at: string;
+  /** This is the last question of the game. Present in BOTH question phases,
+   *  so the screen can say what comes next before it arrives. */
+  is_final: boolean;
+  /**
+   * Everyone whose answer is already in, in ARRIVAL ORDER, `[]` until the
+   * first one lands.
+   *
+   * OPTIONAL ON PURPOSE, and the reason is the measurement itself: this was
+   * seen on `GET /quiz-games/{game}` and nowhere else. The same envelope also
+   * comes back from `POST /join` and `POST /start`, which were NOT measured,
+   * and those responses are written straight into the same cache entry. A
+   * missing field must degrade to "nobody yet", not throw inside a cache
+   * write — so every read goes through `answersIn()` in the feature's model.
+   */
+  answers_in?: QuizAnswerIn[];
+  /**
+   * When the next question opens, on the same clock as `opens_at`/`ends_at`.
+   * `null` while this question is open, an ISO stamp once a NON-FINAL question
+   * enters its reveal, and `null` on a final reveal (there is no next one).
+   */
+  next_opens_at: string | null;
   correct_option_id?: number;
   option_counts?: QuizOptionCount[];
   no_answer_count?: number;
@@ -197,8 +256,22 @@ export interface QuizYourAnswer {
   points?: number;
 }
 
-/** `GET /quiz-games/{game}` and `POST /quiz-games/{game}/join` — THE
- *  authoritative state. Missed events are harmless; this always wins. */
+/**
+ * `GET /quiz-games/{game}` and `POST /quiz-games/{game}/join` — THE
+ * authoritative state. Missed events are harmless; this always wins, and since
+ * 2026-08-04 reading it is also what DRIVES a stalled game forward (the server
+ * runs an overdue transition on any state read, 5s past the published
+ * deadline). So polling this is both the transport and the recovery.
+ *
+ * TWO MEASURED CONSEQUENCES OF EARLY CLOSE. A question closes the moment every
+ * eligible player has answered, not only at `ends_at`:
+ *  - any question can end at any instant, so no screen may assume the timer
+ *    runs out;
+ *  - the LAST question skips its reveal entirely — the status goes
+ *    `question_open` → `finished`, and `current_question` (with `answers_in`)
+ *    becomes `null` in the same frame. Nothing on the wire ever tells a player
+ *    whether their final answer was right; only the results envelope does.
+ */
 export interface QuizGameState {
   game: QuizGame;
   current_question: QuizCurrentQuestion | null;
@@ -297,11 +370,22 @@ export interface QuizQuestionOpenedPayload {
   ends_at: string;
 }
 
+/**
+ * `player` / `response_ms` / `answered_at` were added on 2026-08-04 so this
+ * event can extend the answering list in the frame it arrives. They are typed
+ * OPTIONAL because they have never been seen on a wire: server emission is down
+ * in production, so nothing in this payload is verified. Treat all three as an
+ * accelerator over `current_question.answers_in` — present, they save a poll;
+ * absent, the next state read carries the same fact.
+ */
 export interface QuizAnswerProgressPayload {
   game_uuid: string;
   index: number;
   answered_count: number;
   player_count: number;
+  player?: SlimUser;
+  response_ms?: number;
+  answered_at?: string;
 }
 
 export interface QuizQuestionClosedPayload {
@@ -311,6 +395,11 @@ export interface QuizQuestionClosedPayload {
   option_counts: QuizOptionCount[];
   no_answer_count: number;
   is_final: boolean;
+  /** When the next question opens — the broadcast half of
+   *  {@link QuizCurrentQuestion.next_opens_at}, absent on a final close.
+   *  Optional for the same reason as {@link QuizAnswerProgressPayload}'s new
+   *  fields: documented 2026-08-04, never seen on a wire. */
+  next_opens_at?: string | null;
   /** Only when the game's snapshotted `settings.show_leaderboard` is on. */
   leaderboard?: QuizGamePlayer[];
 }

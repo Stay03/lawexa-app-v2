@@ -27,15 +27,21 @@ import { useSyncExternalStore } from 'react';
  *     `../use-minute-now.ts` does it for the feed's relative timestamps. One
  *     interval serves every subscriber and stops with the last of them.
  *
- *  3. **The remaining time is CLAMPED to the phase's own duration.** The
- *     duration `ends_at − opens_at` is computed from two stamps of the SAME
- *     server clock, so it is exact regardless of how far this device's clock is
- *     from the server's. Only the alignment between the two clocks is
- *     uncertain — there is no server-now on the wire (the HTTP `Date` header is
- *     not CORS-exposed) — so the clamp bounds that uncertainty: a device
- *     running behind can never show MORE than the question's real length, and
- *     one running ahead lands on zero, which is a designed "waiting for the
- *     server" state and still fully answerable (the server decides whether the
+ *  3. **The remaining time is BOUNDED, never corrected.** There is no
+ *     server-now on the wire (the HTTP `Date` header is not CORS-exposed), so
+ *     the offset between this device's clock and the server's is simply
+ *     unknown and nothing here can remove it. What it can do is stop that
+ *     unknown from printing an absurd number, and there are two cases:
+ *      - A phase with BOTH stamps (`opens_at`→`ends_at`, the countdown) has an
+ *        exact duration, because both come from the same server clock. The
+ *        reading is clamped to it, so a device running behind can never show
+ *        more than the phase's real length.
+ *      - A phase with only an END stamp (the gap between questions:
+ *        `next_opens_at` and no published start) has no such duration, and the
+ *        clamp above does NOT cover it. Those callers pass an explicit `capMs`
+ *        instead — a bound, honestly labelled as one, not a correction.
+ *     A device running ahead lands on zero either way, which is a designed
+ *     waiting state and still fully answerable (the server decides whether an
  *     answer is in time; a late one is a quiet 409, never an error).
  *
  * Phase-5 W6, 2026-08-04.
@@ -51,10 +57,17 @@ let now = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 const listeners = new Set<() => void>();
 
+/**
+ * EVERY FIRE ADVANCES THE CLOCK. An earlier version skipped any fire that
+ * landed less than a full tick after the last sample — which, against a
+ * `setInterval` of exactly that period, threw away roughly every other frame
+ * whenever the timer ran a hair early. The next sample then arrived 400ms
+ * later, and the timer bar (whose transition is one tick long) finished its
+ * interpolation and sat still: a visible stutter on the one element in this
+ * feature built to move continuously.
+ */
 function tick(): void {
-  const next = wallOrigin + (performance.now() - perfOrigin);
-  if (next - now < TICK_MS) return;
-  now = next;
+  now = wallOrigin + (performance.now() - perfOrigin);
   for (const listener of listeners) listener();
 }
 
@@ -72,6 +85,12 @@ function subscribe(onStoreChange: () => void): () => void {
     if (listeners.size === 0 && timer !== null) {
       clearInterval(timer);
       timer = null;
+      // BACK TO "NO CLOCK YET", which is what `getSnapshot` then reports until
+      // the next subscriber re-anchors it. Leaving the last reading in place
+      // would make a game reopened ten minutes later paint one frame from a
+      // dead clock — "next question in 605s" — before the first tick corrected
+      // it.
+      now = 0;
     }
   };
 }
@@ -80,12 +99,13 @@ function getSnapshot(): number {
   return now;
 }
 
-/** SSR and the frame before the first subscription: "no clock yet". */
+/** SSR and any frame with no clock running: "no clock yet". */
 function getServerSnapshot(): number {
   return 0;
 }
 
-/** The monotonic epoch estimate in ms — `0` before the clock is running. */
+/** The monotonic epoch estimate in ms — `0` whenever no subscriber is holding
+ *  the clock open (before the first one, and again after the last leaves). */
 export function useGameClock(): number {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
@@ -102,6 +122,16 @@ export interface PhaseClock {
   fraction: number | null;
   /** The deadline has passed: the UI must WAIT (the server may be ±1s). */
   expired: boolean;
+  /**
+   * How far PAST the deadline this reading is, in ms — `0` until it passes.
+   *
+   * Not the same question as `expired`, and the difference is what lets a
+   * screen be honest without being alarmist: the server is allowed to be a
+   * second late, and since the recovery watchdog it deliberately waits five
+   * before it acts. So a surface can stay quiet for the first beats and only
+   * then say it is waiting (`CATCH_UP_AFTER_MS` in `./model.ts`).
+   */
+  overdueMs: number;
   /** No deadline at all — a reveal, a lobby, a finished game. */
   idle: boolean;
   /**
@@ -120,20 +150,26 @@ const IDLE_CLOCK: PhaseClock = {
   totalMs: null,
   fraction: null,
   expired: false,
+  overdueMs: 0,
   idle: true,
   ready: false,
 };
 
 /**
  * Pure derivation — exported so the shaping can be reasoned about (and tested)
- * without a React tree. `nowMs === 0` means the clock has not started yet, and
- * the honest paint for that frame is "full time, not expired": a first frame
- * showing 0:00 would be a lie the very next tick corrects.
+ * without a React tree. `nowMs === 0` means no clock is running, and the honest
+ * paint for that frame is "full time, not expired": a frame showing 0:00 would
+ * be a lie the very next tick corrects.
+ *
+ * `capMs` is the bound for a countdown with NO start stamp (see the module
+ * docblock, part 3). It is ignored when the phase has a real duration, because
+ * that duration is the better bound.
  */
 export function phaseClock(
   deadlineIso: string | null | undefined,
   startIso: string | null | undefined,
   nowMs: number,
+  capMs?: number,
 ): PhaseClock {
   if (!deadlineIso) return IDLE_CLOCK;
   const deadline = Date.parse(deadlineIso);
@@ -142,6 +178,7 @@ export function phaseClock(
   const start = startIso ? Date.parse(startIso) : NaN;
   const totalMs =
     Number.isFinite(start) && deadline > start ? deadline - start : null;
+  const ceiling = totalMs ?? (capMs !== undefined && capMs > 0 ? capMs : null);
 
   if (nowMs === 0) {
     return {
@@ -150,21 +187,26 @@ export function phaseClock(
       totalMs,
       fraction: totalMs ? 1 : null,
       expired: false,
+      overdueMs: 0,
       idle: false,
       ready: false,
     };
   }
 
   let remainingMs = deadline - nowMs;
-  if (totalMs !== null) remainingMs = Math.min(remainingMs, totalMs);
+  if (ceiling !== null) remainingMs = Math.min(remainingMs, ceiling);
   remainingMs = Math.max(0, remainingMs);
 
   return {
     remainingMs,
     seconds: Math.ceil(remainingMs / 1000),
+    // The bar's denominator is the phase's REAL length or nothing — a cap is a
+    // bound on a number, not a claim about how long the phase is, so it must
+    // never become a progress fraction.
     totalMs,
     fraction: totalMs ? Math.min(1, remainingMs / totalMs) : null,
     expired: remainingMs <= 0,
+    overdueMs: Math.max(0, nowMs - deadline),
     idle: false,
     ready: true,
   };
@@ -178,7 +220,8 @@ export function phaseClock(
 export function useServerCountdown(
   deadlineIso: string | null | undefined,
   startIso?: string | null,
+  capMs?: number,
 ): PhaseClock {
   const nowMs = useGameClock();
-  return phaseClock(deadlineIso, startIso, nowMs);
+  return phaseClock(deadlineIso, startIso, nowMs, capMs);
 }

@@ -1,7 +1,22 @@
 /**
- * human-turn — recovers what a person actually ASKED from a `role: "user"` row
- * of an AI session transcript.
+ * human-turn — the FALLBACK that recovers what a person asked from a
+ * `role: "user"` row of an AI session transcript recorded BEFORE 2026-08-04.
  *
+ * ── READ THIS BEFORE DELETING OR EXTENDING IT ─────────────────────────────
+ * The backend now sends `user_content` (exactly what the person typed) and
+ * `asked_by` (who typed it) on every user turn, and the transcript view
+ * PREFERS both. This module is not the primary path any more — it is the only
+ * way to read the turns that already existed when that deploy landed. There is
+ * no backfill, so those rows carry `content` and nothing else, forever. That is
+ * why this file still exists and why it must not be "tidied away" once new
+ * sessions look correct on screen: deleting it would silently turn every
+ * pre-deploy transcript into a wall of prompt scaffolding.
+ *
+ * It is equally not somewhere to add features. Anything the transcript needs
+ * from a turn now comes from a field on the wire; this parse only ever has to
+ * keep working on a fixed, closed set of historical rows.
+ *
+ * ── WHAT IT UNWRAPS ───────────────────────────────────────────────────────
  * `GET /channels/{uuid}/ai/sessions/{session}` returns the agent's own
  * conversation rows, so a user row's `content` is the prompt the backend
  * ASSEMBLED, never the message the person sent. The measured wire format
@@ -16,25 +31,22 @@
  * Showing that verbatim puts machinery the reader never wrote into their own
  * words, so this module unwraps it.
  *
- * THE NAME IN THE MARKER IS NOT AN AUTHOR, AND IS NEVER DISPLAYED. Every part
- * of this string is attacker-controllable: the context block is assembled from
- * channel messages any member can write, and a question may itself contain
- * `</channel_context>` followed by a fresh `Request from <someone>:`. No
- * parsing rule fixes that — first match, last match and every variant are
- * equally spoofable, because the claim is unverifiable in the first place.
- * Presenting it as authorship in a legal product would let one member publish
- * words under another member's name, so the recovered name is discarded here
- * and the view labels human turns neutrally. Only the QUESTION TEXT is
- * recovered: the worst a spoof achieves there is restyling its own author's
- * words.
+ * ── THE NAME IN THE MARKER IS NOT AN AUTHOR, AND IS NEVER DISPLAYED ───────
+ * Every part of this string is attacker-controllable: the context block is
+ * assembled from channel messages any member can write, and a question may
+ * itself contain `</channel_context>` followed by a fresh `Request from
+ * <someone>:`. No parsing rule fixes that — first match, last match and every
+ * variant are equally spoofable, because the claim is unverifiable in the first
+ * place. Presenting it as authorship in a legal product would let one member
+ * publish words under another member's name, so the recovered name is discarded
+ * here and turns that have no `asked_by` are labelled neutrally in the view.
+ * `asked_by` is a SERVER field and carries none of this problem, which is
+ * precisely why attribution waited for it. Only the QUESTION TEXT is recovered
+ * here: the worst a spoof achieves there is restyling its own author's words.
  *
- * A BACKEND ASK IS OPEN for a real author field and the human's original text
- * on the row (item 6 of
- * `docs/v2-docs/backend-ask-2026-08-04-spaces-channels-round-2.md`). When it
- * lands this module is deleted rather than extended: parsing a prompt template
- * is a stopgap, which is why the parse is ALL-OR-NOTHING — an unrecognised
- * shape, or a recognised one with nothing after the marker, returns the content
- * UNCHANGED instead of half-trimmed.
+ * The parse is ALL-OR-NOTHING: an unrecognised shape, or a recognised one with
+ * nothing after the marker, returns the content UNCHANGED rather than
+ * half-trimmed.
  */
 
 /** The close of the assembled prompt's context block, when it carries one. */

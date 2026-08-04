@@ -43,6 +43,7 @@ import { ChannelFeedSkeleton, FeedErrorState, FeedEmptyState } from '../screen/s
 import { MessageActionsSheet } from './MessageActionsSheet';
 import { MessageGroupRow } from './MessageGroupRow';
 import type { MessageRowActions } from './MessageRow';
+import { QuizCardPreview } from './QuizCardPreview';
 import { QuizGameCard } from './QuizGameCard';
 import { RespondingRow } from './RespondingRow';
 import { DaySeparator, UnreadDivider } from './separators';
@@ -111,6 +112,18 @@ import {
  *    deep link uses, so a pin from last week resolves exactly like a
  *    notification link — and, unlike a URL write, it costs no navigation and
  *    can't fight the router's cached search params.
+ *
+ * READ-ONLY MODE (`canParticipate: false`) — a space member previewing a
+ * `space_public` channel they never joined. THE TRANSCRIPT IS THE SAME
+ * TRANSCRIPT: same shaping, same grouping, same scroll contract, same deep
+ * links, same reply-quote jumps. What leaves is every WRITE: the row action
+ * cluster and the long-press sheet, the delete confirm, the empty state's
+ * "write the first message", and the quiz cards' Join. What also leaves —
+ * and this is the part a redesign must not put back — is EVERY READ-POINTER
+ * REPORT: `POST /read` is refused for a previewer, so the bottom sentinel
+ * reports nothing, Esc marks nothing and the jump pill only scrolls. A
+ * previewer therefore has no unread state at all, which is also why no unread
+ * divider is drawn (`channel.unread_count` is members-only and simply absent).
  */
 
 const BOTTOM_THRESHOLD_PX = 80;
@@ -133,6 +146,10 @@ export interface ChannelFeedProps {
   viewerId: number | null;
   viewerUuid: string | null;
   reporter: ChannelReadReporter;
+  /** May the viewer write in this channel? False for a previewer — see the
+   *  READ-ONLY MODE note above. Every write affordance and every read-pointer
+   *  report hangs off this one flag. */
+  canParticipate: boolean;
   /** False while another tab covers the feed (the pane stays mounted but
    *  invisible) — gates the mark-read report: an invisible newest message is
    *  NOT "in the viewport" (§5's clause, taken literally). */
@@ -163,6 +180,7 @@ export function ChannelFeed({
   viewerId,
   viewerUuid,
   reporter,
+  canParticipate,
   active,
   targetMessageUuid,
   typingUsers,
@@ -219,7 +237,16 @@ export function ChannelFeed({
         landing layout-effect can find the element. ───────────────────────── */
   const [anchor, setAnchor] = useState<{ uuid: string | null } | null>(null);
   if (anchor === null && messages.length > 0) {
-    setAnchor({ uuid: unreadAnchorUuid(messages, channel.unread_count ?? 0) });
+    setAnchor({
+      // READ-ONLY MODE HAS NO UNREAD STATE, AND THAT IS ENFORCED HERE RATHER
+      // THAN ASSUMED. `unread_count` is a members-only field, so a previewer
+      // should never receive one — but if a payload ever carried a stale or
+      // non-zero count, the gold "New" line would draw and could never be
+      // cleared: the read pointer is disabled, so Esc, the jump pill and the
+      // bottom sentinel are all no-ops, and the first-paint landing would drop
+      // the reader on that line on every single visit. Zeroed at the source.
+      uuid: unreadAnchorUuid(messages, canParticipate ? (channel.unread_count ?? 0) : 0),
+    });
   }
 
   /* ── Lawexa turns: anchored under their summon, or (when the event omitted
@@ -504,6 +531,42 @@ export function ChannelFeed({
     };
   }, []);
 
+  /* ── The viewport-height keeper: CHROME ABOVE THE TRANSCRIPT MUST NOT MOVE
+        THE TRANSCRIPT.
+
+        The scroller is a flex child, so anything that appears above it —
+        the push nudge, the live-quiz bar, and now the section strip opening
+        the moment a previewer JOINS — shortens it. `scrollHeight` is unchanged
+        and `scrollTop` is unchanged, so the conversation slides out from under
+        the reader by exactly the height that arrived, at the one moment they
+        pressed a button that promised to leave them where they were.
+
+        Held BOTTOM-ANCHORED, the right anchor for a chat: the distance from
+        the content's end stays constant, which for a reader at the bottom
+        means staying at the bottom. Suppressed while a history pull is armed
+        (that restore owns `scrollTop`) and before the first landing has run,
+        so it can never fight either. The existing follower observes the
+        CONTENT box and answers a different question — content growing, not the
+        window onto it shrinking. ─────────────────────────────────────────── */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let lastHeight = el.clientHeight;
+    const observer = new ResizeObserver(() => {
+      const node = scrollRef.current;
+      if (!node) return;
+      const delta = node.clientHeight - lastHeight;
+      lastHeight = node.clientHeight;
+      if (delta === 0) return;
+      if (!didInitialScrollRef.current || pendingRestoreRef.current !== null) return;
+      node.scrollTop = atBottomRef.current
+        ? node.scrollHeight - node.clientHeight
+        : node.scrollTop - delta;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   /* ── Composer-dock clearance, measured live (no CLS; the overlay floats
         over the transcript, so the transcript reserves its height). ──────── */
   useEffect(() => {
@@ -538,8 +601,13 @@ export function ChannelFeed({
   }, []);
   const reportNewestVisible = reporter.reportNewestVisible;
   useEffect(() => {
-    reportNewestVisible(active && bottomVisible ? newestReal : null);
-  }, [active, bottomVisible, newestReal, reportNewestVisible]);
+    // `canParticipate` joins the clause rather than wrapping the effect: the
+    // hook must still be told `null` if the flag ever flips off, so nothing
+    // stays armed from a previous state.
+    reportNewestVisible(
+      canParticipate && active && bottomVisible ? newestReal : null,
+    );
+  }, [canParticipate, active, bottomVisible, newestReal, reportNewestVisible]);
 
   /* ── Targets outside the loaded pages (`?m=` deep links AND panel jumps):
         pull older pages, bounded. Each pull is position-restored
@@ -611,13 +679,14 @@ export function ChannelFeed({
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
     }
-    // Jump-pill click is a mark-read trigger (§5).
-    if (newestReal) reporter.markReadNow(newestReal);
+    // Jump-pill click is a mark-read trigger (§5) — for a member. A previewer
+    // has no pointer to advance, so the pill is purely a scroll.
+    if (canParticipate && newestReal) reporter.markReadNow(newestReal);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    // Esc = mark read (§5).
-    if (event.key === 'Escape' && newestReal) {
+    // Esc = mark read (§5), and only where there is a pointer to move.
+    if (event.key === 'Escape' && canParticipate && newestReal) {
       reporter.markReadNow(newestReal);
       return;
     }
@@ -756,7 +825,9 @@ export function ChannelFeed({
             <FeedEmptyState
               channelName={channel.name}
               description={channel.description}
-              onWriteFirstMessage={onFocusComposer}
+              // No action for a previewer: the way forward here is joining,
+              // and that button already stands in the dock below.
+              onWriteFirstMessage={canParticipate ? onFocusComposer : undefined}
             />
           ) : (
             <div className="flex flex-col gap-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
@@ -787,7 +858,11 @@ export function ChannelFeed({
                   case 'unread':
                     return <UnreadDivider key={item.key} />;
                   case 'quiz-card':
-                    return (
+                    // The live card probes the game and offers Join, both of
+                    // which are blocked for a previewer — so they get the
+                    // record of the quiz without the request or the verb,
+                    // rather than a card that fails when pressed.
+                    return canParticipate ? (
                       <QuizGameCard
                         key={item.key}
                         message={item.message}
@@ -795,6 +870,8 @@ export function ChannelFeed({
                         viewerId={viewerId}
                         onOpenGame={onOpenGame}
                       />
+                    ) : (
+                      <QuizCardPreview key={item.key} message={item.message} />
                     );
                   case 'responding':
                     return (
@@ -818,6 +895,7 @@ export function ChannelFeed({
                         setsize={groupCount}
                         virtualize={groupOrdinal <= groupCount - 1 - UNVIRTUALIZED_TAIL}
                         viewerUuid={viewerUuid}
+                        canEngage={canParticipate}
                         isChannelAdmin={isChannelAdmin}
                         editingUuid={editingUuid}
                         actions={rowActions}
@@ -903,48 +981,54 @@ export function ChannelFeed({
         </div>
       </div>
 
-      {/* Touch action sheet — one per feed. */}
-      <MessageActionsSheet
-        message={sheetMessage}
-        canEdit={sheetIsMine}
-        canDelete={sheetIsMine || isChannelAdmin}
-        onClose={() => setSheetMessageUuid(null)}
-        onReply={(message) => onStartReply(message)}
-        onEdit={(message) => setEditingUuid(message.uuid)}
-        onDelete={(message) => setDeleteTarget(message)}
-        onToggleReaction={rowActions.onToggleReaction}
-        onTogglePin={rowActions.onTogglePin}
-        onToggleSave={rowActions.onToggleSave}
-        onViewAiSession={rowActions.onViewAiSession}
-      />
+      {/* Touch action sheet and the delete confirm — one per feed, and both
+          MEMBER-ONLY: every verb inside them is a write, and the gestures that
+          open them are already gone in read-only mode, so mounting them would
+          leave two unreachable surfaces in the tree. */}
+      {canParticipate && (
+        <>
+          <MessageActionsSheet
+            message={sheetMessage}
+            canEdit={sheetIsMine}
+            canDelete={sheetIsMine || isChannelAdmin}
+            onClose={() => setSheetMessageUuid(null)}
+            onReply={(message) => onStartReply(message)}
+            onEdit={(message) => setEditingUuid(message.uuid)}
+            onDelete={(message) => setDeleteTarget(message)}
+            onToggleReaction={rowActions.onToggleReaction}
+            onTogglePin={rowActions.onTogglePin}
+            onToggleSave={rowActions.onToggleSave}
+            onViewAiSession={rowActions.onViewAiSession}
+          />
 
-      {/* Delete confirm — one per feed, destructive red. */}
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete message?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes the message for everyone in the channel. This
-              can&apos;t be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (deleteTarget) deleteMutate(deleteTarget.uuid);
-                setDeleteTarget(null);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialog
+            open={deleteTarget !== null}
+            onOpenChange={(open) => !open && setDeleteTarget(null)}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete message?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes the message for everyone in the channel. This
+                  can&apos;t be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (deleteTarget) deleteMutate(deleteTarget.uuid);
+                    setDeleteTarget(null);
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </div>
   );
 }

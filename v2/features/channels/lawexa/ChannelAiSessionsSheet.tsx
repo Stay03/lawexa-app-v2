@@ -12,6 +12,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronRight,
+  CornerUpRight,
   Loader2,
   MessagesSquare,
   RotateCcw,
@@ -48,9 +49,13 @@ import { PlainMessageContent } from '../feed/MessageContent';
 import { channelsQueries } from '../queries';
 import { LawexaAvatar, MemberAvatar } from '../ui/avatars';
 import { RelativeTime } from '../ui/RelativeTime';
-import { recoverHumanQuestion } from './human-turn';
 import { useResetChannelAi } from './mutations';
-import { isDialogueRow, machineryLabel, shapeTranscript } from './transcript-model';
+import {
+  humanTurn,
+  isDialogueRow,
+  machineryLabel,
+  shapeTranscript,
+} from './transcript-model';
 
 /**
  * ChannelAiSessionsSheet — the channel's Lawexa history: which conversations
@@ -83,13 +88,24 @@ import { isDialogueRow, machineryLabel, shapeTranscript } from './transcript-mod
  * the feed's markdown prose, so an answer reads identically in both places.
  *
  * THE TRANSCRIPT IS NOT THE MESSAGES TABLE. Its rows come from the agent's own
- * conversation and carry no `uuid`, no `is_ai`, no `author` and no resolved
- * mention list ({@link AiTranscriptMessage}), so this view keys on `id`, takes
- * authorship from `role` alone, and renders bodies through the mention-free
- * renderers — handing a transcript row to the feed's mention-aware ones threw.
- * A human row's `content` is the assembled prompt rather than what was typed;
- * {@link recoverHumanQuestion} recovers the question, and the questioner stays
- * unnamed because the only name on the wire is one any member can forge.
+ * conversation and carry no `uuid`, no `is_ai` and no resolved mention list
+ * ({@link AiTranscriptMessage}), so this view keys on `id`, takes authorship
+ * from `role` alone, and renders bodies through the mention-free renderers —
+ * handing a transcript row to the feed's mention-aware ones threw.
+ *
+ * A USER TURN NOW HAS TWO POSSIBLE ERAS, and {@link humanTurn} is the one place
+ * that knows which: since 2026-08-04 the row carries `user_content` (what the
+ * person actually typed) and `asked_by` (who they were), so a turn from then on
+ * shows the real person with their avatar; a turn from before carries only the
+ * assembled prompt, so its question is recovered by parse and it stays
+ * deliberately UNNAMED — the only name inside that prompt is one any member can
+ * forge, and this product will not print it as authorship.
+ *
+ * AND A TURN CAN NOW POINT BACK. `metadata.channel_message_uuid` names the
+ * channel message that summoned it, so a question read here has a door to the
+ * conversation it came out of — the same jump the pins and saves panels make,
+ * through the same screen-owned handler. Only offered when the row carries the
+ * uuid, which is again the post-deploy rows.
  */
 
 /** `useLayoutEffect` in the browser, `useEffect` on the server — a layout
@@ -110,19 +126,28 @@ export function ChannelAiSessionsSheet({
   channelUuid,
   channelName,
   viewerId,
+  canReset,
   open,
   onOpenChange,
   sessionUuid,
   onSelectSession,
+  onJumpToMessage,
 }: {
   channelUuid: string;
   channelName: string;
   viewerId: number | null;
+  /** False for a space member previewing a `space_public` channel they never
+   *  joined: the history reads, `POST /ai/reset` is refused, so the footer
+   *  offering it is not rendered. */
+  canReset: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** `null` = show the session list. */
   sessionUuid: string | null;
   onSelectSession: (sessionUuid: string | null) => void;
+  /** Land on a channel message from a transcript turn — the screen closes this
+   *  sheet in place, returns to Chat and lets the feed resolve the uuid. */
+  onJumpToMessage: (messageUuid: string) => void;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -134,12 +159,14 @@ export function ChannelAiSessionsSheet({
             viewerId={viewerId}
             open={open}
             onBack={() => onSelectSession(null)}
+            onJumpToMessage={onJumpToMessage}
           />
         ) : (
           <SessionListView
             channelUuid={channelUuid}
             channelName={channelName}
             viewerId={viewerId}
+            canReset={canReset}
             open={open}
             onSelect={onSelectSession}
           />
@@ -155,12 +182,14 @@ function SessionListView({
   channelUuid,
   channelName,
   viewerId,
+  canReset,
   open,
   onSelect,
 }: {
   channelUuid: string;
   channelName: string;
   viewerId: number | null;
+  canReset: boolean;
   open: boolean;
   onSelect: (sessionUuid: string) => void;
 }) {
@@ -240,7 +269,9 @@ function SessionListView({
         )}
       </div>
 
-      <ResetFooter channelUuid={channelUuid} hasActiveSession={hasActive} />
+      {canReset && (
+        <ResetFooter channelUuid={channelUuid} hasActiveSession={hasActive} />
+      )}
     </>
   );
 }
@@ -407,12 +438,14 @@ function TranscriptView({
   viewerId,
   open,
   onBack,
+  onJumpToMessage,
 }: {
   channelUuid: string;
   sessionUuid: string;
   viewerId: number | null;
   open: boolean;
   onBack: () => void;
+  onJumpToMessage: (messageUuid: string) => void;
 }) {
   const [showEverything, setShowEverything] = useState(false);
   const query = useInfiniteQuery({
@@ -539,7 +572,11 @@ function TranscriptView({
               </div>
             )}
             {rows.map((row) => (
-              <TranscriptRow key={row.id} message={row} />
+              <TranscriptRow
+                key={row.id}
+                message={row}
+                onJumpToMessage={onJumpToMessage}
+              />
             ))}
           </div>
         )}
@@ -556,7 +593,13 @@ function TranscriptView({
  * a monospace body: they are a record of what the agent did, not something to
  * read as prose, so they show their content raw, prompt scaffolding and all.
  */
-function TranscriptRow({ message }: { message: AiTranscriptMessage }) {
+function TranscriptRow({
+  message,
+  onJumpToMessage,
+}: {
+  message: AiTranscriptMessage;
+  onJumpToMessage: (messageUuid: string) => void;
+}) {
   // THE SAME PREDICATE THE FILTER USES — never a second copy. A row that the
   // dialogue view hid must render as machinery when "Show everything" reveals
   // it; two definitions would let a hidden row come back dressed as prose.
@@ -596,17 +639,41 @@ function TranscriptRow({ message }: { message: AiTranscriptMessage }) {
     );
   }
 
-  // NEUTRAL BY NECESSITY, not by omission: the row carries no author, and the
-  // name inside the prompt is attacker-controllable (see `./human-turn.ts`),
-  // so no transcript question is ever attributed to a person.
+  // A HUMAN TURN — named when the SERVER named it, neutral when it did not.
+  // `asked_by` is stamped from the authenticated summoner; the name inside the
+  // assembled prompt is member-writable and is never read as an identity (see
+  // `./human-turn.ts`). So a post-2026-08-04 turn finally shows the real
+  // person, and an older one keeps the stand-in — the difference is a fact
+  // about the record, not about the reader.
+  const turn = humanTurn(message);
+  // Bound to a local const so the narrowing survives into the click handler.
+  const summonedBy = turn.channelMessageUuid;
   return (
     <DialogueRow
-      avatar={<MemberAvatar user={null} size="sm" className="mt-0.5 shrink-0" />}
-      name="Someone in this channel"
-      unnamed
+      avatar={
+        <MemberAvatar user={turn.askedBy} size="sm" className="mt-0.5 shrink-0" />
+      }
+      name={turn.askedBy?.name ?? 'Someone in this channel'}
+      unnamed={turn.askedBy === null}
       createdAt={message.created_at}
+      footer={
+        summonedBy ? (
+          <button
+            type="button"
+            onClick={() => onJumpToMessage(summonedBy)}
+            className={cn(
+              'v2-interactive mt-1 inline-flex items-center gap-1 rounded text-xs text-muted-foreground',
+              'transition-colors duration-150 hover:text-foreground motion-reduce:transition-none',
+              FOCUS_RING,
+            )}
+          >
+            <CornerUpRight aria-hidden className="size-3 shrink-0" />
+            Go to this message in the channel
+          </button>
+        ) : undefined
+      }
     >
-      <PlainMessageContent content={recoverHumanQuestion(message.content)} />
+      <PlainMessageContent content={turn.text} />
     </DialogueRow>
   );
 }
@@ -618,6 +685,7 @@ function DialogueRow({
   name,
   unnamed = false,
   createdAt,
+  footer,
   children,
 }: {
   avatar: ReactNode;
@@ -625,6 +693,10 @@ function DialogueRow({
   /** The name is a stand-in, not an attribution — draw it quietly. */
   unnamed?: boolean;
   createdAt: string;
+  /** A quiet line UNDER the body — today, the way back to the channel message
+   *  that summoned this turn. Below rather than beside, so it never competes
+   *  with the words the person wrote. */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -640,6 +712,7 @@ function DialogueRow({
           <RelativeTime iso={createdAt} className="text-xs text-muted-foreground" />
         </div>
         <div className="mt-0.5">{children}</div>
+        {footer}
       </div>
     </div>
   );
