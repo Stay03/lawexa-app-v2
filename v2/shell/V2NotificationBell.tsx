@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { Bell, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Bell, CheckCheck, Settings2 } from 'lucide-react';
 import {
   useMutation,
   useQuery,
@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/sheet';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
 import { optimisticMutation } from '@/v2/runtime/mutations';
+import { NotificationDeliveryControls } from './NotificationDeliveryControls';
 import type {
   MarkAllReadResponse,
   MarkReadResponse,
@@ -46,10 +47,16 @@ import type {
  * `components/notifications/*` is boundary-blocked; only the data layer is
  * shared). Bell + unread badge on a desktop Popover, a mobile bottom Sheet.
  *
- * This is the visual + data bell only — the realtime spine is phase 5. The
- * badge count sits on the LIVE tier so it self-heals on refocus without sockets.
- * Guests never see it: it's hidden entirely when signed out (`signedIn` prop
- * threaded from the server-verified session via `V2Header`).
+ * The badge count sits on the LIVE tier so it self-heals on refocus, and the
+ * phase-5 spine invalidates it on every `.notification` broadcast, so it also
+ * moves without a refocus. Guests never see it: it's hidden entirely when
+ * signed out (`signedIn` prop threaded from the server-verified session via
+ * `V2Header`).
+ *
+ * The panel is TWO views behind one gear: the list, and the spine's delivery
+ * switches (`NotificationDeliveryControls` — see that module for why they
+ * belong here). They swap rather than stack, so the panel's height is the
+ * same either way and the footer link is never pushed out of reach.
  */
 
 /** The single list variant the panel reads; a module constant so its query key
@@ -120,10 +127,12 @@ export function V2NotificationBell({ signedIn }: { signedIn: boolean }) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>{trigger}</SheetTrigger>
+        {/* The CONTAINER owns the height cap and the panel flexes inside it,
+            so the footer link stays on screen on a short phone (audit L3). */}
         <SheetContent
           side="bottom"
           showCloseButton={false}
-          className="v2-safe-bottom gap-0 rounded-t-2xl p-0"
+          className="v2-safe-bottom flex max-h-[85svh] flex-col gap-0 rounded-t-2xl p-0"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Notifications</SheetTitle>
@@ -131,11 +140,7 @@ export function V2NotificationBell({ signedIn }: { signedIn: boolean }) {
               Your recent notifications, newest first.
             </SheetDescription>
           </SheetHeader>
-          <NotificationPanel
-            unreadCount={count}
-            onNavigate={close}
-            bodyClassName="max-h-[60svh]"
-          />
+          <NotificationPanel unreadCount={count} onNavigate={close} />
         </SheetContent>
       </Sheet>
     );
@@ -144,7 +149,11 @@ export function V2NotificationBell({ signedIn }: { signedIn: boolean }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} className="w-[22rem] p-0">
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="flex max-h-[min(32rem,calc(100svh-5rem))] w-[22rem] flex-col p-0"
+      >
         <NotificationPanel unreadCount={count} onNavigate={close} />
       </PopoverContent>
     </Popover>
@@ -165,10 +174,16 @@ function NotificationPanel({
 }: {
   unreadCount: number;
   onNavigate: () => void;
+  /** Optional cap for the scrolling region; normally the CONTAINER caps it. */
   bodyClassName?: string;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  // The panel has TWO views behind one surface (audit L4). Settings SWAP with
+  // the list instead of stacking under it: stacked, they pushed the footer
+  // link off a short viewport and read as something bolted on the end. Swapped,
+  // the panel keeps one height and the gear is an ordinary destination.
+  const [showSettings, setShowSettings] = useState(false);
 
   const listQuery = useQuery(notificationsQueries.list(LIST_PARAMS));
   const notifications = listQuery.data?.data ?? [];
@@ -223,27 +238,57 @@ function NotificationPanel({
   };
 
   return (
-    <div className="flex flex-col">
+    // `min-h-0` on the body row is what lets the panel bound its own height:
+    // the header and the footer link keep their size and the SCROLLING region
+    // gives way, so the footer is reachable on any viewport (audit L3).
+    <div className="flex min-h-0 flex-col">
       <div className="flex items-center justify-between gap-2 px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
-        {unreadCount > 0 ? (
+        <h2 className="text-sm font-semibold text-foreground">
+          {showSettings ? 'Notification settings' : 'Notifications'}
+        </h2>
+        <div className="flex items-center gap-1">
+          {!showSettings && unreadCount > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto gap-1.5 px-2 py-1 text-xs text-muted-foreground"
+              onClick={() => markAll.mutate(undefined)}
+              disabled={markAll.isPending}
+            >
+              <CheckCheck className="size-3.5" />
+              Mark all as read
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
-            size="sm"
-            className="h-auto gap-1.5 px-2 py-1 text-xs text-muted-foreground"
-            onClick={() => markAll.mutate(undefined)}
-            disabled={markAll.isPending}
+            size="icon"
+            className="size-8 text-muted-foreground"
+            aria-label={
+              showSettings ? 'Back to notifications' : 'Notification settings'
+            }
+            aria-expanded={showSettings}
+            onClick={() => setShowSettings((open) => !open)}
           >
-            <CheckCheck className="size-3.5" />
-            Mark all as read
+            {showSettings ? (
+              <ArrowLeft className="size-4" />
+            ) : (
+              <Settings2 className="size-4" />
+            )}
           </Button>
-        ) : null}
+        </div>
       </div>
 
       <Separator />
 
-      <div className={cn('overflow-y-auto overscroll-contain', bodyClassName ?? 'max-h-96')}>
-        {listQuery.isLoading ? (
+      <div
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+          bodyClassName ?? 'max-h-96',
+        )}
+      >
+        {showSettings ? (
+          <NotificationDeliveryControls />
+        ) : listQuery.isLoading ? (
           <PanelSkeleton />
         ) : listQuery.isError ? (
           <PanelError onRetry={() => listQuery.refetch()} />
@@ -265,7 +310,7 @@ function NotificationPanel({
 
       <Separator />
 
-      <div className="p-2">
+      <div className="shrink-0 p-2">
         <Button
           asChild
           variant="ghost"

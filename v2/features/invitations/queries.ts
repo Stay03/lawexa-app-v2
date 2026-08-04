@@ -19,12 +19,11 @@ import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
  * on (the QueryClient default), which covers "accepted on my phone, still
  * listed on my laptop".
  *
- * KNOWN SEAM FOR W5: the realtime spine's `.notification` handler invalidates
- * `notificationsQueries.all` only, so a `space_invite` / `channel_invite` /
- * `organization_invite` push does not currently refresh THESE keys — the badge
- * catches up on the next visit or focus. Adding `invitationsQueries.all` to
- * that handler is a one-line change in `v2/runtime/realtime/spine.tsx`, a file
- * outside this wave's ownership; it is reported rather than made here.
+ * LIVE SINCE W5: the realtime spine's `.notification` handler invalidates
+ * {@link invitationsQueries.all} alongside the notification inbox, and its
+ * reconnect gap-recovery does the same — so a `space_invite` /
+ * `channel_invite` / `organization_invite` arriving on the user channel moves
+ * the pending badge without waiting for a visit or a window focus.
  */
 
 /**
@@ -44,7 +43,7 @@ export interface ViewerScoped {
 const PAGE = { per_page: 50 } as const;
 
 export const invitationsQueries = {
-  /** The prefix every accept/decline invalidates, and the W5 spine seam. */
+  /** The prefix every accept/decline invalidates, and the spine's handle. */
   all: ['invitations'] as const,
 
   /** Pending channel invitations. Rows carry the channel + its space, the

@@ -10,6 +10,7 @@ import {
 } from '@/v2/features/channels/cache';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { collabAccessState } from '@/v2/features/collab/model';
+import { invitationsQueries } from '@/v2/features/invitations/queries';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
 import {
   applySpaceRollupDeltas,
@@ -171,8 +172,8 @@ export function RealtimeSpine() {
   });
 
   // Baseline 2 — pre-warmed channel rows for transitions + mute lookups (and
-  // the home's "Jump back in" key, warm before the user ever visits it).
-  useQuery({ ...channelsQueries.mine({}), enabled: eligible });
+  // the `/channels` index key, warm before the user ever visits it).
+  useQuery({ ...channelsQueries.mine({ viewerId }), enabled: eligible });
 
   const mentionTotal = eligible ? (badgeQuery.data ?? 0) : 0;
 
@@ -196,9 +197,21 @@ export function RealtimeSpine() {
     // Every signed-in v2 user, NO role gate (plan W1 item 2). Blanket
     // invalidation only: the broadcast/REST `type` strings are two different
     // vocabularies (digest §F.8), so nothing here may branch on the payload.
+    //
+    // THE INVITATION INBOXES GO STALE ON THE SAME EVENT (W4 report, W5): three
+    // of the four notification types ARE invitations, and an invitation is the
+    // one collab arrival with no other live signal — it comes from someone
+    // else, and no `.channel.unread` or room event accompanies it. Without
+    // this the pending badge on `/spaces` waited for the next visit or window
+    // focus. Blanket again, for the same reason: the payload's vocabulary is
+    // not ours to branch on, and re-asking three cheap inboxes on a
+    // notification is far below the cost of a badge that lies.
     channel.notification(() => {
       void queryClient.invalidateQueries({
         queryKey: notificationsQueries.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: invitationsQueries.all,
       });
     });
 
@@ -219,6 +232,9 @@ export function RealtimeSpine() {
         void queryClient.invalidateQueries({ queryKey: channelsQueries.all });
         void queryClient.invalidateQueries({
           queryKey: notificationsQueries.all,
+        });
+        void queryClient.invalidateQueries({
+          queryKey: invitationsQueries.all,
         });
       }
       hasConnected = true;

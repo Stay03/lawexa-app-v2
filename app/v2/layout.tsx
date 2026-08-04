@@ -16,6 +16,7 @@ import { DocumentLock } from '@/v2/shell/document-lock';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
+import { V2PushLifecycle } from '@/v2/runtime/push/lifecycle';
 import { RealtimeSpine } from '@/v2/runtime/realtime/spine';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
@@ -194,6 +195,14 @@ export default async function V2Layout({
               lifecycle keys on the viewer, tearing down on the same identity
               edge V2CacheIdentityGuard clears the cache on. */}
           <RealtimeSpine />
+          {/* CLOSED-APP PUSH, the other half of the same contract (phase-5
+              W5). Renders null. It owns only the DEVICE TOKEN lifecycle —
+              the idempotent boot re-sync and the teardown on the viewer
+              edge — and never prompts: the one permission request lives in
+              the in-channel nudge, on a user gesture. Foreground FCM
+              messages are ignored entirely (digest §F.16); while a tab is
+              visible the spine above is the delivery path. */}
+          <V2PushLifecycle />
           {/* Seed the browser query cache with the server-prefetched recents — BOTH the
               sidebar/drawer infinite list and the home's single-page peek, which are
               different query keys — so signed-in first paint is real rows rather than a

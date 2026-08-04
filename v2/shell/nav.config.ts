@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 
 import type { UserRole } from '@/types/auth';
+import { canAccessCollab } from '@/lib/utils/collab-audience';
 import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
-import { canAccessSpaces } from '@/lib/utils/spaces-access';
 
 /**
  * v2 shell navigation — the SINGLE source of truth for both the desktop sidebar
@@ -35,9 +35,10 @@ import { canAccessSpaces } from '@/lib/utils/spaces-access';
  * stays a one-line change.
  *
  * A predicate is always a REUSED pure helper (`canAccessQuizPlayer`,
- * `canAccessSpaces`), never a role list re-declared here: each audience is
- * defined once, in its `lib/utils/*-access.ts` module, and widening it later is
- * still the one-line change those modules promise.
+ * `canAccessCollab`), never a role list re-declared here: each audience is
+ * defined once, in its own `lib/utils/` module, and widening it later is still
+ * the one-line change those modules promise. Widening Spaces at the phase-5
+ * ship was exactly that: one import swapped, no role list edited.
  *
  * NOT A SECURITY BOUNDARY. Hiding a link hides an entry point; the route's own
  * gate (`v2/features/quiz/access.tsx`) and the backend decide access. A user who
@@ -98,12 +99,17 @@ export const v2NavItems: V2NavItem[] = [
     label: 'Spaces',
     href: '/spaces',
     icon: Boxes,
-    // Spaces still lives in v1 behind its own soft-launch gate, and that gate
-    // REDIRECTS outsiders to home. With the v2 preview open to every registered
-    // account (Aug 3, 2026), an ungated row would send most users into that
-    // bounce — so the row shares the feature's audience helper until the
-    // phase-5 rebuild replaces the redirect with a designed state.
-    canAccess: canAccessSpaces,
+    // The v1 soft-launch gate (`canAccessSpaces`: researcher/admin/superadmin)
+    // came OFF here at the phase-5 ship — owner decision D1, every registered
+    // account. It only ever existed because v1's `SpacesGuard` REDIRECTED
+    // outsiders to home, so an ungated row would have sent most users into a
+    // bounce. `/spaces` now serves the v2 tree, whose layouts answer with
+    // designed panels instead (`v2/features/collab/access.tsx`).
+    //
+    // The predicate that stays is the v2 AUDIENCE — the same shape Quiz uses,
+    // excluding only the two unregistered roles. A guest gets no row and, if
+    // they type the URL, the create-account panel: registering is the door.
+    canAccess: canAccessCollab,
   },
   {
     label: 'Quiz',

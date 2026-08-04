@@ -21,8 +21,8 @@ import { SpacesScreen } from '@/v2/features/spaces/list/SpacesScreen';
  * for its badge rollups, so an arrival usually paints rows in the first frame
  * and re-checks behind them (`REFETCH_ON_VISIT`).
  *
- * ROUTES STAY DARK: no `v2/routes.manifest.ts` entry until W5 — reachable only
- * by a direct `/v2/...` URL in dev, per the phase plan.
+ * LIVE SINCE W5 (manifest entry `/spaces/*`) — the nav's Spaces row now opens
+ * this screen for every registered account (owner decision D1).
  */
 export function generateMetadata(): Metadata {
   return {

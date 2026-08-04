@@ -1,4 +1,8 @@
-import type { Channel, Member, Space, SpaceType } from '@/types/collab';
+import type { Member, Space, SpaceType } from '@/types/collab';
+import {
+  QUIET_GRAMMAR,
+  type UnreadGrammar,
+} from '@/v2/features/collab/unread-grammar';
 
 /**
  * spaces model — the pure vocabulary of the W4 spaces surfaces: the type
@@ -33,26 +37,6 @@ export function parseSpaceFilter(raw: string | null | undefined): SpaceFilter {
 /* ── The unread grammar (DIRECTION 2, backend Ruling A) ───────────────────── */
 
 /**
- * What a row must render, in the house's two-tier language:
- *  - `unread`   → the title goes bold AND a small gold dot appears;
- *  - `mentions` → the gold numeric badge, and ONLY mentions are ever a number;
- *  - `muted`    → the row dims and can never go bold, but a direct @you badge
- *                 still shows (mute kills notifications and the unread
- *                 rollup, never a personal mention — Ruling A, exactly).
- *
- * No red anywhere: red is reserved for failure and destructive actions.
- */
-export interface UnreadGrammar {
-  unread: boolean;
-  mentions: number;
-  muted: boolean;
-}
-
-/** A row with nothing to say — one frozen object so a quiet list of fifty
- *  rows allocates nothing and memoised rows keep their references. */
-const QUIET: UnreadGrammar = { unread: false, mentions: 0, muted: false };
-
-/**
  * A SPACE row's grammar, off the §17 rollups the list and detail payloads
  * stamp for members:
  *  - `unread_channels_count` — channels with ≥1 unread, **muted excluded**
@@ -69,29 +53,14 @@ const QUIET: UnreadGrammar = { unread: false, mentions: 0, muted: false };
 export function spaceUnreadGrammar(space: Space): UnreadGrammar {
   const unread = (space.unread_channels_count ?? 0) > 0;
   const mentions = space.mention_count ?? 0;
-  if (!unread && mentions <= 0) return QUIET;
+  if (!unread && mentions <= 0) return QUIET_GRAMMAR;
   return { unread, mentions, muted: false };
 }
 
-/**
- * A CHANNEL row's grammar. `unread_count` / `mention_count` are members-only
- * and kept live between refetches by the spine's `.channel.unread` writers
- * (absolute counts, assigned never incremented) — which is why a row rendered
- * from this function updates within a second of a message arriving without any
- * refetch of its own.
- *
- * MUTE IS APPLIED HERE, ON THE CLIENT, and that is correct: the server still
- * sends a muted channel's `unread_count` (the badge must stay accurate for
- * when the member unmutes), so the row — not the payload — is where mute stops
- * the bold + dot. The mention count passes through untouched.
- */
-export function channelUnreadGrammar(channel: Channel): UnreadGrammar {
-  const muted = channel.my_notify_level === 'muted';
-  const mentions = channel.mention_count ?? 0;
-  const unread = !muted && (channel.unread_count ?? 0) > 0;
-  if (!unread && mentions <= 0 && !muted) return QUIET;
-  return { unread, mentions, muted };
-}
+/* A CHANNEL row's grammar lives with the channels feature
+   (`v2/features/channels/model.ts`): both derivations share the vocabulary in
+   `v2/features/collab/unread-grammar.ts`, and neither feature imports the
+   other (audit L2). */
 
 /* ── Governance ───────────────────────────────────────────────────────────── */
 

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
-import { canAccessSpaces } from '@/lib/utils/spaces-access';
+import { canAccessCollab } from '@/lib/utils/collab-audience';
 import type { UserRole } from '@/types/auth';
 import { useMounted } from '@/v2/shell/use-mounted';
 import { HomeGreeting } from './HomeGreeting';
@@ -129,7 +129,7 @@ export function StudyHome({
           {isStudent ? (
             <StudyModeRow checked={studyMode} onCheckedChange={setStudyMode} />
           ) : null}
-          {canAccessSpaces(role) ? <ChannelMessagesSection /> : null}
+          {canAccessCollab(role) ? <ChannelMessagesSection /> : null}
           <ConversationsSection />
           <RecentlyViewedSection />
         </div>

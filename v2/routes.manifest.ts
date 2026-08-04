@@ -65,6 +65,28 @@
  * "Explore" feed does not come along — v2 shows the viewer their own folders
  * only, and a public folder stays reachable by direct link.
  */
+/**
+ * THE COLLAB BLOCK (phase-5 W5). `/spaces/*`, `/channels/*`, `/invitations`
+ * and `/organization` are the rebuilt Spaces experience: private, members-only
+ * surfaces (every page is `noindex`; none joins the sitemap). Two of them are
+ * new addresses rather than migrations — `/channels` 404'd in v1 (owner
+ * decision D6 turned it into the "My channels" index) and `/organization`
+ * moves the org home out from under v1's `/settings` (D7) — so, like `/work`
+ * and `/study`, a link to either falls through to a v1 404 for a user without
+ * the cookie. Accepted while v2 is a preview: only a v2 user can make one, and
+ * the edge closes at cutover.
+ *
+ * `/invitations` is EXACT: the surface has no sub-routes, and the four v1
+ * invitation URLs collapse onto it (D5).
+ *
+ * THE FOUR LEGACY REDIRECTS below are the compatibility half of D5 + D7. They
+ * are listed here so the proxy rewrites them into `app/v2/`, where each is a
+ * one-line server page that `redirect()`s to the new address. Cookie-scoped by
+ * construction: a v1 user matches no manifest entry, so their four pages keep
+ * serving byte-identically. They exist because old notification `action_url`s,
+ * old emails and old bookmarks point at them — delete them only when the
+ * backend has stopped emitting the old paths AND v1 is gone (phase 7).
+ */
 export const V2_ROUTES = [
   '/',
   '/work',
@@ -78,6 +100,15 @@ export const V2_ROUTES = [
   '/quiz/*',
   '/notes/*',
   '/folders/*',
+  '/spaces/*',
+  '/channels/*',
+  '/invitations',
+  '/organization',
+  // Legacy collab addresses — v2-only redirect shells (see the block above).
+  '/channel-invitations',
+  '/space-invitations',
+  '/organization-invitations',
+  '/settings/organization',
 ] as const;
 
 /**

@@ -173,24 +173,46 @@ Verdict SHIP AFTER FIXES; all applied.
   the live pass.
 - Foreground dedup: v2 registers no FCM `onMessage` handler anywhere (grep-
   verified), so a foreground payload is discarded by construction.
-- The interruption ladder is a pure function (`decideInterruption`) with the
-  new rule inserted after the mute rule, so a muted channel's behaviour is
-  unchanged by push.
+- The interruption ladder is a pure function (`decideInterruption`); push
+  affects only its `sound` term, so no rule above it — and in particular the
+  mute rule — changes behaviour because of push.
 
-**Live pass — FOR THE COORDINATOR TO FILL.**
-> Run `V2_ENABLED=true next build`, then the live flows. Record here: the
-> `data.url` the backend actually sends on a mention push; whether the OS
-> notification is suppressed while a tab is visible; whether the in-app alert is
-> suppressed while the tab is hidden; the four legacy redirects; the nav row for
-> a plain registered account; and whether `/channels` includes muted channels
-> (checklist step 41).
+**Live pass — RUN 2026-08-04 (coordinator, prod wire probe, raw pusher protocol
+over ws with a browser Origin; script preserved in the session scratchpad as
+`live-wire.js`).**
+
+- `V2_ENABLED=true next build` — green (after regenerating a vanished
+  `node_modules/.bin/next` shim via `npm install`).
+- REST, all green against prod with the verified film account: space + channel
+  create, message post, markRead (response carries `last_read_message_uuid` —
+  the uuid-only pass is live), `@lawexa` summon dispatched
+  (`status: "dispatched"` + execution_id + stream_url).
+- `POST /api/broadcasting/auth` green for `private-users.{uuid}` AND
+  `presence-channels.{uuid}`; both subscriptions succeeded. NOTE: Reverb
+  enforces allowed origins on the socket (4009 without one) — headless probes
+  must send `Origin: https://lawexa.com`.
+- Client relay green: a `client-typing` whisper crossed sockets in ~250ms.
+- **FINDING (blocking the live badge criteria, NOT the flip): backend event
+  EMISSION is down in prod.** Zero server-emitted events arrived on either
+  socket across ~2.5 min of activity — no `.message.created`, no
+  `.channel.unread` (markRead echo), no `.read.updated`, no `.ai.turn_started`;
+  the Lawexa reply never posted within 100s. v1 has the identical dependency
+  and is silently degraded the same way today, so the flip is not a regression;
+  the v2 spine self-heals the moment emission returns. Reported:
+  `backend-ask-2026-08-04-broadcast-emission-down.md`.
+- Consequently OPEN until emission returns: F7 (`ai.turn_started.message_uuid`),
+  F6 on the wire (`metadata.execution_id` on AI replies), the push `data.url`,
+  both dedup directions, and checklist step 52 (muted rows in `/channels`).
+  The 1-second badge exit criterion is verified in code + fixtures but NOT yet
+  on the live wire — re-run the probe when the backend replies.
 
 **Film — FOR THE COORDINATOR TO FILL.**
-> Desktop + mobile shots of: the channel with the push nudge, the nudge
-> dismissed, the bell with the three switches, a mention alert, `/channels`,
-> `/spaces`, `/invitations`, `/organization`.
+> Desktop + mobile shots of: the channel with the push nudge, the blocked
+> variant of that bar, the bell's list view and its settings view (four
+> switches, and the paused state), a mention alert, `/channels`, `/spaces`,
+> `/invitations`, `/organization`.
 
-**On-device — FOR THE OWNER/TESTERS.** `w5-device-verification.md`, 41 steps,
+**On-device — FOR THE OWNER/TESTERS.** `w5-device-verification.md`, 52 steps,
 iOS Safari (installed PWA) + Android Chrome.
 
 ---

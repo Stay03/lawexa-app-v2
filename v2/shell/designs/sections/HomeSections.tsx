@@ -36,17 +36,23 @@ import {
  * response that is already warm.
  */
 
-/** One small page of the caller's most-recent channels — a module constant so the
- *  query key is stable and every render resolves to a single cache entry. */
-const MINE_PARAMS = { per_page: 6 } as const;
-
 /**
  * CHANNEL MESSAGES — "Jump back in". The three channels with the newest activity,
  * each showing who spoke last and what they said.
+ *
+ * IT ASKS FOR NO `per_page` (audit M3). The realtime spine already mounts
+ * `mine({ viewerId })` for every eligible viewer, and params are part of the
+ * key — so the `per_page: 6` this section used to pass forked a SECOND cache
+ * entry and a second request on every home load, for a list it then sliced to
+ * three anyway. Matching the spine's params is what makes this module free.
  */
 export function ChannelMessagesSection() {
   const [now] = useState(() => Date.now());
-  const query = useQuery(channelsQueries.mine(MINE_PARAMS));
+  // Viewer-partitioned since W5 (audit note N4): channel rows carry per-viewer
+  // state (`my_role`, `my_notify_level`, both counts), so whose rows these are
+  // belongs in the key rather than resting on the cache-identity guard alone.
+  const { userId: viewerId } = useV2Session();
+  const query = useQuery(channelsQueries.mine({ viewerId }));
   const channels = (query.data?.data ?? []).slice(0, HOME_SECTION_ROWS);
 
   return (

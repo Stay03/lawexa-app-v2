@@ -12,7 +12,8 @@ import {
   UnreadDot,
   formatRelativeTime,
 } from '@/v2/shell/designs/modules';
-import { channelUnreadGrammar, memberCountLabel } from '../model';
+import { channelUnreadGrammar } from '@/v2/features/channels/model';
+import { memberCountLabel } from '../model';
 
 /**
  * SpaceChannelRow — one channel inside a space, on the LIVE unread model

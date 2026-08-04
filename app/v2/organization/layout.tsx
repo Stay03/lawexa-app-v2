@@ -13,7 +13,9 @@ import { CollabAccessGate } from '@/v2/features/collab/access';
  * gate is synchronous (it reads the session snapshot the v2 layout already
  * resolved), so there is no pending branch and no flash.
  *
- * ROUTES STAY DARK: no `v2/routes.manifest.ts` entry until W5.
+ * LIVE SINCE W5: `/organization` is in `v2/routes.manifest.ts`, and the old
+ * `/settings/organization` is a manifest-scoped redirect shell onto it
+ * (`app/v2/settings/organization/page.tsx`) so existing links keep working.
  */
 export default function V2OrganizationLayout({
   children,

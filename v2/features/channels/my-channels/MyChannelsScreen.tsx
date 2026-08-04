@@ -7,11 +7,11 @@ import { Boxes } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
-import { channelsQueries } from '@/v2/features/channels/queries';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { channelsQueries } from '../queries';
 import { MyChannelRow } from './MyChannelRow';
 import {
   MyChannelsEmptyState,
@@ -25,13 +25,13 @@ import {
  * index is one query away and is the natural mobile entry point).
  *
  * ── IT SHARES THE SPINE'S CACHE ENTRY, ON PURPOSE ──────────────────────────
- * `channelsQueries.mine({})` is the EXACT key the realtime spine already
- * mounts for every eligible viewer, so arriving here paints a full list in the
- * first frame with no request of its own, and the spine's `.channel.unread`
- * writers keep these rows' counts live while the screen is open (the owner
- * feel directive: fluidity is cache-first paints). Matching the spine's params
- * is what buys that — a different `per_page` would silently fork a second
- * cache entry and a second request.
+ * `channelsQueries.mine({ viewerId })` is the EXACT key the realtime spine
+ * already mounts for every eligible viewer, so arriving here paints a full
+ * list in the first frame with no request of its own, and the spine's
+ * `.channel.unread` writers keep these rows' counts live while the screen is
+ * open (the owner feel directive: fluidity is cache-first paints). Matching
+ * the spine's params is what buys that — a different `per_page` would silently
+ * fork a second cache entry and a second request.
  *
  * ── WHAT THE SERVER DECIDES, AND WHAT THIS SCREEN THEREFORE DOES NOT ───────
  * `GET /api/channels` is server-sorted by newest activity (empty channels
@@ -46,23 +46,15 @@ import {
  * does arrive renders dimmed with its mention badge at full strength, which is
  * correct under either behaviour. Confirm on the wire in W5's device pass.
  *
- * ── WHERE THIS FILE LIVES ──────────────────────────────────────────────────
- * Under `features/spaces/` rather than `features/channels/`: W4's ownership
- * boundary keeps every file under `v2/features/channels/**` with the parallel
- * wave, and the index route (`app/v2/channels/page.tsx`) is W4's single
- * exception. It reads the channels factory read-only and writes nothing there.
- * Relocating it is a W5 tidy-up.
- *
- * Phase-5 W4, 2026-08-04.
+ * Phase-5 W4; relocated out of `features/spaces/` into its own feature by W5
+ * (W4 built it under spaces only because the channels folder belonged to a
+ * parallel wave — that constraint is gone). 2026-08-04.
  */
-
-/** The spine's own params, so this screen resolves to the SAME cache entry.
- *  A module constant, so the key is referentially stable across renders. */
-const MINE_PARAMS = {} as const;
 
 export function MyChannelsScreen() {
   const session = useV2Session();
   const eligible = collabAccessState(session) === 'eligible';
+  const viewerId = session.userId;
 
   // Frozen at mount for the relative ages — the list refetches on arrival, so
   // clock and data move together and no `Date.now()` runs in render.
@@ -74,7 +66,7 @@ export function MyChannelsScreen() {
   }, []);
 
   const query = useQuery({
-    ...channelsQueries.mine(MINE_PARAMS),
+    ...channelsQueries.mine({ viewerId }),
     enabled: eligible,
   });
 

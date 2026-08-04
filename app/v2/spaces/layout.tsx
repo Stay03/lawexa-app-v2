@@ -17,11 +17,9 @@ import { CollabAccessGate } from '@/v2/features/collab/access';
  * the v2 layout already resolved), so there is no pending branch and no
  * flash.
  *
- * ROUTES STAY DARK: the pages landed with W4 — `(list)/page.tsx` for the
- * spaces list and `[spaceId]/page.tsx` for one space — but `/spaces` is still
- * deliberately absent from `v2/routes.manifest.ts` until W5, so the clean URL
- * keeps falling through to v1 and these screens are reachable only by a direct
- * `/v2/...` URL in dev.
+ * LIVE SINCE W5: `/spaces/*` is in `v2/routes.manifest.ts`, so an opted-in
+ * reader on the clean URL lands here instead of on v1's screens, and the nav
+ * row's v1 soft-launch gate came off with it (D1).
  */
 export default function V2SpacesLayout({
   children,

@@ -13,11 +13,10 @@ import { CollabAccessGate } from '@/v2/features/collab/access';
  * A SERVER layout rendering a `'use client'` gate, per the v2 convention:
  * children stay server components, passed through untouched.
  *
- * ROUTES STAY DARK: `/invitations` is deliberately NOT in
- * `v2/routes.manifest.ts` until W5, which also lands the three legacy
- * redirects (`/channel-invitations`, `/space-invitations`,
- * `/organization-invitations` — owner decision D5) so old notification
- * `action_url`s keep working.
+ * LIVE SINCE W5: `/invitations` is in `v2/routes.manifest.ts`, and so are the
+ * three legacy paths (`/channel-invitations`, `/space-invitations`,
+ * `/organization-invitations`), each a redirect shell onto this one — so old
+ * notification `action_url`s keep working (owner decision D5).
  */
 export default function V2InvitationsLayout({
   children,

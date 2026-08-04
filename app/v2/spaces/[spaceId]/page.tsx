@@ -19,7 +19,7 @@ import { SpaceScreen } from '@/v2/features/spaces/detail/SpaceScreen';
  * the members sheet and the frozen relative-time clock can never leak from one
  * space into another (the channel route's reasoning, applied here).
  *
- * ROUTES STAY DARK: no manifest entry until W5.
+ * LIVE SINCE W5 (manifest entry `/spaces/*`).
  */
 export const metadata: Metadata = {
   title: 'Space',

@@ -69,15 +69,22 @@ export const channelsQueries = {
    * `last_message`-preview-stamped. Keyed by `params` so search / page variants
    * stay distinct cache entries.
    *
-   * PRE-W1 SIGNATURE, KEPT VERBATIM: `HomeSections.tsx` consumes this leaf and
-   * is out of W1's diff budget, so `mine` stays param-keyed without the viewer
-   * segment (the `V2CacheIdentityGuard` covers the identity edge). Migrating it
-   * onto `ViewerScoped` is a one-line follow-up owned by the wave that next
-   * touches the home section.
+   * VIEWER-PARTITIONED SINCE W5 (audit note N4). W1 left this leaf on its
+   * pre-phase signature because the home section consumed it and was out of
+   * that wave's diff budget; W5 owns the home section, so the partition every
+   * other leaf in this factory carries is now uniform here too. The rows are
+   * as per-viewer as any (`my_role`, `my_notify_level`, both counts), and
+   * `V2CacheIdentityGuard` clearing the cache on the identity edge is a
+   * safety net, not a substitute for keying the data by whose it is.
    */
-  mine: (params: ChannelListParams = {}) =>
+  mine: ({ viewerId, ...params }: ChannelListParams & ViewerScoped) =>
     queryOptions({
-      queryKey: [...channelsQueries.lists(), 'mine', params] as const,
+      queryKey: [
+        ...channelsQueries.lists(),
+        'mine',
+        params,
+        { viewerId },
+      ] as const,
       queryFn: () => channelsApi.getMine(params),
       staleTime: STALE_TIMES.standard,
       // Home-glance retention: outlive TanStack's 5-minute default so a return to

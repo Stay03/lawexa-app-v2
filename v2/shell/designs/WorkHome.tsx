@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 
-import { canAccessSpaces } from '@/lib/utils/spaces-access';
+import { canAccessCollab } from '@/lib/utils/collab-audience';
 import type { UserRole } from '@/types/auth';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
@@ -50,9 +50,11 @@ import { ChannelMessagesSection, ConversationsSection } from './sections/HomeSec
  * GUESTS get the honest minimum — greeting, composer, prompts. The sections need a
  * session and are never rendered, so they never fetch.
  *
- * SPACES ARE ROLE-GATED (`canAccessSpaces`, v1's soft-launch rule): a plain user
- * has no channels, so the section would be a permanent empty line. Conversations
- * are for everyone.
+ * THE CHANNELS SECTION follows the v2 collab audience (`canAccessCollab`) — every
+ * registered account since the phase-5 ship (owner decision D1). It previously
+ * carried v1's soft-launch role rule, which would now hide the section from the
+ * same people the nav invites into Spaces. Guests and bots still see nothing,
+ * because they cannot belong to a channel at all. Conversations are for everyone.
  */
 export function WorkHome({
   name,
@@ -122,7 +124,7 @@ export function WorkHome({
 
       {signedIn ? (
         <div className={HOME_SECTIONS}>
-          {canAccessSpaces(role) ? <ChannelMessagesSection /> : null}
+          {canAccessCollab(role) ? <ChannelMessagesSection /> : null}
           <ConversationsSection />
         </div>
       ) : null}

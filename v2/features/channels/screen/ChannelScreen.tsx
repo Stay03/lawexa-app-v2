@@ -74,6 +74,7 @@ import { FilesTab } from '../files/FilesTab';
 import { ListsTab } from '../lists/ListsTab';
 import { ChannelMembersSheet } from '../members/ChannelMembersSheet';
 import { ChannelEditDialog } from '../dialogs/ChannelEditDialog';
+import { EnablePushNudge } from './EnablePushNudge';
 import {
   ChannelAccessDeniedState,
   ChannelErrorState,
@@ -498,6 +499,12 @@ export function ChannelScreen({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {identityHeader}
+
+      {/* The earned moment for closed-app push (W5). Members only — it sits
+          inside this branch, so a non-member reading a public channel is
+          never asked. Renders a zero-height inert row when there is nothing
+          to ask. */}
+      <EnablePushNudge />
 
       <div className="shrink-0 border-b px-4">
         <div className="mx-auto w-full max-w-3xl">

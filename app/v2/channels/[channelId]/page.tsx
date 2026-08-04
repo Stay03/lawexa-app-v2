@@ -24,8 +24,10 @@ import { parseChannelTab } from '@/v2/features/channels/model';
  * baselines, the unread anchor, tab/reply state and dialogs can never leak
  * across channels (v1 keyed its body for the same reason).
  *
- * ROUTES STAY DARK: no `v2/routes.manifest.ts` entry until W5 — reachable
- * only by direct `/v2/...` URL in dev, per the phase plan.
+ * LIVE SINCE W5 (manifest entry `/channels/*`): this page is the landing spot
+ * for BOTH notification paths — the dispatcher's mention toast and the service
+ * worker's `notificationclick` — because both open the same
+ * `/channels/{uuid}?m={message}` URL and `?m=` is read right here.
  */
 
 export const metadata: Metadata = {
