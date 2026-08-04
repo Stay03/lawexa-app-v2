@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -19,9 +20,20 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   buildFeedItems,
   flattenMessages,
+  mergeOutboxRows,
   newestRealMessageUuid,
   unreadAnchorUuid,
 } from '../feed-model';
+import {
+  useToggleReaction,
+  useTogglePin,
+  useToggleSave,
+} from '../engagement-mutations';
+import {
+  anchoredTurns,
+  unanchoredTurns,
+  type RespondingTurn,
+} from '../lawexa/turns';
 import { useEditChannelMessage, useDeleteChannelMessage, useSendChannelMessage, useDiscardFailedMessage } from '../message-mutations';
 import { canManageChannel, isLocalMessageUuid } from '../model';
 import { channelsQueries } from '../queries';
@@ -32,6 +44,7 @@ import { MessageActionsSheet } from './MessageActionsSheet';
 import { MessageGroupRow } from './MessageGroupRow';
 import type { MessageRowActions } from './MessageRow';
 import { QuizGameCard } from './QuizGameCard';
+import { RespondingRow } from './RespondingRow';
 import { AiDivider, DaySeparator, UnreadDivider } from './separators';
 import {
   AlertDialog,
@@ -82,6 +95,22 @@ import {
  * wash can't re-render the list). A target older than the loaded pages pulls
  * up to {@link TARGET_FETCH_PAGE_CAP} older pages before giving up silently —
  * mention deep-links overwhelmingly point into the newest page.
+ *
+ * W3 ADDITIONS:
+ *  - ENGAGEMENT: react / pin / save dispatchers join the stable row-actions
+ *    object, so the hover cluster and the touch sheet drive one set of
+ *    mutations (`../engagement-mutations.ts` owns the optimism and the quiet
+ *    429 handling).
+ *  - LAWEXA: `respondingTurns` splice a "responding" row under the message
+ *    that summoned each one; turns whose event carried no `message_uuid`
+ *    (digest §F.7) render at the FOOT of the transcript instead, above the
+ *    mark-read sentinel. Watching is feed-local single-slot state — one glance
+ *    at a time keeps the transcript readable, and the panel is lazy anyway.
+ *  - JUMP HANDLE: {@link ChannelFeedHandle} lets the screen's pinned/saved
+ *    panels land on a message. It reuses the SAME bounded page-pull the `?m=`
+ *    deep link uses, so a pin from last week resolves exactly like a
+ *    notification link — and, unlike a URL write, it costs no navigation and
+ *    can't fight the router's cached search params.
  */
 
 const BOTTOM_THRESHOLD_PX = 80;
@@ -91,6 +120,13 @@ const TARGET_FETCH_PAGE_CAP = 5;
 
 const useIsomorphicLayoutEffect =
   typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+/** What the screen can ask the feed to do imperatively (panels + deep jumps). */
+export interface ChannelFeedHandle {
+  /** Scroll to a message and wash it. Pulls older pages when it isn't loaded,
+   *  and gives up silently rather than erroring on a stale target. */
+  jumpToMessage: (messageUuid: string) => void;
+}
 
 export interface ChannelFeedProps {
   channel: Channel;
@@ -104,6 +140,10 @@ export interface ChannelFeedProps {
   /** `?m=` deep-link target (navigation-time value; prop changes re-arm). */
   targetMessageUuid: string | null;
   typingUsers: readonly TypingUser[];
+  /** Live Lawexa summons in this channel (room-owned; stable reference). */
+  respondingTurns: readonly RespondingTurn[];
+  /** Imperative handle for the pinned/saved panels' "jump to message". */
+  ref?: React.Ref<ChannelFeedHandle>;
   /** The floating composer (or the non-member notice) — the feed positions
    *  it in its bottom overlay and reserves transcript clearance for it. */
   composer: React.ReactNode;
@@ -111,6 +151,8 @@ export interface ChannelFeedProps {
   onStartReply: (message: Message) => void;
   /** The empty state's one action: focus the composer (DIRECTION 13). */
   onFocusComposer: () => void;
+  /** Open the sessions sheet on one session (screen-owned surface). */
+  onViewAiSession: (sessionUuid: string) => void;
 }
 
 export function ChannelFeed({
@@ -121,9 +163,12 @@ export function ChannelFeed({
   active,
   targetMessageUuid,
   typingUsers,
+  respondingTurns,
   composer,
   onStartReply,
   onFocusComposer,
+  onViewAiSession,
+  ref,
 }: ChannelFeedProps) {
   const {
     data,
@@ -141,21 +186,24 @@ export function ChannelFeed({
   const deleteMutation = useDeleteChannelMessage(channel.uuid);
   const retryMutation = useSendChannelMessage(channel.uuid);
   const discardFailed = useDiscardFailedMessage(channel.uuid);
+  const reactionMutation = useToggleReaction(channel.uuid);
+  const pinMutation = useTogglePin(channel.uuid);
+  const saveMutation = useToggleSave(channel.uuid);
 
   /* ── The transcript = cache pages + any outbox rows a refetch evicted.
         The cache is refetchable state (join-time reconcile, reconnect
         invalidation) and server pages can never contain an unacknowledged
         row — the outbox is that row's durable home, merged back here so a
         background refetch can NEVER silently drop an unsent message (§5's
-        ban, structurally enforced). Cache-present rows are not duplicated. ── */
+        ban, structurally enforced). Cache-present rows are not duplicated,
+        and the merge is CHRONOLOGICAL (audit L13) so a failed send keeps the
+        place it was written in instead of drifting to the end. ─────────────── */
   const cachedMessages = useMemo(() => flattenMessages(data?.pages), [data]);
   const outboxRows = useOutboxMessages(channel.uuid);
-  const messages = useMemo(() => {
-    if (outboxRows.length === 0) return cachedMessages;
-    const present = new Set(cachedMessages.map((message) => message.uuid));
-    const evicted = outboxRows.filter((message) => !present.has(message.uuid));
-    return evicted.length === 0 ? cachedMessages : [...cachedMessages, ...evicted];
-  }, [cachedMessages, outboxRows]);
+  const messages = useMemo(
+    () => mergeOutboxRows(cachedMessages, outboxRows),
+    [cachedMessages, outboxRows],
+  );
   const newestReal = useMemo(
     () => newestRealMessageUuid(messages, isLocalMessageUuid),
     [messages],
@@ -170,10 +218,31 @@ export function ChannelFeed({
     setAnchor({ uuid: unreadAnchorUuid(messages, channel.unread_count ?? 0) });
   }
 
+  /* ── Lawexa turns: anchored under their summon, or (when the event omitted
+        `message_uuid` — digest §F.7) at the foot of the transcript. Both maps
+        are derived, so a turn ending removes its row with no other state. ── */
+  const anchoredByMessage = useMemo(
+    () => anchoredTurns(respondingTurns),
+    [respondingTurns],
+  );
+  const floatingTurns = useMemo(
+    () => unanchoredTurns(respondingTurns),
+    [respondingTurns],
+  );
+  /** Which turn's live stream the reader is watching — one at a time, and a
+   *  lingering id whose turn has ended simply matches nothing (that IS the
+   *  auto-hide; no effect needed to clear it). */
+  const [watchedExecutionId, setWatchedExecutionId] = useState<string | null>(null);
+  const toggleWatch = useCallback((executionId: string) => {
+    setWatchedExecutionId((current) =>
+      current === executionId ? null : executionId,
+    );
+  }, []);
+
   // Items carry their APG article ordinal (1-based) so no counter mutates
   // during render (React Compiler immutability rule).
   const { renderItems, groupCount } = useMemo(() => {
-    const items = buildFeedItems(messages, anchor?.uuid ?? null);
+    const items = buildFeedItems(messages, anchor?.uuid ?? null, anchoredByMessage);
     const withOrdinals: { item: (typeof items)[number]; groupOrdinal: number }[] = [];
     let ordinal = 0;
     for (const item of items) {
@@ -181,7 +250,7 @@ export function ChannelFeed({
       withOrdinals.push({ item, groupOrdinal: item.kind === 'group' ? ordinal : 0 });
     }
     return { renderItems: withOrdinals, groupCount: ordinal };
-  }, [messages, anchor]);
+  }, [messages, anchor, anchoredByMessage]);
 
   /* ── Refs for the scroll contract ─────────────────────────────────────── */
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -220,7 +289,19 @@ export function ChannelFeed({
 
   /* ── Feed-owned row interaction state ─────────────────────────────────── */
   const [editingUuid, setEditingUuid] = useState<string | null>(null);
-  const [sheetMessage, setSheetMessage] = useState<Message | null>(null);
+  /** The long-pressed row, held by UUID rather than by value: the sheet shows
+   *  live toggle state (saved / pinned / reacted), so it must read the CURRENT
+   *  cached row — a captured object would freeze the moment of the press and
+   *  show a stale "Save" after the save landed. It also closes itself when the
+   *  message is deleted out from under it. */
+  const [sheetMessageUuid, setSheetMessageUuid] = useState<string | null>(null);
+  const sheetMessage = useMemo(
+    () =>
+      sheetMessageUuid === null
+        ? null
+        : (messages.find((message) => message.uuid === sheetMessageUuid) ?? null),
+    [messages, sheetMessageUuid],
+  );
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
 
   /** Flash-wash + scroll a loaded message into view (DOM-only — no state).
@@ -256,6 +337,61 @@ export function ChannelFeed({
   }, []);
 
   const consumedTargetRef = useRef<string | null>(null);
+
+  /* ── Imperative jump (pinned / saved panels). A REQUEST, not a target: it
+        carries a nonce so asking for the SAME message twice re-arms the
+        resolver instead of being swallowed as "already consumed". It shares
+        the `?m=` resolver below, so an unloaded pin pulls history exactly like
+        a notification deep link.
+
+        `fromTarget` IS THE EXPIRY, and it exists because a panel jump must not
+        outlive the navigation it happened during. A request is honoured only
+        while the `?m=` prop is still the value it was made against; the moment
+        a LATER navigation changes that prop, the stale request is ignored and
+        the new deep link wins. Without it the first panel jump would sit in
+        state forever and every subsequent `?m=` arriving at this already-
+        mounted channel — every mention toast, every push — would resolve to
+        nothing. Expressed as a derived comparison rather than an effect that
+        clears state, so there is no setState-in-effect and no ordering race
+        between the clear and the next prop. ──────────────────────────────── */
+  const [jumpRequest, setJumpRequest] = useState<{
+    uuid: string;
+    key: string;
+    /** The `?m=` value in force when this jump was requested (`null` = none). */
+    fromTarget: string | null;
+  } | null>(null);
+  const jumpNonceRef = useRef(0);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      jumpToMessage: (messageUuid: string) => {
+        // Already on screen: flash it now, with no state change at all.
+        if (flashMessage(messageUuid)) return;
+        jumpNonceRef.current += 1;
+        setJumpRequest({
+          uuid: messageUuid,
+          key: `${messageUuid}#${jumpNonceRef.current}`,
+          fromTarget: targetMessageUuid,
+        });
+      },
+    }),
+    [flashMessage, targetMessageUuid],
+  );
+
+  /** What the resolver is currently chasing. A panel jump outranks the `?m=`
+   *  it was made during (it is the reader's more recent intent), but a NEWER
+   *  `?m=` outranks the panel jump (see `fromTarget` above). Memoised so the
+   *  resolver effect keys on a CHANGE of target, not on every render — a fresh
+   *  object literal would re-run it on any unrelated re-render. */
+  const activeTarget = useMemo(() => {
+    if (jumpRequest !== null && jumpRequest.fromTarget === targetMessageUuid) {
+      return { uuid: jumpRequest.uuid, key: jumpRequest.key };
+    }
+    return targetMessageUuid
+      ? { uuid: targetMessageUuid, key: targetMessageUuid }
+      : null;
+  }, [jumpRequest, targetMessageUuid]);
 
   /* ── First paint lands at the right place (layout effect: no wrong-end
         frame). Priority: `?m=` target (when already loaded) → unread line →
@@ -401,21 +537,28 @@ export function ChannelFeed({
     reportNewestVisible(active && bottomVisible ? newestReal : null);
   }, [active, bottomVisible, newestReal, reportNewestVisible]);
 
-  /* ── `?m=` targets outside the loaded pages: pull older pages, bounded.
-        Each pull is position-restored (`beginHistoryPull`), so the viewport
-        holds still while pages arrive; giving up (no more pages, or the
-        page cap) leaves the reader exactly where they were. ──────────────── */
+  /* ── Targets outside the loaded pages (`?m=` deep links AND panel jumps):
+        pull older pages, bounded. Each pull is position-restored
+        (`beginHistoryPull`), so the viewport holds still while pages arrive;
+        giving up (no more pages, or the page cap) leaves the reader exactly
+        where they were. The per-target page budget resets with each new
+        request, so a second jump is not starved by the first one's spend. ── */
   const targetFetchCountRef = useRef(0);
+  const budgetForKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!targetMessageUuid || consumedTargetRef.current === targetMessageUuid) {
-      return;
-    }
+    if (!activeTarget || consumedTargetRef.current === activeTarget.key) return;
     if (messages.length === 0) return;
-    if (messages.some((message) => message.uuid === targetMessageUuid)) {
-      consumedTargetRef.current = targetMessageUuid;
-      // Covers both the post-landing arrival AND a late navigation to an
-      // already-open channel (the initial-scroll effect only runs once).
-      if (didInitialScrollRef.current) flashMessage(targetMessageUuid);
+
+    if (budgetForKeyRef.current !== activeTarget.key) {
+      budgetForKeyRef.current = activeTarget.key;
+      targetFetchCountRef.current = 0;
+    }
+
+    if (messages.some((message) => message.uuid === activeTarget.uuid)) {
+      consumedTargetRef.current = activeTarget.key;
+      // Covers the post-landing arrival, a late navigation to an already-open
+      // channel (the initial-scroll effect runs once), and every panel jump.
+      if (didInitialScrollRef.current) flashMessage(activeTarget.uuid);
       return;
     }
     if (hasNextPage && !isFetchingNextPage && targetFetchCountRef.current < TARGET_FETCH_PAGE_CAP) {
@@ -426,11 +569,11 @@ export function ChannelFeed({
     }
     if (!hasNextPage || targetFetchCountRef.current >= TARGET_FETCH_PAGE_CAP) {
       // Give up silently — the feed stays where it is (never an error state
-      // for a stale deep link).
-      consumedTargetRef.current = targetMessageUuid;
+      // for a stale deep link or a pin older than the page budget).
+      consumedTargetRef.current = activeTarget.key;
     }
   }, [
-    targetMessageUuid,
+    activeTarget,
     messages,
     hasNextPage,
     isFetchingNextPage,
@@ -512,6 +655,9 @@ export function ChannelFeed({
   const editMutate = editMutation.mutate;
   const deleteMutate = deleteMutation.mutate;
   const retryMutate = retryMutation.mutate;
+  const reactionMutate = reactionMutation.mutate;
+  const pinMutate = pinMutation.mutate;
+  const saveMutate = saveMutation.mutate;
   const rowActions = useMemo<MessageRowActions>(
     () => ({
       onStartReply,
@@ -532,12 +678,38 @@ export function ChannelFeed({
         });
       },
       onDiscardFailed: discardFailed,
-      onOpenActions: (message) => setSheetMessage(message),
+      onOpenActions: (message) => setSheetMessageUuid(message.uuid),
       onJumpToMessage: (messageUuid) => {
         flashMessage(messageUuid);
       },
+      // Engagement never applies to an unacknowledged row — there is no server
+      // uuid to address yet. The cluster is already hidden while a row is in
+      // the outbox (`canAct`), so this guard is belt-and-braces for the sheet.
+      onToggleReaction: (message, emoji) => {
+        if (isLocalMessageUuid(message.uuid)) return;
+        reactionMutate({ messageUuid: message.uuid, emoji });
+      },
+      onTogglePin: (message) => {
+        if (isLocalMessageUuid(message.uuid)) return;
+        pinMutate({ messageUuid: message.uuid, pinned: message.is_pinned !== true });
+      },
+      onToggleSave: (message) => {
+        if (isLocalMessageUuid(message.uuid)) return;
+        saveMutate({ messageUuid: message.uuid, saved: message.is_bookmarked !== true });
+      },
+      onViewAiSession,
     }),
-    [onStartReply, editMutate, retryMutate, discardFailed, flashMessage],
+    [
+      onStartReply,
+      editMutate,
+      retryMutate,
+      discardFailed,
+      flashMessage,
+      reactionMutate,
+      pinMutate,
+      saveMutate,
+      onViewAiSession,
+    ],
   );
 
   const isChannelAdmin = canManageChannel(channel);
@@ -607,6 +779,17 @@ export function ChannelFeed({
                     return <UnreadDivider key={item.key} />;
                   case 'quiz-card':
                     return <QuizGameCard key={item.key} message={item.message} />;
+                  case 'responding':
+                    return (
+                      <RespondingRow
+                        key={item.key}
+                        turn={item.turn}
+                        watching={watchedExecutionId === item.turn.executionId}
+                        // Spliced under its summon — draw it attached.
+                        attached
+                        onToggleWatch={toggleWatch}
+                      />
+                    );
                   case 'group':
                     return (
                       <MessageGroupRow
@@ -625,6 +808,19 @@ export function ChannelFeed({
                     );
                 }
               })}
+
+              {/* Turns whose `.ai.turn_started` carried no `message_uuid`
+                  (digest §F.7's contradiction) can't be anchored, so they
+                  queue here at the foot of the transcript — a designed
+                  fallback, in summon order, not a degraded anchor. */}
+              {floatingTurns.map((turn) => (
+                <RespondingRow
+                  key={turn.executionId}
+                  turn={turn}
+                  watching={watchedExecutionId === turn.executionId}
+                  onToggleWatch={toggleWatch}
+                />
+              ))}
 
               {/* The mark-read sentinel: "the newest message is in the
                   viewport" ≙ this line is. */}
@@ -695,10 +891,14 @@ export function ChannelFeed({
         message={sheetMessage}
         canEdit={sheetIsMine}
         canDelete={sheetIsMine || isChannelAdmin}
-        onClose={() => setSheetMessage(null)}
+        onClose={() => setSheetMessageUuid(null)}
         onReply={(message) => onStartReply(message)}
         onEdit={(message) => setEditingUuid(message.uuid)}
         onDelete={(message) => setDeleteTarget(message)}
+        onToggleReaction={rowActions.onToggleReaction}
+        onTogglePin={rowActions.onTogglePin}
+        onToggleSave={rowActions.onToggleSave}
+        onViewAiSession={rowActions.onViewAiSession}
       />
 
       {/* Delete confirm — one per feed, destructive red. */}

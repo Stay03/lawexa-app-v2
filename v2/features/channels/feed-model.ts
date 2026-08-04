@@ -1,5 +1,6 @@
 import { formatDayLabel, isSameCalendarDay } from '@/lib/utils/collab';
 import type { Message, SlimUser } from '@/types/collab';
+import type { RespondingTurn } from './lawexa/turns';
 import { GROUP_WINDOW_MS } from './model';
 
 /**
@@ -48,12 +49,20 @@ export interface UnreadDividerItem {
   key: 'unread-divider';
 }
 
+/** "Lawexa is responding", spliced under the message that summoned it. */
+export interface RespondingItem {
+  kind: 'responding';
+  key: string;
+  turn: RespondingTurn;
+}
+
 export type FeedItem =
   | MessageGroupItem
   | DayItem
   | AiDividerItem
   | QuizCardItem
-  | UnreadDividerItem;
+  | UnreadDividerItem
+  | RespondingItem;
 
 /** Flatten the cursor pages (newest-first) into chronological order. */
 export function flattenMessages(
@@ -94,10 +103,18 @@ export function unreadAnchorUuid(
  * spliced immediately before `anchorUuid`'s message (and breaks its group, so
  * the first unseen message re-states its author header under the line — the
  * reader always knows who wrote the first new thing).
+ *
+ * `respondingByMessage` (phase-5 W3) splices a "Lawexa is responding" row
+ * immediately AFTER the message that summoned it and closes the author run, so
+ * the row reads as a consequence of that message rather than as part of the
+ * next one. Turns with no `message_uuid` are not this function's business —
+ * they render at the foot of the transcript (api-digest §F.7's tolerant
+ * fallback; the feed owns that placement).
  */
 export function buildFeedItems(
   messages: readonly Message[],
   anchorUuid: string | null,
+  respondingByMessage?: ReadonlyMap<string, RespondingTurn>,
 ): FeedItem[] {
   const items: FeedItem[] = [];
   let group: MessageGroupItem | null = null;
@@ -169,9 +186,60 @@ export function buildFeedItems(
       };
       items.push(group);
     }
+
+    const turn = respondingByMessage?.get(message.uuid);
+    if (turn) {
+      items.push({
+        kind: 'responding',
+        key: `responding-${turn.executionId}`,
+        turn,
+      });
+      // Close the run: anything the same author says next starts a fresh
+      // header BELOW the row, so the row can't look like part of it.
+      group = null;
+    }
   }
 
   return items;
+}
+
+/**
+ * Merge unacknowledged outbox rows back into the transcript IN CHRONOLOGICAL
+ * ORDER (W2 audit L13).
+ *
+ * A failed send is not a new message — it is a message that belongs at the
+ * moment it was written. Appending evicted rows at the end (the W2 behaviour)
+ * was invisible while the failure was the newest thing on screen, but any
+ * arrival after it pushed the failed row DOWN past messages that came later, so
+ * a retry would silently re-post out of sequence and the reader would lose the
+ * thread it belonged to. Both lists are already sorted, so this is a linear
+ * merge on `created_at` with ties resolved in favour of the CACHED row (a
+ * server row with the same instant is the real one).
+ *
+ * Returns `cached` unchanged when there is nothing to merge — the common case,
+ * and the one that must not allocate.
+ */
+export function mergeOutboxRows(
+  cached: readonly Message[],
+  outbox: readonly Message[],
+): readonly Message[] {
+  if (outbox.length === 0) return cached;
+  const present = new Set(cached.map((message) => message.uuid));
+  const evicted = outbox.filter((message) => !present.has(message.uuid));
+  if (evicted.length === 0) return cached;
+
+  const merged: Message[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < cached.length && j < evicted.length) {
+    const left = Date.parse(cached[i].created_at);
+    const right = Date.parse(evicted[j].created_at);
+    if (left <= right) merged.push(cached[i++]);
+    else merged.push(evicted[j++]);
+  }
+  while (i < cached.length) merged.push(cached[i++]);
+  while (j < evicted.length) merged.push(evicted[j++]);
+  return merged;
 }
 
 /** The newest server-acknowledged message uuid — the read pointer's target

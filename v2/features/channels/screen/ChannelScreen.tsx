@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   Bell,
+  Bookmark,
   Hash,
   Loader2,
   Lock,
@@ -13,6 +14,8 @@ import {
   LogOut,
   MoreHorizontal,
   Pencil,
+  Pin,
+  Sparkles,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -51,8 +54,13 @@ import {
   ChannelComposer,
   type ChannelComposerHandle,
 } from '../composer/ChannelComposer';
-import { ChannelFeed } from '../feed/ChannelFeed';
+import { ChannelFeed, type ChannelFeedHandle } from '../feed/ChannelFeed';
+import { ChannelAiSessionsSheet } from '../lawexa/ChannelAiSessionsSheet';
 import { useChannelReadPointer } from '../mark-read';
+import {
+  PinnedMessagesSheet,
+  SavedMessagesSheet,
+} from '../panels/MessageCollectionSheet';
 import {
   useDeleteChannel,
   useJoinChannel,
@@ -148,6 +156,18 @@ export function ChannelScreen({
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [membershipActionError, setMembershipActionError] = useState<string | null>(null);
   const composerRef = useRef<ChannelComposerHandle>(null);
+  const feedRef = useRef<ChannelFeedHandle>(null);
+
+  /* ── W3 side surfaces. All three are LENSES over this channel, so they open
+        as sheets over the transcript and hand the reader back to it — never a
+        second place to read messages (design-research DIRECTION 14). ─────── */
+  const [pinnedOpen, setPinnedOpen] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  /** The session the sheet is showing; `null` = its list. Owned here because
+   *  the sheet has two entrances (the menu, and any AI message's "view this
+   *  conversation"), and controlling it removes any need to sync inside. */
+  const [sessionUuid, setSessionUuid] = useState<string | null>(null);
 
   const router = useRouter();
   const joinMutation = useJoinChannel(channelUuid);
@@ -169,6 +189,24 @@ export function ChannelScreen({
       // Leaving Lists keeps `?list=` so a return trip restores the selection;
       // the param is meaningless on other tabs and harmless in the URL.
     });
+  }, []);
+
+  /** Land on a message from a panel: back to Chat (through the ONE tab writer,
+   *  so the URL stays in step), then let the feed resolve it — it pulls older
+   *  pages when the message isn't loaded, and gives up silently when it can't
+   *  be reached. The Chat pane keeps its mount across tabs, so the imperative
+   *  handle is live even when the reader was on Lists or Files. */
+  const jumpToMessage = useCallback(
+    (messageUuid: string) => {
+      selectTab('chat');
+      feedRef.current?.jumpToMessage(messageUuid);
+    },
+    [selectTab],
+  );
+
+  const openAiSession = useCallback((nextSessionUuid: string) => {
+    setSessionUuid(nextSessionUuid);
+    setSessionsOpen(true);
   }, []);
 
   const handleStartReply = useCallback((message: Message) => {
@@ -289,6 +327,34 @@ export function ChannelScreen({
                 Join
               </Button>
             )}
+            {/* The two collection affordances — quiet, iconic, and only for
+                members (both endpoints gate on membership). They sit beside
+                the menu rather than inside it because they are READING moves
+                the reader makes mid-conversation, not settings. */}
+            {isMember && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label="Pinned messages"
+                  title="Pinned messages"
+                  onClick={() => setPinnedOpen(true)}
+                >
+                  <Pin aria-hidden className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label="Saved messages"
+                  title="Saved messages (private to you)"
+                  onClick={() => setSavedOpen(true)}
+                >
+                  <Bookmark aria-hidden className="size-4" />
+                </Button>
+              </>
+            )}
             {isMember && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -328,6 +394,15 @@ export function ChannelScreen({
                   <DropdownMenuItem onClick={() => setMembersOpen(true)}>
                     <Users aria-hidden className="size-4" />
                     Members
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSessionUuid(null);
+                      setSessionsOpen(true);
+                    }}
+                  >
+                    <Sparkles aria-hidden className="size-4" />
+                    Lawexa sessions
                   </DropdownMenuItem>
                   {canManage && (
                     <DropdownMenuItem onClick={() => setEditOpen(true)}>
@@ -464,6 +539,7 @@ export function ChannelScreen({
           )}
         >
           <ChannelFeed
+            ref={feedRef}
             channel={channel}
             viewerId={viewerId}
             viewerUuid={viewerUuid}
@@ -471,8 +547,10 @@ export function ChannelScreen({
             active={tab === 'chat'}
             targetMessageUuid={targetMessageUuid}
             typingUsers={room.typingUsers}
+            respondingTurns={room.respondingTurns}
             onStartReply={handleStartReply}
             onFocusComposer={focusComposer}
+            onViewAiSession={openAiSession}
             composer={
               <ChannelComposer
                 ref={composerRef}
@@ -514,6 +592,33 @@ export function ChannelScreen({
       </div>
 
       {/* ── Sheets & dialogs ────────────────────────────────────────────── */}
+      <PinnedMessagesSheet
+        channel={channel}
+        viewerId={viewerId}
+        open={pinnedOpen}
+        onOpenChange={setPinnedOpen}
+        onJumpToMessage={jumpToMessage}
+      />
+
+      <SavedMessagesSheet
+        channel={channel}
+        viewerId={viewerId}
+        open={savedOpen}
+        onOpenChange={setSavedOpen}
+        onJumpToMessage={jumpToMessage}
+      />
+
+      <ChannelAiSessionsSheet
+        channelUuid={channel.uuid}
+        channelName={channel.name}
+        viewerId={viewerId}
+        viewerUuid={viewerUuid}
+        open={sessionsOpen}
+        onOpenChange={setSessionsOpen}
+        sessionUuid={sessionUuid}
+        onSelectSession={setSessionUuid}
+      />
+
       <ChannelMembersSheet
         channel={channel}
         viewerId={viewerId}

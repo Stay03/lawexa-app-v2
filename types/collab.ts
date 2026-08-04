@@ -285,6 +285,27 @@ export interface MessageReplyTo {
   type?: MessageType;
 }
 
+/**
+ * One emoji bucket on a message (phase 3f). Server order is count-desc then
+ * first-reacted; `[]` when nobody has reacted.
+ *
+ * PER-VIEWER — `reacted_by_me` makes the whole array viewer-scoped, which is
+ * why the array is deliberately OMITTED from `message.created`/`updated`
+ * broadcasts and from post/edit responses (api-digest §A/§F.2). It rides REST
+ * feed history only; live changes arrive as `.reaction.toggled` DELTAS
+ * ({@link ReactionToggledPayload}).
+ *
+ * Emoji strings are grapheme-strict server-side (§F.9): lone VS16, lone
+ * skin-tone modifiers and single regional indicators all 422, and skin-tone /
+ * VS16 variants are DISTINCT buckets. The client owns the picker and must send
+ * the exact string it means.
+ */
+export interface MessageReaction {
+  emoji: string;
+  count: number;
+  reacted_by_me: boolean;
+}
+
 export interface Message {
   uuid: string;
   channel_uuid: string;
@@ -305,6 +326,41 @@ export interface Message {
   reply_to?: MessageReplyTo | null;
   edited_at: string | null;
   created_at: string;
+
+  /* ── Engagement (phases 3d–3f, phase-5 W3) ───────────────────────────────
+     THREE FIELDS, TWO TRANSPORT RULES (api-digest §A table + §F.2):
+
+      - `is_pinned` is SHARED (one column, same for everyone), so it rides REST
+        history AND every broadcast, and `.message.pinned` / `.message.unpinned`
+        carry its changes. Safe to take from any payload.
+      - `is_bookmarked` and `reactions` are PER-VIEWER and are deliberately
+        omitted from broadcasts and from post/edit responses — after a real bug
+        where broadcasts hardcoded `is_bookmarked: false`. A cache writer that
+        replaces a row with a broadcast payload MUST preserve the previous
+        row's values for these two, or a stranger's edit silently wipes the
+        viewer's saves and reaction state.
+
+     All three are OPTIONAL because the surface decides: reactions ride the feed
+     only, `is_bookmarked` the feed + saved list, and any locally-constructed
+     (optimistic) row has none of them. `undefined` reads as "unknown", which
+     every consumer treats as the empty/false default. */
+
+  /** Shared pin state — always present on server rows, incl. broadcasts (3e). */
+  is_pinned?: boolean;
+  /** Per-viewer save state; feed + saved list ONLY, never broadcast (3d). */
+  is_bookmarked?: boolean;
+  /** Per-viewer reaction buckets; feed ONLY, never broadcast (3f). */
+  reactions?: MessageReaction[];
+}
+
+/**
+ * A row of `GET /channels/{uuid}/messages/pins` (3e) — the message plus who
+ * pinned it and when. `pinned_at DESC`; these two fields exist on the pins list
+ * ONLY (never in the feed, never on a broadcast).
+ */
+export interface PinnedMessage extends Message {
+  pinned_by: SlimUser | null;
+  pinned_at: string;
 }
 
 /******************************************************************************
@@ -349,6 +405,84 @@ export interface AiSession {
   started_at: string;
   last_activity_at: string;
   ended_at: string | null;
+}
+
+/**
+ * A row of an AI session transcript (`GET /channels/{uuid}/ai/sessions/{s}`).
+ *
+ * The transcript is the COMPLETE conversation — the dialogue turns that were
+ * posted to the channel AND the tool/system machinery behind them — so rows
+ * carry an extra `role` the channel feed's messages never have. The backend's
+ * instruction is to distinguish by `role` + `metadata.type` and filter for a
+ * dialogue view (api-digest §C).
+ *
+ * `role` is typed OPEN on purpose (`(string & {})` keeps the known values in
+ * autocomplete while accepting anything): the machinery vocabulary is the
+ * agent's, it can grow without a frontend release, and the contractual rule for
+ * unrecognised values is "fall back", never "crash". Consumers must therefore
+ * classify with an allow-list of DIALOGUE roles, never a deny-list of
+ * machinery ones.
+ */
+export type AiTranscriptRole =
+  | 'user'
+  | 'assistant'
+  | 'tool'
+  | 'system'
+  | (string & {});
+
+export interface AiTranscriptMessage extends Message {
+  /** Absent on older rows — then authorship falls back to `is_ai` (§F.3). */
+  role?: AiTranscriptRole;
+}
+
+/******************************************************************************
+                              Realtime event payloads
+******************************************************************************/
+
+/**
+ * `.reaction.toggled` on `presence-channels.{uuid}` (3f) — a DELTA, not a row.
+ * `count` is the emoji bucket's new absolute count (assign it, never add), and
+ * `reacted` is `user_uuid`'s new state: apply it to `reacted_by_me` only when
+ * `user_uuid` is the viewer. Fires on real state changes only (§F.18).
+ */
+export interface ReactionToggledPayload {
+  message_uuid: string;
+  emoji: string;
+  count: number;
+  user_uuid: string;
+  reacted: boolean;
+}
+
+/** `.message.pinned` / `.message.unpinned` (3e). Shared state — safe to apply
+ *  verbatim. A rare concurrent double-pin may broadcast twice; the payload is
+ *  idempotent, so a second apply is a no-op (§F.18). */
+export interface MessagePinPayload {
+  message_uuid: string;
+  is_pinned: boolean;
+  pinned_by_uuid: string | null;
+  pinned_at: string | null;
+}
+
+/**
+ * `.ai.turn_started` — a Lawexa summon was dispatched in this channel.
+ *
+ * `message_uuid` is the CONTRADICTION flagged in api-digest §F.7: FC §12
+ * documents it (anchor the responding row under that message), AC §12c's table
+ * omits it. It is therefore typed OPTIONAL and every consumer must be tolerant
+ * — anchor when it is there, fall back to a channel-level row when it is not.
+ */
+export interface AiTurnStartedPayload {
+  channel_uuid: string;
+  execution_id: string;
+  summoner: SlimUser;
+  message_uuid?: string | null;
+}
+
+/** `.ai.turn_failed` — the turn ended with nothing postable. NOTHING posts on
+ *  failure, so this event is the only signal the responding row will get. */
+export interface AiTurnFailedPayload {
+  channel_uuid: string;
+  execution_id: string;
 }
 
 /******************************************************************************
@@ -399,6 +533,12 @@ export interface SendMessagePayload {
 
 export interface UpdateMessagePayload {
   content: string;
+}
+
+/** Body for `POST .../messages/{uuid}/reactions` — a TOGGLE keyed by the exact
+ *  emoji string (grapheme-strict server-side; see {@link MessageReaction}). */
+export interface ToggleReactionPayload {
+  emoji: string;
 }
 
 /** Result of advancing the read pointer (`POST /channels/{uuid}/read`).
@@ -681,7 +821,23 @@ export type MessageResponse = ItemResponse<Message>;
 export type SentMessage = Message & { ai?: AiDispatch };
 export type SendMessageResponse = ItemResponse<SentMessage>;
 export type AiSessionListResponse = LengthAwareResponse<AiSession>;
-export type AiSessionTranscriptResponse = CursorResponse<Message>;
+/** WIDENED (phase-5 W3): rows may carry the machinery `role` — see
+ *  {@link AiTranscriptMessage}. Every field a `Message` consumer reads is still
+ *  present, so this stays assignable everywhere it was before. */
+export type AiSessionTranscriptResponse = CursorResponse<AiTranscriptMessage>;
+
+/* ── Engagement (phase-5 W3) ─────────────────────────────────────────────── */
+
+/** `GET /channels/{uuid}/messages/pins` — `pinned_at DESC`, offset-paginated. */
+export type PinnedMessageListResponse = LengthAwareResponse<PinnedMessage>;
+/** `GET /channels/{uuid}/messages/bookmarks` — the VIEWER's saves here. */
+export type SavedMessageListResponse = LengthAwareResponse<Message>;
+/** `POST .../messages/{uuid}/reactions` — 200 both ways, the new bucket state. */
+export type ReactionToggleResponse = ItemResponse<MessageReaction>;
+/** `POST .../messages/{uuid}/bookmark` — 201 added / 200 removed. */
+export type BookmarkToggleResponse = ItemResponse<{ bookmarked: boolean }>;
+/** `POST` / `DELETE .../messages/{uuid}/pin` — idempotent, any active member. */
+export type PinToggleResponse = ItemResponse<{ is_pinned: boolean }>;
 export type OrganizationResponse = ItemResponse<Organization>;
 export type OrganizationMemberListResponse = LengthAwareResponse<Member>;
 /** `GET /my-organization` returns null when the caller has no organization. */

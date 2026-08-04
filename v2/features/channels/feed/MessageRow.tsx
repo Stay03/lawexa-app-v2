@@ -3,9 +3,13 @@
 import { memo, useState } from 'react';
 import {
   AlertCircle,
+  Bookmark,
   CornerUpLeft,
   Loader2,
   Pencil,
+  Pin,
+  PinOff,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 
@@ -14,9 +18,12 @@ import { Button } from '@/components/ui/button';
 import { formatFullTimestamp } from '@/lib/utils/collab';
 import type { Message } from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { useEngagementThrottled } from '../engagement-throttle';
 import { MESSAGE_MAX_LENGTH, mentionsViewer } from '../model';
 import { useSendState } from '../send-outbox';
+import { LawexaMessageContent } from './LawexaMessageContent';
 import { MessageContent } from './MessageContent';
+import { ReactionChips, ReactionTrayPopover } from './reactions';
 import { useLongPress } from './use-long-press';
 
 /**
@@ -34,8 +41,7 @@ import { useLongPress } from './use-long-press';
  * ACTIONS, TWO INPUT WORLDS (DIRECTION 5 — never permanent toolbars):
  *  - pointer-fine: a hairline action cluster revealed on row hover/focus,
  *    hidden at `pointer: coarse` via the `@media (hover: hover)`-guarded
- *    utility classes. Reply · Edit · Delete today; W3 appends react/pin/save
- *    to the same cluster (it is a plain flex row — extensible by design).
+ *    utility classes. React · Reply · Save · Pin · Edit · Delete.
  *  - touch: long-press lifts the SAME action set into the feed's single
  *    bottom sheet (`onOpenActions`), with Cancel and destructive red.
  *
@@ -43,9 +49,14 @@ import { useLongPress } from './use-long-press';
  * no words) → sent (nothing at all) → `failed` (red icon + Retry inline,
  * never auto-dismissed, plus an explicit Discard — silent drops are banned).
  *
- * W3 SEAM — AI RENDERING: `is_ai` rows flow through the same
- * `MessageContent` plain-text path in W2; W3 swaps this branch for the ported
- * Lawexa markdown renderer. The discriminator is `is_ai` alone (§F.3).
+ * W3 — ENGAGEMENT + AI RENDERING:
+ *  - `is_ai` rows now render through {@link LawexaMessageContent} (markdown +
+ *    mention chips); humans keep the plain-text {@link MessageContent}. The
+ *    discriminator is `is_ai` ALONE — a hard-deleted human is also
+ *    `author: null` and must never be rendered as Lawexa (digest §F.3).
+ *  - reaction chips sit under the content, pins show a quiet marker above it,
+ *    and save is a cluster toggle with no visible trace on the row (it is
+ *    private — a badge would leak it to a shoulder).
  */
 
 export interface MessageRowActions {
@@ -66,6 +77,14 @@ export interface MessageRowActions {
   onOpenActions: (message: Message) => void;
   /** Tap a reply quote → jump to (and wash) the quoted message. */
   onJumpToMessage: (messageUuid: string) => void;
+  /** Toggle one emoji on this message (the exact string, §F.9). */
+  onToggleReaction: (message: Message, emoji: string) => void;
+  /** Pin / unpin for everyone — any active member may do both (§C). */
+  onTogglePin: (message: Message) => void;
+  /** Save / unsave privately — never broadcast (§F.2). */
+  onToggleSave: (message: Message) => void;
+  /** Open the Lawexa session behind an AI reply (`metadata.session_uuid`). */
+  onViewAiSession: (sessionUuid: string) => void;
 }
 
 export const MessageRow = memo(function MessageRow({
@@ -85,10 +104,16 @@ export const MessageRow = memo(function MessageRow({
   actions: MessageRowActions;
 }) {
   const sendState = useSendState(message.uuid);
+  const saveThrottled = useEngagementThrottled('bookmark');
 
   const mentioned = mentionsViewer(message.metadata.mentions, viewerUuid);
   const failed = sendState?.status === 'failed';
   const sending = sendState?.status === 'sending';
+  const pinned = message.is_pinned === true;
+  const saved = message.is_bookmarked === true;
+  // Only AI replies have a session behind them, and only since 2026-08-03
+  // (older history carries `null` — digest §F.6). No id, no affordance.
+  const sessionUuid = message.is_ai ? (message.metadata.session_uuid ?? null) : null;
   // Reply is universal, so every REAL (server-acknowledged) row acts; a row
   // still in the outbox has nothing actionable but Retry/Discard below.
   const canAct = sendState === null;
@@ -125,15 +150,34 @@ export const MessageRow = memo(function MessageRow({
           className="absolute inset-y-0.5 left-0 w-0.5 rounded-full bg-primary/70"
         />
       )}
+      {/* Pin marker — quiet, above the content, and only ever on the few rows
+          that carry it. The pinned SURFACE lives off the channel header
+          (DIRECTION 5); this line exists so a reader scrolling past knows why
+          a message will also be found there. */}
+      {pinned && (
+        <div className="mb-0.5 flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+          <Pin aria-hidden className="size-3 shrink-0" />
+          Pinned
+        </div>
+      )}
+
       {message.reply_to != null && (
         <ReplyQuote replyTo={message.reply_to} onJump={actions.onJumpToMessage} />
       )}
 
-      <MessageContent
-        content={message.content}
-        metadata={message.metadata}
-        viewerUuid={viewerUuid}
-      />
+      {message.is_ai ? (
+        <LawexaMessageContent
+          content={message.content}
+          metadata={message.metadata}
+          viewerUuid={viewerUuid}
+        />
+      ) : (
+        <MessageContent
+          content={message.content}
+          metadata={message.metadata}
+          viewerUuid={viewerUuid}
+        />
+      )}
 
       {message.edited_at && (
         <span
@@ -143,6 +187,11 @@ export const MessageRow = memo(function MessageRow({
           (edited)
         </span>
       )}
+
+      <ReactionChips
+        reactions={message.reactions}
+        onToggle={(emoji) => actions.onToggleReaction(message, emoji)}
+      />
 
       {failed && (
         <div className="mt-1 flex items-center gap-2 text-xs font-medium text-destructive">
@@ -174,8 +223,18 @@ export const MessageRow = memo(function MessageRow({
           on pointer-fine hover, and by `focus-within` the moment a Tab lands
           on a button (the FilesTab / ListItemRow reveal pattern).
           `pointer-events-none` while invisible so touch can't hit ghost
-          buttons. A plain flex row: W3 appends react/pin/save without
-          touching the mechanism. */}
+          buttons.
+
+          THE THIRD REVEAL CONDITION exists for the reaction tray: Radix
+          PORTALS the popover out of this element, so focus moving into the
+          tray does NOT satisfy `focus-within` — the cluster would vanish the
+          instant the tray opened, and the pointer would leave a dead trigger
+          behind. `has-data-[state=open]` reads the trigger's own state, which
+          stays inside the cluster, and holds it visible until the tray closes.
+
+          ORDER IS BY FREQUENCY, not by power: react and reply are what most
+          rows get, save and pin are occasional, and the two author-only verbs
+          sit last so a mis-aimed click lands on something reversible. */}
       {canAct && (
         <div
           className={cn(
@@ -184,14 +243,49 @@ export const MessageRow = memo(function MessageRow({
             '[@media(hover:hover)_and_(pointer:fine)]:group-hover/msg:pointer-events-auto',
             '[@media(hover:hover)_and_(pointer:fine)]:group-hover/msg:opacity-100',
             'focus-within:pointer-events-auto focus-within:opacity-100',
+            'has-data-[state=open]:pointer-events-auto has-data-[state=open]:opacity-100',
           )}
         >
+          <ReactionTrayPopover
+            reactions={message.reactions}
+            onPick={(emoji) => actions.onToggleReaction(message, emoji)}
+          />
           <RowAction
             label="Reply"
             onClick={() => actions.onStartReply(message)}
           >
             <CornerUpLeft aria-hidden className="size-3.5" />
           </RowAction>
+          <RowAction
+            label={saved ? 'Remove from saved' : 'Save message'}
+            pressed={saved}
+            disabled={saveThrottled}
+            onClick={() => actions.onToggleSave(message)}
+          >
+            <Bookmark
+              aria-hidden
+              className={cn('size-3.5', saved && 'fill-current')}
+            />
+          </RowAction>
+          <RowAction
+            label={pinned ? 'Unpin message' : 'Pin message'}
+            pressed={pinned}
+            onClick={() => actions.onTogglePin(message)}
+          >
+            {pinned ? (
+              <PinOff aria-hidden className="size-3.5" />
+            ) : (
+              <Pin aria-hidden className="size-3.5" />
+            )}
+          </RowAction>
+          {sessionUuid && (
+            <RowAction
+              label="View this Lawexa conversation"
+              onClick={() => actions.onViewAiSession(sessionUuid)}
+            >
+              <Sparkles aria-hidden className="size-3.5" />
+            </RowAction>
+          )}
           {canEdit && (
             <RowAction
               label="Edit message"
@@ -215,14 +309,26 @@ export const MessageRow = memo(function MessageRow({
   );
 });
 
+/**
+ * One cluster button.
+ *
+ * `pressed` is `undefined` for the plain verbs (Reply / Edit / Delete) and a
+ * boolean for the two TOGGLES (save, pin) — so only the toggles carry
+ * `aria-pressed`, and a screen reader is never told that "Reply" is a switch
+ * that happens to be off. `disabled` is only ever the quiet throttle state.
+ */
 function RowAction({
   label,
   destructive = false,
+  pressed,
+  disabled = false,
   onClick,
   children,
 }: {
   label: string;
   destructive?: boolean;
+  pressed?: boolean;
+  disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -231,12 +337,16 @@ function RowAction({
       type="button"
       aria-label={label}
       title={label}
+      aria-pressed={pressed}
+      disabled={disabled}
       onClick={onClick}
       className={cn(
-        'v2-interactive p-2 text-muted-foreground transition-colors duration-150 motion-reduce:transition-none',
+        'v2-interactive p-2 transition-colors duration-150 motion-reduce:transition-none',
+        pressed ? 'text-primary' : 'text-muted-foreground',
         destructive
           ? 'hover:bg-destructive/10 hover:text-destructive'
           : 'hover:bg-muted hover:text-foreground',
+        disabled && 'pointer-events-none opacity-50',
         FOCUS_RING,
       )}
     >

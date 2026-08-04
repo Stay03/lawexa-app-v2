@@ -3,15 +3,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { ChannelFile, Message, SlimUser, TaskList } from '@/types/collab';
+import type {
+  AiTurnFailedPayload,
+  AiTurnStartedPayload,
+  ChannelFile,
+  Message,
+  MessagePinPayload,
+  ReactionToggledPayload,
+  SlimUser,
+  TaskList,
+} from '@/types/collab';
 import { getV2Echo } from '@/v2/runtime/realtime/echo';
 import { presenceChannelName } from '@/v2/runtime/realtime/protocol';
 import {
   applyMessageCreated,
   applyMessageDeleted,
   applyMessageUpdated,
+  applyPinState,
+  applyReactionToggled,
   noteChannelMembershipChanged,
 } from './cache';
+import {
+  addRespondingTurn,
+  dropRespondingTurn,
+  resolvedExecutionId,
+  RESPONDING_TURN_TTL_MS,
+  type RespondingTurn,
+} from './lawexa/turns';
 import {
   addFileCache,
   removeFileCache,
@@ -48,12 +66,17 @@ import { channelsQueries } from './queries';
  * {@link TYPING_TTL_MS} (10s), clear a typer the moment their message
  * arrives; EMIT at most one whisper per {@link TYPING_EMIT_THROTTLE_MS} (1s).
  *
- * W3 SEAMS — DELIBERATE NO-OPS, LISTED SO THE NEXT WAVE BINDS THEM HERE:
- *  - `.ai.turn_started` / `.ai.turn_failed` → the Lawexa responding pill
- *    keyed by `metadata.execution_id` (W3; digest §F.6/§F.7).
- *  - `.reaction.toggled` → per-message reaction deltas (W3; digest §F.2 — the
- *    payload is per-viewer-safe deltas, never a full row).
- *  - `.message.pinned` / `.message.unpinned` → pin state + pinned surface (W3).
+ * W3 BOUND THE ENGAGEMENT + LAWEXA SEAMS (2026-08-04):
+ *  - `.reaction.toggled` → a per-emoji DELTA onto the message cache. The
+ *    payload is per-viewer-safe by design (digest §F.2): it names the reacting
+ *    user, so `reacted_by_me` is only touched when that user IS the viewer.
+ *  - `.message.pinned` / `.message.unpinned` → the SHARED pin flag, plus an
+ *    invalidation of the pins panel (the event carries no message body, so the
+ *    list cannot be hand-patched).
+ *  - `.ai.turn_started` / `.ai.turn_failed` → the responding-row machine
+ *    (`./lawexa/turns.ts` holds the rules and the reasoning).
+ *
+ * STILL DELIBERATE NO-OPS:
  *  - `.read.updated` → IGNORED for UI by decision D2 (no read-state display);
  *    the caller's own multi-device badge sync rides `.channel.unread` on the
  *    user channel, which the spine already owns.
@@ -74,9 +97,16 @@ export interface ChannelRoom {
   onlineCount: number;
   /** Who is typing right now (never includes the viewer). */
   typingUsers: readonly TypingUser[];
+  /** Lawexa summons still in flight in this channel — each drives one
+   *  "responding" row. Stable reference between real changes. */
+  respondingTurns: readonly RespondingTurn[];
   /** Throttled typing whisper — the composer calls this per keystroke. */
   notifyTyping: () => void;
 }
+
+/** Frozen empty list so a channel with no live summon hands out one stable
+ *  reference forever (memo-friendly, like the outbox's `NO_MESSAGES`). */
+const NO_TURNS: readonly RespondingTurn[] = [];
 
 export function useChannelRoom(
   channelUuid: string,
@@ -94,9 +124,12 @@ export function useChannelRoom(
     () => new Set(),
   );
   const [typingUsers, setTypingUsers] = useState<readonly TypingUser[]>([]);
+  const [respondingTurns, setRespondingTurns] =
+    useState<readonly RespondingTurn[]>(NO_TURNS);
 
   const whisperRef = useRef<((event: string, data: Record<string, unknown>) => void) | null>(null);
   const typingTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const turnTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const lastWhisperAtRef = useRef(0);
 
   useEffect(() => {
@@ -108,6 +141,7 @@ export function useChannelRoom(
     const room = echo.join(name);
     whisperRef.current = (event, data) => room.whisper(event, data);
     const typingTimers = typingTimersRef.current;
+    const turnTimers = turnTimersRef.current;
 
     const clearTyper = (uuid: string) => {
       const timer = typingTimers.get(uuid);
@@ -118,6 +152,14 @@ export function useChannelRoom(
           ? prev.filter((user) => user.uuid !== uuid)
           : prev,
       );
+    };
+
+    /** End a turn from any of its three exits (reply / failure / TTL). */
+    const endTurn = (executionId: string) => {
+      const timer = turnTimers.get(executionId);
+      if (timer) clearTimeout(timer);
+      turnTimers.delete(executionId);
+      setRespondingTurns((prev) => dropRespondingTurn(prev, executionId));
     };
 
     room
@@ -146,11 +188,15 @@ export function useChannelRoom(
       // A message from someone typing supersedes their indicator (§5's
       // clear-on-send, enforced on the RECEIVING side).
       if (payload.author) clearTyper(payload.author.uuid);
+      // Lawexa's answer retires its own turn — exact id match only, FIRST one
+      // wins (`./lawexa/turns.ts` explains why the guess is gone).
+      const executionId = resolvedExecutionId(payload);
+      if (executionId) endTurn(executionId);
     });
     room.listen('.message.updated', (payload: Message) => {
-      // Broadcasts omit the per-viewer fields by design (digest §F.2). The W2
-      // `Message` type carries none, so wholesale replacement is exact; the
-      // writer's own docblock pins the W3 preserve-fields obligation.
+      // Broadcasts omit `is_bookmarked` + `reactions` by design (digest §F.2);
+      // the writer merges the cached row's values back in, so a stranger's edit
+      // cannot wipe the viewer's saves or reaction state.
       applyMessageUpdated(queryClient, payload);
     });
     room.listen('.message.deleted', (payload: { uuid: string; channel_uuid: string }) => {
@@ -168,6 +214,60 @@ export function useChannelRoom(
         echo.leave(name);
       }
       noteChannelMembershipChanged(queryClient, channelUuid);
+    });
+
+    /* ── Engagement (3e/3f) ─────────────────────────────────────────────── */
+
+    room.listen('.reaction.toggled', (payload: ReactionToggledPayload) => {
+      applyReactionToggled(queryClient, channelUuid, {
+        messageUuid: payload.message_uuid,
+        emoji: payload.emoji,
+        count: payload.count,
+        // The per-viewer half of the row moves ONLY for the viewer's own
+        // reaction; a stranger's toggle changes the count and nothing else.
+        reactedByMe: payload.user_uuid === myUuid ? payload.reacted : null,
+      });
+    });
+
+    const onPinChanged = (payload: MessagePinPayload) => {
+      applyPinState(queryClient, channelUuid, payload.message_uuid, payload.is_pinned);
+      // The panel needs `pinned_by` + `pinned_at`, which this event doesn't
+      // carry — so the list is invalidated rather than patched. Only when it
+      // is already cached: an unopened panel must not fetch on someone else's
+      // pin.
+      const pinsKey = channelsQueries.pinsOf(channelUuid);
+      const cached = queryClient
+        .getQueriesData({ queryKey: pinsKey })
+        .some(([, data]) => data !== undefined);
+      if (cached) void queryClient.invalidateQueries({ queryKey: pinsKey });
+    };
+    room.listen('.message.pinned', onPinChanged);
+    room.listen('.message.unpinned', onPinChanged);
+
+    /* ── Lawexa turns (§B, §F.6/§F.7) ───────────────────────────────────── */
+
+    room.listen('.ai.turn_started', (payload: AiTurnStartedPayload) => {
+      if (!payload.execution_id) return;
+      const executionId = payload.execution_id;
+      setRespondingTurns((prev) =>
+        addRespondingTurn(prev, {
+          executionId,
+          summoner: payload.summoner,
+          // Tolerant anchoring — see `./lawexa/turns.ts` and digest §F.7.
+          messageUuid: payload.message_uuid ?? null,
+          startedAt: Date.now(),
+        }),
+      );
+      const existing = turnTimers.get(executionId);
+      if (existing) clearTimeout(existing);
+      turnTimers.set(
+        executionId,
+        setTimeout(() => endTurn(executionId), RESPONDING_TURN_TTL_MS),
+      );
+    });
+
+    room.listen('.ai.turn_failed', (payload: AiTurnFailedPayload) => {
+      if (payload.execution_id) endTurn(payload.execution_id);
     });
 
     // Lists & files ride this same room (LF §5) — the N3 writers.
@@ -234,9 +334,15 @@ export function useChannelRoom(
       whisperRef.current = null;
       for (const timer of typingTimers.values()) clearTimeout(timer);
       typingTimers.clear();
+      for (const timer of turnTimers.values()) clearTimeout(timer);
+      turnTimers.clear();
       echo.leave(name);
       setOnlineUuids(new Set());
       setTypingUsers([]);
+      // Turns are live socket state, never history: leaving the room ends
+      // them on screen. The server keeps running; the reply will arrive as an
+      // ordinary message next time the reader is here.
+      setRespondingTurns(NO_TURNS);
     };
   }, [enabled, channelUuid, myUuid, queryClient]);
 
@@ -252,6 +358,7 @@ export function useChannelRoom(
   return {
     onlineCount: onlineUuids.size,
     typingUsers,
+    respondingTurns,
     notifyTyping,
   };
 }

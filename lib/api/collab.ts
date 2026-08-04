@@ -13,6 +13,7 @@ import type {
   AddListItemPayload,
   AiSessionListResponse,
   AiSessionTranscriptResponse,
+  BookmarkToggleResponse,
   ChannelFileListResponse,
   ChannelFileResponse,
   ChannelInvitationListResponse,
@@ -36,8 +37,12 @@ import type {
   OrganizationInvitationListResponse,
   OrganizationMemberListResponse,
   OrganizationResponse,
+  PinToggleResponse,
+  PinnedMessageListResponse,
+  ReactionToggleResponse,
   ReorderListItemsPayload,
   RequestVerificationPayload,
+  SavedMessageListResponse,
   SendMessagePayload,
   SendMessageResponse,
   SpaceInvitationListResponse,
@@ -49,6 +54,7 @@ import type {
   TaskListItemsResponse,
   TaskListResponse,
   TaskListSummaryListResponse,
+  ToggleReactionPayload,
   TransferOwnershipPayload,
   UpdateChannelPayload,
   UpdateListItemPayload,
@@ -589,6 +595,96 @@ export const messagesApi = {
   ): Promise<ApiResponse<null>> => {
     const response = await apiClient.delete<ApiResponse<null>>(
       `/channels/${channelUuid}/messages/${messageUuid}`
+    );
+    return response.data;
+  },
+};
+
+/**
+ * Message engagement — reactions, pins and private saves (backend phases
+ * 3d/3e/3f). Every route gates on active channel membership.
+ *
+ * Three toggles and three lists, with three different politics:
+ *  - REACTIONS are shared and broadcast as deltas (`.reaction.toggled`); the
+ *    toggle answers `200` both ways with the emoji bucket's new state. **60/min.**
+ *  - PINS are shared: ANY active member may pin AND unpin anyone's pin
+ *    (first-pinner-wins, idempotent). The list adds `pinned_by` + `pinned_at`.
+ *  - BOOKMARKS ("saves") are PRIVATE and never broadcast — REST is the only
+ *    transport, so the toggle response and the list are the whole truth. **60/min.**
+ */
+export const messageEngagementApi = {
+  /** Toggle one emoji on a message (`200` both ways). 429 = throttled. */
+  toggleReaction: async (
+    channelUuid: string,
+    messageUuid: string,
+    payload: ToggleReactionPayload
+  ): Promise<ReactionToggleResponse> => {
+    const response = await apiClient.post<ReactionToggleResponse>(
+      `/channels/${channelUuid}/messages/${messageUuid}/reactions`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** Pin a message for everyone (`201`; already pinned is a no-op `200`). */
+  pin: async (
+    channelUuid: string,
+    messageUuid: string
+  ): Promise<PinToggleResponse> => {
+    const response = await apiClient.post<PinToggleResponse>(
+      `/channels/${channelUuid}/messages/${messageUuid}/pin`,
+      {}
+    );
+    return response.data;
+  },
+
+  /** Unpin — permitted to any active member, not just the pinner. */
+  unpin: async (
+    channelUuid: string,
+    messageUuid: string
+  ): Promise<PinToggleResponse> => {
+    const response = await apiClient.delete<PinToggleResponse>(
+      `/channels/${channelUuid}/messages/${messageUuid}/pin`
+    );
+    return response.data;
+  },
+
+  /** The channel's pinned messages, `pinned_at DESC`. */
+  getPins: async (
+    channelUuid: string,
+    params: { per_page?: number; page?: number } = {}
+  ): Promise<PinnedMessageListResponse> => {
+    const response = await apiClient.get<PinnedMessageListResponse>(
+      `/channels/${channelUuid}/messages/pins`,
+      {
+        params: { per_page: params.per_page ?? 30, page: params.page ?? 1 },
+      }
+    );
+    return response.data;
+  },
+
+  /** Toggle the caller's private save (`201` added / `200` removed). */
+  toggleBookmark: async (
+    channelUuid: string,
+    messageUuid: string
+  ): Promise<BookmarkToggleResponse> => {
+    const response = await apiClient.post<BookmarkToggleResponse>(
+      `/channels/${channelUuid}/messages/${messageUuid}/bookmark`,
+      {}
+    );
+    return response.data;
+  },
+
+  /** The caller's saved messages in this channel — private, offset-paginated. */
+  getBookmarks: async (
+    channelUuid: string,
+    params: { per_page?: number; page?: number } = {}
+  ): Promise<SavedMessageListResponse> => {
+    const response = await apiClient.get<SavedMessageListResponse>(
+      `/channels/${channelUuid}/messages/bookmarks`,
+      {
+        params: { per_page: params.per_page ?? 30, page: params.page ?? 1 },
+      }
     );
     return response.data;
   },

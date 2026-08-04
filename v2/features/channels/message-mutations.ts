@@ -11,7 +11,7 @@ import type {
   SendMessageResponse,
   SlimUser,
 } from '@/types/collab';
-import { applyMessageCreated } from './cache';
+import { applyMessageCreated, applyMessageUpdated } from './cache';
 import { LOCAL_MESSAGE_PREFIX } from './model';
 import { channelsQueries } from './queries';
 import {
@@ -267,7 +267,12 @@ export function useEditChannelMessage(channelUuid: string) {
     },
 
     onSuccess: (response) => {
-      replaceMessage(queryClient, channelUuid, response.data.uuid, response.data);
+      // Through the SHARED writer, not `replaceMessage`: an edit response omits
+      // `is_bookmarked` + `reactions` exactly like a broadcast does (digest
+      // §F.2), so settling an edit must merge the cached row's per-viewer
+      // fields back in — otherwise fixing your own typo silently clears every
+      // reaction on the message and un-saves it for you.
+      applyMessageUpdated(queryClient, response.data);
     },
   });
 }

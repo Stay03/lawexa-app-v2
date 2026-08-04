@@ -1,8 +1,10 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import {
+  channelAiApi,
   channelFilesApi,
   channelListsApi,
   channelsApi,
+  messageEngagementApi,
   messagesApi,
   spacesApi,
 } from '@/lib/api/collab';
@@ -246,6 +248,101 @@ export const channelsQueries = {
       queryKey: [...channelsQueries.filesOf(channelUuid), { viewerId }] as const,
       queryFn: () => channelFilesApi.getList(channelUuid, { per_page: 50 }),
       staleTime: STALE_TIMES.realtime,
+      gcTime: GC_TIMES.list,
+    }),
+
+  /* ── Engagement surfaces (phase-5 W3) ──────────────────────────────────────
+     Pins and saves are LISTS OF MESSAGES, not message history, so they get
+     their own key families — the message writers must never fan over them (a
+     pinned row and its feed twin are separate cache entries by design, and the
+     panels are refetched, not hand-patched, when pin/save state moves).
+
+     STANDARD tier, not realtime: `.message.pinned` invalidates the pins list
+     explicitly (the event carries no message body, so a write is impossible),
+     and saves have no event at all — REST is their entire transport (§F.2).
+     Both mount only while their panel is open. */
+
+  /** Invalidation handle for one channel's pinned-messages list. */
+  pinsOf: (channelUuid: string) =>
+    [...channelsQueries.all, 'pins', channelUuid] as const,
+
+  /** The channel's pinned messages (`pinned_at DESC`, rows add `pinned_by`). */
+  pins: ({ channelUuid, viewerId }: MessagesOptions) =>
+    queryOptions({
+      queryKey: [...channelsQueries.pinsOf(channelUuid), { viewerId }] as const,
+      queryFn: () => messageEngagementApi.getPins(channelUuid, { per_page: 50 }),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
+  /** Invalidation handle for the VIEWER's saved messages in one channel. */
+  savedOf: (channelUuid: string) =>
+    [...channelsQueries.all, 'saved', channelUuid] as const,
+
+  /** The viewer's private saves here. Viewer-partitioned like everything else,
+   *  and privately scoped server-side — two readers never share this entry. */
+  saved: ({ channelUuid, viewerId }: MessagesOptions) =>
+    queryOptions({
+      queryKey: [...channelsQueries.savedOf(channelUuid), { viewerId }] as const,
+      queryFn: () => messageEngagementApi.getBookmarks(channelUuid, { per_page: 50 }),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
+  /* ── Lawexa sessions (phase-5 W3) ──────────────────────────────────────────
+     The session INDEX is length-aware; a session's TRANSCRIPT is cursor-
+     paginated (newest-first, like message history) and complete — it carries
+     the tool machinery as well as the dialogue. Both mount only while the
+     sessions sheet is open. */
+
+  /** Invalidation handle for a channel's AI-session index (all page variants). */
+  aiSessionsOf: (channelUuid: string) =>
+    [...channelsQueries.all, 'ai-sessions', channelUuid] as const,
+
+  /** A channel's Lawexa sessions, newest-first, page-infinite. */
+  aiSessions: ({ channelUuid, viewerId }: MessagesOptions) =>
+    infiniteQueryOptions({
+      queryKey: [...channelsQueries.aiSessionsOf(channelUuid), { viewerId }] as const,
+      queryFn: ({ pageParam }) =>
+        channelAiApi.getSessions(channelUuid, { per_page: 20, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) =>
+        lastPage.pagination.current_page < lastPage.pagination.last_page
+          ? lastPage.pagination.current_page + 1
+          : undefined,
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+    }),
+
+  /** Invalidation handle for ONE session's transcript. */
+  aiSessionTranscriptOf: (sessionUuid: string) =>
+    [...channelsQueries.all, 'ai-session', sessionUuid] as const,
+
+  /** One session's COMPLETE transcript — cursor, newest-first (so each
+   *  `fetchNextPage()` loads an OLDER page and the view renders reversed).
+   *  Machinery rows are filtered client-side, never server-side: the dialogue
+   *  view is a lens over the whole record, and "show everything" must not
+   *  need a second request. */
+  aiSessionTranscript: ({
+    channelUuid,
+    sessionUuid,
+    viewerId,
+  }: MessagesOptions & { sessionUuid: string }) =>
+    infiniteQueryOptions({
+      queryKey: [
+        ...channelsQueries.aiSessionTranscriptOf(sessionUuid),
+        { viewerId },
+      ] as const,
+      queryFn: ({ pageParam }) =>
+        channelAiApi.getSession(channelUuid, sessionUuid, {
+          per_page: 30,
+          cursor: pageParam ?? undefined,
+        }),
+      initialPageParam: null as string | null,
+      getNextPageParam: (lastPage) => lastPage.pagination.next_cursor ?? undefined,
+      staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
     }),
 };
