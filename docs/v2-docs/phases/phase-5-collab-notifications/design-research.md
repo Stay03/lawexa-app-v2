@@ -19,6 +19,20 @@ visual noise"; Microsoft admitted Teams' crowded controls cause accidental
 screen-shares; Slack's 2023 surface-splitting (Home/DMs/Activity) drew sustained
 backlash for fragmenting where messages live.
 
+## OWNER FEEL DIRECTIVE (Aug 4 2026, binding — sits on top of everything below)
+
+The owner reviewed the research report and set the feel target: **"that slick
+Discord feel, but the UI and UX very modern, sleek and clean."** Read it precisely:
+we take Discord's SLICKNESS — the app-like fluidity (instant channel switching,
+zero-jank transitions, polished hover states, motion that makes the product feel
+alive, a cohesive confident dark theme) — and we REFUSE Discord's noise (density
+knobs, red badge storms, per-row clutter, theme zoo; the no-list stands untouched).
+One sentence for every W2/W3 brief: **Discord's fluidity, Linear's cleanliness, our
+gold.** Practical bar: channel switches paint from cache instantly (the phase-3
+staleTime lesson), every interaction has a polished sub-200ms response, hover states
+are designed not default, and the dark theme is a first-class design target — not a
+derived palette.
+
 ## DIRECTION (binding)
 
 1. **Rows, not bubbles.** Full-width grouped rows (avatar + bold name + quiet
