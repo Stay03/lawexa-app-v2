@@ -113,3 +113,49 @@ House rules: React Compiler lint runs as ERRORS (no setState-in-effect, no
 components/ui only, NEVER v1 components/hooks/stores.
 Report: files + one-line purpose each, deviations with reasons, then
 ASSUMPTIONS split VERIFIED (with how) and UNVERIFIED.
+
+## 5. Post-implementation record (August 4, 2026)
+
+Shipped in `86ff408`. Both checkers said SHIP AFTER FIXES; every finding
+was fixed and re-proved (43/43 model assertions against real probe JSON,
+13/13 on the picker's keyboard logic, 15/15 film checks).
+
+The defects worth remembering:
+
+- **A folder could dead-end forever.** When the first page of contents
+  mapped entirely to dropped types, the empty state replaced the stream
+  AND unmounted the infinite-scroll sentinel — `useInfiniteScrollSentinel`
+  returns early on a null ref and its deps never change, so page 2 was
+  unreachable. RULE: an empty state must never be computed from rendered
+  rows alone; it needs `noMorePages` and a zero drop count.
+- **Enter inside a search debounce filed into the wrong folder** (the
+  list lagged the field), and just after it, an unresolved level made the
+  create row index 0 so Enter minted a duplicate folder. RULE: a keyboard
+  commit must refuse a list that does not answer what is typed.
+- **The active option was addressed by INDEX** while pagination grew the
+  list underneath it. RULE: address a highlighted option by identity.
+- **The phone sheet's focus trap was inert** — Radix's dialog div has no
+  `tabIndex`, so `focus()` was a no-op and the trap never engaged.
+- **A fifth folder payload exists**: `parent` and `children` are a
+  12-key node with NO `user`/`description`/`updated_at`/counts. Typed as
+  the full record it would have thrown. Now `FolderNode`.
+- **`/bookmarks` crashed on a deleted-then-bookmarked folder**
+  (`content: null`, denied by the shared type). Guarded.
+
+Deliberate calls: the delete undo HOLDS the request for six seconds
+(cancelling something unsent is the only undo this build can honestly
+promise — no restore call ships); the unload flush was REMOVED rather
+than keep a promise axios/XHR cannot keep on unload; conversations and
+folder-as-items are dropped at the row mapper, not merely hidden.
+
+Known follow-ups: the reverse lookup ("which folders hold this item")
+and a flat folder list for the picker are filed backend asks; filing a
+FILE item is untested (no v2 file surface exists yet); `is_bookmarked`
+rides on folder payloads unused.
+
+FILM DISCIPLINE (cost real time, recorded): a stale `next start` from an
+earlier session held :3100 and served v1's folders page — always verify
+WHICH process owns the port, never trust a 200. And two "failures" were
+probe errors, not defects: measuring two meta zones as one, and filing
+into a fixture folder that already held the item (the picker answered
+"Already in this folder", correctly).
