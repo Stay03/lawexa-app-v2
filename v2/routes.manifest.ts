@@ -57,6 +57,14 @@
  * selling is out of scope for now — so they are carved out below and keep
  * falling through to v1.
  */
+/**
+ * `/folders/*` covers the library and every folder page. Private and
+ * uuid-addressed: folder slugs are NOT unique (two folders may share one) and
+ * a rename rewrites the whole subtree's paths, so the uuid v1 already used
+ * stays the only honest address and no old link changes meaning. v1's public
+ * "Explore" feed does not come along — v2 shows the viewer their own folders
+ * only, and a public folder stays reachable by direct link.
+ */
 export const V2_ROUTES = [
   '/',
   '/work',
@@ -69,6 +77,7 @@ export const V2_ROUTES = [
   '/bookmarks',
   '/quiz/*',
   '/notes/*',
+  '/folders/*',
 ] as const;
 
 /**

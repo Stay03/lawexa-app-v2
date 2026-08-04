@@ -116,6 +116,18 @@ const STATUTE_STATUS_LABEL: Record<StatuteStatus, string> = {
  * rather than rendered as `undefined` — one missing item, not a broken page.
  */
 export function bookmarkRow(bookmark: Bookmark): BookmarkRowModel | null {
+  // A THIRD case the two guarantees above do not cover: the row is a known
+  // type and its CONTENT IS GONE. Deleting a folder (and, by the same shape,
+  // any bookmarked record) leaves the bookmark behind with `content: null` —
+  // probed on prod, Aug 4 2026. `types/bookmark.ts` declares `content`
+  // non-nullable and is shared with v1, so the compiler never saw it and every
+  // read below (`content.id`, `content.is_bookmarked`) would throw, taking the
+  // whole `/bookmarks` page down with it. Widening to a nullable view — not a
+  // cast — makes the guard honest: a dangling row is dropped exactly like an
+  // unknown type, one missing item instead of a broken page.
+  const present: Bookmark['content'] | null = bookmark.content;
+  if (!present) return null;
+
   const base = {
     bookmarkId: bookmark.id,
     contentId: bookmark.content.id,

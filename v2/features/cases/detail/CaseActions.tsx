@@ -6,12 +6,9 @@ import { Check, FileText, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { BookmarkButton } from '@/v2/features/bookmarks/BookmarkButton';
-
-/** One shape for every action, so the row reads as a set rather than a jumble. */
-const ACTION =
-  'v2-interactive inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
+import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
 
 /**
  * The case action row — save, share, and the full judgment when one exists.
@@ -21,10 +18,11 @@ const ACTION =
  * sits UNDER the heading block, at the weight of metadata rather than of
  * controls: the case is the page, and the actions are things you do to it.
  *
- * Feedback and add-to-folder are NOT here. Both are whole v1 features behind the
- * v2 import boundary (folders in particular is its own phase-4 workstream), and
- * a button that opens nothing is worse than an absent one. Recorded as a gap
- * rather than stubbed.
+ * ADD TO FOLDER landed with the phase-4 folders wave and sits beside the
+ * bookmark, which is its nearest relative: both file the case somewhere the
+ * reader can find it again. FEEDBACK is still absent — a whole v1 feature
+ * behind the v2 import boundary — and stays a recorded gap rather than a button
+ * that opens nothing.
  */
 export function CaseActions({
   caseId,
@@ -49,9 +47,10 @@ export function CaseActions({
         count={bookmarksCount}
         variant="full"
       />
+      <AddToFolderButton target={{ type: 'case', contentId: caseId }} />
       <ShareAction title={title} />
       {hasFullReport ? (
-        <Link href={`/cases/${slug}/report`} className={cn(ACTION, FOCUS_RING)}>
+        <Link href={`/cases/${slug}/report`} className={cn(ACTION_PILL, FOCUS_RING)}>
           <FileText aria-hidden className="size-4" />
           Full judgment
         </Link>
@@ -100,7 +99,7 @@ function ShareAction({ title }: { title: string }) {
     <button
       type="button"
       onClick={() => void share()}
-      className={cn(ACTION, FOCUS_RING)}
+      className={cn(ACTION_PILL, FOCUS_RING)}
       aria-label="Share this case"
     >
       {copied ? (

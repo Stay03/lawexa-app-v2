@@ -7,7 +7,8 @@ import { ArrowLeft, Check, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { StatuteDetail } from '@/types/statute';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
+import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
 import { StatuteBookmarkButton } from '../bookmark/StatuteBookmarkButton';
 import {
   formatStatuteDate,
@@ -27,7 +28,7 @@ import {
  *   status       a REAL badge: a repealed Act must look repealed before a
  *                single provision is read (colour + word, never colour-only)
  *   meta         commencement date, when known
- *   actions      copy-link, bookmark
+ *   actions      copy-link, bookmark, add-to-folder
  *
  * The long title ("AN ACT to …") is deliberately NOT here: it opens the
  * document itself (the AKN preface renders it), and a fact lives in one
@@ -131,6 +132,7 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
           count={detail.bookmarks_count}
           variant="full"
         />
+        <AddToFolderButton target={{ type: 'statute', contentId: detail.id }} />
       </div>
     </header>
   );
@@ -183,10 +185,7 @@ function CopyLinkButton({ slug }: { slug: string }) {
     <button
       type="button"
       onClick={() => void copy()}
-      className={cn(
-        'v2-interactive inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-        FOCUS_RING,
-      )}
+      className={cn(ACTION_PILL, FOCUS_RING)}
     >
       {copied ? (
         <Check aria-hidden className="size-4 text-primary" />

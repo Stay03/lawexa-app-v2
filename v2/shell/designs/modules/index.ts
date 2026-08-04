@@ -18,4 +18,10 @@ export {
   CountBadge,
   UnreadDot,
 } from './rows';
-export { FOCUS_RING, REVEAL, CONTENT_FADE, formatRelativeTime } from './meta';
+export {
+  ACTION_PILL,
+  FOCUS_RING,
+  REVEAL,
+  CONTENT_FADE,
+  formatRelativeTime,
+} from './meta';

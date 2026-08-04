@@ -18,6 +18,19 @@ export const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
 /**
+ * The ONE pill shape every document action row wears — the case page's Save /
+ * Share / Full judgment, the note's Copy link / Export / Edit, the statute's
+ * Copy link, and Add to folder on all three.
+ *
+ * It lives here because it had drifted into four byte-identical copies (three
+ * private `const ACTION`s plus a fourth inline in the statute header), which is
+ * a set that reads as a set only until someone tunes one of them. Pair it with
+ * {@link FOCUS_RING} at every call site, exactly as those rows already did.
+ */
+export const ACTION_PILL =
+  'v2-interactive inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
+
+/**
  * The home surface's ONE signature entrance — a soft fade + 8px rise.
  * `fill-mode-both` holds each block hidden through its stagger delay so nothing
  * pre-flashes on the first frame; `motion-safe` + the globals reduced-motion

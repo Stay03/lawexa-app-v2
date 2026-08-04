@@ -6,14 +6,10 @@ import { Check, Download, Link2, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
+import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
 import { notesApi } from '../api';
 import { NoteBookmarkButton } from '../bookmark/NoteBookmarkButton';
-
-/** One shape for every action, so the row reads as a set rather than a jumble
- *  — the case page's action grammar, verbatim. */
-const ACTION =
-  'v2-interactive inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
 
 /**
  * The note action row — save, copy link, export, and Edit for the author.
@@ -23,12 +19,15 @@ const ACTION =
  * v1 put six buttons ABOVE the note (bookmark, feedback, add-to-folder,
  * export, and a dropdown), so the first thing a reader met was a toolbar.
  *
- * WHAT IS NOT HERE, and why each is an absence rather than a stub: FEEDBACK
- * and ADD-TO-FOLDER are whole v1 features behind the v2 import boundary
- * (folders is its own phase-4 workstream); PUBLISH and PRICE are the
- * marketplace, carved out of v2 entirely; DELETE belongs with the editor,
- * where the confirmation and the redirect live. A button that opens nothing is
- * worse than an absent one.
+ * ADD TO FOLDER landed with the phase-4 folders wave and sits beside the
+ * bookmark, its nearest relative — both file the note where the reader can find
+ * it again.
+ *
+ * WHAT IS STILL NOT HERE, and why each is an absence rather than a stub:
+ * FEEDBACK is a whole v1 feature behind the v2 import boundary; PUBLISH and
+ * PRICE are the marketplace, carved out of v2 entirely; DELETE belongs with the
+ * editor, where the confirmation and the redirect live. A button that opens
+ * nothing is worse than an absent one.
  *
  * EDIT IS OWNERSHIP-GATED IN THE CALLER (`NoteDocument` compares the
  * server-verified `session.userId` against `note.user.id`) and this component
@@ -62,10 +61,11 @@ export function NoteActions({
         count={bookmarksCount}
         variant="full"
       />
+      <AddToFolderButton target={{ type: 'note', contentId: noteId }} />
       <CopyLinkButton slug={slug} />
       {canExport ? <ExportDocxButton slug={slug} /> : null}
       {editHref ? (
-        <Link href={editHref} className={cn(ACTION, FOCUS_RING)}>
+        <Link href={editHref} className={cn(ACTION_PILL, FOCUS_RING)}>
           <Pencil aria-hidden className="size-4" />
           Edit
         </Link>
@@ -112,7 +112,7 @@ function CopyLinkButton({ slug }: { slug: string }) {
     <button
       type="button"
       onClick={() => void copy()}
-      className={cn(ACTION, FOCUS_RING)}
+      className={cn(ACTION_PILL, FOCUS_RING)}
     >
       {copied ? (
         <Check aria-hidden className="size-4 text-primary" />
@@ -193,7 +193,7 @@ function ExportDocxButton({ slug }: { slug: string }) {
       // `<body>` the instant the press lands. The guard in the handler is what
       // actually stops a second request.
       aria-disabled={exporting}
-      className={cn(ACTION, FOCUS_RING)}
+      className={cn(ACTION_PILL, FOCUS_RING)}
     >
       {exporting ? (
         <Loader2
