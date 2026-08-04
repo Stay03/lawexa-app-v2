@@ -1,4 +1,8 @@
 import type { Channel, Member, SlimUser } from '@/types/collab';
+import {
+  QUIET_GRAMMAR,
+  type UnreadGrammar,
+} from '@/v2/features/collab/unread-grammar';
 
 /**
  * channels model — the pure vocabulary of the W2 channel screen: tab parsing,
@@ -25,6 +29,32 @@ export function parseChannelTab(raw: string | null | undefined): ChannelTab {
     default:
       return 'chat';
   }
+}
+
+/* ── The unread grammar (DIRECTION 2, backend Ruling A) ───────────────────── */
+
+/**
+ * A CHANNEL row's grammar — shared by the in-space row and the cross-space
+ * "My channels" row, which is why it belongs to the channels feature and not
+ * to either screen (audit L2 moved it here from `spaces/model.ts`, where it
+ * had left a channels file importing the spaces feature).
+ *
+ * `unread_count` / `mention_count` are members-only and kept live between
+ * refetches by the spine's `.channel.unread` writers (absolute counts,
+ * assigned never incremented) — which is why a row rendered from this function
+ * updates within a second of a message arriving, with no refetch of its own.
+ *
+ * MUTE IS APPLIED HERE, ON THE CLIENT, and that is correct: the server still
+ * sends a muted channel's `unread_count` (the badge must stay accurate for
+ * when the member unmutes), so the row — not the payload — is where mute stops
+ * the bold + dot. The mention count passes through untouched.
+ */
+export function channelUnreadGrammar(channel: Channel): UnreadGrammar {
+  const muted = channel.my_notify_level === 'muted';
+  const mentions = channel.mention_count ?? 0;
+  const unread = !muted && (channel.unread_count ?? 0) > 0;
+  if (!unread && mentions <= 0 && !muted) return QUIET_GRAMMAR;
+  return { unread, mentions, muted };
 }
 
 /* ── Permissions ──────────────────────────────────────────────────────────── */
