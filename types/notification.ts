@@ -26,6 +26,25 @@ export interface Notification {
   channel_uuid?: string | null;
   message_uuid?: string | null;
   space_uuid?: string | null;
+  /**
+   * `channel_quiz_live` ONLY (backend, 2026-08-05) — the row that says a quiz
+   * lobby has opened in a channel. ABSENT on every other notification type, in
+   * exactly the way the subject ids above are absent from the rows that predate
+   * them, so a reader must treat each one as optional rather than as a field
+   * that happens to be empty.
+   *
+   * The row also carries `channel_uuid` (above) and an `action_url` naming a
+   * BACKEND path shape (`/channels/{c}/quiz-games/{g}`) that this app has no
+   * route for — see `v2/features/notifications/presentation.ts`, which owns the
+   * translation into the address the lobby actually lives at.
+   *
+   * There is no email for this kind on purpose: a lobby nobody starts cancels
+   * itself after ten minutes, so arriving late is worth nothing.
+   */
+  game_uuid?: string | null;
+  quiz_title?: string | null;
+  question_count?: number | null;
+  host?: { uuid: string; name: string } | null;
 }
 
 // GET /api/notifications/{id} response

@@ -157,7 +157,11 @@ import {
  * from it: `?game={uuid}` mounts `GameOverlay` across the whole channel — over
  * the header bar and the section bar as well as the panes — so nothing
  * underneath reflows and the chat keeps its scroll, its history and its
- * presence room while the game runs.
+ * presence room while the game runs. It is also the one overlay param that
+ * arrives from OUTSIDE this screen — the go-live notification pushes it onto a
+ * channel the reader may already be reading — so it is adopted on prop change
+ * as well as at mount (see the adoption effect below), and a previewer who
+ * cannot enter is told so in the dock instead of meeting silence.
  *
  * EVERY OVERLAY ANSWERS BACK (owner round, Aug 4). `?game=` and the `?panel=`
  * family — edit, members, pinned, saved, quizzes and the Lawexa sessions sheet
@@ -327,6 +331,57 @@ export function ChannelScreen({
   });
   const closeGame = game.close;
   const gameUuid = game.value;
+  const { show: showGame } = game;
+
+  /**
+   * THE NAVIGATION'S `?game=` IS ADOPTED WHENEVER IT ARRIVES, not only when this
+   * screen is born — which is what makes the go-live notification work for its
+   * likeliest recipient.
+   *
+   * `ssrValue` alone could never do it. It is consulted only where there is no
+   * `window`, so on the client the hook reads the LIVE URL — once, in its lazy
+   * initialiser — and `popstate` is its only other adopter. Neither fires for the
+   * reader who is already sitting in `/channels/{uuid}` when a quiz starts there:
+   * the bell pushes `/channels/{uuid}?game={game}`, the route shell keys this
+   * component by `channelId` so React does NOT remount it, and a push is not a
+   * pop. The overlay stayed `null` and the address bar kept a `?game=` nothing on
+   * screen answered to — until some unrelated panel's `close()` walked back over
+   * an entry carrying it and sprang the game open minutes later. The prop is the
+   * one signal that does change, so the prop is what this reads. (`?m=` re-arms on
+   * prop change and `?tab=` falls back to its prop; `?game=` did neither.)
+   *
+   * AN EFFECT, NOT A RENDER-PHASE ADJUST, and the reason is timing. Next applies a
+   * navigation's URL in `HistoryUpdater`'s `useInsertionEffect` — after the render
+   * pass that delivered these props — so during that render `window.location`
+   * still reads the PREVIOUS address. Adopting from render would therefore be
+   * read straight back as stripped (the hook re-checks the live URL every render),
+   * and calling `show` from render would find no `?game=` yet and quietly PUSH one
+   * — a history write from a render, and a duplicate entry for Back to land on and
+   * re-open the game from. By the time an effect runs, the insertion effect has
+   * already moved the address bar, so `show` finds the live URL equal to the value
+   * and returns having touched no history at all: it only adopts into state. It
+   * cannot fight the quiet-writer rule because it never writes.
+   *
+   * IT CANNOT RE-OPEN A GAME THE READER CLOSED. Its only trigger is a CHANGE of
+   * `initialGameUuid`, and that is a navigation-time prop: closing the overlay is a
+   * quiet history write, which by construction never reaches the App Router and so
+   * never re-renders this page with new props. A dismissal is final.
+   *
+   * `canOpen` STILL RULES. `show` refuses a value this reader may not open, so a
+   * previewer's deep link degrades to the honest line in the join dock below
+   * rather than to a lobby they cannot enter.
+   *
+   * KNOWN LIMIT, stated rather than hidden: re-delivering the SAME uuid changes no
+   * prop, so clicking the same bell row twice after dismissing that same lobby
+   * will not re-open it (the URL says `?game=`, the screen does not). Covering it
+   * needs a per-navigation signal this screen does not have; the alternative —
+   * re-arming whenever the overlay goes empty — would re-open the game the instant
+   * the reader closed it, because `close()`'s `history.back()` has not landed yet.
+   */
+  useEffect(() => {
+    if (initialGameUuid === null) return;
+    showGame(initialGameUuid);
+  }, [initialGameUuid, showGame]);
 
   // `?tab=` is not an overlay — it is a persistent view selector written with
   // REPLACE — but it still has to be re-adopted here, because a Back OUT of a
@@ -380,7 +435,6 @@ export function ChannelScreen({
   // dispatchers are what the callbacks below depend on — the same rule the
   // composer/feed callbacks follow, and what keeps the memoised rows still.
   const { show: showPanel, swap: swapPanel, closeInPlace: closePanel } = panel;
-  const { show: showGame } = game;
 
   /** Land on a message from a panel: close the panel and go back to Chat, then
    *  let the feed resolve it — it pulls older pages when the message isn't
@@ -811,8 +865,19 @@ export function ChannelScreen({
                      not the composer's height — the feed measures the dock live
                      (`--v2-chan-dock-h`) and reserves whatever it actually
                      takes. */
+                  /* THE QUIZ NOTE IS FOR A REAL AUDIENCE, not a leftover. A
+                     `space_public` channel's go-live notification goes to the
+                     WHOLE SPACE, so a space member previewing a room they never
+                     joined is one of its intended recipients — and `canOpen`
+                     correctly refuses them the lobby (joining a game is on the
+                     blocked list). Refusing is right; arriving at a silent
+                     transcript with no mention of the quiz is not. The signal is
+                     the navigation's own `?game=`, not the live URL, because the
+                     refusal effect strips the param from the address bar a frame
+                     later — the prop is what survives it. */
                   <ChannelPreviewDock
                     channelName={channel.name}
+                    quizIsLive={initialGameUuid !== null}
                     onJoin={handleJoin}
                     isJoining={joinMutation.isPending}
                     error={membershipActionError}
@@ -920,7 +985,6 @@ export function ChannelScreen({
         <QuizLibrarySheet
           channel={channel}
           viewerId={viewerId}
-          viewerUuid={viewerUuid}
           onOpenGame={openGame}
           {...panel.bind('quizzes')}
         />

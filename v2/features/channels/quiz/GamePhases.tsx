@@ -24,6 +24,7 @@ import type { SlimUser } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
+import { ShareResults } from './ShareResults';
 import {
   AnswersInRail,
   CountdownDial,
@@ -728,6 +729,12 @@ export function PodiumStage({
           ))}
         </div>
       )}
+
+      {/* SHARING SITS WHERE THE THING WORTH SHARING JUST APPEARED — directly
+          under the podium, before the full ranking. Any player may hand the
+          link out: everyone on this screen already sees more than the public
+          card publishes, so gating it to the host would protect nothing. */}
+      <ShareResults gameUuid={gameUuid} />
 
       <div>
         <StageKicker>Everyone</StageKicker>

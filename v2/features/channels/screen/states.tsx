@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Eye, Hash, Loader2, Lock, LogIn, UserPlus, WifiOff } from 'lucide-react';
+import { Eye, Hash, Loader2, Lock, LogIn, Radio, UserPlus, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -222,15 +222,32 @@ export function ChannelIntro({
  * would be the same action twice, and a failure raised at the top would print
  * its sentence at the bottom.
  *
+ * ── AND IT IS WHERE A REFUSED QUIZ LINK LANDS (2026-08-05) ─────────────────
+ * A `space_public` channel's go-live notification is sent to the WHOLE SPACE, so
+ * a previewer is one of its designed recipients — and the lobby is correctly
+ * closed to them (joining a game is a members-only write, so their screen must
+ * not even ask). Refusing the link is right; landing them on a read-only
+ * transcript that mentions no quiz anywhere is not, because that is the only
+ * thing the notification could produce for them. `quizIsLive` puts the missing
+ * sentence exactly where their one way forward already is.
+ *
+ * IT SAYS WHAT IS CERTAIN AND NOTHING MORE. This surface may not probe the quiz
+ * endpoints, so the only fact it holds is that a game was named in the link that
+ * brought them here — "someone started a quiz", which stays true whatever the
+ * game is doing by the time they read it. It never claims one is running now.
+ *
  * Hook-free: the screen owns the mutation, the pending flag and the error.
  */
 export function ChannelPreviewDock({
   channelName,
+  quizIsLive,
   onJoin,
   isJoining,
   error,
 }: {
   channelName: string;
+  /** The navigation named a `?game=` this reader is not allowed to open. */
+  quizIsLive: boolean;
   onJoin: () => void;
   isJoining: boolean;
   /** The server's own sentence from the last failed attempt, or `null`. */
@@ -239,6 +256,15 @@ export function ChannelPreviewDock({
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-3">
       <div className="rounded-2xl border bg-background/95 px-3 py-2.5 shadow-lg backdrop-blur">
+        {quizIsLive && (
+          <p className="mb-2 flex items-center gap-2.5 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+            <Radio aria-hidden className="size-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">
+              Someone started a quiz here.{' '}
+              <span className="text-foreground">Join to play.</span>
+            </span>
+          </p>
+        )}
         <div className="flex items-center gap-2.5">
           <Eye aria-hidden className="size-4 shrink-0 text-muted-foreground" />
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">

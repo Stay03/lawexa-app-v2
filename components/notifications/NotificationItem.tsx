@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Hash,
   Trash2,
+  Trophy,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,15 @@ import type { Notification } from '@/types/notification';
 
 /**
  * Type-aware display for the Channels notification types, whose `title` /
- * `message` come back null (the client renders from `type` + `action_url`).
+ * `message` come back null (the client renders from `type`).
+ *
+ * A MISS HERE COSTS A GLYPH, NOT A DESTINATION. This map is read for the icon
+ * and the fallback title and for nothing else — where a click goes is worked out
+ * from the row's own `action_url` (see `internalActionPath`), so a `type` string
+ * this map does not know still lands in the right place with a generic bell.
+ * That matters for the quiz kind, registered below under BOTH spellings because
+ * the inbox names types by class while the broadcast payload uses snake case,
+ * and only the snake-case form has ever been documented.
  */
 const CHANNELS_NOTIFICATIONS: Record<
   string,
@@ -37,7 +46,49 @@ const CHANNELS_NOTIFICATIONS: Record<
     icon: Building2,
     title: 'Organization invitation',
   },
+  // A quiz lobby opened in a channel (backend, 2026-08-05).
+  ChannelQuizLiveNotification: { icon: Trophy, title: 'A quiz is live' },
+  channel_quiz_live: { icon: Trophy, title: 'A quiz is live' },
 };
+
+/**
+ * The quiz-live deep link names a BACKEND path (`/channels/{c}/quiz-games/{g}`)
+ * that this app has no route for; the lobby lives on the channel page behind
+ * `?game=`. Rewriting it here keeps the click off a 404 — and on an account
+ * running the new experience the same URL opens the lobby itself.
+ *
+ * Duplicated rather than shared: this file is v1, and v1 must not import from
+ * the v2 tree (the counterpart lives in
+ * `v2/features/notifications/presentation.ts`).
+ */
+const QUIZ_GAME_PATH = /^\/channels\/([^/]+)\/quiz-games\/([^/]+)\/?$/;
+
+function toAppPath(actionUrl: string): string {
+  const match = QUIZ_GAME_PATH.exec(actionUrl.split(/[?#]/)[0]);
+  return match ? `/channels/${match[1]}?game=${match[2]}` : actionUrl;
+}
+
+/**
+ * WHERE A ROW'S OWN LINK ACTUALLY GOES — computed from the `action_url` alone.
+ *
+ * THE TYPE MAP IS NOT ALLOWED TO GATE THIS, and that is the point. The rewrite
+ * above used to run only for rows found in {@link CHANNELS_NOTIFICATIONS}, so
+ * one wrong key in that map — and the quiz kind is registered under two spellings
+ * precisely because nobody has been able to observe which one the inbox sends —
+ * turned a translated link back into a 404. Reading the URL instead makes a
+ * missed key cost a generic icon and title, never a broken destination. It is
+ * also what the v2 counterpart already does.
+ *
+ * A LEADING `//` IS REFUSED, because it is an OFF-SITE address wearing a path's
+ * clothes: `startsWith('/')` would accept `//example.com` and hand it straight to
+ * the router. That mattered less while only six known types reached this code;
+ * now that every row does, it is the guard that keeps the widening honest.
+ */
+function internalActionPath(actionUrl: string | null | undefined): string | null {
+  if (!actionUrl) return null;
+  if (!actionUrl.startsWith('/') || actionUrl.startsWith('//')) return null;
+  return toAppPath(actionUrl);
+}
 
 /******************************************************************************
                                 Types
@@ -75,12 +126,13 @@ function NotificationItem({
   const channelsMeta = CHANNELS_NOTIFICATIONS[notification.type];
   const Icon = channelsMeta?.icon ?? Bell;
   const displayTitle = notification.title || channelsMeta?.title || 'Notification';
-  // Channels notifications deep-link to an in-app route; follow it directly
-  // instead of the generic detail page.
-  const internalTarget =
-    channelsMeta && notification.action_url?.startsWith('/')
-      ? notification.action_url
-      : null;
+  // A row that carries an in-app path is followed directly, translated, instead
+  // of going to the generic detail page — see `internalActionPath`.
+  const internalTarget = internalActionPath(notification.action_url);
+  /** What the "Open link" control opens: the translated path when there is one,
+   *  otherwise the row's link exactly as the server sent it. `null` = no link,
+   *  and then there is no control either. */
+  const openTarget = internalTarget ?? notification.action_url ?? null;
 
   const handleClick = useCallback(() => {
     if (isUnread) {
@@ -151,7 +203,7 @@ function NotificationItem({
 
       {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        {notification.action_url && (
+        {openTarget && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -160,7 +212,10 @@ function NotificationItem({
                 className="h-7 w-7"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(notification.action_url!, '_blank', 'noopener,noreferrer');
+                  // The SAME address the row's own click uses. This control was
+                  // left on the raw `action_url`, so a quiz-live row's "Open
+                  // link" opened the backend path — a 404 in both trees.
+                  window.open(openTarget, '_blank', 'noopener,noreferrer');
                 }}
               >
                 <ExternalLink className="h-3.5 w-3.5" />

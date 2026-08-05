@@ -35,10 +35,17 @@ import type { Notification } from '@/types/notification';
  * Neither vocabulary is ours to freeze, so both are folded to one token first
  * and every rule below reads the token. A kind nobody anticipated still gets a
  * legible label out of {@link humanizeToken} instead of falling off a map.
+ *
+ * ── ONE KIND NEEDS ITS ADDRESS TRANSLATED (2026-08-05) ────────────────────
+ * `channel_quiz_live` arrives with an `action_url` written in the BACKEND's
+ * routing vocabulary rather than this app's. It is the only row so far whose
+ * link cannot be followed as sent, and {@link toAppPath} is where that one
+ * rewrite lives — see its docblock for what the lobby's real address is and how
+ * the channel page answers it.
  */
 
 /** The row's visual class. One glyph per kind — never a second accent colour. */
-export type NotificationMark = 'mention' | 'reply' | 'invite' | 'general';
+export type NotificationMark = 'mention' | 'reply' | 'invite' | 'quiz' | 'general';
 
 /**
  * Where a click goes. `none` is a real answer: a row may carry no
@@ -75,6 +82,7 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   channel_invite: 'Channel invitation',
   space_invite: 'Space invitation',
   organization_invite: 'Organization invitation',
+  channel_quiz_live: 'A quiz is live',
 };
 
 function trimmedOrNull(value: string | null | undefined): string | null {
@@ -111,7 +119,41 @@ function markFromToken(token: string): NotificationMark | null {
   if (token.includes('mention')) return 'mention';
   if (token.includes('repl')) return 'reply';
   if (token.includes('invit')) return 'invite';
+  // Matches the server's own `icon: "quiz"` AND the kind token
+  // `channel_quiz_live`, which is the point of reading both through one
+  // function: the mark is right whichever vocabulary a row arrives in.
+  if (token.includes('quiz')) return 'quiz';
   return null;
+}
+
+/**
+ * TRANSLATE THE BACKEND'S DEEP LINK INTO AN ADDRESS THIS APP HAS.
+ *
+ * `channel_quiz_live` ships `action_url: /channels/{c}/quiz-games/{g}` — a path
+ * shape from the API's own routing table, and one no route in this app answers.
+ * Following it verbatim would 404 the reader out of the very lobby the
+ * notification exists to open, and adding a route to match it would be building
+ * a second address for a surface that already has one.
+ *
+ * The lobby is a MODE over the channel, not a page away from it (see
+ * `GameOverlay` for why), and its address is `?game={uuid}` on the channel:
+ * `app/v2/(collab)/channels/[channelId]/page.tsx` reads `?game=` from the
+ * navigation URL and hands it to `ChannelScreen` as `initialGameUuid`, which
+ * arms the `game` URL overlay and mounts the overlay in the first frame. So a
+ * pushed `/channels/{c}?game={g}` opens the lobby exactly as pressing Join in
+ * the room does, with the chat mounted behind it.
+ *
+ * Anything that is not that shape is returned untouched — this rewrites one
+ * known path and guesses at nothing. A query string on the incoming link is
+ * dropped with the path it belonged to: the destination reads `?game=` and
+ * `?tab=`/`?m=`, none of which a lobby link has any reason to carry.
+ */
+const BACKEND_QUIZ_GAME_PATH = /^\/channels\/([^/]+)\/quiz-games\/([^/]+)\/?$/;
+
+function toAppPath(href: string): string {
+  const match = BACKEND_QUIZ_GAME_PATH.exec(href.split(/[?#]/)[0]);
+  if (!match) return href;
+  return `/channels/${match[1]}?game=${match[2]}`;
 }
 
 /**
@@ -121,11 +163,15 @@ function markFromToken(token: string): NotificationMark | null {
  * clothes — so it is refused before the `startsWith('/')` test can adopt it.
  * Anything that is neither a rooted path nor an absolute http(s) URL is `none`
  * rather than a navigation attempt at a string we do not understand.
+ *
+ * An INTERNAL path goes through {@link toAppPath} on the way out, because the
+ * backend names one surface by a route this app does not have. External URLs
+ * are left exactly as they are — they are not ours to rewrite.
  */
 function resolveDestination(actionUrl: string | null): NotificationDestination {
   const href = trimmedOrNull(actionUrl);
   if (!href || href.startsWith('//')) return NO_DESTINATION;
-  if (href.startsWith('/')) return { kind: 'internal', href };
+  if (href.startsWith('/')) return { kind: 'internal', href: toAppPath(href) };
   if (/^https?:\/\//i.test(href)) return { kind: 'external', href };
   return NO_DESTINATION;
 }

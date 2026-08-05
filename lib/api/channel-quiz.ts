@@ -14,7 +14,8 @@
  * (`lib/api/quiz.ts`) beyond the word.
  *
  * ERROR VOCABULARY (all four are DESIGNED STATES on the surfaces above, never
- * raw errors): 403 membership / host-policy / joined-too-late · 404 unknown
+ * raw errors): 403 membership / host-policy / joined-too-late / a library quiz
+ * asked to go live with no room named / an unknown target room · 404 unknown
  * uuid · 409 wrong state (a second live game, a stale question, an already
  * answered question, editing a played quiz) · 422 validation.
  */
@@ -26,6 +27,7 @@ import type {
   ChannelQuizListResponse,
   ChannelQuizResponse,
   CreateChannelQuizPayload,
+  GoLiveChannelQuizPayload,
   QuizAnswerResponse,
   QuizGameListResponse,
   QuizGameResponse,
@@ -37,7 +39,15 @@ import type {
 
 /** Authoring — gated by the channel's `settings.quiz_host_policy`. */
 export const channelQuizApi = {
-  /** Newest first; rows carry `question_count` and embed no questions. */
+  /**
+   * "Quizzes that have been HERE" — created in this channel or played in it at
+   * least once (the endpoint's meaning changed on 2026-08-05). Newest first;
+   * rows carry `question_count` and embed no questions.
+   *
+   * `visibility` shapes what comes back for OTHER people: a row someone made
+   * private drops off everyone's list but its owner's. Nothing needs to be sent
+   * for that — the server already knows who is asking.
+   */
   getList: async (
     channelUuid: string,
     params: ChannelQuizListParams = {},
@@ -48,20 +58,50 @@ export const channelQuizApi = {
         params: {
           per_page: params.per_page ?? 30,
           page: params.page ?? 1,
-          mine: params.mine,
         },
       },
     );
     return response.data;
   },
 
-  /** `201` returns the AUTHOR view (options carry `is_correct`). */
+  /** THE READER'S OWN LIBRARY — every quiz they authored, wherever it was born
+   *  and wherever it has been played. Paginated, newest first. */
+  getMine: async (
+    params: ChannelQuizListParams = {},
+  ): Promise<ChannelQuizListResponse> => {
+    const response = await apiClient.get<ChannelQuizListResponse>(
+      '/channel-quizzes/mine',
+      {
+        params: {
+          per_page: params.per_page ?? 30,
+          page: params.page ?? 1,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  /** `201` returns the AUTHOR view (options carry `is_correct`). Stamps this
+   *  channel as the quiz's provenance — the right call when the quiz is FOR
+   *  that room. */
   create: async (
     channelUuid: string,
     payload: CreateChannelQuizPayload,
   ): Promise<ChannelQuizResponse> => {
     const response = await apiClient.post<ChannelQuizResponse>(
       `/channels/${channelUuid}/quizzes`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /** The same create with NO room: `201` with `channel_uuid: null`, the quiz
+   *  filed in the author's library until they point it at a channel. */
+  createInLibrary: async (
+    payload: CreateChannelQuizPayload,
+  ): Promise<ChannelQuizResponse> => {
+    const response = await apiClient.post<ChannelQuizResponse>(
+      '/channel-quizzes',
       payload,
     );
     return response.data;
@@ -75,7 +115,8 @@ export const channelQuizApi = {
     return response.data;
   },
 
-  /** A `questions` array is a FULL replacement; 409 while live or once played. */
+  /** A `questions` array is a FULL replacement; 409 while live or once played.
+   *  `visibility` alone is accepted at any time, including mid-game. */
   update: async (
     quizUuid: string,
     payload: UpdateChannelQuizPayload,
@@ -95,16 +136,35 @@ export const channelQuizApi = {
     return response.data;
   },
 
-  /** `201` the new game in lobby, host auto-joined. 409 if the channel
-   *  already has a live game; 403 when the host policy refuses. */
-  goLive: async (quizUuid: string): Promise<QuizGameResponse> => {
+  /**
+   * `201` the new game in lobby, host auto-joined. 409 if the target channel
+   * already has a live game; 403 when the host policy refuses, when a library
+   * quiz is asked to go live with no room named, or when the named room is
+   * unknown (the same status on purpose — the endpoint will not confirm which
+   * uuids exist).
+   *
+   * The payload names WHERE. Callers build it from the room they are standing
+   * in, never from the quiz's own `channel_uuid` — that field is provenance.
+   */
+  goLive: async (
+    quizUuid: string,
+    payload: GoLiveChannelQuizPayload = {},
+  ): Promise<QuizGameResponse> => {
     const response = await apiClient.post<QuizGameResponse>(
       `/channel-quizzes/${quizUuid}/go-live`,
-      {},
+      payload,
     );
     return response.data;
   },
 };
+
+/* THE PUBLIC SHARE CARD IS NOT HERE, AND MUST NOT COME BACK. Its two readers —
+   `app/quiz-results/[gameUuid]/page.tsx` and the OG route beside it — are server
+   modules, and this file imports `apiClient`, which pulls the zustand auth store
+   and the localStorage device-id helpers into the graph of anything that imports
+   it. `GET /public/quiz-games/{game}/results` therefore lives with every other
+   server-side read, in `lib/api/server.ts` (`fetchPublicQuizResults`), where its
+   docblock also records why it may never carry a session. */
 
 /** Games — one live game per channel; the server owns every clock. */
 export const quizGamesApi = {

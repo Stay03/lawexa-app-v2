@@ -1,6 +1,7 @@
 import type { Channel } from '@/types/collab';
 import type {
   ChannelQuizSettings,
+  GoLiveChannelQuizPayload,
   QuizAnswerIn,
   QuizCurrentQuestion,
   QuizGamePlayer,
@@ -62,6 +63,64 @@ export function canHostQuiz(channel: Channel): boolean {
 /** Host-policy copy for the authoring surfaces' refusal state. */
 export const HOST_POLICY_REFUSAL =
   'Only channel admins can create quizzes and start games here.';
+
+/** The same rule read from the library side: a quiz you wrote is yours to keep,
+ *  but this room is not yours to start a game in. */
+export const HOST_POLICY_LIBRARY_NOTE =
+  'You can write quizzes for your own library. Only channel admins can start a game in this channel.';
+
+/* ── Where a quiz RUNS (2026-08-05) ───────────────────────────────────────── */
+
+/**
+ * The `go-live` body for running a quiz in the channel the reader is standing
+ * in. ONE shape, always: name the room.
+ *
+ * IT USED TO HAVE TWO BRANCHES and it no longer does. An empty body is still
+ * valid on the wire — the server falls back to the quiz's own channel — and for
+ * a quiz born in the room on screen the two requests are equivalent. But
+ * choosing between them meant reading `quiz.channel_uuid`, which is PROVENANCE:
+ * it is nullable, it may name a channel that has since been deleted, and it says
+ * nothing about where this game should run. Making the request shape depend on a
+ * field that cannot answer the question is how a correct call becomes an
+ * accidental one. `{ channel_uuid }` is measured working for a quiz born here,
+ * for one born in another room, and for one born in no room at all, so there is
+ * no case left for a second way of saying the same thing.
+ *
+ * The room is therefore never inferred from the quiz — it is the room on screen,
+ * stated outright.
+ */
+export function goLiveTarget(channelUuid: string): GoLiveChannelQuizPayload {
+  return { channel_uuid: channelUuid };
+}
+
+/* ── Visibility (a DISCOVERY switch, not an access one) ───────────────────── */
+
+/**
+ * What the owner is actually choosing, in the words the menu uses.
+ *
+ * THE SECOND SENTENCE IS THE HONEST HALF and it is not optional: `private` hides
+ * the quiz from other people's channel lists and does NOTHING ELSE. Every game
+ * that has already been played stays exactly where it is — its lobby, its
+ * results and its card in the transcript are all still open to the room. A
+ * switch that reads like a retraction, and is not one, is the single worst thing
+ * this surface could say.
+ */
+export const VISIBILITY_CHOICES = [
+  {
+    id: 'shared',
+    label: 'Anyone in the room',
+    hint: 'Shows on the quiz list of every channel it has been played in.',
+  },
+  {
+    id: 'private',
+    label: 'Only me',
+    hint: 'Hides it from those lists. You can still run it anywhere.',
+  },
+] as const;
+
+/** The one line under the choice, on every surface that offers it. */
+export const VISIBILITY_FOOTNOTE =
+  'Either way, games already played keep their scores and stay visible to everyone who was there.';
 
 /* ── Authoring limits (server-validated; mirrored to save a round trip) ───── */
 

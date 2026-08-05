@@ -33,7 +33,7 @@ import type {
   QuizQuestionInput,
   QuizQuestionType,
 } from '@/types/channel-quiz';
-import { useCreateQuiz, useUpdateQuiz } from './mutations';
+import { useCreateLibraryQuiz, useCreateQuiz, useUpdateQuiz } from './mutations';
 import { channelQuizQueries } from './queries';
 import {
   optionLetter,
@@ -69,6 +69,20 @@ import {
  * does not exist yet (digest §E, "known gaps"). So an edit that touches
  * questions and comes back 409 is not reported as a failure: the form says
  * what the rule is and offers the save that WILL work, one press away.
+ *
+ * ── WHERE A NEW QUIZ LANDS (2026-08-05) ────────────────────────────────────
+ * A quiz can now be written FOR a channel (`POST /channels/{c}/quizzes`, which
+ * stamps that channel as its provenance) or straight into the author's LIBRARY
+ * (`POST /channel-quizzes`, provenance `null`). Both run the same way — a game
+ * always names the room it is starting in — so the difference is one of
+ * belonging, not of capability.
+ *
+ * THE CHOICE IS THE TAB THE READER OPENED THE FORM FROM, not a checkbox in it.
+ * The sheet asks the question already ("In this channel" or "My library"), the
+ * answer is visible while they write, and the dialog states the consequence in
+ * one line under the title rather than offering a second, silent control that
+ * would only be able to contradict the first. Editing has no destination at
+ * all — a quiz's home is fixed once it exists.
  */
 
 interface OptionDraft {
@@ -167,10 +181,15 @@ function toPayload(questions: QuestionDraft[]): QuizQuestionInput[] {
   }));
 }
 
+/** Where a NEW quiz is filed. Ignored when editing — a quiz's home is fixed. */
+export type QuizDestination = 'channel' | 'library';
+
 export function QuizFormDialog({
   open,
   onOpenChange,
   channelUuid,
+  channelName,
+  destination,
   viewerId,
   quizUuid,
   onSaved,
@@ -178,6 +197,9 @@ export function QuizFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   channelUuid: string;
+  /** Named in the destination line, so "this channel" is never abstract. */
+  channelName: string;
+  destination: QuizDestination;
   viewerId: number | null;
   /** Present = edit an existing quiz; absent = write a new one. */
   quizUuid?: string;
@@ -191,7 +213,8 @@ export function QuizFormDialog({
   const loaded = detailQuery.data?.data ?? null;
 
   const createQuiz = useCreateQuiz(channelUuid);
-  const updateQuiz = useUpdateQuiz(channelUuid, quizUuid ?? '');
+  const createLibraryQuiz = useCreateLibraryQuiz();
+  const updateQuiz = useUpdateQuiz(quizUuid ?? '');
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -218,7 +241,8 @@ export function QuizFormDialog({
     setFrozen(false);
   }
 
-  const submitting = createQuiz.isPending || updateQuiz.isPending;
+  const submitting =
+    createQuiz.isPending || createLibraryQuiz.isPending || updateQuiz.isPending;
   /** The server only sends `is_correct` to viewers it will let edit. No flag
    *  anywhere ⇒ this reader may not rewrite the questions. */
   const mayEditQuestions =
@@ -299,7 +323,8 @@ export function QuizFormDialog({
       return;
     }
 
-    createQuiz.mutate(
+    const create = destination === 'library' ? createLibraryQuiz : createQuiz;
+    create.mutate(
       {
         title: title.trim(),
         description: description.trim() || undefined,
@@ -320,11 +345,26 @@ export function QuizFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle>{isEdit ? 'Edit quiz' : 'New quiz'}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? 'Edit quiz'
+              : destination === 'library'
+                ? 'New quiz in your library'
+                : `New quiz in ${channelName}`}
+          </DialogTitle>
           <DialogDescription>
             Up to {QUIZ_MAX_QUESTIONS} questions. Everyone answers on their own
             device, and faster right answers score more.
           </DialogDescription>
+          {/* THE CONSEQUENCE, STATED — one line, only while it is still a
+              choice. An edit cannot move a quiz, so it says nothing. */}
+          {!isEdit && (
+            <p className="text-xs text-muted-foreground">
+              {destination === 'library'
+                ? 'It stays yours and appears in no channel until you run it in one — then that channel can see it too.'
+                : `It belongs to ${channelName} and to you, and it is in your library either way.`}
+            </p>
+          )}
         </DialogHeader>
 
         <div className="max-h-[60vh] space-y-5 overflow-y-auto px-6 py-5">

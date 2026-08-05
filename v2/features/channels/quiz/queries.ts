@@ -66,28 +66,53 @@ export const channelQuizQueries = {
 
   /* ── Authoring ─────────────────────────────────────────────────────────── */
 
-  /** Invalidation handle for one channel's quiz library (all filters/pages). */
+  /**
+   * Key prefix for one channel's quiz list (every viewer variant).
+   *
+   * NOT an invalidation handle any more, and the reason is the ownership split:
+   * one quiz now lives on the lists of EVERY channel it has been played in plus
+   * its author's library, so a write cannot name the entries it dirtied. The
+   * mutations settle by predicate over all of them instead (`./mutations.ts`).
+   */
   quizzesOf: (channelUuid: string) =>
     [...channelQuizQueries.all, 'quizzes', channelUuid] as const,
 
-  /** The channel's quizzes, newest first. Rows carry `question_count` and
-   *  embed no questions, so the library list is cheap to keep warm. */
-  quizzes: ({
-    channelUuid,
-    viewerId,
-    mine,
-  }: ChannelScoped & { mine: boolean }) =>
+  /**
+   * QUIZZES THAT HAVE BEEN IN THIS CHANNEL — written here, or played here at
+   * least once (the endpoint's meaning since 2026-08-05). Newest first; rows
+   * carry `question_count` and embed no questions, so the list is cheap to keep
+   * warm.
+   *
+   * NO `mine` FILTER ANY MORE, and its absence is deliberate rather than an
+   * omission: the sheet's second source ({@link myQuizzes}) answers the same
+   * question better, across every room instead of one, so keeping a room-scoped
+   * "Mine" would have been two tabs for one idea and one of them a subset.
+   */
+  quizzes: ({ channelUuid, viewerId }: ChannelScoped) =>
     queryOptions({
-      queryKey: [
-        ...channelQuizQueries.quizzesOf(channelUuid),
-        { mine },
-        { viewerId },
-      ] as const,
-      queryFn: () =>
-        channelQuizApi.getList(channelUuid, {
-          per_page: 30,
-          mine: mine ? 1 : undefined,
-        }),
+      queryKey: [...channelQuizQueries.quizzesOf(channelUuid), { viewerId }] as const,
+      queryFn: () => channelQuizApi.getList(channelUuid, { per_page: 30 }),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+    }),
+
+  /** Key prefix for the reader's own library (every viewer variant). */
+  myQuizzesOf: () => [...channelQuizQueries.all, 'my-quizzes'] as const,
+
+  /**
+   * THE READER'S OWN LIBRARY — every quiz they authored, wherever it was born
+   * and wherever it has run. Not channel-scoped, because a library is not: the
+   * same entry is offered in every room the reader opens the sheet in, so it is
+   * fetched once per session rather than once per channel.
+   *
+   * It is still VIEWER-partitioned like everything else in v2 — "mine" is the
+   * most per-viewer answer there is, and an unpartitioned key would serve one
+   * account's library to the next one to sign in on the same device.
+   */
+  myQuizzes: ({ viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...channelQuizQueries.myQuizzesOf(), { viewerId }] as const,
+      queryFn: () => channelQuizApi.getMine({ per_page: 30 }),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
     }),

@@ -11,6 +11,7 @@ import {
   Reply,
   Settings2,
   Trash2,
+  Trophy,
   UserPlus,
   type LucideIcon,
 } from 'lucide-react';
@@ -130,6 +131,10 @@ const MARK_ICONS: Readonly<Record<NotificationMark, LucideIcon>> = {
   mention: AtSign,
   reply: Reply,
   invite: UserPlus,
+  // A quiz lobby has opened somewhere the reader can play. Still only a glyph:
+  // the row is time-critical (a lobby self-cancels after ten minutes) but that
+  // is what its own words say, not something a second colour may claim.
+  quiz: Trophy,
   general: Bell,
 };
 

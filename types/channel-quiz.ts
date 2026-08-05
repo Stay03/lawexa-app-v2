@@ -25,6 +25,27 @@
  * broadcasts are not reaching clients in production — so they are typed
  * optional and marked as such.
  *
+ * ── 2026-08-05: A QUIZ BELONGS TO A PERSON, AND IS *RUN* IN A CHANNEL ───────
+ * The backend split ownership from venue. Every quiz row and detail now carries
+ * `channel_uuid` (NULLABLE), `visibility` and `is_mine`; a quiz can be created
+ * with no channel at all (`POST /channel-quizzes`), listed as a personal library
+ * (`GET /channel-quizzes/mine`), and pointed at a room only at go-live
+ * (`POST /channel-quizzes/{quiz}/go-live { channel_uuid }`). MEASURED the same
+ * day, and the measurements are what this file encodes:
+ *  - the full row key set is `channel_uuid, created_at, creator, description,
+ *    is_mine, question_count, settings, title, updated_at, uuid, visibility`
+ *    (detail swaps `question_count` for `questions`);
+ *  - `GET /channels/{c}/quizzes` CHANGED MEANING — it is now "quizzes that have
+ *    been here", created here or played here at least once. A library quiz run
+ *    in a channel appears on that channel's list still carrying
+ *    `channel_uuid: null`;
+ *  - `go-live` with an EMPTY body on a library quiz answers `403`, and with an
+ *    unknown `channel_uuid` also `403` (deliberately not `404` — the same
+ *    refusal as "you may not host there", so the endpoint cannot be used to
+ *    probe which channels exist).
+ * The public results endpoint (`GET /public/quiz-games/{game}/results`) landed
+ * in the same wave; see {@link PublicQuizGameResults}.
+ *
  * NOT the solo `/quiz` product (`types/quiz.ts`, `/api/quizzes`). The two share
  * a word and nothing else — no shapes, no screens, no code. Kept in its own
  * module rather than appended to `types/collab.ts` for exactly that reason: a
@@ -54,6 +75,21 @@ import type { ItemResponse, LengthAwareResponse, SlimUser } from '@/types/collab
 export type QuizHostPolicy = 'all_members' | 'admins_only';
 
 export type QuizQuestionType = 'multiple_choice' | 'true_false';
+
+/**
+ * Who can FIND a quiz — discovery only, never access to what has already been
+ * played (backend, 2026-08-05).
+ *
+ *  - `shared`  everyone in a channel the quiz has been played in sees it on
+ *              that channel's list;
+ *  - `private` only the owner sees it there.
+ *
+ * A GAME THAT HAS ALREADY RUN IS UNAFFECTED, and the UI must say so: its lobby,
+ * its results and its chat card stay fully visible to the room even after the
+ * owner makes the quiz private. The flag may also be changed WHILE A GAME IS
+ * LIVE — unlike the questions, which freeze at the first real play (`409`).
+ */
+export type ChannelQuizVisibility = 'shared' | 'private';
 
 /** `lobby → countdown → question_open ⇄ reveal → finished`, with `cancelled`
  *  terminal from any non-terminal state. */
@@ -96,11 +132,35 @@ export interface QuizQuestion {
 
 export interface ChannelQuiz {
   uuid: string;
-  channel_uuid: string;
+  /**
+   * PROVENANCE — the channel this quiz was BORN in. Not "the channel you are
+   * looking at", and never a link target.
+   *
+   * `null` since 2026-08-05, and it means one of TWO things that cannot be told
+   * apart from here: the quiz was written straight into its author's library
+   * (`POST /channel-quizzes`), or the channel it was born in has since been
+   * DELETED (measured — deleting a channel nulls its quizzes' `channel_uuid`,
+   * and its finished games then answer `403` to everyone signed in while the
+   * public results link keeps serving them).
+   *
+   * So NOTHING may promise the reader a room from this field: no "from
+   * #general", no link back, no name lookup. The channel a quiz is being read
+   * IN is the one whose screen is open; the channel a game runs in is
+   * {@link QuizGame.channel_uuid}, which is a different field and stays
+   * non-null.
+   */
+  channel_uuid: string | null;
   title: string;
   description: string | null;
   settings: ChannelQuizSettings;
   creator: SlimUser;
+  /** Who may find it — see {@link ChannelQuizVisibility}. Owner-editable. */
+  visibility: ChannelQuizVisibility;
+  /** The server's own answer to "did this viewer write it?" — the ONLY honest
+   *  source for the owner-only affordances, since authorship can also be read
+   *  from `creator.uuid` but governance (channel admin, space governor,
+   *  platform admin) cannot. */
+  is_mine: boolean;
   /** Present on detail (`GET /channel-quizzes/{quiz}`) and create/update. */
   questions?: QuizQuestion[];
   /** Present on index rows (which never embed questions). */
@@ -137,13 +197,28 @@ export interface UpdateChannelQuizPayload {
   description?: string;
   settings?: Partial<ChannelQuizSettings>;
   questions?: QuizQuestionInput[];
+  /** Owner only, and the ONE field on this payload that a live game does not
+   *  freeze (measured 2026-08-05) — so it can be sent on its own at any time. */
+  visibility?: ChannelQuizVisibility;
+}
+
+/**
+ * `POST /channel-quizzes/{quiz}/go-live` — the body that names WHERE to run it.
+ *
+ * Two measured calls, and only two:
+ *  - `{}` on a quiz that was born in the channel it is being run in → `201`;
+ *  - `{ channel_uuid }` naming the target room → `201`, with the new game's
+ *    `channel_uuid` set to that room.
+ * `{}` on a LIBRARY quiz is `403` ("pick a room"), and an unknown target is the
+ * same `403` as a room the caller may not host in.
+ */
+export interface GoLiveChannelQuizPayload {
+  channel_uuid?: string;
 }
 
 export interface ChannelQuizListParams {
   per_page?: number;
   page?: number;
-  /** `1` = only the caller's own quizzes. */
-  mine?: 1;
 }
 
 /******************************************************************************
@@ -166,6 +241,12 @@ export interface QuizGamePlayer {
 export interface QuizGame {
   uuid: string;
   status: QuizGameStatus;
+  /**
+   * WHERE THIS GAME IS BEING PLAYED — the venue, not the quiz's provenance, and
+   * non-null even when {@link ChannelQuiz.channel_uuid} is null (a library quiz
+   * run in a room stamps the room here). This is the field a screen may trust
+   * to decide which channel a game belongs to.
+   */
   channel_uuid: string;
   quiz: { uuid: string; title: string };
   host: SlimUser | null;
@@ -336,6 +417,50 @@ export interface QuizGameResults {
   questions: QuizQuestionStats[];
 }
 
+/* ── The public share card (2026-08-05) ───────────────────────────────────── */
+
+/**
+ * One podium line as the PUBLIC endpoint publishes it.
+ *
+ * DELIBERATELY NOT A {@link SlimUser}, and the difference is the whole point:
+ * there is no `uuid` and no `username` here, so a row cannot be matched to an
+ * account, cannot be linked to a profile, and must never be passed to anything
+ * that expects a person object. It is a NAME, a FACE and a NUMBER — the least
+ * that can be said while still being a scoreboard.
+ */
+export interface PublicQuizPodiumRow {
+  rank: number;
+  name: string;
+  avatar_url: string | null;
+  score: number;
+}
+
+/**
+ * `GET /public/quiz-games/{game}/results` — the share card's whole world.
+ *
+ * ANONYMOUS AND UNAUTHENTICATED (measured 2026-08-05), and it publishes the
+ * podium and light metadata ONLY: no channel, no space, no questions, no
+ * answers, no per-question stats, and nobody below third. The members-only
+ * {@link QuizGameResults} is unchanged and still carries all of that.
+ *
+ * ONLY A FINISHED GAME RESOLVES. A lobby, a running game, a cancelled game and
+ * an unknown uuid all answer `404` and are indistinguishable from each other —
+ * so a reader of this shape gets ONE honest "not here" state, never a guess at
+ * which of the four it was.
+ *
+ * THE UUID IS THE ONLY KEY: the link IS the secret. Anything that hands this
+ * link out has to say so once, plainly.
+ */
+export interface PublicQuizGameResults {
+  quiz_title: string;
+  question_count: number;
+  player_count: number;
+  finished_at: string;
+  /** Up to three rows, best first. Empty when the game finished with nobody. */
+  podium: PublicQuizPodiumRow[];
+  top_score: number;
+}
+
 /******************************************************************************
                      Realtime payloads (presence room)
 ******************************************************************************/
@@ -430,3 +555,11 @@ export type QuizGameResponse = ItemResponse<QuizGame>;
 export type QuizGameStateResponse = ItemResponse<QuizGameState>;
 export type QuizAnswerResponse = ItemResponse<QuizAnswerReceipt>;
 export type QuizGameResultsResponse = ItemResponse<QuizGameResults>;
+
+/* THE PUBLIC CARD HAS NO ENVELOPE ALIAS, deliberately. Its `200` is the house
+   envelope — measured against prod on 2026-08-05, alongside the `404
+   {"success":false,…}` that every one of its four refusals answers with — but
+   nothing types the wrapper, because its reader
+   (`fetchPublicQuizResults` in `lib/api/server.ts`) proves every field it hands
+   on rather than casting a body into a shape. A public page cannot afford a
+   narrowing that only checks one key: see that reader's docblock. */

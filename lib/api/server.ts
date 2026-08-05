@@ -1,5 +1,9 @@
 import { getApiUrl } from '@/lib/constants/seo';
 import type { CaseDetail } from '@/types/case';
+import type {
+  PublicQuizGameResults,
+  PublicQuizPodiumRow,
+} from '@/types/channel-quiz';
 import type { StatuteStatus } from '@/types/statute';
 
 export interface SeoMeta {
@@ -464,4 +468,154 @@ export async function fetchScanForMetadata(
   } catch {
     return null;
   }
+}
+
+/** See {@link fetchPublicQuizResults} for why this window is not zero. */
+const PUBLIC_QUIZ_RESULTS_REVALIDATE_SECONDS = 300;
+
+/**
+ * THE PUBLIC QUIZ SHARE CARD — a finished channel quiz's podium, for anyone
+ * holding the link. `null` for every refusal the endpoint can make (a lobby, a
+ * running game, a cancelled game and an unknown uuid are ONE indistinguishable
+ * `404`), for a body that is not the shape below, and for a network failure —
+ * because both surfaces that read it have exactly one honest "not here" state
+ * and no session to fall back on.
+ *
+ * ── WHY IT IS HERE AND NOT IN `lib/api/channel-quiz.ts` ────────────────────
+ * Both callers are SERVER modules — `app/quiz-results/[gameUuid]/page.tsx` is a
+ * server component and `app/api/og/quiz-results/[gameUuid]/route.tsx` is a route
+ * handler — and `lib/api/channel-quiz.ts` imports `apiClient`, which drags the
+ * zustand auth store (`create(persist(…))` at module scope) and the
+ * device-id/localStorage helpers into the module graph of whatever imports it.
+ * That graph is evaluated at build time on a prerendered route, which this app
+ * has been bitten by before. Every other server surface here reads through this
+ * module for that reason, and this call is the same shape as its neighbours: a
+ * plain `fetch`, `Accept: application/json`, `next.revalidate`, `null` on
+ * refusal.
+ *
+ * IT MUST NOT GO THROUGH `apiClient` FOR A SECOND REASON. That client attaches a
+ * bearer token whenever one exists and treats a `401` as a dead session: it
+ * clears the auth store and sends the browser to `/login`. The share page is not
+ * on its guest-page allowlist, so a reader whose token had merely gone stale
+ * would be signed out and redirected AWAY from a page that needs no session at
+ * all. A public link must never be able to end someone's session. So: no
+ * credentials, no interceptors, no store.
+ *
+ * ── AND WHY IT IS CACHED ───────────────────────────────────────────────────
+ * A finished game's results never change, and a link that travels is read by
+ * many strangers at once — all of them, on the server, from ONE address. The API
+ * rate-limits by address (120/min, measured), and a limited read would answer
+ * `429`, which this function reports as "not here": a widely shared card would go
+ * blank for everyone at exactly its best moment. Five minutes of `revalidate`
+ * removes that failure mode. The cost is the only mutable case — a game that has
+ * not finished yet keeps its "not here" for up to five minutes after it does —
+ * which is the smaller of the two harms.
+ */
+export async function fetchPublicQuizResults(
+  gameUuid: string
+): Promise<PublicQuizGameResults | null> {
+  const apiUrl = getApiUrl().replace(/\/$/, '');
+
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/public/quiz-games/${encodeURIComponent(gameUuid)}/results`,
+      {
+        headers: { Accept: 'application/json' },
+        next: { revalidate: PUBLIC_QUIZ_RESULTS_REVALIDATE_SECONDS },
+      }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return readPublicQuizResults(await response.json());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ONE SHAPE, PROVED FIELD BY FIELD.
+ *
+ * Measured against prod on August 5, 2026: the `200` is the house envelope
+ * (`{ success, message, data }`) carrying the results object, and BOTH an
+ * unknown uuid and a malformed one answer `404 { success: false, … }`. There is
+ * no bare-body form on this url, so there is no second shape to hedge against.
+ *
+ * EVERY FIELD THE TWO SURFACES DEREFERENCE IS CHECKED, rather than one field
+ * narrowed and the rest cast. The page takes `podium[0]`, spreads the podium,
+ * formats `top_score` and parses `finished_at`; the OG card reads `name.length`
+ * and `score.toLocaleString`. A malformed `200` that satisfied a single-field
+ * check would therefore throw inside a server render, and the stranger who
+ * opened a shared link would meet the framework's unstyled 500 instead of the
+ * designed refusal. Anything that is not exactly this shape reads as `null`,
+ * which is already the one answer this endpoint's four refusals share.
+ *
+ * `avatar_url` is the single lenient field, and deliberately: it is decoration
+ * the card already falls back from (initials), so an absent or non-string value
+ * becomes `null` instead of discarding a real scoreboard.
+ */
+function readPublicQuizResults(body: unknown): PublicQuizGameResults | null {
+  if (typeof body !== 'object' || body === null) return null;
+
+  const { data } = body as { data?: unknown };
+  if (typeof data !== 'object' || data === null) return null;
+
+  const {
+    quiz_title,
+    question_count,
+    player_count,
+    finished_at,
+    top_score,
+    podium,
+  } = data as Partial<PublicQuizGameResults>;
+
+  if (
+    typeof quiz_title !== 'string' ||
+    typeof question_count !== 'number' ||
+    typeof player_count !== 'number' ||
+    typeof finished_at !== 'string' ||
+    typeof top_score !== 'number' ||
+    !Array.isArray(podium)
+  ) {
+    return null;
+  }
+
+  const rows: PublicQuizPodiumRow[] = [];
+  for (const entry of podium) {
+    const row = readPodiumRow(entry);
+    if (row === null) return null;
+    rows.push(row);
+  }
+
+  return {
+    quiz_title,
+    question_count,
+    player_count,
+    finished_at,
+    top_score,
+    podium: rows,
+  };
+}
+
+/** One podium line, or `null` when it is not one. */
+function readPodiumRow(value: unknown): PublicQuizPodiumRow | null {
+  if (typeof value !== 'object' || value === null) return null;
+
+  const { rank, name, avatar_url, score } = value as Partial<PublicQuizPodiumRow>;
+  if (
+    typeof rank !== 'number' ||
+    typeof name !== 'string' ||
+    typeof score !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    rank,
+    name,
+    score,
+    avatar_url: typeof avatar_url === 'string' ? avatar_url : null,
+  };
 }
