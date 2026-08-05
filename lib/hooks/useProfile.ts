@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { profileApi } from '@/lib/api/profile';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { extractApiError } from '@/lib/utils/api-error';
 import type { ProfileUpdatePayload } from '@/types/profile';
 
 export function useUpdateProfile() {
@@ -16,6 +17,14 @@ export function useUpdateProfile() {
       if (response.success && response.data) {
         updateUser({
           name: response.data.name,
+          // The handle identifies the account everywhere it can be tagged, so
+          // the cached session has to carry the new one immediately. It travels
+          // only when the response carries the key: an own `undefined` wins the
+          // store's spread and would blank a good cached handle. `null` is a
+          // real answer (the account has none) and does travel.
+          ...(response.data.username === undefined
+            ? {}
+            : { username: response.data.username }),
           profile: response.data.profile,
           areas_of_expertise: response.data.areas_of_expertise,
         });
@@ -23,9 +32,8 @@ export function useUpdateProfile() {
         toast.success('Profile updated successfully');
       }
     },
-    onError: (error: Error & { response?: { data?: { message?: string } } }) => {
-      const message = error.response?.data?.message || 'Failed to update profile';
-      toast.error(message);
+    onError: (error) => {
+      toast.error(extractApiError(error).message);
     },
   });
 }

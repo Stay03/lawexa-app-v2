@@ -388,7 +388,12 @@ export function useSendMessage(channelUuid: string) {
       // selector during render (that loops via useSyncExternalStore).
       const me = useAuthStore.getState().user;
       const author: SlimUser | null = me
-        ? { uuid: me.uuid ?? '', name: me.name, avatar_url: me.avatar_url }
+        ? {
+            uuid: me.uuid ?? '',
+            name: me.name,
+            username: me.username ?? null,
+            avatar_url: me.avatar_url,
+          }
         : null;
 
       const tempUuid = `optimistic-${(optimisticCounter += 1)}`;
@@ -603,7 +608,12 @@ let optimisticListCounter = 0;
 function actingUser(): SlimUser | null {
   const me = useAuthStore.getState().user;
   return me
-    ? { uuid: me.uuid ?? '', name: me.name, avatar_url: me.avatar_url }
+    ? {
+        uuid: me.uuid ?? '',
+        name: me.name,
+        username: me.username ?? null,
+        avatar_url: me.avatar_url,
+      }
     : null;
 }
 

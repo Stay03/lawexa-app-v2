@@ -157,7 +157,7 @@ export const MessageGroupRow = memo(function MessageGroupRow({
                 key={message.uuid}
                 message={message}
                 canEngage={canEngage}
-                canEdit={isMine}
+                isMine={isMine}
                 canDelete={isMine || isChannelAdmin}
                 viewerUuid={viewerUuid}
                 // The run's head is already dated by the header above it; a

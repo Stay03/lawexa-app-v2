@@ -75,7 +75,13 @@ export function InviteMemberDialog({
     const list = candidates ?? [];
     const query = search.trim().toLowerCase();
     if (!query) return list;
-    return list.filter((c) => c.user.name.toLowerCase().includes(query));
+    return list.filter(
+      ({ user }) =>
+        user.name.toLowerCase().includes(query) ||
+        // A leading `@` is how people type a handle; matching either way means
+        // the search never argues about punctuation.
+        (user.username?.includes(query.replace(/^@/, '')) ?? false)
+    );
   }, [candidates, search]);
 
   const reset = () => {
@@ -230,6 +236,13 @@ export function InviteMemberDialog({
                             <span className="min-w-0 flex-1 truncate text-sm">
                               {user.name}
                             </span>
+                            {/* Adding the wrong person is a real mistake, so
+                                the row carries what tells two of them apart. */}
+                            {user.username && (
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                @{user.username}
+                              </span>
+                            )}
                             {isAdding ? (
                               <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
                             ) : (

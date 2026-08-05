@@ -52,6 +52,14 @@ export interface User {
    */
   uuid?: string;
   name: string;
+  /**
+   * The account's unique `@handle` (backend, 2026-08-05) — the only string
+   * that tags this person. Optional for the same reason `uuid` is: sessions
+   * cached before the field existed do not carry it. `null` means the account
+   * has none yet (guests never get one; existing accounts wait on the backend's
+   * one-time backfill), and an account with no handle cannot be tagged.
+   */
+  username?: string | null;
   email: string | null;
   role: UserRole;
   is_creator: boolean | null;

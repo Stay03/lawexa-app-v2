@@ -8,8 +8,35 @@ const optionalUrl = z
   .optional()
   .or(z.literal(''));
 
+// The handle's shape, mirrored from the backend (2026-08-05): 3–30 characters,
+// lowercase letters, numbers and underscores, first character a letter or
+// number. Checked here so an obvious mistake costs no round trip; the server
+// stays the only authority on reserved and already-taken handles.
+const USERNAME_ALLOWED = /^[a-z0-9_]+$/;
+const USERNAME_START = /^[a-z0-9]/;
+
 export const profileFormSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
+  // Empty means "no handle yet", which is a state the account can stay in —
+  // a handle can be chosen but never cleared, so the field submits nothing.
+  username: optionalString.superRefine((value, ctx) => {
+    if (!value) return;
+    if (value.length < 3) {
+      ctx.addIssue('Username must be at least 3 characters');
+      return;
+    }
+    if (value.length > 30) {
+      ctx.addIssue('Username must be 30 characters or less');
+      return;
+    }
+    if (!USERNAME_ALLOWED.test(value)) {
+      ctx.addIssue('Use lowercase letters, numbers and underscores only');
+      return;
+    }
+    if (!USERNAME_START.test(value)) {
+      ctx.addIssue('Username must start with a letter or number');
+    }
+  }),
   bio: z.string().max(500, 'Bio must be 500 characters or less').optional().or(z.literal('')),
   gender: optionalString,
   date_of_birth: optionalString.refine(

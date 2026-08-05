@@ -1,6 +1,6 @@
 import type { Element, ElementContent, Root, RootContent, Text } from 'hast';
 
-import { mentionTokenRegex } from '@/lib/utils/collab';
+import { isSelfMention, scanMentions, type MentionChip } from '@/lib/utils/collab';
 
 /**
  * rehype-mentions — a rehype transformer that turns resolved `@handles` inside
@@ -15,6 +15,11 @@ import { mentionTokenRegex } from '@/lib/utils/collab';
  * has (`MessageContent`). v1 had one chip style for everyone; in v2 being named
  * personally has to look different from being in the room, on both paths.
  *
+ * "OF THE VIEWER" IS DECIDED BY UUID. This used to take a set of display-name
+ * strings, which emphasised the wrong chip the moment two members shared a
+ * name — the exact ambiguity usernames were introduced to end. The chip map
+ * carries each mention's uuid now, so the comparison is identity.
+ *
  * THE ATTACHER GOTCHA (v1's docblock, kept because it is still a real trap):
  * unified CALLS each `rehypePlugins` entry and registers its RETURN VALUE as the
  * transformer. So this factory returns an attacher that returns the transformer
@@ -23,22 +28,30 @@ import { mentionTokenRegex } from '@/lib/utils/collab';
  *
  * Text nodes only, and never inside `code`/`pre`: a handle in a code sample is
  * code. Unresolved `@tokens` stay plain text — the server's "never guess" rule
- * (digest §F.15), which is also why the map is the server's resolved list and
+ * (digest §F.19), which is also why the map is the server's resolved list and
  * not something this file infers.
  */
 
 /** Elements whose descendant text must never be treated as mentions. */
 const CODE_ELEMENTS = new Set(['code', 'pre']);
 
-function mentionSpan(label: string, isSelf: boolean): Element {
+function mentionSpan(chip: MentionChip, isSelf: boolean): Element {
   return {
     type: 'element',
     tagName: 'span',
     properties: {
       className: ['lawexa-mention'],
       ...(isSelf ? { 'data-self': '' } : {}),
+      // The handle on hover — a POINTER extra only, never the answer to "which
+      // Ada Obi": that is carried by the chip's own text, which becomes the
+      // handle whenever a name is contested (`buildMentionChips`), so a phone
+      // reader is never left guessing. Absent on pre-2026-08-05 history, and
+      // absent when the chip already IS the handle.
+      ...(chip.username && chip.label !== chip.username
+        ? { title: `@${chip.username}` }
+        : {}),
     },
-    children: [{ type: 'text', value: `@${label}` }],
+    children: [{ type: 'text', value: `@${chip.label}` }],
   };
 }
 
@@ -49,29 +62,24 @@ function mentionSpan(label: string, isSelf: boolean): Element {
  */
 function splitTextNode(
   node: Text,
-  handles: Map<string, string>,
-  selfLabels: ReadonlySet<string>,
+  chips: ReadonlyMap<string, MentionChip>,
+  viewerUuid: string | null,
 ): ElementContent[] | null {
   const { value } = node;
+  const hits = scanMentions(value, chips);
+  if (hits.length === 0) return null;
+
   const parts: ElementContent[] = [];
   let lastIndex = 0;
-  let matched = false;
-
-  for (const match of value.matchAll(mentionTokenRegex())) {
-    const token = match[0];
-    const index = match.index ?? 0;
-    const label = handles.get(token.slice(1).toLowerCase());
-    if (!label) continue;
-
-    matched = true;
-    if (index > lastIndex) {
-      parts.push({ type: 'text', value: value.slice(lastIndex, index) });
+  for (const hit of hits) {
+    if (hit.index > lastIndex) {
+      parts.push({ type: 'text', value: value.slice(lastIndex, hit.index) });
     }
-    parts.push(mentionSpan(label, selfLabels.has(label)));
-    lastIndex = index + token.length;
+    parts.push(mentionSpan(hit.chip, isSelfMention(hit.chip.uuid, viewerUuid)));
+    // Only past the HANDLE — a full stop the scan swept up stays text.
+    lastIndex = hit.index + hit.token.length;
   }
 
-  if (!matched) return null;
   if (lastIndex < value.length) {
     parts.push({ type: 'text', value: value.slice(lastIndex) });
   }
@@ -82,20 +90,20 @@ function splitTextNode(
  *  child type so it stays exact for both `Root` and `Element` parents. */
 function visitChildren<Child extends RootContent | ElementContent>(
   children: Child[],
-  handles: Map<string, string>,
-  selfLabels: ReadonlySet<string>,
+  chips: ReadonlyMap<string, MentionChip>,
+  viewerUuid: string | null,
 ): Child[] {
   const next: Child[] = [];
   for (const child of children) {
     if (child.type === 'text') {
-      const replaced = splitTextNode(child, handles, selfLabels);
+      const replaced = splitTextNode(child, chips, viewerUuid);
       // Mention spans are `ElementContent`, valid in either parent.
       if (replaced) next.push(...(replaced as Child[]));
       else next.push(child);
       continue;
     }
     if (child.type === 'element' && !CODE_ELEMENTS.has(child.tagName)) {
-      child.children = visitChildren(child.children, handles, selfLabels);
+      child.children = visitChildren(child.children, chips, viewerUuid);
     }
     next.push(child);
   }
@@ -103,17 +111,17 @@ function visitChildren<Child extends RootContent | ElementContent>(
 }
 
 /**
- * Build the rehype plugin. `handles` is `buildMentionHandleMap(metadata)`;
- * `selfLabels` are the display names that belong to the viewer.
+ * Build the rehype plugin. `chips` is `buildMentionChips(metadata)`;
+ * `viewerUuid` is the reader, for the self-mention weight.
  */
 export function rehypeChannelMentions(
-  handles: Map<string, string>,
-  selfLabels: ReadonlySet<string>,
+  chips: ReadonlyMap<string, MentionChip>,
+  viewerUuid: string | null,
 ) {
   return function attacher() {
     return function transformer(tree: Root): void {
-      if (handles.size === 0) return;
-      tree.children = visitChildren(tree.children, handles, selfLabels);
+      if (chips.size === 0) return;
+      tree.children = visitChildren(tree.children, chips, viewerUuid);
     };
   };
 }

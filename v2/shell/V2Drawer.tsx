@@ -344,7 +344,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
             hairline sets it off from the scroll region — this is a pinned bar over
             scrolling content, not a chrome edge. */}
         <div className="v2-safe-bottom flex shrink-0 flex-col gap-2 border-t border-border p-3">
-          <V2UserFooter user={user} />
+          <V2UserFooter user={user} onNavigate={close} />
           <SwitchBackButton />
         </div>
       </SheetContent>

@@ -21,6 +21,14 @@ import { MemberAvatar } from '../ui/avatars';
  * owner can't be demoted or removed through these endpoints, and members
  * manage themselves via leave — so self rows never show a menu. Phase-5 W2,
  * 2026-08-04.
+ *
+ * THE META LINE LEADS WITH THE HANDLE (2026-08-05, owner decision; v1's
+ * `MemberListItem` has the same shape). A roster is the only place someone can
+ * LOOK UP another person's `@username` without already being mid-message, and
+ * two members with one display name are otherwise indistinguishable here —
+ * which is the problem usernames were introduced to solve. Quiet treatment: the
+ * same muted size as the role it sits beside, and simply absent on a member who
+ * has no handle yet rather than dashed or apologised for.
  */
 export function MemberRow({
   member,
@@ -49,8 +57,18 @@ export function MemberRow({
           <span className="truncate text-sm font-medium">{member.user.name}</span>
           {isSelf && <span className="text-xs text-muted-foreground">You</span>}
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground capitalize">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {member.user.username && (
+            <>
+              <span className="min-w-0 truncate text-xs text-muted-foreground">
+                @{member.user.username}
+              </span>
+              <span aria-hidden className="shrink-0 text-xs text-muted-foreground">
+                ·
+              </span>
+            </>
+          )}
+          <span className="shrink-0 text-xs text-muted-foreground capitalize">
             {member.role_label ?? member.role}
           </span>
           {member.is_pending && (

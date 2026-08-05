@@ -51,7 +51,19 @@ export function MemberListItem({
           {isSelf && <span className="text-xs text-muted-foreground">You</span>}
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs capitalize text-muted-foreground">
+          {/* The handle is what tells two people with the same display name
+              apart, and what a teammate types to tag this one. */}
+          {member.user.username && (
+            <>
+              <span className="min-w-0 truncate text-xs text-muted-foreground">
+                @{member.user.username}
+              </span>
+              <span aria-hidden className="shrink-0 text-xs text-muted-foreground">
+                ·
+              </span>
+            </>
+          )}
+          <span className="shrink-0 text-xs capitalize text-muted-foreground">
             {member.role_label ?? member.role}
           </span>
           {member.is_pending && (

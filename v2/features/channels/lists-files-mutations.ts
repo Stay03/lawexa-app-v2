@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import type {
   AddListItemPayload,
   CreateListPayload,
+  SlimUser,
   TaskList,
   TaskListItem,
   TaskListResponse,
@@ -39,10 +40,18 @@ import { channelsQueries } from './queries';
 
 let localItemCounter = 0;
 
-function actingUser() {
+/** The acting user as a `SlimUser`, read from the sanctioned token bridge at
+ *  MUTATION time (never in render). The full shape — `username` included — so
+ *  an optimistic row is indistinguishable from the one the server echoes. */
+function actingUser(): SlimUser | null {
   const me = useAuthStore.getState().user;
   return me
-    ? { uuid: me.uuid ?? '', name: me.name, avatar_url: me.avatar_url }
+    ? {
+        uuid: me.uuid ?? '',
+        name: me.name,
+        username: me.username ?? null,
+        avatar_url: me.avatar_url,
+      }
     : null;
 }
 

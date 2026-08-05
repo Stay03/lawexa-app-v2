@@ -31,6 +31,14 @@ import { MemberAvatar } from './MemberAvatar';
  *
  * Rows key on `member.user.uuid` at the call site — the member surface is
  * uuid-only (digest §F.4). Phase-5 W4, 2026-08-04.
+ *
+ * THE META LINE CARRIES THE HANDLE (2026-08-05, owner decision; the channel's
+ * `MemberRow` and v1's `MemberListItem` have the same shape). A roster is the
+ * only place someone can LOOK UP another person's `@username` without already
+ * being mid-message, and two members with one display name are otherwise
+ * indistinguishable here. It goes AFTER the crown so the owner mark keeps the
+ * line's first position, is the same muted size as the role beside it, and is
+ * simply absent on a member with no handle yet.
  */
 export function RosterRow({
   member,
@@ -71,11 +79,21 @@ export function RosterRow({
             <span className="shrink-0 text-xs text-muted-foreground">You</span>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
           {isOwner && (
             <Crown aria-hidden className="size-3 shrink-0 text-primary" />
           )}
-          <span className="text-xs capitalize text-muted-foreground">
+          {member.user.username && (
+            <>
+              <span className="min-w-0 truncate text-xs text-muted-foreground">
+                @{member.user.username}
+              </span>
+              <span aria-hidden className="shrink-0 text-xs text-muted-foreground">
+                ·
+              </span>
+            </>
+          )}
+          <span className="shrink-0 text-xs capitalize text-muted-foreground">
             {member.role_label || member.role}
           </span>
           {member.is_pending && (

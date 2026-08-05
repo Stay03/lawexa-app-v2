@@ -24,6 +24,18 @@ import type { IBlockedReason } from '@/types/message-pack';
 export interface SlimUser {
   uuid: string;
   name: string;
+  /**
+   * The unique `@handle` (backend, 2026-08-05). THE ONLY THING TAGGING MATCHES
+   * — `@Ada Obi` and `@ada.obi` now tag nobody, only `@adaobi` does — so a
+   * mention picker must insert THIS, never a slug of `name`.
+   *
+   * `null` means NOT TAGGABLE, and it is not rare: guests never get one, and
+   * every account that predates the deploy has none until the backend's
+   * one-time backfill runs. MEASURED 2026-08-05: still null on a real account
+   * and on channel rosters, so the null branch is the live case today, not an
+   * edge case.
+   */
+  username: string | null;
   avatar_url: string | null;
 }
 
@@ -263,6 +275,13 @@ export interface Channel {
 export interface MessageMention {
   uuid: string;
   name: string;
+  /**
+   * The handle the server actually resolved — the key a renderer must match
+   * the typed `@token` on. `null` on every mention recorded BEFORE 2026-08-05
+   * (no backfill of history), which is why the name-slug match has to survive
+   * as the fallback for old messages instead of being deleted.
+   */
+  username?: string | null;
 }
 
 /** A message's kind. Absent is treated as `'text'`. `ai_divider` is a Lawexa
@@ -280,6 +299,17 @@ export type MessageType =
 export interface MessageMetadata {
   mentions: MessageMention[];
   lawexa_mentioned: boolean;
+  /**
+   * Handles the writer typed that resolved to nobody (backend, 2026-08-05).
+   * The message still posts — ordinary text is full of `@` (an email address,
+   * `@Override` in a code paste) — so this is a hint to show the WRITER, never
+   * a failure. `@lawexa` never appears here; it sets `lawexa_mentioned`.
+   * Absent on messages recorded before the deploy.
+   *
+   * MEASURED 2026-08-05: posting "hi @filmv2 and @nobodyxyz" returned the
+   * matched member in `mentions` and `["nobodyxyz"]` here.
+   */
+  unmatched_handles?: string[];
   /** Present on Lawexa-authored messages; absent (⇒ `'text'`) on human ones. */
   type?: MessageType;
   /** Quiz system cards only (`quiz_game_live` / `quiz_game_finished`): the

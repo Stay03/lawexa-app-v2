@@ -21,6 +21,7 @@ import {
   getProfileFieldVisibility,
   inferStudentEducationLevel,
 } from '@/lib/utils/profile-field-config';
+import { extractApiError, getFieldError } from '@/lib/utils/api-error';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useUpdateProfile } from '@/lib/hooks/useProfile';
 import type { ProfileUpdatePayload } from '@/types/profile';
@@ -39,6 +40,7 @@ function ProfileSettingsPage() {
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
       name: '',
+      username: '',
       bio: '',
       gender: '',
       date_of_birth: '',
@@ -97,6 +99,7 @@ function ProfileSettingsPage() {
 
       form.reset({
         name: user.name || '',
+        username: user.username || '',
         bio: user.profile?.bio || '',
         gender: user.profile?.gender || '',
         date_of_birth: user.profile?.date_of_birth || '',
@@ -165,6 +168,13 @@ function ProfileSettingsPage() {
 
     // Always include these
     if (values.name) payload.name = values.name;
+
+    // A handle can be chosen but not cleared, and re-sending the current one is
+    // a no-op server-side — so it only travels when the user picked a new one.
+    if (values.username && values.username !== (user?.username ?? '')) {
+      payload.username = values.username;
+    }
+
     if (values.bio) payload.bio = values.bio;
     if (values.gender) payload.gender = values.gender;
     if (values.date_of_birth) payload.date_of_birth = values.date_of_birth;
@@ -223,7 +233,16 @@ function ProfileSettingsPage() {
       payload.areas_of_expertise = values.areas_of_expertise;
     }
 
-    updateProfile.mutate(payload);
+    updateProfile.mutate(payload, {
+      onError: (error) => {
+        // Reserved and already-taken handles are only knowable server-side, so
+        // the server's own sentence is what the field shows.
+        const message = getFieldError(extractApiError(error).errors, 'username');
+        if (message) {
+          form.setError('username', { type: 'server', message });
+        }
+      },
+    });
   }
 
   if (isLoading) {
@@ -245,7 +264,7 @@ function ProfileSettingsPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <UserTypeSwitcher form={form} />
-          <PersonalInfoForm form={form} />
+          <PersonalInfoForm form={form} currentUsername={user.username ?? null} />
           <ProfessionalInfoForm form={form} visibility={visibility} />
           <EducationInfoForm form={form} visibility={visibility} />
           <SocialLinksForm form={form} />

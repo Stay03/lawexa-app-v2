@@ -13,6 +13,7 @@ import {
   FormItem,
   FormLabel,
   FormControl,
+  FormDescription,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -29,9 +30,23 @@ import type { ProfileFormValues } from '@/lib/utils/profile-validation';
 
 interface PersonalInfoFormProps {
   form: UseFormReturn<ProfileFormValues>;
+  /** The handle the account holds today, or `null` when it has none yet. */
+  currentUsername: string | null;
 }
 
-export function PersonalInfoForm({ form }: PersonalInfoFormProps) {
+/**
+ * People paste handles with the leading `@`, and the server accepts lowercase
+ * only — fold both away as they type so a valid choice is never reported back
+ * as a mistake.
+ */
+function normalizeUsername(value: string): string {
+  return value.replace(/^@+/, '').toLowerCase();
+}
+
+export function PersonalInfoForm({
+  form,
+  currentUsername,
+}: PersonalInfoFormProps) {
   return (
     <Card>
       <CardHeader>
@@ -51,6 +66,42 @@ export function PersonalInfoForm({ form }: PersonalInfoFormProps) {
               <FormControl>
                 <Input placeholder="Your full name" {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Username</FormLabel>
+              {/* The wrapper stays outside FormControl so the label and the
+                  error description still bind to the input itself. */}
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  @
+                </span>
+                <FormControl>
+                  <Input
+                    placeholder="yourhandle"
+                    autoComplete="off"
+                    spellCheck={false}
+                    {...field}
+                    value={field.value ?? ''}
+                    onChange={(e) =>
+                      field.onChange(normalizeUsername(e.target.value))
+                    }
+                    className="pl-7"
+                  />
+                </FormControl>
+              </div>
+              <FormDescription>
+                {currentUsername
+                  ? 'People type this username to tag you in channels.'
+                  : 'You do not have a handle yet. Pick one so people can tag you in channels.'}
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

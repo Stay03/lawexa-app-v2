@@ -3,6 +3,7 @@
 import { memo, useState } from 'react';
 import {
   AlertCircle,
+  AtSign,
   Bookmark,
   CornerUpLeft,
   Loader2,
@@ -27,8 +28,13 @@ import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
 import type { Message } from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useEngagementThrottled } from '../engagement-throttle';
-import { MESSAGE_MAX_LENGTH, mentionsViewer } from '../model';
+import {
+  MESSAGE_MAX_LENGTH,
+  mentionsViewer,
+  unmatchedHandlesSentence,
+} from '../model';
 import { useSendState } from '../send-outbox';
+import { useHeldValue } from '../use-held-value';
 import { LawexaMessageContent } from './LawexaMessageContent';
 import { MESSAGE_MEASURE } from './measure';
 import { MessageContent } from './MessageContent';
@@ -76,6 +82,32 @@ import { useLongPress } from './use-long-press';
  * THE SEND LADDER (§5, exact): optimistic insert → `sending` (subtle dim,
  * no words) → sent (nothing at all) → `failed` (red icon + Retry inline,
  * never auto-dismissed, plus an explicit Discard — silent drops are banned).
+ *
+ * ── THE MATCHED-NOBODY HINT (§F.19) ────────────────────────────────────────
+ * Since 2026-08-05 a posted message reports the `@handles` that resolved to no
+ * one. That is a HINT AND NOT A FAILURE — the message posted, and ordinary text
+ * is full of `@` (an email address, `@Override` in a code paste) — so it is one
+ * muted line under the body: no red, no icon of alarm, no verb, nothing to
+ * dismiss. It is also WRITER-ONLY, because it is only ever actionable by the
+ * person who typed the handle; on someone else's message it would be a
+ * correction delivered in public.
+ *
+ * IT ONLY EVER SAYS WHAT THE SERVER SAID. A send's optimistic row carries no
+ * resolution, so on a first post the hint arrives with the row that replaces
+ * it. An EDIT is different and is why this is not a bare conditional: an edit
+ * settles IN PLACE, same uuid, same React key — so the line has to be able to
+ * appear under a row already on screen (a typo edited INTO the message) and to
+ * leave one (the very typo it was complaining about, corrected). Both go
+ * through the protect list's always-mounted zero-height grid-rows collapse, the
+ * `EnablePushNudge` idiom, with the sentence HELD through the exit so it never
+ * animates shut while empty. Zero height when silent: nothing focusable,
+ * nothing announceable, no reserved gap.
+ *
+ * The stale-hint window is closed at the source rather than papered over here:
+ * `useEditChannelMessage` drops `unmatched_handles` from the optimistic
+ * metadata, because the moment the text changes the old list is no longer true
+ * about it. The line goes quiet, and comes back only if the server still finds
+ * a handle that matched nobody.
  */
 
 /** The empty handler set a read-only row spreads instead of the hold gesture.
@@ -118,7 +150,7 @@ export interface MessageRowActions {
 export const MessageRow = memo(function MessageRow({
   message,
   canEngage,
-  canEdit,
+  isMine,
   canDelete,
   viewerUuid,
   showGutterTime,
@@ -138,7 +170,13 @@ export const MessageRow = memo(function MessageRow({
    * message is a read.
    */
   canEngage: boolean;
-  canEdit: boolean;
+  /**
+   * Did the viewer write this message? Carries BOTH facts that depend on it,
+   * rather than two booleans that must be kept equal: `PATCH .../messages/
+   * {uuid}` is author-only (digest §C), so authorship IS the edit permission,
+   * and the matched-nobody hint is the writer's own business.
+   */
+  isMine: boolean;
   canDelete: boolean;
   viewerUuid: string | null;
   /** False for a run's first message, which the run header already dates. */
@@ -158,6 +196,12 @@ export const MessageRow = memo(function MessageRow({
   // Only AI replies have a session behind them, and only since 2026-08-03
   // (older history carries `null` — digest §F.6). No id, no affordance.
   const sessionUuid = message.is_ai ? (message.metadata.session_uuid ?? null) : null;
+  // Writer-only, and absent on every message recorded before 2026-08-05.
+  const unmatched = isMine
+    ? unmatchedHandlesSentence(message.metadata.unmatched_handles ?? [])
+    : '';
+  // Held through the collapse so the line never animates shut while empty.
+  const unmatchedShown = useHeldValue(unmatched === '' ? null : unmatched);
   // Reply is universal, so every REAL (server-acknowledged) row acts — for a
   // viewer who may act at all; a row still in the outbox has nothing
   // actionable but Retry/Discard below.
@@ -295,6 +339,27 @@ export const MessageRow = memo(function MessageRow({
           readOnly={!canEngage}
           onToggle={(emoji) => actions.onToggleReaction(message, emoji)}
         />
+
+        {/* See the docblock: a hint, writer-only, never red, nothing to press,
+            and always mounted so an edit can open or close it as a tween. */}
+        <div
+          aria-hidden={unmatched === ''}
+          inert={unmatched === ''}
+          className={cn(
+            'grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out',
+            'motion-reduce:transition-none',
+            unmatched !== ''
+              ? 'mt-1 grid-rows-[1fr] opacity-100'
+              : 'mt-0 grid-rows-[0fr] opacity-0',
+          )}
+        >
+          <div className="overflow-hidden">
+            <p className="flex items-start gap-1.5 text-[11px] leading-4 text-muted-foreground">
+              <AtSign aria-hidden className="mt-0.5 size-3 shrink-0" />
+              <span>{unmatchedShown ?? ''}</span>
+            </p>
+          </div>
+        </div>
 
         {/* THE SEND LADDER'S LAST RUNG, and the one place a write can outlive
             the right to make it. A row reaches `failed` while the viewer was a
@@ -438,8 +503,8 @@ export const MessageRow = memo(function MessageRow({
                       View this Lawexa conversation
                     </DropdownMenuItem>
                   )}
-                  {(canEdit || canDelete) && <DropdownMenuSeparator />}
-                  {canEdit && (
+                  {(isMine || canDelete) && <DropdownMenuSeparator />}
+                  {isMine && (
                     <DropdownMenuItem onClick={() => actions.onStartEdit(message)}>
                       <Pencil aria-hidden className="size-4" />
                       Edit message

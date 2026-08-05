@@ -28,6 +28,12 @@ export interface SessionUser {
   id: number;
   uuid: string | null;
   name: string;
+  /**
+   * The viewer's own `@handle`, so a surface can show it back to them without
+   * a second request. `null` when the account has none yet — which also means
+   * nobody can tag them.
+   */
+  username: string | null;
   email: string | null;
   role: UserRole;
   /** Public avatar URL (safe to render); `null` when unset. */
@@ -75,6 +81,7 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
         id: user.id,
         uuid: user.uuid ?? null,
         name: user.name,
+        username: user.username ?? null,
         email: user.email,
         role: user.role,
         avatar_url: user.avatar_url ?? null,

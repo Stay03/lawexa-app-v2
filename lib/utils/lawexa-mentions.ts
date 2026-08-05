@@ -7,11 +7,17 @@
  * element. Subtrees under `code`/`pre` are skipped so handles inside code are
  * never touched, and unresolved `@tokens` are left as plain text — mirroring the
  * server's "never guess" mention rule.
+ *
+ * Finding the mentions is `scanMentions`, the one shared scanner the plain-text
+ * path uses — token shape, left word boundary and trailing-dot shed in a single
+ * pass. Scanning by hand here is what left Lawexa's replies disagreeing with
+ * human messages twice over: "I'll ask @adaobi." rendered grey because the full
+ * stop was never shed, and an `@` mid-word could chip a person nobody tagged.
  */
 
 import type { Element, ElementContent, Root, RootContent, Text } from 'hast';
 
-import { mentionTokenRegex } from './collab';
+import { scanMentions, type MentionChip } from './collab';
 
 /** Elements whose descendant text must never be treated as mentions. */
 const CODE_ELEMENTS = new Set(['code', 'pre']);
@@ -32,28 +38,23 @@ function mentionSpan(label: string): Element {
  */
 function splitTextNode(
   node: Text,
-  handles: Map<string, string>
+  chips: ReadonlyMap<string, MentionChip>
 ): ElementContent[] | null {
   const { value } = node;
+  const hits = scanMentions(value, chips);
+  if (hits.length === 0) return null;
+
   const parts: ElementContent[] = [];
   let lastIndex = 0;
-  let matched = false;
-
-  for (const match of value.matchAll(mentionTokenRegex())) {
-    const token = match[0];
-    const index = match.index ?? 0;
-    const label = handles.get(token.slice(1).toLowerCase());
-    if (!label) continue;
-
-    matched = true;
-    if (index > lastIndex) {
-      parts.push({ type: 'text', value: value.slice(lastIndex, index) });
+  for (const hit of hits) {
+    if (hit.index > lastIndex) {
+      parts.push({ type: 'text', value: value.slice(lastIndex, hit.index) });
     }
-    parts.push(mentionSpan(label));
-    lastIndex = index + token.length;
+    parts.push(mentionSpan(hit.chip.label));
+    // Only past the HANDLE — a full stop the scan swept up stays text.
+    lastIndex = hit.index + hit.token.length;
   }
 
-  if (!matched) return null;
   if (lastIndex < value.length) {
     parts.push({ type: 'text', value: value.slice(lastIndex) });
   }
@@ -67,12 +68,12 @@ function splitTextNode(
  */
 function visitChildren<Child extends RootContent | ElementContent>(
   children: Child[],
-  handles: Map<string, string>
+  chips: ReadonlyMap<string, MentionChip>
 ): Child[] {
   const next: Child[] = [];
   for (const child of children) {
     if (child.type === 'text') {
-      const replaced = splitTextNode(child, handles);
+      const replaced = splitTextNode(child, chips);
       // Mention spans are `ElementContent`, always valid in either parent.
       if (replaced) {
         next.push(...(replaced as Child[]));
@@ -82,11 +83,25 @@ function visitChildren<Child extends RootContent | ElementContent>(
       continue;
     }
     if (child.type === 'element' && !CODE_ELEMENTS.has(child.tagName)) {
-      child.children = visitChildren(child.children, handles);
+      child.children = visitChildren(child.children, chips);
     }
     next.push(child);
   }
   return next;
+}
+
+/**
+ * Widen the `handle → label` map its caller passes back to the chip shape the
+ * shared resolver reads. `buildMentionHandleMap` is that map's own projection
+ * of the chips, so nothing is invented here: the identity fields stay null
+ * because v1's markdown chip shows one style for everyone and carries no title.
+ */
+function toChips(handles: Map<string, string>): Map<string, MentionChip> {
+  const chips = new Map<string, MentionChip>();
+  for (const [form, label] of handles) {
+    chips.set(form, { label, uuid: null, username: null });
+  }
+  return chips;
 }
 
 /**
@@ -97,10 +112,11 @@ function visitChildren<Child extends RootContent | ElementContent>(
  * attacher with no tree and crash.
  */
 export function rehypeLawexaMentions(handles: Map<string, string>) {
+  const chips = toChips(handles);
   return function attacher() {
     return function transformer(tree: Root): void {
-      if (handles.size === 0) return;
-      tree.children = visitChildren(tree.children, handles);
+      if (chips.size === 0) return;
+      tree.children = visitChildren(tree.children, chips);
     };
   };
 }

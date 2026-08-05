@@ -33,6 +33,13 @@ import { MemberAvatar } from '../ui/avatars';
  * INLINE (dup → 409, unknown email → 422 — server copy verbatim, no toast).
  * Channel invitees must already be active space members (digest §F.15), so
  * the "In this space" tab is the primary path. Phase-5 W2, 2026-08-04.
+ *
+ * THE PEOPLE ROWS CARRY A HANDLE (2026-08-05). This is a surface where a person
+ * is CHOSEN, and a space large enough to need a search box is large enough to
+ * hold two people with one name — so the row shows the `@username` that tells
+ * them apart, and the search matches it as well as the name. Members with no
+ * handle yet keep their row: a handle is what TAGS someone, not what invites
+ * them, and this dialog invites.
  */
 
 export interface InviteCandidate {
@@ -72,8 +79,12 @@ export function InviteMemberDialog({
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return candidates;
-    return candidates.filter((candidate) =>
-      candidate.user.name.toLowerCase().includes(query),
+    return candidates.filter(
+      ({ user }) =>
+        user.name.toLowerCase().includes(query) ||
+        // A leading `@` is how people type a handle; matching either way means
+        // the search never argues about punctuation.
+        (user.username?.includes(query.replace(/^@/, '')) ?? false),
     );
   }, [candidates, search]);
 
@@ -186,8 +197,8 @@ export function InviteMemberDialog({
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search people in this space"
-                  aria-label="Search people in this space"
+                  placeholder="Search by name or @handle"
+                  aria-label="Search people in this space by name or handle"
                   className="pl-8"
                 />
               </div>
@@ -227,6 +238,13 @@ export function InviteMemberDialog({
                             <span className="min-w-0 flex-1 truncate text-sm">
                               {user.name}
                             </span>
+                            {/* Same row grammar as the `@` picker: name, then
+                                the handle that separates two of them. */}
+                            {user.username && (
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                @{user.username}
+                              </span>
+                            )}
                             {isAdding ? (
                               <Loader2
                                 aria-hidden

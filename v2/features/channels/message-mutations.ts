@@ -46,7 +46,15 @@ let localCounter = 0;
 function actingUser(): SlimUser | null {
   const me = useAuthStore.getState().user;
   return me
-    ? { uuid: me.uuid ?? '', name: me.name, avatar_url: me.avatar_url }
+    ? {
+        uuid: me.uuid ?? '',
+        name: me.name,
+        // Carried so an optimistic row is the SAME shape the server echoes —
+        // it is what the reader is tagged by, even though nothing on their own
+        // row renders it.
+        username: me.username ?? null,
+        avatar_url: me.avatar_url,
+      }
     : null;
 }
 
@@ -251,9 +259,20 @@ export function useEditChannelMessage(channelUuid: string) {
         }
       }
       if (previous) {
+        // THE MATCHED-NOBODY LIST DOES NOT SURVIVE THE EDIT. It describes
+        // handles in the OLD text, and the commonest reason to edit a message
+        // carrying one is to fix exactly the handle it names — so carrying it
+        // over would leave the hint contradicting the corrected words until the
+        // PATCH settles. The server re-parses mentions on edit and we cannot
+        // predict the answer, so the honest optimistic state is silence.
+        // `mentions` is NOT cleared: dropping it would strip the chips out of
+        // the reader's own sentence mid-edit.
+        const { unmatched_handles: _stale, ...metadata } = previous.metadata;
+        void _stale;
         replaceMessage(queryClient, channelUuid, messageUuid, {
           ...previous,
           content,
+          metadata,
           edited_at: new Date().toISOString(),
         });
       }

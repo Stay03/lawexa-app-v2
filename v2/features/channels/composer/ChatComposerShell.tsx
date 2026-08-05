@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { AlertCircle, Check, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -193,19 +193,3 @@ export function ComposerAction({
   );
 }
 
-/**
- * Hold a value through its own exit tween.
- *
- * A collapsing row that renders `null` empties in the first frame and then
- * animates an empty box shut, which reads as a glitch rather than a dismissal.
- * This is React's sanctioned guarded render-adjust (the same idiom the reply
- * bar and `EnablePushNudge` already use), so the last real value survives until
- * a new one replaces it. Values must be referentially stable between sets —
- * every caller here sets from an event handler, never from a render-time
- * literal, so the guard can never loop.
- */
-export function useHeldValue<T>(value: T | null): T | null {
-  const [held, setHeld] = useState<T | null>(value);
-  if (value !== null && value !== held) setHeld(value);
-  return value ?? held;
-}

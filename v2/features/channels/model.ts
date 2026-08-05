@@ -113,62 +113,100 @@ export const REACTION_TRAY: readonly string[] = [
 
 /* ── Mentions ─────────────────────────────────────────────────────────────── */
 
+/*
+ * WHERE A `@handle` IS ALLOWED TO APPEAR (the house rule, 2026-08-05).
+ *
+ * A handle earns its pixels on exactly four kinds of surface:
+ *  1. where a person is being CHOSEN — the composer's `@` picker and the
+ *     add-people picker, which is where two "Ada Obi"s have to be told apart
+ *     before one of them is picked;
+ *  2. on a ROSTER ROW — the channel, space and organization member lists. This
+ *     is the only place someone can LOOK UP another person's handle without
+ *     already being mid-message, and two identically-named people in a roster
+ *     are otherwise impossible to tell apart, which is the exact problem
+ *     usernames were introduced to solve. v1's `MemberListItem` ships it, so
+ *     the two codebases say the same thing (owner decision, 2026-08-05);
+ *  3. where a person is being IDENTIFIED TO THEMSELVES — the account row in
+ *     the shell footer, the one place a reader can learn what others must type
+ *     to reach them, and the way in to changing it;
+ *  4. nowhere else.
+ *
+ * It stays OFF author headers, avatar stacks and the space lobby's people
+ * strip: those are glances, not lookups, and a handle on each would be a fact
+ * nobody in that context came for, paid for by every row on the screen.
+ *
+ * IN THE FEED IT IS DIFFERENT AGAIN, and deliberately so. A resolved mention
+ * chip renders the DISPLAY NAME, because a username is a lookup key rather
+ * than a public identity — until one message tags two people who share a name,
+ * at which point that chip shows the handle instead (`buildMentionChips`). The
+ * roster is where you go to learn a handle; the sentence is not.
+ *
+ * Nobody needs to know a handle to use one: both pickers match the display name
+ * as well, so the handle is only ever the tie-breaker it was built to be.
+ */
+
 /** One row of the composer's @mention autocomplete. `user: null` is the
- *  synthetic Lawexa candidate (summons the channel AI — FC §11). */
+ *  synthetic Lawexa candidate (summons the channel AI — FC §11).
+ *
+ *  `handle` is NON-NULLABLE on purpose: a candidate exists only if picking it
+ *  produces a tag that lands. Someone who cannot be tagged is not a candidate
+ *  with a missing field — they are not a candidate. See {@link MentionOptions}. */
 export interface MentionCandidate {
   key: string;
   name: string;
+  /** The exact string the composer writes after `@` — the member's unique
+   *  `username`, which is the ONLY thing the server matches (digest §F.19). */
   handle: string;
   user: SlimUser | null;
 }
 
-/** The two server-resolvable handle forms for a display name (digest §F.15):
- *  the name lowercased with spaces REMOVED, and the same with spaces → `.`.
- *  Diacritics are left exactly as typed — the server matches them literally. */
-function mentionHandleForms(name: string): [squashed: string, dotted: string] {
-  const lowered = name.toLowerCase().trim();
-  return [lowered.replace(/\s+/g, ''), lowered.replace(/\s+/g, '.')];
-}
-
-/** Reserved by the synthetic AI candidate — a member cannot claim it. */
+/** Reserved by the synthetic AI candidate — the server refuses it as a
+ *  username, so no member can shadow the summon. */
 const LAWEXA_HANDLE = 'lawexa';
 
+/** What the composer's `@` picker may offer, and who it must explain instead. */
+export interface MentionOptions {
+  /** Rows the picker offers. Every one of them tags someone. */
+  candidates: MentionCandidate[];
+  /** Display names of active members with NO handle — never offered, because
+   *  no string tags them, and named in the picker's one explanatory line so
+   *  their absence reads as a fact about them rather than a broken search. */
+  untaggable: string[];
+}
+
 /**
- * Build the autocomplete candidates from the active roster + the synthetic
+ * Build the `@` picker's contents from the active roster + the synthetic
  * `lawexa` entry.
  *
- * AMBIGUOUS HANDLES ARE NOT OFFERED (W2 audit L11, digest §F.15). The server
- * resolves a handle to a member only when exactly ONE member answers to it;
- * two people who share a form make that form match NOBODY. v1 listed both of
- * them anyway, so picking either produced a message whose `@mention` silently
- * resolved to no one — it rendered as plain text and notified nobody, with
- * nothing on screen to explain why.
+ * THE HANDLE IS THE MEMBER'S USERNAME, FULL STOP (digest §F.19). Tagging used
+ * to match a slug of the display name, so this built one; since 2026-08-05 the
+ * server matches a unique `@username` and nothing else, and a slug tags nobody.
  *
- * So each member is offered under the first of their two forms that is
- * unambiguous across the whole active roster (dotted preferred — it reads as a
- * handle and collides less), and a member whose BOTH forms collide is left out
- * of the list entirely rather than offered as a mention that cannot work. They
- * are still reachable by every other means the channel has; what is removed is
- * only the false promise.
+ * THAT ALSO DELETES THE AMBIGUITY RULE THIS FUNCTION USED TO CARRY. It dropped
+ * a member entirely when two display names collided, because a shared slug
+ * resolved to no one — which quietly hid exactly the two people ("Ada Obi" and
+ * "Ada Obi") that usernames were introduced to make reachable. Usernames are
+ * unique by construction (`adaobi`, `adaobi2`), so every member with one is
+ * offered, and the handle on each row is what tells them apart.
+ *
+ * A MEMBER WITH NO USERNAME IS NOT OFFERED. Guests never get one, and every
+ * account predating the backfill has none — measured 2026-08-05: that is still
+ * EVERY account in production. There is no string that tags them, so offering
+ * a row would be a promise the send cannot keep. They are returned separately
+ * instead: the picker names them in one quiet line, because a reader who can
+ * see someone in the member list and not in the picker is owed the reason.
  */
-export function buildMentionCandidates(members: readonly Member[]): MentionCandidate[] {
-  const active = members.filter((member) => member.is_active);
-
-  // Count every form across the roster, seeding the reserved AI handle so a
-  // member named "Lawexa" can never shadow the summon.
-  const uses = new Map<string, number>([[LAWEXA_HANDLE, 1]]);
-  for (const member of active) {
-    for (const form of new Set(mentionHandleForms(member.user.name))) {
-      uses.set(form, (uses.get(form) ?? 0) + 1);
-    }
-  }
-
+export function buildMentionOptions(members: readonly Member[]): MentionOptions {
   const candidates: MentionCandidate[] = [];
-  for (const member of active) {
-    const [squashed, dotted] = mentionHandleForms(member.user.name);
-    const handle =
-      uses.get(dotted) === 1 ? dotted : uses.get(squashed) === 1 ? squashed : null;
-    if (handle === null) continue;
+  const untaggable: string[] = [];
+
+  for (const member of members) {
+    if (!member.is_active) continue;
+    const handle = member.user.username;
+    if (!handle) {
+      untaggable.push(member.user.name);
+      continue;
+    }
     candidates.push({
       key: member.user.uuid,
       name: member.user.name,
@@ -178,7 +216,61 @@ export function buildMentionCandidates(members: readonly Member[]): MentionCandi
   }
 
   candidates.push({ key: LAWEXA_HANDLE, name: 'Lawexa', handle: LAWEXA_HANDLE, user: null });
-  return candidates;
+  return { candidates, untaggable };
+}
+
+/** How many items a list sentence names before it starts counting. */
+const MAX_NAMED = 3;
+
+/**
+ * The house voice for a short list of names or handles: "A", "A and B",
+ * "A, B and C", then "A, B, C and 2 others". Shared by the picker's
+ * can't-be-tagged line and the feed's matched-nobody hint so the two read as
+ * one product rather than two authors.
+ */
+function namesSentence(items: readonly string[]): string {
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0];
+  if (items.length <= MAX_NAMED) {
+    return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+  }
+  const rest = items.length - MAX_NAMED;
+  return `${items.slice(0, MAX_NAMED).join(', ')} and ${rest} ${rest === 1 ? 'other' : 'others'}`;
+}
+
+/**
+ * The picker's line for members no string can tag (see {@link MentionOptions}).
+ * One entry per PERSON, so a name that stands for several of them is said once
+ * and counted: without that, the very case this feature exists for — two people
+ * called "Ada Obi", neither with a handle — printed as "Ada Obi, Ada Obi and
+ * Bo", which reads as a bug rather than as two people. There is nothing to tell
+ * them apart by yet, and that is exactly what the line is reporting.
+ */
+export function untaggableSentence(names: readonly string[]): string {
+  if (names.length === 0) return '';
+  const perName = new Map<string, number>();
+  for (const name of names) perName.set(name, (perName.get(name) ?? 0) + 1);
+  const items = [...perName].map(([name, count]) =>
+    count > 1 ? `${name} ×${count}` : name,
+  );
+  return `${namesSentence(items)} can't be tagged yet — no handle.`;
+}
+
+/**
+ * The writer-only line under their OWN message when `@tokens` matched nobody
+ * (`metadata.unmatched_handles`, digest §F.19).
+ *
+ * A HINT, NOT A FAILURE, and the copy has to earn that: the message posted, and
+ * ordinary text is full of `@` — an email address, `@Override` in a code paste.
+ * So it states what happened and stops. No apology, no verb, no red.
+ *
+ * Handles are unique strings, so the same one typed twice is ONE thing that
+ * did not match and is named once.
+ */
+export function unmatchedHandlesSentence(handles: readonly string[]): string {
+  if (handles.length === 0) return '';
+  const unique = [...new Set(handles)];
+  return `${namesSentence(unique.map((handle) => `@${handle}`))} didn't match anyone in this channel.`;
 }
 
 /** Whether a message personally @mentions the viewer — drives the gold

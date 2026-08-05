@@ -1,20 +1,36 @@
 import { useMemo } from 'react';
 
 import { cn } from '@/lib/utils';
-import { parseMessageContent } from '@/lib/utils/collab';
+import { isSelfMention, parseMessageContent } from '@/lib/utils/collab';
 import type { MessageMetadata } from '@/types/collab';
 
 /**
  * MessageContent — message text with resolved @mentions highlighted. Only
  * handles the server actually resolved (`metadata.mentions`, plus `@lawexa`
  * when `lawexa_mentioned`) light up; unresolved `@tokens` stay plain text —
- * the server's "never guess" rule (digest §F.15). The parser is the pure
+ * the server's "never guess" rule (digest §F.19). The parser is the pure
  * `lib/utils/collab.ts` one (sanctioned utils layer — one source of truth
  * with v1, not a fork).
  *
  * A mention OF THE VIEWER renders stronger (gold fill, readable text) than a
  * mention of someone else (quiet gold tint) — the self-mention emphasis the
  * audit found missing in v1 (§8 item 6; design-research DIRECTION 2).
+ *
+ * "OF THE VIEWER" IS DECIDED BY UUID, NOT BY NAME. This compared display-name
+ * strings until 2026-08-05, so two members called "Ada Obi" both lit up when
+ * either was named — the ambiguity usernames exist to end, reproduced in the
+ * one place it is most personal.
+ *
+ * THE CHIP SHOWS THE DISPLAY NAME — UNLESS THE NAME IS CONTESTED. The writer
+ * typed `@adaobi2`; the reader sees `@Ada Obi`, because our username is a
+ * lookup key rather than a public identity (generated, never chosen, absent
+ * everywhere a person is merely speaking — Discord's split, and the backend's
+ * own when it left notification previews reading "@Ada Obi"). But when ONE
+ * message tags two different people who share a name, the name has failed at
+ * its only job, and `buildMentionChips` swaps that chip's text for the handle.
+ * That is the disambiguation, and it is TEXT — a `title` tooltip would answer
+ * a mouse and leave every phone reader exactly where they started. The title
+ * stays as a pointer convenience, never as the mechanism.
  *
  * W3 SEAM — LAWEXA MARKDOWN: AI messages flow through this same plain-text
  * path in W2. W3 ports the markdown renderer (`LawexaMessageContent`) and
@@ -40,26 +56,22 @@ export function MessageContent({
     [content, metadata],
   );
 
-  const selfNames = useMemo(() => {
-    if (!viewerUuid) return new Set<string>();
-    // Same rule as `buildMentionHandleMap`: a payload without `mentions`
-    // degrades to "nobody was mentioned", it never takes the feed down.
-    return new Set(
-      (metadata.mentions ?? [])
-        .filter((mention) => mention.uuid === viewerUuid)
-        .map((mention) => mention.name),
-    );
-  }, [metadata.mentions, viewerUuid]);
-
   return (
     <div className={BODY_CLASS}>
       {segments.map((segment, index) =>
         segment.type === 'mention' ? (
           <span
             key={index}
+            // Nothing to add when the chip already IS the handle (a contested
+            // name) — a tooltip repeating the text under the cursor is noise.
+            title={
+              segment.username && segment.label !== segment.username
+                ? `@${segment.username}`
+                : undefined
+            }
             className={cn(
               'rounded px-1 font-medium',
-              selfNames.has(segment.label)
+              isSelfMention(segment.uuid, viewerUuid)
                 ? 'bg-primary/20 text-foreground'
                 : 'bg-primary/10 text-primary',
             )}

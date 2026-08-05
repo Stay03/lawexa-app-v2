@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { subscriptionQueries } from '@/v2/features/subscription/queries';
 import type { SessionUser } from '@/v2/runtime/session';
+import { FOCUS_RING } from './designs/modules';
 
 /**
  * V2UserFooter — the real account row for the sidebar + drawer footers,
@@ -20,14 +21,37 @@ import type { SessionUser } from '@/v2/runtime/session';
  * fetched client-side: `subscriptionQueries.current()` gated to signed-in users,
  * mirroring v1's `plan?.name ?? 'Free'` semantics.
  *
+ * THE HANDLE IS HERE, AND SO IS THE WAY TO SET ONE. A `@username` is what tags
+ * a person (digest §F.19); this row is the product's account card, the one
+ * surface that answers "what do people type to reach me?" — see the house rule
+ * in `v2/features/channels/model.ts` for the full list of surfaces that earn a
+ * handle. It sits beside the plan because both are quiet facts ABOUT the
+ * account rather than the account's name, and because a third line would make a
+ * footer of a footer. Known from the session, so it paints immediately while
+ * the plan is still resolving.
+ *
+ * WITHOUT ONE, THIS ROW IS THE ONLY DOOR v2 HAS. Handles are set on the profile
+ * screen, which v2 has not rebuilt and must not rebuild for this — so the row
+ * became a link to `/settings/profile` (the same cross-tree linking the shell
+ * already does for `/settings/developer` and `/settings/message-packs`), and
+ * "Set a handle" takes the handle's place until there is one. That matters
+ * today rather than in principle: with the backfill unrun, EVERY account has
+ * `username: null`, so the channel mention picker's entire content is "…can't
+ * be tagged yet", and this is the sentence that ends it. It retires itself the
+ * moment a handle exists.
+ *
  * Signed out → a tasteful sign-in affordance instead of the account row.
  */
 export function V2UserFooter({
   user,
   className,
+  onNavigate,
 }: {
   user: SessionUser | null;
   className?: string;
+  /** The drawer's dismiss — its own nav rows call it on click, and this row is
+   *  a nav row now. The persistent sidebar passes nothing. */
+  onNavigate?: () => void;
 }) {
   const planQuery = useQuery({
     ...subscriptionQueries.current(),
@@ -47,7 +71,20 @@ export function V2UserFooter({
   const planName = planQuery.data?.data?.plan?.name;
 
   return (
-    <div className={cn('flex items-center gap-2 rounded-lg px-1 py-1', className)}>
+    <Link
+      href="/settings/profile"
+      onClick={onNavigate}
+      // NO `aria-label`. The row's own content — name, handle (or "Set a
+      // handle") and plan — is the honest accessible name; overriding it with a
+      // tidier sentence would delete two of those three facts for the readers
+      // least able to get them elsewhere.
+      className={cn(
+        'v2-interactive flex items-center gap-2 rounded-lg px-1 py-1',
+        'transition-colors duration-150 hover:bg-muted motion-reduce:transition-none',
+        FOCUS_RING,
+        className,
+      )}
+    >
       <Avatar className="size-8">
         <AvatarImage src={user.avatar_url ?? undefined} alt="" />
         <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
@@ -58,15 +95,33 @@ export function V2UserFooter({
         <span className="truncate text-sm font-medium text-foreground">
           {user.name}
         </span>
-        {planQuery.isPending ? (
-          <Skeleton className="mt-0.5 h-3 w-14 rounded" />
-        ) : (
-          <span className="truncate text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-            {planName ?? 'Free'}
+        {/* A DIV, not a span: `Skeleton` renders a div, and a div inside a span
+            is invalid markup React will fight over at hydration. */}
+        <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <span
+            className={cn(
+              'min-w-0 truncate',
+              // Not gold-as-decoration: without a handle nobody can tag this
+              // person at all, so the accent is doing its one job — this
+              // concerns you.
+              !user.username && 'font-medium text-primary',
+            )}
+          >
+            {user.username ? `@${user.username}` : 'Set a handle'}
           </span>
-        )}
+          <span aria-hidden className="shrink-0">
+            ·
+          </span>
+          {planQuery.isPending ? (
+            <Skeleton className="h-3 w-14 shrink-0 rounded" />
+          ) : (
+            <span className="min-w-0 truncate motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+              {planName ?? 'Free'}
+            </span>
+          )}
+        </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

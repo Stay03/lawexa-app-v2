@@ -31,23 +31,24 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useUploadChannelFile } from '../lists-files-mutations';
 import { useSendChannelMessage } from '../message-mutations';
 import {
-  buildMentionCandidates,
+  buildMentionOptions,
   FILE_ACCEPT_ATTR,
   MESSAGE_MAX_LENGTH,
   REACTION_TRAY,
+  untaggableSentence,
   validateChannelFile,
   type MentionCandidate,
 } from '../model';
 import { channelsQueries } from '../queries';
 import { MemberAvatar, LawexaAvatar } from '../ui/avatars';
 import type { TypingUser } from '../room';
+import { useHeldValue } from '../use-held-value';
 import {
   ChatComposerShell,
   ComposerAction,
   ComposerNotice,
   ComposerTrayRow,
   COMPOSER_ACTION,
-  useHeldValue,
 } from './ChatComposerShell';
 
 /**
@@ -94,10 +95,23 @@ import {
  * because the semantics differ: those keys are toggles carrying `aria-pressed`
  * against a message's buckets, these insert text at a caret.
  *
- * MENTIONS: `@` triggers the roster autocomplete (dotted handles, the
- * server-resolvable form — §F.15) plus the synthetic Lawexa candidate;
- * ArrowUp/Down navigate, Enter/Tab apply, Escape dismisses. The AtSign
- * control drops an `@` at the caret and opens the picker (v1's affordance).
+ * MENTIONS: `@` triggers the roster autocomplete plus the synthetic Lawexa
+ * candidate; ArrowUp/Down navigate, Enter/Tab apply, Escape dismisses. The
+ * AtSign control drops an `@` at the caret and opens the picker (v1's
+ * affordance).
+ *
+ * WHAT IT INSERTS IS THE MEMBER'S UNIQUE `@username` (§F.19). It used to insert
+ * a slug of the display name, which as of 2026-08-05 tags nobody. Each row
+ * carries name + handle, so the two people called "Ada Obi" — the case this
+ * whole change exists for — are told apart BEFORE either is picked, and the
+ * query matches either field so nobody has to know a handle to use one.
+ *
+ * A MEMBER WITH NO HANDLE IS NEVER A ROW. No string tags them — guests never
+ * get a handle, and neither does any account still waiting on the backfill —
+ * and a row that cannot keep its promise is worse than no row at all. They are
+ * named instead in one quiet line under the list, because a reader who can see
+ * someone in the member list and not here is owed the reason. Measured
+ * 2026-08-05, that line is currently the whole picker.
  *
  * THE COUNTER APPEARS AT 200 REMAINING, not 500. At 500 it was on screen for
  * a message most people never write, which made a number ride the composer
@@ -210,22 +224,38 @@ export function ChannelComposer({
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [value]);
 
-  const candidates = useMemo(
-    () => buildMentionCandidates(membersQuery.data?.data ?? []),
+  const options = useMemo(
+    () => buildMentionOptions(membersQuery.data?.data ?? []),
     [membersQuery.data],
   );
 
   const suggestions = useMemo(() => {
     if (!mention) return [];
     const query = mention.query;
-    return candidates
+    return options.candidates
       .filter(
         (candidate) =>
           candidate.handle.includes(query) ||
           candidate.name.toLowerCase().includes(query),
       )
       .slice(0, MAX_SUGGESTIONS);
-  }, [mention, candidates]);
+  }, [mention, options]);
+
+  /** Members the same query names who have no handle — the picker's one
+   *  explanatory line, never rows. Filtered by the SAME query so the sentence
+   *  answers the search that is on screen, not the whole roster. */
+  const untaggable = useMemo(() => {
+    if (!mention) return '';
+    const query = mention.query;
+    return untaggableSentence(
+      options.untaggable.filter((name) => name.toLowerCase().includes(query)),
+    );
+  }, [mention, options]);
+
+  /** Is the picker actually ON SCREEN? A pending `@token` that matches nobody
+   *  and explains nobody shows nothing, and Escape must not be swallowed by an
+   *  invisible surface — the reply bar behind it is what the reader meant. */
+  const pickerOpen = mention !== null && (suggestions.length > 0 || untaggable !== '');
 
   // Every tray row — and the typing legend — holds its last content through
   // its own fade, so nothing ever animates out while empty.
@@ -395,24 +425,30 @@ export function ChannelComposer({
     // apply a mention or send the message (audit M5 — CJK input).
     if (event.key === 'Enter' && event.nativeEvent.isComposing) return;
 
-    if (mention && suggestions.length > 0) {
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        setActiveIndex((index) => (index + 1) % suggestions.length);
-        return;
+    if (pickerOpen) {
+      // Navigation and apply need something to land ON. The picker can be open
+      // with no rows at all — showing only the can't-be-tagged line — and in
+      // that state Enter must send the message like any other Enter.
+      if (suggestions.length > 0) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          setActiveIndex((index) => (index + 1) % suggestions.length);
+          return;
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          setActiveIndex(
+            (index) => (index - 1 + suggestions.length) % suggestions.length,
+          );
+          return;
+        }
+        if (event.key === 'Enter' || event.key === 'Tab') {
+          event.preventDefault();
+          applyMention(suggestions[activeIndex]);
+          return;
+        }
       }
-      if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        setActiveIndex(
-          (index) => (index - 1 + suggestions.length) % suggestions.length,
-        );
-        return;
-      }
-      if (event.key === 'Enter' || event.key === 'Tab') {
-        event.preventDefault();
-        applyMention(suggestions[activeIndex]);
-        return;
-      }
+      // Escape dismisses whatever the picker is showing — rows or a sentence.
       if (event.key === 'Escape') {
         event.preventDefault();
         setMention(null);
@@ -448,42 +484,66 @@ export function ChannelComposer({
       typing={{ label: typingShown ?? '', visible: typing }}
       tray={
         <>
-          {/* Mention autocomplete — floats above the whole tray. */}
-          {mention && suggestions.length > 0 && (
-            <div className="absolute bottom-full left-0 z-20 mb-2 w-72 max-w-full overflow-hidden rounded-xl border bg-popover shadow-md">
-              <ul role="listbox" aria-label="Mention someone">
-                {suggestions.map((candidate, index) => (
-                  <li
-                    key={candidate.key}
-                    role="option"
-                    aria-selected={index === activeIndex}
-                  >
-                    <button
-                      type="button"
-                      // Fire before the textarea blurs so the insertion lands.
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        applyMention(candidate);
-                      }}
-                      onPointerEnter={() => setActiveIndex(index)}
-                      className={cn(
-                        'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
-                        index === activeIndex && 'bg-accent',
-                      )}
+          {/* Mention autocomplete — floats above the whole tray. It opens for
+              a line that has nothing to OFFER but something to SAY, which is
+              the live state today: every row is a person with a handle, and
+              everyone else is the sentence underneath. */}
+          {pickerOpen && (
+            <div
+              className={cn(
+                'absolute bottom-full left-0 z-20 mb-2 w-72 max-w-full overflow-hidden rounded-xl border bg-popover shadow-md',
+                'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1',
+                'motion-safe:duration-150',
+              )}
+            >
+              {suggestions.length > 0 && (
+                <ul role="listbox" aria-label="Mention someone">
+                  {suggestions.map((candidate, index) => (
+                    <li
+                      key={candidate.key}
+                      role="option"
+                      aria-selected={index === activeIndex}
                     >
-                      {candidate.user === null ? (
-                        <LawexaAvatar size="sm" />
-                      ) : (
-                        <MemberAvatar user={candidate.user} size="sm" />
-                      )}
-                      <span className="truncate">{candidate.name}</span>
-                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                        @{candidate.handle}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      <button
+                        type="button"
+                        // Fire before the textarea blurs so the insertion lands.
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          applyMention(candidate);
+                        }}
+                        onPointerEnter={() => setActiveIndex(index)}
+                        className={cn(
+                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                          index === activeIndex && 'bg-accent',
+                        )}
+                      >
+                        {candidate.user === null ? (
+                          <LawexaAvatar size="sm" />
+                        ) : (
+                          <MemberAvatar user={candidate.user} size="sm" />
+                        )}
+                        <span className="truncate">{candidate.name}</span>
+                        {/* The handle is what separates two people with one
+                            name — the reason this row has a second column. */}
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                          @{candidate.handle}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {untaggable !== '' && (
+                <p
+                  className={cn(
+                    'px-3 py-2 text-xs text-muted-foreground',
+                    suggestions.length > 0 && 'border-t',
+                  )}
+                >
+                  {untaggable}
+                </p>
+              )}
             </div>
           )}
 

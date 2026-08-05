@@ -6,7 +6,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 
 import { cn } from '@/lib/utils';
-import { buildMentionHandleMap } from '@/lib/utils/collab';
+import { buildMentionChips } from '@/lib/utils/collab';
 import type { MessageMetadata } from '@/types/collab';
 import { rehypeChannelMentions } from './rehype-mentions';
 
@@ -34,7 +34,9 @@ import { rehypeChannelMentions } from './rehype-mentions';
  * TWO CHIP WEIGHTS, MATCHING THE PLAIN-TEXT PATH: a mention of the VIEWER
  * renders filled and readable; a mention of anyone else is a quiet gold tint.
  * Both are styled here rather than in the plugin so the two renderers hold one
- * visual definition (`MessageContent` uses the same two class pairs).
+ * visual definition (`MessageContent` uses the same two class pairs). Which
+ * weight applies is decided by UUID inside the plugin — see its docblock for
+ * why a display-name comparison could not survive usernames.
  */
 
 /** `react-markdown` doesn't re-export `PluggableList`; derive it from the prop. */
@@ -95,18 +97,10 @@ export function LawexaMessageContent({
   /** For the self-mention emphasis; `null` mutes the distinction. */
   viewerUuid: string | null;
 }) {
-  const rehypePlugins = useMemo<PluginList>(() => {
-    // Same rule as `buildMentionHandleMap`: a payload without `mentions`
-    // degrades to "nobody was mentioned", it never takes the feed down.
-    const selfLabels = new Set(
-      viewerUuid
-        ? (metadata.mentions ?? [])
-            .filter((mention) => mention.uuid === viewerUuid)
-            .map((mention) => mention.name)
-        : [],
-    );
-    return [rehypeChannelMentions(buildMentionHandleMap(metadata), selfLabels)];
-  }, [metadata, viewerUuid]);
+  const rehypePlugins = useMemo<PluginList>(
+    () => [rehypeChannelMentions(buildMentionChips(metadata), viewerUuid)],
+    [metadata, viewerUuid],
+  );
 
   return <LawexaProse content={content} rehypePlugins={rehypePlugins} />;
 }

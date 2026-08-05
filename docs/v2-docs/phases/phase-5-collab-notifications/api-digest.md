@@ -11,6 +11,7 @@ Sources (all in `Stay03/lawexa-api-v3`):
 - `docs/api/channel-quiz.md` — "QZ"
 - `docs/channel-lists-and-files/frontend-contract.md` — "LF"
 - `docs/frontend-replies/reply-2026-08-03-channels-spaces-update.md` — "RP" (names/paths only; contradictions flagged)
+- `docs/frontend-replies/reply-2026-08-05-usernames-and-tagging.md` — usernames + tagging (§F.19; supersedes the old mention rule everywhere)
 
 Baseline note: the cross-space `GET /api/channels` list and "recently-viewed" exist (RP calls them consumed baseline) but their contract lives in the July-18 exchange docs, not in any source above — resolve from local code, not this digest.
 
@@ -25,10 +26,11 @@ Sources: AC §6, FC §14, 3b–3f, QZ "Chat cards", RP §1b/§2.
 | `uuid` | string | yes | yes | — |
 | `channel_uuid` | string | yes | yes | — |
 | `is_ai` | bool — `true` ⇒ Lawexa-authored (AI reply, `ai_divider`, or quiz card). THE discriminator; never infer AI from `author: null` | yes | yes | — |
-| `author` | `{uuid,name,avatar_url}` \| `null` (`null` = Lawexa OR hard-deleted human; disambiguate via `is_ai`) | yes | yes | — |
+| `author` | `{uuid,name,username,avatar_url}` \| `null` (`null` = Lawexa OR hard-deleted human; disambiguate via `is_ai`). `username: string \| null` is the unique `@handle` — the ONLY thing tagging matches (§F.19); `null` = not taggable, and still `null` on every production account as of 2026-08-05 | yes | yes | — |
 | `content` | string ≤8000 | yes | yes | `message.updated` replaces bubble |
 | `metadata.type` | `"text"` (or absent) · `"ai_divider"` · `"quiz_game_live"` · `"quiz_game_finished"` | yes | yes | — |
-| `metadata.mentions` | `[{uuid,name}]` — resolved members only; AI messages parse mentions identically | yes | yes | re-parsed on edit |
+| `metadata.mentions` | `[{uuid,name,username}]` — resolved members only; AI messages parse mentions identically. `username` (2026-08-05) is the handle that resolved and the key a renderer must match the body's `@token` on; `null` on mentions recorded before that date (no backfill), whose bodies hold name slugs instead — §F.19 | yes | yes | re-parsed on edit |
+| `metadata.unmatched_handles` | `string[]` — handles the writer typed that matched nobody (2026-08-05). **The message still posts**: a hint for the WRITER, never an error. `@lawexa` never appears here. Absent on pre-deploy messages — §F.19 | yes | yes | re-parsed on edit |
 | `metadata.lawexa_mentioned` | bool | yes | yes | — |
 | `metadata.execution_id` | string \| `null` — on every AI-authored message (since 2026-08-03); equals `ai.turn_started`'s / summon response's `execution_id` exactly. `null` on human messages AND pre-2026-08-03 AI history (no backfill) | yes | yes (one serializer builds both — cannot disagree) | arrives with the bubble |
 | `metadata.session_uuid` | string \| `null` — the AI session behind an AI bubble; feed it to `GET /channels/{uuid}/ai/sessions/{session}` for the full transcript. Same null rules as `execution_id` | yes | yes | — |
@@ -115,7 +117,7 @@ Envelope `{success, message, data}`; length-aware pagination everywhere except *
 - `GET/PUT/DELETE /api/channels/{uuid}` — settings incl. `ai_mentions_notify` (bool, default false) and `quiz_host_policy` (`all_members` default | `admins_only`)
 - `POST /api/channels/{uuid}/join` — public only, must be space member; private → 403
 - `POST /api/channels/{uuid}/leave`
-- `GET /api/channels/{uuid}/members` — rows carry `last_read_message_uuid`; `notify_level` on **your own row only**
+- `GET /api/channels/{uuid}/members` — rows carry `last_read_message_uuid`; `notify_level` on **your own row only**; `user.username` is the tag handle, `null` = not taggable (§F.19)
 - `POST /api/channels/{uuid}/members` — invite (**30/min**); invitee must be active space member else 422
 - `PATCH /api/channels/{uuid}/members/me` `{notify_level: all|mentions_only|muted}` — the ONLY way to change notify level
 - `PUT/DELETE /api/channels/{uuid}/members/{userUuid}` — role change (rejects notify_level) / remove
@@ -237,7 +239,12 @@ Source: QZ; gaps confirmed in RP §1e.
 12. **Editing `@lawexa` into a message never summons** (post-only, D8) — no `ai` field on the edit response. `data.ai` blocked-state is private to the summoner; other members see nothing. (FC §11, AC §12a)
 13. **Muted members still receive `.channel.unread`** — badge updates always; toasts/sounds gated client-side by `my_notify_level`. `notify_level` is changeable ONLY via `PATCH /channels/{uuid}/members/me` and visible only on your own member row. (FC §18.3, AC §5)
 14. **Read-receipt pointer can rest on a soft-deleted message** — you'll receive a uuid you can't locate in the feed; treat as "read up to an unknown recent point". Soft-deleted messages are also VALID markRead targets. (3c)
-15. **Mentions**: handle = name lowercased with spaces removed OR dotted; ambiguous handles match nobody; diacritics typed as-is; channel invitees must already be active space members (422 otherwise). (FC §8, AC §5–6)
+15. **Channel invitees** must already be active space members (422 otherwise). (AC §5–6)
 16. **Push token DELETE needs a JSON body** (form-encoded 422s on DELETE); registering someone else's token reassigns it (shared-device rule); ignore FCM foreground messages entirely (Reverb covers open app); iOS needs installed PWA. (FC §9, AC §11)
 17. **Quiz `settings` are snapshotted into the game at go-live**; `quiz_host_policy` unknown values behave as `all_members`; quiz-card `is_ai` was `false` for the feature's first day only (fixed 2026-08-03 before any quiz UI existed). (QZ, RP §1e/§5)
 18. **Reactions/pins/reads broadcast only on actual state change** — no-op toggles/marks are silent; a concurrent double-pin may rarely double-broadcast (benign, idempotent payload). (3c, 3e, 3f)
+19. **Mentions match a unique `@username` and NOTHING else** (2026-08-05 — supersedes the name-slug rule this item used to carry, which item 15 held until that date). Every account has one, generated from the name and unique by suffix: "Ada Obi" → `adaobi`, a second "Ada Obi" → `adaobi2`. `@Ada Obi` and `@ada.obi` now tag nobody. Rules: 3–30 chars, `[a-z0-9_]`, must start with a letter or number; reserved words (`lawexa`, `admin`, `support`, …) and taken handles 422 with the reason in `errors.username`; submitting your own current handle is a no-op. Consequences for the client:
+    - **`username: string | null` is on every `SlimUser`** (message authors, member rows) and at the top level of `GET /api/profile`; `PUT /api/profile {"username": …}` changes it. **`null` means NOT TAGGABLE** — guests never get one, and neither does any account predating the one-time `users:backfill-usernames`. **Measured 2026-08-05: that backfill has NOT run, so null is the live case on every production account**, not an edge case. A picker must insert `username` and must not offer a member without one.
+    - **`metadata.mentions[].username`** is the handle the server resolved — the key a renderer matches the typed `@token` on. **`null` on every mention recorded before 2026-08-05** (history is not backfilled), so the name-slug forms survive as the fallback for exactly those entries and for nothing else.
+    - **`metadata.unmatched_handles: string[]`** lists handles the writer typed that resolved to nobody. **The message still posts** — ordinary text is full of `@` — so this is a hint to show the WRITER, never an error. `@lawexa` never appears here; it sets `lawexa_mentioned`. Absent on pre-deploy messages.
+    - Notification previews still read the **display name** ("@Ada Obi"), not the raw handle. (reply-2026-08-05-usernames-and-tagging.md; verified against production 2026-08-05 — see `docs/v2-docs/backend-ask-2026-08-05-username-backfill.md`)

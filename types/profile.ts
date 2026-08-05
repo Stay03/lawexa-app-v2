@@ -2,6 +2,14 @@ import type { UserType } from './auth';
 
 export interface ProfileUpdatePayload {
   name?: string;
+  /**
+   * The account's `@handle`. 3–30 characters, lowercase letters, numbers and
+   * underscores, starting with a letter or number. Reserved words and taken
+   * handles come back 422 with the reason in `errors.username`; sending the
+   * account's own current handle is a no-op, not a conflict (all three
+   * measured against production, 2026-08-05).
+   */
+  username?: string;
   user_type?: UserType;
   profession?: string;
   country?: string;
