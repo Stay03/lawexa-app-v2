@@ -59,12 +59,17 @@ import { spacesQueries } from '../queries';
  * says so, because "transfer ownership" alone reads as "and then I leave",
  * which is not what happens.
  *
- * THE ROSTER IS ALREADY WARM WHEN THIS OPENS. `SpaceScreen` mounts the same
- * roster key alongside the space (it needs the caller's role from it), so this
- * sheet's own `enabled: open` query resolves to a populated cache entry and
- * paints rows rather than a skeleton — v1's lazy-fetch-on-open is deliberately
- * NOT the shape here. The gate is kept anyway so the sheet is self-sufficient
- * if it is ever mounted somewhere the screen has not already asked.
+ * THE ROSTER IS ALREADY WARM WHEN THIS OPENS, AND THAT IS WHY IT IS MOUNTED
+ * WHERE IT IS. `CollabFrame` mounts the same roster key on the SPACE route
+ * (the lobby's People block reads it), so this sheet's own `enabled: open`
+ * query resolves to a populated cache entry and paints rows rather than a
+ * skeleton — v1's lazy-fetch-on-open is deliberately NOT the shape here. The
+ * gate is kept anyway so the sheet is self-sufficient wherever it is mounted.
+ *
+ * It is NOT reachable from a channel route: `?roster=1` is refused there, both
+ * because the roster query is not mounted (so it would open cold) and, more
+ * importantly, because the `?invite=` param below would then have two owners
+ * on one screen — see the rule in `CollabFrame`.
  *
  * Rows key on `member.user.uuid` — the member surface is uuid-only (§F.4).
  * Phase-5 W4, 2026-08-04.

@@ -22,6 +22,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -30,6 +31,11 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { SwitchBackButton } from '@/app/v2/switch-back-button';
+import {
+  NavSignalMark,
+  QUIET_NAV_SIGNAL,
+  useCollabNavSignal,
+} from '@/v2/features/channels/my-channels/nav-signal';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
@@ -156,6 +162,10 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
     fetchNextPage: recentsQuery.fetchNextPage,
     rootRef: scrollRef,
   });
+  // The Channels row's live unread signal — the same hook the drawer calls, so
+  // the rail and the drawer can no more drift on what a row SAYS than on which
+  // rows exist. Above the mobile early-return, because hooks are unconditional.
+  const collabSignal = useCollabNavSignal();
 
   if (isMobile) return null;
 
@@ -218,19 +228,40 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
               }
 
               const active = isActive(item.href);
+              // The unread grammar on the nav row: bold + gold dot = unread, a
+              // number is ONLY ever mentions, no red. The label bolds here and
+              // the mark renders in the trailing slot.
+              const signal = item.signalId ? collabSignal : QUIET_NAV_SIGNAL;
+              const alerting = signal.unread || signal.mentions > 0;
               return (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
                     asChild
                     tooltip={item.label}
                     isActive={active}
-                    className={cn('transition-colors', active && ACTIVE_ROW)}
+                    className={cn(
+                      'transition-colors',
+                      active && ACTIVE_ROW,
+                      !active && alerting && 'font-semibold',
+                    )}
                   >
                     <Link href={item.href}>
                       {Icon ? <Icon /> : null}
                       <span>{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
+                  {/* The primitive's OWN badge slot, not a child of the button:
+                      `SidebarMenuButton` is `overflow-hidden` and collapses to
+                      `size-8 p-2` in the icon rail, so a mark inside it is
+                      clipped there. `SidebarMenuBadge` is the sibling the
+                      primitive positions for exactly this, and it hides itself
+                      when the rail collapses — where the row is a bare icon
+                      with a tooltip and has no room to say more. */}
+                  {alerting ? (
+                    <SidebarMenuBadge>
+                      <NavSignalMark signal={signal} />
+                    </SidebarMenuBadge>
+                  ) : null}
                 </SidebarMenuItem>
               );
             })}

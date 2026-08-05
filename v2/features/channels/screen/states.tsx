@@ -1,17 +1,23 @@
-import { Eye, Loader2, Lock, LogIn, MessagesSquare, WifiOff } from 'lucide-react';
+import { format } from 'date-fns';
+import { Eye, Hash, Loader2, Lock, LogIn, UserPlus, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Channel, SlimUser } from '@/types/collab';
+import { PlaceCrest } from '@/v2/features/collab/kit/Crest';
+import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
+import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
+import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { MESSAGE_MEASURE } from '../feed/measure';
 
 /**
- * states — the channel screen's loading shapes and designed refusals, shared
- * by the live screen AND the route fallback (`app/v2/channels/[channelId]/
- * loading.tsx`) so the two silhouettes can never drift (§8's home-frame
- * lesson). Phase-5 W2, 2026-08-04. All panels render through the collab
- * feature's `CollabMessage` (error ≠ empty, refusals are designed states —
- * study A0/A3). Everything here is presentational and hook-free, so the
+ * states — the channel screen's loading shapes, its designed refusals, and the
+ * block a channel opens with. Shared by the live screen AND the route fallback
+ * (`app/v2/channels/[channelId]/loading.tsx`) so the two silhouettes can never
+ * drift (§8's home-frame lesson). Phase-5 W2, redesigned in the W2 redesign
+ * wave (2026-08-05). Everything here is presentational and hook-free, so the
  * route fallback can render it `aria-hidden` + `inert`.
  *
  * `still` follows the house rule (quiz `states.tsx` precedent): a route
@@ -21,8 +27,9 @@ import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 
 /* ── Feed shapes ──────────────────────────────────────────────────────────── */
 
-/** One author-run skeleton — avatar + name/time bar + one or two text bars,
- *  the exact `MessageGroupRow` geometry. */
+/** One author-run skeleton — avatar + name/time bar + one or two text bars, at
+ *  the `MessageGroupRow` geometry INCLUDING its measure, so the swap from
+ *  skeleton to text moves no line ending. */
 function MessageGroupSkeleton({
   still,
   lines,
@@ -36,7 +43,10 @@ function MessageGroupSkeleton({
   return (
     <div className="flex gap-3 px-1">
       <Skeleton className={cn('mt-0.5 size-8 shrink-0 rounded-full', bar)} />
-      <div className="min-w-0 flex-1 space-y-2">
+      {/* `text-[0.9375rem]` with no text in it: `ch` resolves against the
+          element's own font size, so this is what makes the skeleton's 66ch
+          the SAME width as the body text that replaces it. */}
+      <div className={cn('min-w-0 flex-1 space-y-2 text-[0.9375rem]', MESSAGE_MEASURE)}>
         <div className="flex items-baseline gap-2">
           <Skeleton className={cn('h-3.5 rounded', bar)} style={{ width: nameWidth }} />
           <Skeleton className={cn('h-3 w-10 rounded', bar)} />
@@ -69,63 +79,126 @@ export function ChannelFeedSkeleton({ still = false }: { still?: boolean }) {
   );
 }
 
-/** Feed load failure — visually distinct from empty, real in-place retry. */
+/**
+ * Feed load failure — the kit's failure half, as a PANEL rather than a strip
+ * because nothing else is on screen when history fails: a 40px line alone in an
+ * empty transcript is a leftover, not a state (`CollabFailure`'s own rule).
+ */
 export function FeedErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <CollabMessage
+    <CollabFailure
+      presentation="panel"
       icon={WifiOff}
-      tone="alert"
       title="Couldn't load messages"
-      description="We couldn't load this channel's history. Check your connection and try again."
-      action={
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          Try again
-        </Button>
-      }
+      message="We couldn't load this channel's history. Check your connection and try again."
+      onRetry={onRetry}
     />
   );
 }
 
 /**
- * The designed empty channel — teaches (name + purpose) and acts (focus the
- * composer). Never a blank pane (DIRECTION 13).
+ * ChannelIntro — how a channel OPENS, and the same block when it is empty.
  *
- * `onWriteFirstMessage` IS OPTIONAL BECAUSE THE ACT IS. A space member
- * previewing a public channel they have not joined can read this room and not
- * write in it, so the same empty state has to be able to teach WITHOUT
- * offering a button that would only 403 — {@link ChannelPreviewDock} already
- * carries the one way forward, and a second, broken one here would be worse
- * than none. The title changes with it: an unjoined room is not "ready" for
- * you yet.
+ * ── ONE COMPONENT FOR BOTH, WHICH IS THE WHOLE IDEA ────────────────────────
+ * The shipped screen had two unrelated answers to "what is this room": a 12px
+ * muted sentence ("This is the beginning of general.") at the head of loaded
+ * history, and a centred `CollabMessage` panel when there was nothing. So a
+ * channel taught you what it was for exactly once — on the day it was empty —
+ * and never again. This is the birth certificate: the crest, the name, the
+ * purpose, who is here, a way to bring someone else, and the day it started.
+ * It renders at the top of the FIRST page of history and, unchanged, as the
+ * empty state (DIRECTION 13: empty states teach and act).
+ *
+ * ── THE CREST IS THE CHANNEL'S OWN ─────────────────────────────────────────
+ * `PlaceCrest` on the channel's uuid, not the space's: the space is already
+ * named in the header's breadcrumb and again in the line below, and a room
+ * deserves a mark of its own. Its kind is not guessed — the visibility glyph
+ * beside the name states it in words the crest cannot.
+ *
+ * ── WHAT EACH AUDIENCE IS OFFERED ──────────────────────────────────────────
+ * `onWriteFirstMessage` only when the channel is genuinely empty AND the
+ * reader may write (it focuses the composer); `onAddPeople` only for a channel
+ * admin. A previewer gets the block with no verbs at all — their one way
+ * forward is the join dock at the foot of the transcript, and a second, failing
+ * button here would be worse than none.
  */
-export function FeedEmptyState({
-  channelName,
-  description,
+export function ChannelIntro({
+  channel,
+  members,
+  onOpenRoster,
+  onAddPeople,
   onWriteFirstMessage,
 }: {
-  channelName: string;
-  description: string | null;
+  channel: Channel;
+  members: readonly SlimUser[];
+  onOpenRoster?: () => void;
+  onAddPeople?: () => void;
   onWriteFirstMessage?: () => void;
 }) {
+  const VisibilityIcon = channel.visibility === 'private' ? Lock : Hash;
+  const total = channel.active_members_count;
+  const countLabel = `${total} ${total === 1 ? 'member' : 'members'}`;
+  const created = channel.created_at ? new Date(channel.created_at) : null;
+  const createdLabel =
+    created && !Number.isNaN(created.getTime())
+      ? `Created ${format(created, 'd MMMM yyyy')}`
+      : null;
+
   return (
-    <CollabMessage
-      icon={MessagesSquare}
-      tone="neutral"
-      title={onWriteFirstMessage ? `${channelName} is ready` : 'Nothing here yet'}
-      description={
-        description?.trim() ||
-        (onWriteFirstMessage
-          ? 'No messages yet. Whatever your group is working on, this is where it starts.'
-          : `Nobody has written in ${channelName} yet.`)
-      }
-      action={
-        onWriteFirstMessage ? (
-          <Button size="sm" onClick={onWriteFirstMessage}>
-            Write the first message
-          </Button>
-        ) : undefined
-      }
-    />
+    <div className="flex flex-col items-start gap-3 pb-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+      <PlaceCrest uuid={channel.uuid} name={channel.name} size="lg" />
+
+      <div className="min-w-0">
+        <h2 className="flex items-center gap-1.5 text-xl leading-tight font-semibold">
+          <VisibilityIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <span className="sr-only">{channel.visibility_label}</span>
+          <span className="min-w-0 break-words">{channel.name}</span>
+        </h2>
+        <p className={cn('mt-1.5 text-sm leading-relaxed text-muted-foreground', MESSAGE_MEASURE)}>
+          {channel.description?.trim() ||
+            `This is the very beginning of ${channel.name}. Everything written here stays with the channel.`}
+        </p>
+      </div>
+
+      {/* `min-h-6` IS A SCROLL-CONTRACT DETAIL, not styling. The roster is a
+          separate request, so this line starts as the count in WORDS (one line
+          of 12px text) and becomes a row of 24px faces when it lands. Without a
+          reserved height the intro would grow by ~8px at the very top of the
+          transcript, shifting everything below it under a reader who is
+          scrolled up. The stack's own height is the floor. */}
+      <MetaLine
+        className="min-h-6"
+        lead={[
+          <PresenceStack
+            key="people"
+            members={members}
+            total={total}
+            countLabel={countLabel}
+            label={countLabel}
+            size="sm"
+            onClick={onOpenRoster}
+          />,
+          channel.space.name,
+          createdLabel,
+        ]}
+      />
+
+      {(onWriteFirstMessage || onAddPeople) && (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {onWriteFirstMessage && (
+            <Button size="sm" onClick={onWriteFirstMessage}>
+              Write the first message
+            </Button>
+          )}
+          {onAddPeople && (
+            <Button size="sm" variant="outline" onClick={onAddPeople}>
+              <UserPlus aria-hidden className="size-4" />
+              Add people
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -135,23 +208,21 @@ export function FeedEmptyState({
  *
  * THE ABSENCE IS THE POINT, AND SO IS ITS PLACE. Reading is open here and
  * replying is not, so the honest surface is the one the reply would have come
- * from: the dock keeps the composer's exact column and cap
- * (`max-w-xs` / `sm:max-w-md`), so it sits on the transcript's own axis and the
- * reader meets a way IN rather than a control that fails.
+ * from: the dock keeps the composer's exact column and cap (the transcript's
+ * own `max-w-3xl`), so it sits on the transcript's axis and the reader meets a
+ * way IN rather than a control that fails.
  *
  * IT IS NOT THE COMPOSER'S HEIGHT. It is a taller bordered card, and its
- * sentence wraps to two or three lines on a narrow phone with a long channel
- * name. Nothing has to be reserved for that here: the feed measures whatever
- * occupies this slot (`--v2-chan-dock-h`, a live `ResizeObserver`) and gives
- * the transcript exactly that much clearance, wrapping included.
+ * sentence wraps on a narrow phone with a long channel name. Nothing has to be
+ * reserved for that here: the feed measures whatever occupies this slot
+ * (`--v2-chan-dock-h`, a live `ResizeObserver`) and gives the transcript
+ * exactly that much clearance, wrapping included.
  *
  * IT IS THE ONLY JOIN ON THE SCREEN. The header carries no second button: two
  * would be the same action twice, and a failure raised at the top would print
- * its sentence at the bottom. Everything about the attempt — the press, the
- * pending spinner, the server's words — happens in this one place.
+ * its sentence at the bottom.
  *
- * Hook-free: the screen owns the mutation, the pending flag and the error, so
- * this stays a presentational panel like the rest of this file.
+ * Hook-free: the screen owns the mutation, the pending flag and the error.
  */
 export function ChannelPreviewDock({
   channelName,
@@ -166,7 +237,7 @@ export function ChannelPreviewDock({
   error: string | null;
 }) {
   return (
-    <div className="mx-auto w-full max-w-xs px-4 pb-3 sm:max-w-md">
+    <div className="mx-auto w-full max-w-3xl px-4 pb-3">
       <div className="rounded-2xl border bg-background/95 px-3 py-2.5 shadow-lg backdrop-blur">
         <div className="flex items-center gap-2.5">
           <Eye aria-hidden className="size-4 shrink-0 text-muted-foreground" />
@@ -227,16 +298,12 @@ export function ChannelAccessDeniedState() {
 /** Channel detail load failure. */
 export function ChannelErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <CollabMessage
+    <CollabFailure
+      presentation="panel"
       icon={WifiOff}
-      tone="alert"
       title="Couldn't load this channel"
-      description="Something went wrong on our side. Please try again."
-      action={
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          Try again
-        </Button>
-      }
+      message="Something went wrong on our side. Please try again."
+      onRetry={onRetry}
     />
   );
 }
@@ -244,36 +311,31 @@ export function ChannelErrorState({ onRetry }: { onRetry: () => void }) {
 /* ── The whole screen's silhouette (route fallback + live pending) ───────── */
 
 /**
- * The channel screen's frame at rest: identity header row, the tab strip,
- * the feed column, and the floating composer pill. `app/v2/channels/
- * [channelId]/loading.tsx` renders it `still` and inert; the live screen
- * renders it (pulsing) while the channel detail resolves. Geometry mirrors
- * `ChannelScreen` exactly — max-w-3xl column, header paddings, the composer's
- * compact pill cap — so the hand-off is content resolving, not a layout swap.
+ * The channel screen's frame at rest: the ONE `h-14` header bar, the feed
+ * column, and the transcript-width composer. `app/v2/channels/[channelId]/
+ * loading.tsx` renders it `still` and inert; the live screen renders it
+ * (pulsing) while the channel detail resolves. Geometry mirrors the live
+ * screen exactly — the same bar height, the same `max-w-3xl` column, the same
+ * composer cap — so the hand-off is content resolving, not a layout swap.
+ *
+ * THERE IS NO TAB-STRIP ROW HERE ANY MORE, because there is none on the live
+ * screen: the sections ride inside the bar at `md:`+ and a bottom bar on a
+ * phone, and neither of those reserves a row above the transcript.
  */
 export function ChannelScreenFrame({ still = false }: { still?: boolean }) {
   const bar = still ? 'animate-none' : undefined;
   return (
     <div className="relative flex h-full min-h-0 flex-col">
-      {/* Identity header row */}
-      <div className="shrink-0 border-b px-4 pt-3 pb-2">
-        <div className="mx-auto w-full max-w-3xl">
-          <div className="flex items-center gap-2">
-            <Skeleton className={cn('size-4 rounded', bar)} />
-            <Skeleton className={cn('h-5 w-40 rounded', bar)} />
+      {/* The one header bar */}
+      <div className="shrink-0 border-b">
+        <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-2 px-4">
+          <Skeleton className={cn('size-4 shrink-0 rounded', bar)} />
+          <Skeleton className={cn('h-4 w-36 rounded', bar)} />
+          <Skeleton className={cn('hidden h-6 w-28 rounded-full md:block', bar)} />
+          <div className="flex flex-1 items-center justify-end gap-1.5">
+            <Skeleton className={cn('size-6 shrink-0 rounded-full', bar)} />
+            <Skeleton className={cn('h-8 w-16 shrink-0 rounded-lg', bar)} />
           </div>
-          <div className="mt-1.5 flex items-center gap-2">
-            <Skeleton className={cn('h-3.5 w-24 rounded', bar)} />
-            <Skeleton className={cn('h-3.5 w-20 rounded', bar)} />
-          </div>
-        </div>
-      </div>
-      {/* Tab strip */}
-      <div className="shrink-0 border-b px-4">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-4 py-2.5">
-          <Skeleton className={cn('h-4 w-12 rounded', bar)} />
-          <Skeleton className={cn('h-4 w-12 rounded', bar)} />
-          <Skeleton className={cn('h-4 w-12 rounded', bar)} />
         </div>
       </div>
       {/* Feed column */}
@@ -282,10 +344,10 @@ export function ChannelScreenFrame({ still = false }: { still?: boolean }) {
           <ChannelFeedSkeleton still={still} />
         </div>
       </div>
-      {/* Floating composer pill (compact cap, matches the live overlay) */}
+      {/* The composer, on the transcript's own column */}
       <div className="absolute inset-x-0 bottom-0">
-        <div className="v2-safe-bottom mx-auto w-full max-w-xs px-4 pb-3 sm:max-w-md">
-          <Skeleton className={cn('h-12 w-full rounded-3xl', bar)} />
+        <div className="v2-safe-bottom mx-auto w-full max-w-3xl px-4 pb-3">
+          <Skeleton className={cn('h-13 w-full rounded-2xl', bar)} />
         </div>
       </div>
     </div>

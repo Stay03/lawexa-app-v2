@@ -12,12 +12,14 @@ import { MyChannelsScreen } from '@/v2/features/channels/my-channels/MyChannelsS
  * the right first paint — and it is already warm, because the realtime spine
  * mounts this exact query key for its badge rollups.
  *
- * SEGMENT LAYOUT: the `/channels` collab gate already lives in
- * `app/v2/channels/layout.tsx` (W1), so this page needs none of its own.
+ * SEGMENT LAYOUT: the collab gate lives in `app/v2/(collab)/layout.tsx`, one
+ * door shared with `/spaces/*`, so this page needs none of its own. That
+ * layout also holds the persistent space frame — which renders nothing here,
+ * because a cross-space index is not inside any one space.
  *
  * IT LIVES IN AN `(index)` ROUTE GROUP so its `loading.tsx` wraps ONLY this
- * route. A `loading.tsx` placed directly in `app/v2/channels/` would also be
- * the outer boundary for `/channels/[channelId]`, and a hard load of a channel
+ * route. A `loading.tsx` placed directly in the `channels` segment would also
+ * be the outer boundary for `/channels/[channelId]`, and a hard load of a channel
  * would then paint the LIST's silhouette before the channel's own one — the
  * quiz `(hub)` precedent, and exactly what the phase plan asks for
  * ("route-group `loading.tsx` shaped like the channel").

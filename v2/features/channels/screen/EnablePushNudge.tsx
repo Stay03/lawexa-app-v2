@@ -74,7 +74,11 @@ export function EnablePushNudge() {
       )}
     >
       <div className="overflow-hidden">
-        <div className="border-b bg-primary/5 px-4 py-2">
+        {/* NO `border-b`. The channel gets ONE hairline, and it belongs to the
+            header above this bar; a second rule here made the chrome read as
+            two stacked bars rather than one header with something attached to
+            it. The tint is what separates the nudge from the transcript. */}
+        <div className="bg-primary/5 px-4 py-2">
           <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
             <Icon
               aria-hidden

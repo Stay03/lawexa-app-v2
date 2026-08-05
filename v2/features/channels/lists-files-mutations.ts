@@ -337,12 +337,67 @@ export function useReorderListItems(channelUuid: string, listUuid: string) {
 
 /* ── Files ────────────────────────────────────────────────────────────────── */
 
-/** Upload (multipart, 15 MB, content-sniffed). Success prepends the file into
- *  the library caches; the pending row is the tab's local state. */
+/** What one upload needs beyond the bytes: where to report progress, and how
+ *  to be called off. */
+export interface UploadChannelFileVariables {
+  file: File;
+  /** Bytes ON THE WIRE, not completion — the server is still storing the file
+   *  when this reaches `total`. See `channelFilesApi.upload`. */
+  onProgress?: (sent: number, total: number) => void;
+  /** Aborts the request. Cancellation is a REJECTION like any other; the
+   *  caller distinguishes it by remembering that it asked. */
+  signal?: AbortSignal;
+}
+
+/**
+ * What `mutate` accepts. A BARE `File` is the shorthand for "just send it" —
+ * the shape a caller with nowhere to show progress and no cancel affordance
+ * writes (the composer's attach). The object form is for a caller that has
+ * both, and it is an object precisely because progress and cancellation must
+ * ride WITH the file they belong to: a tray running four concurrent uploads
+ * needs each one addressable, and a hook-level callback could not tell them
+ * apart.
+ */
+export type UploadChannelFileInput = File | UploadChannelFileVariables;
+
+function uploadVariables(input: UploadChannelFileInput): UploadChannelFileVariables {
+  return input instanceof File ? { file: input } : input;
+}
+
+/**
+ * Upload (multipart, 15 MB, content-sniffed). Success prepends the file into
+ * the library caches; any in-flight row is the caller's own local state.
+ *
+ * ── DETERMINATE PROGRESS AND CANCEL ARE AVAILABLE HERE ────────────────────
+ * The transport DOES have a progress channel and an abort path — axios's
+ * `onUploadProgress` and `signal`, threaded through `channelFilesApi.upload`.
+ * Any surface that shows an upload can therefore show a real percentage and
+ * offer a real Cancel:
+ *
+ *     const controller = new AbortController();
+ *     upload.mutate({ file, signal: controller.signal,
+ *                     onProgress: (sent, total) => setPercent(sent / total) });
+ *
+ * TWO CAVEATS THAT ARE PART OF THE CONTRACT. `onProgress` measures BYTES ON
+ * THE WIRE: reaching `total` means the upload is sent, not stored, so a
+ * surface must not paint "done" until the promise settles (the Files tray
+ * shows an indeterminate "Finishing…" for that window). And once every byte is
+ * sent, aborting no longer stops anything the server is doing — offer Cancel
+ * only while bytes are still moving.
+ *
+ * FOR CONCURRENT UPLOADS USE `mutateAsync`. One `useMutation` is ONE observer:
+ * TanStack v5 overwrites the per-call `{onSuccess, onError}` on every
+ * `mutate()`, so with several files in flight only the last one's callbacks
+ * fire. `mutateAsync` returns a promise per call and has no such sharing.
+ * `v2/features/channels/files/use-upload-queue.ts` is the worked example.
+ */
 export function useUploadChannelFile(channelUuid: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => channelFilesApi.upload(channelUuid, file),
+    mutationFn: (input: UploadChannelFileInput) => {
+      const { file, onProgress, signal } = uploadVariables(input);
+      return channelFilesApi.upload(channelUuid, file, { onProgress, signal });
+    },
     meta: { silentError: true },
     onSuccess: (response) => {
       // Through the shared writer so the id-dedupe against a raced

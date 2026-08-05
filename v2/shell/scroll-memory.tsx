@@ -88,6 +88,24 @@ import { V2_SHELL_CONTENT_ID } from './shell-content';
  * a position there).
  */
 
+/**
+ * ── WHICH ELEMENT SCROLLS (added with the collab frame, Aug 5) ─────────────
+ * `.v2-shell__content` is no longer the only scroller. A route may dock a
+ * persistent frame — the space rail beside a channel — in which case the frame
+ * is `h-full` and the PANE inside it owns the scroll, or the rail would scroll
+ * away with the conversation. Such a pane marks itself with
+ * {@link V2_SCROLLER_ATTR}, and this module restores the innermost marked
+ * scroller when one is mounted, falling back to the shell's.
+ *
+ * The element is therefore resolved AT EVERY USE, never captured once: an
+ * offset is keyed to a history entry, and the entry's route decides which
+ * element that offset belongs to. For the same reason the fallback scroll
+ * listener and the restore-abort listeners bind to `document` in the capture
+ * phase (scroll does not bubble, but it does capture) rather than to an
+ * element that the next navigation may replace.
+ */
+const V2_SCROLLER_ATTR = 'data-v2-scroller';
+
 /** Sits beside Next's own fields on `history.state`. */
 const KEY_FIELD = '__v2ScrollKey';
 /** The App Router marker url-params.ts documents — presence ⇒ quiet writes. */
@@ -194,8 +212,10 @@ export function ScrollMemory() {
   }, [pathname, searchParams]);
 
   useEffect(() => {
-    const el = document.getElementById(V2_SHELL_CONTENT_ID);
-    if (!el) return;
+    /** The scroller that owns the current route (see the docblock). */
+    const activeScroller = (): HTMLElement | null =>
+      document.querySelector<HTMLElement>(`[${V2_SCROLLER_ATTR}]`) ??
+      document.getElementById(V2_SHELL_CONTENT_ID);
 
     const offsets = loadStore();
     let restorePending = false;
@@ -255,6 +275,8 @@ export function ScrollMemory() {
       // covered by the capture-phase click snapshot below instead.
       if (event.navigationType === 'push') return;
       if (restorePending) return;
+      const el = activeScroller();
+      if (!el) return;
       record(readKey(window.history.state as HistoryState) ?? activeKey, el.scrollTop);
       persistNow(); // synchronous — this may be the last tick before unload
     };
@@ -266,6 +288,8 @@ export function ScrollMemory() {
     // non-navigating clicks costs one map write and can never corrupt.
     const onAnyClick = () => {
       if (restorePending) return;
+      const el = activeScroller();
+      if (!el) return;
       record(readKey(window.history.state as HistoryState) ?? activeKey, el.scrollTop);
       persistSoon();
     };
@@ -277,11 +301,16 @@ export function ScrollMemory() {
     const saveFrame = () => {
       rafId = 0;
       if (restorePending) return;
+      const el = activeScroller();
+      if (!el) return;
       record(readKey(window.history.state as HistoryState) ?? activeKey, el.scrollTop);
       persistSoon();
     };
-    const onScroll = () => {
+    // Capture phase on the document: scroll does not bubble, but it does
+    // capture, so one listener covers whichever element owns the route.
+    const onScroll = (event: Event) => {
       if (restorePending || rafId) return;
+      if (event.target !== activeScroller()) return;
       rafId = window.requestAnimationFrame(saveFrame);
     };
 
@@ -305,27 +334,34 @@ export function ScrollMemory() {
         });
       };
       const abort = () => finish();
-      const fits = () => el.scrollHeight - el.clientHeight >= target;
+      // Resolved per attempt, not captured: on a traversal the returning
+      // route's scroller may not be the one that was mounted when the restore
+      // began (a collab pane replacing the shell scroller, or the reverse).
+      const fits = (el: HTMLElement) => el.scrollHeight - el.clientHeight >= target;
 
       cancelRestore = () => {
         if (frame) window.cancelAnimationFrame(frame);
         frame = 0;
-        for (const type of abortEvents) el.removeEventListener(type, abort);
+        for (const type of abortEvents) document.removeEventListener(type, abort, true);
       };
 
-      if (target === 0 || fits()) {
-        el.scrollTop = target;
+      const first = activeScroller();
+      if (first && (target === 0 || fits(first))) {
+        first.scrollTop = target;
         finish();
         return;
       }
 
       // Streaming return: pin to the honest skeleton position and wait for
       // the page to grow tall enough to hold the reader's place.
-      el.scrollTop = 0;
-      for (const type of abortEvents) el.addEventListener(type, abort, { passive: true });
+      if (first) first.scrollTop = 0;
+      for (const type of abortEvents) {
+        document.addEventListener(type, abort, { capture: true, passive: true });
+      }
       const tick = () => {
         frame = 0;
-        if (fits()) {
+        const el = activeScroller();
+        if (el && fits(el)) {
           el.scrollTop = target;
           finish();
           return;
@@ -348,7 +384,7 @@ export function ScrollMemory() {
       navigation.addEventListener('navigate', onNavigate);
       document.addEventListener('click', onAnyClick, { capture: true, passive: true });
     } else {
-      el.addEventListener('scroll', onScroll, { passive: true });
+      document.addEventListener('scroll', onScroll, { capture: true, passive: true });
     }
     window.addEventListener('popstate', onPopState);
     window.addEventListener('pagehide', onPageHide);
@@ -366,7 +402,7 @@ export function ScrollMemory() {
         navigation.removeEventListener('navigate', onNavigate);
         document.removeEventListener('click', onAnyClick, { capture: true });
       } else {
-        el.removeEventListener('scroll', onScroll);
+        document.removeEventListener('scroll', onScroll, true);
       }
       window.removeEventListener('popstate', onPopState);
       window.removeEventListener('pagehide', onPageHide);

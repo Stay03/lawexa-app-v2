@@ -1,17 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   Bell,
   Bookmark,
-  Hash,
   Loader2,
   Lock,
   LogOut,
-  MoreHorizontal,
   Pencil,
   Pin,
   Sparkles,
@@ -21,7 +18,6 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,25 +29,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { Message, NotifyLevel } from '@/types/collab';
+import type { Message, NotifyLevel, SlimUser } from '@/types/collab';
 import { channelAccess } from '@/v2/features/collab/access';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
-import { TabRow } from '@/v2/shell/TabRow';
 import {
   ChannelComposer,
   type ChannelComposerHandle,
@@ -80,6 +72,8 @@ import { GameOverlay } from '../quiz/GameOverlay';
 import { LiveQuizBar } from '../quiz/LiveQuizBar';
 import { QuizLibrarySheet } from '../quiz/QuizLibrarySheet';
 import { EnablePushNudge } from './EnablePushNudge';
+import { ChannelPlaceHeader, type HeaderLens } from './PlaceHeader';
+import { CHANNEL_SECTIONS, SectionSwitch, type SectionCounts } from './SectionSwitch';
 import {
   ChannelAccessDeniedState,
   ChannelErrorState,
@@ -88,12 +82,23 @@ import {
 } from './states';
 
 /**
- * ChannelScreen — the W2 channel client root: detail three-state, the
- * identity header (published into the shell header via header-context), the
- * Chat | Lists | Files strip on the ONE TabRow primitive with the tab in the
- * URL, the presence room, the read pointer, and the member/refusal branches.
- * Phase-5 W2; sources: plan W2 items 1–2, study A3 verdicts, design-research
- * OWNER FEEL DIRECTIVE — 2026-08-04.
+ * ChannelScreen — the W2 channel client root: detail three-state, ONE header
+ * bar ({@link ChannelPlaceHeader}, also published into the shell header via
+ * header-context), Chat | Lists | Files as a segmented control rather than a
+ * strip, the presence room, the read pointer, and the member/refusal branches.
+ * Phase-5 W2; rebuilt in the W2 redesign wave (2026-08-05) after the owner's
+ * verdict on the shipped chrome. Sources: plan W2 items 1–2, study A3 verdicts,
+ * design-research OWNER FEEL DIRECTIVE, redesign-brief "Channel screen".
+ *
+ * ── THE CHROME DIET, WHICH WAS THE WHOLE COMPLAINT ────────────────────────
+ * What used to sit above the first message on a phone: an identity header with
+ * its own hairline, a push nudge with its own hairline, the live-quiz bar, and
+ * a tab strip with its own hairline — around 150px, three rules, for a screen
+ * whose entire job is the conversation. What sits there now: one `h-14` bar and
+ * one hairline. The description became a disclosure on the name, the sections
+ * became a control INSIDE the bar (a bottom bar on a phone, hidden while the
+ * reader is in Chat), the push nudge lost its rule, and the member/online
+ * counts became faces.
  *
  * TAB / URL STATE MODEL. `?tab=` (and the Lists tab's `?list=`) are QUIET
  * URL writes (`quietReplaceUrlParams`): the component owns the state, the
@@ -110,16 +115,17 @@ import {
  * themselves. The state is what the screen obeys, so the mirror can lag by one
  * value but the screen is never showing something other than what it says.
  *
- * CHAT KEEPS ITS MOUNT across tab switches (v1's forceMount contract): the
- * feed pane toggles its display class instead of unmounting, so its scroll
- * position, outbox rows, unread divider and room-fed cache writes survive a
- * detour to Lists or Files. Lists/Files mount per visit (their caches make
- * that cheap, and the URL keeps their selection).
+ * CHAT KEEPS ITS MOUNT across section switches (v1's forceMount contract): the
+ * feed pane is hidden with `visibility: hidden` + `inert` — NEVER `display:
+ * none`, which destroys the browser's rendering state and with it the feed's
+ * scroll position — so its scroll position, outbox rows, unread anchor and
+ * room-fed cache writes survive a detour to Lists or Files. Lists/Files mount
+ * per visit (their caches make that cheap, and the URL keeps their selection).
  *
  * ACCESS IS ONE MODEL, READ ONCE ({@link channelAccess}), and every surface on
  * this screen is a consequence of it rather than a second opinion:
- *  - `member`  → tabs, feed, composer, engagement, the read pointer, the
- *    presence room, the quiz door, the push nudge, governance;
+ *  - `member`  → all three sections, feed, composer, engagement, the read
+ *    pointer, the presence room, the quiz door, the push nudge, governance;
  *  - `preview` (a space member reading a `space_public` channel they never
  *    joined) → THE REAL ROOM, read-only: the same feed, the same pins, the
  *    same roster, the same Lawexa history — with every write affordance ABSENT
@@ -133,12 +139,14 @@ import {
  *
  * THE BLOCKED READS ARE NOT REQUESTED, WHICH IS THE HARDER HALF. A 403 landing
  * inside a live query is a broken screen, so preview gates by MOUNT: the Files
- * and Lists panes are unreachable (the section strip only offers what the
+ * and Lists panes are unreachable (the section control only offers what the
  * access model allows, and `?tab=` resolves back to Chat when it names one it
  * does not), the saved lens and the quiz library never open, `?panel=`/`?game=`
  * values that would open them are refused by `canOpen`, and the read pointer
- * and the presence room are handed `enabled: false`. Nothing on this screen
- * sends a request a previewer's token cannot answer for.
+ * and the presence room are handed `enabled: false`. The two count subscriptions
+ * that feed the section control are `enabled: false` and therefore issue no
+ * request at all. Nothing on this screen sends a request a previewer's token
+ * cannot answer for.
  *
  * CHANNEL SWITCHES REMOUNT WHOLESALE: the route shell keys this component by
  * `channelId`, so tab/reply/dialog state, scroll baselines and the feed's
@@ -147,7 +155,7 @@ import {
  *
  * GAME MODE (W6). A live quiz is a MODE over this screen, not a route away
  * from it: `?game={uuid}` mounts `GameOverlay` across the whole channel — over
- * the identity header and the tab strip as well as the panes — so nothing
+ * the header bar and the section bar as well as the panes — so nothing
  * underneath reflows and the chat keeps its scroll, its history and its
  * presence room while the game runs.
  *
@@ -192,6 +200,42 @@ export function ChannelScreen({
   const access = channel ? channelAccess(channel) : null;
   const canRead = access?.canRead === true;
   const canParticipate = access?.canParticipate === true;
+
+  /* ── The people in the header, and in the channel's intro ─────────────────
+        The header shows FACES now, not the word "4 members", so it needs the
+        roster. This is the SAME cache entry the composer's mention
+        autocomplete and the members sheet already read, so on a member's
+        screen it costs no extra request; for a previewer it is one request the
+        access model explicitly allows (the roster read is open in preview) and
+        gated on `canRead` so a private-channel refusal never asks. */
+  const rosterQuery = useQuery({
+    ...channelsQueries.members(channelUuid, { viewerId }),
+    enabled: canRead,
+  });
+  const memberFaces = useMemo<readonly SlimUser[]>(() => {
+    const rows = rosterQuery.data?.data;
+    if (!rows) return NO_FACES;
+    return rows.filter((member) => member.is_active).map((member) => member.user);
+  }, [rosterQuery.data]);
+
+  /* ── The section counts, read from cache and never fetched ────────────────
+        `enabled: false` subscribes to the two caches without ever issuing a
+        request: the Lists and Files sections fill them when they are opened,
+        and until then the segmented control simply shows no number rather than
+        a zero it has not earned. It also means a previewer's screen — whose
+        Lists and Files reads are blocked — asks for nothing at all here. */
+  const listsCount = useQuery({
+    ...channelsQueries.taskLists({ channelUuid, viewerId }),
+    enabled: false,
+  }).data?.pagination.total;
+  const filesCount = useQuery({
+    ...channelsQueries.files({ channelUuid, viewerId }),
+    enabled: false,
+  }).data?.pagination.total;
+  const sectionCounts = useMemo<SectionCounts>(
+    () => ({ lists: listsCount, files: filesCount }),
+    [listsCount, filesCount],
+  );
 
   /* Both are MEMBER-ONLY transports and both are gated at the source. The
      presence room admits active channel members alone (`broadcasting/auth`
@@ -304,12 +348,12 @@ export function ChannelScreen({
   const deleteMutation = useDeleteChannel(channelUuid);
   const notifyMutation = useSetChannelNotifyLevel(channelUuid);
 
-  // Publish the channel name into the shell header's centre slot.
-  const channelName = channel?.name ?? null;
-  useEffect(() => {
-    if (channelName) setHeaderContext({ title: channelName, confidential: false });
-    return () => clearHeaderContext();
-  }, [channelName]);
+  /* NOTHING IS PUBLISHED INTO THE SHELL HEADER'S CENTRE SLOT ANY MORE. This
+     screen used to `setHeaderContext({ title })`, which was already dead: the
+     collab routes hand the shell their own header slot, and `V2Header`'s
+     centre only renders published context on routes that have not. Keeping the
+     call would have been a second, invisible owner of the channel's name — and
+     the name has exactly one owner on this screen, the header bar below. */
 
   /**
    * SETTERS ARE LISTED, NOT ASSUMED, in this component's dependency arrays.
@@ -328,6 +372,9 @@ export function ChannelScreen({
       // the param is meaningless on other tabs and harmless in the URL.
     });
   }, [setTab]);
+
+  /** Show the file library — the composer's "it landed in Files" offer. */
+  const openFiles = useCallback(() => selectTab('files'), [selectTab]);
 
   // The hook's dispatchers are stable; the hook OBJECT is not, so the
   // dispatchers are what the callbacks below depend on — the same rule the
@@ -440,205 +487,150 @@ export function ChannelScreen({
     );
   }
 
-  const VisibilityIcon = channel.visibility === 'private' ? Lock : Hash;
   const notifyLevel: NotifyLevel = channel.my_notify_level ?? 'all';
   /** A space member reading a public channel they have not joined. Named
    *  because several affordances exist ONLY here (the read-only Lawexa door,
    *  the dock that stands where the composer stands). */
   const isPreview = access.state === 'preview';
 
-  const identityHeader = (
-    <div className="shrink-0 border-b px-4 pt-3 pb-2">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <VisibilityIcon
-                aria-hidden
-                className="size-4 shrink-0 text-muted-foreground"
-              />
-              <span className="sr-only">{channel.visibility_label}</span>
-              <h1 className="truncate text-lg leading-tight font-semibold">
-                {channel.name}
-              </h1>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-              <Link
-                href={`/spaces/${channel.space.uuid}`}
-                className={cn(
-                  'rounded transition-colors duration-150 hover:text-foreground motion-reduce:transition-none',
-                )}
-              >
-                {channel.space.name}
-              </Link>
-              <span aria-hidden>·</span>
-              {/* The roster read is open to a previewer, so the count is a
-                  door for them too — only the private-channel refusal leaves
-                  it as plain text. */}
-              {canRead ? (
-                <button
-                  type="button"
-                  onClick={() => panel.show('members')}
-                  className="v2-interactive inline-flex items-center gap-1 rounded transition-colors duration-150 hover:text-foreground motion-reduce:transition-none"
-                >
-                  <Users aria-hidden className="size-3.5" />
-                  {channel.active_members_count}{' '}
-                  {channel.active_members_count === 1 ? 'member' : 'members'}
-                </button>
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  <Users aria-hidden className="size-3.5" />
-                  {channel.active_members_count}{' '}
-                  {channel.active_members_count === 1 ? 'member' : 'members'}
-                </span>
-              )}
-              {/* Presence, softened: a quiet count, no green dots (DIRECTION 7). */}
-              {room.onlineCount > 0 && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>{room.onlineCount} online</span>
-                </>
-              )}
-            </div>
-          </div>
+  /* WHICH SECTIONS THIS READER CAN REACH — derived from the access model, one
+     entry per tab, so the control and the pane can never disagree about what is
+     available. Chat is the room itself and is open to anyone who may read it;
+     Lists and Files each hang off their own capability, because their reads
+     are separate rulings (and the lists one may yet open — see
+     `channelAccess`). */
+  const sectionAvailable: Record<ChannelTab, boolean> = {
+    chat: true,
+    lists: access.canReadLists,
+    files: canParticipate,
+  };
+  const sections = CHANNEL_SECTIONS.filter((entry) => sectionAvailable[entry.id]);
 
-          {/* NO JOIN BUTTON HERE, AND THAT IS THE DESIGN. A previewer's join
-              lives in the dock at the foot of the transcript — always visible,
-              at the place the reply would have come from, carrying the
-              server's sentence when an attempt fails. A second button up here
-              would be the same action twice, and the failure would land at the
-              other end of the screen from the press. */}
-          <div className="flex shrink-0 items-center gap-2">
-            {/* The collection affordances — quiet, iconic, beside the menu
-                rather than inside it, because they are READING moves the
-                reader makes mid-conversation, not settings. Pins are shared
-                and their list is open to a previewer; saves are a write the
-                previewer does not have, so the bookmark is simply not there. */}
-            {canRead && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Pinned messages"
-                title="Pinned messages"
-                onClick={() => panel.show('pinned')}
-              >
-                <Pin aria-hidden className="size-4" />
-              </Button>
-            )}
-            {canParticipate && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Saved messages"
-                title="Saved messages (private to you)"
-                onClick={() => panel.show('saved')}
-              >
-                <Bookmark aria-hidden className="size-4" />
-              </Button>
-            )}
-            {/* Lawexa's history is open to a previewer, and their cluster has
-                no menu to put it in (the menu is settings, and they have
-                none), so it stands as its own quiet door. */}
-            {isPreview && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Lawexa sessions"
-                title="Lawexa sessions"
-                onClick={() => panel.show('ai')}
-              >
-                <Sparkles aria-hidden className="size-4" />
-              </Button>
-            )}
-            {canParticipate && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    aria-label="Channel options"
-                  >
-                    <MoreHorizontal aria-hidden className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Bell aria-hidden className="size-3.5" />
-                    Notifications
-                  </DropdownMenuLabel>
-                  {/* N1: the mutation assigns `my_notify_level` into every
-                      cached channel row + re-rolls the space (Ruling A). */}
-                  <DropdownMenuRadioGroup
-                    value={notifyLevel}
-                    onValueChange={(value) =>
-                      notifyMutation.mutate(value as NotifyLevel)
-                    }
-                  >
-                    <DropdownMenuRadioItem value="all">
-                      All messages
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="mentions_only">
-                      Mentions only
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="muted">
-                      Muted
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => panel.show('members')}>
-                    <Users aria-hidden className="size-4" />
-                    Members
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => panel.show('ai')}>
-                    <Sparkles aria-hidden className="size-4" />
-                    Lawexa sessions
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => panel.show('quizzes')}>
-                    <Trophy aria-hidden className="size-4" />
-                    Quizzes
-                  </DropdownMenuItem>
-                  {canManage && (
-                    <DropdownMenuItem onClick={() => panel.show('edit')}>
-                      <Pencil aria-hidden className="size-4" />
-                      Edit channel
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => setLeaveOpen(true)}
-                  >
-                    <LogOut aria-hidden className="size-4" />
-                    Leave channel
-                  </DropdownMenuItem>
-                  {canManage && (
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => setDeleteOpen(true)}
-                    >
-                      <Trash2 aria-hidden className="size-4" />
-                      Delete channel
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </div>
-        {channel.description && (
-          <p
-            className="mt-1 line-clamp-1 text-sm text-muted-foreground"
-            title={channel.description}
-          >
-            {channel.description}
-          </p>
-        )}
-      </div>
-    </div>
+  /* THE READING LENSES — pins, private saves, and (for a previewer, who has no
+     menu to hold it) Lawexa's history. They are one segmented object in the
+     header because they are one KIND of move: a lens over this channel's own
+     messages, never a second place to read them (DIRECTION 14). Each is gated
+     by what its endpoint will actually answer. */
+  const lenses: HeaderLens[] = [];
+  if (canRead) {
+    lenses.push({
+      id: 'pinned',
+      label: 'Pinned messages',
+      icon: Pin,
+      onSelect: () => panel.show('pinned'),
+    });
+  }
+  if (canParticipate) {
+    lenses.push({
+      id: 'saved',
+      label: 'Saved messages (private to you)',
+      icon: Bookmark,
+      onSelect: () => panel.show('saved'),
+    });
+  }
+  if (isPreview) {
+    lenses.push({
+      id: 'ai',
+      label: 'Lawexa sessions',
+      icon: Sparkles,
+      onSelect: () => panel.show('ai'),
+    });
+  }
+
+  /* NO JOIN IN THE MENU, AND NO JOIN IN THE HEADER. A previewer's way in lives
+     in the dock at the foot of the transcript — always visible, at the place
+     the reply would have come from, carrying the server's sentence when an
+     attempt fails. A second control up here would be the same action twice,
+     and the failure would land at the other end of the screen from the press.
+     A previewer therefore has NO overflow at all: everything in this menu is a
+     setting or a write they do not have. */
+  const channelMenu = canParticipate ? (
+    <>
+      {/* Below `xl:` the sections live in a bottom bar that is hidden while the
+          reader is in Chat — so this is the door OUT of the conversation, and
+          the bar is how they come back. At `xl:`+ the segmented control in the
+          header already does both jobs, and this group is gone. */}
+      {sections.length > 1 && (
+        <DropdownMenuGroup className="xl:hidden">
+          <DropdownMenuLabel className="text-xs text-muted-foreground">
+            Sections
+          </DropdownMenuLabel>
+          {sections
+            .filter((entry) => entry.id !== 'chat')
+            .map((entry) => (
+              <DropdownMenuItem key={entry.id} onClick={() => selectTab(entry.id)}>
+                <entry.icon aria-hidden className="size-4" />
+                {entry.label}
+              </DropdownMenuItem>
+            ))}
+          <DropdownMenuSeparator />
+        </DropdownMenuGroup>
+      )}
+
+      <DropdownMenuLabel className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Bell aria-hidden className="size-3.5" />
+        Notifications
+      </DropdownMenuLabel>
+      {/* N1: the mutation assigns `my_notify_level` into every cached channel
+          row + re-rolls the space (Ruling A). */}
+      <DropdownMenuRadioGroup
+        value={notifyLevel}
+        onValueChange={(value) => notifyMutation.mutate(value as NotifyLevel)}
+      >
+        <DropdownMenuRadioItem value="all">All messages</DropdownMenuRadioItem>
+        <DropdownMenuRadioItem value="mentions_only">
+          Mentions only
+        </DropdownMenuRadioItem>
+        <DropdownMenuRadioItem value="muted">Muted</DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={() => panel.show('members')}>
+        <Users aria-hidden className="size-4" />
+        Members
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => panel.show('ai')}>
+        <Sparkles aria-hidden className="size-4" />
+        Lawexa sessions
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => panel.show('quizzes')}>
+        <Trophy aria-hidden className="size-4" />
+        Quizzes
+      </DropdownMenuItem>
+      {canManage && (
+        <DropdownMenuItem onClick={() => panel.show('edit')}>
+          <Pencil aria-hidden className="size-4" />
+          Edit channel
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem variant="destructive" onClick={() => setLeaveOpen(true)}>
+        <LogOut aria-hidden className="size-4" />
+        Leave channel
+      </DropdownMenuItem>
+      {canManage && (
+        <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+          <Trash2 aria-hidden className="size-4" />
+          Delete channel
+        </DropdownMenuItem>
+      )}
+    </>
+  ) : undefined;
+
+  const identityHeader = (
+    <ChannelPlaceHeader
+      channel={channel}
+      members={memberFaces}
+      onlineCount={room.onlineCount}
+      // The roster read is open to a previewer too — only the private-channel
+      // refusal leaves the stack as a plain, unopenable mark.
+      onOpenRoster={canRead ? () => panel.show('members') : undefined}
+      sections={sections}
+      section={tab}
+      onSelectSection={selectTab}
+      sectionCounts={sectionCounts}
+      lenses={lenses}
+      menu={channelMenu}
+    />
   );
 
   /* ── Closed: a private channel the reader is not in ───────────────────────
@@ -660,7 +652,7 @@ export function ChannelScreen({
         {identityHeader}
         <div className="mx-auto w-full max-w-3xl flex-1 px-4">
           <CollabMessage
-            icon={VisibilityIcon}
+            icon={Lock}
             tone="neutral"
             title={`${channel.name} is private`}
             description="Only its members can read this channel. Ask someone already in it to add you."
@@ -673,22 +665,12 @@ export function ChannelScreen({
   /* ── Member and previewer: ONE room, two sets of affordances ──────────────
         Deliberately one tree rather than two. The panes, the header and the
         dock sit at the same positions in both, so JOINING does not remount
-        anything: the composer replaces the dock and the strip opens, while the
-        feed keeps its scroll, its loaded history and the reader's place in the
-        conversation. ──────────────────────────────────────────────────────── */
+        anything and — since the redesign — does not resize anything either:
+        the composer replaces the dock, the header's lens segment and overflow
+        appear INSIDE a bar whose height never changes, and the feed keeps its
+        scroll, its loaded history and the reader's place in the conversation.
+        ──────────────────────────────────────────────────────────────────── */
   const gameOpen = gameUuid !== null;
-  /* WHICH SECTIONS THIS READER CAN REACH — derived from the access model, one
-     entry per tab, so the strip and the pane can never disagree about what is
-     available. Chat is the room itself and is open to anyone who may read it;
-     Lists and Files each hang off their own capability, because their reads
-     are separate rulings (and the lists one may yet open — see
-     `channelAccess`). */
-  const sectionAvailable: Record<ChannelTab, boolean> = {
-    chat: true,
-    lists: access.canReadLists,
-    files: canParticipate,
-  };
-  const sections = CHANNEL_TABS.filter((section) => sectionAvailable[section.id]);
 
   /* AN UNREACHABLE SECTION IS CORRECTED IN THE STATE, NOT MASKED IN THE RENDER.
      Resolving `tab` to Chat for display while leaving the state on `files` puts
@@ -747,56 +729,18 @@ export function ChannelScreen({
           />
         )}
 
-        {/* Chat / Lists / Files — only the sections this reader can reach, and
-            NO STRIP AT ALL when that leaves one. A previewer's two other
-            destinations are blocked, and a tab strip whose only tab is the one
-            already showing is furniture: its absence reclaims a row and a
-            hairline for the reader who came to read.
+        {/* THE TAB STRIP IS GONE, AND ITS ROW AND HAIRLINE WITH IT. The
+            sections now ride inside the header bar at `md:`+ and in a bottom
+            bar on a phone (below), so a reader in Chat — which is nearly all
+            of channel-time — pays nothing at all for them.
 
-            ALWAYS MOUNTED, ZERO-HEIGHT WHEN HIDDEN — `EnablePushNudge`'s
-            grid-rows idiom, reused rather than re-invented (the protect list's
-            instruction). It matters here because the strip appears the instant
-            a previewer JOINS: snapping ~41px of chrome in above a transcript
-            shortens the scroll viewport in one frame and drags the
-            conversation out from under the reader. Opening it over 200ms lets
-            the feed's viewport-resize keeper follow the change smoothly, and
-            `motion-reduce` collapses that to the same instant swap the rest of
-            the app makes. Inert and `aria-hidden` while closed, so nothing
-            focusable sits at zero height. */}
-        <div
-          aria-hidden={sections.length <= 1}
-          inert={sections.length <= 1}
-          className={cn(
-            'grid shrink-0 transition-[grid-template-rows] duration-200 ease-out',
-            'motion-reduce:transition-none',
-            sections.length > 1 ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-          )}
-        >
-          <div className="overflow-hidden">
-            <div className="border-b px-4">
-              <div className="mx-auto w-full max-w-3xl">
-                <TabRow
-                  tabs={sections}
-                  value={tab}
-                  onChange={selectTab}
-                  ariaLabel="Channel sections"
-                  className="flex w-fit items-center gap-4"
-                  tabClassName={(selected) =>
-                    cn(
-                      'v2-interactive relative flex min-h-10 items-center gap-1.5 rounded-none px-0.5 text-sm font-medium',
-                      'transition-colors duration-150 motion-reduce:transition-none',
-                      selected
-                        ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )
-                  }
-                >
-                  {(item) => item.label}
-                </TabRow>
-              </div>
-            </div>
-          </div>
-        </div>
+            IT ALSO RETIRES THE JOIN-TIME SNAP. The strip used to appear the
+            instant a previewer joined, shortening the scroll viewport by ~41px
+            in one frame at exactly the moment they pressed a button promising
+            to leave them where they were; the grid-rows tween was there to
+            soften that. Neither the header (fixed at `h-14`) nor the bottom bar
+            (hidden in Chat, and a previewer is always in Chat) changes height
+            on join, so the event the tween existed for cannot happen. */}
 
         {/* The pane region: every pane fills the same box (absolute stacking).
             Chat KEEPS ITS MOUNT and, when inactive, is hidden with
@@ -823,10 +767,14 @@ export function ChannelScreen({
               canParticipate={canParticipate}
               active={tab === 'chat'}
               targetMessageUuid={targetMessageUuid}
-              typingUsers={room.typingUsers}
+              members={memberFaces}
               respondingTurns={room.respondingTurns}
               onStartReply={handleStartReply}
               onFocusComposer={focusComposer}
+              onOpenRoster={() => panel.show('members')}
+              // Inviting is governance, so the intro only offers it to someone
+              // who can actually complete it.
+              onAddPeople={canManage ? () => panel.show('members') : undefined}
               onViewAiSession={openAiSession}
               onOpenGame={openGame}
               composer={
@@ -850,7 +798,9 @@ export function ChannelScreen({
                       replyTo={replyTo}
                       onCancelReply={() => setReplyTo(null)}
                       onTyping={room.notifyTyping}
+                      typingUsers={room.typingUsers}
                       onSentSuccess={handleSentSuccess}
+                      onOpenFiles={openFiles}
                     />
                   </div>
                 ) : (
@@ -897,6 +847,51 @@ export function ChannelScreen({
             </div>
           )}
         </div>
+
+        {/* THE NARROW-PANE SECTION BAR — and it is HIDDEN IN CHAT,
+            deliberately. A segmented bar that is always on screen is a
+            permanent tab strip wearing a different shape; the conversation is
+            where a reader spends almost all of their time here, and it should
+            spend nothing on navigation it is not using. The way OUT of Chat is
+            the header's overflow, which carries the sections at these widths;
+            the way BACK is this bar, which is on screen for exactly as long as
+            the reader is somewhere they need to leave.
+
+            `xl:hidden`, not `md:hidden`: below `xl:` the channel PANE is not
+            the viewport — the app sidebar and, from `lg:`, the docked space
+            rail are taking their share — so this is the right control for a
+            ~500px column whether that column is a phone or a desktop window.
+            The header's own segment takes over at `xl:` (see `PlaceHeader`).
+
+            It opens and closes on the same symmetric grid-rows tween as every
+            other reveal in the feature, and the feed's viewport keeper holds
+            the transcript bottom-anchored through the height change. */}
+        {sections.length > 1 && (
+          <div
+            aria-hidden={tab === 'chat'}
+            inert={tab === 'chat'}
+            className={cn(
+              'grid shrink-0 xl:hidden',
+              'transition-[grid-template-rows] duration-200 ease-out',
+              'motion-reduce:transition-none',
+              tab === 'chat' ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
+            )}
+          >
+            <div className="overflow-hidden">
+              <div className="v2-safe-bottom border-t px-4 py-2">
+                <div className="mx-auto w-full max-w-3xl">
+                  <SectionSwitch
+                    sections={sections}
+                    value={tab}
+                    onChange={selectTab}
+                    counts={sectionCounts}
+                    density="bar"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Game mode ───────────────────────────────────────────────────
@@ -1065,8 +1060,7 @@ export function ChannelScreen({
  *  inside it. A uuid never contains `:`, so the split is unambiguous. */
 const AI_PANEL_PREFIX = 'ai:';
 
-const CHANNEL_TABS: readonly { id: ChannelTab; label: string }[] = [
-  { id: 'chat', label: 'Chat' },
-  { id: 'lists', label: 'Lists' },
-  { id: 'files', label: 'Files' },
-];
+/** One frozen empty roster, so a channel whose members have not arrived hands
+ *  the header and the intro the SAME array every render (a fresh `[]` would
+ *  re-render both on every unrelated cache write). */
+const NO_FACES: readonly SlimUser[] = [];

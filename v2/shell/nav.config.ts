@@ -6,6 +6,7 @@ import {
   GraduationCap,
   Library,
   MessageSquare,
+  MessagesSquare,
   NotebookPen,
   PenSquare,
   Radar,
@@ -57,6 +58,17 @@ export interface V2NavLeaf {
   icon?: LucideIcon;
 }
 
+/**
+ * A live signal a row may carry — the unread grammar rendered on the
+ * navigation itself, so the nav becomes a triage surface instead of a list of
+ * doors. The config names WHICH signal; the surfaces render it through the
+ * feature that owns the data (`v2/features/channels/my-channels/nav-signal`),
+ * because a shell config may not hold a query. One id today; the union is the
+ * point — a second signal must be declared here, never inlined in a surface,
+ * or the rail and the drawer start disagreeing again.
+ */
+export type V2NavSignalId = 'channels';
+
 /** A top-level nav row; `items` makes it an expandable group (e.g. Library). */
 export interface V2NavItem extends V2NavLeaf {
   items?: V2NavLeaf[];
@@ -65,6 +77,8 @@ export interface V2NavItem extends V2NavLeaf {
    * signed out). Omitted ⇒ visible to everyone. See the module docblock.
    */
   canAccess?: (role: UserRole | null) => boolean;
+  /** Optional live unread signal on this row. See {@link V2NavSignalId}. */
+  signalId?: V2NavSignalId;
 }
 
 /** The gold primary action pinned at the top of the sidebar / bottom of the drawer. */
@@ -95,6 +109,23 @@ export const v2NavItems: V2NavItem[] = [
     ],
   },
   { label: 'Bookmarks', href: '/bookmarks', icon: Bookmark },
+  {
+    // THE CONVERSATIONS YOU ARE IN, above the places they live (redesign
+    // wave, Aug 5). `/channels` was the best-built row in the collab feature —
+    // the only one that previews content — and NOTHING linked to it: the list
+    // of your own conversations, which is the home screen of every chat
+    // product, was reachable only by typing the URL. It sits above Spaces
+    // because triage comes before navigation: you open a channel far more
+    // often than you go looking for the space it belongs to.
+    //
+    // Same audience predicate as Spaces, from the same shared helper — the two
+    // collab doors can never drift apart on who may see them.
+    label: 'Channels',
+    href: '/channels',
+    icon: MessagesSquare,
+    canAccess: canAccessCollab,
+    signalId: 'channels',
+  },
   {
     label: 'Spaces',
     href: '/spaces',

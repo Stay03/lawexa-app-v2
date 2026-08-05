@@ -14,7 +14,7 @@ import { ArrowDown, Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import type { Channel, Message } from '@/types/collab';
+import type { Channel, Message, SlimUser } from '@/types/collab';
 import type { ChannelReadReporter } from '@/v2/features/channels/mark-read';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
@@ -38,15 +38,14 @@ import { useEditChannelMessage, useDeleteChannelMessage, useSendChannelMessage, 
 import { canManageChannel, isLocalMessageUuid } from '../model';
 import { channelsQueries } from '../queries';
 import { outboxGet, useOutboxMessages } from '../send-outbox';
-import type { TypingUser } from '../room';
-import { ChannelFeedSkeleton, FeedErrorState, FeedEmptyState } from '../screen/states';
+import { ChannelFeedSkeleton, ChannelIntro, FeedErrorState } from '../screen/states';
+import { DayDivider, UnreadDivider } from './FeedDivider';
 import { MessageActionsSheet } from './MessageActionsSheet';
 import { MessageGroupRow } from './MessageGroupRow';
 import type { MessageRowActions } from './MessageRow';
 import { QuizCardPreview } from './QuizCardPreview';
 import { QuizGameCard } from './QuizGameCard';
 import { RespondingRow } from './RespondingRow';
-import { DaySeparator, UnreadDivider } from './separators';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,12 +58,24 @@ import {
 } from '@/components/ui/alert-dialog';
 
 /**
- * ChannelFeed — the member-only transcript: day separators, author runs, the
- * gold unread divider with land-at-line, the jump-to-latest pill, `?m=`
+ * ChannelFeed — the member-only transcript: day dividers, author runs, the
+ * gold unread line with land-at-line, the jump-to-latest pill, `?m=`
  * deep-link landing, the send ladder's row actions, and the mark-read
  * viewport trigger. Phase-5 W2; sources: plan W2 item 3,
  * foundation-standards §5 (scroll etiquette + mark-read triggers),
  * design-research DIRECTIONS 3/9/10/11 (binding) — 2026-08-04.
+ *
+ * W2 REDESIGN WAVE (2026-08-05), all of it INSIDE the mechanics below rather
+ * than beside them:
+ *  - the two non-message lines gained a hierarchy ({@link DayDivider} recedes,
+ *    {@link UnreadDivider} spans the column and carries "Mark as read");
+ *  - the head of history and the empty state became the SAME block
+ *    ({@link ChannelIntro}), so a channel says what it is for every time you
+ *    reach its beginning, not only on the day it was empty;
+ *  - the typing whisper moved OUT of this file and onto the composer's own top
+ *    edge, where it is left-aligned to the text column instead of centred
+ *    under the middle of the page.
+ * Nothing in the scroll contract moved.
  *
  * SCROLL CONTRACT (the conversation screen's proven mechanics, ported):
  *  - the FIRST paint lands where the reader should start — the `?m=` target,
@@ -156,7 +167,8 @@ export interface ChannelFeedProps {
   active: boolean;
   /** `?m=` deep-link target (navigation-time value; prop changes re-arm). */
   targetMessageUuid: string | null;
-  typingUsers: readonly TypingUser[];
+  /** Faces for {@link ChannelIntro}'s presence stack (screen-owned roster). */
+  members: readonly SlimUser[];
   /** Live Lawexa summons in this channel (room-owned; stable reference). */
   respondingTurns: readonly RespondingTurn[];
   /** Imperative handle for the pinned/saved panels' "jump to message". */
@@ -166,8 +178,12 @@ export interface ChannelFeedProps {
   composer: React.ReactNode;
   /** Stage a reply in the composer (screen-owned state). */
   onStartReply: (message: Message) => void;
-  /** The empty state's one action: focus the composer (DIRECTION 13). */
+  /** The intro's one action when the channel is empty: focus the composer. */
   onFocusComposer: () => void;
+  /** Open the roster from the intro's presence stack. Omitted where closed. */
+  onOpenRoster?: () => void;
+  /** The intro's invite affordance — channel admins only. */
+  onAddPeople?: () => void;
   /** Open the sessions sheet on one session (screen-owned surface). */
   onViewAiSession: (sessionUuid: string) => void;
   /** Open the channel's live-quiz mode on a game (screen-owned `?game=`) —
@@ -183,11 +199,13 @@ export function ChannelFeed({
   canParticipate,
   active,
   targetMessageUuid,
-  typingUsers,
+  members,
   respondingTurns,
   composer,
   onStartReply,
   onFocusComposer,
+  onOpenRoster,
+  onAddPeople,
   onViewAiSession,
   onOpenGame,
   ref,
@@ -249,6 +267,21 @@ export function ChannelFeed({
     });
   }
 
+  /* THE UNREAD LINE'S ONE EXPLICIT DISMISSAL. `Esc` advances the read pointer
+     and deliberately LEAVES the line standing (§5: it persists for the view
+     session, because the reader may be using it as a bookmark). "Mark as read"
+     on the divider is the stronger, stated intent — it advances the pointer AND
+     takes the line away, because a control that says "mark as read" and leaves
+     a "New" line on screen has not done what it said. Feed-local, so it lasts
+     exactly as long as this view of the channel. */
+  const [unreadCleared, setUnreadCleared] = useState(false);
+  const activeAnchor = unreadCleared ? null : (anchor?.uuid ?? null);
+  /** The viewport's distance from the CONTENT BOTTOM at the moment the line is
+   *  dismissed — the same bottom-anchored measure the history-pull restore
+   *  uses, for the same reason: removing the divider shortens the transcript
+   *  ABOVE the reader, and nothing else on this path holds their place. */
+  const unreadClearRestoreRef = useRef<number | null>(null);
+
   /* ── Lawexa turns: anchored under their summon, or (when the event omitted
         `message_uuid` — digest §F.7) at the foot of the transcript. Both maps
         are derived, so a turn ending removes its row with no other state. ── */
@@ -273,7 +306,7 @@ export function ChannelFeed({
   // Items carry their APG article ordinal (1-based) so no counter mutates
   // during render (React Compiler immutability rule).
   const { renderItems, groupCount } = useMemo(() => {
-    const items = buildFeedItems(messages, anchor?.uuid ?? null, anchoredByMessage);
+    const items = buildFeedItems(messages, activeAnchor, anchoredByMessage);
     const withOrdinals: { item: (typeof items)[number]; groupOrdinal: number }[] = [];
     let ordinal = 0;
     for (const item of items) {
@@ -281,7 +314,7 @@ export function ChannelFeed({
       withOrdinals.push({ item, groupOrdinal: item.kind === 'group' ? ordinal : 0 });
     }
     return { renderItems: withOrdinals, groupCount: ordinal };
-  }, [messages, anchor, anchoredByMessage]);
+  }, [messages, activeAnchor, anchoredByMessage]);
 
   /* ── Refs for the scroll contract ─────────────────────────────────────── */
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -469,6 +502,25 @@ export function ChannelFeed({
     atBottomRef.current =
       el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_THRESHOLD_PX;
   }, [data, isFetchingNextPage]);
+
+  /* ── Unread-line dismissal restore — the same bottom-anchored maths as the
+        pull above, on its own ref and its own effect so the protected history
+        path is not asked to carry a second trigger. Dismissing the line removes
+        an item from the transcript, which shortens the content ABOVE the reader
+        by the divider and its gap; without this the conversation would jump up
+        under them at the exact moment they pressed a button. A LAYOUT effect,
+        so the corrected position is set before paint and no wrong frame draws.
+        Fires once per dismissal (the ref is cleared) and never afterwards. ─── */
+  useIsomorphicLayoutEffect(() => {
+    if (unreadClearRestoreRef.current === null) return;
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight - unreadClearRestoreRef.current;
+      atBottomRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_THRESHOLD_PX;
+    }
+    unreadClearRestoreRef.current = null;
+  }, [unreadCleared]);
 
   /* ── Own-send scroll (passive effect, ref sync). ──────────────────────── */
   useEffect(() => {
@@ -684,6 +736,16 @@ export function ChannelFeed({
     if (canParticipate && newestReal) reporter.markReadNow(newestReal);
   };
 
+  /** The unread divider's own verb — see `unreadCleared` above. The measure is
+   *  taken BEFORE the state change, so the layout effect that follows can put
+   *  the reader back where they were once the line has gone. */
+  const markReadAndClearLine = () => {
+    if (newestReal) reporter.markReadNow(newestReal);
+    const el = scrollRef.current;
+    if (el) unreadClearRestoreRef.current = el.scrollHeight - el.scrollTop;
+    setUnreadCleared(true);
+  };
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     // Esc = mark read (§5), and only where there is a pointer to move.
     if (event.key === 'Escape' && canParticipate && newestReal) {
@@ -822,9 +884,11 @@ export function ChannelFeed({
                  is none left to fetch — with older pages outstanding the feed
                  branch renders, carrying its "Load older messages" button. */
           renderItems.length === 0 && !hasNextPage ? (
-            <FeedEmptyState
-              channelName={channel.name}
-              description={channel.description}
+            <ChannelIntro
+              channel={channel}
+              members={members}
+              onOpenRoster={onOpenRoster}
+              onAddPeople={onAddPeople}
               // No action for a previewer: the way forward here is joining,
               // and that button already stands in the dock below.
               onWriteFirstMessage={canParticipate ? onFocusComposer : undefined}
@@ -846,17 +910,32 @@ export function ChannelFeed({
                   </Button>
                 </div>
               ) : (
-                <p className="text-center text-xs text-muted-foreground">
-                  This is the beginning of {channel.name}.
-                </p>
+                /* The head of history is the SAME block the empty state uses:
+                   a channel should teach what it is every time you reach its
+                   beginning, not only on the one day it was empty. Without the
+                   write-first action — there already is a first message. */
+                <ChannelIntro
+                  channel={channel}
+                  members={members}
+                  onOpenRoster={onOpenRoster}
+                  onAddPeople={onAddPeople}
+                />
               )}
 
               {renderItems.map(({ item, groupOrdinal }) => {
                 switch (item.kind) {
                   case 'day':
-                    return <DaySeparator key={item.key} label={item.label} />;
+                    return <DayDivider key={item.key} label={item.label} />;
                   case 'unread':
-                    return <UnreadDivider key={item.key} />;
+                    return (
+                      <UnreadDivider
+                        key={item.key}
+                        // A previewer has no read pointer to advance, so the
+                        // verb is simply absent rather than present-and-failing
+                        // (they also never get a divider — belt and braces).
+                        onMarkRead={canParticipate ? markReadAndClearLine : undefined}
+                      />
+                    );
                   case 'quiz-card':
                     // The live card probes the game and offers Join, both of
                     // which are blocked for a previewer — so they get the
@@ -959,22 +1038,11 @@ export function ChannelFeed({
           </button>
         </div>
 
-        {/* Typing whisper — ONE quiet line above the composer, never stacked
-            bubbles (DIRECTION 7). The row is always mounted at fixed height,
-            so appearing text never shifts the composer. */}
-        <div className="mx-auto h-5 w-full max-w-xs px-4 text-xs text-muted-foreground sm:max-w-md">
-          {/* No live region here: typing is presence noise, and announcing
-              every typer change would spam screen readers (audit L12). */}
-          <span
-            className={cn(
-              'inline-block max-w-full truncate rounded bg-background/80 px-1 backdrop-blur-sm',
-              'transition-opacity duration-200 motion-reduce:transition-none',
-              typingUsers.length > 0 ? 'opacity-100' : 'opacity-0',
-            )}
-          >
-            {typingLabel(typingUsers)}
-          </span>
-        </div>
+        {/* The typing whisper used to live HERE, as a fixed-height row centred
+            under the middle of the page and lined up with nothing. It is now a
+            legend on the composer's own top edge (`ChatComposerShell`), which
+            costs no height at all and is unmistakably about the box you are
+            typing into. */}
 
         <div ref={dockRef} className="pointer-events-auto v2-safe-bottom">
           {composer}
@@ -1031,13 +1099,4 @@ export function ChannelFeed({
       )}
     </div>
   );
-}
-
-function typingLabel(users: readonly TypingUser[]): string {
-  if (users.length === 0) return '';
-  if (users.length === 1) return `${users[0].name} is typing…`;
-  if (users.length === 2) {
-    return `${users[0].name} and ${users[1].name} are typing…`;
-  }
-  return 'Several people are typing…';
 }

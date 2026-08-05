@@ -8,6 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import type { SessionUser } from '@/v2/runtime/session';
+import {
+  useCollabHeader,
+  type CollabHeaderContext,
+} from '@/v2/features/collab/shell/collab-header';
+import {
+  CollabHeaderBack,
+  CollabHeaderRailToggle,
+  CollabHeaderTitle,
+} from '@/v2/features/collab/shell/CollabHeaderSlot';
 import { LogoMark, LogoWordmark } from './Logo';
 import { V2NotificationBell } from './V2NotificationBell';
 import { V2HeaderMenu } from './V2HeaderMenu';
@@ -36,6 +45,24 @@ import { useHeaderContext } from './header-context';
  *    (+ a compact confidential badge), skeleton-first while it resolves. `HeaderCenter`
  *    cross-fades the two symmetrically. Equal `1fr` side columns keep it dead-centre;
  *    both clusters fit inside their track down to 320px.
+ *
+ * ── THE COLLAB ROUTE CONTEXT (phase-5 redesign) ────────────────────────────
+ * Inside a space, a title is not enough: the reader has to know which SPACE
+ * they are in and be able to get out of the channel and into its list. So
+ * `v2/features/collab/shell/collab-header.ts` publishes a richer context and,
+ * WHEN AND ONLY WHEN it is present, three things change — the mobile logo mark
+ * becomes a back chevron, a channel-list toggle appears between `md:` and
+ * `lg:`, and the centre carries the space crest with the channel name over the
+ * space name BELOW `md:` only.
+ *
+ * THE CENTRE GOES EMPTY AT `md:` AND UP ON THESE ROUTES, deliberately: that is
+ * where the channel screen's own `PlaceHeader` starts naming the channel and
+ * its space directly under this bar, and printing the same name twice on one
+ * screen is worse than printing it once. The generic `RouteContext` is not used
+ * as a fallback there either — it would put the same title back.
+ *
+ * Everything else, on every other route, is untouched: no context, no swap,
+ * byte-identical header.
  *  - RIGHT (grid col 3): exactly TWO controls (owner #28) — the notification bell
  *    (hidden for guests) and the overflow menu (`V2HeaderMenu`), which now owns
  *    the light/dark theme toggle. The bare theme button has left the bar.
@@ -50,6 +77,10 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   // conversation screen sets {title, confidential} once its history resolves, and
   // may update the title later (async name generation). `title` is null until then.
   const { title, confidential } = useHeaderContext();
+  // Present only inside a space (`/spaces/{uuid}`, `/channels/{uuid}`), where
+  // the collab frame publishes it. `null` everywhere else, and every branch
+  // below falls back to exactly what it did before.
+  const collab = useCollabHeader();
   const signedIn = !!user;
   const railCollapsed = state === 'collapsed';
 
@@ -90,14 +121,23 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         >
           <Menu className="size-5" />
         </Button>
-        <span className="flex shrink-0 items-center md:hidden">
-          <LogoMark className="size-9" />
-        </span>
+        {/* Inside a space the phone needs an "up" more than it needs a second
+            brand mark — the crest in the centre already names where you are. */}
+        {collab ? (
+          <CollabHeaderBack context={collab} />
+        ) : (
+          <span className="flex shrink-0 items-center md:hidden">
+            <LogoMark className="size-9" />
+          </span>
+        )}
 
         {/* Desktop: sidebar trigger + breadcrumb slot. The wordmark appears only
             while the rail is collapsed, so the brand never leaves the chrome and
             is never shown twice (reviewer finding). */}
         <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex" />
+        {/* The channel-list toggle for the band where the space rail is not
+            docked yet but the phone's centre cluster has already gone. */}
+        {collab ? <CollabHeaderRailToggle context={collab} /> : null}
         {railCollapsed ? (
           <span className="hidden shrink-0 items-center md:flex">
             <LogoWordmark className="h-9" />
@@ -122,6 +162,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         expectsContext={expectsContext}
         title={title}
         confidential={confidential}
+        collab={collab}
       />
 
       {/* RIGHT cluster — bell + overflow menu (owner #28). Uncrowded by decree. */}
@@ -150,11 +191,14 @@ function HeaderCenter({
   expectsContext,
   title,
   confidential,
+  collab,
 }: {
   isHome: boolean;
   expectsContext: boolean;
   title: string | null;
   confidential: boolean;
+  /** Inside a space the centre carries the place, not just the title. */
+  collab: CollabHeaderContext | null;
 }) {
   return (
     <div className="grid min-w-0 place-items-center">
@@ -170,7 +214,9 @@ function HeaderCenter({
         inert={isHome || undefined}
         className="col-start-1 row-start-1 transition-opacity duration-200 motion-reduce:transition-none data-[active=false]:pointer-events-none data-[active=false]:opacity-0"
       >
-        {isHome ? null : (
+        {isHome ? null : collab ? (
+          <CollabHeaderTitle context={collab} />
+        ) : (
           <RouteContext
             title={title}
             confidential={confidential}

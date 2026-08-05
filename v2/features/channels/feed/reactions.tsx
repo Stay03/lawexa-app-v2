@@ -196,14 +196,15 @@ export function ReactionTrayPopover({
           aria-label="Add a reaction"
           title="Add a reaction"
           className={cn(
-            'v2-interactive p-2 text-muted-foreground transition-colors duration-150',
-            'hover:bg-muted hover:text-foreground motion-reduce:transition-none',
+            'v2-interactive flex items-center justify-center p-2 text-muted-foreground',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'hover:bg-muted hover:text-foreground',
             open && 'bg-muted text-foreground',
             FOCUS_RING,
             className,
           )}
         >
-          <SmilePlus aria-hidden className="size-3.5" />
+          <SmilePlus aria-hidden className="size-4" />
         </button>
       </PopoverTrigger>
       <PopoverContent

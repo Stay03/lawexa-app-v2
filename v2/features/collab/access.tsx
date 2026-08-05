@@ -9,10 +9,13 @@ import { CollabVerifyEmailState } from './ui/VerifyEmailState';
 
 /**
  * CollabAccessGate — the ONE audience gate for every `/spaces/*` and
- * `/channels/*` surface. Mounted once per segment (`app/v2/spaces/layout.tsx`
- * and `app/v2/channels/layout.tsx`), so it decides before any collab screen,
- * query or route fallback below it exists. The exact `QuizAccessGate`
- * pattern; audience per owner decision D1 (2026-08-04); plan W1 item 7.
+ * `/channels/*` surface. Mounted ONCE, in `app/v2/(collab)/layout.tsx` — the
+ * route group both address families now live under — so it decides before any
+ * collab screen, query or route fallback below it exists. It used to be
+ * mounted twice, once per segment, with a comment promising the two doors
+ * could never drift; there is one door now, so they cannot. The exact
+ * `QuizAccessGate` pattern; audience per owner decision D1 (2026-08-04); plan
+ * W1 item 7.
  *
  * SYNCHRONOUS, AND THAT IS THE WHOLE POINT: `useV2Session()` reads a snapshot
  * the SERVER already resolved before this tree mounted, so the decision is

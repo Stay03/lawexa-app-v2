@@ -15,11 +15,14 @@ import { SpaceScreen } from '@/v2/features/spaces/detail/SpaceScreen';
  * The client cache is the right first paint — arriving from `/spaces` the row
  * data is already warm.
  *
- * `key={spaceId}` remounts the screen wholesale per space, so dialog state,
- * the members sheet and the frozen relative-time clock can never leak from one
- * space into another (the channel route's reasoning, applied here).
+ * `key={spaceId}` remounts the screen wholesale per space, so its dialog state
+ * can never leak from one space into another (the channel route's reasoning,
+ * applied here). The SPACE ITSELF is held one level up, by the `(collab)`
+ * layout's frame, which is what keeps the rail on screen while the reader moves
+ * between this page and the channels below it.
  *
- * LIVE SINCE W5 (manifest entry `/spaces/*`).
+ * LIVE SINCE W5 (manifest entry `/spaces/*`); moved under the `(collab)` group
+ * in the redesign wave, which changes the file path and NOT the URL.
  */
 export const metadata: Metadata = {
   title: 'Space',

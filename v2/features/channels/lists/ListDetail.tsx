@@ -17,15 +17,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import {
-  ArrowLeft,
-  ArrowUp,
-  ListChecks,
-  Loader2,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-} from 'lucide-react';
+import { ArrowLeft, ArrowUp, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -46,10 +38,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Channel } from '@/types/collab';
-import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
   useAddListItem,
@@ -59,18 +50,30 @@ import {
 import { canManageList, isLocalItemUuid, LIST_ITEM_MAX } from '../model';
 import { channelsQueries } from '../queries';
 import { RelativeTime } from '../ui/RelativeTime';
-import { ListCreatorLabel, ListProgress } from './list-bits';
+import { ListCreatorLabel, ListRing, ListRingLabel } from './list-bits';
 import { ListFormDialog } from './ListFormDialog';
 import { ListItemRow } from './ListItemRow';
+import { ListDetailSkeleton, ListGoneState } from './states';
 
 /**
- * ListDetail — one task list: header (back, title, manage menu, creator +
- * updated meta, progress), the sortable items, and the add-item composer.
- * A v2 port of v1's `ListDetailView` (study A5 KEEP throughout) on the v2
- * keys and writers. Reordering sends the FULL uuid set, so dragging disables
- * outright while any optimistic add holds a temp uuid (v1's exact rule). A
- * deleted or access-lost list (403/404) resolves into a designed gone-state
- * with a way back — never a redirect. Phase-5 W2, 2026-08-04.
+ * ListDetail — one task list: a compact header (back, title, the completion
+ * ring, the manage menu), the sortable items, and a DOCKED add-item composer.
+ *
+ * ── THE COMPOSER IS A FOOTER NOW ───────────────────────────────────────────
+ * It used to sit at the bottom of the scrolling CONTENT, so adding one item to
+ * a thirty-item list meant scrolling past everything you had already written
+ * to reach the box — and then scrolling back. It is now outside the scroll
+ * region, pinned under it, which is the same idiom the chat composer uses:
+ * "compose at the bottom" is one place in this product, not two.
+ *
+ * ── WHAT IS UNCHANGED, DELIBERATELY ────────────────────────────────────────
+ * Reordering sends the FULL uuid set, so dragging disables outright while any
+ * optimistic add holds a temp uuid (v1's exact rule, and the endpoint 422s
+ * otherwise); the grip handle is the only draggable surface, with an 8px
+ * pointer activation distance and the keyboard sensor; a deleted or
+ * access-lost list (403/404) resolves into a designed gone-state with a way
+ * back, never a redirect; `?rename=1` is gated on the same `canManage` as the
+ * menu item, and the delete confirmation stays OUT of the URL.
  */
 export function ListDetail({
   channel,
@@ -113,47 +116,31 @@ export function ListDetail({
   );
 
   if (detailQuery.isPending) {
-    return <ListDetailSkeleton />;
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl px-4 py-4">
+          <ListDetailSkeleton />
+        </div>
+      </div>
+    );
   }
 
   if (detailQuery.isError || !list) {
-    const status = detailQuery.isError
-      ? extractApiError(detailQuery.error).status
-      : 0;
-    const gone = status === 403 || status === 404;
+    const status = detailQuery.isError ? extractApiError(detailQuery.error).status : 0;
     return (
-      <CollabMessage
-        icon={ListChecks}
-        tone={gone ? 'neutral' : 'alert'}
-        title={gone ? 'This list is no longer available' : "Couldn't load this list"}
-        description={
-          gone
-            ? 'It may have been deleted, or you no longer have access to this channel.'
-            : 'Something went wrong on our side. Please try again.'
-        }
-        action={
-          <div className="flex items-center gap-2">
-            {!gone && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void detailQuery.refetch()}
-              >
-                Try again
-              </Button>
-            )}
-            <Button variant={gone ? 'outline' : 'ghost'} size="sm" onClick={onBack}>
-              <ArrowLeft aria-hidden className="size-4" />
-              Back to lists
-            </Button>
-          </div>
-        }
-      />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl px-4 py-4">
+          <ListGoneState
+            gone={status === 403 || status === 404}
+            onRetry={() => void detailQuery.refetch()}
+            onBack={onBack}
+          />
+        </div>
+      </div>
     );
   }
 
   const checkedCount = list.items.filter((item) => item.is_checked).length;
-
   const orderedUuids = list.items.map((item) => item.uuid);
   const dragDisabled = orderedUuids.some(isLocalItemUuid);
 
@@ -167,32 +154,42 @@ export function ListDetail({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-3">
-        <div className="flex items-start gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            aria-label="Back to lists"
-            className="-ml-1 size-8 shrink-0"
-          >
-            <ArrowLeft aria-hidden className="size-4" />
-          </Button>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4">
+          {/* Compact header: one line carrying the way back, the name, the
+              fill level and the governance menu. */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onBack}
+                aria-label="Back to lists"
+                className="v2-interactive -ml-1 size-8 shrink-0"
+              >
+                <ArrowLeft aria-hidden className="size-4" />
+              </Button>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-2">
-              <h2 className="min-w-0 flex-1 text-base leading-tight font-semibold">
+              <h2 className="min-w-0 flex-1 truncate text-base font-semibold leading-tight">
                 {list.title}
               </h2>
-              {canManage && (
+
+              <ListRing
+                checked={checkedCount}
+                total={list.items.length}
+                size="sm"
+                className="shrink-0"
+              />
+
+              {canManage ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 shrink-0"
+                      className="v2-interactive size-8 shrink-0"
                       aria-label="List options"
                     >
                       <MoreHorizontal aria-hidden className="size-4" />
@@ -213,57 +210,70 @@ export function ListDetail({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
+              ) : null}
             </div>
 
-            {list.description && (
-              <p className="mt-1 text-sm text-muted-foreground">{list.description}</p>
-            )}
+            {list.description ? (
+              <p className="pl-9 text-sm text-muted-foreground">{list.description}</p>
+            ) : null}
 
             {/* Two-zone meta: identity left, time right-anchored. */}
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <ListCreatorLabel isAi={list.is_ai} creator={list.creator} />
-              <RelativeTime
-                iso={list.updated_at}
-                prefix="Updated"
-                className="shrink-0 text-xs text-muted-foreground"
-              />
-            </div>
+            <MetaLine
+              className="pl-9"
+              lead={[
+                <ListCreatorLabel
+                  key="creator"
+                  isAi={list.is_ai}
+                  creator={list.creator}
+                />,
+                <ListRingLabel
+                  key="progress"
+                  checked={checkedCount}
+                  total={list.items.length}
+                />,
+              ]}
+              trail={[<RelativeTime key="age" iso={list.updated_at} prefix="Updated" />]}
+            />
           </div>
-        </div>
 
-        {list.items.length > 0 && (
-          <ListProgress checked={checkedCount} total={list.items.length} />
-        )}
+          {list.items.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No items yet — add the first one below.
+            </p>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={orderedUuids}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-0.5">
+                  {list.items.map((item) => (
+                    <ListItemRow
+                      key={item.uuid}
+                      item={item}
+                      channelUuid={channel.uuid}
+                      listUuid={list.uuid}
+                      dragDisabled={dragDisabled}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+        </div>
       </div>
 
-      {list.items.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">
-          No items yet — add the first one below.
-        </p>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={orderedUuids} strategy={verticalListSortingStrategy}>
-            <div className="space-y-0.5">
-              {list.items.map((item) => (
-                <ListItemRow
-                  key={item.uuid}
-                  item={item}
-                  channelUuid={channel.uuid}
-                  listUuid={list.uuid}
-                  dragDisabled={dragDisabled}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
-
-      <AddItemComposer channelUuid={channel.uuid} listUuid={list.uuid} />
+      {/* Docked composer — outside the scroll region, so a thirty-item list is
+          still one tap from a new item. */}
+      <div className="shrink-0 border-t bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto w-full max-w-3xl">
+          <AddItemComposer channelUuid={channel.uuid} listUuid={list.uuid} />
+        </div>
+      </div>
 
       {/* Keyed on `openKey` so it stays mounted through its closing transition
           and re-derives its fields from the current list on every opening. */}
@@ -286,9 +296,7 @@ export function ListDetail({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteList.isPending}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteList.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault();
@@ -360,30 +368,13 @@ function AddItemComposer({
       <Button
         type="button"
         size="icon"
-        className="size-9 shrink-0 rounded-full"
+        className="v2-interactive size-9 shrink-0 rounded-full"
         onClick={submit}
         disabled={!value.trim()}
         aria-label="Add item"
       >
         <ArrowUp aria-hidden className="size-4" />
       </Button>
-    </div>
-  );
-}
-
-function ListDetailSkeleton() {
-  return (
-    <div aria-hidden className="space-y-4">
-      <Skeleton className="h-5 w-1/2 rounded" />
-      <Skeleton className="h-3 w-3/4 rounded" />
-      <Skeleton className="h-1.5 w-full rounded-full" />
-      <div className="space-y-2 pt-2">
-        {[0, 1, 2].map((index) => (
-          <div key={index} style={{ opacity: Math.max(0.35, 1 - index * 0.25) }}>
-            <Skeleton className="h-9 w-full rounded-lg" />
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

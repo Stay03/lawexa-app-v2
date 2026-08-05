@@ -862,17 +862,42 @@ export const channelFilesApi = {
     return response.data;
   },
 
-  /** Upload a single file (multipart, field `file`, max 15 MB). */
+  /**
+   * Upload a single file (multipart, field `file`, max 15 MB).
+   *
+   * `options` is OPTIONAL and additive — existing callers are unchanged:
+   *  - `onProgress(sent, total)` reports BYTES PUT ON THE WIRE, which is not
+   *    the same thing as "done". When `sent === total` the server is still
+   *    storing and sniffing the file, so a caller must not paint 100 % as
+   *    completion; wait for the promise.
+   *  - `signal` aborts the request (the upload tray's Cancel). An aborted
+   *    request rejects like any other failure — the caller decides whether it
+   *    was a cancellation, by remembering that it asked for one.
+   */
   upload: async (
     channelUuid: string,
-    file: File
+    file: File,
+    options: {
+      onProgress?: (sent: number, total: number) => void;
+      signal?: AbortSignal;
+    } = {}
   ): Promise<ChannelFileResponse> => {
     const formData = new FormData();
     formData.append('file', file);
     const response = await apiClient.post<ChannelFileResponse>(
       `/channels/${channelUuid}/files`,
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        signal: options.signal,
+        onUploadProgress: options.onProgress
+          ? (event) => {
+              // `event.total` is absent on some transports; the file's own
+              // size is the honest denominator and never lies.
+              options.onProgress?.(event.loaded, event.total ?? file.size);
+            }
+          : undefined,
+      }
     );
     return response.data;
   },

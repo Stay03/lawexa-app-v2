@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { ChevronRight, MessageSquare, Search, X } from 'lucide-react';
+import { ChevronRight, MessageSquare, X } from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,11 @@ import {
 } from '@/components/ui/sheet';
 import { useSidebar } from '@/components/ui/sidebar';
 import { SwitchBackButton } from '@/app/v2/switch-back-button';
+import {
+  NavSignalMark,
+  QUIET_NAV_SIGNAL,
+  useCollabNavSignal,
+} from '@/v2/features/channels/my-channels/nav-signal';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
@@ -150,6 +155,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   // Same filter, same source, same server-verified role as the rail — see
   // `visibleNavItems`. The two surfaces cannot drift on what exists.
   const navItems = visibleNavItems(user?.role ?? null);
+  // The Channels row's live unread signal. Read UNCONDITIONALLY (a hook may
+  // not be called behind a branch) and off the cache entry the realtime spine
+  // already mounts, so it costs an observer and never a request; it resolves
+  // to the quiet value for anyone the collab gate would refuse.
+  const collabSignal = useCollabNavSignal();
 
   return (
     <Sheet open={openMobile} onOpenChange={setOpenMobile}>
@@ -187,14 +197,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
             <LogoWordmark className="h-10 w-auto" />
           </Link>
           <span className="flex-1" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-11 rounded-full text-muted-foreground"
-            aria-label="Search"
-          >
-            <Search className="size-5" />
-          </Button>
+          {/* A Search button lived here with NO handler — a control that looked
+              live, took a tap, and did nothing. Removed rather than wired: this
+              drawer does not own search, and inventing a destination for it
+              here would be guessing at a surface another part of the shell is
+              responsible for. An absent control is honest; a dead one is not. */}
           <Button
             variant="ghost"
             size="icon"
@@ -239,6 +246,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
 
               const Icon = item.icon;
               const active = isActive(item.href);
+              // The unread grammar on the nav row: bold + gold dot = unread, a
+              // number is ONLY ever mentions, no red. The label bolds here and
+              // the mark renders in the trailing slot.
+              const signal = item.signalId ? collabSignal : QUIET_NAV_SIGNAL;
+              const alerting = signal.unread || signal.mentions > 0;
               return (
                 <Link
                   key={item.label}
@@ -249,10 +261,12 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                     active
                       ? 'bg-primary/10 font-medium text-primary'
                       : 'text-foreground hover:bg-muted',
+                    !active && alerting && 'font-semibold',
                   )}
                 >
                   {Icon ? <Icon className="size-5 shrink-0" /> : null}
                   <span className="truncate">{item.label}</span>
+                  <NavSignalMark signal={signal} className="ml-auto" />
                 </Link>
               );
             })}

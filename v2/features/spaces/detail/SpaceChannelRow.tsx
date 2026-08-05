@@ -5,112 +5,119 @@ import Link from 'next/link';
 import { BellOff, Hash, Lock } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import type { Channel } from '@/types/collab';
+import {
+  channelPreviewLine,
+  type RailRow,
+} from '@/v2/features/collab/shell/collab-route';
+import { ChannelPreviewText } from '@/v2/features/collab/shell/SpaceRail';
 import {
   CountBadge,
   FOCUS_RING,
   UnreadDot,
   formatRelativeTime,
 } from '@/v2/shell/designs/modules';
-import { channelUnreadGrammar } from '@/v2/features/channels/model';
-import { memberCountLabel } from '../model';
 
 /**
- * SpaceChannelRow — one channel inside a space, on the LIVE unread model
- * (study A2's FIX: v1 rendered a static `unread_count` that only moved on a
- * refetch — audit §8 item 2).
+ * SpaceChannelRow — one channel in the space lobby's activity digest.
  *
- * ── WHAT DRIVES WHAT (DIRECTION 2; backend Ruling A) ───────────────────────
+ * ── WHAT CHANGED, AND WHY ──────────────────────────────────────────────────
+ * It used to be the space's ENTIRE navigation, in raw API order, showing a
+ * description where the cross-space row showed a real last message — which is
+ * why the my-channels list read better as a view of a space than the space
+ * page did. Navigation is the rail's job now, so this row is free to be what
+ * the lobby needs: a digest line that says what was last said here. The
+ * preview comes from the one shared derivation
+ * (`collab-route.ts#channelPreviewLine`), so the rail, the drawer and this row
+ * cannot answer the same question three ways.
+ *
+ * ── WHAT DID NOT CHANGE, AND MUST NOT ──────────────────────────────────────
  *   `unread_count > 0` and NOT muted → name SEMIBOLD + gold dot + gold glyph.
  *   `mention_count > 0`              → the gold number, and a number is ONLY
  *                                      ever mentions. Shown even when muted:
  *                                      a mute never suppresses a direct @you.
- *   `my_notify_level === 'muted'`    → the row's IDENTITY dims (glyph, name,
- *                                      meta, age) and the bell-off glyph
- *                                      appears; the name can never go bold
- *                                      here, whatever `unread_count` says.
- *                                      Mute is honoured EXACTLY — "muting
- *                                      that doesn't fully silence" is the top
- *                                      complaint the research names.
+ *   `my_notify_level === 'muted'`    → the row's IDENTITY dims and the
+ *                                      bell-off glyph appears; the name can
+ *                                      never go bold here, whatever
+ *                                      `unread_count` says.
  *
- * ── WHERE THE MUTED DIM MAY LIVE, AND WHY IT MATTERS ───────────────────────
- * The dim is applied to a WRAPPER around the dimmable parts, never to the
+ * THE DIM IS APPLIED TO A WRAPPER around the dimmable parts, NEVER to the
  * anchor: CSS `opacity` composites its whole subtree as one layer, so a
  * descendant `opacity-100` inside a faded parent is a no-op. An anchor-level
- * dim would therefore render a muted channel's @you badge at 60% — muting the
- * exact signal Ruling A guarantees a mute can never suppress. The trailing
- * badge is a sibling of the dim wrapper for precisely that reason.
+ * dim would render a muted channel's @you badge at 60% — muting the exact
+ * signal Ruling A guarantees a mute can never suppress. The trailing badge is
+ * a SIBLING of the dim wrapper for precisely that reason.
  *
  * Both counts are ABSOLUTE values assigned by the spine's `.channel.unread`
  * writers, so this row moves within a second of a message landing, with no
- * request from the space screen.
+ * request from the lobby.
  *
- * ── THE META LINE'S TWO ZONES ──────────────────────────────────────────────
- * LEAD: what the channel is (its description, or the honest "No messages yet"
- * when it has neither description nor history). TRAIL: the member count,
- * right-anchored so the counts read down the column, with the last-activity
- * age beside the badge on the title line — the fact that ranks the row sits
- * where the eye already is.
- *
- * `memo` holds because the spine's writers are reference-stable on a no-op.
- * Phase-5 W4, 2026-08-04.
+ * `memo` holds because `row` comes out of the frame's memoised sections and
+ * `now` only moves once a minute — and it is not optional decoration: the
+ * React Compiler's transform is not enabled in this repo, so without it every
+ * query transition above re-renders the whole digest.
  */
 export const SpaceChannelRow = memo(function SpaceChannelRow({
-  channel,
+  row,
   now,
-  index,
 }: {
-  channel: Channel;
-  /** Frozen clock for the relative age — threaded from the screen's lazy
-   *  `useState` so no `Date.now()` runs in render (React Compiler lint). */
+  row: RailRow;
+  /**
+   * The shared minute clock. `0` is its pre-hydration value and means "no age
+   * yet" — handing it to the formatter would date every row as "now".
+   */
   now: number;
-  index: number;
 }) {
-  const { unread, mentions, muted } = channelUnreadGrammar(channel);
+  const { channel, grammar } = row;
+  const { unread, mentions, muted } = grammar;
   const Icon = channel.visibility === 'private' ? Lock : Hash;
-  const age = formatRelativeTime(channel.last_message_at, now);
-  // THE DIM IS SCOPED, NEVER ON THE ANCHOR — see the docblock. `opacity` on a
-  // parent composites the whole subtree, so a descendant `opacity-100` cannot
-  // undo it; the mention badge must therefore sit OUTSIDE this wrapper.
+  const age = now > 0 ? formatRelativeTime(channel.last_message_at, now) : '';
+  const line = channelPreviewLine(row);
+  const preview = line.kind === 'none' ? null : line;
+  // THE DIM IS SCOPED, NEVER ON THE ANCHOR — see the docblock. The mention
+  // badge must sit OUTSIDE this wrapper.
   const dim = muted
     ? 'opacity-60 transition-opacity duration-150 group-hover:opacity-100 motion-reduce:transition-none'
     : undefined;
 
   return (
-    <li
-      className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:fill-mode-both motion-safe:duration-200"
-      style={{ animationDelay: `${Math.min(index, 14) * 25}ms` }}
-    >
+    <li>
+      {/* NO `aria-current` HERE. This row only ever appears on the space's own
+          page, where no channel is open — the ACTIVE-row state belongs to the
+          rail, which is the thing that sits beside an open channel. */}
       <Link
         href={`/channels/${channel.uuid}`}
         className={cn(
-          'group flex min-w-0 items-start gap-3 rounded-lg px-2 py-3',
-          'transition-colors duration-150 hover:bg-secondary/50 active:bg-secondary/70',
-          'motion-reduce:transition-none v2-interactive',
+          'group flex min-w-0 items-start gap-3 rounded-xl px-3 py-2.5',
+          'transition-colors duration-150 motion-reduce:transition-none v2-interactive',
+          'hover:bg-secondary/50 active:bg-secondary/70',
           FOCUS_RING,
         )}
       >
         <span className={cn('flex min-w-0 flex-1 items-start gap-3', dim)}>
-          <Icon
+          <span
             aria-hidden
             className={cn(
-              'mt-0.5 size-[18px] shrink-0 transition-colors duration-150 motion-reduce:transition-none',
-              // `unread || mentions` — the SAME activity test the spaces list
-              // row and the my-channels row use for their tiles, so a
-              // muted-with-@you channel (unread false, mentions > 0) is warm
-              // on every surface instead of warm on one and cold on another.
-              unread || mentions > 0 ? 'text-primary' : 'text-muted-foreground',
+              'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg',
+              'transition-colors duration-150 motion-reduce:transition-none',
+              // The SAME activity test every other collab row uses, so a
+              // muted-with-@you channel is warm on every surface.
+              unread || mentions > 0
+                ? 'bg-primary/10 text-primary'
+                : 'bg-secondary text-muted-foreground group-hover:text-foreground',
             )}
-          />
+          >
+            <Icon className="size-[18px]" />
+          </span>
 
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
               <span
+                title={channel.name}
                 className={cn(
-                  'min-w-0 truncate text-[15px] text-foreground transition-colors duration-150 group-hover:text-primary motion-reduce:transition-none',
+                  'min-w-0 truncate text-[15px] text-foreground',
+                  'transition-colors duration-150 group-hover:text-primary motion-reduce:transition-none',
                   unread ? 'font-semibold' : 'font-medium',
                 )}
-                title={channel.name}
               >
                 {channel.name}
               </span>
@@ -123,14 +130,8 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
               ) : null}
             </span>
 
-            <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
-              <span className="min-w-0 flex-1 truncate">
-                {channel.description?.trim() ||
-                  (channel.last_message_at ? '' : 'No messages yet')}
-              </span>
-              <span className="shrink-0 tabular-nums">
-                {memberCountLabel(channel.active_members_count)}
-              </span>
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              {preview ? <ChannelPreviewText line={preview} /> : null}
             </span>
           </span>
         </span>
