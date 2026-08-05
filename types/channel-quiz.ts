@@ -136,24 +136,51 @@ export interface ChannelQuiz {
    * PROVENANCE — the channel this quiz was BORN in. Not "the channel you are
    * looking at", and never a link target.
    *
-   * `null` since 2026-08-05, and it means one of TWO things that cannot be told
-   * apart from here: the quiz was written straight into its author's library
-   * (`POST /channel-quizzes`), or the channel it was born in has since been
-   * DELETED (measured — deleting a channel nulls its quizzes' `channel_uuid`,
-   * and its finished games then answer `403` to everyone signed in while the
-   * public results link keeps serving them).
+   * `null` when the quiz was written straight into its author's library
+   * (`POST /channel-quizzes`) and has never belonged to a room.
    *
-   * So NOTHING may promise the reader a room from this field: no "from
-   * #general", no link back, no name lookup. The channel a quiz is being read
-   * IN is the one whose screen is open; the channel a game runs in is
+   * IT USED TO BE AMBIGUOUS AND NO LONGER IS. Earlier on 2026-08-05, deleting a
+   * channel NULLED its quizzes' `channel_uuid`, so a null could equally mean
+   * "born in a library" or "its room is gone", and its finished games answered
+   * `403` to their own host. The backend fixed both the same evening: the uuid
+   * now survives the deletion and {@link ChannelQuiz.channel_deleted} carries
+   * the fact instead (re-measured — a quiz whose channel we deleted came back
+   * with its uuid intact and `channel_deleted: true`).
+   *
+   * NOTHING may still promise the reader a room from this field: no "from
+   * #general", no link back, no name lookup — the room may be deleted, and a
+   * quiz's origin is not where it is being read. The channel a quiz is being
+   * read IN is the one whose screen is open; the channel a game runs in is
    * {@link QuizGame.channel_uuid}, which is a different field and stays
    * non-null.
    */
   channel_uuid: string | null;
+  /** The room named by {@link channel_uuid} no longer exists. Measured
+   *  2026-08-05; absent from the backend's contract doc, which still describes
+   *  the pre-fix shape. */
+  channel_deleted: boolean;
   title: string;
   description: string | null;
   settings: ChannelQuizSettings;
-  creator: SlimUser;
+  /**
+   * THE AUTHOR, OR `null` WHEN THAT ACCOUNT IS GONE — the same rule every other
+   * person-bearing collab shape follows ({@link QuizGame.host},
+   * `Message.author`, `TaskListItem.creator`).
+   *
+   * Typed non-null until 2026-08-05, which was a lie the wire settled: a live
+   * channel's quiz list crashed the whole screen on `creator.name`, and the
+   * deployed bundle proves that read is what threw. Never dereference it
+   * without a fallback.
+   *
+   * NOT the Lawexa signal. A quiz Lawexa drafts keeps the person who asked for
+   * it as its creator (measured) — {@link is_ai_generated} is what says Lawexa
+   * wrote the questions.
+   */
+  creator: SlimUser | null;
+  /** Lawexa drafted the questions. The quiz still belongs to the person who
+   *  asked — `creator` is them and `is_mine` is true for them (measured
+   *  2026-08-05 by asking Lawexa for a quiz and reading the row back). */
+  is_ai_generated: boolean;
   /** Who may find it — see {@link ChannelQuizVisibility}. Owner-editable. */
   visibility: ChannelQuizVisibility;
   /** The server's own answer to "did this viewer write it?" — the ONLY honest

@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   Radio,
+  Sparkles,
   Trash2,
   Trophy,
   WifiOff,
@@ -99,9 +100,13 @@ import { QuizFormDialog } from './QuizFormDialog';
  * Pressing Go live inside a channel means "run this in this channel", so the
  * room is context and there is no picker. `goLiveTarget` builds the body; the
  * quiz's own `channel_uuid` is PROVENANCE and is never treated as a
- * destination, a link or a name — it can be null, and a null can equally mean
- * "written into a library" or "its channel was deleted", which is exactly why
- * nothing here ever says where a quiz came from.
+ * destination, a link or a name. It can be null (a quiz written straight into a
+ * library) and the room it names can be gone (`channel_deleted`) — so nothing
+ * here says where a quiz came from, only what it is.
+ *
+ * NEITHER IS `creator` SAFE TO DEREFERENCE. It is null once that account is
+ * gone, exactly like a message author, and reading `creator.name` here took the
+ * whole channel screen down on a live channel on 2026-08-05.
  *
  * ONE LIVE GAME PER CHANNEL is a server rule, so the sheet leads with it: when
  * a game is already running, the top of the list says so and offers the way in,
@@ -529,17 +534,34 @@ function QuizRow({
               for. Stating the size twice, once wrongly, is worse than stating
               it once. */}
           <MemberAvatar user={quiz.creator} size="sm" />
-          {/* NOTHING HERE NAMES A ROOM. `quiz.channel_uuid` is provenance, may
-              be null, and a null cannot be told apart from a channel that has
-              been deleted — so a quiz is described by what it IS (how many
-              questions, whose, when) and never by where it came from. */}
+          {/* NOTHING HERE NAMES A ROOM. `quiz.channel_uuid` is where the quiz
+              was born, not where it is being read, and the room may since have
+              been deleted (`channel_deleted`) — so a quiz is described by what
+              it IS (how many questions, whose, when) and never by where it
+              came from. */}
           <span className="shrink-0">
             {count} {count === 1 ? 'question' : 'questions'}
           </span>
+          {/* `creator` IS NULLABLE AND THIS LINE PROVED IT. Reading
+              `creator.name` here crashed the whole channel screen on a live
+              channel (2026-08-05) — the account had gone, the wire sent null,
+              and our type said it could not. A missing author is a designed
+              word now, never a dereference. */}
           <span className="min-w-0 truncate">
             ·{' '}
-            {quiz.is_mine ? 'you' : quiz.creator.name}
+            {quiz.is_mine
+              ? 'you'
+              : (quiz.creator?.name ?? 'Someone who has left')}
           </span>
+          {/* Lawexa wrote the questions; the person above still owns it. Said
+              once, quietly, because "who made this" is the honest answer to a
+              row you are about to run for a whole room. */}
+          {quiz.is_ai_generated && (
+            <span className="inline-flex min-w-0 shrink-0 items-center gap-1">
+              <Sparkles aria-hidden className="size-3 shrink-0 text-primary" />
+              <span className="truncate">drafted by Lawexa</span>
+            </span>
+          )}
           {/* Dropped exactly where the sheet stops being the whole screen:
               below `sm` it is viewport-wide, and the narrowest phone this ships
               to has no room for a "Sunday, August 3" beside a name. Tied to the
