@@ -4,6 +4,7 @@ import type {
   ChannelListResponse,
   ChannelResponse,
   Message,
+  MessageAttachment,
   MessageListResponse,
   MessageReaction,
   NotifyLevel,
@@ -47,12 +48,25 @@ import { channelsQueries } from './queries';
  * {@link applyPinState} and {@link applyBookmarkState} are per-message field
  * deltas onto the same `messagesOf(channel)` caches — the same
  * `setQueryData`-from-events sanction, same no-op stability contract.
+ *
+ * ATTACHMENTS CROSS EVERY FAMILY (2026-08-05). A message's `attachments` are
+ * library files, so a FILE event has to reach the MESSAGE caches:
+ * {@link applyFileRemovedFromMessages} is the one writer that runs off the
+ * file library's own delete and `.file.changed` removal, because the backend
+ * deletes a file everywhere at once. It reaches the pins and saved panels too —
+ * those hold their own copies of whole `Message` rows, and a panel still
+ * offering a chip the library no longer has is the same lie the transcript
+ * would be telling. It REPORTS what it changed
+ * ({@link MessageAttachmentsSnapshot}) so a failed delete can be undone row by
+ * row rather than by restoring whole cache entries — the discipline
+ * {@link removeFromMessageCollection} / {@link restoreMessageCollections}
+ * already keep.
  */
 
 type MessagePages = InfiniteData<MessageListResponse, string | null>;
 
 /**
- * Carry the PER-VIEWER engagement fields across a row replacement.
+ * Carry the OPTIONAL fields across a row replacement.
  *
  * `incoming` wins wherever it actually defines a value; `previous` fills every
  * field the incoming payload left `undefined`. That single rule is correct for
@@ -63,6 +77,15 @@ type MessagePages = InfiniteData<MessageListResponse, string | null>;
  *    legitimate transitions (a save removed on another device, a reaction
  *    bucket emptied) that a "preserve unconditionally" rule would freeze.
  *
+ * THE RULE IS ABOUT `undefined`, NOT ABOUT OWNERSHIP, which is why the two
+ * SHARED optional fields ride it too. `is_pinned` and `attachments` are one
+ * column and one relation, the same for everyone, and every server payload
+ * defines them — so the merge simply hands them straight through. What the rule
+ * buys for them is the other direction: a payload that OMITS the key (an older
+ * broadcast shape, a surface that ships a slimmer row) can no longer unpin a
+ * message or strip its files off a cached row. Only a payload that actually
+ * says `[]` can empty the list, and only the server says that.
+ *
  * Returns `incoming` UNCHANGED when nothing had to be carried, so a writer that
  * changed nothing still returns its exact input (the stability contract).
  */
@@ -72,12 +95,17 @@ export function mergeViewerFields(previous: Message, incoming: Message): Message
   const needsReactions =
     incoming.reactions === undefined && previous.reactions !== undefined;
   const needsPin = incoming.is_pinned === undefined && previous.is_pinned !== undefined;
-  if (!needsBookmark && !needsReactions && !needsPin) return incoming;
+  const needsAttachments =
+    incoming.attachments === undefined && previous.attachments !== undefined;
+  if (!needsBookmark && !needsReactions && !needsPin && !needsAttachments) {
+    return incoming;
+  }
   return {
     ...incoming,
     ...(needsBookmark ? { is_bookmarked: previous.is_bookmarked } : {}),
     ...(needsReactions ? { reactions: previous.reactions } : {}),
     ...(needsPin ? { is_pinned: previous.is_pinned } : {}),
+    ...(needsAttachments ? { attachments: previous.attachments } : {}),
   };
 }
 
@@ -324,6 +352,152 @@ export function findCachedMessage(
     }
   }
   return null;
+}
+
+/* ── The attachment writer, across every message-bearing family ────────────── */
+
+/**
+ * One cache entry that holds whole `Message` rows. The transcript is an
+ * INFINITE cache (`pages[].data[]`); the pins and saved panels are flat
+ * length-aware lists (`data[]`). Both arms are walked by the same writer,
+ * because a deleted file leaves every message that carried it wherever that
+ * message happens to be cached.
+ *
+ * The flat arm names ONLY the field this writer touches. Everything else on
+ * the entry — the `pagination` block, and the pins list's own `pinned_by` /
+ * `pinned_at` on each row — rides through the spreads below untouched, so the
+ * panels read back exactly the shape they fetched.
+ */
+type MessageBearingCache = MessagePages | { data: Message[] };
+
+/** Every key family that holds whole `Message` rows for one channel. */
+function messageBearingKeys(channelUuid: string): readonly (readonly unknown[])[] {
+  return [
+    channelsQueries.messagesOf(channelUuid),
+    channelsQueries.pinsOf(channelUuid),
+    channelsQueries.savedOf(channelUuid),
+  ];
+}
+
+/** Map an array of rows, returning the EXACT input when nothing moved. */
+function mapRows(rows: Message[], map: (row: Message) => Message): Message[] {
+  let changed = false;
+  const next = rows.map((row) => {
+    const mapped = map(row);
+    if (mapped !== row) changed = true;
+    return mapped;
+  });
+  return changed ? next : rows;
+}
+
+/** Map every message row inside one cache entry, whichever shape it is.
+ *  Returns the EXACT input when `map` changed nothing (stability contract). */
+function mapRowsInEntry(
+  entry: MessageBearingCache,
+  map: (row: Message) => Message,
+): MessageBearingCache {
+  if ('pages' in entry) {
+    let changed = false;
+    const pages = entry.pages.map((page) => {
+      const rows = mapRows(page.data, map);
+      if (rows === page.data) return page;
+      changed = true;
+      return { ...page, data: rows };
+    });
+    return changed ? { ...entry, pages } : entry;
+  }
+  const rows = mapRows(entry.data, map);
+  return rows === entry.data ? entry : { ...entry, data: rows };
+}
+
+/**
+ * ONE message's attachment list as it was before a file was stripped out of it,
+ * addressed by the cache entry it lives in. This — not the whole entry — is the
+ * unit a rollback restores.
+ */
+export interface MessageAttachmentsSnapshot {
+  queryKey: readonly unknown[];
+  messageUuid: string;
+  attachments: readonly MessageAttachment[];
+}
+
+/**
+ * Strip one file from every cached message that carried it, and report exactly
+ * which rows moved.
+ *
+ * THERE IS ONE FILE, SO THERE IS ONE DELETE. Removing a file from the channel's
+ * library removes it from every message it was attached to — measured
+ * 2026-08-05, a message with two attachments dropped to one the moment one of
+ * them was deleted — and that is the backend's intent, not a side effect.
+ * Nothing refetches the transcript when a file is deleted, so without this the
+ * row that carried it keeps a chip whose URL now 404s, in the same tab where
+ * the reader just deleted it.
+ *
+ * IT WALKS THE PANELS TOO. A pinned or saved row is a SEPARATE copy of the
+ * message under its own key family, read by `MessageCollectionSheet` — so a
+ * transcript-only writer left the pins panel saying "2 files" about a message
+ * that now has one, with a chip that could only fail.
+ *
+ * THE RETURN VALUE IS THE ROLLBACK. Restoring whole cache entries would take a
+ * `message.created` that landed during the in-flight DELETE back out of the
+ * transcript, and it would not come back until the next history fetch. So the
+ * writer names the rows it changed and {@link restoreMessageAttachments} puts
+ * back those rows and nothing else.
+ *
+ * A quoted `reply_to.attachment_count` elsewhere in the feed goes stale by one
+ * until the next history fetch. That is a number inside a quote rather than an
+ * affordance that can fail, and hunting it through every reply on screen would
+ * cost more than it is worth.
+ */
+export function applyFileRemovedFromMessages(
+  queryClient: QueryClient,
+  channelUuid: string,
+  fileId: number,
+): MessageAttachmentsSnapshot[] {
+  const snapshots: MessageAttachmentsSnapshot[] = [];
+  for (const prefix of messageBearingKeys(channelUuid)) {
+    for (const [queryKey, data] of queryClient.getQueriesData<MessageBearingCache>({
+      queryKey: prefix,
+    })) {
+      if (!data) continue;
+      // `mapRows` calls this once per row, so the snapshot list cannot gain a
+      // duplicate for a row it visited twice.
+      const next = mapRowsInEntry(data, (row) => {
+        const attachments = row.attachments;
+        if (!attachments?.some((file) => file.id === fileId)) return row;
+        snapshots.push({ queryKey, messageUuid: row.uuid, attachments });
+        return { ...row, attachments: attachments.filter((file) => file.id !== fileId) };
+      });
+      if (next !== data) queryClient.setQueryData(queryKey, next);
+    }
+  }
+  return snapshots;
+}
+
+/**
+ * Put back exactly what {@link applyFileRemovedFromMessages} took — one
+ * message's attachment list per snapshot, leaving every other row in the entry
+ * exactly as it is now. A message that arrived while the DELETE was in flight
+ * therefore survives the undo.
+ *
+ * A snapshot whose cache entry has since been garbage-collected is silently
+ * skipped: the updater returns `undefined`, which TanStack reads as "don't
+ * write", so a rollback never conjures an entry nobody is subscribed to.
+ */
+export function restoreMessageAttachments(
+  queryClient: QueryClient,
+  snapshots: readonly MessageAttachmentsSnapshot[],
+): void {
+  for (const snapshot of snapshots) {
+    queryClient.setQueryData<MessageBearingCache>(snapshot.queryKey, (data) => {
+      if (!data) return data;
+      return mapRowsInEntry(data, (row) =>
+        row.uuid === snapshot.messageUuid
+          ? { ...row, attachments: [...snapshot.attachments] }
+          : row,
+      );
+    });
+  }
 }
 
 /** Drop a (soft-)deleted message from every cached page. */

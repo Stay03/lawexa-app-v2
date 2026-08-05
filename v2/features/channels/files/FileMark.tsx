@@ -140,7 +140,13 @@ function ImageThumb({ url }: { url: string }) {
   );
 }
 
-export function FileMark({ file }: { file: ChannelFile }) {
+/** Everything the mark actually reads. Typed as the fields rather than as
+ *  `ChannelFile` so a {@link MessageAttachment} — the same row without an
+ *  `uploader` — wears the same mark in the feed, with no cast and no second
+ *  component. */
+export type MarkableFile = Pick<ChannelFile, 'mime_type' | 'original_name' | 'url'>;
+
+export function FileMark({ file }: { file: MarkableFile }) {
   const kind = fileKind(file);
   if (kind !== 'image' || !isRenderableImage(file) || !file.url) {
     return <GlyphMark kind={kind} />;

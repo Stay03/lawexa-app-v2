@@ -19,6 +19,7 @@ import { formatFullTimestamp } from '@/lib/utils/collab';
 import type { Message } from '@/types/collab';
 
 import { LawexaMessageContent } from './LawexaMessageContent';
+import { MessageAttachmentList } from './MessageAttachmentList';
 import { MessageContent } from './MessageContent';
 
 interface MessageRowProps {
@@ -132,15 +133,36 @@ export function MessageRow({
           Reply
         </span>
       )}
-      {message.is_ai ? (
-        <LawexaMessageContent
-          content={message.content}
-          metadata={message.metadata}
-          animateReveal={animateReveal}
-        />
-      ) : (
-        <MessageContent content={message.content} metadata={message.metadata} />
-      )}
+      {/* A message sent from v2 can be nothing but files (backend,
+          2026-08-05), and `content` is then `""` — which the text renderer
+          would turn into a blank line of body height above them. */}
+      {message.content !== '' &&
+        (message.is_ai ? (
+          <LawexaMessageContent
+            content={message.content}
+            metadata={message.metadata}
+            animateReveal={animateReveal}
+          />
+        ) : (
+          <MessageContent content={message.content} metadata={message.metadata} />
+        ))}
+      {/* AND IT CAN END UP WITH NEITHER. Delete the only attachment of a
+          file-only message and the server keeps the message, serving it back
+          with `content: ""` and `attachments: []` — measured on production,
+          2026-08-05. With no text and no files this row rendered nothing at
+          all: an author and a timestamp over empty space, which reads as a
+          message that failed to load rather than one there is nothing left in.
+          Muted italics so the line cannot be mistaken for somebody's words.
+
+          THE SAME SENTENCE IS IN v2's `v2/features/channels/feed/
+          MessageRow.tsx`. v1 may not import from v2 (the boundary rule), so
+          the words are duplicated on purpose and must move together. */}
+      {message.content === '' &&
+        !(message.attachments && message.attachments.length > 0) && (
+          <p className="text-sm text-muted-foreground italic">
+            Nothing left to show in this message.
+          </p>
+        )}
       {message.edited_at && (
         <span
           className="ml-1 text-[11px] text-muted-foreground"
@@ -148,6 +170,9 @@ export function MessageRow({
         >
           (edited)
         </span>
+      )}
+      {message.attachments && message.attachments.length > 0 && (
+        <MessageAttachmentList attachments={message.attachments} />
       )}
 
       {(canEdit || canDelete) && (

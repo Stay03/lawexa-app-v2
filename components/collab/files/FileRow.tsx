@@ -95,8 +95,11 @@ export function fileIcon(mimeType: string, name: string): FileIconKind {
 /**
  * Render the type icon for a file. Each bucket renders a concrete icon element
  * (no component reference chosen at render time) to satisfy React-Compiler lint.
+ *
+ * Exported because a message's attachments wear the same glyph as the library
+ * row for the same file — one vocabulary, not two switch statements.
  */
-function FileTypeIcon({
+export function FileTypeIcon({
   mimeType,
   name,
   className,

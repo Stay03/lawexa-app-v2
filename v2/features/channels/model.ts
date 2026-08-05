@@ -1,4 +1,10 @@
-import type { Channel, Member, SlimUser } from '@/types/collab';
+import type {
+  Channel,
+  Member,
+  Message,
+  MessageReplyTo,
+  SlimUser,
+} from '@/types/collab';
 import {
   QUIET_GRAMMAR,
   type UnreadGrammar,
@@ -323,6 +329,16 @@ export function validateChannelFile(file: File): string | null {
   return null;
 }
 
+/**
+ * THE ARCHIVE DISCLOSURE, ONE SENTENCE, ONE HOME. It is a stated backend
+ * obligation (digest §F.10) and it is now owed by two surfaces — the library
+ * row and a zip attached to a message — so it lives beside the predicate that
+ * decides when to say it rather than being retyped at each call site, where the
+ * two copies would drift.
+ */
+export const ARCHIVE_NOTE =
+  "Archives aren't scanned for malware — only open files from people you trust.";
+
 /** Zip rows are download-only and carry the "archives aren't scanned" note —
  *  both stated backend obligations (digest §F.10). Content type wins;
  *  extension is the fallback for generic mimes. */
@@ -333,6 +349,54 @@ export function isArchiveFile(mimeType: string, name: string): boolean {
     mime === 'application/x-zip-compressed' ||
     name.toLowerCase().endsWith('.zip')
   );
+}
+
+/* ── Message attachments (backend, 2026-08-05) ────────────────────────────── */
+
+/** Server cap on files per message. Refused client-side BEFORE the upload, so
+ *  the 422 this prevents is never reachable and no file is uploaded to a
+ *  message that could not have carried it. */
+export const MAX_MESSAGE_ATTACHMENTS = 10;
+
+/** "1 file" / "3 files" — how a message with no words is named. */
+export function fileCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'file' : 'files'}`;
+}
+
+/**
+ * What a message is QUOTED by — its own words, or, when it has none, what it
+ * actually carries.
+ *
+ * A file-only message has `content: ""`, and every surface that previews a
+ * message (the reply bar, the pins and saved panels) would otherwise render a
+ * blank line the reader cannot interpret. Naming the files is the smallest
+ * true thing to say instead.
+ */
+export function messagePreviewText(
+  message: Pick<Message, 'content' | 'attachments'>,
+): string {
+  const text = message.content.trim();
+  if (text !== '') return text;
+  const count = message.attachments?.length ?? 0;
+  return count > 0 ? fileCountLabel(count) : '';
+}
+
+/**
+ * The same question asked of a REPLY QUOTE, which sees a different shape: a
+ * server-rendered `content_preview` and a count, not the message.
+ *
+ * `content_preview` measured as `""` (not `null`) on a file-only target, and
+ * `attachment_count` is ABSENT on every reply recorded before the deploy — so
+ * an empty preview with no count is genuinely nothing to say, and returns `''`
+ * rather than inventing "0 files".
+ */
+export function replyQuoteText(
+  replyTo: Pick<MessageReplyTo, 'content_preview' | 'attachment_count'>,
+): string {
+  const text = replyTo.content_preview?.trim() ?? '';
+  if (text !== '') return text;
+  const count = replyTo.attachment_count ?? 0;
+  return count > 0 ? fileCountLabel(count) : '';
 }
 
 /* ── Lists ────────────────────────────────────────────────────────────────── */

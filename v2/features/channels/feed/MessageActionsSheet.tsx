@@ -111,8 +111,16 @@ export function MessageActionsSheet({
 
             {/* Keyed by uuid so the "Copied" confirmation can never survive
                 into the next message's sheet — the sheet itself is one per feed
-                and stays mounted. */}
-            <CopyTextAction key={message.uuid} content={message.content} onDone={onClose} />
+                and stays mounted.
+
+                A MESSAGE MADE ONLY OF FILES HAS NOTHING TO COPY. Its `content`
+                is `""` (backend, 2026-08-05), and the verb would put an empty
+                string on the clipboard and then say "Copied" about it. The row
+                is simply absent instead — the file itself is reached by opening
+                it, not by copying the message. */}
+            {message.content.trim() !== '' && (
+              <CopyTextAction key={message.uuid} content={message.content} onDone={onClose} />
+            )}
             <SheetAction
               label="Reply"
               onClick={() => {

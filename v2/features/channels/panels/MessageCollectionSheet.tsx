@@ -17,6 +17,7 @@ import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useTogglePin, useToggleSave } from '../engagement-mutations';
 import { useEngagementThrottled } from '../engagement-throttle';
+import { messagePreviewText } from '../model';
 import { channelsQueries } from '../queries';
 import { LawexaAvatar, MemberAvatar } from '../ui/avatars';
 import { RelativeTime } from '../ui/RelativeTime';
@@ -287,6 +288,12 @@ function CollectionRow({
     ? 'Lawexa'
     : (message.author?.name ?? 'Deleted member');
   const detail = pinnedDetail(message);
+  // A pinned or saved message may be nothing but files (backend, 2026-08-05),
+  // and `content: ""` would leave this row as an author's name over a blank
+  // line. It says what the message carries instead, in italics so the count is
+  // never mistaken for something somebody wrote.
+  const hasText = message.content.trim() !== '';
+  const preview = messagePreviewText(message);
 
   return (
     <li className="group/row relative">
@@ -323,8 +330,13 @@ function CollectionRow({
               className="shrink-0 text-xs text-muted-foreground"
             />
           </span>
-          <span className="mt-0.5 line-clamp-2 block text-sm break-words text-muted-foreground">
-            {message.content}
+          <span
+            className={cn(
+              'mt-0.5 line-clamp-2 block text-sm break-words text-muted-foreground',
+              !hasText && 'italic',
+            )}
+          >
+            {preview}
           </span>
           {/* Second meta zone — the collection's own fact, never the
               message's. */}

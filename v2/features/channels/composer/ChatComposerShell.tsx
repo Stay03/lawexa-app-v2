@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode } from 'react';
-import { AlertCircle, Check, X } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -106,41 +106,34 @@ export function ComposerTrayRow({
 }
 
 /**
- * A tray notice — one sentence, one optional way forward, one dismissal. Used
- * by the Lawexa-blocked reason (private to the summoner, §F.12 — an inline
- * line, never a toast, never a feed row) and by the attachment outcome.
+ * A tray notice — one sentence and one dismissal. Used by the Lawexa-blocked
+ * reason (private to the summoner, §F.12 — an inline line, never a toast,
+ * never a feed row) and by a REFUSED send: an unsupported file, one over the
+ * cap, an upload that failed, or Enter pressed while bytes are still moving.
+ *
+ * IT ONLY EVER REPORTS A REFUSAL. It used to take a `tone`, with a second
+ * `done` face that confirmed an upload had landed in the Files section. Since
+ * attachments actually attach (2026-08-05) a successful upload is a CHIP in the
+ * staging tray, and the tray's own line carries the Files link — so nothing has
+ * called for the confirming face since, and a branch no caller can reach is a
+ * second design nobody is maintaining. There is one face, and it is the one
+ * that says no.
  *
  * THE TINT NEVER TOUCHES THE SENTENCE, the same rule `CollabFailure` states:
- * the tone colours the glyph and the border, the words stay on
+ * the alarm colours the glyph and the border, the words stay on
  * `text-foreground`, because muted-red body text does not clear 4.5:1.
  */
 export function ComposerNotice({
-  tone,
   text,
-  action,
   onDismiss,
 }: {
-  tone: 'failure' | 'done';
   text: ReactNode;
-  /** A single trailing control — "Files" after an upload lands, say. */
-  action?: ReactNode;
   onDismiss: () => void;
 }) {
-  const failed = tone === 'failure';
   return (
-    <div
-      className={cn(
-        'flex items-start gap-2 rounded-xl border bg-background px-3 py-2 text-xs',
-        failed ? 'border-destructive/30' : 'border-border',
-      )}
-    >
-      {failed ? (
-        <AlertCircle aria-hidden className="mt-0.5 size-3.5 shrink-0 text-destructive" />
-      ) : (
-        <Check aria-hidden className="mt-0.5 size-3.5 shrink-0 text-primary" />
-      )}
+    <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs">
+      <AlertCircle aria-hidden className="mt-0.5 size-3.5 shrink-0 text-destructive" />
       <p className="min-w-0 flex-1 text-foreground">{text}</p>
-      {action}
       <button
         type="button"
         onClick={onDismiss}

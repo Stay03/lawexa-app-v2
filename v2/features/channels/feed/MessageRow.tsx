@@ -25,18 +25,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
-import type { Message } from '@/types/collab';
+import type { Message, MessageAttachment } from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useEngagementThrottled } from '../engagement-throttle';
 import {
   MESSAGE_MAX_LENGTH,
   mentionsViewer,
+  replyQuoteText,
   unmatchedHandlesSentence,
 } from '../model';
 import { useSendState } from '../send-outbox';
 import { useHeldValue } from '../use-held-value';
 import { LawexaMessageContent } from './LawexaMessageContent';
 import { MESSAGE_MEASURE } from './measure';
+import { MessageAttachments } from './MessageAttachments';
 import { MessageContent } from './MessageContent';
 import { ReactionChips, ReactionTrayPopover } from './reactions';
 import { useLongPress } from './use-long-press';
@@ -114,6 +116,10 @@ import { useLongPress } from './use-long-press';
  *  Module-scoped so it is one object for the whole feed. */
 const NO_LONG_PRESS = {} as const;
 
+/** One frozen array for every row that carries no files — a fresh `[]` per
+ *  render would be a new reference under a memo boundary for no reason. */
+const EMPTY_ATTACHMENTS: readonly MessageAttachment[] = [];
+
 /** One cluster control's shape — shared by the plain buttons and the overflow
  *  trigger, which cannot be a component because Radix needs the element. */
 const ROW_ACTION =
@@ -188,6 +194,8 @@ export const MessageRow = memo(function MessageRow({
   const sendState = useSendState(message.uuid);
   const saveThrottled = useEngagementThrottled('bookmark');
 
+  const hasText = message.content !== '';
+  const attachments = message.attachments ?? EMPTY_ATTACHMENTS;
   const mentioned = mentionsViewer(message.metadata.mentions, viewerUuid);
   const failed = sendState?.status === 'failed';
   const sending = sendState?.status === 'sending';
@@ -216,8 +224,23 @@ export const MessageRow = memo(function MessageRow({
   const holdHandlers = canEngage ? longPress : NO_LONG_PRESS;
 
   if (editing) {
-    // Keyed by uuid so the draft state initialises fresh per edit session.
-    return <MessageEditBox key={message.uuid} message={message} actions={actions} />;
+    // THE EDIT BOX EDITS THE WORDS, AND THE FILES STAY ON SCREEN. Returning it
+    // alone turned a file-only message into a bare textarea with nothing above
+    // or below it — the row it replaced simply looked gone. The attachments
+    // render exactly where they render on the finished row, so a reader
+    // captioning three files can still see the three files.
+    return (
+      <div>
+        {/* Keyed by uuid so the draft state initialises fresh per edit session. */}
+        <MessageEditBox key={message.uuid} message={message} actions={actions} />
+        {attachments.length > 0 && (
+          <MessageAttachments
+            attachments={attachments}
+            className={cn(MESSAGE_MEASURE, 'mt-1.5')}
+          />
+        )}
+      </div>
+    );
   }
 
   return (
@@ -311,18 +334,47 @@ export const MessageRow = memo(function MessageRow({
           <ReplyQuote replyTo={message.reply_to} onJump={actions.onJumpToMessage} />
         )}
 
-        {message.is_ai ? (
-          <LawexaMessageContent
-            content={message.content}
-            metadata={message.metadata}
-            viewerUuid={viewerUuid}
-          />
-        ) : (
-          <MessageContent
-            content={message.content}
-            metadata={message.metadata}
-            viewerUuid={viewerUuid}
-          />
+        {/* A MESSAGE MAY HAVE NO WORDS. Since files can be sent on their own
+            (backend, 2026-08-05), `content` is legitimately `""` — and the
+            body renderer would answer that with an empty line of body-height
+            above the files, which reads as a message that failed to load. No
+            text, no text element. */}
+        {hasText &&
+          (message.is_ai ? (
+            <LawexaMessageContent
+              content={message.content}
+              metadata={message.metadata}
+              viewerUuid={viewerUuid}
+            />
+          ) : (
+            <MessageContent
+              content={message.content}
+              metadata={message.metadata}
+              viewerUuid={viewerUuid}
+            />
+          ))}
+
+        {/* AND A MESSAGE MAY HAVE NEITHER. Delete the only attachment of a
+            file-only message and the server keeps the message and serves it
+            back with `content: ""` and `attachments: []` — measured on
+            production, 2026-08-05, not a cache artifact. With no text and no
+            files the body rendered NOTHING: an author's name and a timestamp
+            over four pixels of empty space, which reads as a row that failed to
+            load rather than one there is nothing left in.
+
+            It also covers the case nobody can measure while broadcast emission
+            is down: a `message.created` that arrives without its documented
+            `attachments`. Either way the row says what it is instead of looking
+            broken. Muted and italic, the same rule the reply quote's "2 files"
+            follows, so it can never be mistaken for something somebody typed.
+
+            THE SAME SENTENCE IS IN v1's `components/collab/MessageRow.tsx`.
+            v1 may not import from v2, so the words are duplicated on purpose;
+            they are one message and must move together. */}
+        {!hasText && attachments.length === 0 && (
+          <p className="text-muted-foreground italic">
+            Nothing left to show in this message.
+          </p>
         )}
 
         {message.edited_at && (
@@ -332,6 +384,13 @@ export const MessageRow = memo(function MessageRow({
           >
             (edited)
           </span>
+        )}
+
+        {attachments.length > 0 && (
+          <MessageAttachments
+            attachments={attachments}
+            className={hasText ? 'mt-1.5' : undefined}
+          />
         )}
 
         <ReactionChips
@@ -651,6 +710,13 @@ function MessageEditBox({
  * threads; Telegram's tap-to-jump is the target interaction). The preview is
  * a live server read: a deleted target arrives as `is_deleted` with a null
  * preview and renders as a quiet tombstone, not a broken quote.
+ *
+ * A QUOTE OF A FILE-ONLY MESSAGE SAYS WHAT IT IS QUOTING. That target has
+ * `content_preview: ""` — an empty string, measured, not `null` — so the quote
+ * used to render an author's name followed by nothing, which looks like a
+ * failure rather than a message made of files. `replyQuoteText` falls through
+ * to the count, and it is set in muted italics so the words "2 files" can never
+ * be mistaken for something somebody typed.
  */
 function ReplyQuote({
   replyTo,
@@ -662,6 +728,8 @@ function ReplyQuote({
   const authorName = replyTo.is_ai
     ? 'Lawexa'
     : (replyTo.author?.name ?? 'Deleted member');
+  const quoted = replyQuoteText(replyTo);
+  const quotingFiles = (replyTo.content_preview ?? '').trim() === '' && quoted !== '';
 
   if (replyTo.is_deleted) {
     return (
@@ -684,7 +752,7 @@ function ReplyQuote({
     >
       <CornerUpLeft aria-hidden className="size-3 shrink-0 self-center" />
       <span className="shrink-0 font-medium text-foreground/80">{authorName}</span>
-      <span className="truncate">{replyTo.content_preview ?? ''}</span>
+      <span className={cn('truncate', quotingFiles && 'italic')}>{quoted}</span>
     </button>
   );
 }

@@ -26,6 +26,7 @@ import type {
 import { getV2Echo } from '@/v2/runtime/realtime/echo';
 import { presenceChannelName } from '@/v2/runtime/realtime/protocol';
 import {
+  applyFileRemovedFromMessages,
   applyMessageCreated,
   applyMessageDeleted,
   applyMessageUpdated,
@@ -47,6 +48,7 @@ import {
   upsertListCaches,
 } from './lists-files-cache';
 import { channelsQueries } from './queries';
+import { noteChannelFileRemoved } from './removed-files';
 import { publishQuizGameEvent } from './quiz/game-bus';
 import { channelQuizQueries } from './quiz/queries';
 
@@ -309,6 +311,16 @@ export function useChannelRoom(
       (payload: { action: 'added' | 'removed'; file: ChannelFile }) => {
         if (payload.action === 'removed') {
           removeFileCache(queryClient, channelUuid, payload.file.id);
+          // One file, one delete: the backend drops it from every message that
+          // carried it too, so the transcript (and the pins/saved panels) have
+          // to follow the library or a stranger's delete leaves a dead chip on
+          // screen here. Nothing rolls back a broadcast, so the reported
+          // snapshots have no undo to serve and are discarded.
+          applyFileRemovedFromMessages(queryClient, channelUuid, payload.file.id);
+          // And the composer, which may be holding this exact file staged for
+          // the next send — a chip nobody removed would post an id the server
+          // no longer has (`./removed-files.ts`).
+          noteChannelFileRemoved(channelUuid, payload.file.id);
         } else {
           addFileCache(queryClient, channelUuid, payload.file);
         }

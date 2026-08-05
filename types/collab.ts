@@ -339,6 +339,18 @@ export interface MessageReplyTo {
   content_preview: string | null;
   is_deleted: boolean;
   type?: MessageType;
+  /**
+   * How many files the quoted message carries (backend, 2026-08-05). ABSENT on
+   * every reply recorded before that deploy — there was no backfill — so a
+   * missing key must read as 0, never as "unknown".
+   *
+   * Measured 2026-08-05: a reply to a message carrying two files reported `2`
+   * here with a `content_preview` of `""` — an EMPTY STRING, not `null`. The
+   * two facts together are what lets a quote say what it is quoting instead of
+   * rendering a blank line: `null` means deleted, `""` plus a count means the
+   * target is files and nothing else.
+   */
+  attachment_count?: number;
 }
 
 /**
@@ -360,6 +372,38 @@ export interface MessageReaction {
   emoji: string;
   count: number;
   reacted_by_me: boolean;
+}
+
+/**
+ * A file carried BY a message (backend, 2026-08-05).
+ *
+ * NOT A {@link ChannelFile}, and deliberately its own interface: the message
+ * payload omits `uploader`, and reusing `ChannelFile` here would type a field
+ * the server never sends — every consumer would then read `file.uploader.name`
+ * off `undefined`. Everything else IS the same row: an attachment is created by
+ * the ordinary `POST /channels/{uuid}/files` upload and appears in the channel's
+ * library as well. One upload, one file, two places it shows — which is also
+ * why deleting it from the library removes it from every message that carried
+ * it (measured).
+ *
+ * ── `url` EXPIRES IN ONE HOUR ──────────────────────────────────────────────
+ * It is pre-signed (measured: `X-Amz-Expires=3600`), so it must never be
+ * persisted, stored beyond the response it arrived in, or put in a link a
+ * reader may follow later — a tab left open past the hour holds nothing but
+ * dead URLs. It is good for PAINTING a thumbnail on arrival and for nothing
+ * else. `GET /files/{id}/download` mints a fresh one; that is the affordance
+ * for opening a file, and the retry for an image that failed to load.
+ */
+export interface MessageAttachment {
+  id: number;
+  /** Pre-signed and short-lived — see the interface docblock. */
+  url: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  category: string;
+  upload_status: string;
+  created_at: string;
 }
 
 export interface Message {
@@ -407,6 +451,27 @@ export interface Message {
   is_bookmarked?: boolean;
   /** Per-viewer reaction buckets; feed ONLY, never broadcast (3f). */
   reactions?: MessageReaction[];
+
+  /**
+   * Files this message carries (backend, 2026-08-05), in the order the sender
+   * listed them — `attachment_ids` order is preserved server-side (measured) —
+   * and `[]` when there are none.
+   *
+   * SHARED, not per-viewer, so it follows the `is_pinned` transport rule rather
+   * than the `is_bookmarked` one: it rides REST history, the send response, the
+   * edit response (measured — files survive an edit unchanged) and the
+   * `message.created`/`message.updated` broadcasts (documented; the broadcast
+   * side could not be measured while emission was down in production). Take it
+   * from the payload wherever the payload defines it.
+   *
+   * OPTIONAL for exactly the reason the three fields above are: a
+   * locally-constructed (optimistic) row is built from what the composer knows,
+   * and `undefined` reads as "unknown", which every consumer treats as the
+   * empty default. Server rows always carry it — so a cached row that HAS
+   * attachments must not be blanked by a payload that merely omits the key
+   * (`mergeViewerFields` in the v2 channels cache is where that rule lives).
+   */
+  attachments?: MessageAttachment[];
 }
 
 /**
@@ -622,11 +687,33 @@ export interface MemberListParams {
 ******************************************************************************/
 
 export interface SendMessagePayload {
-  content: string;
+  /**
+   * OPTIONAL SINCE 2026-08-05, and only because attachments exist. Measured
+   * against production that day: a body carrying `attachment_ids` and no
+   * `content` key posts (201) and the message comes back with `content: ""`;
+   * `content: ""` posts too; a body with NEITHER content nor attachments is
+   * still a 422.
+   *
+   * Callers OMIT rather than send `""`. Both forms are accepted on the wire,
+   * but an empty string is a caption that says nothing, and leaving the key out
+   * is the honest expression of "there is no caption".
+   */
+  content?: string;
   parent_message_uuid?: string;
   /** Reply target (3b): must be a live message in the SAME channel (else 422).
    *  The current wire name — `parent_message_uuid` above predates it. */
   reply_to_uuid?: string;
+  /**
+   * Library file ids to attach, IN ORDER — the server preserves it (measured:
+   * `[txt, png]` came back in that order). Max 10.
+   *
+   * Two 422s are reachable here and both are the client's to make impossible
+   * rather than to translate: a repeated id (`errors.attachment_ids.0` — "The
+   * same file cannot be attached twice.") and an id that is not a file of this
+   * channel (`errors.attachment_ids` — "One or more of those files are not
+   * available in this channel.").
+   */
+  attachment_ids?: number[];
 }
 
 export interface UpdateMessagePayload {

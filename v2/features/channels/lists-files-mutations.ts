@@ -14,6 +14,11 @@ import type {
   UpdateListPayload,
 } from '@/types/collab';
 import {
+  applyFileRemovedFromMessages,
+  restoreMessageAttachments,
+  type MessageAttachmentsSnapshot,
+} from './cache';
+import {
   addFileCache,
   patchListItems,
   removeFileCache,
@@ -22,6 +27,7 @@ import {
 } from './lists-files-cache';
 import { LOCAL_ITEM_PREFIX } from './model';
 import { channelsQueries } from './queries';
+import { noteChannelFileRemoved } from './removed-files';
 
 /**
  * lists-files-mutations — the Lists/Files tab write paths, ported from v1
@@ -416,39 +422,88 @@ export function useUploadChannelFile(channelUuid: string) {
   });
 }
 
-/** Delete a file (uploader or governance); optimistic drop + rollback. */
+/**
+ * Delete a file (uploader or governance); optimistic drop + rollback.
+ *
+ * IT DELETES IN THREE PLACES BECAUSE THE BACKEND DOES. Since 2026-08-05 a file
+ * can also be an attachment on a message, and removing it from the library
+ * removes it from every message that carried it (measured). So the optimistic
+ * write reaches the transcript — otherwise the reader deletes a file and the
+ * message beside it keeps offering a chip that can only 404 — and the pins and
+ * saved panels with it, which hold their own copies of those rows.
+ *
+ * ── THE TWO SNAPSHOTS ARE DELIBERATELY DIFFERENT SHAPES ────────────────────
+ * The LIBRARY is this mutation's own list: it can be snapshotted whole, because
+ * nothing else writes it during the round trip. The MESSAGE caches cannot. A
+ * `message.created` can land at any moment, and restoring a whole transcript
+ * entry would take that message back out of the feed until the next history
+ * fetch — a stranger's message erased by our failed delete. So the message half
+ * rolls back ROW BY ROW, through the snapshots
+ * `applyFileRemovedFromMessages` reports.
+ *
+ * ── THE COMPOSER IS TOLD, AND IS NEVER UNTOLD ──────────────────────────────
+ * A staged chip is a library row the composer is holding, so a delete has to
+ * reach it too or the next send posts an id the server no longer has. The
+ * publish happens HERE, in `onMutate`, at the same moment the library row
+ * leaves — and is not reversed by `onError`. See `./removed-files.ts` for why a
+ * chip the reader watched disappear must not come back.
+ */
 export function useDeleteChannelFile(channelUuid: string) {
   const queryClient = useQueryClient();
   return useMutation<
     Awaited<ReturnType<typeof channelFilesApi.remove>>,
     Error,
     number,
-    { snapshots: [readonly unknown[], unknown][] }
+    {
+      library: [readonly unknown[], unknown][];
+      attachments: MessageAttachmentsSnapshot[];
+    }
   >({
     mutationFn: (id) => channelFilesApi.remove(channelUuid, id),
 
     onMutate: (id) => {
-      const snapshots = queryClient.getQueriesData({
+      const library = queryClient.getQueriesData({
         queryKey: channelsQueries.filesOf(channelUuid),
       });
       removeFileCache(queryClient, channelUuid, id);
-      return { snapshots: [...snapshots] };
+      const attachments = applyFileRemovedFromMessages(queryClient, channelUuid, id);
+      noteChannelFileRemoved(channelUuid, id);
+      return { library: [...library], attachments };
     },
 
     onError: (_error, _id, context) => {
-      for (const [queryKey, data] of context?.snapshots ?? []) {
+      if (!context) return;
+      for (const [queryKey, data] of context.library) {
         if (data !== undefined) queryClient.setQueryData(queryKey, data);
       }
+      restoreMessageAttachments(queryClient, context.attachments);
     },
   });
 }
 
-/** Fetch the member-gated signed URL and open it — the download action. */
+/**
+ * Fetch the member-gated signed URL and open it — the download action.
+ *
+ * THE OPEN IS PART OF THE MUTATION, not an afterthought in `onSuccess`. It runs
+ * after the round trip, so it is outside the gesture's synchronous frame, and
+ * iOS Safari answers that with a blocked window and a `null` return rather than
+ * an exception. Discarding that return is how a download becomes a tap that
+ * does nothing at all — no tab, no spinner, no reason — which is the one
+ * failure a reader cannot even report. Throwing here puts it in the mutation's
+ * error state, where the row can say so and offer a fresh gesture the engine
+ * will honour. Same rule as the feed's attachment opener.
+ */
 export function useDownloadChannelFile() {
   return useMutation({
-    mutationFn: (id: number) => filesApi.getDownloadUrl(id),
-    onSuccess: (data) => {
-      if (data.data?.url) window.open(data.data.url, '_blank', 'noopener');
+    mutationFn: async (id: number) => {
+      const response = await filesApi.getDownloadUrl(id);
+      const url = response.data?.url;
+      if (!url) throw new Error('The download link came back empty.');
+      if (!window.open(url, '_blank', 'noopener')) {
+        throw new Error('The browser blocked the new tab.');
+      }
+      return response;
     },
+    meta: { silentError: true },
   });
 }

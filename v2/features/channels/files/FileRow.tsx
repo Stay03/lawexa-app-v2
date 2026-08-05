@@ -24,7 +24,7 @@ import {
   useDeleteChannelFile,
   useDownloadChannelFile,
 } from '../lists-files-mutations';
-import { canManageChannel, isArchiveFile } from '../model';
+import { ARCHIVE_NOTE, canManageChannel, isArchiveFile } from '../model';
 import { RelativeTime } from '../ui/RelativeTime';
 import { FileMark } from './FileMark';
 
@@ -92,6 +92,30 @@ export function FileRow({
           lead={[formatBytes(file.size), file.uploader.name]}
           trail={[<RelativeTime key="age" iso={file.created_at} />]}
         />
+
+        {/* The download's one visible failure. It is HERE rather than in a
+            toast because this tab raises none, and it needs to exist at all
+            because a blocked new tab is a tap that does nothing: the retry is
+            a fresh gesture, which is exactly what an engine that refused the
+            first one will honour. */}
+        {download.isError && (
+          <p
+            role="status"
+            className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground"
+          >
+            <span>Couldn&rsquo;t open it.</span>
+            <button
+              type="button"
+              onClick={() => download.mutate(file.id)}
+              className={cn(
+                'rounded font-medium text-foreground underline underline-offset-2',
+                FOCUS_RING,
+              )}
+            >
+              Try again
+            </button>
+          </p>
+        )}
       </div>
 
       <div
@@ -170,10 +194,9 @@ export function FileRow({
   );
 }
 
-const ARCHIVE_NOTE =
-  "Archives aren't scanned for malware — only open files from people you trust.";
-
-/** The zip caution, one line tall and out of the filename's way. */
+/** The zip caution, one line tall and out of the filename's way. The sentence
+ *  itself lives in `../model` beside the predicate — the feed owes the same
+ *  disclosure on an attached zip and must not keep a second copy of it. */
 function ArchiveChip() {
   const [open, setOpen] = useState(false);
   return (

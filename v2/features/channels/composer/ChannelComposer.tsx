@@ -26,20 +26,31 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { Channel, Message, MessageReplyTo } from '@/types/collab';
+import { formatBytes } from '@/lib/utils/format-bytes';
+import type {
+  Channel,
+  ChannelFile,
+  Message,
+  MessageAttachment,
+  MessageReplyTo,
+} from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { isRenderableImage } from '../files/file-model';
 import { useUploadChannelFile } from '../lists-files-mutations';
 import { useSendChannelMessage } from '../message-mutations';
 import {
   buildMentionOptions,
   FILE_ACCEPT_ATTR,
+  MAX_MESSAGE_ATTACHMENTS,
   MESSAGE_MAX_LENGTH,
+  messagePreviewText,
   REACTION_TRAY,
   untaggableSentence,
   validateChannelFile,
   type MentionCandidate,
 } from '../model';
 import { channelsQueries } from '../queries';
+import { useRemovedChannelFiles } from '../removed-files';
 import { MemberAvatar, LawexaAvatar } from '../ui/avatars';
 import type { TypingUser } from '../room';
 import { useHeldValue } from '../use-held-value';
@@ -69,13 +80,40 @@ import {
  * shared symmetric grid-rows tween and holds its last content through the exit
  * so it never flashes empty.
  *
- * ATTACH IS NEW, AND IT IS THE SAME UPLOAD THE FILES SECTION MAKES — ALL THE
- * WAY DOWN. There was no attachment affordance anywhere in the conversation
- * despite a whole Files section: the only way to put a document in a channel
- * was to leave the conversation, find the section and drop it there. This runs
- * the existing `useUploadChannelFile` (same allow-list, same 15MB cap, same
- * cache writer), so an attachment IS a file in the library — and the notice
- * that confirms it says exactly that, with a way to go and look.
+ * ── ATTACH MEANS ATTACH (backend, 2026-08-05) ──────────────────────────────
+ * This affordance shipped before the API could carry a file ON a message, and
+ * it did the only thing available: it uploaded to the channel's Files library
+ * and posted the text separately. The message showed nothing. That was a bug
+ * we shipped, and it is what this half of the composer now fixes — an upload
+ * ends as a STAGED attachment here, and the next send carries it
+ * (`attachment_ids`, order preserved server-side, max 10).
+ *
+ * IT IS STILL THE SAME UPLOAD THE FILES SECTION MAKES — ALL THE WAY DOWN. One
+ * `POST /channels/{uuid}/files` through the existing `useUploadChannelFile`:
+ * same allow-list, same 15MB cap, same cache writer. There is no separate
+ * "attachment" storage anywhere in this system; a file is a file, and the one
+ * upload puts it in two places at once.
+ *
+ * WHICH IS WHY REMOVING A CHIP CANNOT DELETE ANYTHING, AND THE TRAY SAYS SO.
+ * By the time a chip exists the file is already in the channel's library and
+ * visible to everyone in the Files section — un-staging it only decides that
+ * THIS message will not carry it. Leaving that unsaid would let a reader
+ * believe they had taken a file back; so the tray carries one quiet line
+ * stating it, with the Files link right there, while anything is staged and
+ * never once it isn't. The line replaces the old "it went to Files" notice,
+ * which said the same fact at the wrong moment (after an upload, when nothing
+ * had been decided yet) and is now simply what staging means.
+ *
+ * AND WHEN THE FILE ITSELF GOES, THE CHIP GOES WITH IT. A reader who follows
+ * that link and deletes the file — or a member who deletes it from the other
+ * end of the channel — leaves this composer holding a library row that no
+ * longer exists, and Send would post an id the server can only refuse. The
+ * removal arrives through `../removed-files.ts` and the chip is dropped BEFORE
+ * a send can carry it, rather than being diagnosed afterwards from a 422 that
+ * has already cost the reader their message and their caption. It never comes
+ * back either: a failed delete rolls the library back, but a chip somebody
+ * watched disappear must not reappear on a message they may already have sent.
+ * The file is still in the library, so re-attaching is two taps.
  *
  * IT TAKES THE PROGRESS AND THE CANCEL TOO. The hook's object form carries
  * `onProgress` and `signal`, so each in-flight chip shows a determinate
@@ -87,6 +125,32 @@ import {
  * settles rather than vanishing at the top of the bar. A cancellation rejects
  * like any other failure, so the composer remembers that it asked and stays
  * silent instead of reporting a problem the reader caused on purpose.
+ *
+ * A SEND WAITS FOR ITS UPLOADS. While anything is in flight, Send is refused —
+ * with the reason in its accessible name, and the percentage already on screen
+ * beside it. The alternative is a message that posts without the file the
+ * reader watched themselves attach, which is the exact failure this whole
+ * change exists to end.
+ *
+ * THE CAP 422 NEVER REACHES THE READER. The ten-file limit is refused HERE,
+ * before the upload is even started, so a file that could not have been carried
+ * is never put in the library either. The server's OTHER attachment 422 — the
+ * same file twice — is unreachable by construction rather than by guard: every
+ * upload mints its own library row with its own id, so choosing one file twice
+ * stages two ids and posts two ids, which is what the server expects (it
+ * dedupes on id, and no id can repeat). `stagedIdsRef` records that invariant
+ * so two uploads settling in one tick cannot break it.
+ *
+ * The thumbnail on a staged image is the LOCAL `File` via `createObjectURL`,
+ * not the returned `url`: it paints in the same frame with no request, it
+ * cannot expire mid-compose (the server's URL is signed for an hour), and it
+ * is unarguably the bytes the reader just chose. Every object URL created here
+ * is revoked when its chip leaves — on removal, on send, on the file being
+ * deleted out from under it, and on unmount.
+ *
+ * SENDING WITH NO WORDS IS A SEND. `canSend` reads files OR text, and an empty
+ * caption omits `content` from the payload entirely rather than sending `""`
+ * (both post; only one of them is honest about there being no caption).
  *
  * EMOJI IS THE PRODUCT'S ONE VOCABULARY. It inserts from `REACTION_TRAY`, the
  * curated set the reaction surfaces already use, rather than shipping an emoji
@@ -129,6 +193,15 @@ const MAX_SUGGESTIONS = 6;
 /** How much room is left before the counter is worth showing. */
 const COUNTER_AT = 200;
 
+/**
+ * Why a send is refused while bytes are still moving. ONE string, said in two
+ * places: it is the Send button's accessible name, and it is the tray notice a
+ * KEYBOARD sender gets when Enter does nothing — a disabled button explains
+ * itself to anyone who reaches it, and explains nothing at all to someone who
+ * never touches it.
+ */
+const UPLOAD_STILL_RUNNING = 'Waiting for the upload to finish.';
+
 export interface ChannelComposerHandle {
   focus: () => void;
 }
@@ -145,7 +218,8 @@ export interface ChannelComposerProps {
   /** A send was ACCEPTED by the server — the screen advances the read
    *  pointer with the new uuid (§5's send trigger). */
   onSentSuccess: (serverUuid: string) => void;
-  /** Show the Files section — offered after an attachment lands. */
+  /** Show the Files section — offered from the staging tray, which is where a
+   *  reader learns their attachments are already in the library. */
   onOpenFiles: () => void;
   ref?: React.Ref<ChannelComposerHandle>;
 }
@@ -159,14 +233,31 @@ function toReplyPreview(message: Message): MessageReplyTo {
     content_preview: message.content.slice(0, 200),
     is_deleted: false,
     type: message.metadata.type,
+    // The optimistic quote must be able to describe a file-only target too;
+    // without this the quote on the reader's own reply would render blank
+    // until the server row replaced it.
+    attachment_count: message.attachments?.length ?? 0,
   };
 }
 
-interface ComposerNoticeState {
-  tone: 'failure' | 'done';
-  text: string;
-  /** True when the notice is about a file that reached the library. */
-  landed: boolean;
+/**
+ * The uploaded row as a message attachment. An explicit projection rather than
+ * passing the `ChannelFile` through: it is assignable (the attachment shape is
+ * a subset), but it would put an `uploader` into the cache that no server
+ * message row carries, and a field that exists only on rows we built ourselves
+ * is a trap for the next reader.
+ */
+function toMessageAttachment(file: ChannelFile): MessageAttachment {
+  return {
+    id: file.id,
+    url: file.url,
+    original_name: file.original_name,
+    mime_type: file.mime_type,
+    size: file.size,
+    category: file.category,
+    upload_status: file.upload_status,
+    created_at: file.created_at,
+  };
 }
 
 /** One upload the composer started and has not yet heard back about. */
@@ -176,6 +267,15 @@ interface PendingUpload {
   /** Whole percent of BYTES SENT — not completion. See the docblock. */
   percent: number;
   controller: AbortController;
+}
+
+/** One file waiting to ride the next send. */
+interface StagedAttachment {
+  file: MessageAttachment;
+  /** `blob:` preview of the LOCAL file for an image chip, revoked when the
+   *  chip leaves; `null` for everything else. See the docblock for why this is
+   *  the local bytes rather than the server's one-hour URL. */
+  preview: string | null;
 }
 
 export function ChannelComposer({
@@ -193,18 +293,90 @@ export function ChannelComposer({
   const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
-  const [notice, setNotice] = useState<ComposerNoticeState | null>(null);
+  /** One refusal sentence — an unsupported file, an oversized one, a failed
+   *  upload, the ten-file cap, or an Enter that arrived while bytes were still
+   *  moving. Never a confirmation: staging IS the confirmation now. */
+  const [notice, setNotice] = useState<string | null>(null);
   const [uploading, setUploading] = useState<readonly PendingUpload[]>([]);
+  /** Everything this composer has staged. Not what is on screen — see
+   *  {@link staged} directly below, which is the list every other line in this
+   *  component reads. */
+  const [stagedRows, setStagedRows] = useState<readonly StagedAttachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadIdRef = useRef(0);
   /** Uploads the reader called off. An abort rejects like any other failure,
    *  so this is how the composer tells "it broke" from "I stopped it". */
   const cancelledUploadsRef = useRef(new Set<number>());
+  /** Every object URL this composer has minted and not yet revoked. Written
+   *  only from event handlers and the removal effect — never in render, which
+   *  the React Compiler rules forbid outright. */
+  const objectUrlsRef = useRef(new Set<string>());
+  /** Every id this composer has ever claimed — the guard that keeps two
+   *  uploads settling in the same tick from staging one row twice. It lives in
+   *  a ref rather than being derived in render because the check runs inside an
+   *  upload callback, where the closure's staged list may be a frame behind.
+   *  An id the LIBRARY has since dropped is deliberately left in it: that id
+   *  can never be minted again, so nothing is being locked out. */
+  const stagedIdsRef = useRef(new Set<number>());
+
+  /**
+   * The files that will actually ride the next send.
+   *
+   * A staged chip is a LIBRARY ROW, and the library can lose it while the
+   * composer is holding it (see the component docblock). The store is the
+   * authority on that, so the visible list is derived rather than patched:
+   * there is no window in which a dead id is still armed, and no state to keep
+   * in step with an event. Returns the exact `stagedRows` reference whenever
+   * nothing has been revoked, so the ordinary case allocates nothing and the
+   * memo boundaries below hold.
+   */
+  const removedFileIds = useRemovedChannelFiles(channel.uuid);
+  const staged = useMemo(() => {
+    if (removedFileIds.size === 0) return stagedRows;
+    const live = stagedRows.filter((entry) => !removedFileIds.has(entry.file.id));
+    return live.length === stagedRows.length ? stagedRows : live;
+  }, [stagedRows, removedFileIds]);
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
   }));
+
+  /**
+   * The one chip exit with no handler behind it: the FILE was deleted, here or
+   * by another member, so nothing in this component ran and there is nowhere
+   * else to release the preview. Un-staging and sending revoke in the handler
+   * that caused them; this is the third door.
+   *
+   * IT READS `stagedRows`, NOT `staged`, AND THAT IS THE WHOLE SAFETY OF IT. A
+   * preview that has been minted but whose `setStagedRows` has not committed yet
+   * is in no list this effect can see, so a passive flush landing between an
+   * upload settling and its chip appearing cannot revoke a URL that chip is
+   * about to paint. Revoking is idempotent, so a re-run costs nothing.
+   *
+   * Revoking a URL an `<img>` has already loaded does not unpaint it, so the
+   * staging tray's held-content exit still shows its thumbnails all the way
+   * through the collapse.
+   */
+  useEffect(() => {
+    if (removedFileIds.size === 0) return;
+    for (const entry of stagedRows) {
+      if (!entry.preview || !removedFileIds.has(entry.file.id)) continue;
+      URL.revokeObjectURL(entry.preview);
+      objectUrlsRef.current.delete(entry.preview);
+    }
+  }, [stagedRows, removedFileIds]);
+
+  // Leaving the conversation mid-compose must not leak the previews. Captured
+  // into a local at effect time (the ref object is stable, so this is the
+  // sanctioned form of a cleanup that reads a ref).
+  useEffect(() => {
+    const urls = objectUrlsRef.current;
+    return () => {
+      for (const url of urls) URL.revokeObjectURL(url);
+      urls.clear();
+    };
+  }, []);
 
   const send = useSendChannelMessage(channel.uuid);
   const upload = useUploadChannelFile(channel.uuid);
@@ -262,6 +434,7 @@ export function ChannelComposer({
   const replyShown = useHeldValue(replyTo);
   const aiNoticeShown = useHeldValue(aiNotice);
   const noticeShown = useHeldValue(notice);
+  const stagedShown = useHeldValue(staged.length > 0 ? staged : null) ?? staged;
   const typing = typingUsers.length > 0;
   const typingShown = useHeldValue(typing ? typingLabel(typingUsers) : null);
 
@@ -325,14 +498,36 @@ export function ChannelComposer({
         Client pre-validation only saves a round trip — the server sniffs the
         content, so a renamed `.exe` still 422s and lands in the same notice.
         A rejection never enters the in-flight list, so the "uploading" row is
-        only ever things that are actually uploading. ─────────────────────── */
+        only ever things that are actually uploading.
+
+        THE CAP IS CHECKED BEFORE THE UPLOAD, counting what is staged AND what
+        is still on the wire. Refusing after the fact would leave a file in the
+        channel's library that no message could ever carry — a stray upload
+        caused by a limit the reader was never shown. ─────────────────────── */
+  const revokePreview = (url: string | null) => {
+    if (!url) return;
+    URL.revokeObjectURL(url);
+    objectUrlsRef.current.delete(url);
+  };
+
   const attachFiles = (list: FileList | null) => {
+    // Read once per picked file rather than from state, which does not update
+    // between iterations of this loop.
+    let claimed = staged.length + uploading.length;
+
     for (const file of Array.from(list ?? [])) {
-      const invalid = validateChannelFile(file);
-      if (invalid) {
-        setNotice({ tone: 'failure', text: invalid, landed: false });
+      if (claimed >= MAX_MESSAGE_ATTACHMENTS) {
+        setNotice(
+          `A message can carry ${MAX_MESSAGE_ATTACHMENTS} files, so "${file.name}" wasn't attached. Send these first.`,
+        );
         continue;
       }
+      const invalid = validateChannelFile(file);
+      if (invalid) {
+        setNotice(invalid);
+        continue;
+      }
+      claimed += 1;
       const id = (uploadIdRef.current += 1);
       const controller = new AbortController();
       setUploading((current) => [
@@ -360,21 +555,29 @@ export function ChannelComposer({
           },
         },
         {
-          onSuccess: () =>
-            setNotice({
-              tone: 'done',
-              text: `${file.name} was added to this channel's files.`,
-              landed: true,
-            }),
+          onSuccess: (response) => {
+            const attachment = toMessageAttachment(response.data);
+            // A repeated id cannot come out of this path — every upload mints a
+            // new library row — and this guard is what makes the server's "The
+            // same file cannot be attached twice." 422 unreachable rather than
+            // merely unlikely. It is checked FIRST so a refused stage never
+            // creates an object URL it would then have to clean up.
+            if (stagedIdsRef.current.has(attachment.id)) return;
+            stagedIdsRef.current.add(attachment.id);
+            // The local bytes, not the server's signed URL — see the docblock.
+            // Only for a format the browser will actually paint, so a chip can
+            // never hold an object URL nothing can render.
+            const preview = isRenderableImage(attachment)
+              ? URL.createObjectURL(file)
+              : null;
+            if (preview) objectUrlsRef.current.add(preview);
+            setStagedRows((current) => [...current, { file: attachment, preview }]);
+          },
           onError: (error) => {
             // Asked for: the row simply leaves. Reporting a "failure" the
             // reader caused on purpose would be the app arguing with them.
             if (cancelledUploadsRef.current.delete(id)) return;
-            setNotice({
-              tone: 'failure',
-              text: `${file.name} — ${extractApiError(error).message}`,
-              landed: false,
-            });
+            setNotice(`${file.name} — ${extractApiError(error).message}`);
           },
           onSettled: () =>
             setUploading((current) => current.filter((entry) => entry.id !== id)),
@@ -388,15 +591,34 @@ export function ChannelComposer({
     entry.controller.abort();
   };
 
+  /** Un-stage one file. It stays in the channel's library — the tray says so. */
+  const unstage = (entry: StagedAttachment) => {
+    revokePreview(entry.preview);
+    stagedIdsRef.current.delete(entry.file.id);
+    setStagedRows((current) => current.filter((row) => row.file.id !== entry.file.id));
+  };
+
   const handleSend = () => {
     const content = value.trim();
-    if (!content || content.length > MESSAGE_MAX_LENGTH) return;
+    if (content.length > MESSAGE_MAX_LENGTH) return;
+    // Files alone are a message; nothing at all is a 422 the server would
+    // rightly refuse, so it never leaves here.
+    if (content === '' && staged.length === 0) return;
+    // A send while an upload is still on the wire would post without it. The
+    // button says so in its accessible name; Enter has no button to say it
+    // with, so the tray does — a keystroke that does nothing and explains
+    // nothing is the reader being ignored.
+    if (uploading.length > 0) {
+      setNotice(UPLOAD_STILL_RUNNING);
+      return;
+    }
 
     send.mutate(
       {
         content,
         replyToUuid: replyTo?.uuid ?? null,
         replyToPreview: replyTo ? toReplyPreview(replyTo) : null,
+        attachments: staged.map((entry) => entry.file),
       },
       {
         onSuccess: (response) => {
@@ -417,6 +639,9 @@ export function ChannelComposer({
     );
     setValue('');
     setMention(null);
+    for (const entry of staged) revokePreview(entry.preview);
+    stagedIdsRef.current.clear();
+    setStagedRows([]);
     if (replyTo) onCancelReply();
   };
 
@@ -472,7 +697,14 @@ export function ChannelComposer({
   };
 
   const remaining = MESSAGE_MAX_LENGTH - value.length;
-  const canSend = value.trim().length > 0 && remaining >= 0;
+  const uploadingNow = uploading.length > 0;
+  const canSend =
+    (value.trim().length > 0 || staged.length > 0) && remaining >= 0 && !uploadingNow;
+  /** Why Send is refused, when the reason is not simply "nothing to send".
+   *  It becomes the button's accessible name, because a disabled control with
+   *  no explanation is a dead end for anyone who cannot see the percentage
+   *  counting up two rows above it. */
+  const sendBlockedReason = uploadingNow ? UPLOAD_STILL_RUNNING : null;
   const replyingToName = replyShown
     ? replyShown.is_ai
       ? 'Lawexa'
@@ -549,7 +781,6 @@ export function ChannelComposer({
 
           <ComposerTrayRow open={aiNotice !== null}>
             <ComposerNotice
-              tone="failure"
               text={
                 <>
                   <span className="font-medium">Lawexa couldn&rsquo;t respond.</span>{' '}
@@ -562,22 +793,7 @@ export function ChannelComposer({
 
           <ComposerTrayRow open={notice !== null}>
             <ComposerNotice
-              tone={noticeShown?.tone ?? 'done'}
-              text={noticeShown?.text ?? ''}
-              action={
-                noticeShown?.landed ? (
-                  <button
-                    type="button"
-                    onClick={onOpenFiles}
-                    className={cn(
-                      'shrink-0 rounded font-medium text-primary underline underline-offset-2',
-                      FOCUS_RING,
-                    )}
-                  >
-                    Files
-                  </button>
-                ) : undefined
-              }
+              text={noticeShown ?? ''}
               onDismiss={() => setNotice(null)}
             />
           </ComposerTrayRow>
@@ -624,6 +840,81 @@ export function ChannelComposer({
             </div>
           </ComposerTrayRow>
 
+          {/* Staged attachments — what the next send will carry.
+
+              THE LINE UNDER THEM IS NOT A DISCLAIMER, IT IS THE FACT. An
+              upload lands in the channel's library the moment it completes;
+              staging only decides which message carries it. So the tray states
+              that plainly while it is on screen, and offers the Files section
+              as the place to go — which is also the only honest answer to
+              "then how do I actually delete it?". */}
+          <ComposerTrayRow open={staged.length > 0}>
+            <div className="rounded-xl border bg-background px-3 py-2">
+              <ul
+                aria-label="Files on this message"
+                className="flex flex-wrap items-center gap-1.5"
+              >
+                {stagedShown.map((entry) => (
+                  <li
+                    key={entry.file.id}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border py-0.5 pr-1 pl-1"
+                  >
+                    {entry.preview ? (
+                      /* eslint-disable-next-line @next/next/no-img-element -- a blob: object URL for the local file; next/image cannot take one, and there is nothing to optimise. */
+                      <img
+                        src={entry.preview}
+                        alt=""
+                        aria-hidden
+                        width={20}
+                        height={20}
+                        className="size-5 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <Paperclip
+                        aria-hidden
+                        className="ml-1 size-3 shrink-0 text-muted-foreground"
+                      />
+                    )}
+                    <span className="min-w-0 truncate text-xs text-foreground">
+                      {entry.file.original_name}
+                    </span>
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                      {formatBytes(entry.file.size)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => unstage(entry)}
+                      aria-label={`Don't send ${entry.file.original_name}`}
+                      title="Remove from this message"
+                      className={cn(
+                        'v2-interactive flex size-5 shrink-0 items-center justify-center rounded-full',
+                        'text-muted-foreground transition-colors duration-150',
+                        'hover:bg-secondary hover:text-foreground motion-reduce:transition-none',
+                        FOCUS_RING,
+                      )}
+                    >
+                      <X aria-hidden className="size-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[11px] leading-4 text-muted-foreground">
+                Already in this channel&rsquo;s{' '}
+                <button
+                  type="button"
+                  onClick={onOpenFiles}
+                  className={cn(
+                    'rounded font-medium text-primary underline underline-offset-2',
+                    FOCUS_RING,
+                  )}
+                >
+                  files
+                </button>
+                . Removing one here won&rsquo;t delete it.
+              </p>
+            </div>
+          </ComposerTrayRow>
+
           {/* Reply staging bar — symmetric collapse, last content held. */}
           <ComposerTrayRow open={replyTo !== null}>
             <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2 text-xs">
@@ -631,7 +922,10 @@ export function ChannelComposer({
               <p className="min-w-0 flex-1 truncate text-muted-foreground">
                 Replying to{' '}
                 <span className="font-medium text-foreground">{replyingToName}</span>
-                {replyShown ? ` — ${replyShown.content}` : ''}
+                {/* `messagePreviewText`, not `.content`: replying to a message
+                    made only of files would otherwise trail off after the
+                    name, which reads as a bar that failed to fill in. */}
+                {replyShown ? ` — ${messagePreviewText(replyShown)}` : ''}
               </p>
               <button
                 type="button"
@@ -715,8 +1009,8 @@ export function ChannelComposer({
         className="size-8 shrink-0 rounded-lg"
         onClick={handleSend}
         disabled={!canSend}
-        aria-label="Send message"
-        title="Send message"
+        aria-label={sendBlockedReason ?? 'Send message'}
+        title={sendBlockedReason ?? 'Send message'}
       >
         <SendHorizontal aria-hidden className="size-4" />
       </Button>

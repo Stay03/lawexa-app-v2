@@ -7,6 +7,7 @@ import { messagesApi } from '@/lib/api/collab';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type {
   Message,
+  MessageAttachment,
   MessageListResponse,
   SendMessageResponse,
   SlimUser,
@@ -129,6 +130,8 @@ function replaceMessage(
 }
 
 export interface SendMessageVariables {
+  /** The caption. `''` is a legitimate value — a message may be nothing but
+   *  files — and is what makes the wire omit the `content` key entirely. */
   content: string;
   /** Reply target — becomes `reply_to_uuid` on the wire (3b). */
   replyToUuid?: string | null;
@@ -136,6 +139,16 @@ export interface SendMessageVariables {
    *  before the server echoes it back. Derived by the composer from the
    *  target message it is replying to. */
   replyToPreview?: Message['reply_to'];
+  /**
+   * Files to attach, IN ORDER (the server preserves it).
+   *
+   * THE ROWS, NOT THE IDS. The same list is both halves of the send: its ids
+   * are the wire payload, and the rows themselves are the optimistic message's
+   * `attachments` — so the chips paint in the frame the row does instead of
+   * waiting a round trip. The composer already holds these rows; the upload
+   * that produced them is what put them in the channel's library.
+   */
+  attachments?: readonly MessageAttachment[];
   /** A RETRY re-uses the failed row instead of inserting a second one —
    *  the uuid stays stable, so the row never re-animates. */
   retryLocalUuid?: string;
@@ -151,14 +164,22 @@ export function useSendChannelMessage(channelUuid: string) {
   const queryClient = useQueryClient();
 
   return useMutation<SendMessageResponse, Error, SendMessageVariables, { localUuid: string }>({
-    mutationFn: ({ content, replyToUuid }) =>
+    mutationFn: ({ content, replyToUuid, attachments }) =>
       messagesApi.send(channelUuid, {
-        content,
+        // NO CAPTION ⇒ NO `content` KEY. `content: ""` posts too (both forms
+        // measured 2026-08-05), but an empty string is a caption that says
+        // nothing; leaving the key out says there isn't one. A body with
+        // neither content nor attachments is a 422, which is why the composer
+        // refuses that send before it reaches here.
+        ...(content ? { content } : {}),
         ...(replyToUuid ? { reply_to_uuid: replyToUuid } : {}),
+        ...(attachments && attachments.length > 0
+          ? { attachment_ids: attachments.map((file) => file.id) }
+          : {}),
       }),
     meta: { silentError: true },
 
-    onMutate: ({ content, replyToUuid, replyToPreview, retryLocalUuid }) => {
+    onMutate: ({ content, replyToUuid, replyToPreview, attachments, retryLocalUuid }) => {
       if (retryLocalUuid) {
         outboxMarkSending(retryLocalUuid);
         return { localUuid: retryLocalUuid };
@@ -178,6 +199,10 @@ export function useSendChannelMessage(channelUuid: string) {
         reply_to: replyToPreview ?? null,
         edited_at: null,
         created_at: new Date().toISOString(),
+        // `[]` rather than `undefined`: the composer KNOWS whether this message
+        // carries files, and the difference between the two is exactly
+        // "none" versus "not known yet" (see `mergeViewerFields`).
+        attachments: attachments ? [...attachments] : [],
       };
       insertLocalMessage(queryClient, channelUuid, optimistic);
       outboxSet(localUuid, {

@@ -85,14 +85,21 @@ export function useDeleteFile() {
 }
 
 /**
- * Hook for downloading a file (opens signed URL)
+ * Hook for downloading a file (opens signed URL).
+ *
+ * The signed URL is minted first, so `window.open` runs OUTSIDE the click's
+ * synchronous frame — which every engine treats as a popup, and which iOS
+ * Safari answers with a bare `null` rather than an exception. Discarding that
+ * return meant a tap that did nothing at all and said nothing either. It is
+ * read, and a blocked open lands in v1's own error channel.
  */
 export function useDownloadFile() {
   return useMutation({
     mutationFn: (id: number) => filesApi.getDownloadUrl(id),
     onSuccess: (data) => {
-      if (data.data?.url) {
-        window.open(data.data.url, '_blank');
+      if (!data.data?.url) return;
+      if (!window.open(data.data.url, '_blank')) {
+        toast.error('Your browser blocked the file from opening. Allow pop-ups for this site and try again.');
       }
     },
     onError: (error) => {

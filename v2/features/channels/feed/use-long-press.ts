@@ -18,6 +18,20 @@ import { useCallback, useRef } from 'react';
  * stamps `data-flash` for a deep-link wash. A `useState` here would re-render a
  * memoised row — and every row above it in the group — for a 450ms tint.
  *
+ * ── A PRESS THAT FIRED SWALLOWS THE CLICK BEHIND IT ───────────────────────
+ * A completed long-press is followed by an ordinary `click` on whatever was
+ * under the finger. On a plain row that click hits nothing; on a row that
+ * contains BUTTONS — an attachment tile, a reply quote — it hits one of them,
+ * so touch-and-hold used to open the actions sheet AND open the file in a tab
+ * over it, from a single gesture the reader made once.
+ *
+ * {@link LongPressHandlers.onClickCapture} is the answer, and it is on CAPTURE
+ * for a reason: the handlers are spread on the ROW, and the capture phase runs
+ * root→target, so this fires before the tile's own `onClick` and can stop the
+ * synthetic event from ever reaching it. A bubble-phase handler would run after
+ * the tab had already opened. It consumes exactly one click — the flag is spent
+ * the moment it is read — so the tap after the sheet closes behaves normally.
+ *
  * ── WHAT THIS FILE CANNOT DO ALONE ────────────────────────────────────────
  * The native iOS selection that used to come up WITH the sheet is not stopped
  * here. iOS decides at the START of the gesture whether the text is selectable,
@@ -41,6 +55,9 @@ export interface LongPressHandlers {
   onPointerUp: () => void;
   onPointerCancel: () => void;
   onContextMenu: (event: React.MouseEvent) => void;
+  /** Eats the click that follows a completed press — see the docblock. Must be
+   *  spread on the same element as the rest, which is the row. */
+  onClickCapture: (event: React.MouseEvent) => void;
 }
 
 export function useLongPress(onLongPress: () => void): LongPressHandlers {
@@ -63,8 +80,13 @@ export function useLongPress(onLongPress: () => void): LongPressHandlers {
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
-      if (event.pointerType !== 'touch') return;
+      // Cleared for EVERY press, mouse included, and before the touch guard.
+      // The flag is normally spent by the click or the contextmenu that follows
+      // the gesture, but an engine that emits neither would otherwise leave it
+      // armed and eat an unrelated click much later. A new press is always a
+      // clean slate.
       firedRef.current = false;
+      if (event.pointerType !== 'touch') return;
       originRef.current = { x: event.clientX, y: event.clientY };
       const node = event.currentTarget;
       nodeRef.current = node;
@@ -107,11 +129,21 @@ export function useLongPress(onLongPress: () => void): LongPressHandlers {
     }
   }, []);
 
+  const onClickCapture = useCallback((event: React.MouseEvent) => {
+    if (!firedRef.current) return;
+    // Spent here, so this suppresses exactly the one click the gesture
+    // produced and never the reader's next real tap.
+    firedRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
   return {
     onPointerDown,
     onPointerMove,
     onPointerUp: disarm,
     onPointerCancel: disarm,
     onContextMenu,
+    onClickCapture,
   };
 }

@@ -809,6 +809,10 @@ export function ChannelFeed({
         retryMutate({
           content: entry.content,
           replyToUuid: entry.replyToUuid,
+          // The row is the outbox's own copy, so its files are still the
+          // files this send was made of — a retry that dropped them would
+          // quietly post the caption alone.
+          attachments: entry.message.attachments,
           retryLocalUuid: message.uuid,
         });
       },

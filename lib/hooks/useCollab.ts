@@ -396,16 +396,21 @@ export function useSendMessage(channelUuid: string) {
           }
         : null;
 
+      // `content` became optional on the shared payload type when attachments
+      // shipped (a file-only send omits it). v1 has no attach affordance, so
+      // its own composer always supplies one; the fallback is what keeps this
+      // row honest if the payload ever arrives without.
+      const content = payload.content ?? '';
       const tempUuid = `optimistic-${(optimisticCounter += 1)}`;
       const optimistic: Message = {
         uuid: tempUuid,
         channel_uuid: channelUuid,
         is_ai: false,
         author,
-        content: payload.content,
+        content,
         metadata: {
           mentions: [],
-          lawexa_mentioned: /(^|\s)@lawexa\b/i.test(payload.content),
+          lawexa_mentioned: /(^|\s)@lawexa\b/i.test(content),
         },
         parent_message_uuid: payload.parent_message_uuid ?? null,
         edited_at: null,
