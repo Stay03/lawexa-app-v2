@@ -126,6 +126,24 @@ import {
  * like any other failure, so the composer remembers that it asked and stays
  * silent instead of reporting a problem the reader caused on purpose.
  *
+ * EVERY UPLOAD IS ITS OWN PROMISE — `mutateAsync`, NEVER `mutate`. The file
+ * input carries `multiple`, so choosing three files at once is an ordinary
+ * gesture, and it used to lose two of them. One `useMutation` is ONE observer:
+ * TanStack v5 stores the per-call `{onSuccess, onError, onSettled}` ON that
+ * observer and OVERWRITES them on the next `mutate()`, detaching the call
+ * before it. The hook's own cache writer lives on the MUTATION rather than the
+ * observer and still ran for all three, which is what made the loss so quiet —
+ * every file really did land in the channel's Files library, while only the
+ * last one was ever staged and the other two chips sat at "100%" forever with
+ * nothing but a Cancel, pinning a `File` of up to 15MB and an `AbortController`
+ * for the life of the tab. A promise per call is not shared state, so each
+ * upload settles on its own. The Files tray met this first and
+ * `../files/use-upload-queue.ts` is the worked example.
+ *
+ * AND THE IN-FLIGHT ROW LEAVES IN A `finally` — the one path that staged,
+ * refused, cancelled and threw all pass through — so no chip can outlive the
+ * upload it describes.
+ *
  * A SEND WAITS FOR ITS UPLOADS. While anything is in flight, Send is refused —
  * with the reason in its accessible name, and the percentage already on screen
  * beside it. The alternative is a message that posts without the file the
@@ -276,6 +294,16 @@ interface StagedAttachment {
    *  chip leaves; `null` for everything else. See the docblock for why this is
    *  the local bytes rather than the server's one-hour URL. */
   preview: string | null;
+  /**
+   * THE ORDER THE READER PICKED IN, which is not the order the uploads finish
+   * in. Concurrent uploads settle by size and by luck, so appending on arrival
+   * made a three-file pick read back shuffled — and differently on each run.
+   * The server preserves `attachment_ids` order, so the tray and the sent
+   * message would have disagreed with the file dialog for no reason a reader
+   * could see. This is the upload's own monotonic id, and the tray keeps its
+   * rows sorted by it.
+   */
+  pick: number;
 }
 
 export function ChannelComposer({
@@ -380,7 +408,9 @@ export function ChannelComposer({
 
   const send = useSendChannelMessage(channel.uuid);
   const upload = useUploadChannelFile(channel.uuid);
-  const uploadMutate = upload.mutate;
+  /** `mutateAsync`, never `mutate` — one observer cannot hold per-call
+   *  callbacks for concurrent uploads. See the docblock. */
+  const uploadAsync = upload.mutateAsync;
   const membersQuery = useQuery({
     ...channelsQueries.members(channel.uuid, { viewerId }),
     enabled: channel.is_member === true,
@@ -510,10 +540,94 @@ export function ChannelComposer({
     objectUrlsRef.current.delete(url);
   };
 
+  /** Put a finished upload's library row in the staging tray, in the position
+   *  the reader picked it in rather than the one it finished in. */
+  const stage = (file: File, uploaded: ChannelFile, pick: number) => {
+    const attachment = toMessageAttachment(uploaded);
+    // A repeated id cannot come out of this path — every upload mints a new
+    // library row — and this guard is what makes the server's "The same file
+    // cannot be attached twice." 422 unreachable rather than merely unlikely.
+    // It is checked FIRST so a refused stage never creates an object URL it
+    // would then have to clean up.
+    if (stagedIdsRef.current.has(attachment.id)) return;
+    stagedIdsRef.current.add(attachment.id);
+    // The local bytes, not the server's signed URL — see the docblock. Only
+    // for a format the browser will actually paint, so a chip can never hold
+    // an object URL nothing can render.
+    const preview = isRenderableImage(attachment)
+      ? URL.createObjectURL(file)
+      : null;
+    if (preview) objectUrlsRef.current.add(preview);
+    setStagedRows((current) =>
+      [...current, { file: attachment, preview, pick }].sort(
+        (left, right) => left.pick - right.pick,
+      ),
+    );
+  };
+
+  /**
+   * One upload, start to finish, on its OWN promise — the whole reason this is
+   * `mutateAsync` and a `try`/`catch` rather than the observer callbacks the
+   * shipped version passed to `mutate()`. See the docblock.
+   *
+   * THE ROW IS RETIRED IN THE `finally`, which every outcome passes through:
+   * staged, refused by the server, called off by the reader, or a transport
+   * that threw before the request left. That is what makes a chip stuck at
+   * "100%" with no promise behind it structurally impossible rather than
+   * merely unobserved.
+   */
+  const runUpload = async (entry: PendingUpload, file: File) => {
+    try {
+      const response = await uploadAsync({
+        file,
+        signal: entry.controller.signal,
+        onProgress: (sent, total) => {
+          const percent =
+            total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+          // The updater returns its EXACT input when the whole percent has not
+          // moved, so a hundred progress events cost at most a hundred renders
+          // of this small subtree — never one per packet under the reader's
+          // cursor while they are typing.
+          setUploading((current) => {
+            const row = current.find((candidate) => candidate.id === entry.id);
+            if (!row || row.percent === percent) return current;
+            return current.map((candidate) =>
+              candidate.id === entry.id ? { ...candidate, percent } : candidate,
+            );
+          });
+        },
+      });
+      // A CANCEL THAT LOST THE RACE IS STILL A CANCEL. Once the last byte is
+      // sent an abort stops nothing the server is doing, so this promise can
+      // resolve after the reader pressed Cancel — and staging the file then
+      // would put a chip on the message they had just taken it off. The upload
+      // stands (nothing takes an upload back), which is exactly what the tray's
+      // own line already says removing a chip means.
+      if (!cancelledUploadsRef.current.has(entry.id)) {
+        // `entry.id` is the monotonic upload counter, so it IS the pick order —
+        // for one gesture and across gestures alike.
+        stage(file, response.data, entry.id);
+      }
+    } catch (error) {
+      // Asked for: the row simply leaves. Reporting a "failure" the reader
+      // caused on purpose would be the app arguing with them.
+      if (!cancelledUploadsRef.current.has(entry.id)) {
+        setNotice(`${file.name} — ${extractApiError(error).message}`);
+      }
+    } finally {
+      // Drained HERE and not in the branches above, so an abort that raced a
+      // completing upload cannot leave its id in the set for the life of the
+      // component.
+      cancelledUploadsRef.current.delete(entry.id);
+      setUploading((current) => current.filter((row) => row.id !== entry.id));
+    }
+  };
+
   const attachFiles = (list: FileList | null) => {
     // Read once per picked file rather than from state, which does not update
     // between iterations of this loop.
     let claimed = staged.length + uploading.length;
+    const accepted: { entry: PendingUpload; file: File }[] = [];
 
     for (const file of Array.from(list ?? [])) {
       if (claimed >= MAX_MESSAGE_ATTACHMENTS) {
@@ -528,62 +642,24 @@ export function ChannelComposer({
         continue;
       }
       claimed += 1;
-      const id = (uploadIdRef.current += 1);
-      const controller = new AbortController();
-      setUploading((current) => [
-        ...current,
-        { id, name: file.name, percent: 0, controller },
-      ]);
-      uploadMutate(
-        {
-          file,
-          signal: controller.signal,
-          onProgress: (sent, total) => {
-            const percent =
-              total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
-            // The updater returns its EXACT input when the whole percent has
-            // not moved, so a hundred progress events cost at most a hundred
-            // renders of this small subtree — never one per packet under the
-            // reader's cursor while they are typing.
-            setUploading((current) => {
-              const entry = current.find((row) => row.id === id);
-              if (!entry || entry.percent === percent) return current;
-              return current.map((row) =>
-                row.id === id ? { ...row, percent } : row,
-              );
-            });
-          },
+      accepted.push({
+        entry: {
+          id: (uploadIdRef.current += 1),
+          name: file.name,
+          percent: 0,
+          controller: new AbortController(),
         },
-        {
-          onSuccess: (response) => {
-            const attachment = toMessageAttachment(response.data);
-            // A repeated id cannot come out of this path — every upload mints a
-            // new library row — and this guard is what makes the server's "The
-            // same file cannot be attached twice." 422 unreachable rather than
-            // merely unlikely. It is checked FIRST so a refused stage never
-            // creates an object URL it would then have to clean up.
-            if (stagedIdsRef.current.has(attachment.id)) return;
-            stagedIdsRef.current.add(attachment.id);
-            // The local bytes, not the server's signed URL — see the docblock.
-            // Only for a format the browser will actually paint, so a chip can
-            // never hold an object URL nothing can render.
-            const preview = isRenderableImage(attachment)
-              ? URL.createObjectURL(file)
-              : null;
-            if (preview) objectUrlsRef.current.add(preview);
-            setStagedRows((current) => [...current, { file: attachment, preview }]);
-          },
-          onError: (error) => {
-            // Asked for: the row simply leaves. Reporting a "failure" the
-            // reader caused on purpose would be the app arguing with them.
-            if (cancelledUploadsRef.current.delete(id)) return;
-            setNotice(`${file.name} — ${extractApiError(error).message}`);
-          },
-          onSettled: () =>
-            setUploading((current) => current.filter((entry) => entry.id !== id)),
-        },
-      );
+        file,
+      });
     }
+
+    if (accepted.length === 0) return;
+    // ONE commit for the whole gesture: three files picked together open the
+    // tray once instead of playing its reveal three times.
+    const rows = accepted.map(({ entry }) => entry);
+    setUploading((current) => [...current, ...rows]);
+    // `void`: each attempt owns its promise and reports through state.
+    for (const { entry, file } of accepted) void runUpload(entry, file);
   };
 
   const cancelUpload = (entry: PendingUpload) => {

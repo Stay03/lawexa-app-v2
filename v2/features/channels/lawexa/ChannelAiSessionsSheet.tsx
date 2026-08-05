@@ -151,7 +151,15 @@ export function ChannelAiSessionsSheet({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+      {/* Variant-matched width, or these are dead classes: the primitive sizes
+          itself with `data-[side=right]:w-3/4` + `data-[side=right]:sm:max-w-sm`,
+          and an attribute selector outranks a bare utility — so a plain
+          `w-full sm:max-w-lg` loses silently and the sheet renders at three
+          quarters of a phone screen. Same trap, same remedy, as `SpaceDrawer`. */}
+      <SheetContent
+        side="right"
+        className="flex flex-col gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-lg"
+      >
         {sessionUuid ? (
           <TranscriptView
             channelUuid={channelUuid}

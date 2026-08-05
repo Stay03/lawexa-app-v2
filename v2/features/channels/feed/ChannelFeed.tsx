@@ -620,13 +620,58 @@ export function ChannelFeed({
   }, []);
 
   /* ── Composer-dock clearance, measured live (no CLS; the overlay floats
-        over the transcript, so the transcript reserves its height). ──────── */
+        over the transcript, so the transcript reserves its height).
+
+        AND A READER AT THE BOTTOM STAYS AT THE BOTTOM WHILE IT GROWS. Staging
+        a file — or quoting a reply, or being told why a send was refused —
+        opens a tray that grows the dock UPWARD over the transcript. The
+        clearance below grows with it, so `scrollHeight` grows while `scrollTop`
+        does not, and the message that was sitting just above the composer a
+        moment ago is now behind it. On a phone that is the message you were
+        about to reply to.
+
+        NEITHER OBSERVER ABOVE CAN SEE THIS, which is why the fix belongs here
+        and not beside them. The bottom-follower watches the CONTENT box, and a
+        `padding-bottom` change leaves a content box exactly the size it was;
+        the viewport keeper watches the SCROLLER's `clientHeight`, and the
+        padding is on the scroller's child, not the scroller. The dock's own
+        height is the only signal there is, and this is the callback that
+        already holds it — so every tray is covered, not just the attachment
+        one.
+
+        HOLDING IS NOT ANIMATING, so there is no motion to make conditional.
+        The correction is one `scrollTop` write per resize notification, and the
+        tray's own 200ms grid-rows tween is what turns those writes into a
+        glide: the dock reaches its new height over a dozen frames and the
+        transcript is re-pinned on each of them. A reader with motion turned off
+        gets the tray in one step (`ComposerTrayRow`'s
+        `motion-reduce:transition-none`) and exactly one write with it.
+
+        ONLY SOMEBODY ALREADY AT THE BOTTOM IS MOVED, and they are moved to the
+        bottom — the same rule, and the same maths, the viewport keeper applies
+        when chrome appears above the transcript. A reader up in history is
+        untouched: the tray is growing into space below them that they were not
+        looking at. Suppressed before the first landing and while a history pull
+        is armed, both of which own `scrollTop`. ─────────────────────────────── */
   useEffect(() => {
     const dock = dockRef.current;
     const root = rootRef.current;
     if (!dock || !root) return;
+    let lastHeight = dock.offsetHeight;
     const sync = () => {
-      root.style.setProperty('--v2-chan-dock-h', `${dock.offsetHeight}px`);
+      const height = dock.offsetHeight;
+      root.style.setProperty('--v2-chan-dock-h', `${height}px`);
+      const delta = height - lastHeight;
+      lastHeight = height;
+      if (delta === 0) return;
+      const el = scrollRef.current;
+      if (!el || !atBottomRef.current) return;
+      if (!didInitialScrollRef.current || pendingRestoreRef.current !== null) return;
+      // Read AFTER the write: the property has already changed the
+      // transcript's bottom clearance, so this measurement is of the height
+      // the reader has to be re-pinned against, not the one before the tray
+      // opened.
+      el.scrollTop = el.scrollHeight - el.clientHeight;
     };
     sync();
     const observer = new ResizeObserver(sync);

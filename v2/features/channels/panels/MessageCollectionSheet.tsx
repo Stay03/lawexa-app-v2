@@ -201,7 +201,14 @@ function CollectionSheet({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+      {/* Variant-matched width, or these are dead classes — see `SpaceDrawer`.
+          The primitive's `data-[side=right]:*` sizing outranks a bare utility,
+          so `w-full sm:max-w-md` lost silently and this sheet has been drawing
+          at three quarters of a phone screen. */}
+      <SheetContent
+        side="right"
+        className="flex flex-col gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+      >
         <SheetHeader className="border-b">
           <SheetTitle className="flex items-center gap-2">
             {kind === 'pins' ? (

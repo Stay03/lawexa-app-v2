@@ -235,7 +235,19 @@ export function QuizLibrarySheet({
           onOpenChange(next);
         }}
       >
-        <SheetContent side="right" className="flex w-full flex-col sm:max-w-lg">
+        <SheetContent
+          side="right"
+          /* VARIANT-MATCHED WIDTH, or these are dead classes. The Sheet
+             primitive sets its own size with `data-[side=right]:w-3/4` and
+             `data-[side=right]:sm:max-w-sm`, and an attribute selector outranks
+             a bare utility on specificity — so the plain `w-full sm:max-w-lg`
+             that used to be here lost silently, and this sheet has been
+             rendering at three quarters of a phone screen and 384px on a
+             desktop. That missing quarter is most of why its rows were
+             truncating a quiz title at seventeen characters. Same trap, same
+             remedy, as `V2Drawer` and `SpaceDrawer`. */
+          className="flex flex-col data-[side=right]:w-full data-[side=right]:sm:max-w-lg"
+        >
           <SheetHeader className="gap-1 border-b">
             <SheetTitle>Quizzes</SheetTitle>
             <p className="text-sm text-muted-foreground">
@@ -290,15 +302,34 @@ export function QuizLibrarySheet({
             )}
 
             <div className="flex items-center justify-between gap-3">
+              {/* THE STRIP SCROLLS, IT NEVER WRAPS — the radar/bookmarks
+                  mechanic (`overflow-x-auto` on the tablist itself), not a
+                  fifth answer. `min-w-0` is what makes it work: a flex child
+                  cannot shrink past its own content without it, and with
+                  nothing to shrink there was nothing to scroll — so "In this
+                  channel" and "My library" broke onto two lines INSIDE their
+                  own tabs and the strip read as three uneven blocks. Now the
+                  labels are `whitespace-nowrap`, each tab holds its width, and
+                  the row that runs out of space scrolls.
+
+                  `-m-1 p-1` IS THE FOCUS RING'S ROOM, ON ALL FOUR SIDES. An
+                  `overflow-x-auto` box clips its own padding edge in both axes,
+                  and Radix moves focus to the first tab when the sheet opens —
+                  so with vertical room only, the ring on a tab sitting flush at
+                  the left edge lost its left and top and drew as a broken
+                  bracket, which reads as a rendering fault rather than focus.
+                  The negative margin gives the room back, so the strip's
+                  position and height are unchanged. */}
               <TabRow
                 tabs={SOURCES}
                 value={source}
                 onChange={(next) => setSource(next)}
                 ariaLabel="Which quizzes to show"
-                className="flex items-center gap-4"
+                className="v2-quiet-scroll -m-1 flex min-w-0 items-center gap-4 overflow-x-auto p-1"
                 tabClassName={(selected) =>
                   cn(
-                    'v2-interactive relative flex min-h-9 items-center rounded-none text-sm font-medium',
+                    'v2-interactive relative flex min-h-9 shrink-0 items-center rounded-none',
+                    'text-sm font-medium whitespace-nowrap',
                     'transition-colors duration-150 motion-reduce:transition-none',
                     selected
                       ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary'
@@ -310,7 +341,7 @@ export function QuizLibrarySheet({
               </TabRow>
 
               {mayCreateHere && (
-                <Button size="sm" onClick={() => openForm()}>
+                <Button size="sm" className="shrink-0" onClick={() => openForm()}>
                   <Plus aria-hidden className="size-4" />
                   New quiz
                 </Button>
@@ -463,26 +494,73 @@ function QuizRow({
   return (
     <li className="flex items-start gap-3 rounded-xl border bg-card px-3 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">
+        {/* AT A NARROW WIDTH THE ROW'S HEIGHT GIVES, NOT THE TITLE. Go live and
+            the overflow trigger are a fixed 126px whatever the row says, and a
+            phone that hands the title what is left was cutting it to "Land
+            registratio…" — a quiz the reader cannot identify is a row they
+            cannot use. The width the sheet was actually rendering at is fixed
+            above and returns most of that room; a second line covers the rest,
+            rather than dropping the words off the one verb on the row. One line
+            again from `sm`, where the column is wide enough that a second was
+            only ever going to be a ragged half-line. */}
+        <p className="line-clamp-2 text-sm font-medium text-foreground sm:line-clamp-1">
           {quiz.title}
         </p>
-        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-          <MemberAvatar user={quiz.creator} size="sm" className="size-4" />
+        {/* ONE LINE THAT GIVES IN A DECIDED ORDER, never a wrapped one.
+
+            It used to be `flex-wrap` around a `truncate` span carrying all
+            three facts and no `min-w-0` — the one thing a truncating flex child
+            cannot go without, because its automatic minimum is otherwise its
+            whole content. So the span could not shrink, wrapped to a row of its
+            own, and left the avatar stranded alone on the line above it: at
+            phone width on every row, at desktop width on most of them.
+
+            Nothing wraps now, and the order of surrender is explicit. THE DATE
+            GOES FIRST, whole rather than as a stub — a date cut to "Y…" tells a
+            reader strictly less than no date at all, and of the three facts it
+            is the one they are least likely to have come for. THEN THE AUTHOR
+            truncates, which at least still names a person. THE QUESTION COUNT
+            NEVER GIVES: it is the fact that says what the quiz is. */}
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+          {/* No `className`: the mark is already `shrink-0` from the Avatar
+              primitive, and the `size-4` that used to ride here was a dead
+              class — `data-[size=sm]:size-6` outranks a bare `size-4` on
+              specificity, so this has always drawn at the `sm` size it asks
+              for. Stating the size twice, once wrongly, is worse than stating
+              it once. */}
+          <MemberAvatar user={quiz.creator} size="sm" />
           {/* NOTHING HERE NAMES A ROOM. `quiz.channel_uuid` is provenance, may
               be null, and a null cannot be told apart from a channel that has
               been deleted — so a quiz is described by what it IS (how many
               questions, whose, when) and never by where it came from. */}
-          <span className="truncate">
-            {count} {count === 1 ? 'question' : 'questions'} ·{' '}
-            {quiz.is_mine ? 'you' : quiz.creator.name} ·{' '}
-            {formatDayLabel(quiz.created_at)}
+          <span className="shrink-0">
+            {count} {count === 1 ? 'question' : 'questions'}
+          </span>
+          <span className="min-w-0 truncate">
+            ·{' '}
+            {quiz.is_mine ? 'you' : quiz.creator.name}
+          </span>
+          {/* Dropped exactly where the sheet stops being the whole screen:
+              below `sm` it is viewport-wide, and the narrowest phone this ships
+              to has no room for a "Sunday, August 3" beside a name. Tied to the
+              same breakpoint as the sheet's own `sm:max-w-lg` so the two can
+              never disagree about which sheet this is. */}
+          <span className="hidden shrink-0 sm:inline">
+            · {formatDayLabel(quiz.created_at)}
           </span>
           {/* The switch's state, legible without opening the menu. Owner-only,
-              because nobody else can see a private quiz in the first place. */}
+              because nobody else can see a private quiz in the first place.
+
+              IT IS THE ONE THING HERE BESIDES THE NAME THAT CAN GIVE, and it
+              has to be: on the narrowest phone the avatar, the question count
+              and this chip alone are wider than the column, so if every one of
+              them held its width the line would spill sideways over the Go live
+              button — which is worse than the wrap it replaced. The lock never
+              shrinks, so the mark survives whatever happens to the words. */}
           {quiz.is_mine && isPrivate && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-1.5 py-0.5">
-              <Lock aria-hidden className="size-3" />
-              Only me
+            <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-secondary px-1.5 py-0.5">
+              <Lock aria-hidden className="size-3 shrink-0" />
+              <span className="truncate">Only me</span>
             </span>
           )}
         </div>

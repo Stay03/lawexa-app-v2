@@ -102,7 +102,13 @@ export function ChannelMembersSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-sm">
+      {/* Variant-matched width, or these are dead classes — see `SpaceDrawer`.
+          `sm:max-w-sm` happened to match what the primitive already sets, but
+          `w-full` did not, so on a phone this drew at three quarters. */}
+      <SheetContent
+        side="right"
+        className="flex flex-col gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-sm"
+      >
         <SheetHeader className="border-b">
           <SheetTitle>Members</SheetTitle>
           <p className="text-sm text-muted-foreground">
