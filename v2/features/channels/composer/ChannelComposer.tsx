@@ -41,6 +41,7 @@ import { useSendChannelMessage } from '../message-mutations';
 import {
   buildMentionOptions,
   FILE_ACCEPT_ATTR,
+  filesFromClipboard,
   MAX_MESSAGE_ATTACHMENTS,
   MESSAGE_MAX_LENGTH,
   messagePreviewText,
@@ -93,6 +94,17 @@ import {
  * same allow-list, same 15MB cap, same cache writer. There is no separate
  * "attachment" storage anywhere in this system; a file is a file, and the one
  * upload puts it in two places at once.
+ *
+ * A PASTE IS AN ATTACH (owner, 2026-08-05). A screenshot is the commonest thing
+ * anyone has on a clipboard, and pasting one here used to do nothing at all —
+ * silently, which is the worst way for a thing to not work. It now runs the
+ * same `attachFiles` as the paperclip, so a pasted file and a picked one cannot
+ * drift. Two details carry it: a clipboard image has NO FILENAME and our
+ * pre-check reads the extension off the name, so `filesFromClipboard` names it
+ * first (the server sniffs content and does not care what a file is called);
+ * and a paste carrying text as well as a picture — a spreadsheet cell, a block
+ * of rich text — keeps its text, because breaking ordinary pasting to serve the
+ * rarer case would be a bad trade.
  *
  * WHICH IS WHY REMOVING A CHIP CANNOT DELETE ANYTHING, AND THE TRAY SAYS SO.
  * By the time a chip exists the file is already in the channel's library and
@@ -623,13 +635,13 @@ export function ChannelComposer({
     }
   };
 
-  const attachFiles = (list: FileList | null) => {
+  const attachFiles = (list: readonly File[]) => {
     // Read once per picked file rather than from state, which does not update
     // between iterations of this loop.
     let claimed = staged.length + uploading.length;
     const accepted: { entry: PendingUpload; file: File }[] = [];
 
-    for (const file of Array.from(list ?? [])) {
+    for (const file of list) {
       if (claimed >= MAX_MESSAGE_ATTACHMENTS) {
         setNotice(
           `A message can carry ${MAX_MESSAGE_ATTACHMENTS} files, so "${file.name}" wasn't attached. Send these first.`,
@@ -1026,7 +1038,7 @@ export function ChannelComposer({
         accept={FILE_ACCEPT_ATTR}
         className="hidden"
         onChange={(event) => {
-          attachFiles(event.target.files);
+          attachFiles(Array.from(event.target.files ?? []));
           // Let the same file be chosen twice in a row.
           event.target.value = '';
         }}
@@ -1060,6 +1072,25 @@ export function ChannelComposer({
           if (event.target.value.trim()) onTyping();
         }}
         onKeyDown={handleKeyDown}
+        // PASTE A PICTURE AND IT ATTACHES, which is the whole affordance: a
+        // screenshot is the commonest thing anyone has on a clipboard, and
+        // before this it silently did nothing at all. It runs the SAME path as
+        // the paperclip — same allow-list, same cap, same staging tray, same
+        // send — so a pasted file and a picked one cannot behave differently.
+        //
+        // A PASTE THAT ALSO CARRIES WORDS KEEPS ITS WORDS. Copying a cell out
+        // of a spreadsheet, or a block of rich text, puts both a picture and
+        // plain text on the clipboard; swallowing the text there would break
+        // ordinary pasting to serve the rarer case. So the default is only
+        // prevented when the clipboard has nothing to type.
+        onPaste={(event) => {
+          const files = filesFromClipboard(event.clipboardData);
+          if (files.length === 0) return;
+          if (!event.clipboardData.getData('text/plain').trim()) {
+            event.preventDefault();
+          }
+          attachFiles(files);
+        }}
         rows={1}
         maxLength={MESSAGE_MAX_LENGTH}
         placeholder={`Message ${channel.name}`}

@@ -316,6 +316,76 @@ export const FILE_MAX_SIZE_BYTES = 15 * 1024 * 1024;
 /** `accept` attribute for the hidden file input. */
 export const FILE_ACCEPT_ATTR = FILE_ALLOWED_EXTENSIONS.map((ext) => `.${ext}`).join(',');
 
+/**
+ * The extension to give a file that arrives without a usable one — which is
+ * every screenshot on the clipboard.
+ *
+ * Only the types the allow-list already accepts appear here: this hands a
+ * nameless file the name it should have had, it never widens what may be sent.
+ */
+const PASTED_EXTENSIONS: Readonly<Record<string, string>> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+};
+
+/**
+ * Name a file that came off the clipboard, so the rest of the pipeline can
+ * treat it exactly like a picked one.
+ *
+ * A COPIED SCREENSHOT HAS NO NAME, and `validateChannelFile` reads the
+ * extension off the name — so without this a paste is refused with the
+ * nonsense sentence `"" isn't a supported file type.` The backend is explicit
+ * that it sniffs the content and does not care what a file is called
+ * (2026-08-05), so the name is ours to choose and only has to be honest and
+ * readable in the Files tab afterwards.
+ *
+ * A file that already has an allowed extension is returned UNTOUCHED — copying
+ * `contract.pdf` out of a folder should keep its name. A type we cannot place
+ * is also returned untouched, so it meets the ordinary refusal under its own
+ * name rather than a name we invented for it.
+ */
+function nameClipboardFile(file: File, index: number, total: number): File {
+  const extension = file.name.toLowerCase().split('.').pop() ?? '';
+  if (file.name && (FILE_ALLOWED_EXTENSIONS as readonly string[]).includes(extension)) {
+    return file;
+  }
+  const guessed = PASTED_EXTENSIONS[file.type.toLowerCase()];
+  if (!guessed) return file;
+
+  const kind = file.type.startsWith('image/') ? 'image' : 'file';
+  // Numbered only when one paste carried several, so the ordinary case is a
+  // clean "pasted-image.png" rather than "pasted-image-1.png".
+  const suffix = total > 1 ? `-${index + 1}` : '';
+  return new File([file], `pasted-${kind}${suffix}.${guessed}`, {
+    type: file.type,
+    lastModified: file.lastModified,
+  });
+}
+
+/**
+ * The files carried by a paste (or a drop), named and ready to upload. Empty
+ * for an ordinary text paste, which must be left completely alone.
+ *
+ * `files` is read first because it is what a file copied out of a folder
+ * arrives in; `items` is the fallback that carries a screenshot. Reading both
+ * is not belt-and-braces — the two clipboard shapes genuinely differ.
+ */
+export function filesFromClipboard(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const carried =
+    data.files.length > 0
+      ? Array.from(data.files)
+      : Array.from(data.items)
+          .filter((item) => item.kind === 'file')
+          .map((item) => item.getAsFile())
+          .filter((file): file is File => file !== null);
+
+  return carried.map((file, index) => nameClipboardFile(file, index, carried.length));
+}
+
 /** Client-side pre-validation: an error sentence naming the file and the
  *  reason, or `null` when the file may be sent. The server stays authoritative. */
 export function validateChannelFile(file: File): string | null {
