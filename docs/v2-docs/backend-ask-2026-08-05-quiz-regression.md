@@ -1,78 +1,89 @@
-# Backend — LIVE REGRESSION: the quiz migration detached existing quizzes (2026-08-05)
+# Backend — CORRECTED: it is not the quiz migration, it is channel deletion (2026-08-05)
 
-Reported after the owner hit an error opening a channel's quiz. Measured against
-production the same hour, with a real account that owns everything involved.
+**This document replaces what we sent you earlier today. The earlier version blamed
+the quiz migration for detaching quizzes. That was wrong, and we are sorry for the
+noise.** We re-measured against production, could not reproduce the detachment, and
+then found the real cause with a controlled test. The corrected finding is smaller
+but real, and it is below.
 
-**Summary: existing quizzes lost their channel, and their finished games are now
-403 to the people who ran them — while the new public link serves the same game
-to anyone with no login at all.**
+## What we got wrong
 
-## What we measured
-
-One account. It owns the space, owns the channel, created the quizzes, hosted and
-played the game.
-
-**1. Quizzes created inside a channel now have no channel.**
+We reported that quizzes created inside a channel came back with `channel_uuid: null`,
+and concluded the migration had cleared the column. It had not. Re-measured today:
 
 ```
-GET /api/channel-quizzes/mine        → 200, 3 quizzes
-    every one:  "channel_uuid": null
+POST /api/channels/{channel}/quizzes  → 201, channel_uuid = that channel   ✅
+GET  /api/channels/{channel}/quizzes  → 200, the quiz is on the list       ✅
+POST /api/channel-quizzes/{quiz}/go-live {} → 201, game.channel_uuid set   ✅
+GET  /api/quiz-games/{game}           → 200 to the host                    ✅
 ```
 
-All three were created yesterday with `POST /api/channels/{channel}/quizzes` — in
-a channel, not in a library. Your reply says *"existing quizzes keep their channel
-and every existing call behaves exactly as before"*, and that the migration only
-relaxes the column to nullable. These rows read as though the channel was cleared.
+Everything in your reply behaves as documented. The three detached quizzes we
+measured had simply outlived the channel they were made in — that channel had been
+deleted, which is also why its lists later 404'd. We should have checked whether the
+channel still existed before writing to you.
 
-**2. So the channel's own lists are now empty.**
+## The real finding: deleting a channel strands its games
 
-```
-GET /api/channels/{channel}/quizzes     → 200, count 0
-GET /api/channels/{channel}/quiz-games  → 200, count 0
-```
+Controlled test, run end to end on production today. One account, its own space:
+create a channel → create a quiz in it → go live → play the game to `finished` →
+read everything → delete the channel → read the same things again.
 
-The channel has three quizzes created in it and two games played in it. Under the
-new meaning — "created here *or* played here at least once" — both paths should
-return them. Both return nothing.
-
-**3. And the games are now unauthorized to their own host.**
+**Before the delete**
 
 ```
-GET /api/quiz-games/{game}          → 403 "This action is unauthorized."
-GET /api/quiz-games/{game}/results  → 403 "This action is unauthorized."
-GET /api/public/quiz-games/{game}/results → 200, full podium
+GET /api/channel-quizzes/{quiz}            → 200, channel_uuid = the channel
+GET /api/channels/{channel}/quizzes        → 200, count 1
+GET /api/quiz-games/{game}                 → 200
+GET /api/quiz-games/{game}/results         → 200
+GET /api/public/quiz-games/{game}/results  → 200   (anonymous)
 ```
 
-Same game, same moment. The signed-in host, channel owner and space owner is
-refused; the anonymous public endpoint serves it. That inversion is the clearest
-statement of the problem: the permission chain resolves through the quiz's
-channel, the quiz no longer has one, and the check falls into the same refusal
-branch you use for an unknown channel.
+**After `DELETE /api/channels/{channel}` — nothing else changed**
 
-Game uuid, if it helps you trace it: `771fc24e-cb4c-4f00-baa8-ce93911278a9`.
-Quiz uuid: `d3d93ec9-783f-43c6-a910-3bdb89ff9742`.
+```
+GET /api/channel-quizzes/{quiz}            → 200, channel_uuid = null
+GET /api/channel-quizzes/mine              → 200, still listed, channel_uuid = null
+GET /api/quiz-games/{game}                 → 403 "This action is unauthorized."
+GET /api/quiz-games/{game}/results         → 403 "This action is unauthorized."
+GET /api/public/quiz-games/{game}/results  → 200   (anonymous — full podium)
+```
 
-## What this means for users right now
+So a finished game becomes unreadable to the host who ran it, the moment the room
+it happened in is deleted — while the public link keeps serving that same game to
+anyone with no login at all. The signed-in owner is refused; the stranger is not.
+That inversion is the part worth fixing.
 
-Every quiz made before this deploy is invisible on the channel it was made in,
-and every game already played is unopenable by the people who played it. Opening
-a quiz in a channel errors. This is what the owner reported.
+The quiz surviving in the owner's library with `channel_uuid: null` looks correct
+to us under the new model — provenance is gone because the room is gone. We are
+only flagging the games.
 
 ## What we would like
 
-1. Restore the channel on quizzes that had one. If the migration cleared it, the
-   games still carry their channel — `quiz_games.channel_id` is intact, which is
-   how the public endpoint still resolves the game — so the origin can be
-   recovered from the earliest game per quiz where nothing else survives.
-2. Make the permission check tolerate a quiz with no channel. A library quiz is
-   now a legitimate state, and a game already carries the channel it ran in; the
-   game's own channel is the right thing to authorize against, not the quiz's
-   birthplace.
-3. Confirm the two lists return quizzes and games that were played in a channel,
-   not only those born there.
+1. **Authorize a game against the game's own channel, not the quiz's origin.**
+   `quiz_games.channel_id` is intact after the delete — it is how the public
+   endpoint still resolves the game. When that channel is gone, a played game
+   should still be readable by the people who played it (the host at minimum), or
+   it should 404 honestly. A 403 that an anonymous request can walk around is the
+   one answer that cannot be right.
+2. **Tell us which you intend**, so we can build the matching state. Either is
+   workable for us and we will design for whichever you pick:
+   - the game outlives its channel and its players keep their result; or
+   - the game dies with its channel, and the members-only endpoint returns 404.
 
-We have changed nothing on our side and are not working around it — a client that
-papered over a 403 here would be hiding a real refusal.
+   Right now we cannot tell a real refusal from a stranded record, so we cannot
+   write honest words for the reader.
+
+## For the record — everything else measured clean
+
+`attachment_ids` on send, `attachments` on every message, the duplicate and
+unknown-file 422s, `reply_to.attachment_count`, files surviving an edit, deleting a
+library file removing it from its messages, the library create, `visibility`,
+`is_mine`, go-live with an explicit `channel_uuid`, the 403 on a library quiz with
+no room named, and the anonymous public results — all as documented. The only
+correction to your prose is that a channel's quiz list returns library quizzes with
+`channel_uuid: null`, which your reply does say and which we have now confirmed on
+a real wire.
 
 ## Response
 
