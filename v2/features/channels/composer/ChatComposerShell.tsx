@@ -42,18 +42,75 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * quote, the Lawexa-blocked notice and the upload notice all open and close the
  * same way and all occupy exactly zero height — inert and `aria-hidden` — when
  * they have nothing to say.
+ *
+ * ── THE INPUT ROW HAS TWO ARRANGEMENTS (owner, 2026-08-06) ─────────────────
+ * One line is one row, exactly as it always was: `[attach @ emoji] [input]
+ * [send]`, compact. Past that, the buttons were holding two tall empty columns
+ * either side of a message squeezed into half the phone's width — the longer
+ * the message, the narrower the column it was written in, which is backwards.
+ * So once the text passes about two lines the input takes the FULL width and
+ * the buttons drop to a slim row beneath it, Send on the right.
+ *
+ * IT IS ONE SET OF NODES IN ONE CONTAINER, RE-FLOWED — never two arrangements
+ * rendered conditionally. Moving a control between two parents remounts it, and
+ * remounting these particular controls closes the emoji popover mid-pick and
+ * drops focus off whatever the reader was on. Here the input simply takes a
+ * `basis-full` first line and the rest of the row wraps under it, so React
+ * re-renders nothing at all when the arrangement changes.
+ *
+ * WHICH IS WHY THE SWITCH IS DRIVEN BY A `data-expanded` ATTRIBUTE the composer
+ * WRITES, not by state. The composer already measures this input in a DOM
+ * effect to auto-grow it; the arrangement is the second answer that measurement
+ * produces, and routing it through React state would cost a render of the whole
+ * composer on a threshold the reader crosses while typing. The attribute is
+ * rendered once as `false` and never named again in JSX, so React has nothing
+ * to patch and the composer's write stands.
+ *
+ * AND IT IS INSTANT ON PURPOSE. A wrap is not a tweenable property — no
+ * interpolation exists between "beside" and "under" — so the only honest
+ * options were a fake (cross-fading a duplicate set of controls) or nothing.
+ * The house rule settles it: a half-animated reflow is worse than an instant
+ * one. It also matches what the change MEANS, since it happens in the same beat
+ * as the box growing a line: the box made room.
+ *
+ * ── THE DOM ORDER IS THE INPUT FIRST, AND `order` MOVES THE COMPACT ROW ────
+ * It was the other way round — `[actions, input, trailing]` in the DOM, with the
+ * input pulled to the front by `order-first` when expanded — and that costs
+ * something after all, which the paragraph above used to deny. Expanded, the
+ * three quiet verbs sit visually BELOW the input while coming BEFORE it in the
+ * DOM, so Tab from the message dropped down a row to attach · mention · emoji
+ * and then climbed back up: focus order out of step with the visual order, WCAG
+ * 2.4.3.
+ *
+ * So the DOM is `[input, actions, trailing]` — write the message, decorate it,
+ * send it — which is a meaningful sequence in BOTH arrangements, and the one the
+ * expanded layout also draws top to bottom. The compact row is the one that gets
+ * an `order`: the verbs move to the left of the input, where a chat composer
+ * puts them, while Tab still reaches the input first. That is the only ordering
+ * either arrangement can be given without moving a node between parents, which
+ * would remount the emoji popover mid-pick.
  */
 
 export function ChatComposerShell({
   typing,
   tray,
+  actions,
+  trailing,
+  rowRef,
   children,
 }: {
   /** The typing whisper. `label` must be HELD through `visible: false`. */
   typing?: { label: string; visible: boolean };
   /** Staging rows above the surface — reply quote, notices, uploads. */
   tray?: ReactNode;
-  /** The inner row: attach · mention · emoji · textarea · send. */
+  /** The quiet verbs: attach · mention · emoji. Beside the input on one line,
+   *  under it once it grows. */
+  actions: ReactNode;
+  /** The emphasised end: the remaining-characters counter and Send. */
+  trailing: ReactNode;
+  /** The measured row — the composer writes `data-expanded` on this node. */
+  rowRef: React.Ref<HTMLDivElement>;
+  /** The input itself. Sized by its wrapper, so it wants `w-full`, not `flex-1`. */
   children: ReactNode;
 }) {
   return (
@@ -75,7 +132,46 @@ export function ChatComposerShell({
             </span>
           )}
 
-          <div className="flex items-end gap-1 p-1.5">{children}</div>
+          <div
+            ref={rowRef}
+            data-expanded="false"
+            className={cn(
+              'group/composer flex items-end gap-1 p-1.5',
+              'data-[expanded=true]:flex-wrap data-[expanded=true]:gap-y-1.5',
+            )}
+          >
+            {/* First in the DOM, and first in the tab order, in both
+                arrangements. `basis-full` is what makes it take the whole line
+                when expanded; the rest of the row then wraps beneath it. */}
+            <div
+              className={cn(
+                'min-w-0 flex-1',
+                'group-data-[expanded=true]/composer:basis-full',
+              )}
+            >
+              {children}
+            </div>
+
+            {/* Visually to the LEFT of the input while the row is one line —
+                the only thing `order` is used for, and only here. */}
+            <div
+              className={cn(
+                'flex shrink-0 items-center gap-1',
+                'group-data-[expanded=false]/composer:order-first',
+              )}
+            >
+              {actions}
+            </div>
+
+            <div
+              className={cn(
+                'flex shrink-0 items-center gap-1',
+                'group-data-[expanded=true]/composer:ml-auto',
+              )}
+            >
+              {trailing}
+            </div>
+          </div>
         </div>
       </div>
     </div>

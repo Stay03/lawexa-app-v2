@@ -11,7 +11,6 @@ import {
   LogOut,
   Pencil,
   Pin,
-  Sparkles,
   Trash2,
   Trophy,
   Users,
@@ -80,6 +79,7 @@ import {
   ChannelPreviewDock,
   ChannelScreenFrame,
 } from './states';
+import { LawexaMark } from '../ui/avatars';
 
 /**
  * ChannelScreen — the W2 channel client root: detail three-state, ONE header
@@ -586,7 +586,7 @@ export function ChannelScreen({
     lenses.push({
       id: 'ai',
       label: 'Lawexa sessions',
-      icon: Sparkles,
+      icon: LawexaMark,
       onSelect: () => panel.show('ai'),
     });
   }
@@ -643,7 +643,7 @@ export function ChannelScreen({
         Members
       </DropdownMenuItem>
       <DropdownMenuItem onClick={() => panel.show('ai')}>
-        <Sparkles aria-hidden className="size-4" />
+        <LawexaMark />
         Lawexa sessions
       </DropdownMenuItem>
       <DropdownMenuItem onClick={() => panel.show('quizzes')}>
@@ -855,6 +855,12 @@ export function ChannelScreen({
                       typingUsers={room.typingUsers}
                       onSentSuccess={handleSentSuccess}
                       onOpenFiles={openFiles}
+                      // The composer's one reason to move the transcript: a
+                      // message restored from the device that failed to send in
+                      // an earlier session sits at its own timestamp, far above
+                      // where the reader landed. Same jump the pinned and saved
+                      // panels use.
+                      onJumpToMessage={jumpToMessage}
                     />
                   </div>
                 ) : (

@@ -5,6 +5,7 @@ import { HydrationBoundary } from '@tanstack/react-query';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { V2QueryProvider } from '@/v2/runtime/query-provider';
 import { V2CacheIdentityGuard } from '@/v2/runtime/cache-identity-guard';
+import { ChannelDeviceSweep } from '@/v2/features/channels/device-sweep';
 import { prefetchRecentsState } from '@/v2/features/conversations/server';
 import { AppShell } from '@/v2/shell/AppShell';
 import { DockProvider, DockHost } from '@/v2/shell/Dock';
@@ -166,6 +167,15 @@ export default async function V2Layout({
             recently-viewed and quiz scores would paint for the NEXT user on the same
             device for up to the 30-minute retention. See the file for the full trace. */}
         <V2CacheIdentityGuard userId={user?.id ?? null} />
+        {/* THE SAME BOUNDARY, FOR THE DEVICE. The cache guard above owns what is
+            in memory in the query client; this owns what the channels feature
+            left on `localStorage` — the previous reader's half-written messages
+            and their unsent ones. Renders null. It sits HERE, not in the
+            composer it used to hang off, because that component only mounts for
+            someone who can post: B reading a channel they may not write in, or
+            never opening a channel at all, kept A's words on the disk for the
+            whole session. See the module for the render/effect split. */}
+        <ChannelDeviceSweep userId={user?.id ?? null} />
         {/* Publishes the ALREADY-COMPUTED session to the v2 client tree, so pages and
             screens read the server-verified identity from context instead of each
             awaiting `/auth/me` themselves. Because this layout is preserved across soft

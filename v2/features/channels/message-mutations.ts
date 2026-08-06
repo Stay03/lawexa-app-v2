@@ -41,6 +41,22 @@ type MessagePages = InfiniteData<MessageListResponse, string | null>;
 
 let localCounter = 0;
 
+/**
+ * A PER-DOCUMENT salt on the optimistic uuid, added 2026-08-06 with the
+ * outbox's disk half.
+ *
+ * `local-1` used to be unique because nothing outlived the tab. A failed send
+ * now does (`./send-outbox.ts`), and this counter restarts at zero on every
+ * load — so the first message of the next session would mint the uuid a
+ * restored failed row is already holding, and `outboxSet` would OVERWRITE the
+ * unsent message with the new one. Silently, and only for the reader unlucky
+ * enough to have a failure waiting for them.
+ *
+ * Only the PREFIX is load-bearing anywhere (`isLocalMessageUuid`), so the shape
+ * between the prefix and the counter is free.
+ */
+const localSalt = Math.random().toString(36).slice(2, 8);
+
 /** The acting user as a SlimUser, read from the sanctioned token bridge at
  *  MUTATION time (never in render — a store selector building an object
  *  would loop via useSyncExternalStore). */
@@ -184,7 +200,7 @@ export function useSendChannelMessage(channelUuid: string) {
         outboxMarkSending(retryLocalUuid);
         return { localUuid: retryLocalUuid };
       }
-      const localUuid = `${LOCAL_MESSAGE_PREFIX}${(localCounter += 1)}`;
+      const localUuid = `${LOCAL_MESSAGE_PREFIX}${localSalt}-${(localCounter += 1)}`;
       const optimistic: Message = {
         uuid: localUuid,
         channel_uuid: channelUuid,
