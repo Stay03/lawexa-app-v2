@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Channel, SlimUser } from '@/types/collab';
@@ -31,12 +34,29 @@ import type { MarkComponent } from '../ui/avatars';
  * adjacent 32px grey squares of near-identical weight, which is a row of
  * buttons rather than a set of decisions.
  *
- * ── THE BAR IS FIXED AT `h-14`, AND THAT IS THE POINT ──────────────────────
+ * ── THE BAR'S HEIGHT IS FIXED PER WIDTH, AND THAT IS THE POINT ─────────────
  * Everything that used to change the header's HEIGHT now changes its CONTENT:
- * the description is a disclosure on the name, the sections are a segment, and
- * joining a channel adds controls rather than a row. The one thing that still
- * moves the header is the reader opening the description themselves, and the
- * feed's viewport keeper holds them bottom-anchored through it.
+ * the description is a disclosure, the sections are a segment, and joining a
+ * channel adds controls rather than a row. The one thing that still moves the
+ * header is the reader opening the description themselves, and the feed's
+ * viewport keeper holds them bottom-anchored through it.
+ *
+ * ── THE NAME IS PRINTED ONCE PER SCREEN, AND BELOW `md:` NOT HERE ──────────
+ * The shell's own header carries the channel name over the space name BELOW
+ * `md:` only, and deliberately goes EMPTY at `md:` and up because that is where
+ * this bar starts naming the channel (`v2/shell/V2Header.tsx`, and the same
+ * contract again in `v2/features/collab/shell/CollabHeaderSlot.tsx`). Half of
+ * that contract was honoured and half was not: this bar's `h1` rendered at
+ * every width, so a phone printed "Product Development" in the shell bar and
+ * again, one row below, here — two bars of height spent saying one thing before
+ * the conversation starts, which is the complaint that took this screen from
+ * four stacked bars to one in the first place.
+ *
+ * So below `md:` the heading is `sr-only` — the screen keeps its `h1` and
+ * assistive tech keeps the name at every width, because a document whose only
+ * heading changed with the viewport would be a different document at every
+ * width — and the bar prints what the shell CANNOT: what the channel is FOR.
+ * See "THE PURPOSE LINE" below.
  *
  * ── THE TWO BREAKPOINTS, AND WHY THEY ARE WHERE THEY ARE ───────────────────
  * Three surfaces can name the space a channel lives in — the shell's collab
@@ -68,6 +88,35 @@ import type { MarkComponent } from '../ui/avatars';
  * than a second grey run in the bar — the header states WHO is here, and the
  * roster it opens is where "how many are looking" belongs. No presence dots,
  * ever (DIRECTION 7, binding).
+ *
+ * ── THE PURPOSE LINE, AND WHY IT IS THE DISCLOSURE'S TRIGGER ON A PHONE ────
+ * The description has always been a disclosure rather than a permanent 20px
+ * row, and the CONTROL was the channel name. Take the name away below `md:`
+ * and the affordance loses its trigger, so at that width the trigger becomes
+ * the description ITSELF, on one truncated line: the reader taps what they want
+ * to read the rest of, which is the same move the name asked for and a plainer
+ * one.
+ *
+ * TWO TRIGGERS, ONE PER WIDTH, ONE DISCLOSURE — the same `descriptionOpen` and
+ * the same `aria-controls`, and exactly one of them is ever displayed, so the
+ * other is `display:none` and therefore out of the tab order and out of the
+ * accessibility tree entirely. (Two controls for one job, switched by CSS, is
+ * the `SPACE_DRAWER_TRIGGER_IDS` idiom this feature already runs on.) They must
+ * not both be `sr-only`-style hidden: a clipped control is still focusable, and
+ * a phone reader tabbing into an invisible copy of the name is worse than the
+ * duplicate this change removes.
+ *
+ * A channel with no description has nothing to disclose, so at that width the
+ * slot falls back to the visibility in words ("Private"), which the lock glyph
+ * beside it can only imply. It is `aria-hidden` because the `sr-only` label on
+ * the glyph already says it, so the words are printed once too.
+ *
+ * ── AND THE BAR IS SHORTER FOR IT ──────────────────────────────────────────
+ * `h-11` below `md:`, `h-14` from there up. 56px is the height of a bar built
+ * around a 16px semibold heading; without one, the tallest thing in it is a
+ * 32px control, and 44px holds that with room to spare — the standards' primary
+ * tap target, exactly. The strip now reads as subordinate to the shell bar
+ * above it, which is what it is.
  */
 
 export interface HeaderLens {
@@ -117,7 +166,7 @@ export function ChannelPlaceHeader({
   return (
     <div className="shrink-0 border-b">
       <div className="mx-auto w-full max-w-3xl px-4">
-        <div className="flex h-14 items-center gap-2">
+        <div className="flex h-11 items-center gap-2 md:h-14">
           {/* ── Identity ─────────────────────────────────────────────── */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <VisibilityIcon
@@ -132,38 +181,87 @@ export function ChannelPlaceHeader({
                 pushes the presence stack and the actions off the bar instead of
                 ellipsizing. The truncation itself lives on the innermost span,
                 because `truncate` on an element with a flex child clips it
-                without ever drawing the ellipsis. */}
-            <h1 className="flex min-w-0 items-center text-base leading-tight font-semibold">
+                without ever drawing the ellipsis.
+
+                `sr-only` below `md:` — the shell bar prints the channel there
+                (see the docblock). It is the heading, not the trigger, at that
+                width, so the button inside it is `hidden` rather than clipped:
+                `sr-only` leaves a control focusable, and a phone reader must
+                not be able to tab into an invisible copy of a control the
+                purpose line beside it already offers. */}
+            <h1 className="sr-only min-w-0 md:not-sr-only md:flex md:items-center md:text-base md:leading-tight md:font-semibold">
               {description ? (
-                /* The description used to cost 20px on every channel forever.
-                   As a disclosure it costs a chevron, and the name itself is
-                   the control — the reader reaches for what they want to know
-                   more about. */
-                <button
-                  type="button"
-                  aria-expanded={descriptionOpen}
-                  aria-controls={DESCRIPTION_ID}
-                  onClick={() => setDescriptionOpen((open) => !open)}
-                  className={cn(
-                    'v2-interactive flex min-w-0 items-center gap-1 rounded',
-                    'transition-colors duration-150 hover:text-foreground/80 motion-reduce:transition-none',
-                    FOCUS_RING,
-                  )}
-                >
-                  <span className="min-w-0 truncate">{channel.name}</span>
-                  <ChevronDown
-                    aria-hidden
+                <>
+                  {/* The description used to cost 20px on every channel forever.
+                      As a disclosure it costs a chevron, and the name itself is
+                      the control — the reader reaches for what they want to know
+                      more about. */}
+                  <button
+                    type="button"
+                    aria-expanded={descriptionOpen}
+                    aria-controls={DESCRIPTION_ID}
+                    onClick={() => setDescriptionOpen((open) => !open)}
                     className={cn(
-                      'size-4 shrink-0 text-muted-foreground',
-                      'transition-transform duration-200 motion-reduce:transition-none',
-                      descriptionOpen && 'rotate-180',
+                      'v2-interactive hidden min-w-0 items-center gap-1 rounded md:flex',
+                      'transition-colors duration-150 hover:text-foreground/80 motion-reduce:transition-none',
+                      FOCUS_RING,
                     )}
-                  />
-                </button>
+                  >
+                    <span className="min-w-0 truncate">{channel.name}</span>
+                    <ChevronDown
+                      aria-hidden
+                      className={cn(
+                        'size-4 shrink-0 text-muted-foreground',
+                        'transition-transform duration-200 motion-reduce:transition-none',
+                        descriptionOpen && 'rotate-180',
+                      )}
+                    />
+                  </button>
+                  {/* The heading's OWN text below `md:`, where the button above
+                      is `display:none` and would otherwise take the name out of
+                      the accessibility tree along with the pixels. */}
+                  <span className="md:hidden">{channel.name}</span>
+                </>
               ) : (
-                <span className="min-w-0 truncate">{channel.name}</span>
+                <span className="min-w-0 md:truncate">{channel.name}</span>
               )}
             </h1>
+
+            {/* ── The purpose (below `md:` only) ─────────────────────────
+                What this bar can say that the shell bar above it cannot — and,
+                since the name went, where the description's disclosure lives at
+                this width. See the docblock. */}
+            {description ? (
+              <button
+                type="button"
+                aria-expanded={descriptionOpen}
+                aria-controls={DESCRIPTION_ID}
+                onClick={() => setDescriptionOpen((open) => !open)}
+                className={cn(
+                  'v2-interactive flex min-w-0 flex-1 items-center gap-1 rounded md:hidden',
+                  'text-sm text-muted-foreground',
+                  'transition-colors duration-150 hover:text-foreground motion-reduce:transition-none',
+                  FOCUS_RING,
+                )}
+              >
+                <span className="min-w-0 truncate">{description}</span>
+                <ChevronDown
+                  aria-hidden
+                  className={cn(
+                    'size-4 shrink-0',
+                    'transition-transform duration-200 motion-reduce:transition-none',
+                    descriptionOpen && 'rotate-180',
+                  )}
+                />
+              </button>
+            ) : (
+              <span
+                aria-hidden
+                className="min-w-0 truncate text-sm text-muted-foreground md:hidden"
+              >
+                {channel.visibility_label}
+              </span>
+            )}
 
             {/* The space as a real object, not a text link: the same crest the
                 space's own lane and header carry, so the reader recognises
@@ -264,6 +362,20 @@ const DESCRIPTION_ID = 'v2-channel-description';
  *
  * `aria-pressed` is deliberately absent: opening a lens is a navigation, not a
  * toggle, and the panel it opens is not a state of this button.
+ *
+ * ── ON A PHONE THE BAR'S TRAILING SLOT HOLDS EXACTLY ONE OBJECT ────────────
+ * Below `md:` this bar also carries the channel's purpose on one line, and a
+ * 360px row cannot hold a line of prose AND faces AND a two-glyph frame AND an
+ * overflow: filmed at 390px with all four, the purpose truncated to "Everything
+ * on th…", which is not a sentence and not worth a bar.
+ *
+ * So at that width the lenses fold INTO the overflow, as labelled rows at the
+ * head of the menu — which is the better affordance for them on a phone anyway:
+ * two 28px unlabelled glyphs become two thumb-sized rows that say what they
+ * open. They fold only when there IS a menu to fold into. A previewer has none
+ * (every item in it is a write they do not have), so their lenses keep the
+ * frame and their bar has no overflow — one object either way, never both and
+ * never neither. At `md:`+ nothing here changes at all.
  */
 function ActionCluster({
   lenses,
@@ -272,12 +384,15 @@ function ActionCluster({
   lenses: readonly HeaderLens[];
   menu?: ReactNode;
 }) {
+  const lensesFoldIntoMenu = menu !== undefined && lenses.length > 0;
+
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       {lenses.length > 0 && (
         <div
           className={cn(
-            'flex items-center gap-0.5 rounded-lg border p-0.5',
+            'items-center gap-0.5 rounded-lg border p-0.5',
+            lensesFoldIntoMenu ? 'hidden md:flex' : 'flex',
             'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
           )}
         >
@@ -315,6 +430,20 @@ function ActionCluster({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
+            {/* The lenses' other home. `md:hidden` on the GROUP, not on each
+                row, so the separator leaves with them and the menu never opens
+                on a rule with nothing above it. */}
+            {lensesFoldIntoMenu && (
+              <DropdownMenuGroup className="md:hidden">
+                {lenses.map((lens) => (
+                  <DropdownMenuItem key={lens.id} onClick={lens.onSelect}>
+                    <lens.icon aria-hidden className="size-4" />
+                    {lens.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+              </DropdownMenuGroup>
+            )}
             {menu}
           </DropdownMenuContent>
         </DropdownMenu>

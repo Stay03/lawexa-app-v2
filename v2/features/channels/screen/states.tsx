@@ -337,12 +337,18 @@ export function ChannelErrorState({ onRetry }: { onRetry: () => void }) {
 /* ── The whole screen's silhouette (route fallback + live pending) ───────── */
 
 /**
- * The channel screen's frame at rest: the ONE `h-14` header bar, the feed
- * column, and the transcript-width composer. `app/v2/channels/[channelId]/
- * loading.tsx` renders it `still` and inert; the live screen renders it
- * (pulsing) while the channel detail resolves. Geometry mirrors the live
- * screen exactly — the same bar height, the same `max-w-3xl` column, the same
- * composer cap — so the hand-off is content resolving, not a layout swap.
+ * The channel screen's frame at rest: the ONE header bar, the feed column, and
+ * the transcript-width composer. `app/v2/channels/[channelId]/loading.tsx`
+ * renders it `still` and inert; the live screen renders it (pulsing) while the
+ * channel detail resolves. Geometry mirrors the live screen exactly — the same
+ * bar height AT EACH WIDTH (`h-11` below `md:`, `h-14` from there up), the same
+ * `max-w-3xl` column, the same composer cap — so the hand-off is content
+ * resolving, not a layout swap.
+ *
+ * THE LEADING BAR IS SHAPED DIFFERENTLY PER WIDTH, because the live bar is: at
+ * `md:`+ it reserves a short, heading-weight name; below `md:` the name is in
+ * the shell bar and this row carries the channel's purpose on one quiet line,
+ * so the shape that resolves is a full-width text run, not a 9rem stub.
  *
  * THERE IS NO TAB-STRIP ROW HERE ANY MORE, because there is none on the live
  * screen: the sections ride inside the bar at `md:`+ and a bottom bar on a
@@ -354,11 +360,13 @@ export function ChannelScreenFrame({ still = false }: { still?: boolean }) {
     <div className="relative flex h-full min-h-0 flex-col">
       {/* The one header bar */}
       <div className="shrink-0 border-b">
-        <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-2 px-4">
+        <div className="mx-auto flex h-11 w-full max-w-3xl items-center gap-2 px-4 md:h-14">
           <Skeleton className={cn('size-4 shrink-0 rounded', bar)} />
-          <Skeleton className={cn('h-4 w-36 rounded', bar)} />
+          <Skeleton
+            className={cn('h-3.5 min-w-0 flex-1 rounded md:h-4 md:w-36 md:flex-none', bar)}
+          />
           <Skeleton className={cn('hidden h-6 w-28 rounded-full md:block', bar)} />
-          <div className="flex flex-1 items-center justify-end gap-1.5">
+          <div className="flex items-center justify-end gap-1.5 md:flex-1">
             <Skeleton className={cn('size-6 shrink-0 rounded-full', bar)} />
             <Skeleton className={cn('h-8 w-16 shrink-0 rounded-lg', bar)} />
           </div>
