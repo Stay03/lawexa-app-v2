@@ -306,13 +306,13 @@ const TEXTAREA_MAX_HEIGHT = 200;
  * lines; collapsing fires when it fits ONE expanded line. A length that does
  * both at once therefore exists exactly when `r > 2` — the bound is 2, not 3.
  * And measured off the classes this composer actually ships, at a 320px
- * viewport: the row's content box is 274px, the input holds 122px of text
+ * viewport: the row's content box is 274px, the input holds 114px of text
  * compact (three 32px verbs, a 32px Send, four 4px gaps and the textarea's own
- * 8px of padding) and 266px expanded, so `r` = 2.18. Break-even is a 342px
+ * 16px of padding) and 258px expanded, so `r` = 2.26. Break-even is a 350px
  * viewport. EVERY narrower one — 320px, a Fold's cover screen, Android
  * split-screen, any phone at 125% zoom — has a band of message lengths (at
- * 320px, about 33 to 36 characters) where the buttons jump under and beside the
- * input on every single keystroke.
+ * 320px, anything between about 228px and 258px of text) where the buttons jump
+ * under and beside the input on every single keystroke.
  *
  * WHICH IS WHY THE DECISION IS VERIFIED RATHER THAN ASSUMED — see
  * {@link applyArrangement}. Widening the gap is not the fix and makes it
@@ -1829,7 +1829,23 @@ function ChannelComposerBody({
         aria-label={`Message ${channel.name}`}
         // `w-full`, not `flex-1`: the shell's wrapper is the flex item now, and
         // it is what widens to the full row once the message outgrows one line.
-        className="max-h-[200px] min-h-8 w-full resize-none bg-transparent px-1 py-1.5 text-base outline-none placeholder:text-muted-foreground sm:text-sm"
+        //
+        // `block` IS LOAD-BEARING, and its absence was a real defect rather
+        // than a style. A `<textarea>` is inline-level by default, so it sat on
+        // a line box in its wrapper and the wrapper reserved the font's DESCENT
+        // under it — measured 2026-08-06, six phantom pixels below the box on
+        // every arrangement. They made the row six pixels taller than the box it
+        // contains, and because the row is `items-end` they also pushed the
+        // three verbs six pixels BELOW the text they sit beside on one line.
+        //
+        // `px-2`, NOT `px-1`, because the composer already HAS a content inset
+        // and the input was not using it: the row's `p-1.5` plus the 8px a
+        // `size-4` glyph is centred by inside a `size-8` control puts every icon
+        // in this surface — paperclip, mention, emoji, Send — at 14px from the
+        // edge. 4px of padding put the words at 10px, so expanded (where the
+        // text sits directly above the verbs) the block read ragged. 8px is that
+        // same 14px, and both edges of the surface now have ONE inset.
+        className="block max-h-[200px] min-h-8 w-full resize-none bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-muted-foreground sm:text-sm"
       />
     </ChatComposerShell>
   );

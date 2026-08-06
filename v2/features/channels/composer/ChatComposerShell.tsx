@@ -89,6 +89,28 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * puts them, while Tab still reaches the input first. That is the only ordering
  * either arrangement can be given without moving a node between parents, which
  * would remount the emoji popover mid-pick.
+ *
+ * ── THE ROW HAS ONE INSET, AND NO ROW GAP (owner, 2026-08-06) ──────────────
+ * "The long text in that text area is not done well." The arrangement worked;
+ * the block it drew was ragged down the left and loose down the middle, and both
+ * were measurable rather than matters of taste.
+ *
+ * THE INSET IS `p-1.5` PLUS THE GLYPH'S OWN 8px, WHICH IS 14. Every icon on this
+ * surface is a `size-4` glyph centred in a `size-8` control, so it lands 14px
+ * from the edge — on the left (paperclip) and on the right (Send) alike. The
+ * input's `px-1` put the WORDS at 10px, four pixels adrift of the verbs directly
+ * beneath them. It is the input that moved (`px-2`, in `ChannelComposer`),
+ * because 14 was already this surface's inset everywhere else; changing the row's
+ * padding to meet 10 would have made the compact row taller, which is the height
+ * this whole change exists to give back.
+ *
+ * AND THE ROW GAP IS ZERO BECAUSE THE CONTROLS BRING THEIR OWN. A `size-8`
+ * control carries 8px of air around its glyph on every side. Adding 6px of
+ * `gap-y` on top of the input's own 6px of `py` opened a 12px band between the
+ * last line of text and the top of a box whose ink starts 8px lower still — a
+ * gap half again as big as the 14px under the verbs, which is exactly the dead
+ * band that read as unfinished. At zero the two bands are both 14px and the
+ * expanded surface loses 6px of height on a phone with the keyboard up.
  */
 
 export function ChatComposerShell({
@@ -137,7 +159,7 @@ export function ChatComposerShell({
             data-expanded="false"
             className={cn(
               'group/composer flex items-end gap-1 p-1.5',
-              'data-[expanded=true]:flex-wrap data-[expanded=true]:gap-y-1.5',
+              'data-[expanded=true]:flex-wrap data-[expanded=true]:gap-y-0',
             )}
           >
             {/* First in the DOM, and first in the tab order, in both
