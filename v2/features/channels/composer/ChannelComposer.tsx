@@ -285,6 +285,35 @@ const MAX_SUGGESTIONS = 6;
 /** How much room is left before the counter is worth showing. */
 const COUNTER_AT = 200;
 
+/**
+ * WHAT THE EMPTY BOX SAYS — and the shortest sentence that says it.
+ *
+ * `Message ${channel.name}` is Slack's line and it does not survive our channel
+ * names. "Message Product Development" needs about 210px; the compact row left
+ * it 184px at a 390px viewport, so it WRAPPED, and the composer opened two lines
+ * tall with the verbs shoved down beside the second one — nothing typed, and
+ * already reading as broken. That is the shot this file was sent back for a
+ * third time.
+ *
+ * Widening the box (see `ChatComposerShell`) fixes that particular name. It does
+ * not make an interpolated placeholder safe, because a channel name has no
+ * bound and the next one is longer. A placeholder that can wrap is a placeholder
+ * that is too long, so this one is a FIXED sentence: 15 characters, about 110px,
+ * against the 218px of text a 280px viewport still gives it — the narrowest
+ * screen v2 draws for. It cannot wrap anywhere we ship.
+ *
+ * It is also the imperative both AI composers already use ("Ask a legal
+ * question", "Ask a follow-up"), so the app asks for a message the same way
+ * twice rather than two ways once.
+ *
+ * THE CHANNEL NAME IS NOT LOST — it moves to the accessible name below, which
+ * has no width to overflow, and that is the one place it was still doing work. A
+ * sighted reader has the header an inch above the box (which is why the header
+ * stopped printing the name twice on a phone the same day); a screen reader
+ * landing on this input has only the label.
+ */
+const PLACEHOLDER = 'Write a message';
+
 /** The input grows to here, then scrolls inside itself. LOCKSTEP with the
  *  textarea's own `max-h-[200px]`: the effect writes the height, and the class
  *  is what stops a first paint overshooting it before the effect runs. */
@@ -305,19 +334,28 @@ const TEXTAREA_MAX_HEIGHT = 200;
  * compact text widths. Expanding fires when the text no longer fits TWO compact
  * lines; collapsing fires when it fits ONE expanded line. A length that does
  * both at once therefore exists exactly when `r > 2` — the bound is 2, not 3.
- * And measured off the classes this composer actually ships, at a 320px
- * viewport: the row's content box is 274px, the input holds 114px of text
- * compact (three 32px verbs, a 32px Send, four 4px gaps and the textarea's own
- * 16px of padding) and 258px expanded, so `r` = 2.26. Break-even is a 350px
- * viewport. EVERY narrower one — 320px, a Fold's cover screen, Android
- * split-screen, any phone at 125% zoom — has a band of message lengths (at
- * 320px, anything between about 228px and 258px of text) where the buttons jump
- * under and beside the input on every single keystroke.
+ * And measured off the classes this composer used to ship, at a 320px viewport:
+ * the row's content box is 274px, the input held 114px of text compact (three
+ * 32px verbs, a 32px Send, four 4px gaps and the textarea's own 16px of padding)
+ * and 258px expanded, so `r` = 2.26 — over the bound, with a band of message
+ * lengths where the buttons jumped under and beside the input on every single
+ * keystroke.
  *
- * WHICH IS WHY THE DECISION IS VERIFIED RATHER THAN ASSUMED — see
- * {@link applyArrangement}. Widening the gap is not the fix and makes it
- * strictly worse: collapsing at two lines instead of one moves the bound to
- * `r > 1`, which no arrangement can satisfy.
+ * THAT BAND IS NOW UNREACHABLE BY CONSTRUCTION, because the phone stopped using
+ * the compact row at all (2026-08-06, third pass — `ChatComposerShell` has the
+ * account of why). The compact row exists only at `sm` and up, where `r` is
+ * 578/434 = 1.33 at a 640px viewport and 706/562 = 1.26 in the 768px column,
+ * nowhere near 2. Below `sm` the arrangement is pinned in CSS: `r` is exactly 1,
+ * and writing this attribute changes no width, so the measurement that follows
+ * it cannot disagree with the one before.
+ *
+ * THE VERIFICATION STAYS ANYWAY — see {@link applyArrangement}. It costs one
+ * reflow on the one keystroke that crosses the threshold, and it makes the
+ * arrangement a fixed point as a property of the MEASUREMENT rather than of two
+ * ratios that the next control added to this surface would quietly move.
+ * Widening the gap is not the fix and makes it strictly worse: collapsing at two
+ * lines instead of one moves the bound to `r > 1`, which no arrangement can
+ * satisfy.
  */
 const EXPAND_AT_LINES = 3;
 const COLLAPSE_AT_LINES = 1;
@@ -535,7 +573,12 @@ function wrappedLines(el: HTMLTextAreaElement): number | null {
  * arrangement this function leaves behind is therefore a FIXED POINT — running
  * it again cannot move it — which is a property of the measurement rather than
  * of the viewport, so it holds at 342px, at 320px and at 280px alike, where the
- * two-number gap alone provably does not (see {@link EXPAND_AT_LINES}).
+ * two-number gap alone provably did not (see {@link EXPAND_AT_LINES}).
+ *
+ * BELOW `sm` IT IS A FIXED POINT FOR A SECOND, SIMPLER REASON: the arrangement
+ * is CSS's there and this attribute moves nothing, so the re-read after the
+ * write is the same number as the read before it. The function still runs — it
+ * is also what sizes the box — and still settles in one pass.
  *
  * It costs one extra reflow on the one keystroke that crosses the threshold, and
  * nothing on any other. Nothing here paints: layout effects and the
@@ -1825,7 +1868,9 @@ function ChannelComposerBody({
         }}
         rows={1}
         maxLength={MESSAGE_MAX_LENGTH}
-        placeholder={`Message ${channel.name}`}
+        // The visible line is fixed and the channel's name is in the label —
+        // see {@link PLACEHOLDER} for why the two say different things.
+        placeholder={PLACEHOLDER}
         aria-label={`Message ${channel.name}`}
         // `w-full`, not `flex-1`: the shell's wrapper is the flex item now, and
         // it is what widens to the full row once the message outgrows one line.

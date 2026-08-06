@@ -44,12 +44,44 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * they have nothing to say.
  *
  * ── THE INPUT ROW HAS TWO ARRANGEMENTS (owner, 2026-08-06) ─────────────────
- * One line is one row, exactly as it always was: `[attach @ emoji] [input]
- * [send]`, compact. Past that, the buttons were holding two tall empty columns
- * either side of a message squeezed into half the phone's width — the longer
- * the message, the narrower the column it was written in, which is backwards.
- * So once the text passes about two lines the input takes the FULL width and
- * the buttons drop to a slim row beneath it, Send on the right.
+ * One line is one row: `[attach @ emoji] [input] [send]`, compact. Past that,
+ * the buttons were holding two tall empty columns either side of a message
+ * squeezed into half the phone's width — the longer the message, the narrower
+ * the column it was written in, which is backwards. So once the text passes
+ * about two lines the input takes the FULL width and the buttons drop to a slim
+ * row beneath it, Send on the right.
+ *
+ * ── AND ON A PHONE THERE IS ONLY THE SECOND ONE (owner, 2026-08-06, 3rd pass)
+ * "Still a mess." It was, and the reflow above was answering the wrong
+ * question. The compact row was being tried at EVERY width, and on a phone
+ * there is no room for it: three 32px verbs, a 32px Send, the gaps and the
+ * input's own inset take 160px, which the surface pays out of 358px at 390.
+ * MEASURED off this build, the words got 184px at 390, 154px at 360 and 114px
+ * at 320 — 47%, 43% and 36% of the screen. The controls held more width than
+ * the message did, and the reflow could not save the states that matter most,
+ * because it only fires at a THIRD line: an empty box and a one-line message
+ * both sat in that cramped column by construction.
+ *
+ * The proof was in the empty box. `Message Product Development` wrapped in
+ * 184px, so the composer opened TWO LINES TALL with nothing typed and the verbs
+ * pushed down beside the second line, leaving an L-shaped hole where the first
+ * line's left half should be — the owner's screenshot. At 320 the same
+ * placeholder wrapped to THREE lines, tripped the trigger, and stacked: the
+ * narrow phone drew the composer correctly and the wide one did not.
+ *
+ * So the arrangement is CSS's decision, and the phone does not get a vote: below
+ * `sm` the input takes the whole line and the verbs sit under it, always. The
+ * compact row survives only where there is genuinely room for it — 434px of text
+ * at a 640px viewport, 562px in the 768px column — which is the same rule as the
+ * rest of v2's responsive work, a `sm:` variant rather than anything measured in
+ * JS. Below `sm` there is nothing left for the trigger to get wrong: no cramped
+ * column, no wrapping placeholder (see `ChannelComposer`'s `placeholder`), and
+ * no threshold the reader can cross mid-sentence.
+ *
+ * IT COSTS 8 PIXELS, MEASURED. The empty composer was 74px tall at 390 (two
+ * placeholder lines); stacked it is 82px, the height 320 has always paid. Set
+ * against 184px → 328px of writing width, and against the box no longer opening
+ * pre-broken, that is the trade and it is worth taking.
  *
  * IT IS ONE SET OF NODES IN ONE CONTAINER, RE-FLOWED — never two arrangements
  * rendered conditionally. Moving a control between two parents remounts it, and
@@ -65,6 +97,13 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * composer on a threshold the reader crosses while typing. The attribute is
  * rendered once as `false` and never named again in JSX, so React has nothing
  * to patch and the composer's write stands.
+ *
+ * EVERY RULE THAT READS THE ATTRIBUTE IS NOW BEHIND `sm:`, and that is the whole
+ * of the phone change — one variant on three class lists, no second code path,
+ * no `useIsMobile`. The composer keeps writing the attribute at every width
+ * because the measurement is what sizes the box anyway; below `sm` the CSS
+ * simply does not consult it. That is also why the trigger cannot flap here: a
+ * write that moves nothing cannot change what the next measurement sees.
  *
  * AND IT IS INSTANT ON PURPOSE. A wrap is not a tweenable property — no
  * interpolation exists between "beside" and "under" — so the only honest
@@ -84,11 +123,15 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  *
  * So the DOM is `[input, actions, trailing]` — write the message, decorate it,
  * send it — which is a meaningful sequence in BOTH arrangements, and the one the
- * expanded layout also draws top to bottom. The compact row is the one that gets
+ * stacked layout also draws top to bottom. The compact row is the one that gets
  * an `order`: the verbs move to the left of the input, where a chat composer
  * puts them, while Tab still reaches the input first. That is the only ordering
  * either arrangement can be given without moving a node between parents, which
  * would remount the emoji popover mid-pick.
+ *
+ * On a phone the two orders are now the same order, since the compact row is not
+ * drawn there: the reader reads the message, then the verbs, then Send, top to
+ * bottom, and Tab follows exactly that.
  *
  * ── THE ROW HAS ONE INSET, AND NO ROW GAP (owner, 2026-08-06) ──────────────
  * "The long text in that text area is not done well." The arrangement worked;
@@ -154,21 +197,25 @@ export function ChatComposerShell({
             </span>
           )}
 
+          {/* `flex-wrap` is unconditional now that the phone always stacks, and
+              it costs the compact row nothing: the input's basis is 0 there, so
+              it shrinks rather than pushing anything onto a second line. The row
+              gap is explicitly zero — the `size-8` controls bring their own 8px
+              of air, and 4px on top of it is the dead band this surface had. */}
           <div
             ref={rowRef}
             data-expanded="false"
-            className={cn(
-              'group/composer flex items-end gap-1 p-1.5',
-              'data-[expanded=true]:flex-wrap data-[expanded=true]:gap-y-0',
-            )}
+            className="group/composer flex flex-wrap items-end gap-x-1 gap-y-0 p-1.5"
           >
-            {/* First in the DOM, and first in the tab order, in both
-                arrangements. `basis-full` is what makes it take the whole line
-                when expanded; the rest of the row then wraps beneath it. */}
+            {/* First in the DOM, and first in the tab order, in every
+                arrangement. `basis-full` is what makes it take the whole line;
+                the rest of the row then wraps beneath it. It is the DEFAULT —
+                a phone never asks for anything else — and `sm:basis-0` is what
+                hands the compact row back where the width can carry it. */}
             <div
               className={cn(
-                'min-w-0 flex-1',
-                'group-data-[expanded=true]/composer:basis-full',
+                'min-w-0 grow basis-full',
+                'sm:basis-0 sm:group-data-[expanded=true]/composer:basis-full',
               )}
             >
               {children}
@@ -179,16 +226,17 @@ export function ChatComposerShell({
             <div
               className={cn(
                 'flex shrink-0 items-center gap-1',
-                'group-data-[expanded=false]/composer:order-first',
+                'sm:group-data-[expanded=false]/composer:order-first',
               )}
             >
               {actions}
             </div>
 
+            {/* Send holds the right end of whichever line it lands on. */}
             <div
               className={cn(
-                'flex shrink-0 items-center gap-1',
-                'group-data-[expanded=true]/composer:ml-auto',
+                'ml-auto flex shrink-0 items-center gap-1',
+                'sm:ml-0 sm:group-data-[expanded=true]/composer:ml-auto',
               )}
             >
               {trailing}
