@@ -1,4 +1,5 @@
-import type { LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+
 
 import { cn } from '@/lib/utils';
 
@@ -37,7 +38,8 @@ export function CollabMessage({
   footnote,
   className,
 }: {
-  icon: LucideIcon;
+  /** Any mark that takes a `className` — a lucide icon, or a brand mark. */
+  icon: ComponentType<{ className?: string }>;
   title: string;
   description: string;
   tone?: CollabMessageTone;

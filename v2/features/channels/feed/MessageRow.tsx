@@ -11,7 +11,6 @@ import {
   Pencil,
   Pin,
   PinOff,
-  Sparkles,
   Trash2,
 } from 'lucide-react';
 
@@ -42,6 +41,7 @@ import { MessageAttachments } from './MessageAttachments';
 import { MessageContent } from './MessageContent';
 import { ReactionChips, ReactionTrayPopover } from './reactions';
 import { useLongPress } from './use-long-press';
+import { LawexaMark } from '../ui/avatars';
 
 /**
  * MessageRow — one message line: reply quote, content, edited marker, the
@@ -151,6 +151,10 @@ export interface MessageRowActions {
   onToggleSave: (message: Message) => void;
   /** Open the Lawexa session behind an AI reply (`metadata.session_uuid`). */
   onViewAiSession: (sessionUuid: string) => void;
+  /** Raise the full-screen picture viewer on one image of this message. The
+   *  MESSAGE is passed, not just the file, because the viewer's set is this
+   *  message's own pictures — see `./image-target.ts`. */
+  onOpenImage: (message: Message, attachmentId: number) => void;
 }
 
 export const MessageRow = memo(function MessageRow({
@@ -236,6 +240,9 @@ export const MessageRow = memo(function MessageRow({
         {attachments.length > 0 && (
           <MessageAttachments
             attachments={attachments}
+            onOpenImage={(attachmentId) =>
+              actions.onOpenImage(message, attachmentId)
+            }
             className={cn(MESSAGE_MEASURE, 'mt-1.5')}
           />
         )}
@@ -389,6 +396,9 @@ export const MessageRow = memo(function MessageRow({
         {attachments.length > 0 && (
           <MessageAttachments
             attachments={attachments}
+            onOpenImage={(attachmentId) =>
+              actions.onOpenImage(message, attachmentId)
+            }
             className={hasText ? 'mt-1.5' : undefined}
           />
         )}
@@ -558,7 +568,7 @@ export const MessageRow = memo(function MessageRow({
                     <DropdownMenuItem
                       onClick={() => actions.onViewAiSession(sessionUuid)}
                     >
-                      <Sparkles aria-hidden className="size-4" />
+                      <LawexaMark />
                       View this Lawexa conversation
                     </DropdownMenuItem>
                   )}

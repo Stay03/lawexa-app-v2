@@ -11,7 +11,6 @@ import {
   Play,
   Plus,
   Radio,
-  Sparkles,
   Trash2,
   Trophy,
   WifiOff,
@@ -53,7 +52,7 @@ import type { Channel } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { TabRow } from '@/v2/shell/TabRow';
 import { canManageChannel } from '../model';
-import { MemberAvatar } from '../ui/avatars';
+import { LawexaMark, MemberAvatar } from '../ui/avatars';
 import { useHeldValue } from '../use-held-value';
 import { useDeleteQuiz, useGoLive, useSetQuizVisibility } from './mutations';
 import {
@@ -558,7 +557,7 @@ function QuizRow({
               row you are about to run for a whole room. */}
           {quiz.is_ai_generated && (
             <span className="inline-flex min-w-0 shrink-0 items-center gap-1">
-              <Sparkles aria-hidden className="size-3 shrink-0 text-primary" />
+              <LawexaMark className="size-3 shrink-0" />
               <span className="truncate">drafted by Lawexa</span>
             </span>
           )}

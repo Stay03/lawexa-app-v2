@@ -1,7 +1,6 @@
 'use client';
 
 import { memo } from 'react';
-import { Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +9,7 @@ import type { Message, SlimUser } from '@/types/collab';
 import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { mentionsViewer } from '../model';
 import { useMinuteNow } from '../use-minute-now';
-import { LawexaAvatar, MemberAvatar } from '../ui/avatars';
+import { LawexaAvatar, LawexaMark, MemberAvatar } from '../ui/avatars';
 import { MessageRow, type MessageRowActions } from './MessageRow';
 
 /**
@@ -140,7 +139,7 @@ export const MessageGroupRow = memo(function MessageGroupRow({
               variant="secondary"
               className="h-4 gap-0.5 px-1.5 text-[10px] font-medium [&>svg]:size-2.5!"
             >
-              <Sparkles aria-hidden />
+              <LawexaMark className="size-2.5" />
               AI
             </Badge>
           )}

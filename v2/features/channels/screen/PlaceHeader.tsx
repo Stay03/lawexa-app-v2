@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Hash, Lock, MoreHorizontal, type LucideIcon } from 'lucide-react';
+import { ChevronDown, Hash, Lock, MoreHorizontal } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { ChannelTab } from '../model';
 import { SectionSwitch, type ChannelSection, type SectionCounts } from './SectionSwitch';
+import type { MarkComponent } from '../ui/avatars';
 
 /**
  * PlaceHeader — ONE bar and ONE hairline over a channel. Phase-5 redesign
@@ -72,7 +73,7 @@ import { SectionSwitch, type ChannelSection, type SectionCounts } from './Sectio
 export interface HeaderLens {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon: MarkComponent;
   onSelect: () => void;
 }
 

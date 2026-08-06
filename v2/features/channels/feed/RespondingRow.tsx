@@ -2,11 +2,12 @@
 
 import { useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { RespondingTurn } from '../lawexa/turns';
+import { LawexaMark } from '../ui/avatars';
 
 /**
  * RespondingRow — "Lawexa is responding", plus the optional live glance.
@@ -97,10 +98,7 @@ export function RespondingRow({
       )}
     >
       <div className="flex min-h-6 items-center gap-2 text-xs">
-        <Sparkles
-          aria-hidden
-          className="size-3.5 shrink-0 text-primary motion-safe:animate-pulse"
-        />
+        <LawexaMark className="size-3.5 shrink-0 motion-safe:animate-pulse" />
         <span className="min-w-0 flex-1 truncate text-muted-foreground">
           Lawexa is responding to{' '}
           <span className="font-medium text-foreground">{turn.summoner.name}</span>

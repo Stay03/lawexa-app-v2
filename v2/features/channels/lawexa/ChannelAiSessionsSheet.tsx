@@ -16,7 +16,6 @@ import {
   Loader2,
   MessagesSquare,
   RotateCcw,
-  Sparkles,
   WifiOff,
   Wrench,
 } from 'lucide-react';
@@ -47,7 +46,7 @@ import { useEngagementThrottled } from '../engagement-throttle';
 import { LawexaMarkdown } from '../feed/LawexaMessageContent';
 import { PlainMessageContent } from '../feed/MessageContent';
 import { channelsQueries } from '../queries';
-import { LawexaAvatar, MemberAvatar } from '../ui/avatars';
+import { LawexaAvatar, LawexaMark, MemberAvatar } from '../ui/avatars';
 import { RelativeTime } from '../ui/RelativeTime';
 import { useResetChannelAi } from './mutations';
 import {
@@ -215,7 +214,7 @@ function SessionListView({
     <>
       <SheetHeader className="border-b">
         <SheetTitle className="flex items-center gap-2">
-          <Sparkles aria-hidden className="size-4 text-primary" />
+          <LawexaMark />
           Lawexa sessions
         </SheetTitle>
         <p className="text-sm text-muted-foreground">
@@ -243,7 +242,7 @@ function SessionListView({
         ) : sessions.length === 0 ? (
           <div className="px-4 py-6">
             <CollabMessage
-              icon={Sparkles}
+              icon={LawexaMark}
               tone="neutral"
               title="No Lawexa sessions yet"
               description="Mention @lawexa in the channel and the conversation that follows will be kept here."
@@ -303,7 +302,7 @@ function SessionRow({
         )}
       >
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Sparkles aria-hidden className="size-4" />
+          <LawexaMark />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
@@ -509,7 +508,7 @@ function TranscriptView({
           </Button>
         </div>
         <SheetTitle className="flex items-center gap-2">
-          <Sparkles aria-hidden className="size-4 text-primary" />
+          <LawexaMark />
           Lawexa session
         </SheetTitle>
         {/* The toggle names its own cost. It only exists once we KNOW something

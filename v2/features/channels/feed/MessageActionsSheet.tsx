@@ -9,7 +9,6 @@ import {
   Pencil,
   Pin,
   PinOff,
-  Sparkles,
   Trash2,
 } from 'lucide-react';
 
@@ -25,6 +24,7 @@ import type { Message } from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { ReactionTrayRow } from './reactions';
+import { LawexaMark } from '../ui/avatars';
 
 /**
  * MessageActionsSheet — the TOUCH half of the row-actions contract: one
@@ -166,7 +166,7 @@ export function MessageActionsSheet({
                   onViewAiSession(sessionUuid);
                 }}
               >
-                <Sparkles aria-hidden className="size-4" />
+                <LawexaMark />
               </SheetAction>
             )}
             {canEdit && (

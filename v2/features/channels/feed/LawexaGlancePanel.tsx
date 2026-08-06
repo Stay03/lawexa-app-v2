@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { isErrorMessage, isHandoverMessage } from '@/types/chat';
@@ -12,6 +12,7 @@ import { AssistantMessageRow } from '@/v2/features/conversations/conversation/ro
 import { HandoverRow } from '@/v2/features/conversations/conversation/rows/HandoverRow';
 import { CompactToolChain } from '@/v2/features/conversations/conversation/tools/CompactToolChain';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { LawexaMark } from '../ui/avatars';
 
 /**
  * LawexaGlancePanel — watch one Lawexa turn happen, live. Phase-5 W3; study A9
@@ -98,7 +99,7 @@ export function LawexaGlancePanel({
       )}
     >
       <div className="flex items-center gap-1.5 border-b bg-background/60 px-3 py-2 text-xs">
-        <Sparkles aria-hidden className="size-3 shrink-0 text-primary" />
+        <LawexaMark className="size-3 shrink-0" />
         <span className="min-w-0 flex-1 truncate text-muted-foreground">
           Watching Lawexa answer{' '}
           <span className="font-medium text-foreground">{summonerName}</span>
