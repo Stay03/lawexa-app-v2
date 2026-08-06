@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { Channel, Message, SlimUser } from '@/types/collab';
 import type { ChannelReadReporter } from '@/v2/features/channels/mark-read';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   buildFeedItems,
@@ -40,8 +41,10 @@ import { channelsQueries } from '../queries';
 import { outboxGet, useOutboxMessages } from '../send-outbox';
 import { ChannelFeedSkeleton, ChannelIntro, FeedErrorState } from '../screen/states';
 import { DayDivider, UnreadDivider } from './FeedDivider';
+import { formatImageTarget } from './image-target';
 import { MessageActionsSheet } from './MessageActionsSheet';
 import { MessageGroupRow } from './MessageGroupRow';
+import { MessageImageViewer } from './MessageImageViewer';
 import type { MessageRowActions } from './MessageRow';
 import { QuizCardPreview } from './QuizCardPreview';
 import { QuizGameCard } from './QuizGameCard';
@@ -123,6 +126,11 @@ import {
  *    deep link uses, so a pin from last week resolves exactly like a
  *    notification link — and, unlike a URL write, it costs no navigation and
  *    can't fight the router's cached search params.
+ *
+ * PICTURES OPEN HERE, NOT IN A TAB (owner, 2026-08-06). `?image=` is this
+ * component's own overlay param — the precedent is `ListsTab`'s `?list=` — and
+ * it is owned here rather than by the screen because only this component holds
+ * the array the viewer resolves against. See {@link MessageImageViewer}.
  *
  * READ-ONLY MODE (`canParticipate: false`) — a space member previewing a
  * `space_public` channel they never joined. THE TRANSCRIPT IS THE SAME
@@ -367,6 +375,35 @@ export function ChannelFeed({
     [messages, sheetMessageUuid],
   );
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
+
+  /**
+   * The picture viewer's URL state (`?image={messageUuid}:{attachmentId}`).
+   *
+   * IT IS OWNED HERE, NOT BY THE SCREEN, and the precedent is `?list=`, which
+   * `ListsTab` owns for the same reason: the param names something only this
+   * component can resolve. The viewer's set is the pictures of ONE message, and
+   * the array those come from — cache pages merged with the outbox — is derived
+   * right here. Hoisting the param to `ChannelScreen` would mean either a
+   * second observer on the message history (re-deriving what this component
+   * already holds, and missing every unacknowledged row) or passing the whole
+   * transcript upward. Neither buys anything: the feed only mounts for a reader
+   * who may read the channel, which is the same gate `canOpen` would apply.
+   *
+   * NO `ssrValue`: the viewer only ever renders through a Radix portal, so a
+   * `?image=` that is open in the URL produces no server HTML either way and
+   * hydration cannot diverge (the hook's own rule).
+   *
+   * AND NO ADOPTION EFFECT, unlike `?game=`. That param needed one because it
+   * arrives from OUTSIDE its screen — a go-live notification pushes it onto a
+   * channel the reader is already sitting in, and a push is neither a fresh
+   * mount nor a popstate. `?image=` has exactly three entrances and the hook
+   * already answers all three: a tile press (this component's own `show`), a
+   * cold load or a shared link (the lazy initialiser reads the live URL), and
+   * Back/Forward (the hook's `popstate` adopter). Nothing else can produce one,
+   * so there is no soft navigation to adopt from.
+   */
+  const image = useUrlOverlay('image');
+  const { show: showImage, swap: swapImage, close: closeImage } = image;
 
   /** Flash-wash + scroll a loaded message into view (DOM-only — no state).
    *  `instant` is the INITIAL landing's mode (audit M7): the first frames
@@ -882,6 +919,10 @@ export function ChannelFeed({
         saveMutate({ messageUuid: message.uuid, saved: message.is_bookmarked !== true });
       },
       onViewAiSession,
+      // A PUSH, so Back closes the viewer — and `show` is idempotent, so a
+      // double-tapped tile still costs exactly one entry.
+      onOpenImage: (message, attachmentId) =>
+        showImage(formatImageTarget(message.uuid, attachmentId)),
     }),
     [
       onStartReply,
@@ -893,6 +934,7 @@ export function ChannelFeed({
       pinMutate,
       saveMutate,
       onViewAiSession,
+      showImage,
     ],
   );
 
@@ -1097,6 +1139,36 @@ export function ChannelFeed({
           {composer}
         </div>
       </div>
+
+      {/* The picture viewer. NOT member-gated — looking at a photo is reading,
+          and a previewer sees the same transcript.
+
+          ALWAYS MOUNTED, never `image.value &&`: Radix Presence cannot play an
+          exit for a component that unmounts in the same commit (the house
+          dialog contract, stated at `use-url-overlay.ts`), and a full-screen
+          surface that vanished in one frame is the abrupt dismissal the motion
+          rule forbids. It renders no portal while closed, so standing mounted
+          costs a `<Dialog open={false}>` and nothing else.
+
+          NOT KEYED PER OPENING either, and that is the one place it departs
+          from the edit-dialog idiom on purpose: this overlay's VALUE CHANGES
+          WHILE IT IS OPEN — every swipe is a new `?image=` — so a key derived
+          from it would remount the viewer mid-gesture. It holds nothing that
+          needs resetting instead: the current picture is derived from the URL,
+          and each frame's paint state is keyed by its own file id. Same
+          reasoning as `ChannelAiSessionsSheet`, the other multi-value
+          overlay. */}
+      <MessageImageViewer
+        value={image.value}
+        // A deep link can arrive before the first page of history does. Until
+        // it settles, "we can't find it" is not yet a true thing to say.
+        resolving={isPending}
+        messages={messages}
+        // A REPLACE: the whole visit is one history entry, so Back leaves the
+        // viewer rather than walking back through every picture.
+        onSelect={swapImage}
+        onClose={closeImage}
+      />
 
       {/* Touch action sheet and the delete confirm — one per feed, and both
           MEMBER-ONLY: every verb inside them is a write, and the gestures that

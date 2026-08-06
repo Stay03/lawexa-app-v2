@@ -78,6 +78,40 @@ function DialogContent({
   )
 }
 
+/**
+ * The dialog's content surface with NO shape of its own — same Radix machinery
+ * as `DialogContent` (focus trap, Escape, `aria-modal`, the dismissable layer),
+ * none of the centred-card geometry.
+ *
+ * It exists for the one dialog whose shape is not a card: the channel picture
+ * viewer, which fills the screen. Expressing that through `DialogContent`'s
+ * `className` would mean unpicking `grid`, `gap-6`, `p-6`, `rounded-4xl`,
+ * `max-w-*` at two breakpoints, `top-1/2 left-1/2` and both translates one
+ * conflicting utility at a time — a chain that reads as correct and silently
+ * stops being it the day the card is re-tuned. Callers own the whole class
+ * list, and must include their own positioning and `z-50`.
+ *
+ * Render it inside `DialogPortal` beside a `DialogOverlay`: the overlay is what
+ * carries the scroll lock, so a surface without one does not have one.
+ *
+ * ITS SLOT IS ITS OWN. `data-slot="dialog-content"` names the centred card, and
+ * two surfaces answering to one name would be indistinguishable to any rule or
+ * test written against it later — which is exactly the sort of thing a slot
+ * attribute exists to be.
+ */
+function DialogSurface({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  return (
+    <DialogPrimitive.Content
+      data-slot="dialog-surface"
+      className={className}
+      {...props}
+    />
+  )
+}
+
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -150,6 +184,7 @@ export {
   DialogHeader,
   DialogOverlay,
   DialogPortal,
+  DialogSurface,
   DialogTitle,
   DialogTrigger,
 }

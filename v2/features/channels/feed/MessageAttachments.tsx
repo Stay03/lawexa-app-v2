@@ -1,18 +1,17 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
 import { Download, ImageOff, Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { filesApi } from '@/lib/api/files';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import type { MessageAttachment } from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { isRenderableImage } from '../files/file-model';
 import { FileMark } from '../files/FileMark';
 import { ARCHIVE_NOTE, isArchiveFile } from '../model';
+import { useFreshFileUrl, useOpenFileInNewTab } from './use-file-url';
 
 /**
  * MessageAttachments — the files a message carries, under its words (backend,
@@ -30,7 +29,22 @@ import { ARCHIVE_NOTE, isArchiveFile } from '../model';
  * the row arrives, where a failure is visible and recoverable. Every OPENING
  * goes through `GET /files/{id}/download`, minted at click time, which is the
  * same gated endpoint the Files tab downloads through and the only URL in this
- * system that is fresh by construction.
+ * system that is fresh by construction. Both halves live in `./use-file-url.ts`
+ * now, because the picture viewer needs them too and two copies of the popup
+ * rule below would be two copies to keep true.
+ *
+ * ── A PICTURE OPENS IN THE APP; EVERYTHING ELSE OPENS IN A TAB ─────────────
+ * Owner, 2026-08-06: "when i click on these images in channels it take me to
+ * new tab thats not good ui/ux." A photo is part of the message, so tapping a
+ * TILE now raises {@link MessageImageViewer} over the conversation — no round
+ * trip, no spinner, no lost place — and swiping there moves between the
+ * pictures of this same message. A document still opens in a tab, because a tab
+ * is where a PDF belongs; that path is untouched.
+ *
+ * THE FAILED TILE KEEPS THE TAB, deliberately. Its picture has already been
+ * refused once, minted afresh and refused again, so offering to open it
+ * full-screen would be offering a second black rectangle. "Open it" hands the
+ * reader out to the browser, which is the only thing left that might work.
  *
  * ── AND THE THUMBNAIL RECOVERS ONCE PER EXPIRY ─────────────────────────────
  * An `<img>` whose src expired fires `onError` and then does nothing forever.
@@ -71,9 +85,14 @@ import { ARCHIVE_NOTE, isArchiveFile } from '../model';
 
 export function MessageAttachments({
   attachments,
+  onOpenImage,
   className,
 }: {
   attachments: readonly MessageAttachment[];
+  /** Raise the full-screen viewer on one picture of this message. Required, so
+   *  a future caller cannot quietly fall back to the tab behaviour the owner
+   *  asked us to take away. */
+  onOpenImage: (attachmentId: number) => void;
   className?: string;
 }) {
   if (attachments.length === 0) return null;
@@ -82,7 +101,10 @@ export function MessageAttachments({
       {attachments.map((attachment) => (
         <li key={attachment.id}>
           {isRenderableImage(attachment) ? (
-            <ImageAttachment attachment={attachment} />
+            <ImageAttachment
+              attachment={attachment}
+              onOpen={() => onOpenImage(attachment.id)}
+            />
           ) : (
             <FileAttachment attachment={attachment} />
           )}
@@ -90,17 +112,6 @@ export function MessageAttachments({
       ))}
     </ul>
   );
-}
-
-/**
- * Mint a FRESH signed URL for a file. `silentError` because the feed's
- * refusals are inline — see the module docblock.
- */
-function useFreshFileUrl() {
-  return useMutation({
-    mutationFn: (id: number) => filesApi.getDownloadUrl(id),
-    meta: { silentError: true },
-  });
 }
 
 /** The tile's box: capped, and shaped before anything loads. */
@@ -128,47 +139,16 @@ function AttachmentFailure({ text, onRetry }: { text: string; onRetry: () => voi
   );
 }
 
-/**
- * Open a file in a new tab through a freshly minted URL. Kept as one hook so
- * the tile and the named row cannot drift on what "open" means.
- *
- * `window.open` runs after the round trip rather than in the click itself,
- * which is how the Files tab has always opened a file. That is deliberate
- * consistency, not an oversight: the same operation must not behave one way in
- * the library and another in the feed.
- *
- * IT IS ALSO THE ONE CASE THAT FAILS WITHOUT FAILING. A `window.open` outside
- * the click's own synchronous frame is a popup by every engine's rules, and iOS
- * Safari in particular simply returns `null` — no exception, no navigation.
- * Tapping an attachment on a phone would then do NOTHING AT ALL, which on
- * touch is the whole feature. So the return value is read, and a blocked open
- * lands in the same inline failure line as a refused mint: the reader is told,
- * and "Try again" is a fresh gesture the engine will honour.
- */
-function useOpenAttachment() {
-  const fresh = useFreshFileUrl();
-  const [failed, setFailed] = useState(false);
-  const open = (id: number) => {
-    setFailed(false);
-    fresh.mutate(id, {
-      onSuccess: (response) => {
-        const url = response.data?.url;
-        if (!url) {
-          setFailed(true);
-          return;
-        }
-        if (!window.open(url, '_blank', 'noopener')) setFailed(true);
-      },
-      onError: () => setFailed(true),
-    });
-  };
-  return { open, opening: fresh.isPending, failed };
-}
-
 /** A picture, shown. */
-function ImageAttachment({ attachment }: { attachment: MessageAttachment }) {
+function ImageAttachment({
+  attachment,
+  onOpen,
+}: {
+  attachment: MessageAttachment;
+  onOpen: () => void;
+}) {
   const refresh = useFreshFileUrl();
-  const { open, opening, failed: openFailed } = useOpenAttachment();
+  const { open, opening, failed: openFailed } = useOpenFileInNewTab();
   /**
    * The URL being painted. Seeded from the row and thereafter owned by the
    * refresh — deliberately NOT following a later `attachment.url`. A refetched
@@ -195,6 +175,15 @@ function ImageAttachment({ attachment }: { attachment: MessageAttachment }) {
       onSuccess: (response) => {
         const url = response.data?.url;
         if (!url) {
+          setPaint('failed');
+          return;
+        }
+        // A MINT THAT HANDS BACK THE URL THAT JUST FAILED IS A FAILURE. `src` is
+        // the `<img>`'s key, so an identical value changes nothing: the element
+        // is never rebuilt, no `onLoad` and no `onError` can arrive, and `paint`
+        // would sit at 'pending' behind a skeleton that pulses for ever with no
+        // way out.
+        if (url === src) {
           setPaint('failed');
           return;
         }
@@ -246,11 +235,14 @@ function ImageAttachment({ attachment }: { attachment: MessageAttachment }) {
 
   return (
     <div>
+      {/* NO ROUND TRIP ON THE PRESS. The viewer opens from state the row
+          already holds, so the tile has no pending state and no way to fail:
+          the picture is on screen in the frame the finger lifts. Minting is the
+          VIEWER's business, and only if its own paint expires. */}
       <button
         type="button"
-        onClick={() => open(attachment.id)}
-        disabled={opening}
-        aria-label={`Open ${attachment.original_name}`}
+        onClick={onOpen}
+        aria-label={`View ${attachment.original_name}`}
         title={`${attachment.original_name} — ${formatBytes(attachment.size)}`}
         className={cn(
           TILE,
@@ -283,18 +275,10 @@ function ImageAttachment({ attachment }: { attachment: MessageAttachment }) {
             paint === 'shown' ? 'opacity-100' : 'opacity-0',
           )}
         />
-        {opening && (
-          <span className="absolute inset-0 flex items-center justify-center bg-background/60">
-            <Loader2 aria-hidden className="size-4 animate-spin text-foreground" />
-          </span>
-        )}
       </button>
-      {openFailed && (
-        <AttachmentFailure
-          text="Couldn't open it."
-          onRetry={() => open(attachment.id)}
-        />
-      )}
+      {/* No pending veil and no failure line here any more: this tile opens the
+          viewer from state it already has. `opening` / `openFailed` belong to
+          the FAILED branch above, which returns before this one. */}
     </div>
   );
 }
@@ -309,7 +293,7 @@ function ImageAttachment({ attachment }: { attachment: MessageAttachment }) {
  * is; the full string is one hover (or one screen-reader pass) away in `title`.
  */
 function FileAttachment({ attachment }: { attachment: MessageAttachment }) {
-  const { open, opening, failed } = useOpenAttachment();
+  const { open, opening, failed } = useOpenFileInNewTab();
   const isArchive = isArchiveFile(attachment.mime_type, attachment.original_name);
 
   return (
