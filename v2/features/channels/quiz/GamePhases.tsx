@@ -24,6 +24,7 @@ import type { SlimUser } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
+import type { QuizShareStanding } from '@/lib/constants/quiz-share';
 import { ShareResults } from './ShareResults';
 import {
   AnswersInRail,
@@ -684,6 +685,22 @@ export function PodiumStage({
     (row): row is QuizRankingRow => row !== undefined,
   );
 
+  // What the share card should SAY depends on where this reader finished, and
+  // both facts are already on screen. A viewer absent from the ranking watched
+  // rather than played — the host who never answered, or a member who opened
+  // the results afterwards — and is asked for the share on different grounds.
+  const leader = results.ranking.find((row) => row.rank === 1) ?? null;
+  const viewerRow =
+    viewerUuid === null
+      ? null
+      : (results.ranking.find((row) => row.user.uuid === viewerUuid) ?? null);
+  const standing: QuizShareStanding =
+    viewerRow === null
+      ? { outcome: 'watched', leader: leader?.user.name ?? null }
+      : viewerRow.rank === 1
+        ? { outcome: 'won' }
+        : { outcome: 'played', leader: leader?.user.name ?? null };
+
   return (
     <GameStage>
       <div className="text-center">
@@ -734,7 +751,11 @@ export function PodiumStage({
           under the podium, before the full ranking. Any player may hand the
           link out: everyone on this screen already sees more than the public
           card publishes, so gating it to the host would protect nothing. */}
-      <ShareResults gameUuid={gameUuid} />
+      <ShareResults
+        gameUuid={gameUuid}
+        standing={standing}
+        quizTitle={results.game.quiz.title}
+      />
 
       <div>
         <StageKicker>Everyone</StageKicker>
