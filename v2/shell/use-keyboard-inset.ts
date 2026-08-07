@@ -39,6 +39,31 @@ import { useEffect } from 'react';
  *     stays the spec default `false` and the browser keeps resizing the visual
  *     viewport — exactly what this formula measures.
  *
+ * ── AND IT PUTS THE PAGE BACK AFTERWARDS (Arthur, 2026-08-07) ──────────────
+ * Measuring the keyboard is only half the job. iOS also SCROLLS THE DOCUMENT to
+ * bring the focused field into view, and it does that even though the document
+ * lock sets `overflow: hidden` on `html` and `body` — that declaration has never
+ * reliably stopped iOS, which is the whole reason the "position: fixed body"
+ * scroll-lock trick exists. While the keyboard is up that scroll is correct and
+ * we must not fight it.
+ *
+ * The bug is that iOS does not always undo it. Dismiss the keyboard and the
+ * document stays offset, so the shell — pinned to the viewport and unable to
+ * scroll itself — is drawn with its top cut off: the header, its hamburger and
+ * the brand mark all sitting above the visible area, with a scrollbar on a
+ * document that is supposed to have none. The reader cannot scroll it back
+ * either, because `overflow: hidden` blocks THEM even though it did not block
+ * the browser.
+ *
+ * Reported and photographed by @arthur on an iPhone, 2026-08-07: correct on
+ * first load, clipped after opening and closing the keyboard once. It is also
+ * the most likely half of the owner's older "the header disappears sometimes",
+ * which had resisted diagnosis because nobody connects it to the keyboard.
+ *
+ * So: whenever the occlusion reads zero — the keyboard is gone — any leftover
+ * document scroll is by definition not the reader's and is put back to zero.
+ * The reset is deliberately NOT run while the keyboard is up.
+ *
  * No `setState` — it only writes a CSS custom property on the document element
  * (React Compiler lint: an effect with listeners + cleanup and no render-phase
  * state is fine). Runs once (empty deps); cleans up its listeners and the
@@ -57,6 +82,20 @@ export function useKeyboardInset(): void {
 
     const root = document.documentElement;
 
+    /**
+     * Undo a document scroll the browser performed and did not put back.
+     *
+     * Only ever called with the keyboard gone, so a non-zero offset here cannot
+     * be a reader's scroll: the document is locked and they have no way to make
+     * one. Both spellings are reset because the scrolling element differs by
+     * engine, and both are cheap no-ops when already zero.
+     */
+    const restoreDocumentScroll = (): void => {
+      const scroller = document.scrollingElement;
+      if (scroller && scroller.scrollTop !== 0) scroller.scrollTop = 0;
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+
     const update = (): void => {
       // Height occluded at the bottom of the layout viewport (keyboard + any
       // accessory bar). Reads ≈0 when the browser resized the layout viewport
@@ -68,15 +107,29 @@ export function useKeyboardInset(): void {
         window.innerHeight - viewport.height - viewport.offsetTop,
       );
       root.style.setProperty('--keyboard-inset', `${occlusion}px`);
+      if (occlusion === 0) restoreDocumentScroll();
+    };
+
+    /**
+     * iOS restores (or fails to restore) its scroll AFTER the blur settles, so a
+     * reset fired synchronously on `focusout` lands too early and is overwritten.
+     * One frame later is enough, and the occlusion is re-read at that point so a
+     * blur that merely moves focus to the NEXT field — keyboard still up — does
+     * nothing.
+     */
+    const onFocusOut = (): void => {
+      requestAnimationFrame(update);
     };
 
     update();
     viewport.addEventListener('resize', update);
     viewport.addEventListener('scroll', update);
+    document.addEventListener('focusout', onFocusOut);
 
     return () => {
       viewport.removeEventListener('resize', update);
       viewport.removeEventListener('scroll', update);
+      document.removeEventListener('focusout', onFocusOut);
       root.style.removeProperty('--keyboard-inset');
     };
   }, []);
