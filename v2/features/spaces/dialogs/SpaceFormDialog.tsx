@@ -272,8 +272,28 @@ export function SpaceFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
+      {/* ── TALLER THAN A PHONE, SO IT IS BUILT AS THREE BANDS ──────────────
+          A header that stays, a body that scrolls, a footer that stays.
+
+          It used to be one block, and the block WAS the dialog. Measured on a
+          360px phone it came to ~1,115px — the two `ChoiceCards` groups stack
+          below `sm:` and cost ~217px each — inside a 640px screen. A centred
+          box taller than the viewport hangs off BOTH ends by equal amounts, so
+          Save, Cancel and the close X were all off-screen at once with no
+          scroll anywhere able to reach them: the page is locked and the dialog
+          is portalled outside the app's only scroll region. That is the bug
+          Arthur photographed (owner review, 2026-08-07).
+
+          `DialogContent` now caps and scrolls by default, which on its own
+          makes Save reachable. This file goes further, because reachable-by-
+          scrolling is not the same as reachable: the primary action of a long
+          form should never be something the reader has to go looking for.
+          `overflow-hidden` takes the scroller off the box, `flex flex-col`
+          makes the middle band the only thing that moves, and Save stays in
+          view at every height. Same shape as `QuizFormDialog`, which had
+          already worked this out. */}
+      <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 px-6 pt-6 pr-12 pb-4">
           <DialogTitle>{isEdit ? 'Edit space' : 'Create a space'}</DialogTitle>
           <DialogDescription>
             {isEdit
@@ -282,85 +302,90 @@ export function SpaceFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* The preview leads on a phone (you see the object before you describe
-            it) and sits beside the fields from `sm` up. */}
-        <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_13rem]">
-          <div className="order-2 min-w-0 space-y-4 sm:order-1">
-            <div className="space-y-2">
-              <Label htmlFor={`${uid}-name`}>Name</Label>
-              <Input
-                id={`${uid}-name`}
-                maxLength={SPACE_NAME_MAX}
-                placeholder="e.g. Firm HQ"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  // IME Enter confirms the composition; it must never submit.
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                    event.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-              />
-            </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6">
+          {/* The preview leads on a phone (you see the object before you
+              describe it) and sits beside the fields from `sm` up. */}
+          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_13rem]">
+            <div className="order-2 min-w-0 space-y-4 sm:order-1">
+              <div className="space-y-2">
+                <Label htmlFor={`${uid}-name`}>Name</Label>
+                <Input
+                  id={`${uid}-name`}
+                  maxLength={SPACE_NAME_MAX}
+                  placeholder="e.g. Firm HQ"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  onKeyDown={(event) => {
+                    // IME Enter confirms the composition; it must never submit.
+                    if (
+                      event.key === 'Enter' &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      handleSubmit();
+                    }
+                  }}
+                />
+              </div>
 
-            <ChoiceCards
-              legend="Type"
-              choices={TYPE_CHOICES}
-              value={type}
-              onChange={setType}
-            />
-
-            {!isEdit && organization ? (
               <ChoiceCards
-                legend="Owner"
-                choices={ownerChoices}
-                value={owner}
-                onChange={setOwner}
+                legend="Type"
+                choices={TYPE_CHOICES}
+                value={type}
+                onChange={setType}
               />
-            ) : null}
 
-            <div className="space-y-2">
-              <Label htmlFor={`${uid}-description`}>Description</Label>
-              <Textarea
-                id={`${uid}-description`}
-                maxLength={SPACE_DESCRIPTION_MAX}
-                rows={3}
-                placeholder="What is this space for?"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
+              {!isEdit && organization ? (
+                <ChoiceCards
+                  legend="Owner"
+                  choices={ownerChoices}
+                  value={owner}
+                  onChange={setOwner}
+                />
+              ) : null}
+
+              <div className="space-y-2">
+                <Label htmlFor={`${uid}-description`}>Description</Label>
+                <Textarea
+                  id={`${uid}-description`}
+                  maxLength={SPACE_DESCRIPTION_MAX}
+                  rows={3}
+                  placeholder="What is this space for?"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </div>
+
+              <ChoiceCards
+                legend="Who can join"
+                choices={PRIVACY_CHOICES}
+                value={privacy}
+                onChange={setPrivacy}
               />
             </div>
 
-            <ChoiceCards
-              legend="Who can join"
-              choices={PRIVACY_CHOICES}
-              value={privacy}
-              onChange={setPrivacy}
-            />
+            <div className="order-1 sm:order-2">
+              <SpacePreview
+                uuid={space?.uuid ?? null}
+                name={name}
+                type={type}
+                isPrivate={isPrivate}
+                ownerLabel={ownerLabel}
+              />
+            </div>
           </div>
 
-          <div className="order-1 sm:order-2">
-            <SpacePreview
-              uuid={space?.uuid ?? null}
-              name={name}
-              type={type}
-              isPrivate={isPrivate}
-              ownerLabel={ownerLabel}
-            />
-          </div>
+          {error && (
+            <p
+              role="alert"
+              className="mt-4 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
+            >
+              {error}
+            </p>
+          )}
         </div>
 
-        {error && (
-          <p
-            role="alert"
-            className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
-          >
-            {error}
-          </p>
-        )}
-
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t px-6 py-4">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

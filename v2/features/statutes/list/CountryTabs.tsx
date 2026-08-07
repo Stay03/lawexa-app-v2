@@ -21,9 +21,33 @@ import { toAlpha2 } from '../statute-row-model';
  *
  * Static chrome: the facets resolve from the seed placeholder on the first
  * frame (the caller supplies it), so the tab row never flashes in after the
- * list. On narrow screens the row scrolls horizontally, bleeding to the
- * screen edge so the scroll affordance is visible — which is why the
- * scroller wraps the tablist here instead of living on it.
+ * list.
+ *
+ * ── THE ROW SCROLLS INSIDE THE PILL, NOT PAST THE SCREEN (2026-08-07) ───────
+ * This used to wrap the tablist in `-mx-4 overflow-x-auto px-4`, which cancels
+ * the page gutter exactly, so the scroller's clip line and the physical screen
+ * border were the same line. The tablist itself is an `inline-flex` of
+ * `shrink-0` chips, so it sized to the SUM of its chips and became the thing
+ * that overflowed — measured at 400.7px inside a 360px phone, with 56.7px of
+ * pill, its own rounded right cap included, hanging off the glass. The last
+ * country was sliced mid-word against the bezel.
+ *
+ * The old note here argued that the bleed made the scroll affordance visible.
+ * It did the opposite: a pill with no visible right end reads as a broken
+ * layout, where a pill that closes inside the gutter and scrolls its contents
+ * reads as "there is more" — the argument this codebase already makes at
+ * `v2/features/channels/quiz/ui.tsx:456-459`. Owner review, 2026-08-07.
+ *
+ * So the scroller moved ONTO the tablist and the pill gained `max-w-full`,
+ * which is the string seven sibling strips already share (RadarTabs, NoteTabs,
+ * SpaceTypeTabs, ItemTypeTabs, bookmarks/TypeTabs, MyChannelsScreen, FilesTab).
+ * Measured after: the pill closes at x=344 on a 360px phone — 16px inside the
+ * border — and the chips scroll within it.
+ *
+ * `overscroll-x-contain` is not decoration. A horizontal fling that runs past
+ * the last chip would otherwise hand the gesture on to the browser, and in a
+ * WebView that gesture is the system back-swipe: flicking through countries
+ * could navigate away from the library.
  */
 export function CountryTabs({
   facets,
@@ -62,41 +86,37 @@ export function CountryTabs({
   const active = tabs.some((tab) => tab.id === value) ? value : '';
 
   return (
-    <div className="-mx-4 overflow-x-auto px-4">
-      <TabRow
-        tabs={tabs}
-        value={active}
-        onChange={onChange}
-        ariaLabel="Filter statutes by country"
-        className="inline-flex items-center gap-0.5 rounded-full bg-secondary/60 p-0.5"
-        tabClassName={(selected) =>
-          cn(
-            'v2-interactive inline-flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
-            selected
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-          )
-        }
-      >
-        {(tab, selected) => (
-          <>
-            {tab.code ? <FlagIcon code={tab.code} /> : null}
-            {tab.label}
-            {tab.count !== null ? (
-              <span
-                className={cn(
-                  'tabular-nums',
-                  selected
-                    ? 'text-muted-foreground'
-                    : 'text-muted-foreground/60',
-                )}
-              >
-                {tab.count}
-              </span>
-            ) : null}
-          </>
-        )}
-      </TabRow>
-    </div>
+    <TabRow
+      tabs={tabs}
+      value={active}
+      onChange={onChange}
+      ariaLabel="Filter statutes by country"
+      className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
+      tabClassName={(selected) =>
+        cn(
+          'v2-interactive inline-flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
+          selected
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground',
+        )
+      }
+    >
+      {(tab, selected) => (
+        <>
+          {tab.code ? <FlagIcon code={tab.code} /> : null}
+          {tab.label}
+          {tab.count !== null ? (
+            <span
+              className={cn(
+                'tabular-nums',
+                selected ? 'text-muted-foreground' : 'text-muted-foreground/60',
+              )}
+            >
+              {tab.count}
+            </span>
+          ) : null}
+        </>
+      )}
+    </TabRow>
   );
 }
