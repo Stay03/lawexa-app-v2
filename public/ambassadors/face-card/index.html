@@ -575,7 +575,23 @@ Curious about what Lawexa can do? Explore \u2192 www.lawexa.com
   function getBlob(){ return new Promise(res=>cv.toBlob(res,'image/png',0.95)); }
   let downloaded=false;
   async function downloadCard(){ const b=await getBlob(); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=fileName(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); downloaded=true; }
-  document.getElementById('dl').addEventListener('click',async()=>{ await downloadCard(); showToast('Card downloaded. Post it anywhere and tag @lawexaai.'); });
+  /* NOTHING LEAVES THIS PAGE WITH "Your Name" ON IT. @arthur, 2026-08-08: the
+     placeholders are drawn on the card, so an empty form still produces a
+     downloadable, postable card that says "Your Name" and "Your University" —
+     and the person only finds out after it is on their timeline. Checked here
+     rather than in the download itself so the share buttons get the same guard
+     from one place. Focuses the first empty field, because a refusal that does
+     not say where to look is just a wall. */
+  function detailsMissing(){
+    const first = !nameI.value.trim() ? nameI : (!instI.value.trim() ? instI : null);
+    if(!first) return false;
+    first.focus();
+    first.scrollIntoView({block:'center',behavior:'smooth'});
+    showToast(first===nameI ? 'Add your name first — it is printed on the card.'
+                            : 'Add your institution first — it is printed on the card.');
+    return true;
+  }
+  document.getElementById('dl').addEventListener('click',async()=>{ if(detailsMissing()) return; await downloadCard(); showToast('Card downloaded. Post it anywhere and tag @lawexaai.'); });
 
   async function copyCaption(){ try{ await navigator.clipboard.writeText(caption.value); return true; }catch(e){ caption.select(); try{document.execCommand('copy');}catch(_){}; return true; } }
   document.getElementById('copyCap').addEventListener('click',async()=>{ await copyCaption(); showToast('Caption copied.'); });
@@ -589,15 +605,34 @@ Curious about what Lawexa can do? Explore \u2192 www.lawexa.com
     await downloadCard(); await copyCaption(); showToast('Card saved and caption copied. Pick a platform below to post.');
   });
 
+  /* THE TAB IS OPENED INSIDE THE TAP, NOT AFTER IT. @arthur, 2026-08-08: "the
+     share icon doesn't hyperlink". It always had the right address — the browser
+     was throwing the window away. A tap grants a short-lived permission to open
+     one, and this handler spent it: it awaited the clipboard AND the card render
+     (a full 1080px canvas to a blob) before calling window.open, by which time
+     the permission had expired and the call was silently treated as a popup.
+     Reliably fatal on iOS, where any await ends it.
+
+     So the window is opened empty while the tap is still warm, then pointed at
+     the address once the work is done. `opener` is cleared by hand because
+     `noopener` in window.open returns null, which would throw the handle away
+     again — the very thing being fixed. */
   document.querySelectorAll('.pf').forEach(btn=>btn.addEventListener('click',async()=>{
+    if(detailsMissing()) return;
     const net=btn.dataset.net; const cap=encodeURIComponent(caption.value); const url=encodeURIComponent('https://lawexa.com');
-    await copyCaption(); if(!downloaded) await downloadCard();
     let link=null;
     if(net==='whatsapp') link=`https://wa.me/?text=${cap}`;
     else if(net==='x') link=`https://twitter.com/intent/tweet?text=${cap}`;
     else if(net==='facebook') link=`https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${cap}`;
     else if(net==='linkedin') link=`https://www.linkedin.com/feed/?shareActive=true&text=${cap}`;
-    if(link){ window.open(link,'_blank','noopener'); showToast('Card saved and caption copied. Attach the card in the post that opened.'); }
+    const tab = link ? window.open('', '_blank') : null;
+    if(tab){ try{ tab.opener=null; }catch(e){} }
+    await copyCaption(); if(!downloaded) await downloadCard();
+    if(link){
+      if(tab) tab.location.replace(link);
+      else window.open(link,'_blank','noopener');
+      showToast('Card saved and caption copied. Attach the card in the post that opened.');
+    }
     else showToast('Card saved and caption copied. Open Instagram, upload the card, and tag @lawexaai.');
   }));
 })();
