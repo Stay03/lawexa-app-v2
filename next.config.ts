@@ -67,6 +67,22 @@ const nextConfig: NextConfig = {
         source: '/ambassadors',
         destination: '/ambassadors/index.html',
       },
+      {
+        // The face-card maker an approved ambassador is sent to, at a clean URL
+        // for the same reason as the line above: this address is printed in the
+        // welcome email and read by people, so it must not end in `.html`.
+        //
+        // It lives in `public/` rather than the app tree ON PURPOSE. The page is
+        // one self-contained file — its display font, its logo and its artwork
+        // are all embedded, and it paints the card on a canvas — so routing it
+        // through the app would buy nothing and cost it a React runtime.
+        //
+        // The backend reads this address from a setting
+        // (`LAWEXA_AMBASSADOR_FACE_CARD_URL`), so moving it later costs a config
+        // change and no deploy.
+        source: '/ambassadors/face-card',
+        destination: '/ambassadors/face-card/index.html',
+      },
     ];
   },
 };
