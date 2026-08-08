@@ -92,31 +92,46 @@ export interface MentionChip {
   username: string | null;
 }
 
-/** A parsed message-content segment: plain text, a resolved @mention, or a link. */
+/**
+ * A parsed message-content segment: plain text, a resolved @mention, or a link.
+ *
+ * A link carries both halves because they differ: `value` is what the reader
+ * sees (`www.lawexa.com`, as typed) and `href` is where the tap goes
+ * (`https://www.lawexa.com`, with the scheme we supplied).
+ */
 export type MessageSegment =
   | { type: 'text'; value: string }
-  | { type: 'link'; value: string }
+  | { type: 'link'; value: string; href: string }
   | ({ type: 'mention'; value: string } & MentionChip);
 
 /**
- * A web address inside message text.
+ * A web address inside message text — an explicit scheme, or a `www.` host.
  *
- * `https?` ONLY, and that is a security decision rather than a scope one. This
- * runs over text a stranger typed, and the output becomes an `href` — so a
+ * ── WHAT IS DELIBERATELY NOT MATCHED, AND WHY ──────────────────────────────
+ * A NAKED DOMAIN. `lawexa.com` on its own stays text. Deciding that it is an
+ * address means also deciding that `Order 5 r.2` and `s.14(1)` are not, and in
+ * a legal product a false link inside a citation is worse than a missing one.
+ *
+ * `www.` IS matched, and the first version of this was wrong to lump the two
+ * together (@arthur tested it with `www.lawexa.com` on 2026-08-08, minutes
+ * after it shipped). Nobody types `www.` by accident and no citation format
+ * contains it, so the prefix is the writer saying "address" as clearly as a
+ * scheme does. It is a signal, where a naked domain is a guess.
+ *
+ * A second dot is required after `www.`, so `www.lawexa` — not a public host —
+ * stays text while `www.lawexa.com` does not.
+ *
+ * ── THE SCHEME RULE IS SECURITY, NOT SCOPE ─────────────────────────────────
+ * This runs over text a stranger typed and the output becomes an `href`, so a
  * pattern loose enough to admit `javascript:` or `data:` would hand every
- * member a script-injection primitive. Anchoring on the scheme means a
- * malicious one can never be produced, which is a stronger guarantee than
- * sanitising afterwards.
- *
- * Bare `www.` and naked domains are deliberately NOT matched. Guessing that
- * `lawexa.com` is a link means also guessing that `Order 5 r.2` is not, and the
- * cost of being wrong is a false link in a legal citation. A scheme is the
- * writer saying "this is an address" out loud.
+ * member a script-injection primitive. Matching only `https?` — and SUPPLYING
+ * `https://` ourselves for the `www.` case — means a dangerous scheme cannot be
+ * produced at all. That is a stronger guarantee than sanitising afterwards.
  *
  * Global, so callers must request a fresh instance — `lastIndex` is stateful.
  */
 function linkTokenRegex(): RegExp {
-  return /https?:\/\/[^\s<>]+/gi;
+  return /(?:https?:\/\/|\bwww\.)[^\s<>]+/gi;
 }
 
 /**
@@ -163,13 +178,35 @@ function splitLinks(value: string): MessageSegment[] {
   for (const match of value.matchAll(linkTokenRegex())) {
     const start = match.index;
     if (start === undefined) continue;
-    const url = trimSentencePunctuation(match[0]);
-    if (url.length === 0) continue;
+    const token = trimSentencePunctuation(match[0]);
+    if (token.length === 0) continue;
+
+    const schemeless = /^www\./i.test(token);
+    if (schemeless) {
+      // `www.lawexa` is not a public host. Require the second dot before calling
+      // a schemeless token an address; a scheme needs no such proof.
+      if ((token.match(/\./g)?.length ?? 0) < 2) continue;
+      // `ada@www.x.com` is an EMAIL, and `\b` alone happily matches the `www.`
+      // inside it — which would have linked the tail of somebody's address and
+      // left the name behind as text. Checked by looking at the character
+      // before rather than with a lookbehind: a lookbehind that an older engine
+      // cannot parse takes the whole module down at load, and a link nicety is
+      // not worth that risk.
+      const before = start > 0 ? value[start - 1] : '';
+      if (before === '@' || before === '.') continue;
+    }
+
     if (start > lastIndex) {
       segments.push({ type: 'text', value: value.slice(lastIndex, start) });
     }
-    segments.push({ type: 'link', value: url });
-    lastIndex = start + url.length;
+    // WE supply the scheme, so it is always `https` — the token itself can
+    // never contribute one, which is what keeps `javascript:` unreachable.
+    segments.push({
+      type: 'link',
+      value: token,
+      href: schemeless ? `https://${token}` : token,
+    });
+    lastIndex = start + token.length;
   }
 
   if (lastIndex < value.length) {

@@ -45,7 +45,7 @@ export function MessageContent({ content, metadata }: MessageContentProps) {
           // shown v1 readers a URL that still could not be tapped.
           <a
             key={i}
-            href={segment.value}
+            href={segment.href}
             target="_blank"
             rel="noopener noreferrer nofollow"
             className="break-all text-primary underline underline-offset-2 hover:text-primary/80"

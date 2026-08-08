@@ -90,7 +90,7 @@ export function MessageContent({
           // otherwise push the whole feed sideways on a phone.
           <a
             key={index}
-            href={segment.value}
+            href={segment.href}
             target="_blank"
             rel="noopener noreferrer nofollow"
             className="break-all text-primary underline underline-offset-2 hover:text-primary/80"
