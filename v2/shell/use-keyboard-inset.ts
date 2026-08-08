@@ -62,8 +62,8 @@ import { useEffect } from 'react';
  *
  * So: whenever the occlusion reads zero — the keyboard is gone — any leftover
  * document scroll is by definition not the reader's and is put back to zero.
- * Zero occlusion is only a PROXY for "keyboard gone" and it has one hole, so
- * the viewport path also defers to whether anything is focused; see `isTyping`.
+ * Zero occlusion is only a PROXY for "keyboard gone" and it has one hole, so the
+ * viewport path also requires the visual viewport to be unpanned; see `settled`.
  *
  * No `setState` — it only writes a CSS custom property on the document element
  * (React Compiler lint: an effect with listeners + cleanup and no render-phase
@@ -97,7 +97,7 @@ export function useKeyboardInset(): void {
     };
 
     /**
-     * Is the reader typing right now?
+     * Has the viewport actually come to rest, or is it panned under a keyboard?
      *
      * ZERO OCCLUSION IS A PROXY FOR "KEYBOARD GONE", AND THE PROXY HAS A HOLE.
      * With the document locked, iOS reveals a focused field by panning the
@@ -111,16 +111,23 @@ export function useKeyboardInset(): void {
      * shipped. The window is narrow — it also needs iOS to have left a layout
      * scroll to undo — but "narrow" is not "impossible", and the cost of being
      * wrong is losing your place mid-sentence.
+     *
+     * ── THE FIRST GUARD WAS A PROXY, AND THE PROXY BROKE THE FIX ────────────
+     * That review's hazard was first closed by asking whether anything was
+     * FOCUSED. It is the wrong question, and @arthur found out the hard way the
+     * same day: edit a message, dismiss the keyboard with Done, and iOS keeps
+     * the field focused. Zero occlusion, focus still in a text box, so the
+     * restore never ran and the screen stayed shoved up — the exact bug this
+     * whole file exists to fix, reintroduced by its own guard. The docblock
+     * below already said Done does not reliably blur; I wrote that and then
+     * relied on blur anyway one function up.
+     *
+     * `offsetTop` is the thing itself rather than a proxy for it. A panned
+     * visual viewport has a non-zero `offsetTop`; a keyboard that has gone has
+     * `offsetTop === 0`, focused field or not. So the hazard stays closed and
+     * the fix stays working, and neither depends on where the caret is.
      */
-    const isTyping = (): boolean => {
-      const active = document.activeElement;
-      if (!(active instanceof HTMLElement)) return false;
-      return (
-        active.isContentEditable ||
-        active.tagName === 'INPUT' ||
-        active.tagName === 'TEXTAREA'
-      );
-    };
+    const settled = (): boolean => viewport.offsetTop === 0;
 
     const update = (): void => {
       // Height occluded at the bottom of the layout viewport (keyboard + any
@@ -133,24 +140,23 @@ export function useKeyboardInset(): void {
         window.innerHeight - viewport.height - viewport.offsetTop,
       );
       root.style.setProperty('--keyboard-inset', `${occlusion}px`);
-      // The viewport-driven path cannot tell a closed keyboard from a fully
-      // panned one, so it defers to the focus. The blur path below does not
-      // need that guard and must not have it.
-      if (occlusion === 0 && !isTyping()) restoreDocumentScroll();
+      // Zero occlusion AND an unpanned visual viewport. The second term is what
+      // separates "the keyboard has gone" from "the keyboard is up and the pan
+      // has run to the bottom" — see `settled`.
+      if (occlusion === 0 && settled()) restoreDocumentScroll();
     };
 
     /**
-     * The blur path — and the ONLY one allowed to restore while something is
-     * still focused.
+     * The blur path — a second chance, for the engines that settle late.
      *
      * iOS settles its scroll AFTER the blur, so a reset fired synchronously on
      * `focusout` lands too early and is overwritten. One frame later is enough.
      *
-     * IT DELIBERATELY SKIPS THE `isTyping` GUARD. Dismissing the keyboard with
-     * the Done key does not reliably blur the field on iOS, so a focus-based
-     * guard here could block the very case this whole fix exists for — Arthur's
-     * cut-off header. The occlusion re-read is the real gate: a blur that merely
-     * moves focus to the NEXT field still measures a keyboard, and does nothing.
+     * It does not take the `settled` check, and that asymmetry is deliberate: a
+     * blur means the keyboard is on its way out, so a pan still in progress is
+     * a transient to be undone rather than a state to respect. The occlusion
+     * re-read is the gate that matters here — a blur that merely moves focus to
+     * the NEXT field still measures a keyboard, and does nothing.
      */
     const onFocusOut = (): void => {
       requestAnimationFrame(() => {
