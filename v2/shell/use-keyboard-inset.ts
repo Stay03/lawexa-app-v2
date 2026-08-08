@@ -62,7 +62,8 @@ import { useEffect } from 'react';
  *
  * So: whenever the occlusion reads zero — the keyboard is gone — any leftover
  * document scroll is by definition not the reader's and is put back to zero.
- * The reset is deliberately NOT run while the keyboard is up.
+ * Zero occlusion is only a PROXY for "keyboard gone" and it has one hole, so
+ * the viewport path also defers to whether anything is focused; see `isTyping`.
  *
  * No `setState` — it only writes a CSS custom property on the document element
  * (React Compiler lint: an effect with listeners + cleanup and no render-phase
@@ -85,15 +86,40 @@ export function useKeyboardInset(): void {
     /**
      * Undo a document scroll the browser performed and did not put back.
      *
-     * Only ever called with the keyboard gone, so a non-zero offset here cannot
-     * be a reader's scroll: the document is locked and they have no way to make
-     * one. Both spellings are reset because the scrolling element differs by
-     * engine, and both are cheap no-ops when already zero.
+     * A non-zero offset here cannot be a reader's scroll: the document is locked
+     * and they have no way to make one. Both spellings are reset because the
+     * scrolling element differs by engine, and both are cheap no-ops at zero.
      */
     const restoreDocumentScroll = (): void => {
       const scroller = document.scrollingElement;
       if (scroller && scroller.scrollTop !== 0) scroller.scrollTop = 0;
       if (window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+
+    /**
+     * Is the reader typing right now?
+     *
+     * ZERO OCCLUSION IS A PROXY FOR "KEYBOARD GONE", AND THE PROXY HAS A HOLE.
+     * With the document locked, iOS reveals a focused field by panning the
+     * VISUAL viewport inside the layout viewport, which grows `offsetTop`. At
+     * full pan `offsetTop` reaches `innerHeight - viewport.height`, so the
+     * occlusion arithmetic crosses exactly zero WHILE THE KEYBOARD IS STILL UP.
+     * Restoring the scroll at that moment would yank the field the reader is
+     * typing in out from under them.
+     *
+     * Found by an adversarial review of this file on 2026-08-08, hours after it
+     * shipped. The window is narrow — it also needs iOS to have left a layout
+     * scroll to undo — but "narrow" is not "impossible", and the cost of being
+     * wrong is losing your place mid-sentence.
+     */
+    const isTyping = (): boolean => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement)) return false;
+      return (
+        active.isContentEditable ||
+        active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA'
+      );
     };
 
     const update = (): void => {
@@ -107,18 +133,34 @@ export function useKeyboardInset(): void {
         window.innerHeight - viewport.height - viewport.offsetTop,
       );
       root.style.setProperty('--keyboard-inset', `${occlusion}px`);
-      if (occlusion === 0) restoreDocumentScroll();
+      // The viewport-driven path cannot tell a closed keyboard from a fully
+      // panned one, so it defers to the focus. The blur path below does not
+      // need that guard and must not have it.
+      if (occlusion === 0 && !isTyping()) restoreDocumentScroll();
     };
 
     /**
-     * iOS restores (or fails to restore) its scroll AFTER the blur settles, so a
-     * reset fired synchronously on `focusout` lands too early and is overwritten.
-     * One frame later is enough, and the occlusion is re-read at that point so a
-     * blur that merely moves focus to the NEXT field — keyboard still up — does
-     * nothing.
+     * The blur path — and the ONLY one allowed to restore while something is
+     * still focused.
+     *
+     * iOS settles its scroll AFTER the blur, so a reset fired synchronously on
+     * `focusout` lands too early and is overwritten. One frame later is enough.
+     *
+     * IT DELIBERATELY SKIPS THE `isTyping` GUARD. Dismissing the keyboard with
+     * the Done key does not reliably blur the field on iOS, so a focus-based
+     * guard here could block the very case this whole fix exists for — Arthur's
+     * cut-off header. The occlusion re-read is the real gate: a blur that merely
+     * moves focus to the NEXT field still measures a keyboard, and does nothing.
      */
     const onFocusOut = (): void => {
-      requestAnimationFrame(update);
+      requestAnimationFrame(() => {
+        const occlusion = Math.max(
+          0,
+          window.innerHeight - viewport.height - viewport.offsetTop,
+        );
+        root.style.setProperty('--keyboard-inset', `${occlusion}px`);
+        if (occlusion === 0) restoreDocumentScroll();
+      });
     };
 
     update();

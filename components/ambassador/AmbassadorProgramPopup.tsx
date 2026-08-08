@@ -75,12 +75,19 @@ export function AmbassadorProgramPopup() {
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
+      {/* THREE BANDS, because the hero cannot be allowed to push the buttons out.
+          `DialogContent` gained a height ceiling on 2026-08-07, and this card
+          keeps `overflow-hidden` so the image stays inside the rounded corners —
+          which together meant that on a short screen (a phone in landscape) the
+          action row was clipped with no way to scroll to it. It used to merely
+          overhang. So the picture is now a fixed band and the words below it
+          scroll. Found by an adversarial review of that ceiling, 2026-08-08. */}
       <DialogContent
         showCloseButton={false}
-        className="gap-0 overflow-hidden p-0 sm:max-w-md"
+        className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
       >
         {/* Hero */}
-        <div className="relative">
+        <div className="relative shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/ambassadors/og-image.png"
@@ -98,7 +105,7 @@ export function AmbassadorProgramPopup() {
         </div>
 
         {/* Body */}
-        <div className="flex flex-col gap-4 p-6">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
           <div className="flex flex-col gap-2">
             <DialogTitle className="text-xl font-semibold leading-snug">
               Become a Lawexa campus ambassador
