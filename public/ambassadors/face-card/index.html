@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The page asks Google for a font, and a page that fetches from another
+     company hands that company the address it was loaded from. This page
+     carries a person's name in its form, so it sends no address at all. -->
+<meta name="referrer" content="no-referrer">
 <title>Create your Lawexa Ambassador Face Card</title>
 <meta name="description" content="Personalise and share your official Lawexa Campus Ambassador card. Add your photo and details, then post it to any platform tagging @lawexaai.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -120,6 +124,8 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .field input:focus{outline:none;border-color:var(--gold);background:#fff;box-shadow:0 0 0 4px rgba(212,175,55,.15);}
 .field + .field{margin-top:14px;}
 
+.signedout{font-size:13px;color:var(--ink-500);margin:10px 0 0;}
+.signedout a{color:var(--gold-deep);font-weight:700;}
 .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;}
 .chips .swatch{cursor:pointer;border:none;background:transparent;padding:0;display:flex;flex-direction:column;align-items:center;gap:6px;}
 .chips .swatch .sw{width:52px;height:52px;border-radius:14px;border:2.5px solid transparent;box-shadow:var(--sh-sm);transition:all .18s var(--ease);position:relative;overflow:hidden;}
@@ -248,6 +254,7 @@ footer a{color:var(--gold-deep);font-weight:600;}
         <p class="grouplabel"><span class="n">2</span>Your details</p>
         <div class="field"><label for="name">Your name</label><input id="name" type="text" placeholder="e.g. Precious Ekong" maxlength="34"></div>
         <div class="field"><label for="inst">Institution</label><input id="inst" type="text" placeholder="e.g. University of Lagos" maxlength="46"></div>
+            <p class="signedout" id="signedout" hidden>Signed in to Lawexa? <a href="/login?redirect=%2Fambassadors%2Fface-card">Sign in</a> and these fill themselves.</p>
       </div>
 
       <div class="block">
@@ -557,10 +564,43 @@ www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
   instI.addEventListener('input',()=>{ state.institution=instI.value; refreshCaption(); draw(); });
   caption.addEventListener('input',()=>{ capDirty=true; });
 
-  const q=new URLSearchParams(location.search);
-  if(q.get('name')){ nameI.value=q.get('name'); state.name=nameI.value; }
-  if(q.get('institution')){ instI.value=q.get('institution'); state.institution=instI.value; }
   caption.value=defCaption();
+
+  /* PREFILL COMES FROM THE ACCOUNT, NOT THE ADDRESS BAR (owner, 2026-08-08).
+     The first version carried the name and school as parameters in the link the
+     welcome email sends. It worked, and it was wrong twice over: a link that
+     holds somebody's name can be forwarded, logged and screenshotted, and this
+     page fetches a font from Google — which would have received that name and
+     school with every card. The ambassador page next door already reads the
+     signed-in account, so the mechanism existed and was not used.
+
+     THE ONE CASE IT DOES NOT COVER, STATED PLAINLY: a link tapped inside Gmail
+     opens Gmail's own browser, which does not share the sign-in. That reader
+     looks signed-out to us, so the boxes stay empty and a quiet line offers the
+     way in. No wall — they can still make a card by typing two things.
+
+     Institution follows the same order the email does: law school first, then
+     university. Failure is silent by design; an empty form is a working form. */
+  (function prefillFromAccount(){
+    var API = (location.hostname==='localhost'||location.hostname==='127.0.0.1')
+      ? 'http://localhost:8000/api' : 'https://prod-api.lawexa.com/api';
+    var token;
+    try{ token = (JSON.parse(localStorage.getItem('lawexa-auth')||'{}').state||{}).token; }catch(e){}
+    var hint = document.getElementById('signedout');
+    if(!token){ hint.hidden = false; return; }
+    fetch(API+'/auth/me',{headers:{Accept:'application/json',Authorization:'Bearer '+token}})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(me){
+        var u = me && ((me.data && me.data.user) || me.data);
+        if(!u){ hint.hidden = false; return; }
+        var p = u.profile || {};
+        if(u.name && !nameI.value){ nameI.value = u.name; state.name = u.name; }
+        var school = p.law_school || p.university || '';
+        if(school && !instI.value){ instI.value = school; state.institution = school; }
+        refreshCaption(); draw();
+      })
+      .catch(function(){ hint.hidden = false; });
+  })();
 
   // theme / format
   document.getElementById('themes').addEventListener('click',e=>{ const b=e.target.closest('[data-theme]'); if(!b) return;
