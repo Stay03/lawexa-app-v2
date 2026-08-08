@@ -65,7 +65,14 @@ a{color:inherit;text-decoration:none;}
   padding:26px;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:var(--sh-md);}
 .stage .live{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-deep);}
 .stage .live .pd{width:8px;height:8px;border-radius:50%;background:var(--gold);animation:pulse 2s var(--ease) infinite;}
-.card-canvas{max-width:100%;max-height:min(60vh,600px);height:auto;width:auto;border-radius:18px;box-shadow:var(--sh-xl);background:var(--cream);touch-action:none;}
+/* The card only takes over finger movement ONCE THERE IS A PHOTO TO DRAG.
+     `touch-action:none` is right while positioning a photo and wrong before one
+     exists: the canvas is the largest thing on a phone's first screen, so a
+     blanket rule turned every swipe that began on it into nothing, and the page
+     felt stuck. The drag handler already refuses without `state.img`; this makes
+     the CSS agree with it. @arthur, 2026-08-08. */
+  .card-canvas{max-width:100%;max-height:min(60vh,600px);height:auto;width:auto;border-radius:18px;box-shadow:var(--sh-xl);background:var(--cream);touch-action:pan-y;}
+  .card-canvas[data-has-photo]{touch-action:none;}
 .card-canvas.grab{cursor:grab;}
 .card-canvas.grabbing{cursor:grabbing;}
 .fmt{display:inline-flex;background:var(--white);border:1.5px solid var(--cream-deep);border-radius:var(--pill);padding:4px;gap:2px;box-shadow:var(--sh-sm);}
@@ -168,6 +175,25 @@ footer a{color:var(--gold-deep);font-weight:600;}
   .nav .kit{display:none;}
   .panel{padding:24px 20px;}
   .stage{padding:18px;}
+  /* UPLOAD HAS TO BE ON THE FIRST SCREEN — it is the only thing to do here, and
+     it sat about 30px below the fold on a 390x844 phone. @arthur, 2026-08-08.
+
+     THE CAP IS ON WIDTH, AND THAT IS THE WHOLE POINT. I first capped the height
+     and it changed nothing, because in Post shape the card is SQUARE and its
+     height follows its width — it was never touching the height limit. Worse,
+     trimming the stage padding to buy space made the card WIDER and therefore
+     TALLER, and the fold moved the wrong way. Only a width cap moves it.
+
+     Measured at 390x844, top of the upload box: 100% -> 876 (off screen),
+     78% -> 807 (a sliver), 68% -> 776 (visible), 60% -> 750. 68% is the trade:
+     the card is still big enough to judge and the upload box is properly in view
+     rather than technically in view. */
+  .card-canvas{max-width:68%;max-height:min(42vh,420px);}
+  /* The words above cost ~235px before anything happens. Trimmed, not removed —
+     they still say what the page is for. */
+  .intro{padding:16px 0 12px;}
+  .intro h1{font-size:30px;margin:6px 0 0;}
+  .intro p{font-size:14.5px;margin:8px auto 0;}
 }
 </style>
 </head>
@@ -483,7 +509,7 @@ footer a{color:var(--gold-deep);font-weight:600;}
   const zoomWrap=document.getElementById('zoomWrap'), zoom=document.getElementById('zoom');
   function loadFile(f){ if(!f||!f.type.startsWith('image/')) return;
     const r=new FileReader();
-    r.onload=e=>{ const img=new Image(); img.onload=()=>{ state.img=img; state.ready=true; state.zoom=1; state.offX=0; state.offY=0; zoom.value=1;
+    r.onload=e=>{ const img=new Image(); img.onload=()=>{ state.img=img; state.ready=true; cv.setAttribute('data-has-photo',''); state.zoom=1; state.offX=0; state.offY=0; zoom.value=1;
         clampOffsets(); draw();
         drop.classList.add('has'); drop.innerHTML=`<img class="thumb" src="${e.target.result}" alt=""><div class="meta"><h4>Photo added</h4><p>Drag on the card to position · zoom below</p></div><span class="ic"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-refresh-cw"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />  <path d="M21 3v5h-5" />  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />  <path d="M8 16H3v5" /></svg></span>`;
         icons(); zoomWrap.classList.add('show'); cv.classList.add('grab');
