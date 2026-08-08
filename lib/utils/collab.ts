@@ -128,10 +128,20 @@ export type MessageSegment =
  * `https://` ourselves for the `www.` case — means a dangerous scheme cannot be
  * produced at all. That is a stronger guarantee than sanitising afterwards.
  *
+ * ── EMAILS ARE THE THIRD ALTERNATIVE (@arthur, 2026-08-08) ─────────────────
+ * "Emails should open mail app." A plain address left the reader copying it by
+ * hand, which is the complaint this whole change started from, one step along.
+ *
+ * ORDER INSIDE THIS PATTERN IS LOad-BEARING. The address alternatives come
+ * first, so `www.lawexa.com` is claimed as a link; the email alternative then
+ * catches `ada@www.x.com` whole, rather than leaving the name behind and
+ * linking the host. Both shapes are covered by one left-to-right scan with no
+ * second pass to keep in step.
+ *
  * Global, so callers must request a fresh instance — `lastIndex` is stateful.
  */
 function linkTokenRegex(): RegExp {
-  return /(?:https?:\/\/|\bwww\.)[^\s<>]+/gi;
+  return /(?:https?:\/\/|\bwww\.)[^\s<>]+|[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/gi;
 }
 
 /**
@@ -181,7 +191,12 @@ function splitLinks(value: string): MessageSegment[] {
     const token = trimSentencePunctuation(match[0]);
     if (token.length === 0) continue;
 
-    const schemeless = /^www\./i.test(token);
+    // An email is anything the scan claimed that carries an `@` and no scheme.
+    // Checked before the `www.` branch because `ada@www.x.com` satisfies both
+    // readings and only one of them is right.
+    const isEmail = !/^https?:\/\//i.test(token) && token.includes('@');
+
+    const schemeless = !isEmail && /^www\./i.test(token);
     if (schemeless) {
       // `www.lawexa` is not a public host. Require the second dot before calling
       // a schemeless token an address; a scheme needs no such proof.
@@ -199,12 +214,17 @@ function splitLinks(value: string): MessageSegment[] {
     if (start > lastIndex) {
       segments.push({ type: 'text', value: value.slice(lastIndex, start) });
     }
-    // WE supply the scheme, so it is always `https` — the token itself can
-    // never contribute one, which is what keeps `javascript:` unreachable.
+    // WE supply the scheme in both schemeless cases, so it is always one we
+    // chose — the token can never contribute one, which is what keeps
+    // `javascript:` unreachable no matter what a stranger types.
     segments.push({
       type: 'link',
       value: token,
-      href: schemeless ? `https://${token}` : token,
+      href: isEmail
+        ? `mailto:${token}`
+        : schemeless
+          ? `https://${token}`
+          : token,
     });
     lastIndex = start + token.length;
   }

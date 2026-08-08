@@ -88,11 +88,16 @@ export function MessageContent({
           // `noopener` is not optional here: the target is a stranger's text.
           // `break-all` because a URL is one unbreakable token and would
           // otherwise push the whole feed sideways on a phone.
+          // A `mailto:` gets NO `target` — the handler takes over in place, and
+          // asking for a new tab as well leaves an empty one behind on several
+          // browsers. `rel` goes with it, since there is no document to reach
+          // back through.
           <a
             key={index}
             href={segment.href}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
+            {...(segment.href.startsWith('mailto:')
+              ? {}
+              : { target: '_blank', rel: 'noopener noreferrer nofollow' })}
             className="break-all text-primary underline underline-offset-2 hover:text-primary/80"
           >
             {segment.value}

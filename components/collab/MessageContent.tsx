@@ -43,11 +43,13 @@ export function MessageContent({ content, metadata }: MessageContentProps) {
           // can be opened by tapping it. Rendered here too, not only in v2:
           // both trees share one parser, and leaving this branch out would have
           // shown v1 readers a URL that still could not be tapped.
+          // No `target` on a `mailto:` — see the note in the v2 twin.
           <a
             key={i}
             href={segment.href}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
+            {...(segment.href.startsWith('mailto:')
+              ? {}
+              : { target: '_blank', rel: 'noopener noreferrer nofollow' })}
             className="break-all text-primary underline underline-offset-2 hover:text-primary/80"
           >
             {segment.value}
