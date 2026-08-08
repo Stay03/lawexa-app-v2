@@ -526,17 +526,31 @@ footer a{color:var(--gold-deep);font-weight:600;}
   // details
   const nameI=document.getElementById('name'), instI=document.getElementById('inst');
   let capDirty=false;
-  function defCaption(){ const inst=state.institution.trim(); const at=inst?` at ${inst}`:'';
+  function defCaption(){ const inst=state.institution.trim();
+    /* THE SCHOOL IS THE PART THAT CAN BLOW THE LIMIT, SO IT IS THE PART THAT
+       GOES. The form caps a school at 46 characters, but the ambassador email
+       now prefills these from the account through the address bar, and a value
+       set in code walks straight past `maxlength` — measured: a 60-character
+       school arrives intact. Rather than truncate somebody's school, build the
+       caption with it and drop the clause only if the result would be cut by X
+       anyway. A caption without the school reads fine; one cut mid-word does
+       not, and it is cut in public. @arthur, 2026-08-08. */
+    const at=inst?` at ${inst}`:'';
     /* SHORT ENOUGH FOR X, WHICH IS THE TIGHTEST PLACE IT GOES. @arthur,
-       2026-08-08: the old one ran past 460 characters and X stops at 280, so it
-       was truncated on the one platform where the cut is public. Worst case
-       here is 214 characters, with the longest institution the form allows (46)
-       -- room to spare on every network. */
-    return `I’m officially a face of Lawexa${at}. 🎉
+       2026-08-08: the old caption ran past 460 characters against X's 280, so
+       it was cut mid-sentence on the one platform where the cut is public.
+       Worst case with the longest school the FORM allows (46) is 217. */
+    const body=(a)=>`I’m officially a face of Lawexa${a}. 🎉
 
 Trusted legal AI for law students — research cases, study smarter, pass exams.
 
-www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`; }
+www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
+    /* But the email now prefills the school through the address bar, and a
+       value set in code walks past `maxlength` — measured: a 60-character
+       school arrives whole. Rather than truncate somebody's school, drop the
+       clause only when keeping it would be cut by X anyway. A caption without
+       the school reads fine; one cut mid-word does not. */
+    return body(at).length <= 280 ? body(at) : body(''); }
   const caption=document.getElementById('caption');
   function refreshCaption(){ if(!capDirty) caption.value=defCaption(); }
   nameI.addEventListener('input',()=>{ state.name=nameI.value; draw(); });
