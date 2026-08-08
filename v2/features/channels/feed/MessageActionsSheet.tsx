@@ -9,6 +9,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  TextSelect,
   Trash2,
 } from 'lucide-react';
 
@@ -47,6 +48,31 @@ import { LawexaMark } from '../ui/avatars';
  * A fine pointer never lost drag-to-copy, so the desktop cluster does NOT get a
  * matching glyph: adding a seventh grey square to buy back something the mouse
  * already does would cost the row more than it gained.
+ *
+ * SELECT TEXT IS THE SECOND TOUCH-ONLY ACTION, and it is the missing half of
+ * that same trade (@arthur, Aug 7). "Whole rather than partial" was the honest
+ * description of a compromise, not a principle: he wanted one sentence out of a
+ * message and could only take all of it. The two verbs are siblings and sit
+ * together — Copy text ends the job in one tap when the whole message is what
+ * you wanted, Select text gives this one row back to the platform so a finger
+ * can draw the part that is. Neither is gated by a media query, for the same
+ * reason Copy text never was: THIS SHEET only ever opens from a touch long
+ * press, so a mouse — which never lost drag-select — never sees either.
+ *
+ * BOTH ARE WITHHELD FROM A MESSAGE MADE ONLY OF FILES. `content` is `""` there
+ * (backend, 2026-08-05): one verb would copy an empty string and say "Copied"
+ * about it, the other would select nothing and look broken.
+ *
+ * "SELECT TEXT" IS ANNOUNCED LIKE EVERY OTHER ROW, and that is a decision, not
+ * an oversight. It is tempting to hide it from assistive tech — a screen reader
+ * carries its own text cursor and its own copy, and the highlight this paints is
+ * a purely visual affordance — but that argument would hide a control that is
+ * plainly ON SCREEN, which is the one thing `aria-hidden` must never do (it
+ * would also have to be pulled from the sheet's focus trap to stay legal). A
+ * reader running VoiceOver or TalkBack on a phone they can also see would find a
+ * row they can touch and cannot reach. It stays, plainly named, its hint inside
+ * its own accessible name, next to the Copy text that will usually serve them
+ * better.
  */
 export function MessageActionsSheet({
   message,
@@ -60,6 +86,7 @@ export function MessageActionsSheet({
   onTogglePin,
   onToggleSave,
   onViewAiSession,
+  onSelectText,
 }: {
   /** The long-pressed message; `null` = closed. */
   message: Message | null;
@@ -73,6 +100,9 @@ export function MessageActionsSheet({
   onTogglePin: (message: Message) => void;
   onToggleSave: (message: Message) => void;
   onViewAiSession: (sessionUuid: string) => void;
+  /** Hand this one message's words back to the platform's own selection —
+   *  see the docblock, and `use-text-select-mode.ts` for the mechanics. */
+  onSelectText: (message: Message) => void;
 }) {
   const open = message !== null;
   const reactionThrottled = useEngagementThrottled('reaction');
@@ -81,10 +111,28 @@ export function MessageActionsSheet({
   const saved = message?.is_bookmarked === true;
   const sessionUuid =
     message?.is_ai === true ? (message.metadata.session_uuid ?? null) : null;
+  /** True for exactly one close: the one "Select text" asked for. A ref rather
+   *  than state because nothing renders differently — it is read once, by the
+   *  focus handler below, on the way out. */
+  const keepSelectionRef = useRef(false);
 
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
-      <SheetContent side="bottom" className="v2-safe-bottom rounded-t-2xl">
+      <SheetContent
+        side="bottom"
+        className="v2-safe-bottom rounded-t-2xl"
+        // EVERY OTHER VERB WANTS ITS FOCUS BACK; THIS ONE MUST NOT TAKE IT.
+        // Radix returns focus to whatever held it when the sheet opened, which
+        // on a phone can be the composer — and a textarea taking focus takes
+        // the document selection with it and, on iOS, the keyboard comes up
+        // over the message the reader asked to read. So the restore is
+        // suppressed for that one close and left alone for all the others.
+        onCloseAutoFocus={(event) => {
+          if (!keepSelectionRef.current) return;
+          keepSelectionRef.current = false;
+          event.preventDefault();
+        }}
+      >
         <SheetHeader className="pb-0">
           <SheetTitle className="truncate text-sm text-muted-foreground">
             {message
@@ -119,7 +167,42 @@ export function MessageActionsSheet({
                 is simply absent instead — the file itself is reached by opening
                 it, not by copying the message. */}
             {message.content.trim() !== '' && (
-              <CopyTextAction key={message.uuid} content={message.content} onDone={onClose} />
+              <>
+                <CopyTextAction
+                  key={message.uuid}
+                  content={message.content}
+                  onDone={onClose}
+                />
+                {/* THE SELECTION IS MADE FIRST, AND THE SHEET LEAVES AFTER IT.
+                    Closing first would push the work into a timer chasing the
+                    sheet's 200ms exit; this way it is one straight line, and
+                    the reader watches the sheet slide off a message that is
+                    already highlighted. Radix's modal environment does not
+                    interfere — measured, see `use-text-select-mode.ts`.
+
+                    THE SECOND LINE IS NOT DECORATION. No browser will raise the
+                    drag handles for a selection made by script — Blink clears
+                    the flag on every Selection API call, and on iOS the handles
+                    belong to a UIKit interaction JavaScript cannot activate — so
+                    the highlight this action paints is the whole message and the
+                    reader narrows it with the platform's own gesture. That
+                    gesture is a touch-and-hold, which is also the gesture that
+                    opened this sheet, so it has to be said out loud once. It is
+                    said HERE, at the moment of choosing, rather than as a line
+                    of chrome in the transcript that would then need its own way
+                    of going away. */}
+                <SheetAction
+                  label="Select text"
+                  hint="Touch and hold to adjust"
+                  onClick={() => {
+                    keepSelectionRef.current = true;
+                    onSelectText(message);
+                    onClose();
+                  }}
+                >
+                  <TextSelect aria-hidden className="size-4" />
+                </SheetAction>
+              </>
             )}
             <SheetAction
               label="Reply"
@@ -242,8 +325,10 @@ function CopyTextAction({
     } catch {
       // Clipboard refused (insecure context, or permission denied). Close
       // without claiming a copy that did not happen — the same silent path the
-      // conversation and case copy affordances take. Nothing to surface: the
-      // reader can still select the text on a pointer-fine device.
+      // conversation and case copy affordances take. Nothing to surface: a
+      // pointer-fine reader can still drag across the text, and since Aug 7 a
+      // touch reader has Select text one row below, which reaches the
+      // platform's own Copy rather than this API.
       onDone();
       return;
     }
@@ -270,9 +355,16 @@ function CopyTextAction({
 }
 
 /** One sheet row. `pressed` is `undefined` for plain verbs and a boolean for
- *  the two toggles — same rule as the desktop cluster's `RowAction`. */
+ *  the two toggles — same rule as the desktop cluster's `RowAction`.
+ *
+ *  `hint` is the exception the list earns rather than the shape it takes. Every
+ *  other row is a verb that finishes when you press it and needs no explaining;
+ *  Select text hands the message to a gesture, and the gesture has to be named.
+ *  It rides INSIDE the button rather than beside it, so the sentence is part of
+ *  the row's accessible name and a screen reader hears the whole offer. */
 function SheetAction({
   label,
+  hint,
   destructive = false,
   pressed,
   disabled = false,
@@ -280,6 +372,7 @@ function SheetAction({
   children,
 }: {
   label: string;
+  hint?: string;
   destructive?: boolean;
   pressed?: boolean;
   disabled?: boolean;
@@ -293,7 +386,7 @@ function SheetAction({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'v2-interactive flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium',
+        'v2-interactive flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-1.5 text-left text-sm font-medium',
         'transition-colors duration-150 motion-reduce:transition-none',
         destructive
           ? 'text-destructive active:bg-destructive/10'
@@ -305,7 +398,16 @@ function SheetAction({
       )}
     >
       {children}
-      {label}
+      {hint === undefined ? (
+        label
+      ) : (
+        <span className="flex min-w-0 flex-col">
+          <span>{label}</span>
+          <span className="truncate text-xs font-normal text-muted-foreground">
+            {hint}
+          </span>
+        </span>
+      )}
     </button>
   );
 }

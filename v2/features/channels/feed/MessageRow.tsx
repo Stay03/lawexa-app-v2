@@ -79,7 +79,8 @@ import { LawexaMark } from '../ui/avatars';
  *    worst version of one. What is left is what a row is actually for —
  *    respond, reply, everything else;
  *  - touch: long-press lifts the FULL action set into the feed's single bottom
- *    sheet (`onOpenActions`), unchanged, with Copy text at its head.
+ *    sheet (`onOpenActions`), unchanged, with Copy text and Select text — the
+ *    whole message and any part of it — at its head.
  *
  * THE SEND LADDER (§5, exact): optimistic insert → `sending` (subtle dim,
  * no words) → sent (nothing at all) → `failed` (red icon + Retry inline,
@@ -270,6 +271,14 @@ export const MessageRow = memo(function MessageRow({
         // selection for a menu with Copy text"; in read-only mode there is no
         // menu, so taking selection away would leave a previewer on a phone
         // unable to copy anything at all. They keep the browser's own gesture.
+        //
+        // AND THE SHEET CAN LEND IT BACK, one row at a time: "Select text"
+        // stamps `data-selecting` here and `.v2-touch-hold[data-selecting]`
+        // returns this row — only this row, only while the selection lives — to
+        // ordinary selectable text, callout included. No class of ours draws
+        // that state: the selection highlight is the state, and from there the
+        // row belongs to the platform's own touch-and-hold. `use-long-press`
+        // stands down for exactly as long as that lasts.
         canEngage && 'v2-touch-hold',
         // Armed-hold feedback: `use-long-press` stamps this attribute straight
         // onto the node (no React state — the row is memoised), and the
@@ -345,21 +354,37 @@ export const MessageRow = memo(function MessageRow({
             (backend, 2026-08-05), `content` is legitimately `""` — and the
             body renderer would answer that with an empty line of body-height
             above the files, which reads as a message that failed to load. No
-            text, no text element. */}
-        {hasText &&
-          (message.is_ai ? (
-            <LawexaMessageContent
-              content={message.content}
-              metadata={message.metadata}
-              viewerUuid={viewerUuid}
-            />
-          ) : (
-            <MessageContent
-              content={message.content}
-              metadata={message.metadata}
-              viewerUuid={viewerUuid}
-            />
-          ))}
+            text, no text element.
+
+            AND WHERE THERE ARE WORDS, THEY ARE FENCED OFF FROM EVERYTHING ELSE
+            THE ROW SAYS. `data-message-body` is what the sheet's "Select text"
+            selects (`use-text-select-mode`), and it is a wrapper rather than a
+            prop on the two renderers because both of them are also the AI
+            session transcript's body: a message's selectable extent is a FEED
+            fact and has no business travelling into a surface with no
+            long-press gesture at all.
+
+            It is the boundary as well as the target. The row around it carries
+            the pin marker, the reply quote, the "(edited)" note, the reaction
+            chips and the matched-nobody hint; opening a selection over that lot
+            would hand the reader something to undo before they could use it. */}
+        {hasText && (
+          <div data-message-body>
+            {message.is_ai ? (
+              <LawexaMessageContent
+                content={message.content}
+                metadata={message.metadata}
+                viewerUuid={viewerUuid}
+              />
+            ) : (
+              <MessageContent
+                content={message.content}
+                metadata={message.metadata}
+                viewerUuid={viewerUuid}
+              />
+            )}
+          </div>
+        )}
 
         {/* AND A MESSAGE MAY HAVE NEITHER. Delete the only attachment of a
             file-only message and the server keeps the message and serves it

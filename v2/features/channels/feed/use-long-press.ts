@@ -2,6 +2,8 @@
 
 import { useCallback, useRef } from 'react';
 
+import { SELECTING_ATTRIBUTE, selectionHoldsRow } from './use-text-select-mode';
+
 /**
  * use-long-press — the touch half of the row-actions contract: hover actions
  * on pointer-fine, a long-press bottom sheet on touch (design-research
@@ -38,6 +40,21 @@ import { useCallback, useRef } from 'react';
  * so nothing armed at the 450ms mark can help; the rule is static CSS, in
  * `shell.css`'s `.v2-touch-hold`. This hook only clears a selection that was
  * already on screen when the press fired.
+ *
+ * ── AND ONE ROW WHERE IT STANDS DOWN COMPLETELY ───────────────────────────
+ * The sheet's "Select text" hands a single row back to the platform
+ * (`use-text-select-mode.ts`). While the reader is holding that selection, a
+ * long press there means "adjust it", not "open the menu" — so the gesture is
+ * refused at pointer-down, before the timer, before the tint, and above all
+ * before the `removeAllRanges()` in the fire path, which would take away the
+ * selection they came back for. Without this the feature is a loop: Select text
+ * → the obvious next gesture → the sheet again.
+ *
+ * IT ASKS THE SELECTION, NOT ONLY THE STAMP. A `data-selecting` row whose
+ * selection has gone (an engine whose exit watchers all missed) is a row in no
+ * mode at all, and refusing it would be the one way this feature could shut a
+ * message out of its own actions permanently. It is treated as an ordinary row:
+ * the sheet opens, and the feed clears the mode on the way through.
  */
 
 const LONG_PRESS_MS = 450;
@@ -87,8 +104,11 @@ export function useLongPress(onLongPress: () => void): LongPressHandlers {
       // clean slate.
       firedRef.current = false;
       if (event.pointerType !== 'touch') return;
-      originRef.current = { x: event.clientX, y: event.clientY };
       const node = event.currentTarget;
+      // See "AND ONE ROW WHERE IT STANDS DOWN COMPLETELY" above. Nothing has
+      // been armed or stamped yet, so returning here leaves no state behind.
+      if (node.hasAttribute(SELECTING_ATTRIBUTE) && selectionHoldsRow(node)) return;
+      originRef.current = { x: event.clientX, y: event.clientY };
       nodeRef.current = node;
       node.setAttribute(HOLDING_ATTRIBUTE, '');
       timerRef.current = setTimeout(() => {

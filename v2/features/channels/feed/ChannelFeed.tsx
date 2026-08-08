@@ -49,6 +49,7 @@ import type { MessageRowActions } from './MessageRow';
 import { QuizCardPreview } from './QuizCardPreview';
 import { QuizGameCard } from './QuizGameCard';
 import { RespondingRow } from './RespondingRow';
+import { useTextSelectMode } from './use-text-select-mode';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -126,6 +127,13 @@ import {
  *    deep link uses, so a pin from last week resolves exactly like a
  *    notification link — and, unlike a URL write, it costs no navigation and
  *    can't fight the router's cached search params.
+ *
+ * SELECT TEXT (@arthur, 2026-08-07) gives one message's words back to the
+ * finger, and it is owned here for the same reason the action sheet is: only
+ * one message may be in it at a time, and "one at a time" is only a rule if one
+ * thing enforces it. Like the deep-link wash it is a DOM stamp, so nothing about
+ * it re-renders a row. See `use-text-select-mode.ts` for how the mode ends, and
+ * why a scroll is deliberately not one of the ways.
  *
  * PICTURES OPEN HERE, NOT IN A TAB (owner, 2026-08-06). `?image=` is this
  * component's own overlay param — the precedent is `ListsTab`'s `?list=` — and
@@ -375,6 +383,12 @@ export function ChannelFeed({
     [messages, sheetMessageUuid],
   );
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
+  /** "Select text": one row at a time, handed back to the platform's own
+   *  selection. FEED-OWNED for exactly the reason the sheet is — "one at a
+   *  time" is only a rule if one thing enforces it — but held as a DOM stamp
+   *  rather than as state, because the rows it marks are memoised and this
+   *  changes nothing React renders. See `use-text-select-mode.ts`. */
+  const textSelect = useTextSelectMode(rootRef);
 
   /**
    * The picture viewer's URL state (`?image={messageUuid}:{attachmentId}`).
@@ -875,6 +889,7 @@ export function ChannelFeed({
   const reactionMutate = reactionMutation.mutate;
   const pinMutate = pinMutation.mutate;
   const saveMutate = saveMutation.mutate;
+  const textSelectExit = textSelect.exit;
   const rowActions = useMemo<MessageRowActions>(
     () => ({
       onStartReply,
@@ -899,7 +914,15 @@ export function ChannelFeed({
         });
       },
       onDiscardFailed: discardFailed,
-      onOpenActions: (message) => setSheetMessageUuid(message.uuid),
+      // A HOLD ANYWHERE ENDS A SELECTION ANYWHERE. The hold gesture already
+      // stands down on the row that is selecting, so reaching here means the
+      // reader has moved on to a different message — and the fire path has
+      // just cleared the selection out from under the old one, which would
+      // otherwise leave a row stamped for a selection that no longer exists.
+      onOpenActions: (message) => {
+        textSelectExit();
+        setSheetMessageUuid(message.uuid);
+      },
       onJumpToMessage: (messageUuid) => {
         flashMessage(messageUuid);
       },
@@ -935,6 +958,7 @@ export function ChannelFeed({
       saveMutate,
       onViewAiSession,
       showImage,
+      textSelectExit,
     ],
   );
 
@@ -1188,6 +1212,7 @@ export function ChannelFeed({
             onTogglePin={rowActions.onTogglePin}
             onToggleSave={rowActions.onToggleSave}
             onViewAiSession={rowActions.onViewAiSession}
+            onSelectText={(message) => textSelect.enter(message.uuid)}
           />
 
           <AlertDialog

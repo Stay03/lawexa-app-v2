@@ -223,6 +223,37 @@ html.v2-document-lock body {
 }
 
 /* -----------------------------------------------------------------------------
+   …AND THE ONE ROW THAT HAS BEEN HANDED BACK (@arthur, Aug 7: on a phone he can
+   only copy a whole message, never part of one).
+
+   The rule above is a TRADE — finger selection given up for a long-press menu
+   whose head is "Copy text" — and this is the other half of it: the sheet's
+   "Select text" stamps `data-selecting` on exactly one message row, and for the
+   length of that selection the row goes back to behaving like ordinary web text.
+   `use-text-select-mode.ts` owns the stamp and takes it away again; nothing here
+   is ever true for two rows at once.
+
+   IT UNDOES BOTH PROPERTIES, BECAUSE BOTH WERE SET. `user-select: text` alone
+   would give iOS a selectable row that still refuses to raise the callout the
+   selection is made FOR (Copy / Look Up / Share sit in it), so the callout comes
+   back to `default` too — for this row, while it is selecting, and nowhere else.
+
+   `touch-action` DELIBERATELY DOES NOT MOVE. It governs which SCROLL a touch may
+   start, not whether text can be selected, and `pan-y pinch-zoom` is exactly
+   what a reader dragging a selection handle wants: a vertical drag still scrolls
+   the transcript, and a horizontal one is not stolen by the browser mid-drag.
+
+   The attribute selector is (0,2,0) against the class's (0,1,0), so it wins
+   inside the coarse media block above without being repeated in it — one rule,
+   both properties, one row.
+   -------------------------------------------------------------------------- */
+.v2-touch-hold[data-selecting] {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* -----------------------------------------------------------------------------
    Quiet scrollbar (owner, July 31 — the docked chat's scrollbar next to the
    page's read as "two sidebars"). For INNER scrollers that sit near the page's
    own scrollbar: thin, trackless, and invisible until the reader hovers or
