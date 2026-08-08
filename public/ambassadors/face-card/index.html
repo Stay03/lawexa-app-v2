@@ -588,18 +588,37 @@ www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
     try{ token = (JSON.parse(localStorage.getItem('lawexa-auth')||'{}').state||{}).token; }catch(e){}
     var hint = document.getElementById('signedout');
     if(!token){ hint.hidden = false; return; }
-    fetch(API+'/auth/me',{headers:{Accept:'application/json',Authorization:'Bearer '+token}})
-      .then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(me){
+
+    var get = function(path){
+      return fetch(API+path,{headers:{Accept:'application/json',Authorization:'Bearer '+token}})
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .catch(function(){ return null; });
+    };
+
+    /* TWO SOURCES, AND THE ORDER IS THE POINT (@backendclaude, 2026-08-08).
+       The SCHOOL comes from the ambassador's own application, because that is
+       the same source the welcome email reads — so the card and the email can
+       never disagree about where somebody studies. The profile is the fallback
+       and can be years stale, or missing outright: a profile row may not exist
+       at all, in which case the whole block is absent rather than its fields
+       being empty. Measured on this account, which has none.
+
+       The NAME comes from the account, because that is the one the person
+       maintains, and the application's copy is frozen at the moment they
+       applied. */
+    Promise.all([get('/auth/me'), get('/ambassadors/my-application')])
+      .then(function(res){
+        var me = res[0], app = res[1];
         var u = me && ((me.data && me.data.user) || me.data);
-        if(!u){ hint.hidden = false; return; }
-        var p = u.profile || {};
-        if(u.name && !nameI.value){ nameI.value = u.name; state.name = u.name; }
-        var school = p.law_school || p.university || '';
+        var a = app && app.data;
+        if(!u && !a){ hint.hidden = false; return; }
+        var p = (u && u.profile) || {};
+        var name = (u && u.name) || (a && a.name) || '';
+        var school = (a && (a.law_school || a.university)) || p.law_school || p.university || '';
+        if(name && !nameI.value){ nameI.value = name; state.name = name; }
         if(school && !instI.value){ instI.value = school; state.institution = school; }
         refreshCaption(); draw();
-      })
-      .catch(function(){ hint.hidden = false; });
+      });
   })();
 
   // theme / format
