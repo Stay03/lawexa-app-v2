@@ -673,8 +673,10 @@ export function ChannelScreen({
   const identityHeader = (
     <ChannelPlaceHeader
       channel={channel}
-      members={memberFaces}
-      onlineCount={room.onlineCount}
+      // `null` for anyone with no presence room — a previewer, a refusal. They
+      // are told the member count in words rather than shown faces that would
+      // claim a presence nobody measured (see `PlaceHeader`).
+      presence={canParticipate ? room.presence : null}
       // The roster read is open to a previewer too — only the private-channel
       // refusal leaves the stack as a plain, unopenable mark.
       onOpenRoster={canRead ? () => panel.show('members') : undefined}

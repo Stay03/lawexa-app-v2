@@ -19,13 +19,24 @@ import type { SlimUser } from '@/types/collab';
  * survivor; the channels feature's `ui/avatars.tsx` re-exports it, so its
  * consumers kept their import path and the duplicate implementation is gone.
  */
+
+/**
+ * The least a face needs: something to draw, and something to fall back to.
+ *
+ * Every `SlimUser` satisfies it — and so does the presence room's
+ * `{uuid, name, avatar_url}`, which carries no `username` and must not be
+ * typed as though it did. Asking for the two fields this actually reads is
+ * what lets both stand in front of it honestly.
+ */
+export type PersonMark = Pick<SlimUser, 'name' | 'avatar_url'>;
+
 export function MemberAvatar({
   user,
   size = 'default',
   className,
 }: {
   /** `null` renders a neutral placeholder (a deleted account). */
-  user: SlimUser | null;
+  user: PersonMark | null;
   size?: 'sm' | 'default' | 'lg';
   className?: string;
 }) {

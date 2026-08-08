@@ -19,8 +19,14 @@ import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { ChannelTab } from '../model';
+import type { ChannelPresence } from '../room';
+import { HereNow } from './HereNow';
 import { SectionSwitch, type ChannelSection, type SectionCounts } from './SectionSwitch';
 import type { MarkComponent } from '../ui/avatars';
+
+/** One frozen empty roster, so the no-presence fallback hands `PresenceStack`
+ *  the same reference every render and it renders the count in WORDS. */
+const NO_FACES: readonly SlimUser[] = [];
 
 /**
  * PlaceHeader — ONE bar and ONE hairline over a channel. Phase-5 redesign
@@ -81,13 +87,23 @@ import type { MarkComponent } from '../ui/avatars';
  * Both gates are keyed to where the rail docks. If that moves, these move with
  * it — they are the only two breakpoints in this feature's chrome.
  *
- * ── PRESENCE IS FACES, AND THE COUNT IS A WORD ─────────────────────────────
- * `PresenceStack` replaces both the "4 members" text and the "3 online" text.
- * With a roster it shows faces and a `+N`; without one it says the count in
- * words. The online figure rides its accessible name and its tooltip rather
- * than a second grey run in the bar — the header states WHO is here, and the
- * roster it opens is where "how many are looking" belongs. No presence dots,
- * ever (DIRECTION 7, binding).
+ * ── THE FACES MEAN "HERE NOW", AND ONLY WHEN THEY CAN ──────────────────────
+ * The slot holds one of two objects, and which one depends on whether this
+ * reader is in the presence room at all:
+ *
+ *   IN THE ROOM   — {@link HereNow}: three faces of people who are here this
+ *                   second, then a `+N` of MORE PEOPLE HERE, opening the
+ *                   roster. Presence is the thing the header shows, not a
+ *                   figure hidden in a `title` where a phone never finds it.
+ *   NO ROOM       — a previewer, or a refusal. `PresenceStack` with NO faces,
+ *                   which prints the member count in words. Showing roster
+ *                   faces in this slot would be the old lie in a new place:
+ *                   the cluster now means "here", and someone with no socket
+ *                   cannot know who is.
+ *
+ * No presence dots, ever (DIRECTION 7, binding) — and no "3 here · 12 members"
+ * line either: a `+N` beside a total is two numbers with different meanings,
+ * side by side (@arthur, 2026-08-06).
  *
  * ── THE PURPOSE LINE, AND WHY IT IS THE DISCLOSURE'S TRIGGER ON A PHONE ────
  * The description has always been a disclosure rather than a permanent 20px
@@ -128,8 +144,7 @@ export interface HeaderLens {
 
 export function ChannelPlaceHeader({
   channel,
-  members,
-  onlineCount,
+  presence,
   onOpenRoster,
   sections,
   section,
@@ -139,10 +154,8 @@ export function ChannelPlaceHeader({
   menu,
 }: {
   channel: Channel;
-  /** Faces for the stack. Empty degrades to the count in words. */
-  members: readonly SlimUser[];
-  /** Live presence total; `0` when there is no room (a previewer, a refusal). */
-  onlineCount: number;
+  /** Who is here now. `null` for a reader with no room — see the docblock. */
+  presence: ChannelPresence | null;
   /** Opens the roster. Omitted where the roster is not readable. */
   onOpenRoster?: () => void;
   /** Sections this reader can reach. One entry = no control at all. */
@@ -160,8 +173,6 @@ export function ChannelPlaceHeader({
   const description = channel.description?.trim() || null;
   const total = channel.active_members_count;
   const countLabel = `${total} ${total === 1 ? 'member' : 'members'}`;
-  const presenceLabel =
-    onlineCount > 0 ? `${countLabel}, ${onlineCount} online` : countLabel;
 
   return (
     <div className="shrink-0 border-b">
@@ -302,20 +313,22 @@ export function ChannelPlaceHeader({
           )}
 
           {/* ── People ───────────────────────────────────────────────────
-              A `div`, never a `span`: `PresenceStack` builds on `AvatarGroup`,
+              A `div`, never a `span`: both of these build on `AvatarGroup`,
               which emits flow content, and a `div` inside a `span` is invalid.
-              The wrapper exists to carry the hover `title` — which is where the
-              online figure lives, rather than as a second grey text run in the
-              bar (see the file docblock). */}
-          <div title={presenceLabel} className="shrink-0">
-            <PresenceStack
-              members={members}
-              total={total}
-              countLabel={countLabel}
-              label={presenceLabel}
-              size="sm"
-              onClick={onOpenRoster}
-            />
+              Which one renders is the whole question — see the file docblock. */}
+          <div className="shrink-0">
+            {presence !== null && onOpenRoster ? (
+              <HereNow presence={presence} onOpenRoster={onOpenRoster} />
+            ) : (
+              <PresenceStack
+                members={NO_FACES}
+                total={total}
+                countLabel={countLabel}
+                label={countLabel}
+                size="sm"
+                onClick={onOpenRoster}
+              />
+            )}
           </div>
 
           {/* ── Actions ──────────────────────────────────────────────── */}

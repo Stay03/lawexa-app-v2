@@ -5,10 +5,19 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { MemberAvatar } from '../membership/MemberAvatar';
 
 /**
- * PresenceStack — the ONE answer to "who is here". Overlapping faces, a `+N`
- * overflow chip and the authoritative total, built on the shared
+ * PresenceStack — the ONE answer to "who BELONGS here". Overlapping faces, a
+ * `+N` overflow chip and the authoritative total, built on the shared
  * `AvatarGroup` / `AvatarGroupCount` primitives (which shipped unused; this is
  * the component they were for).
+ *
+ * ── IT IS A ROSTER, AND THE NAME IS OLDER THAN THE DISTINCTION ─────────────
+ * It reads a MEMBER LIST and a member COUNT: a space's people, a list's
+ * assignees, an invitation's room. Nothing here is live. Since 2026-08-08 the
+ * channel header means something genuinely different by a face — who is in the
+ * room this second — and that job belongs to
+ * `v2/features/channels/screen/HereNow.tsx`, which is fed by the socket and not
+ * by a roster. If you are reaching for faces that must be CURRENT, this is the
+ * wrong component.
  *
  * ── NO PRESENCE DOTS. EVER. ────────────────────────────────────────────────
  * `AvatarBadge` exists in the same primitive file and is deliberately not
@@ -91,7 +100,10 @@ export function PresenceStack({
           <MemberAvatar key={member.uuid} user={member} size={geometry.avatar} />
         ))}
         {overflow > 0 ? (
-          <AvatarGroupCount className={cn('font-medium tabular-nums', geometry.text)}>
+          // No text size here: `AvatarGroupCount` sizes its own type off the
+          // group's avatars, and a bare `text-xs` would lose to that variant's
+          // specificity anyway — a dead class pretending to be a decision.
+          <AvatarGroupCount className="font-medium tabular-nums">
             {`+${overflow > 99 ? 99 : overflow}`}
           </AvatarGroupCount>
         ) : null}

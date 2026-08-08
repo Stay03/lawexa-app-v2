@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type {
@@ -80,6 +80,39 @@ import { channelQuizQueries } from './quiz/queries';
  * {@link TYPING_TTL_MS} (10s), clear a typer the moment their message
  * arrives; EMIT at most one whisper per {@link TYPING_EMIT_THROTTLE_MS} (1s).
  *
+ * ── PRESENCE MEANS "HERE NOW", AND AWAY IS A SECOND WHISPER (2026-08-08) ────
+ * The room reports WHO is in the channel, not how many: `here`/`joining`/
+ * `leaving` carry `{uuid, name, avatar_url}` (digest §B), which is a face and
+ * an arrival order. The header draws the people; a bare count is what it used
+ * to hide in a tooltip.
+ *
+ * "I have gone quiet" rides the SAME client-to-client transport as typing, one
+ * word apart. On `visibilitychange` — and best-effort again on `pagehide` — the
+ * viewer whispers `away {uuid, away}`, and every other device in the room dims
+ * that face. Nothing is asked of the backend for this and nothing needs to be.
+ *
+ * A MISSING SIGNAL MEANS "HERE", NEVER "AWAY" (ruling, 2026-08-06). A pocketed
+ * phone frequently never gets to send the goodbye: `visibilitychange` is the
+ * last event a page can rely on, `pagehide` covers most of the rest, and a tab
+ * killed from the app switcher sends neither. So {@link ChannelPresence.away}
+ * starts EMPTY for everyone and only ever fills from a signal that actually
+ * arrived — a dim face honestly says "was here, may have stepped away", never
+ * "is not looking". Someone who joins after an away whisper never heard it and
+ * draws that person bright, which is the correct direction to be wrong in.
+ *
+ * The one moment a tab can be background WITHOUT a `visibilitychange` to report
+ * it is the moment it opened there (a middle-click, a restored session), so the
+ * viewer's state is whispered once from inside `here()` — the first instant the
+ * whisper transport exists — and only when it is already hidden.
+ *
+ * A DEPARTURE IS HELD FOR ONE EXIT ANIMATION. `leaving` takes the person out of
+ * `here` immediately, so the count is honest on the very frame it changes, and
+ * parks them in `departing` for {@link PRESENCE_EXIT_MS} — the header's cue to
+ * fade that face instead of blinking it away. The TTL sits here with the typing
+ * and turn timers because the room owns every clock on this channel, and the
+ * two lists are kept apart precisely so a departing face can never be counted
+ * as present.
+ *
  * W3 BOUND THE ENGAGEMENT + LAWEXA SEAMS (2026-08-04):
  *  - `.reaction.toggled` → a per-emoji DELTA onto the message cache. The
  *    payload is per-viewer-safe by design (digest §F.2): it names the reacting
@@ -109,14 +142,53 @@ import { channelQuizQueries } from './quiz/queries';
 const TYPING_TTL_MS = 10_000;
 const TYPING_EMIT_THROTTLE_MS = 1_000;
 
+/** How long a departed face is held so the header can play one exit on it.
+ *  The house motion budget (200ms), and the header's transition is written to
+ *  the same number — a face that outlived its animation would sit fully drawn
+ *  on someone who has gone. */
+const PRESENCE_EXIT_MS = 200;
+
 export interface TypingUser {
   uuid: string;
   name: string;
 }
 
+/**
+ * A person as the PRESENCE ROOM describes them — `{uuid, name, avatar_url}`
+ * and nothing else (digest §B).
+ *
+ * Deliberately NOT `SlimUser`: the wire carries no `username` here, and typing
+ * it as one would let a mention picker read a handle that was never sent.
+ */
+export interface PresenceMember {
+  uuid: string;
+  name: string;
+  avatar_url: string | null;
+}
+
+/** The `away` whisper: one person telling the room their tab went quiet. */
+interface AwayWhisper {
+  uuid: string;
+  away: boolean;
+}
+
+/** Who is in this channel right now, and which of them have gone quiet. */
+export interface ChannelPresence {
+  /**
+   * Everyone the socket says is in the room, in the order they arrived, the
+   * viewer included. `null` until the first `here()` lands — "not known yet"
+   * is not "nobody", and the two draw differently.
+   */
+  here: readonly PresenceMember[] | null;
+  /** Faces on their way out, held for {@link PRESENCE_EXIT_MS}. Never counted. */
+  departing: readonly PresenceMember[];
+  /** Of {@link here}, whoever told us their tab is in the background. */
+  away: ReadonlySet<string>;
+}
+
 export interface ChannelRoom {
-  /** Presence-derived online membership (includes the viewer). */
-  onlineCount: number;
+  /** Who is here now (includes the viewer) — see {@link ChannelPresence}. */
+  presence: ChannelPresence;
   /** Who is typing right now (never includes the viewer). */
   typingUsers: readonly TypingUser[];
   /** Lawexa summons still in flight in this channel — each drives one
@@ -130,6 +202,27 @@ export interface ChannelRoom {
  *  reference forever (memo-friendly, like the outbox's `NO_MESSAGES`). */
 const NO_TURNS: readonly RespondingTurn[] = [];
 
+/** The same trick for presence: one empty list and one empty set, so a quiet
+ *  room never hands the header a fresh reference to re-memo against. */
+const NO_MEMBERS: readonly PresenceMember[] = [];
+const NO_UUIDS: ReadonlySet<string> = new Set();
+
+/** Immutable set edits that return `prev` untouched when nothing changed —
+ *  the reference IS the change signal for every consumer downstream. */
+function withUuid(prev: ReadonlySet<string>, uuid: string): ReadonlySet<string> {
+  if (prev.has(uuid)) return prev;
+  const next = new Set(prev);
+  next.add(uuid);
+  return next;
+}
+
+function withoutUuid(prev: ReadonlySet<string>, uuid: string): ReadonlySet<string> {
+  if (!prev.has(uuid)) return prev;
+  const next = new Set(prev);
+  next.delete(uuid);
+  return next;
+}
+
 export function useChannelRoom(
   channelUuid: string,
   options: { enabled?: boolean } = {},
@@ -142,9 +235,9 @@ export function useChannelRoom(
   const myUuid = useAuthStore((state) => state.user?.uuid ?? null);
   const myName = useAuthStore((state) => state.user?.name ?? '');
 
-  const [onlineUuids, setOnlineUuids] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
+  const [here, setHere] = useState<readonly PresenceMember[] | null>(null);
+  const [departing, setDeparting] = useState<readonly PresenceMember[]>(NO_MEMBERS);
+  const [away, setAway] = useState<ReadonlySet<string>>(NO_UUIDS);
   const [typingUsers, setTypingUsers] = useState<readonly TypingUser[]>([]);
   const [respondingTurns, setRespondingTurns] =
     useState<readonly RespondingTurn[]>(NO_TURNS);
@@ -152,6 +245,7 @@ export function useChannelRoom(
   const whisperRef = useRef<((event: string, data: Record<string, unknown>) => void) | null>(null);
   const typingTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const turnTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const exitTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const lastWhisperAtRef = useRef(0);
 
   useEffect(() => {
@@ -164,6 +258,21 @@ export function useChannelRoom(
     whisperRef.current = (event, data) => room.whisper(event, data);
     const typingTimers = typingTimersRef.current;
     const turnTimers = turnTimersRef.current;
+    const exitTimers = exitTimersRef.current;
+
+    /**
+     * Tell the room whether this viewer's tab is in the background.
+     *
+     * Fire-and-forget by design. A whisper sent in the sliver between `join()`
+     * and `subscription_succeeded` is dropped with a console warning by
+     * pusher-js rather than thrown, and losing it costs nothing: everyone else
+     * keeps reading no-signal as "here", which is the ruling.
+     */
+    const sendAway = (isAway: boolean) => {
+      const whisper = whisperRef.current;
+      if (!whisper) return;
+      whisper('away', { uuid: myUuid, away: isAway } satisfies AwayWhisper);
+    };
 
     const clearTyper = (uuid: string) => {
       const timer = typingTimers.get(uuid);
@@ -185,25 +294,49 @@ export function useChannelRoom(
     };
 
     room
-      .here((members: SlimUser[]) =>
-        setOnlineUuids(new Set(members.map((member) => member.uuid))),
-      )
-      .joining((member: SlimUser) =>
-        setOnlineUuids((prev) => {
-          if (prev.has(member.uuid)) return prev;
-          const next = new Set(prev);
-          next.add(member.uuid);
-          return next;
+      .here((members: PresenceMember[]) => {
+        // A copy, not the socket's array: this becomes render state, and the
+        // reference is what tells the header something changed.
+        setHere(members.slice());
+        // The one background a `visibilitychange` can never report, because it
+        // happened before there was anything to report it to (see docblock).
+        if (document.visibilityState === 'hidden') sendAway(true);
+      })
+      .joining((member: PresenceMember) =>
+        setHere((prev) => {
+          if (prev === null) return [member];
+          return prev.some((person) => person.uuid === member.uuid)
+            ? prev
+            : [...prev, member];
         }),
       )
-      .leaving((member: SlimUser) =>
-        setOnlineUuids((prev) => {
-          if (!prev.has(member.uuid)) return prev;
-          const next = new Set(prev);
-          next.delete(member.uuid);
-          return next;
-        }),
-      );
+      .leaving((member: PresenceMember) => {
+        setHere((prev) =>
+          prev === null
+            ? prev
+            : prev.filter((person) => person.uuid !== member.uuid),
+        );
+        // Out of the count immediately, on screen for one exit animation. The
+        // dim (if they had gone quiet first) is released with them, so a
+        // reconnect a second later never inherits a stale one.
+        setDeparting((prev) =>
+          prev.some((person) => person.uuid === member.uuid)
+            ? prev
+            : [...prev, member],
+        );
+        const running = exitTimers.get(member.uuid);
+        if (running) clearTimeout(running);
+        exitTimers.set(
+          member.uuid,
+          setTimeout(() => {
+            exitTimers.delete(member.uuid);
+            setDeparting((prev) =>
+              prev.filter((person) => person.uuid !== member.uuid),
+            );
+            setAway((prev) => withoutUuid(prev, member.uuid));
+          }, PRESENCE_EXIT_MS),
+        );
+      });
 
     room.listen('.message.created', (payload: Message) => {
       applyMessageCreated(queryClient, payload);
@@ -365,6 +498,17 @@ export function useChannelRoom(
       invalidateLiveProbe();
     });
 
+    room.listenForWhisper('away', (payload: AwayWhisper) => {
+      // Our own whisper is never echoed back to us; the guard says so out loud
+      // rather than leaving it to Pusher's behaviour, and costs one compare.
+      if (!payload?.uuid || payload.uuid === myUuid) return;
+      setAway((prev) =>
+        payload.away
+          ? withUuid(prev, payload.uuid)
+          : withoutUuid(prev, payload.uuid),
+      );
+    });
+
     room.listenForWhisper('typing', (payload: TypingUser) => {
       if (!payload?.uuid || payload.uuid === myUuid) return;
       setTypingUsers((prev) => [
@@ -384,6 +528,15 @@ export function useChannelRoom(
       );
     });
 
+    /* ── The away signal (see docblock) ─────────────────────────────────────
+          `visibilitychange` is the last event a page can count on; `pagehide`
+          catches most of what it misses. Both say the same word, and neither is
+          load-bearing — silence is read as "here" by everyone else. */
+    const reportVisibility = () => sendAway(document.visibilityState === 'hidden');
+    const reportGone = () => sendAway(true);
+    document.addEventListener('visibilitychange', reportVisibility);
+    window.addEventListener('pagehide', reportGone);
+
     // Join-time reconcile (see docblock): only prefixes that already hold
     // data — a first open is fetching anyway, and invalidating a pending
     // query would only double the request.
@@ -401,13 +554,22 @@ export function useChannelRoom(
     }
 
     return () => {
+      document.removeEventListener('visibilitychange', reportVisibility);
+      window.removeEventListener('pagehide', reportGone);
       whisperRef.current = null;
       for (const timer of typingTimers.values()) clearTimeout(timer);
       typingTimers.clear();
       for (const timer of turnTimers.values()) clearTimeout(timer);
       turnTimers.clear();
+      for (const timer of exitTimers.values()) clearTimeout(timer);
+      exitTimers.clear();
       echo.leave(name);
-      setOnlineUuids(new Set());
+      // Back to "not known yet", never to "nobody": the next room this hook
+      // joins has to earn its faces, and a stale set would draw the previous
+      // channel's people for a frame.
+      setHere(null);
+      setDeparting(NO_MEMBERS);
+      setAway(NO_UUIDS);
       setTypingUsers([]);
       // Turns are live socket state, never history: leaving the room ends
       // them on screen. The server keeps running; the reply will arrive as an
@@ -425,8 +587,16 @@ export function useChannelRoom(
     whisper('typing', { uuid: myUuid, name: myName });
   }, [myUuid, myName]);
 
+  // Three stable state references in a plain bundle: the object is new each
+  // render, the lists inside it are not, so the header's memo only re-runs when
+  // someone actually arrived, left or went quiet.
+  const presence = useMemo<ChannelPresence>(
+    () => ({ here, departing, away }),
+    [here, departing, away],
+  );
+
   return {
-    onlineCount: onlineUuids.size,
+    presence,
     typingUsers,
     respondingTurns,
     notifyTyping,
