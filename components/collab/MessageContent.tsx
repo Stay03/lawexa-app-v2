@@ -38,6 +38,20 @@ export function MessageContent({ content, metadata }: MessageContentProps) {
           >
             @{segment.label}
           </span>
+        ) : segment.type === 'link' ? (
+          // Links became a segment type on 2026-08-08 so an address in a message
+          // can be opened by tapping it. Rendered here too, not only in v2:
+          // both trees share one parser, and leaving this branch out would have
+          // shown v1 readers a URL that still could not be tapped.
+          <a
+            key={i}
+            href={segment.value}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="break-all text-primary underline underline-offset-2 hover:text-primary/80"
+          >
+            {segment.value}
+          </a>
         ) : (
           <span key={i}>{segment.value}</span>
         )

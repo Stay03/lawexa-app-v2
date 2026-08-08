@@ -92,10 +92,91 @@ export interface MentionChip {
   username: string | null;
 }
 
-/** A parsed message-content segment: plain text or a resolved @mention. */
+/** A parsed message-content segment: plain text, a resolved @mention, or a link. */
 export type MessageSegment =
   | { type: 'text'; value: string }
+  | { type: 'link'; value: string }
   | ({ type: 'mention'; value: string } & MentionChip);
+
+/**
+ * A web address inside message text.
+ *
+ * `https?` ONLY, and that is a security decision rather than a scope one. This
+ * runs over text a stranger typed, and the output becomes an `href` — so a
+ * pattern loose enough to admit `javascript:` or `data:` would hand every
+ * member a script-injection primitive. Anchoring on the scheme means a
+ * malicious one can never be produced, which is a stronger guarantee than
+ * sanitising afterwards.
+ *
+ * Bare `www.` and naked domains are deliberately NOT matched. Guessing that
+ * `lawexa.com` is a link means also guessing that `Order 5 r.2` is not, and the
+ * cost of being wrong is a false link in a legal citation. A scheme is the
+ * writer saying "this is an address" out loud.
+ *
+ * Global, so callers must request a fresh instance — `lastIndex` is stateful.
+ */
+function linkTokenRegex(): RegExp {
+  return /https?:\/\/[^\s<>]+/gi;
+}
+
+/**
+ * Give back the trailing characters that belong to the SENTENCE, not the URL.
+ *
+ * "See https://lawexa.com/cases." ends in a full stop the reader wrote, and
+ * swallowing it produces a link that 404s. Brackets are counted rather than
+ * stripped, because a closing paren is only sentence punctuation when the URL
+ * did not open one itself — Wikipedia addresses like
+ * `.../wiki/Mandamus_(law)` are common enough in our corpus to matter.
+ */
+function trimSentencePunctuation(raw: string): string {
+  let url = raw;
+  while (url.length > 1) {
+    const last = url[url.length - 1];
+    if ('.,;:!?"\''.includes(last)) {
+      url = url.slice(0, -1);
+      continue;
+    }
+    if (last === ')' || last === ']') {
+      const open = last === ')' ? '(' : '[';
+      const opened = url.split(open).length - 1;
+      const closed = url.split(last).length - 1;
+      if (closed > opened) {
+        url = url.slice(0, -1);
+        continue;
+      }
+    }
+    break;
+  }
+  return url;
+}
+
+/**
+ * Split a run of plain text into text and link segments.
+ *
+ * Only ever applied to text that mention-scanning has already claimed its share
+ * of, so a handle can never be swallowed by a URL or the other way round.
+ */
+function splitLinks(value: string): MessageSegment[] {
+  const segments: MessageSegment[] = [];
+  let lastIndex = 0;
+
+  for (const match of value.matchAll(linkTokenRegex())) {
+    const start = match.index;
+    if (start === undefined) continue;
+    const url = trimSentencePunctuation(match[0]);
+    if (url.length === 0) continue;
+    if (start > lastIndex) {
+      segments.push({ type: 'text', value: value.slice(lastIndex, start) });
+    }
+    segments.push({ type: 'link', value: url });
+    lastIndex = start + url.length;
+  }
+
+  if (lastIndex < value.length) {
+    segments.push({ type: 'text', value: value.slice(lastIndex) });
+  }
+  return segments;
+}
 
 /**
  * The mention-token shape (`@handle`). Callers that scan with `matchAll` should
@@ -328,14 +409,14 @@ export function parseMessageContent(
   const chips = buildMentionChips(metadata);
 
   if (chips.size === 0) {
-    return content ? [{ type: 'text', value: content }] : [];
+    return content ? splitLinks(content) : [];
   }
 
   const segments: MessageSegment[] = [];
   let lastIndex = 0;
   for (const hit of scanMentions(content, chips)) {
     if (hit.index > lastIndex) {
-      segments.push({ type: 'text', value: content.slice(lastIndex, hit.index) });
+      segments.push(...splitLinks(content.slice(lastIndex, hit.index)));
     }
     segments.push({ type: 'mention', value: hit.token, ...hit.chip });
     // Only past the HANDLE — any full stop the scan swept up stays text.
@@ -343,7 +424,7 @@ export function parseMessageContent(
   }
 
   if (lastIndex < content.length) {
-    segments.push({ type: 'text', value: content.slice(lastIndex) });
+    segments.push(...splitLinks(content.slice(lastIndex)));
   }
   return segments;
 }

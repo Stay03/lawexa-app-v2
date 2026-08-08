@@ -78,6 +78,25 @@ export function MessageContent({
           >
             @{segment.label}
           </span>
+        ) : segment.type === 'link' ? (
+          // A LINK IN A MESSAGE HAS TO BE TAPPABLE, and until 2026-08-08 it was
+          // not — addresses rendered as plain text, so the only way to open one
+          // on a phone was to long-press, copy the WHOLE message, and pick the
+          // URL out of it by hand. Reported by @arthur, who tried to open a
+          // report we had just sent him.
+          //
+          // `noopener` is not optional here: the target is a stranger's text.
+          // `break-all` because a URL is one unbreakable token and would
+          // otherwise push the whole feed sideways on a phone.
+          <a
+            key={index}
+            href={segment.value}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="break-all text-primary underline underline-offset-2 hover:text-primary/80"
+          >
+            {segment.value}
+          </a>
         ) : (
           <span key={index}>{segment.value}</span>
         ),
