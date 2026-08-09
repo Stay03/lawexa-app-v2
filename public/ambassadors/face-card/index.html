@@ -133,9 +133,9 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .chips .swatch.on .sw{border-color:var(--gold);transform:translateY(-2px);box-shadow:var(--sh-gold);}
 .chips .swatch span{font-size:12px;font-weight:600;color:var(--ink-500);}
 .chips .swatch.on span{color:var(--ink-900);}
-.sw.t-cream{background:#F5EFE0;} .sw.t-cream::after{background:radial-gradient(circle at 50% 38%,#D4AF37 0 26%,transparent 27%);opacity:.9;}
-.sw.t-ink{background:#0F0F0F;} .sw.t-ink::after{background:radial-gradient(circle at 50% 38%,#D4AF37 0 26%,transparent 27%);}
-.sw.t-gold{background:#D4AF37;} .sw.t-gold::after{background:radial-gradient(circle at 50% 38%,#0F0F0F 0 26%,transparent 27%);}
+.sw.t-cream{background:#F5EFE0;} .sw.t-cream::after{background:radial-gradient(circle at 50% 50%,#D4AF37 0 26%,transparent 27%);opacity:.9;}
+.sw.t-ink{background:#0F0F0F;} .sw.t-ink::after{background:radial-gradient(circle at 50% 50%,#D4AF37 0 26%,transparent 27%);}
+.sw.t-gold{background:#D4AF37;} .sw.t-gold::after{background:radial-gradient(circle at 50% 50%,#0F0F0F 0 26%,transparent 27%);}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;border:none;font-family:var(--font-sans);font-weight:700;font-size:15.5px;
   padding:14px 22px;border-radius:var(--pill);transition:transform .18s var(--ease),box-shadow .25s var(--ease),background .2s var(--ease);width:100%;}
@@ -228,8 +228,8 @@ footer a{color:var(--gold-deep);font-weight:600;}
         <span class="live"><span class="pd"></span>Live preview</span>
         <canvas id="card" class="card-canvas" width="1080" height="1080" role="img" aria-label="Your Lawexa Ambassador card preview"></canvas>
         <div class="fmt" role="tablist" aria-label="Card format">
-          <button data-fmt="square" class="on"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-square"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <rect x="3" y="3" rx="2" /></svg>Post</button>
-          <button data-fmt="story"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-rectangle-vertical"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <rect x="6" y="2" rx="2" /></svg>Story</button>
+          <button data-fmt="square" class="on"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-square"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <rect width="18" height="18" x="3" y="3" rx="2" /></svg>Post</button>
+          <button data-fmt="story"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-rectangle-vertical"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <rect width="12" height="20" x="6" y="2" rx="2" /></svg>Story</button>
         </div>
         <div class="hint" id="dragHint"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-move"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M12 2v20" />  <path d="m15 19-3 3-3-3" />  <path d="m19 9 3 3-3 3" />  <path d="M2 12h20" />  <path d="m5 9-3 3 3 3" />  <path d="m9 5 3-3 3 3" /></svg>Upload a photo, then drag it on the card to position</div>
       </div>
@@ -273,7 +273,7 @@ footer a{color:var(--gold-deep);font-weight:600;}
           <button class="btn btn-ink" id="share"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-share-2"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <circle cx="18" cy="5" r="3" />  <circle cx="6" cy="12" r="3" />  <circle cx="18" cy="19" r="3" />  <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" />  <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>Share</button>
         </div>
         <div class="cap">
-          <label for="caption">Caption <button class="copy" id="copyCap"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-copy"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <rect x="8" y="8" rx="2" ry="2" />  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>Copy</button></label>
+          <label for="caption">Caption <button class="copy" id="copyCap"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-copy"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>Copy</button></label>
           <textarea id="caption"></textarea>
         </div>
         
@@ -535,13 +535,13 @@ footer a{color:var(--gold-deep);font-weight:600;}
   let capDirty=false;
   function defCaption(){ const inst=state.institution.trim();
     /* THE SCHOOL IS THE PART THAT CAN BLOW THE LIMIT, SO IT IS THE PART THAT
-       GOES. The form caps a school at 46 characters, but the ambassador email
-       now prefills these from the account through the address bar, and a value
-       set in code walks straight past `maxlength` — measured: a 60-character
-       school arrives intact. Rather than truncate somebody's school, build the
-       caption with it and drop the clause only if the result would be cut by X
-       anyway. A caption without the school reads fine; one cut mid-word does
-       not, and it is cut in public. @arthur, 2026-08-08. */
+       GOES. The form caps a school at 46 characters, but the page prefills it
+       from the ambassador's application, and a value set in code walks straight
+       past `maxlength` — measured: a 60-character school arrives intact. Rather
+       than truncate somebody's school, build the caption with it and drop the
+       clause only if the result would be cut by X anyway. A caption without the
+       school reads fine; one cut mid-word does not, and it is cut in public.
+       @arthur, 2026-08-08. */
     const at=inst?` at ${inst}`:'';
     /* SHORT ENOUGH FOR X, WHICH IS THE TIGHTEST PLACE IT GOES. @arthur,
        2026-08-08: the old caption ran past 460 characters against X's 280, so
@@ -549,14 +549,9 @@ footer a{color:var(--gold-deep);font-weight:600;}
        Worst case with the longest school the FORM allows (46) is 217. */
     const body=(a)=>`I’m officially a face of Lawexa${a}. 🎉
 
-Trusted legal AI for law students — research cases, study smarter, pass exams.
+Trusted legal AI for law students. Research cases, study smarter, pass exams.
 
 www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
-    /* But the email now prefills the school through the address bar, and a
-       value set in code walks past `maxlength` — measured: a 60-character
-       school arrives whole. Rather than truncate somebody's school, drop the
-       clause only when keeping it would be cut by X anyway. A caption without
-       the school reads fine; one cut mid-word does not. */
     return body(at).length <= 280 ? body(at) : body(''); }
   const caption=document.getElementById('caption');
   function refreshCaption(){ if(!capDirty) caption.value=defCaption(); }
