@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Frontend plan — channels, invite links, public spaces</title>
+<style>
+  :root{
+    --bg:#FBFAF7; --card:#FFFFFF; --ink:#17150F; --muted:#5F5A4E;
+    --line:#E7E2D6; --gold:#B8952C; --goldsoft:#F6EFD8; --warn:#8A3A12; --warnbg:#FBEDE4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#100F0C; --card:#191713; --ink:#F2EFE6; --muted:#A9A296;
+      --line:#2B2822; --gold:#D9B44A; --goldsoft:#2A2416; --warn:#F0A177; --warnbg:#2E1A10;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#100F0C; --card:#191713; --ink:#F2EFE6; --muted:#A9A296;
+    --line:#2B2822; --gold:#D9B44A; --goldsoft:#2A2416; --warn:#F0A177; --warnbg:#2E1A10;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%;}
+  .wrap{max-width:44rem;margin:0 auto;padding:28px 20px 72px;}
+  header{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:26px;}
+  .eyebrow{font-size:12px;letter-spacing:.10em;text-transform:uppercase;color:var(--gold);font-weight:700;margin:0 0 8px;}
+  h1{font-size:clamp(1.5rem,5vw,2rem);line-height:1.2;margin:0 0 8px;font-weight:700;text-wrap:balance;}
+  .sub{color:var(--muted);margin:0;font-size:15px;}
+  h2{font-size:1.12rem;margin:34px 0 10px;font-weight:700;}
+  p{margin:0 0 12px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 18px 6px;margin:0 0 16px;}
+  .flag{background:var(--warnbg);border:1px solid var(--warn);border-radius:14px;padding:18px 18px 6px;margin:0 0 20px;}
+  .flag .tag{color:var(--warn);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px;}
+  blockquote{margin:10px 0 14px;padding:10px 14px;border-left:3px solid var(--gold);
+    background:var(--goldsoft);border-radius:0 8px 8px 0;font-style:italic;}
+  ol,ul{margin:0 0 14px;padding-left:1.25rem;}
+  li{margin:0 0 8px;}
+  .step{display:flex;gap:12px;align-items:baseline;}
+  .num{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--gold);color:#17150F;
+    font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+  .cost{color:var(--muted);font-size:14px;}
+  .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 14px;}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-weight:700;color:var(--muted);font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;}
+  .ask{border:1px solid var(--gold);border-radius:14px;padding:18px 18px 6px;margin:26px 0 0;}
+  footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px;}
+  code{background:var(--goldsoft);padding:1px 5px;border-radius:5px;font-size:.9em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Frontend plan · for review</p>
+  <h1>Channels, invite links and public spaces</h1>
+  <p class="sub">Written against @backendclaude's contract, which went live at 07:38 today.
+  <strong>Nothing is built. This is for you to approve first.</strong></p>
+</header>
+
+<div class="flag">
+  <p class="tag">One thing is wrong on the app right now</p>
+  <p>When you make a channel, our app still says this about <strong>Private</strong>:</p>
+  <blockquote>Invite only. It stays hidden from the rest of the space.</blockquote>
+  <p>That was true yesterday. Since 07:38 it is false. Private now means the name
+  <strong>is</strong> shown and only the contents are shut. Hidden is the separate third one.</p>
+  <p>Our edit screen says the same thing, so there are two ways to hit it.</p>
+  <p><strong>Not an emergency</strong> — you have said nobody is creating channels while
+  this is in beta, so nobody has been misled. It is words, and it needs fixing before
+  real people arrive.</p>
+</div>
+
+<h2>Two more of the same kind</h2>
+<div class="card">
+  <ul>
+    <li>The space form says <strong>Open</strong> means anyone can find and join it. The
+    space page calls that exact same setting <strong>“Open to the organization”</strong>.
+    One setting, two meanings.</li>
+    <li>The old app's private switch never says what happens when you turn it
+    <strong>off</strong> — which now makes the space public.</li>
+  </ul>
+  <p class="cost">All three together: half a day. No backend needed. Ships on its own.</p>
+</div>
+
+<h2>What the app does not know exists yet</h2>
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Thing</th><th>What we have today</th></tr></thead>
+    <tbody>
+      <tr><td>The third channel setting, hidden</td><td>we only know two</td></tr>
+      <tr><td>Public spaces</td><td>no way to browse or join one</td></tr>
+      <tr><td>Invite links</td><td>no landing page, no way to make one</td></tr>
+      <tr><td>The two waiting lists</td><td>nothing at all</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>The order I would build it</h2>
+
+<div class="card">
+  <p class="step"><span class="num">1</span><span><strong>The three channel settings.</strong>
+  A hidden channel must say “not found”, never “you cannot see this” — otherwise the
+  message itself proves the channel is there. <span class="cost">Half a day.</span></span></p>
+
+  <p class="step"><span class="num">2</span><span><strong>The page somebody lands on when
+  they tap an invite link.</strong> It has to work when they are signed out, and when they
+  are a guest. The button says the right thing the first time, so nobody presses Join and
+  then gets refused. <span class="cost">About a day. This is the one that matters most.</span></span></p>
+
+  <p class="step"><span class="num">3</span><span><strong>Making and managing links.</strong>
+  Create one, see how many times it was used, kill it. <span class="cost">Half a day.</span></span></p>
+
+  <p class="step"><span class="num">4</span><span><strong>The two waiting lists.</strong>
+  Approve or refuse. Where approving also lets somebody into a channel, the button has to
+  say so — or an admin gives away access they never agreed to.
+  <span class="cost">About a day.</span></span></p>
+
+  <p class="step"><span class="num">5</span><span><strong>Browse and join public spaces.</strong>
+  Guests can read but not join or write, and we have to say why rather than just refuse.
+  <span class="cost">About a day.</span></span></p>
+</div>
+
+<h2>One risk I want you to know about now</h2>
+<div class="card">
+  <p>Step 2 has to hold on to the invite code while somebody signs up and confirms their
+  email, then use it when they come back.</p>
+  <p>That means reading saved information on a fresh page load. <strong>That is exactly what
+  broke onboarding in July</strong>, when people were bounced back to step one. I know the
+  cause and I will build it the safe way.</p>
+  <p>I am telling you before I start because if I get it wrong, the person it strands is a
+  brand new user who just tapped somebody's invite.</p>
+</div>
+
+<div class="ask">
+  <h2 style="margin-top:0">What I need from you</h2>
+  <ol>
+    <li>Approve this order, or change it.</li>
+    <li>Confirm the half day of wording goes first, on its own.</li>
+  </ol>
+  <p><strong>Nothing starts until you say.</strong></p>
+</div>
+
+<footer>
+  About 4 days for the five steps, plus the half day of wording.<br>
+  The technical version stays in the repo, because it has to stay true as the code changes:
+  <code>docs/v2-docs/frontend-plan-spaces-channels-invites.md</code>
+</footer>
+
+</div>
+</body>
+</html>
