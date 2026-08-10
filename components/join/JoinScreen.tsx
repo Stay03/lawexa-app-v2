@@ -10,7 +10,7 @@ import { isAxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { inviteLinksApi } from '@/lib/api/collab';
-import type { InviteViewerAction } from '@/types/collab';
+import type { InvitePreview, InviteViewerAction } from '@/types/collab';
 import { forgetPendingInvite, rememberPendingInvite } from './pending-invite';
 
 /**
@@ -73,6 +73,32 @@ const ACTION_LABEL: Record<InviteViewerAction, string> = {
   request: 'Ask to join',
   already_member: 'Open the space',
 };
+
+/**
+ * The line under the name. The description when there is one; otherwise a
+ * sentence built from what we know.
+ *
+ * @arthur chose the made-up line over showing nothing (2026-08-10). I had argued
+ * for nothing, on the grounds that a shorter page beats a page with a hole in
+ * it. His reasoning is better for the case that matters: the spaces with no
+ * description are exactly the ones whose owners are about to send this link to
+ * a stranger, and "Bar Finals Study Group" alone tells that stranger nothing
+ * about what they are being invited into.
+ *
+ * The channel line NAMES THE SPACE rather than saying "a channel", for the same
+ * reason — somebody who has never heard of us needs to know what the room is in.
+ */
+function subtitleFor(invite: InvitePreview): string {
+  const written = invite.channel_name
+    ? invite.channel_description?.trim()
+    : invite.space_description?.trim();
+  if (written) return written;
+
+  if (invite.channel_name) return `A channel in ${invite.space_name}`;
+  return invite.space_type === 'study'
+    ? 'A study space on Lawexa'
+    : 'A work space on Lawexa';
+}
 
 export function JoinScreen({ code }: { code: string }) {
   const router = useRouter();
@@ -203,6 +229,11 @@ export function JoinScreen({ code }: { code: string }) {
             <Lock aria-hidden className="size-3.5" />#{invite.channel_name}
           </p>
         ) : null}
+
+        {/* Never blank: see `subtitleFor`. */}
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          {subtitleFor(invite)}
+        </p>
 
         <p className="mt-3 text-sm text-muted-foreground">
           {invite.member_count}{' '}

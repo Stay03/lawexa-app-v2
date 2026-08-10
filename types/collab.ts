@@ -1077,11 +1077,17 @@ export interface InvitePreview {
   code: string;
   space_uuid: string;
   space_name: string;
+  /** The space's own description. ADDED 2026-08-10 by @backendclaude and
+   *  verified live. Often empty — plenty of spaces never write one, and those
+   *  are exactly the people about to send a stranger an invite. */
+  space_description?: string | null;
   space_type: SpaceType;
   member_count: number;
   inviter_name: string | null;
   /** The channel the link named, when it named one. */
   channel_name: string | null;
+  /** Empty when the link points at a whole space rather than a channel. */
+  channel_description?: string | null;
   requires_approval: boolean;
   viewer_action: InviteViewerAction;
 }

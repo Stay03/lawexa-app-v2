@@ -312,14 +312,27 @@ export function ChannelPreviewDock({
  * too — someone on the other side of whichever wall this is can let you
  * through. Restore a specific sentence only when the shape has been measured
  * with two accounts in one space.
+ *
+ * ── AND SINCE 2026-08-10 IT MUST NOT CONFIRM THE CHANNEL EXISTS ────────────
+ * There is now a THIRD state, `hidden`, whose entire promise is that outsiders
+ * cannot tell it is there. The old title — "You don't have access to THIS
+ * channel" — quietly broke that: you only lack access to something real, so
+ * anybody could confirm a hidden channel by pasting its address and reading our
+ * refusal. The API is careful about this (it 404s the join route for exactly
+ * this reason) and our copy was undoing it.
+ *
+ * The wording below asserts nothing about existence. It is equally true for a
+ * channel that is hidden, one that is private, and one that never existed —
+ * which is precisely what makes it safe, because we cannot tell those apart
+ * from a 403 and must not appear to.
  */
 export function ChannelAccessDeniedState() {
   return (
     <CollabMessage
       icon={Lock}
       tone="neutral"
-      title="You don't have access to this channel"
-      description="This channel isn't open to you. Ask someone already in it to invite you, or pick a channel from your own spaces."
+      title="We couldn't open this channel"
+      description="It may not be open to you, or it may not exist. If somebody sent you here, ask them to let you in."
     />
   );
 }
