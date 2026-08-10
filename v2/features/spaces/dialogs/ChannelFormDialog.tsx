@@ -1,7 +1,9 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { Hash, Loader2, Lock } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+
+import { channelVisibilityFace } from '@/v2/features/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -64,20 +66,28 @@ import { useCreateChannel } from '../mutations';
  * policy refusal is an answer, not an interruption.
  */
 
-const VISIBILITY_CHOICES: readonly Choice<ChannelVisibility>[] = [
-  {
-    value: 'space_public',
-    icon: Hash,
-    title: 'Open to the space',
-    description: 'Everyone in the space can find it and join.',
-  },
-  {
-    value: 'private',
-    icon: Lock,
-    title: 'Private',
-    description: 'Invite only. It stays hidden from the rest of the space.',
-  },
+/* THREE STATES, AND THE WORDS COME FROM THE ONE TABLE. Until 2026-08-10 this
+   list said a private channel "stays hidden from the rest of the space", which
+   the API stopped honouring at 07:38 that morning — private now lists the name
+   and shuts the contents, and `hidden` is its own state. Deriving the order
+   from the union means a fourth state cannot be silently left out of the
+   chooser. */
+const VISIBILITY_ORDER: readonly ChannelVisibility[] = [
+  'space_public',
+  'private',
+  'hidden',
 ];
+
+const VISIBILITY_CHOICES: readonly Choice<ChannelVisibility>[] =
+  VISIBILITY_ORDER.map((value) => {
+    const face = channelVisibilityFace(value);
+    return {
+      value,
+      icon: face.icon,
+      title: face.title,
+      description: face.description,
+    };
+  });
 
 export function ChannelFormDialog({
   open,
@@ -233,7 +243,8 @@ function ChannelPreview({
   visibility: ChannelVisibility;
   description: string;
 }) {
-  const Glyph = visibility === 'private' ? Lock : Hash;
+  const face = channelVisibilityFace(visibility);
+  const Glyph = face.icon;
   const trimmedName = name.trim();
   const trimmedDescription = description.trim();
   return (
@@ -254,10 +265,7 @@ function ChannelPreview({
           {trimmedName ? `#${trimmedName}` : '#your-channel'}
         </span>
         <span className="block min-w-0 truncate text-xs text-muted-foreground">
-          {trimmedDescription ||
-            (visibility === 'private'
-              ? 'Private — invite only'
-              : 'Open to everyone in the space')}
+          {trimmedDescription || face.label}
         </span>
       </span>
     </div>

@@ -45,6 +45,8 @@ export function SpacePlaceHeader({
   onCreateChannel,
   onOpenRoster,
   onEdit,
+  onInvites,
+  onRequests,
   onDelete,
 }: {
   space: Space;
@@ -54,6 +56,8 @@ export function SpacePlaceHeader({
   onCreateChannel: () => void;
   onOpenRoster: () => void;
   onEdit: () => void;
+  onInvites: () => void;
+  onRequests: () => void;
   onDelete: () => void;
 }) {
   const countLabel = memberCountLabel(space.active_members_count);
@@ -94,6 +98,8 @@ export function SpacePlaceHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onInvites}>Invite by link</DropdownMenuItem>
+              <DropdownMenuItem onClick={onRequests}>Waiting to join</DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Pencil aria-hidden className="size-4" />
                 Edit space

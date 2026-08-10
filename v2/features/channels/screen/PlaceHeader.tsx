@@ -2,7 +2,9 @@
 
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Hash, Lock, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, MoreHorizontal } from 'lucide-react';
+
+import { channelVisibilityFace } from '@/v2/features/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -169,7 +171,8 @@ export function ChannelPlaceHeader({
   menu?: ReactNode;
 }) {
   const [descriptionOpen, setDescriptionOpen] = useState(false);
-  const VisibilityIcon = channel.visibility === 'private' ? Lock : Hash;
+  const visibilityFace = channelVisibilityFace(channel.visibility);
+  const VisibilityIcon = visibilityFace.icon;
   const description = channel.description?.trim() || null;
   const total = channel.active_members_count;
   const countLabel = `${total} ${total === 1 ? 'member' : 'members'}`;

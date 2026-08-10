@@ -19,6 +19,15 @@ import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { InviteLinksPanel } from '@/v2/features/invites/InviteLinksPanel';
+import { SpaceJoinRequestsPanel } from '@/v2/features/invites/JoinRequestsPanel';
 import { SpaceFormDialog } from '../dialogs/SpaceFormDialog';
 import { useDeleteSpace } from '../mutations';
 import { SPACE_LOBBY_COLUMN, SPACE_LOBBY_GRID } from './lobby-parts';
@@ -84,7 +93,9 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
    * would strip a real admin's deep link before it could work.
    */
   const panel = useUrlOverlay('panel', {
-    canOpen: space ? { edit: canManage } : undefined,
+    canOpen: space
+      ? { edit: canManage, invites: canManage, requests: canManage }
+      : undefined,
   });
 
   /**
@@ -142,6 +153,8 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
         onCreateChannel={scope.openCreateChannel}
         onOpenRoster={scope.openRoster}
         onEdit={() => panel.show('edit')}
+        onInvites={() => panel.show('invites')}
+        onRequests={() => panel.show('requests')}
         onDelete={() => {
           setDeleteError(null);
           setDeleteOpen(true);
@@ -171,6 +184,36 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
           <SpaceAboutBlock space={space} />
         </div>
       </div>
+
+      {/* INVITE LINKS AND THE WAITING LIST — admin surfaces, on the same
+          url-overlay mechanism as Edit so Back closes them (W1 rule). */}
+      <Sheet {...panel.bind('invites')}>
+        <SheetContent side="right" className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Invite by link</SheetTitle>
+            <SheetDescription>
+              Share a link with anybody. You decide who actually gets in.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-6">
+            <InviteLinksPanel spaceUuid={space.uuid} />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet {...panel.bind('requests')}>
+        <SheetContent side="right" className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Waiting to join</SheetTitle>
+            <SheetDescription>
+              People who used a link that needs your approval.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-6">
+            <SpaceJoinRequestsPanel spaceUuid={space.uuid} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <SpaceFormDialog
         key={panel.keyFor('edit')}

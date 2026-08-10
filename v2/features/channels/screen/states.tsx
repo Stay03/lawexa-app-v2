@@ -1,5 +1,7 @@
 import { format } from 'date-fns';
-import { Eye, Hash, Loader2, Lock, LogIn, Radio, UserPlus, WifiOff } from 'lucide-react';
+import { Eye, Loader2, Lock, LogIn, Radio, UserPlus, WifiOff } from 'lucide-react';
+
+import { channelVisibilityFace } from '@/v2/features/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -135,7 +137,8 @@ export function ChannelIntro({
   onAddPeople?: () => void;
   onWriteFirstMessage?: () => void;
 }) {
-  const VisibilityIcon = channel.visibility === 'private' ? Lock : Hash;
+  const visibilityFace = channelVisibilityFace(channel.visibility);
+  const VisibilityIcon = visibilityFace.icon;
   const total = channel.active_members_count;
   const countLabel = `${total} ${total === 1 ? 'member' : 'members'}`;
   const created = channel.created_at ? new Date(channel.created_at) : null;

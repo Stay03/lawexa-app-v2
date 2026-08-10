@@ -2,7 +2,9 @@
 
 import { memo } from 'react';
 import Link from 'next/link';
-import { BellOff, Hash, Lock } from 'lucide-react';
+import { BellOff } from 'lucide-react';
+
+import { channelVisibilityFace } from '@/v2/features/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import {
@@ -69,7 +71,11 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
 }) {
   const { channel, grammar } = row;
   const { unread, mentions, muted } = grammar;
-  const Icon = channel.visibility === 'private' ? Lock : Hash;
+  // Read the glyph off the face record rather than calling for it: a component
+  // assigned straight out of a call reads as "created during render" to the
+  // React Compiler lint, and it is right to be strict about that.
+  const visibilityFace = channelVisibilityFace(channel.visibility);
+  const Icon = visibilityFace.icon;
   const age = now > 0 ? formatRelativeTime(channel.last_message_at, now) : '';
   const line = channelPreviewLine(row);
   const preview = line.kind === 'none' ? null : line;

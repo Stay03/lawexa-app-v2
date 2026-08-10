@@ -22,10 +22,18 @@ import type {
   ChannelMemberListResponse,
   ChannelResponse,
   CreateChannelPayload,
+  CreateInviteLinkPayload,
   CreateListPayload,
   CreateOrganizationPayload,
   CreateSpacePayload,
+  DiscoverSpacesParams,
+  DiscoverSpacesResponse,
+  InviteAcceptResponse,
+  InviteLinkListResponse,
+  InviteLinkResponse,
   InviteMemberPayload,
+  InvitePreviewResponse,
+  JoinRequestListResponse,
   MarkReadResponse,
   MemberListParams,
   MemberResponse,
@@ -908,6 +916,169 @@ export const channelFilesApi = {
   ): Promise<ApiResponse<null>> => {
     const response = await apiClient.delete<ApiResponse<null>>(
       `/channels/${channelUuid}/files/${id}`
+    );
+    return response.data;
+  },
+};
+
+/**
+ * Invite links, the two waiting lists, and browsing public spaces.
+ * API commit `36a2c54`, 2026-08-10 — `docs/api/spaces-channels-invite-links.md`.
+ */
+export const inviteLinksApi = {
+  /**
+   * THE ONE ROUTE THAT MUST WORK WITHOUT A TOKEN. It renders the "you have been
+   * invited" screen for somebody who has no account yet, so it deliberately
+   * carries no `Authorization` requirement.
+   *
+   * It still goes through `apiClient`: a token is SENT when one exists, and it
+   * has to be, because `viewer_action` is the server's answer about THIS
+   * viewer. Stripping the token here would tell a signed-in member they need
+   * to sign up.
+   *
+   * `404` (no such code) and `410` (revoked, expired or used up) are different
+   * on purpose, so somebody whose invite quietly lapsed is told why rather than
+   * that it never existed.
+   */
+  preview: async (code: string): Promise<InvitePreviewResponse> => {
+    const response = await apiClient.get<InvitePreviewResponse>(
+      `/invite-links/${code}`
+    );
+    return response.data;
+  },
+
+  /** Previewing never counts as a use — only this does. */
+  accept: async (code: string): Promise<InviteAcceptResponse> => {
+    const response = await apiClient.post<InviteAcceptResponse>(
+      `/invite-links/${code}/accept`,
+      {}
+    );
+    return response.data;
+  },
+
+  list: async (spaceUuid: string): Promise<InviteLinkListResponse> => {
+    const response = await apiClient.get<InviteLinkListResponse>(
+      `/spaces/${spaceUuid}/invite-links`
+    );
+    return response.data;
+  },
+
+  create: async (
+    spaceUuid: string,
+    payload: CreateInviteLinkPayload = {}
+  ): Promise<InviteLinkResponse> => {
+    const response = await apiClient.post<InviteLinkResponse>(
+      `/spaces/${spaceUuid}/invite-links`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** Revoke. The row is kept, never deleted, so its use count survives. */
+  revoke: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(
+      `/invite-links/${id}`
+    );
+    return response.data;
+  },
+};
+
+/**
+ * The waiting lists. Two queues, one shape.
+ *
+ * EVERY `id` HERE IS READ OFF THE ROW, never built. The API shipped once with
+ * that field missing and thirty passing tests did not catch it, because a test
+ * keeps the id it created while an app has to read it back.
+ */
+export const joinRequestsApi = {
+  listForSpace: async (spaceUuid: string): Promise<JoinRequestListResponse> => {
+    const response = await apiClient.get<JoinRequestListResponse>(
+      `/spaces/${spaceUuid}/join-requests`
+    );
+    return response.data;
+  },
+
+  approveSpace: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      `/space-join-requests/${id}/approve`,
+      {}
+    );
+    return response.data;
+  },
+
+  rejectSpace: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      `/space-join-requests/${id}/reject`,
+      {}
+    );
+    return response.data;
+  },
+
+  listForChannel: async (
+    channelUuid: string
+  ): Promise<JoinRequestListResponse> => {
+    const response = await apiClient.get<JoinRequestListResponse>(
+      `/channels/${channelUuid}/join-requests`
+    );
+    return response.data;
+  },
+
+  /**
+   * Ask to be let into a private channel.
+   *
+   * `201` created, `200` you already had one waiting — BOTH are successes and
+   * neither may draw an error. `404` is a hidden channel and must be shown as
+   * "no such channel": anything softer confirms it exists. `409` means the
+   * channel is open and should simply be joined.
+   */
+  requestChannel: async (channelUuid: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      `/channels/${channelUuid}/join-requests`,
+      {}
+    );
+    return response.data;
+  },
+
+  approveChannel: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      `/channel-join-requests/${id}/approve`,
+      {}
+    );
+    return response.data;
+  },
+
+  rejectChannel: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      `/channel-join-requests/${id}/reject`,
+      {}
+    );
+    return response.data;
+  },
+};
+
+/** Browsing and joining public spaces. */
+export const discoverApi = {
+  spaces: async (
+    params: DiscoverSpacesParams = {}
+  ): Promise<DiscoverSpacesResponse> => {
+    const response = await apiClient.get<DiscoverSpacesResponse>(
+      '/spaces/discover',
+      {
+        params: {
+          search: params.search || undefined,
+          per_page: params.per_page ?? 20,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /** Self-join a public space. `403` for a guest, or for a private space. */
+  join: async (spaceUuid: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      `/spaces/${spaceUuid}/join`,
+      {}
     );
     return response.data;
   },

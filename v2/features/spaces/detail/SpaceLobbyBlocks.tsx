@@ -247,7 +247,12 @@ export function SpaceAboutBlock({ space }: { space: Space }) {
             ) : (
               <Globe aria-hidden className="size-3 text-muted-foreground" />
             )}
-            {space.is_private ? 'Private' : 'Open to the organization'}
+            {/* NOT "Open to the organization". The create form calls this exact
+                state "anyone can find it and join without an invitation", and
+                until 2026-08-10 the flag did nothing so the disagreement was
+                harmless. It is a real setting now, and a personal space has no
+                organization for the old wording to even refer to. */}
+            {space.is_private ? 'Private' : 'Open to anyone'}
           </span>
         </LobbyFact>
         <LobbyFact term="Kind">{space.type_label}</LobbyFact>

@@ -171,10 +171,19 @@ export function SpaceFormDialog({
           </div>
 
           <div className="flex items-center justify-between rounded-lg border p-3">
+            {/* THE OFF STATE HAS TO SAY WHAT IT DOES. This read "Private space /
+                Only invited members can find and join it" with nothing anywhere
+                about turning it OFF — and since 2026-08-10 off means anybody on
+                Lawexa can find the space and walk in. Two of the three spaces
+                that were accidentally public were made through this switch.
+                The sentence now follows the switch, so it describes the setting
+                you are actually leaving it on. */}
             <div>
               <p className="text-sm font-medium">Private space</p>
               <p className="text-xs text-muted-foreground">
-                Only invited members can find and join it.
+                {isPrivate
+                  ? 'Only invited members can find and join it.'
+                  : 'Off: anyone on Lawexa can find this space and join it.'}
               </p>
             </div>
             <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />

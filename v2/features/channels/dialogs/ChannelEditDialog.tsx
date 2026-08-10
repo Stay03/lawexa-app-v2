@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
+import { channelVisibilityFace } from '@/v2/features/collab/visibility';
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -125,11 +127,22 @@ export function ChannelEditDialog({
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
+              {/* THE SAME THREE STATES AS THE CREATE DIALOG, from the same
+                  table. This screen is the second door onto the mistake: it
+                  offered only two, and called private "invite only", so an
+                  existing channel could be switched to private by somebody who
+                  believed that still meant invisible. */}
               <SelectContent>
-                <SelectItem value="space_public">
-                  Public — anyone in the space
-                </SelectItem>
-                <SelectItem value="private">Private — invite only</SelectItem>
+                {(['space_public', 'private', 'hidden'] as const).map(
+                  (value) => {
+                    const face = channelVisibilityFace(value);
+                    return (
+                      <SelectItem key={value} value={value}>
+                        {face.title} &mdash; {face.label}
+                      </SelectItem>
+                    );
+                  },
+                )}
               </SelectContent>
             </Select>
           </div>

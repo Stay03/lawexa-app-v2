@@ -1,0 +1,85 @@
+How spaces and channels will work 
+ Implementation plan &middot; Lawexa 
+ How spaces and channels will work 
+ Everything decided on 9 August, in one place. What the words mean, what happens to people already using Lawexa, and the order it gets built in. 
+ Written by Backend Claude 
+ For Stay and Arthur 
+ Date 9 August 2026 
+ Status Plan &mdash; nothing built yet 
+ The words 
+ Two settings. That is the whole vocabulary. 
+ A space is one of two things 
+ Private. Only people who are let in can find it or enter it. Every space today is this one. 
+ Public. Anyone can find it in a list and read its open channels. 
+ A channel is one of three things 
+ Open. Everyone who can see the space can read it. A new channel is this unless somebody changes it. 
+ Private. The name shows in the list. Nobody outside reads a word of it. You ask to get in, and an admin decides. 
+ Hidden. Shows nowhere at all. You only know it exists if you are already in it. 
+ The one thing worth remembering 
+ Private is a lock on the door. Hidden is no door at all. A private channel tells you it is there and refuses you. A hidden channel tells you nothing. 
+ What that means in practice 
+ Six combinations. Nothing else is possible. 
+ Space Channel What a stranger gets 
+ Private Open Nothing. Cannot even find the space. 
+ Private Private Nothing. 
+ Private Hidden Nothing. 
+ Public Open Reads it, without signing up. Must sign up to write. 
+ Public Private Sees the name. Reads nothing. Can ask to join. 
+ Public Hidden Never knows it exists. 
+ Inside a private space, members see the open and private channels, and see a hidden one only if they are in it. Lawexa staff can see spaces and who is in them, but never read messages &mdash; that is already true today and does not change. 
+ Somebody new gets a link 
+ The whole journey, from their side. 
+ Someone sends them a link. WhatsApp, a lecture slide, a friend. For a public space they could also just find it in a list &mdash; there the link is a shortcut, not a key. 
+ They tap it. The app opens and quietly makes them a guest, the way it does today. 
+ They see a small page. Space name, channel name, who invited them, how many people are inside. No messages. 
+ The button already says the right thing. Not &ldquo;Join&rdquo; followed by an error. It says Sign up to join , because the app is told up front what this particular person needs. 
+ They sign up. Google is instant. Email means confirming the email first, and the app keeps hold of the link while they do. 
+ They land inside. Or on the waiting list, if that space or channel needs approval. An admin sees them and lets them in. 
+ The order it gets built 
+ Not a preference. Each step needs the one before it. 
+ Step 1 &mdash; The three channel settings 
+ Add hidden, change what private means, move every private channel that exists today to hidden, and stop anyone but space admins creating channels. 
+ Why first: everything that shows a list of channels depends on what these three words mean. Doing it first means changing that list once instead of twice. It is also safe to ship alone, because it changes nothing anybody can see. 
+ Step 2 &mdash; The waiting list 
+ Somebody asks to join. An admin sees the request and approves or refuses it. 
+ Why second: the three features after it all need it. And most of it already exists : being invited today puts a row in a waiting state until you accept. Asking to join is the same row with nobody named as the inviter. The direction reverses; the machinery does not change. 
+ Step 3 &mdash; Invite links 
+ A link anyone can be given, which can expire, be capped, or be killed. 
+ Why third: it adds new things and changes nothing that exists, so it is the safest place to prove the waiting list works before crowds use it. It is also what was asked for first, so the value lands early. 
+ Step 4 &mdash; Public spaces 
+ A browsable list, joining without an invitation, guests reading open channels, and a read limit so nobody empties us out. 
+ Why last: it is the only step that changes what people can already see, and it leans on all three above. By the time it ships, the joining machinery has been in real use for a while. 
+ What changes for people already using Lawexa 
+ Checked against the live database, not guessed. 
+ 17 channels 
+ 17 private channels exist. Under the new meaning of private, their names would appear in front of everyone in their space &mdash; 55 separate occasions where somebody is shown a name they cannot see today . 
+ So all 17 become hidden instead. Hidden is exactly what they already are, so not one person sees anything new, loses anything, or needs telling. Anyone who wants theirs listed can switch it themselves later, knowing what it does. 
+ 3 spaces 
+ 3 spaces out of 18 are already set to not-private. Two are Arthur&rsquo;s study groups from July, made on the old app, where switching that off explained nothing at all. The third is a one-person work space. 
+ They are not being flipped in bulk. Arthur has been asked directly about his two. The third gets set private with a one-tap way to undo it, because the app currently describes that setting two different ways and nobody could have chosen it fully informed. 
+ Everything else &mdash; every private space, every open channel, every member &mdash; carries on exactly as it does now. 
+ Decided 
+ Public spaces will exist. 
+ Channels have three settings: open, private, hidden. 
+ A brand new channel is open unless changed. Arthur 
+ Only space admins create channels. Stay 
+ A guest can read a public space and its open channels. An account is needed to join and to write. Stay 
+ Getting into a private channel is by request, and a space or channel admin approves. Stay 
+ Guests never become members. The button says so before it is pressed. 
+ Email confirmation stays required. Nobody is waved past it. 
+ Still open 
+ Arthur&rsquo;s two study spaces. Did he mean to open them? 
+ The member list. Anyone in a space sees everyone in it. In a public space that means a stranger who joins Arthur&rsquo;s study group sees every student&rsquo;s name. Fine for a work space, less obviously fine for that one. 
+ Refusing a request. Today, declining deletes the record &mdash; so somebody refused could ask again immediately, forever. Worth settling before people can queue up. 
+ Where the link points. Assumed to be the app, not the API. 
+ Cost 
+ Step Time 
+ 1 &middot; Three channel settings, and moving the 17 1 day 
+ 2 &middot; The waiting list &frac12; day 
+ 3 &middot; Invite links 1&frac12; days 
+ 4 &middot; Public spaces, guest reading, read limits 1&frac12; days 
+ Total 4 to 4&frac12; days 
+ Step 2 is short because most of it is already built. Frontend Claude has about half a day of his own on the wording, and it has to ship in the same release, not after it. 
+ Each step can go live on its own. Nothing waits for all four to be finished. 
+ Every number here was checked against the live database on 9 August 2026. Nothing has been built. If a detail matters to a decision you are making, ask and I will show where it came from. 
+ This page deletes itself at 02:07 UTC on 10 August 2026 , twelve hours after it went up.

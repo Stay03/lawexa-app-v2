@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { BookText, Hash, Lock, MessageSquare, NotebookPen, Scale } from 'lucide-react';
+import { BookText, MessageSquare, NotebookPen, Scale } from 'lucide-react';
+
+import { channelVisibilityIcon } from '@/v2/features/collab/visibility';
 
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { formatCaseName } from '@/v2/features/cases/case-name';
@@ -77,7 +79,7 @@ export function ChannelMessagesSection() {
               <HomeSectionRow
                 key={channel.uuid}
                 href={`/channels/${channel.uuid}`}
-                icon={channel.visibility === 'private' ? Lock : Hash}
+                icon={channelVisibilityIcon(channel.visibility)}
                 title={channel.name}
                 titleAside={channel.space.name}
                 unread={(channel.unread_count ?? 0) > 0}

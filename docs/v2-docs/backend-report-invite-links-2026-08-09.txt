@@ -1,0 +1,136 @@
+Invite by link — implementation report 
+ Implementation report · Lawexa API 
+ Invite people to a space with a link 
+ Today the only way into a space is for an owner or admin to type in the email of someone who already has a Lawexa account. This is what it takes to replace that with a link you can paste anywhere. 
+ Written by Backend Claude 
+ For Stay 
+ Date 9 August 2026 
+ Status Proposal — nothing built yet 
+ The short version 
+ If you read nothing else. 
+ What I found 
+ There is no invite-link machinery anywhere in the codebase to build on. Not for spaces, not for channels, not even for quiz games — a quiz is joined by being in the channel already, it has no join code. All four invitation systems we have (firm, organization, space, channel) work the same way: an admin creates a pending row in a members table, and the invitee accepts it by row number. Nothing is addressed by a code, nothing expires, and nothing can be handed to someone who is not already a Lawexa user. 
+ So this is a new table and five new endpoints, not a new column on an old table. That is the honest cost. 
+ What you would get: an owner or admin opens a space, presses Invite by link , and gets something like lawexa.com/join/k7m2q9xr4npv3b8t . Anyone with the link sees the space name and who invited them before signing in. When they accept, they land in the space. The creator can set it to expire, cap how many people can use it, or kill it. 
+ What this does not include: public spaces. No browsable list of spaces, no joining one without a link. That is a separate feature, roughly 1½–2 days on its own, explained further down. 
+ What it costs: about 2 to 2½ days . That is the build, the tests, and the notification to admins. 
+ What I need from you: three decisions, all listed at the bottom. The biggest one is whether a link lets someone straight in or puts them in a queue for approval. 
+ How you get into a space today 
+ Two doors, and both of them are locked from the inside. 
+ I traced every line of code in the app that can create a space membership. There are exactly three, and only one of them involves another human: 
+ Door Who can open it What it needs 
+ You made the space 
+ You 
+ You become Owner automatically. 
+ Your personal space 
+ You 
+ Built for you the first time you open Lawexa. Guests do not get one. 
+ An admin invites you 
+ The space's own owner or admin 
+ You must already have a Lawexa account. They type your email or your user ID. If you have never signed up, there is nothing to type. 
+ "Admin" means two different people — be clear which 
+ Everywhere in this report, admin means the space's own owner or admin — the person who made the space, or somebody they promoted. That is who invites people, and that is who would create invite links. 
+ Separately, and already true today: a Lawexa staff admin can do all of it in any space. Anyone whose Lawexa account role is Admin or Superadmin can invite into any space, open any space, and read any space's member list without being a member of it. Researchers cannot — only those two roles. 
+ That is existing behaviour, not something this feature adds. But if Lawexa staff being able to walk into any space is not what you want, that is its own decision and its own change. 
+ There is no self-join for a space , at all. Channels have a self-join — but only for channels marked "visible to the whole space", and it checks first that you are already an active member of the parent space. So the channel door only opens for people who are already inside the building. 
+ Are we adding public spaces? No. 
+ Public spaces are not part of this work. After this is built, the link is still the only way into a space from outside. Nobody can browse a list of spaces, and nobody can join one they were not sent a link to. 
+ Two separate things below sound like they are about public spaces. They are not the same thing, so here they are side by side. 
+ The dead flag (a fact, not a plan) 
+ Spaces have a setting called is_private , switched on by default. Nothing in the app reads it. It gets saved when a space is created and shown back in the API, and that is the end of its life. Every space behaves as private whatever that setting says, because the permission check only ever asks one question — "is this person a member". Turning the flag off today would change nothing at all. 
+ Public spaces (a feature we have not built and are not building here) 
+ A public space would mean two things that do not exist: a list people can browse , and joining without being invited . Building it means making that dead flag start working everywhere, adding the browse list, adding a join, and deciding who can see a space's members and messages before they are in it — which is a product question, not a code one. 
+ Rough cost: another 1½ to 2 days , and more decisions than typing. That is a guess, not a costed estimate. I left it out to keep this piece at 2–2½ days. If you want it, say so and I will cost it properly. 
+ The engineering detail — where this lives 
+ Membership rows are only ever created in two files: app/Services/SpaceService.php (creator at line 234, personal space at 149, admin invite at 339) and app/Services/ChannelService.php (creator at 239, self-join at 309, invite at 384). Nothing else in app/ or in any seeder writes to space_members or channel_members . 
+ is_private appears only at Space.php:35 (fillable), Space.php:66 (cast), CreateSpaceRequest.php:33 , UpdateSpaceRequest.php:34 , SpaceService.php:169 and SpaceResource.php:29 . SpacePolicy::view at SpacePolicy.php:24 ignores it. 
+ What the link would do 
+ The journey, from the side of the person who receives it. 
+ Someone pastes you a link. 
+ WhatsApp, email, a slide at a lecture. The link carries a random code and nothing else — no space number, no email address, nothing that identifies you or lets anyone guess a different space's link. 
+ You open it, signed in or not. 
+ You see the space name, what kind of space it is, how many people are in it, who created the invite, and — if it is a link to one specific channel — that channel's name. That is all. No messages, no member list, no files. 
+ If the link is dead, it says so. 
+ Expired, cancelled, or already used up by its limit — the page says which. A code that never existed just says not found. 
+ You sign in or sign up. 
+ The app holds onto the code while you do. New accounts sign up as normal. 
+ You accept, and you are in. 
+ Or, if the link is set to require approval, you are in the queue and the space admins get a notification. If you were already a member, the link just takes you to the space — no error, no duplicate. 
+ The rule I would hold to 
+ The preview page must never leak more than a person would learn from the invite message itself. Space name, member count, inviter. Someone who finds a link in a group chat should learn nothing they could not have learned by asking the person who posted it. 
+ What gets built 
+ One new table, five endpoints. 
+ The table 
+ A new space_invite_links table. One row per link. I would not make it a generic "invite link to anything" table — tying it directly to a space lets the database enforce that a link always points somewhere real, and it keeps us out of a known trap in this codebase where polymorphic tables must be registered in a lookup list or they store inconsistent values. 
+ Column What it is for 
+ code The random part of the URL. 16 characters, unique, drawn from an alphabet with no 0/O or 1/l confusion. Enough randomness that guessing is not a strategy. 
+ space_id Which space it lets you into. Required. 
+ channel_id Optional. If set, accepting also drops you into that one channel. 
+ role What you arrive as. Member or admin — never owner. 
+ requires_approval Straight in, or into a queue. See the decision at the bottom. 
+ max_uses , uses Optional cap and the running count. Empty cap means unlimited. 
+ expires_at Optional. Empty means it never expires on its own. 
+ revoked_at Set when someone kills the link. Kept rather than deleted so we can still answer "who joined through which link". 
+ created_by Whose name appears on the preview. 
+ The endpoints 
+ Endpoint Who Does what 
+ GET /api/invite-links/{code} 
+ No sign-in 
+ The preview. The only endpoint in the whole spaces area that does not need a token — it has to work before someone has an account. 
+ POST /api/invite-links/{code}/accept 
+ Signed in 
+ Join, or request to join. Safe to call twice. 
+ POST /api/spaces/{space}/invite-links 
+ Owner / admin 
+ Create a link. 
+ GET /api/spaces/{space}/invite-links 
+ Owner / admin 
+ List the space's links and how many times each was used. 
+ DELETE /api/invite-links/{id} 
+ Owner / admin 
+ Kill a link. 
+ Permission to create and kill links matches who can invite today — owner, admin, or a platform admin. No new permission concept. 
+ What the frontend gets told when it goes wrong 
+ Code Means What the page should say 
+ 404 No such link "This invite link doesn't exist." 
+ 410 Expired, cancelled, or used up "This invite has expired — ask for a new one." 
+ 429 Too many tries "Too many attempts. Try again in a minute." 
+ 200 Already a member Nothing — just open the space. 
+ A conscious trade 
+ Splitting 404 from 410 tells someone holding a dead code that the code was once real. That is a small thing to give away, and the alternative — one blank "not found" for everything — means a person whose invite quietly expired has no idea why, and blames us. I would take the useful message. Say the word if you would rather it were silent. 
+ Three things that will bite 
+ These came out of reading the code, not out of imagining problems. 
+ 1 · A brand-new user cannot accept until they verify their email 
+ Every single API route in Lawexa refuses unverified email accounts. So the exact person this feature exists for — someone with no Lawexa account who clicks a link — signs up, and then hits a wall before they can join. 
+ What I would do: leave the wall standing. The frontend holds the invite code through sign-up and verification, and joins them the moment they come back verified. Punching a hole in email verification for one endpoint is how holes become permanent. People who sign up with Google are verified instantly anyway, which is most of them. 
+ 2 · Guests would silently become members 
+ A "guest" in Lawexa is a real account with a real token, created from a device fingerprint, with no name and no email. Those tokens pass every check a normal signed-in user passes. If we do nothing, a guest clicking an invite link joins the space as an anonymous account that nobody can identify or contact, permanently. 
+ What I would do: refuse guests at the accept step with a clear signal, so the frontend sends them to sign up first and then joins them. 
+ 3 · A link handed to someone already invited by email 
+ Say you invite Arthur by email, and before he accepts you paste him the link. Today's code would treat that as a conflict and error. That is nonsense from his side — he has one invitation, delivered twice. 
+ What I would do: the link wins. If he already has a pending invite and the link is the straight-in kind, he goes straight in. If he is already a full member, the link opens the space and says nothing. No error he did not cause. 
+ Two more, smaller — the ones that break the build rather than the user 
+ Members are one row, forever. The members table allows exactly one row per person per space, and tracks joined/pending/left in flags on that row. Someone who left and comes back through a link must have their old row switched back on, not a new one inserted — a plain insert throws. Both existing join paths already do this dance; the new one copies it. 
+ A channel member must be a space member. The code enforces this in four separate places. A link that points at a channel has to create the space membership too, in the same transaction, and fire the event that keeps the live member list on screen correct. 
+ What I am deliberately not building 
+ Public spaces you can browse. Covered in full further up — the link stays the only way in from outside, the dead is_private flag stays dead, and the permission model is untouched. Roughly 1½–2 days on its own if you want it. 
+ Invite links for firms and organizations. They have their own invite systems. Spaces first; copy it across later if it earns its place. 
+ Per-person links. One link, many people. Tracking who was meant to use which link is a different, bigger feature. 
+ Quiz join codes. Still worth doing and still about half a day, but it is a separate thing — a code that puts you in a running game, not in a space. Nothing here blocks it. 
+ Cost 
+ Piece Time 
+ Table, model, factory, code generation ½ day 
+ The five endpoints, permissions, the join logic 1 day 
+ Notifying admins when someone requests to join ½ day 
+ Tests — the happy path plus expired, revoked, used-up, guest, unverified, already-a-member, previously-left, and the channel-scoped link ½ day 
+ Total 2 – 2½ days 
+ The frontend is separate and not counted here — a preview page, a create-link panel, and holding the code through sign-up. 
+ What I need from you 
+ 1 · Straight in, or approval queue? 
+ We settled on approval earlier. Having now read the code I would soften that: build both, ship with approval as the default. The column costs nothing now and costs a migration later. A team invite where the owner has to approve everyone they just invited is friction; a link posted publicly where anyone walks in is a problem. Same feature, different setting. 
+ 2 · Where does the link point? 
+ I have assumed lawexa.com/join/{code} — the app, not the API. The app reads the code, calls the API for the preview, and handles sign-in. Confirm and I will write it that way. 
+ 3 · Is this next? 
+ It is 2–2½ days. The other things sitting in my queue are the scraping holes from July, "last seen" in words, and Arthur's @ for cases and statutes at about four days. Your call on the order. 
+ Every claim in this report was checked against the code on 9 August 2026. Nothing has been built or changed — this is a proposal. If a detail here matters to a decision you are making, ask and I will show you the lines it came from. 
+ This page deletes itself at 13:23 UTC on 9 August 2026 , twelve hours after it went up. Nothing to remember and nothing left lying around.

@@ -41,7 +41,12 @@ export interface SlimUser {
 
 export type OrganizationType = 'law_firm' | 'university' | 'company' | 'bank' | 'other';
 export type SpaceType = 'work' | 'study';
-export type ChannelVisibility = 'space_public' | 'private';
+/** `space_public` = open, `private` = listed by name but shut, `hidden` = no door
+ *  at all. THREE STATES SINCE 2026-08-10 (api commit 36a2c54): `private` used to
+ *  mean invisible, and every private channel that predates that deploy was
+ *  migrated to `hidden` so nobody's promise was broken. Anything that branches on
+ *  this must decide about `hidden` explicitly — see `channelVisibilityFace`. */
+export type ChannelVisibility = 'space_public' | 'private' | 'hidden';
 export type MemberRole = 'owner' | 'admin' | 'member';
 export type NotifyLevel = 'all' | 'mentions_only' | 'muted';
 
@@ -1043,3 +1048,153 @@ export type TaskListItemsResponse = ItemResponse<TaskListItem[]>;
 export type ChannelFileListResponse = LengthAwareResponse<ChannelFile>;
 /** A single channel file — upload result. */
 export type ChannelFileResponse = ItemResponse<ChannelFile>;
+
+/******************************************************************************
+              Invite links, waiting lists and public spaces
+        (API commit 36a2c54, 2026-08-10 — docs/api/spaces-channels-invite-links.md)
+******************************************************************************/
+
+/**
+ * What THIS viewer must do next about an invite link, decided by the server.
+ *
+ * ── BUILD EVERY BUTTON ON THIS, NEVER ON "DO I HAVE A TOKEN" ───────────────
+ * A guest carries a real token and passes authentication, so the usual test
+ * says "signed in" and would offer them Join — which the server then refuses.
+ * That is the refusal-after-the-press the contract exists to prevent. The
+ * server folds guest-ness, email confirmation and membership into one word;
+ * read the word.
+ */
+export type InviteViewerAction =
+  | 'sign_up'
+  | 'verify_email'
+  | 'join'
+  | 'request'
+  | 'already_member';
+
+/** `GET /invite-links/{code}` — THE ONE UNAUTHENTICATED ROUTE. It has to
+ *  answer before somebody has an account, which is the whole point of it. */
+export interface InvitePreview {
+  code: string;
+  space_uuid: string;
+  space_name: string;
+  space_type: SpaceType;
+  member_count: number;
+  inviter_name: string | null;
+  /** The channel the link named, when it named one. */
+  channel_name: string | null;
+  requires_approval: boolean;
+  viewer_action: InviteViewerAction;
+}
+
+/** What `POST /invite-links/{code}/accept` did.
+ *  `already_member` and `already_waiting` are SUCCESSES — pressing twice must
+ *  never draw an error. */
+export type InviteAcceptStatus =
+  | 'joined'
+  | 'request'
+  | 'already_member'
+  | 'already_waiting';
+
+export interface InviteAcceptResult {
+  status: InviteAcceptStatus;
+  space_uuid: string;
+  channel_uuid?: string | null;
+}
+
+/**
+ * MEASURED against production 2026-08-10, not taken from the doc. The written
+ * contract says "list, with use counts" without naming the field, and the
+ * server sends `uses` — so a type built on the obvious guess (`uses_count`)
+ * would have read `undefined` and quietly shown every link as unused. There is
+ * also no `url`: the link is built from the code, by us.
+ */
+export interface InviteLink {
+  id: number;
+  code: string;
+  role: Exclude<MemberRole, 'owner'>;
+  role_label: string;
+  requires_approval: boolean;
+  channel: { uuid: string; name: string } | null;
+  max_uses: number | null;
+  /** Previewing never counts. Only a real join or request moves this. */
+  uses: number;
+  /** The server's own verdict — live, not expired, not revoked, uses left. */
+  is_usable: boolean;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  creator: SlimUser;
+}
+
+export interface CreateInviteLinkPayload {
+  channel_uuid?: string;
+  role?: Exclude<MemberRole, 'owner'>;
+  /** Defaults to TRUE server-side — an unattended link lets strangers in. */
+  requires_approval?: boolean;
+  max_uses?: number;
+  expires_at?: string;
+}
+
+/**
+ * One person waiting to be let in. The same shape for spaces and channels.
+ *
+ * `id` IS THE HANDLE approve and reject bind on, and it must be READ from this
+ * row, never constructed. The API shipped once without it and thirty green
+ * tests missed it, because tests keep the id they created and never read it
+ * back the way an app has to.
+ */
+export interface JoinRequest {
+  id: number;
+  user: SlimUser;
+  /** How they arrived, when it was a link. */
+  invite_code: string | null;
+  created_at: string;
+  /**
+   * PRESENT = approving this ALSO grants that channel. It has to be said on
+   * the approve control: an admin reading "join request" would otherwise hand
+   * out channel access they never agreed to. `null` grants the space only.
+   */
+  also_joins_channel: {
+    uuid: string;
+    name: string;
+    visibility: ChannelVisibility;
+  } | null;
+}
+
+/**
+ * A public space in the browse list.
+ *
+ * MEASURED against production 2026-08-10 — the doc describes the endpoint but
+ * not its row, and guessing cost two mistakes worth keeping a note about:
+ *  - it is `active_members_count`, not `member_count`. The obvious name renders
+ *    an empty gap where the number should be, with no error anywhere.
+ *  - THERE IS NO `is_member`. So this list cannot tell whether the viewer is
+ *    already inside, and a member browsing is offered Join on their own
+ *    space. Handled below rather than hidden; asked of @backendclaude.
+ */
+export interface DiscoverableSpace {
+  uuid: string;
+  name: string;
+  description: string | null;
+  type: SpaceType;
+  type_label: string;
+  is_private: boolean;
+  organization: OrganizationRef | null;
+  active_members_count: number;
+  /** NOT SENT TODAY. Optional so the row degrades honestly if it ever arrives. */
+  is_member?: boolean;
+  created_at: string;
+}
+
+export interface DiscoverSpacesParams {
+  search?: string;
+  per_page?: number;
+  page?: number;
+}
+
+export type InvitePreviewResponse = ItemResponse<InvitePreview>;
+export type InviteAcceptResponse = ItemResponse<InviteAcceptResult>;
+export type InviteLinkResponse = ItemResponse<InviteLink>;
+export type InviteLinkListResponse = ItemResponse<InviteLink[]>;
+export type JoinRequestListResponse = ItemResponse<JoinRequest[]>;
+export type DiscoverSpacesResponse = LengthAwareResponse<DiscoverableSpace>;

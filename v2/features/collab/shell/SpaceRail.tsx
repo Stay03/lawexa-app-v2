@@ -4,6 +4,8 @@ import { memo, type ReactNode } from 'react';
 import Link from 'next/link';
 import { BellOff, Hash, Lock, Plus } from 'lucide-react';
 
+import { channelVisibilityFace } from '@/v2/features/collab/visibility';
+
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -128,7 +130,8 @@ const RailChannelRow = memo(function RailChannelRow({
 }) {
   const { channel, grammar } = row;
   const { unread, mentions, muted } = grammar;
-  const Icon = channel.visibility === 'private' ? Lock : Hash;
+  const visibilityFace = channelVisibilityFace(channel.visibility);
+  const Icon = visibilityFace.icon;
   const age =
     withPreview && now > 0 ? formatRelativeTime(channel.last_message_at, now) : '';
   const line = withPreview ? channelPreviewLine(row) : null;
