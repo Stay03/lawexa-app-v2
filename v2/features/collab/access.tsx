@@ -95,22 +95,25 @@ export type ChannelAccessState = 'member' | 'preview' | 'closed';
  * what the server does with a PRIVATE channel, which is the open question
  * below.
  *
- * ── OPEN QUESTION: DOES A PRIVATE CHANNEL'S DETAIL 403? ───────────────────
- * `closed` exists because the pre-preview screen believed a space member could
- * load a private channel's detail and be refused its contents in the UI. That
- * belief is INHERITED, NOT MEASURED. The backend ruling says private channels
- * are "members only, no preview, not even for space admins", which reads like
- * the detail is refused too; the API digest says channel detail is visible to
- * "members and space governors / platform admins", which reads like it is not,
- * at least for governors. Settling it needs two accounts in one space, which
- * nobody has had yet.
+ * ── SETTLED 2026-08-10: A PRIVATE CHANNEL'S DETAIL DOES NOT 403 ───────────
+ * This was an open question for six days, inherited rather than measured, and
+ * it is now measured against production with a space member (`@frontendclaude`
+ * in Lawexa HQ) and a private channel they are not in:
  *
- * So BOTH shapes are handled and NEITHER is asserted in copy: a 403 lands on
- * the screen's access-denied panel, a 200 on the private-channel panel, and
- * both sentences are true whichever way it turns out. Do not collapse the two
- * paths, and do not write copy that names the wall, until it has been
- * measured — an unreachable branch costs nothing, and a refusal that tells the
- * reader the wrong thing about their own space costs trust.
+ *   GET /channels/{uuid}            → 200, `is_member: false`, `my_role: null`
+ *   GET /channels/{uuid}/messages   → 403
+ *   GET /channels/{uuid}/members    → 403
+ *
+ * So `closed` IS reached, and it is the shape the screen must be good at: the
+ * reader holds the channel's real name and real member count, and is refused
+ * only its contents. That is what makes "Ask to join" honest there — the
+ * server has already told them the room exists.
+ *
+ * A 403 on the DETAIL therefore means something else entirely: the reader is
+ * outside the space, or the channel is `hidden`, or it never existed. Those
+ * three are deliberately indistinguishable, so the screen's access-denied panel
+ * still names no wall and offers no action — see `ChannelAccessDeniedState`.
+ * Keep the two paths separate; they answer different questions now.
  *
  * ── OPEN IN PREVIEW (measured against the backend's ruling) ────────────────
  * message history · pinned messages · the member roster · channel details ·

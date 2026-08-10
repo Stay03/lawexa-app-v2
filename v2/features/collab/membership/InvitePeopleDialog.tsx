@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { InviteMemberPayload } from '@/types/collab';
+import { InviteLinkSection } from '@/v2/features/invites/InviteLinkSection';
 
 /**
  * InvitePeopleDialog — invite by email, with a role. Shared by the space and
@@ -49,6 +50,7 @@ export function InvitePeopleDialog({
   title,
   description,
   onInvite,
+  linkScope,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,6 +58,9 @@ export function InvitePeopleDialog({
   description?: string;
   /** Rejects on failure so the dialog can surface the server line inline. */
   onInvite: (payload: InviteMemberPayload) => Promise<void>;
+  /** A SPACE, so it can also offer a link. Organizations pass nothing: invite
+   *  links are a spaces feature and there is no organization equivalent. */
+  linkScope?: { spaceUuid: string; placeName: string };
 }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member'>('member');
@@ -197,6 +202,16 @@ export function InvitePeopleDialog({
             >
               {error}
             </p>
+          )}
+
+          {/* UNDER the address field, not beside it. Typing an email is the
+              thing most people came to do; the link is what they need when the
+              person they are inviting has no Lawexa account to address. */}
+          {linkScope && (
+            <InviteLinkSection
+              spaceUuid={linkScope.spaceUuid}
+              placeName={linkScope.placeName}
+            />
           )}
         </div>
 

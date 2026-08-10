@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronDown, MoreHorizontal } from 'lucide-react';
 
-import { channelVisibilityFace } from '@/v2/features/collab/visibility';
+import { channelVisibilityFace } from '@/lib/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

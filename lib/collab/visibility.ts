@@ -6,13 +6,20 @@ import type { ChannelVisibility } from '@/types/collab';
  * One place that decides how a channel's visibility LOOKS and READS.
  *
  * ── WHY THIS EXISTS ────────────────────────────────────────────────────────
- * Six files carried their own copy of `visibility === 'private' ? Lock : Hash`.
- * That worked while there were two states. On 2026-08-10 the API grew a third,
- * and every one of those copies would have drawn a HIDDEN channel with the OPEN
- * glyph — the loudest possible lie about a privacy setting, in six places, with
- * nothing to make anyone notice. A ternary cannot be exhaustive; a record keyed
- * by the union can, and TypeScript now fails the build if a fourth state ever
- * arrives and this table does not answer for it.
+ * Twelve files carried their own copy of `visibility === 'private' ? Lock :
+ * Hash`. That worked while there were two states. On 2026-08-10 the API grew a
+ * third, and every one of those copies would have drawn a HIDDEN channel with
+ * the OPEN glyph — the loudest possible lie about a privacy setting, in twelve
+ * places, with nothing to make anyone notice. A ternary cannot be exhaustive; a
+ * record keyed by the union can, and TypeScript now fails the build if a fourth
+ * state ever arrives and this table does not answer for it.
+ *
+ * ── WHY IT LIVES IN lib/ AND NOT IN v2/ ────────────────────────────────────
+ * Three of those twelve are in the old app, which is what live users are on
+ * today, and v1 is forbidden by lint from importing anything under v2/ so that
+ * v2 stays deletable in one command. A second copy for v1 would be the exact
+ * bug this file was written to kill, so the table sits beside the other things
+ * both apps share — `types/collab.ts`, `lib/api/collab.ts` — and both read it.
  *
  * ── THE WORDS ARE HERE TOO, AND THAT IS DELIBERATE ─────────────────────────
  * The glyph and the sentence explaining it were drifting apart: the create
@@ -69,7 +76,10 @@ export function channelVisibilityFace(
   return CHANNEL_VISIBILITY_FACES[visibility] ?? CHANNEL_VISIBILITY_FACES.hidden;
 }
 
-/** Just the glyph — the shape six call sites actually wanted. */
+/** Just the glyph — the shape most call sites actually wanted. Read `.icon` off
+ *  the face instead where the result is assigned to a capitalised const, or
+ *  `react-hooks/static-components` reads the call as a component built during
+ *  render. */
 export function channelVisibilityIcon(
   visibility: ChannelVisibility,
 ): LucideIcon {

@@ -4,7 +4,7 @@ import { memo } from 'react';
 import Link from 'next/link';
 import { BellOff } from 'lucide-react';
 
-import { channelVisibilityFace } from '@/v2/features/collab/visibility';
+import { channelVisibilityFace } from '@/lib/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import type { Channel } from '@/types/collab';

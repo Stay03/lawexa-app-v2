@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Loader2, Mail, Search, UserPlus, Users } from 'lucide-react';
+import { Link2, Loader2, Mail, Search, UserPlus, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { InviteMemberPayload, SlimUser } from '@/types/collab';
+import { InviteLinkSection } from '@/v2/features/invites/InviteLinkSection';
 import { MemberAvatar } from '../ui/avatars';
 
 /**
@@ -46,7 +47,7 @@ export interface InviteCandidate {
   user: SlimUser;
 }
 
-type InviteTab = 'people' | 'email';
+type InviteTab = 'people' | 'email' | 'link';
 
 export function InviteMemberDialog({
   open,
@@ -56,6 +57,7 @@ export function InviteMemberDialog({
   onInvite,
   candidates,
   candidatesLoading = false,
+  linkScope,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,6 +67,14 @@ export function InviteMemberDialog({
   onInvite: (payload: InviteMemberPayload) => Promise<void>;
   candidates: InviteCandidate[];
   candidatesLoading?: boolean;
+  /**
+   * THE THIRD WAY IN, and the only one that reaches somebody with no Lawexa
+   * account. Both tabs above it are closed doors to a stranger: the picker
+   * lists people who are already in the space, and the email field addresses an
+   * account that has to exist. A channel-scoped link makes the space membership
+   * and the channel membership in one accept.
+   */
+  linkScope?: { spaceUuid: string; channelUuid: string; placeName: string };
 }) {
   const [tab, setTab] = useState<InviteTab>('people');
   const [role, setRole] = useState<'admin' | 'member'>('member');
@@ -159,11 +169,21 @@ export function InviteMemberDialog({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+        {/* The strip sizes itself to what is actually offered: a reader with no
+            link half must not meet a two-column grid with a hole in it. */}
+        <div
+          className={cn(
+            'grid gap-1 rounded-lg bg-muted p-1',
+            linkScope ? 'grid-cols-3' : 'grid-cols-2',
+          )}
+        >
           {(
             [
               { id: 'people', label: 'In this space', icon: Users },
               { id: 'email', label: 'By email', icon: Mail },
+              ...(linkScope
+                ? ([{ id: 'link', label: 'By link', icon: Link2 }] as const)
+                : []),
             ] as const
           ).map(({ id, label, icon: Icon }) => (
             <button
@@ -275,7 +295,7 @@ export function InviteMemberDialog({
               </Button>
             </DialogFooter>
           </div>
-        ) : (
+        ) : tab === 'email' ? (
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="invite-email">Email address</Label>
@@ -314,6 +334,29 @@ export function InviteMemberDialog({
               </Button>
             </DialogFooter>
           </div>
+        ) : (
+          /* `linkScope` is what put this tab on the strip, so it is present
+             here — but the tab is reachable by state and the narrowing has to
+             be real, not assumed. */
+          linkScope && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Anyone with this link can ask to join {linkScope.placeName}. They
+                do not need a Lawexa account first — signing up is part of it.
+              </p>
+              <InviteLinkSection
+                spaceUuid={linkScope.spaceUuid}
+                channelUuid={linkScope.channelUuid}
+                placeName={linkScope.placeName}
+                framing="standalone"
+              />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Done
+                </Button>
+              </DialogFooter>
+            </div>
+          )
         )}
       </DialogContent>
     </Dialog>

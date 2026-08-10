@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Hash,
   History,
   Loader2,
   Lock,
@@ -37,6 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
+import { channelVisibilityFace } from '@/lib/collab/visibility';
 import {
   useChannel,
   useChannelMessages,
@@ -164,7 +164,8 @@ export function ChannelView({ channelUuid }: ChannelViewProps) {
     return <ChannelViewSkeleton />;
   }
 
-  const Icon = channel.visibility === 'private' ? Lock : Hash;
+  const visibilityFace = channelVisibilityFace(channel.visibility);
+  const Icon = visibilityFace.icon;
   const canManage =
     channel.my_role === 'owner' || channel.my_role === 'admin';
 

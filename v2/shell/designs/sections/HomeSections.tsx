@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { BookText, MessageSquare, NotebookPen, Scale } from 'lucide-react';
 
-import { channelVisibilityIcon } from '@/v2/features/collab/visibility';
+import { channelVisibilityIcon } from '@/lib/collab/visibility';
 
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { formatCaseName } from '@/v2/features/cases/case-name';

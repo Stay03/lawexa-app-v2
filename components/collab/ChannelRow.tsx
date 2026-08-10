@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { Hash, Lock, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { channelVisibilityFace } from '@/lib/collab/visibility';
 import { cn } from '@/lib/utils';
 import type { Channel } from '@/types/collab';
 
@@ -12,7 +13,8 @@ interface ChannelRowProps {
 
 /** A channel row within a space — links through to the message reader. */
 export function ChannelRow({ channel }: ChannelRowProps) {
-  const Icon = channel.visibility === 'private' ? Lock : Hash;
+  const visibilityFace = channelVisibilityFace(channel.visibility);
+  const Icon = visibilityFace.icon;
   const hasUnread = (channel.unread_count ?? 0) > 0;
 
   return (

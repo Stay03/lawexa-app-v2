@@ -1,6 +1,6 @@
 import { type LucideIcon } from 'lucide-react';
 
-import { channelVisibilityFace } from '@/v2/features/collab/visibility';
+import { channelVisibilityFace } from '@/lib/collab/visibility';
 import type {
   ChannelInvitation,
   OrganizationInvitation,

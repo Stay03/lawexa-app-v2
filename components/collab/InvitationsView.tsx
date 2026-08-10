@@ -6,8 +6,6 @@ import {
   Briefcase,
   Building2,
   GraduationCap,
-  Hash,
-  Lock,
   MailOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,6 +15,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { PageContainer, PageHeader } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
+import { channelVisibilityFace } from '@/lib/collab/visibility';
 import {
   useAcceptChannelInvitation,
   useAcceptOrganizationInvitation,
@@ -185,7 +184,9 @@ export function InvitationsView() {
             {channels.map((invitation) => (
               <InvitationCard
                 key={`channel-${invitation.id}`}
-                icon={invitation.channel.visibility === 'private' ? Lock : Hash}
+                icon={
+                  channelVisibilityFace(invitation.channel.visibility).icon
+                }
                 title={`#${invitation.channel.name}`}
                 subtitle={`in ${invitation.channel.space.name}`}
                 roleLabel={invitation.role_label}

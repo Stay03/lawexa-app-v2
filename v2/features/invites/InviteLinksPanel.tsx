@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Copy, Link2, Loader2, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Link2, Loader2, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import type { InviteLink } from '@/types/collab';
+import { CopyLinkButton } from './link';
 import {
   useCreateInviteLink,
   useInviteLinks,
@@ -18,11 +19,10 @@ import {
 /**
  * InviteLinksPanel — make a link, see how it is doing, kill it.
  *
- * ── THE LINK IS BUILT HERE, BECAUSE THE SERVER DOES NOT SEND ONE ───────────
- * Measured against production: the row carries `code`, not a URL. So the
- * address is ours to compose, and it is composed from `window.location.origin`
- * rather than a constant — otherwise a link copied on staging points at
- * production and quietly invites somebody into the wrong place.
+ * This is where links are MANAGED. Where they are FOUND is the invite dialog
+ * ({@link InviteLinkSection}), which shows the one usable link for its scope
+ * beside the email field; the address itself is composed in one place for both
+ * (`./link`).
  *
  * ── REVOKE IS NOT DELETE, AND THE UI SAYS SO ───────────────────────────────
  * The server keeps a revoked row so its use count survives. A revoked link is
@@ -36,42 +36,65 @@ import {
  * switch says that in those words rather than naming the flag.
  */
 
-function inviteUrl(code: string): string {
-  const origin =
-    typeof window === 'undefined' ? 'https://lawexa.com' : window.location.origin;
-  return `${origin}/join/${code}`;
-}
-
 function usesLabel(link: InviteLink): string {
   if (link.max_uses === null) return `${link.uses} used`;
   return `${link.uses} of ${link.max_uses} used`;
 }
 
-function CopyButton({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
+/**
+ * One link row. Split out because the list now renders two groups of them and
+ * a dead one must look identical wherever it is shown.
+ */
+function LinkRow({
+  link,
+  onRevoke,
+  revoking,
+}: {
+  link: InviteLink;
+  onRevoke: (id: number) => void;
+  revoking: boolean;
+}) {
+  const dead = !link.is_usable;
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="shrink-0"
-      onClick={() => {
-        // Written inside the click, never after an await — a clipboard write
-        // that has lost the user gesture is refused on iOS.
-        void navigator.clipboard?.writeText(inviteUrl(code));
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1600);
-      }}
+    <li
+      className={cn('rounded-xl border border-border/60 p-3', dead && 'opacity-60')}
     >
-      {copied ? (
-        <>
-          <Check aria-hidden className="size-4" /> Copied
-        </>
-      ) : (
-        <>
-          <Copy aria-hidden className="size-4" /> Copy
-        </>
-      )}
-    </Button>
+      <div className="flex items-center gap-2">
+        <code
+          className={cn(
+            'min-w-0 flex-1 truncate rounded bg-secondary px-2 py-1 text-xs',
+            dead && 'line-through',
+          )}
+        >
+          /join/{link.code}
+        </code>
+        {dead ? null : <CopyLinkButton code={link.code} className="shrink-0" />}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-3">
+        {/* WHICH CHANNEL, WHEN THERE IS ONE. Channel-scoped links are made from
+            the invite dialog now, so this list holds two kinds of link whose
+            addresses look identical. Without the name an admin cannot tell the
+            link that opens the whole space from the one that also drops people
+            into a single channel — and those hand out different access. */}
+        <p className="text-xs text-muted-foreground">
+          {link.channel ? `#${link.channel.name} · ` : ''}
+          {dead ? 'Stopped working' : usesLabel(link)}
+          {link.requires_approval ? ' · you approve' : ' · straight in'}
+        </p>
+        {dead ? null : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            disabled={revoking}
+            onClick={() => onRevoke(link.id)}
+          >
+            <Trash2 aria-hidden className="size-4" /> Stop it
+          </Button>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -80,8 +103,22 @@ export function InviteLinksPanel({ spaceUuid }: { spaceUuid: string }) {
   const create = useCreateInviteLink(spaceUuid);
   const revoke = useRevokeInviteLink(spaceUuid);
   const [requiresApproval, setRequiresApproval] = useState(true);
+  const [showDead, setShowDead] = useState(false);
 
   const rows = links.data?.data ?? [];
+  /**
+   * THE DEAD ONES ARE FOLDED AWAY, AND THIS IS NOT COSMETIC.
+   *
+   * Revoked rows are kept on purpose — their use counts are the answer to "who
+   * got in through what" — but the server returns them mixed in with the live
+   * ones, newest first, and a space that has been used for a while is mostly
+   * dead links. Watching this panel run against a real space (2026-08-10) it
+   * showed six struck-through rows and no live link at all: the reader has to
+   * read every row to learn there is nothing to copy. Live first, dead behind
+   * one press, and the count is stated so nothing looks deleted.
+   */
+  const live = rows.filter((link) => link.is_usable);
+  const dead = rows.filter((link) => !link.is_usable);
 
   return (
     <div className="space-y-5">
@@ -134,50 +171,57 @@ export function InviteLinksPanel({ spaceUuid }: { spaceUuid: string }) {
           No links yet. Make one and share it anywhere.
         </p>
       ) : (
-        <ul className="space-y-3">
-          {rows.map((link) => {
-            const dead = !link.is_usable;
-            return (
-              <li
-                key={link.id}
-                className={cn(
-                  'rounded-xl border border-border/60 p-3',
-                  dead && 'opacity-60',
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <code
-                    className={cn(
-                      'min-w-0 flex-1 truncate rounded bg-secondary px-2 py-1 text-xs',
-                      dead && 'line-through',
-                    )}
-                  >
-                    /join/{link.code}
-                  </code>
-                  {dead ? null : <CopyButton code={link.code} />}
-                </div>
+        <div className="space-y-3">
+          {live.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No link is working right now. Make one above.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {live.map((link) => (
+                <LinkRow
+                  key={link.id}
+                  link={link}
+                  onRevoke={(id) => revoke.mutate(id)}
+                  revoking={revoke.isPending}
+                />
+              ))}
+            </ul>
+          )}
 
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <p className="text-xs text-muted-foreground">
-                    {dead ? 'Stopped working' : usesLabel(link)}
-                    {link.requires_approval ? ' · you approve' : ' · straight in'}
-                  </p>
-                  {dead ? null : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      disabled={revoke.isPending}
-                      onClick={() => revoke.mutate(link.id)}
-                    >
-                      <Trash2 aria-hidden className="size-4" /> Stop it
-                    </Button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+          {dead.length > 0 && (
+            <div className="space-y-3 pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-center text-muted-foreground"
+                onClick={() => setShowDead((open) => !open)}
+                aria-expanded={showDead}
+              >
+                {showDead ? (
+                  <ChevronUp aria-hidden className="size-4" />
+                ) : (
+                  <ChevronDown aria-hidden className="size-4" />
+                )}
+                {dead.length === 1
+                  ? '1 link has stopped working'
+                  : `${dead.length} links have stopped working`}
+              </Button>
+              {showDead && (
+                <ul className="space-y-3">
+                  {dead.map((link) => (
+                    <LinkRow
+                      key={link.id}
+                      link={link}
+                      onRevoke={(id) => revoke.mutate(id)}
+                      revoking={revoke.isPending}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

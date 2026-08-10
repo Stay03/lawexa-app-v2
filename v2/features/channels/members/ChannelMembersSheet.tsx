@@ -174,6 +174,11 @@ export function ChannelMembersSheet({
         onInvite={handleInvite}
         candidates={candidates}
         candidatesLoading={spaceMembersQuery.isPending}
+        linkScope={{
+          spaceUuid: channel.space.uuid,
+          channelUuid: channel.uuid,
+          placeName: `#${channel.name}`,
+        }}
       />
     </Sheet>
   );

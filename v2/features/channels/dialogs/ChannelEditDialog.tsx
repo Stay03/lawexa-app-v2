@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
-import { channelVisibilityFace } from '@/v2/features/collab/visibility';
+import { channelVisibilityFace } from '@/lib/collab/visibility';
 
 import { Button } from '@/components/ui/button';
 import {

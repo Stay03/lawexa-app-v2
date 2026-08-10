@@ -7,12 +7,12 @@ import {
   Bell,
   Bookmark,
   Loader2,
-  Lock,
   LogOut,
   Pencil,
   Pin,
   Trash2,
   Trophy,
+  UserCheck,
   Users,
 } from 'lucide-react';
 
@@ -39,7 +39,8 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Message, NotifyLevel, SlimUser } from '@/types/collab';
 import { channelAccess } from '@/v2/features/collab/access';
-import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { ChannelJoinRequestsSheet } from '@/v2/features/invites/ChannelJoinRequestsSheet';
+import { useRequestChannelAccess } from '@/v2/features/invites/queries';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -75,6 +76,7 @@ import { ChannelPlaceHeader, type HeaderLens } from './PlaceHeader';
 import { CHANNEL_SECTIONS, SectionSwitch, type SectionCounts } from './SectionSwitch';
 import {
   ChannelAccessDeniedState,
+  ChannelClosedState,
   ChannelErrorState,
   ChannelPreviewDock,
   ChannelScreenFrame,
@@ -268,6 +270,11 @@ export function ChannelScreen({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [membershipActionError, setMembershipActionError] = useState<string | null>(null);
+  /** The wait that follows "Ask to join". It lives here and not in the channel
+   *  resource because the server carries no field for it — see
+   *  {@link ChannelClosedState} for why storing it any longer would go stale. */
+  const [askedToJoin, setAskedToJoin] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
   const composerRef = useRef<ChannelComposerHandle>(null);
   const feedRef = useRef<ChannelFeedHandle>(null);
 
@@ -305,6 +312,7 @@ export function ChannelScreen({
           saved: canParticipate,
           quizzes: canParticipate,
           ai: canRead,
+          requests: canManage,
         }
       : undefined,
   });
@@ -399,6 +407,7 @@ export function ChannelScreen({
 
   const router = useRouter();
   const joinMutation = useJoinChannel(channelUuid);
+  const askMutation = useRequestChannelAccess(channelUuid);
   const leaveMutation = useLeaveChannel(channelUuid);
   const deleteMutation = useDeleteChannel(channelUuid);
   const notifyMutation = useSetChannelNotifyLevel(channelUuid);
@@ -496,6 +505,38 @@ export function ChannelScreen({
       onError: (error) => setMembershipActionError(extractApiError(error).message),
     });
   }, [joinMutate]);
+
+  /**
+   * The private channel's one way forward. Three server answers matter and none
+   * of them is the ordinary error:
+   *
+   *  - `2xx` — taken. `201` is a new request and `200` one already waiting, and
+   *    BOTH are the same wait to the person pressing, so neither may draw an
+   *    error.
+   *  - `409` — the channel is not private any more; it can simply be joined. The
+   *    fix is not a sentence, it is the truth: refetch the detail and the screen
+   *    re-renders as the readable transcript with its Join dock.
+   *  - `404` — it is gone, or it turned `hidden` between the load and the press.
+   *    Refetch for the same reason, and let the detail's own refusal answer.
+   *
+   * Anything else keeps the server's own sentence, under the button that
+   * produced it — never a toast.
+   */
+  const askMutate = askMutation.mutate;
+  const handleAskToJoin = useCallback(() => {
+    setAskError(null);
+    askMutate(undefined, {
+      onSuccess: () => setAskedToJoin(true),
+      onError: (error) => {
+        const failure = extractApiError(error);
+        if (failure.status === 409 || failure.status === 404) {
+          void detailQuery.refetch();
+          return;
+        }
+        setAskError(failure.message);
+      },
+    });
+  }, [askMutate, detailQuery]);
 
   /** `setReplyTo` is listed for the reason given on {@link selectTab}. */
   const handleStartReply = useCallback((message: Message) => {
@@ -651,6 +692,12 @@ export function ChannelScreen({
         Quizzes
       </DropdownMenuItem>
       {canManage && (
+        <DropdownMenuItem onClick={() => panel.show('requests')}>
+          <UserCheck aria-hidden className="size-4" />
+          Waiting to join
+        </DropdownMenuItem>
+      )}
+      {canManage && (
         <DropdownMenuItem onClick={() => panel.show('edit')}>
           <Pencil aria-hidden className="size-4" />
           Edit channel
@@ -696,22 +743,27 @@ export function ChannelScreen({
         exists is not the same as reading it, and the space's channel list
         already showed them the name.
 
-        WHETHER THIS BRANCH IS EVER REACHED IS AN OPEN QUESTION, recorded where
-        the assumption lives (`v2/features/collab/access.tsx`). If the server
-        refuses a private channel's DETAIL to a space member who never joined,
-        the reader lands on `ChannelAccessDeniedState` instead and never gets
-        here. Both panels now say the same true thing in their own words, so
-        the reader is told nothing we have not established either way. ─────── */
+        THIS BRANCH IS REACHED — MEASURED 2026-08-10, no longer assumed. The
+        open question recorded here and in `v2/features/collab/access.tsx` was
+        whether the server releases a private channel's DETAIL to a space member
+        who never joined. It does: `200` with `is_member: false`, while the
+        messages and the roster each answer `403`. So the reader holds a real
+        name and a real refusal, and the panel can offer the door. ─────────── */
   if (!canRead) {
     return (
       <div className="flex h-full min-h-0 flex-col">
         {identityHeader}
-        <div className="mx-auto w-full max-w-3xl flex-1 px-4">
-          <CollabMessage
-            icon={Lock}
-            tone="neutral"
-            title={`${channel.name} is private`}
-            description="Only its members can read this channel. Ask someone already in it to add you."
+        {/* CENTRED IN WHAT IS LEFT, not hung under the header. This branch
+            renders no feed at all, so the panel is the only thing on a
+            full-height screen; top-aligned it read as a message that had lost
+            its conversation. */}
+        <div className="mx-auto flex w-full max-w-3xl flex-1 items-center justify-center px-4">
+          <ChannelClosedState
+            channelName={channel.name}
+            asked={askedToJoin}
+            onAsk={handleAskToJoin}
+            isAsking={askMutation.isPending}
+            error={askError}
           />
         </div>
       </div>
@@ -1041,6 +1093,17 @@ export function ChannelScreen({
         viewerUuid={viewerUuid}
         {...panel.bind('members')}
       />
+
+      {/* The other end of "Ask to join". Gated on the same `canManage` as its
+          menu item, and on the same `?panel=` mechanism as every other sheet,
+          so Back closes it. */}
+      {canManage && (
+        <ChannelJoinRequestsSheet
+          channelUuid={channel.uuid}
+          channelName={channel.name}
+          {...panel.bind('requests')}
+        />
+      )}
 
       {/* Never mounted on `open` — keyed on `openKey` instead, so it stays
           through its closing transition and remounts on each opening with its

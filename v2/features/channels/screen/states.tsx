@@ -1,7 +1,16 @@
 import { format } from 'date-fns';
-import { Eye, Loader2, Lock, LogIn, Radio, UserPlus, WifiOff } from 'lucide-react';
+import {
+  Clock,
+  Eye,
+  Loader2,
+  Lock,
+  LogIn,
+  Radio,
+  UserPlus,
+  WifiOff,
+} from 'lucide-react';
 
-import { channelVisibilityFace } from '@/v2/features/collab/visibility';
+import { channelVisibilityFace } from '@/lib/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -293,25 +302,116 @@ export function ChannelPreviewDock({
   );
 }
 
+/**
+ * ChannelClosedState — a PRIVATE channel a space member is not in, and the one
+ * refusal on this screen that is not a dead end.
+ *
+ * ── THE SHAPE IS MEASURED, NOT ASSUMED (2026-08-10) ────────────────────────
+ * The open question recorded in `v2/features/collab/access.tsx` was whether a
+ * private channel's detail is even released to a space member who never joined.
+ * It is: production answers `200` with `is_member: false`, and refuses only its
+ * messages and its roster (`403` each). So this branch is REACHED, the reader
+ * holds the channel's real name, and the honest thing to offer is the door.
+ *
+ * ── WHY THIS IS A REQUEST AND NOT A JOIN ───────────────────────────────────
+ * A `space_public` channel is joined by pressing Join — the server simply lets
+ * you in, which is why that lives in the dock at the foot of a readable
+ * transcript. Private is the other rule: nobody walks in, an admin decides. So
+ * the verb is "Ask to join", the panel is where the transcript would have been,
+ * and the state after the press is a WAIT, not an arrival. Calling it Join here
+ * would promise a door that opens on the press.
+ *
+ * ── AND WHY THIS PANEL, NOT THE 403 ONE ────────────────────────────────────
+ * `ChannelAccessDeniedState` carries no action on purpose. A `403` cannot be
+ * told apart from a hidden channel or one that never existed, and the join
+ * route answers `404` for exactly those — so a button there would be a control
+ * that fails, and its failure would confirm what the `hidden` state exists to
+ * conceal. Here the server has already released the channel, so asking about it
+ * gives nothing away.
+ *
+ * ── THE WAIT DOES NOT SURVIVE A RELOAD, AND THAT IS THE SERVER'S GAP ───────
+ * The channel resource carries nothing about the viewer's own pending request
+ * (measured: `uuid, name, description, visibility, visibility_label, space,
+ * is_member, my_role, my_notify_level, active_members_count, created_at,
+ * updated_at`). So a reload puts "Ask to join" back. Pressing it again is
+ * harmless — the server answers `200` for a request already waiting, a SUCCESS
+ * — and lands the reader back on the same wait. Storing the press on this side
+ * was the alternative and it would go stale the moment an admin decided, which
+ * is worse than one extra press.
+ *
+ * Hook-free like everything else here: the screen owns the mutation.
+ */
+export function ChannelClosedState({
+  channelName,
+  asked,
+  onAsk,
+  isAsking,
+  error,
+}: {
+  channelName: string;
+  /** The server has taken the request — this reader is waiting. */
+  asked: boolean;
+  onAsk: () => void;
+  isAsking: boolean;
+  /** The server's own sentence from the last failed attempt, or `null`. */
+  error: string | null;
+}) {
+  if (asked) {
+    return (
+      <CollabMessage
+        icon={Clock}
+        tone="neutral"
+        title="You asked to join"
+        description={`An admin of ${channelName} will decide. If they say yes, the channel opens for you.`}
+      />
+    );
+  }
+
+  return (
+    <CollabMessage
+      icon={Lock}
+      tone="accent"
+      title={`${channelName} is private`}
+      description="Only its members can read it. Ask to join and an admin of the channel decides."
+      action={
+        <div className="flex flex-col items-center gap-2">
+          <Button onClick={onAsk} disabled={isAsking}>
+            {isAsking ? (
+              <Loader2 aria-hidden className="size-4 animate-spin" />
+            ) : (
+              <LogIn aria-hidden className="size-4" />
+            )}
+            Ask to join
+          </Button>
+          {error && (
+            <p role="alert" className="text-xs font-medium text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+      }
+    />
+  );
+}
+
 /* ── Screen-level refusals ────────────────────────────────────────────────── */
 
 /**
  * 403 — a POLICY refusal, never auto-mapped to verify-email (collab model's
  * rule).
  *
- * THE COPY DELIBERATELY DOES NOT NAME THE WALL. Since preview landed, a 403
- * here has two possible meanings and we have measured neither: the reader is
- * outside the SPACE (certain), or the channel is PRIVATE and the server refuses
- * its detail to a space member who never joined (unknown — see the open
- * question in `v2/features/collab/access.tsx`). Naming either one would tell
- * half the readers something false: a colleague opening a link to a private
- * channel in a space they are already in must not be told they are not in that
- * space and asked to be invited to it.
+ * THE COPY DELIBERATELY DOES NOT NAME THE WALL, and measuring the shape only
+ * made that more necessary. A private channel's detail is released to a space
+ * member (`200`, measured 2026-08-10 — see `v2/features/collab/access.tsx`), so
+ * a `403` here is NOT the private case at all. It is one of three: the reader is
+ * outside the space, the channel is `hidden`, or it never existed. Those three
+ * are meant to be indistinguishable, and naming any of them would tell the other
+ * two readers something false.
  *
- * So it says what is true in both cases, and the way forward is true in both
- * too — someone on the other side of whichever wall this is can let you
- * through. Restore a specific sentence only when the shape has been measured
- * with two accounts in one space.
+ * THAT IS ALSO WHY THIS PANEL CARRIES NO ACTION while the private one does. The
+ * join route answers `404` for a hidden or absent channel, so an "Ask to join"
+ * button here would be a control that fails — and its failure would be the
+ * confirmation the `hidden` state exists to withhold.
  *
  * ── AND SINCE 2026-08-10 IT MUST NOT CONFIRM THE CHANNEL EXISTS ────────────
  * There is now a THIRD state, `hidden`, whose entire promise is that outsiders
