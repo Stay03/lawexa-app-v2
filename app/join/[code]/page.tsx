@@ -26,10 +26,78 @@ import { JoinScreen } from '@/components/join/JoinScreen';
  *
  * `noindex`: an invite code is a key, and keys do not belong in search results.
  */
-export const metadata: Metadata = {
-  title: 'Join on Lawexa',
-  robots: { index: false, follow: false },
-};
+/**
+ * THE CARD THAT APPEARS WHEN THE LINK IS PASTED INTO WHATSAPP.
+ *
+ * @arthur, 2026-08-10: the page itself was right and this was still wrong. A
+ * static title meant every invite ever sent previewed as "Join on Lawexa" over
+ * the site's generic blurb about legal research — so the moment somebody shares
+ * an invite, the thing their friend actually reads says nothing about the space
+ * they are being invited to. The landing page we spent the afternoon on is the
+ * SECOND thing they see. This is the first.
+ *
+ * So the preview is fetched here, on the server, and the card is written from
+ * it. The endpoint is deliberately unauthenticated — WhatsApp's crawler carries
+ * no account, which is exactly the case it was built for.
+ *
+ * `noindex` STAYS. An invite code is a key: it may be unfurled in a chat, and
+ * it must never be sitting in a search result. Unfurling and indexing are
+ * different things and this allows only the first.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}): Promise<Metadata> {
+  const { code } = await params;
+  const fallback: Metadata = {
+    title: 'Join on Lawexa',
+    description: 'You have been invited to a space on Lawexa.',
+    robots: { index: false, follow: false },
+  };
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL ?? 'https://prod-api.lawexa.com/api'}/invite-links/${code}`,
+      { headers: { Accept: 'application/json' }, next: { revalidate: 60 } },
+    );
+    if (!response.ok) return fallback;
+
+    const invite = (await response.json())?.data;
+    if (!invite?.space_name) return fallback;
+
+    // The channel is the more specific thing when the link names one.
+    const place = invite.channel_name
+      ? `#${invite.channel_name}`
+      : invite.space_name;
+    const title = invite.inviter_name
+      ? `${invite.inviter_name} invited you to ${place}`
+      : `You have been invited to ${place}`;
+
+    // Same rule as the page: never blank, and never a placeholder either.
+    const written = invite.channel_name
+      ? invite.channel_description
+      : invite.space_description;
+    const description =
+      written?.trim() ||
+      (invite.channel_name
+        ? `A channel in ${invite.space_name} on Lawexa.`
+        : invite.space_type === 'study'
+          ? `A study space on Lawexa. ${invite.member_count} already here.`
+          : `A work space on Lawexa. ${invite.member_count} already here.`);
+
+    return {
+      title,
+      description,
+      robots: { index: false, follow: false },
+      openGraph: { title, description, type: 'website', siteName: 'Lawexa' },
+      twitter: { card: 'summary', title, description },
+    };
+  } catch {
+    // A crawler must still get a sensible card if the API is unreachable.
+    return fallback;
+  }
+}
 
 export default async function JoinPage({
   params,
