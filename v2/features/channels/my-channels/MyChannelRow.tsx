@@ -2,7 +2,9 @@
 
 import { memo } from 'react';
 import Link from 'next/link';
-import { BellOff, Hash, Lock } from 'lucide-react';
+import { BellOff } from 'lucide-react';
+
+import { channelVisibilityFace } from '@/v2/features/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import type { Channel } from '@/types/collab';
@@ -59,7 +61,11 @@ export const MyChannelRow = memo(function MyChannelRow({
   index: number;
 }) {
   const { unread, mentions, muted } = channelUnreadGrammar(channel);
-  const Glyph = channel.visibility === 'private' ? Lock : Hash;
+  // MISSED BY THE FIRST SWEEP, reported by @arthur: a hidden channel drew the
+  // OPEN mark here. The sweep that replaced the other sites read a TRUNCATED
+  // grep as if it were the whole list.
+  const visibilityFace = channelVisibilityFace(channel.visibility);
+  const Glyph = visibilityFace.icon;
   const age = formatRelativeTime(channel.last_message_at, now);
   const preview = channel.last_message;
   const dim = muted

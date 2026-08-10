@@ -1,4 +1,6 @@
-import { Lock, type LucideIcon } from 'lucide-react';
+import { type LucideIcon } from 'lucide-react';
+
+import { channelVisibilityFace } from '@/v2/features/collab/visibility';
 import type {
   ChannelInvitation,
   OrganizationInvitation,
@@ -171,17 +173,20 @@ export function channelInvitationRow(
   invitation: ChannelInvitation,
 ): InvitationRowModel {
   const channel = invitation.channel;
-  const isPrivate = channel.visibility === 'private';
+  // Three states, not two: a HIDDEN channel was falling to the else and being
+  // labelled a plain 'Channel' with no mark at all.
+  const face = channelVisibilityFace(channel.visibility);
+  const isOpen = channel.visibility === 'space_public';
   return {
     key: `channel:${invitation.id}`,
     kind: 'channel',
     id: invitation.id,
     title: channel.name,
     titlePrefix: '#',
-    titleMark: isPrivate ? Lock : null,
+    titleMark: isOpen ? null : face.icon,
     crest: { kind: 'place', uuid: channel.space.uuid, name: channel.space.name },
     facts: factsOf(
-      isPrivate ? 'Private channel' : 'Channel',
+      isOpen ? 'Channel' : `${face.title} channel`,
       `in ${channel.space.name}`,
       shortFact(channel.description),
     ),
