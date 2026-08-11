@@ -45,7 +45,7 @@ export async function GET(
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={logoUrl} height={60} alt="Lawexa" />
           <div style={{ color: '#8b8fa3', fontSize: 22, marginTop: 24 }}>
-            Nigerian Legal Resources
+            Where Modern Legal Work Happens
           </div>
         </div>
       ),

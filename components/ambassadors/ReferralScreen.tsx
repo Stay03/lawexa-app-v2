@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMounted } from '@/lib/hooks/useMounted';
 import { ambassadorsApi } from '@/lib/api/ambassadors';
-import type { AmbassadorCode } from '@/types/ambassador';
 
 /**
  * ReferralScreen — an ambassador's code, the link that carries it, and every
@@ -46,6 +45,10 @@ import type { AmbassadorCode } from '@/types/ambassador';
  */
 
 /* ── Small parts ─────────────────────────────────────────────────────────── */
+
+/** @arthur's wording, 2026-08-11, verbatim. */
+const SHARE_TEXT =
+  'I use Lawexa to research cases and laws, draft, study, and get legal work done faster.\n\nTry it with my link and get 10 FREE AI messages:';
 
 function referralUrl(code: string): string {
   const origin =
@@ -140,17 +143,35 @@ function ClaimForm({
   onDone,
 }: {
   current: string | null;
-  onDone: (state: { current: AmbassadorCode | null; history: AmbassadorCode[] }) => void;
+  /** Refetches. Awaited, so the button stays busy until the screen is right. */
+  onDone: () => Promise<void>;
 }) {
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
 
   const claim = useMutation({
     mutationFn: (code: string) => ambassadorsApi.claimCode(code),
-    onSuccess: (response) => {
+    /**
+     * ── THE RESPONSE BODY IS NOT READ, AND THAT IS THE FIX ─────────────────
+     * This first shipped writing the POST's body straight into the cache, on
+     * the assumption that claiming returns the same `{current, history}` shape
+     * as fetching. Nobody had measured that, and it does not. So the cache took
+     * a shape with no `current` in it, the screen decided the ambassador still
+     * had no code, and claiming appeared to do NOTHING — @arthur claimed one,
+     * saw the same form, and only found out it had worked by reloading the page
+     * himself. His words: an unsuspecting ambassador enters it again, or worse
+     * enters a different one.
+     *
+     * Refetching instead is correct whatever the server returns, which is the
+     * point: the screen now depends on the shape the GET is documented to have,
+     * and on nothing about the POST at all.
+     */
+    onSuccess: async (_response, code) => {
       setValue('');
       setError(null);
-      if (response.data) onDone(response.data);
+      await onDone();
+      setSaved(code.trim().toLowerCase());
     },
     onError: (failure) => {
       const status = isAxiosError(failure) ? failure.response?.status : undefined;
@@ -187,6 +208,7 @@ function ClaimForm({
           onChange={(event) => {
             setValue(event.target.value);
             if (error) setError(null);
+            if (saved) setSaved(null);
           }}
         />
         <Button type="submit" disabled={!trimmed || claim.isPending}>
@@ -200,6 +222,14 @@ function ClaimForm({
           ? ' Your old code keeps working, so anything already printed still counts.'
           : ' Saved in small letters, whatever you type.'}
       </p>
+      {/* SAYING SO IS THE POINT. Changing a code leaves this form looking
+          exactly as it did, so without a word here the only difference is a
+          line of text further up the page that the reader is not looking at. */}
+      {saved && !error && (
+        <p role="status" className="text-sm font-medium text-primary">
+          Saved. Your code is now {saved}.
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-sm font-medium text-destructive">
           {error}
@@ -317,23 +347,32 @@ export function ReferralScreen() {
   const current = codeState.data?.data?.current ?? null;
   const history = codeState.data?.data?.history ?? [];
   const numbers = performance.data?.data ?? null;
-  /** Prefer the per-code tallies: a retired code that can show it brought nine
-   *  people answers the question far better than one that only proves it still
-   *  exists. Falls back to the code list when the numbers have not landed. */
-  const retiredTallies = numbers?.by_code.filter((entry) => !entry.is_current) ?? null;
   const retired = history.filter((entry) => !entry.is_current);
+  /**
+   * Prefer the per-code tallies — a retired code that can show it brought nine
+   * people answers the question far better than one that only proves it still
+   * exists.
+   *
+   * FALL BACK WHENEVER THEY ARE EMPTY, not merely when they have not loaded.
+   * The two lists come from different endpoints and can disagree: caught with a
+   * fixture where the tallies were empty while the history had two retired
+   * codes, which rendered the heading and the reassuring sentence above an
+   * empty space. Showing the codes without their counts is worse than showing
+   * counts; showing neither, under a heading promising them, is worst.
+   */
+  const retiredRows =
+    numbers && numbers.by_code.length > 0
+      ? numbers.by_code.filter((entry) => !entry.is_current)
+      : retired;
 
-  const onClaimed = (next: {
-    current: AmbassadorCode | null;
-    history: AmbassadorCode[];
-  }) => {
-    client.setQueryData(['ambassador-code'], {
-      success: true,
-      message: '',
-      data: next,
-    });
-    // The code changed, so every tally keyed by code is now stale.
-    void client.invalidateQueries({ queryKey: ['ambassador-performance'] });
+  /** Refetch both — the code list, and the tallies that are keyed by code.
+   *  Awaited by the form so its button stays busy until this screen actually
+   *  shows the new code, rather than going quiet while the old one is still up. */
+  const onClaimed = async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ['ambassador-code'] }),
+      client.invalidateQueries({ queryKey: ['ambassador-performance'] }),
+    ]);
   };
 
   return (
@@ -379,7 +418,11 @@ export function ReferralScreen() {
                   void navigator
                     .share({
                       title: 'Join me on Lawexa',
-                      text: 'Sign up with my link and get 10 free messages to start:',
+                      // @arthur's words, 2026-08-11, used verbatim. It leads
+                      // with what Lawexa is FOR rather than with the giveaway —
+                      // somebody reading it in WhatsApp needs to know why they
+                      // would want it before they are told it is free.
+                      text: SHARE_TEXT,
                       url: referralUrl(current.code),
                     })
                     .catch(() => {
@@ -437,7 +480,9 @@ export function ReferralScreen() {
             <ClaimForm current={current.code} onDone={onClaimed} />
           </section>
 
-          {retired.length > 0 && (
+          {/* Guarded on the rows it will ACTUALLY draw, not on a sibling list —
+              otherwise the heading can appear over nothing. */}
+          {retiredRows.length > 0 && (
             <section className="space-y-2 border-t pt-6">
               <h2 className="text-sm font-medium">Codes you&rsquo;ve used before</h2>
               {/* THE REASSURANCE IS THE POINT OF THIS LIST. A code goes on a
@@ -450,7 +495,7 @@ export function ReferralScreen() {
                 counting for you.
               </p>
               <ul className="space-y-1.5 pt-1">
-                {(retiredTallies ?? retired).map((entry) => (
+                {retiredRows.map((entry) => (
                   <li key={entry.code} className="flex items-center gap-2">
                     <code className="min-w-0 flex-1 truncate rounded bg-secondary px-2 py-1 text-xs text-muted-foreground">
                       {entry.code}

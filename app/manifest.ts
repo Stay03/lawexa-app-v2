@@ -6,9 +6,10 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://lawexa.com';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
-    name: 'Lawexa - Nigerian Legal Resources',
+    name: 'Lawexa - Where Modern Legal Work Happens',
     short_name: 'Lawexa',
-    description: 'Access Nigerian law cases, notes, and legal research materials',
+    description:
+      'Lawexa powers lawyers, students, and teams to research cases and laws across jurisdictions, draft, study, and collaborate with AI to get legal work done faster and reliably',
     start_url: '/',
     display: 'standalone',
     // With an origin-wide scope, Android's installed app (WebAPK) captures every

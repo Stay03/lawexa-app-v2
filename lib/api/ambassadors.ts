@@ -117,9 +117,17 @@ export const ambassadorsApi = {
    * rendered afterwards must be the code the server returned, never the string
    * that was typed — a code that displays differently from how it resolves is
    * a bug report waiting to happen, and this one gets printed on a face card.
+   *
+   * ── THE RETURN IS DELIBERATELY UNTYPED, AND THAT IS A SCAR ─────────────────
+   * This was first written as returning `AmbassadorCodeState`, the same shape
+   * as `getCode`. That was a GUESS — nobody measured it — and it is wrong, so
+   * the screen wrote a shape with no `current` into its cache and claiming a
+   * code appeared to do nothing at all (@arthur, 2026-08-11). Callers must
+   * REFETCH after this succeeds rather than read what it hands back. Typing it
+   * as `unknown` is what stops the next person assuming again.
    */
-  claimCode: async (code: string): Promise<ApiResponse<AmbassadorCodeState>> => {
-    const response = await apiClient.post<ApiResponse<AmbassadorCodeState>>(
+  claimCode: async (code: string): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post<ApiResponse<unknown>>(
       '/ambassadors/code',
       { code }
     );

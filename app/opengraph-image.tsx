@@ -19,7 +19,7 @@ import { ImageResponse } from 'next/og';
  * unfurlers fall back to og:image (verified: Next populates twitter:image from
  * this file when the root `twitter` card config is present).
  */
-export const alt = 'Lawexa — Nigerian Legal Resources';
+export const alt = 'Lawexa — Where Modern Legal Work Happens';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -71,7 +71,7 @@ export default function Image() {
             marginTop: 20,
           }}
         >
-          Nigerian Legal Resources
+          Where Modern Legal Work Happens
         </div>
       </div>
     ),
