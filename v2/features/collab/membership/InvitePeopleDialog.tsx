@@ -60,7 +60,7 @@ export function InvitePeopleDialog({
   onInvite: (payload: InviteMemberPayload) => Promise<void>;
   /** A SPACE, so it can also offer a link. Organizations pass nothing: invite
    *  links are a spaces feature and there is no organization equivalent. */
-  linkScope?: { spaceUuid: string; placeName: string };
+  linkScope?: { spaceUuid: string };
 }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member'>('member');
@@ -207,12 +207,7 @@ export function InvitePeopleDialog({
           {/* UNDER the address field, not beside it. Typing an email is the
               thing most people came to do; the link is what they need when the
               person they are inviting has no Lawexa account to address. */}
-          {linkScope && (
-            <InviteLinkSection
-              spaceUuid={linkScope.spaceUuid}
-              placeName={linkScope.placeName}
-            />
-          )}
+          {linkScope && <InviteLinkSection spaceUuid={linkScope.spaceUuid} />}
         </div>
 
         <DialogFooter>

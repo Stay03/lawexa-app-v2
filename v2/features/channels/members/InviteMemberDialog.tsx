@@ -358,7 +358,6 @@ export function InviteMemberDialog({
               <InviteLinkSection
                 spaceUuid={linkScope.spaceUuid}
                 channelUuid={linkScope.channelUuid}
-                placeName={linkScope.placeName}
                 framing="standalone"
               />
               <DialogFooter>

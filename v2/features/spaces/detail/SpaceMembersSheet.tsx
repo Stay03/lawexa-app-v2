@@ -265,7 +265,7 @@ export function SpaceMembersSheet({
         title={`Invite to ${space.name}`}
         description="They get an invitation they can accept from their own Invitations page."
         onInvite={handleInvite}
-        linkScope={{ spaceUuid: space.uuid, placeName: space.name }}
+        linkScope={{ spaceUuid: space.uuid }}
       />
 
       <AlertDialog

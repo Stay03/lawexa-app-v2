@@ -61,8 +61,6 @@ function linkForScope(
 export function InviteLinkSection({
   spaceUuid,
   channelUuid,
-  /** What the link lets somebody into, in words — "Lawexa HQ", "#general". */
-  placeName,
   /** `section` sits under a form and introduces itself; `standalone` fills a
    *  tab that has already been labelled, so it repeats neither the rule nor the
    *  heading. */
@@ -70,7 +68,6 @@ export function InviteLinkSection({
 }: {
   spaceUuid: string;
   channelUuid?: string;
-  placeName: string;
   framing?: 'section' | 'standalone';
 }) {
   const links = useInviteLinks(spaceUuid);
@@ -105,9 +102,21 @@ export function InviteLinkSection({
         </>
       ) : (
         <>
+          {/* THE NAME IS NOT IN THE BUTTON, AND THAT IS NOT A STYLE CHOICE.
+              A shadcn button is `whitespace-nowrap`, and `DialogContent` is a
+              grid whose track sizes to its widest item — so "Make a link to
+              #500 Level Sessions with Dieko" set the track 25px wider than the
+              dialog's content box, every sibling stretched to match, and the
+              Copy button and the ends of three sentences were painted off the
+              side of the phone. Measured, not guessed: the button's
+              `scrollWidth` was 336 in a 313 box.
+
+              The sentence directly above already names the place, so the button
+              never needed to. `min-w-0` and the truncating label stay anyway —
+              they are what stops the NEXT long string doing this again. */}
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full min-w-0"
             disabled={create.isPending}
             onClick={() =>
               create.mutate({
@@ -117,11 +126,11 @@ export function InviteLinkSection({
             }
           >
             {create.isPending ? (
-              <Loader2 aria-hidden className="size-4 animate-spin" />
+              <Loader2 aria-hidden className="size-4 shrink-0 animate-spin" />
             ) : (
-              <Link2 aria-hidden className="size-4" />
+              <Link2 aria-hidden className="size-4 shrink-0" />
             )}
-            Make a link to {placeName}
+            <span className="truncate">Make a link</span>
           </Button>
           {/* Approval is ON, and the sentence says what that MEANS rather than
               naming the flag. Anyone who wants the unattended kind, or a cap or

@@ -97,7 +97,17 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 grid max-w-[calc(100%-2rem)] gap-6 rounded-4xl p-6 text-sm ring-1 duration-100 sm:max-w-md fixed left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2",
+          // `grid-cols-[minmax(0,1fr)]` IS LOAD-BEARING. A grid track defaults
+          // to `auto`, which is at least its widest item's min-content — so a
+          // single `whitespace-nowrap` button with a long label sets the track
+          // WIDER than the dialog's own content box, every sibling stretches to
+          // that track, and the overflow is painted off the side of the phone
+          // while `max-w` reports the dialog as correctly sized. Measured on a
+          // 393px viewport: content 386 in a 361 box, with nothing anywhere
+          // reporting itself as overflowing. `minmax(0,…)` lets the track
+          // shrink, so long content truncates or wraps inside the dialog
+          // instead of escaping it. (@arthur, 2026-08-11.)
+          "bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 grid grid-cols-[minmax(0,1fr)] max-w-[calc(100%-2rem)] gap-6 rounded-4xl p-6 text-sm ring-1 duration-100 sm:max-w-md fixed left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2",
           DIALOG_VIEWPORT_FIT,
           className
         )}
