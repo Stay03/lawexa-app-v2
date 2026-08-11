@@ -1,165 +1,158 @@
-# Frontend plan — ambassador referrals, and the new membership lines
+# Frontend plan — ambassador referrals
 
-Written 2026-08-11 against two docs @backendclaude published and deployed at
-01:16 UTC:
+Rewritten 2026-08-11 02:10 UTC, after a full audit of the contract against this
+codebase and after @backendclaude answered it.
 
-- `Stay03/lawexa-api-v3` → `docs/api/ambassador-referrals.md`
-- `Stay03/lawexa-api-v3` → `docs/api/spaces-channels-invite-links.md`
-
-Every claim below about **our** code was checked against the files named in it.
-
----
-
-## 0. The most important line in his doc is already done — but by accident
-
-His doc says, twice, that the one thing that cannot be repaired afterwards is
-sending `referral_code` on the **guest** call, because almost everybody is
-issued a guest token before they ever sign up and attribution is written once.
-
-**We already do it.** `lib/utils/attribution.ts` reads `?ref=` *and*
-`?referral_code=`, stores the payload in `sessionStorage`, and
-`lib/api/auth.ts` spreads `getStoredAttribution()` into all three calls that
-matter — `register` (:17), the Google callback (:40) and `guestToken` (:50).
-This shipped with the attribution work and predates the referral feature.
-
-**But it is only correct by luck, and that is worth fixing before it bites.**
-
-`captureAttribution()` runs in an effect inside `<AttributionBootstrap />`,
-mounted in `app/layout.tsx:72`. `useGuestAuth` acquires its token in an effect
-too. React runs effects **child first, then parent** — so a component deeper
-than the root layout runs its effect *before* the bootstrap's. Nothing
-guarantees the code is in `sessionStorage` when the guest call is built.
-
-What saves it today is unrelated: `useGuestAuth` waits on
-`isFingerprintLoading` (`lib/hooks/useGuestAuth.ts:49`), and FingerprintJS is
-async, so the bootstrap always wins the race in practice. Delete that await, or
-cache the fingerprint synchronously, and every referral from a first-time
-visitor is silently lost with nothing to find it by.
-
-**Fix, ~15 minutes:** call `captureAttribution()` at the top of `guestToken()`
-(and `register`/Google) rather than depending on effect order. It is already
-idempotent and first-touch — `attribution.ts:75` returns early if a payload
-exists — so calling it again is free and the ordering hazard disappears.
-
-This is item one. It is the cheapest thing on the list and the only one whose
-failure cannot be repaired.
+Sources: `Stay03/lawexa-api-v3` → `docs/api/ambassador-referrals.md` and
+`docs/api/spaces-channels-invite-links.md`. Every claim about **our** code below
+names the file it was checked against.
 
 ---
 
-## 1. The membership lines are live and we are drawing them wrong — RIGHT NOW
+## Status of the two items that came first
 
-Deployed 01:16. Every join, leave and removal now posts a system message into
-the channel. Our feed has a contractual fallback to plain text for unknown
-types (`types/collab.ts:298`), so nothing breaks — which is exactly why this is
-easy to leave broken: **"Ada Obi joined the channel" is currently drawn as an
-ordinary message bubble, as though Ada typed those words.**
+Both **DONE and pushed** (`8cd6d1e`), 01:38–02:22, 44 minutes.
 
-The contract, from his doc:
-
-| `metadata.type` | Content |
-|---|---|
-| `member_joined` | `Ada Obi joined the channel` |
-| `member_left` | `Ada Obi left the channel` |
-| `member_removed` | `Ada Obi was removed from the channel` |
-
-- `is_ai` is `false` **and** `author` is `null`. Either test alone identifies one.
-- `metadata.user_uuid` says who it is about.
-- They must **not** make a channel look unread.
-- `member_left` and `member_removed` stay different words. Rendering a removal
-  as "left" misrepresents that person in front of everyone.
-
-**One trap, and our code already has the rule written down.** A `null` author is
-NOT Lawexa. `types/collab.ts` already says to key Lawexa on `is_ai`, never on a
-missing author — that rule was written for hard-deleted humans and it now
-protects these lines too. Do not let anything start reading `author === null`.
-
-**Work:** extend `MessageType`, add a quiet centred line renderer, exclude the
-three types from unread counting. **~2 hours.** This is the only item that is
-visibly wrong on the live site today.
+- **Referral capture no longer depends on luck.** `getStoredAttribution()` now
+  captures before it reads (`lib/utils/attribution.ts`), so the code is present
+  on the guest call regardless of React's effect order. This was the one thing
+  in the whole feature that could not be repaired after the fact.
+- **Membership lines are furniture.** Own feed item, day-label grammar, distinct
+  glyphs for left vs removed, and they close the author run
+  (`v2/features/channels/feed-model.ts`, `feed/FeedDivider.tsx`).
 
 ---
 
-## 2. The ambassador's own screen — claim a code, see their numbers
+## What the audit changed about this plan
 
-```
-GET  /api/ambassadors/code          403 = not an ambassador
-POST /api/ambassadors/code          { code }   throttle 10/min
-GET  /api/ambassadors/performance   throttle 60/min
-```
+The audit was not a formality — it found two **backend bugs** that were wearing
+the costume of labelling questions, both being fixed tonight:
 
-**There is no ambassador role and there will not be one.** Gate on the `403`
-from `GET /api/ambassadors/code`, never on a user role. This is the same shape
-as the guest rule we already follow on invites: ask the server what this person
-can do, do not infer it.
+- **`revenue` was not money.** Payments in naira and dollars were summed into one
+  number: "139,200 naira plus 17 dollars" became 255,221 of nothing. It becomes
+  revenue **per currency**. This is why the field could not be labelled — it was
+  not a real quantity.
+- **`referred_count` double-counted almost everybody.** A guest row was counted,
+  then a second row at registration. One person who clicks and joins counted as
+  two. It becomes people who actually created an account, and **the number will
+  go down** — that is the fix working.
 
-Screen:
-- No code yet (`current: null`) → the claim form, not an error.
-- Has one → show it, the share link `lawexa.com/?ref={code}`, a copy control,
-  and **the retired codes**. Retired codes still work, and an ambassador who
-  changed theirs needs to see that last term's printed face card still credits
-  them. That is the whole promise of the face card.
-- `referred_count` and `paid_count`. No names, no emails — an ambassador is not
-  staff.
+Also being added after the audit: `busiest_day` becomes a date **and** a count,
+the ambassador gets their own last-referral date, per-code counts so a retired
+code can prove it still brings people, a confirmed/received-the-pack count, and
+a typed row identity for the admin table.
 
-Errors are already written for us: `409` taken, `422` use the server's message,
-`429` slow down.
-
-**Codes are stored lowercase.** `AdaObi` saves and returns as `adaobi`. Render
-what the API returned, never what was typed — the face card is printed from
-this and a code that displays differently from how it resolves is a bug report
-waiting to happen.
-
-**~3/4 day.**
+**Nothing may be built on `revenue` or `referred_count` until he says the shapes
+are settled.** Building against a field that is about to change is how a screen
+ships with a number nobody can explain.
 
 ---
 
-## 3. Admin financials
+## Phase 1 — The ambassador's own screen (≈ ¾ day)
 
-```
-GET /api/admin/ambassadors/financials     role:admin
-```
+Blocked on nothing. Uses only the code endpoints, which are stable.
 
-Reuses the `components/admin/observability` primitives, as the job screens do.
+### 1a · Types and the data layer
+`types/ambassador.ts` gains the code + performance shapes; `lib/api/` gains the
+three calls; a `v2/features/referrals/queries.ts` in the `v2/features/invites/`
+shape. `revenue` is typed `string` and stays a string forever.
 
-Three things to get right, all stated in his doc and all easy to get wrong:
+### 1b · The door — who even sees this
+`GET /api/ambassadors/my-application` decides it, **not a user role**. There is
+no ambassador role and there will not be one; roles are a priority ladder and
+inserting one changes the meaning of every existing check.
+The v2 rail cannot host the entry as it stands: `nav.config.ts:79` types
+`canAccess` as a pure `(role) => boolean` and the module forbids queries in the
+shell config. So either the rail grammar is extended, or the entry lives where
+the app already knows the person is approved — the "You're in" card on the
+static apply page (`public/ambassadors/integration.js:121`), which is a dead end
+today.
+**Needs a decision — see Open questions.**
 
-- **`revenue` is a decimal STRING, 2dp, never a number.** Format it, never do
-  arithmetic on it. Parsing to float throws away exactness the server computed.
-- **`revenue` is what referred people spent. It is NOT commission.** Nobody has
-  decided ambassadors are paid anything. The column may not be called
-  "earnings" or "owed".
-- **`unusual_activity`** (>20 signups in a day) is a prompt to look, not an
-  accusation — a lecture-hall demo trips it exactly as farming does. Render it
-  as a quiet marker, never a warning or a block.
-- Ambassadors who referred nobody appear with zeros. Do not filter them out:
-  "did nothing" and "not in the list" are different answers.
+### 1c · The claim form
+Claim and change are one call. `409` taken, `422` use the server's sentence,
+`429` slow down. **Display the code the API returned, never what was typed** —
+codes are stored lowercase, and a code that renders differently from how it
+resolves is a bug report waiting to happen. No client-side availability check
+exists, and the refusal is honest, so the form submits and reports.
 
-**~1 day.**
+### 1d · The code card and the share link
+The current code, `lawexa.com/?ref={code}`, a copy control, and **the retired
+codes**, because a printed face card carries a code that must keep working.
+Once per-code counts land, each retired code shows what it still brings — until
+then the card may state the code is still live but **must not imply a number it
+does not have**.
+
+### 1e · The numbers, honestly
+`referred_count` and `paid_count` only, with `paid_count` labelled as *ever paid*
+— it excludes refunds, unconverted trials, the free plan and gifts, including
+the welcome pack. **No earnings, no commission, no implication of either**: the
+API deliberately has no earnings concept and nobody has decided ambassadors are
+paid anything.
 
 ---
 
-## 4. The link itself — nothing to build
+## Phase 2 — Admin financials (≈ 1 day) — BLOCKED until the shapes settle
 
-`lawexa.com/?ref=adalaw` already works end to end once §0 is done. A code that
-matches nothing is stored and credits nobody; it never fails a signup, so there
-is **no client-side validation to write**.
+### 2a · Route and navigation
+`/admin/ambassadors/financials`, a new `contentNavItems` entry, and
+`excludePaths: ['/admin/ambassadors/financials']` on the existing Ambassadors
+item — the exact precedent is Cases at `components/admin/admin-nav-content.tsx:42`.
+Reuses `components/admin/observability` primitives, as `/admin/operations` does.
+
+### 2b · The table
+Per-currency revenue when it lands. Zero-referral ambassadors **stay in the
+list**: "did nothing" and "not in the list" are different answers.
+
+### 2c · The traps, all of them stated so they cannot be walked into
+- `revenue` is a decimal **string**. Format it; never parse it, never sum it,
+  never derive from it. `totals` exists so the client never does money arithmetic.
+- `revenue` is **what referred people spent**, not commission. The column may not
+  be called Earnings or Owed.
+- `gifted_messages` is a **count of messages**, not money. Any naira figure is
+  invented.
+- `unusual_activity` is **a prompt to look, not an accusation** — a lecture-hall
+  demo trips it exactly as farming does. No red, no "Flagged" filter tab, no
+  default sort by it.
 
 ---
 
-## Order, and why
+## Phase 3 — The share promise (small, but it is live and it is wrong)
 
-1. **§0**, 15 minutes. Cannot be repaired if it goes wrong.
-2. **§1**, 2 hours. Wrong on the live site right now.
-3. **§2**, 3/4 day. The thing ambassadors actually asked for.
-4. **§3**, 1 day. Needs §2's shape settled first.
+`public/ambassadors/integration.js:316` shares the words *"Sign up here and get
+10 free messages to start"* on a URL carrying `utm_campaign=ambassador-10-free`
+and **no referral code**. The pack is granted on referral attribution. So the
+promise is, as far as this side can tell, empty today.
 
-**Total ≈ 2 days.** Treat that the way @backendclaude asked his own numbers to
-be treated tonight: it is sized in human days out of habit, and the last four
-things I estimated at a day and a half took 1 hour 10. I will report the real
-time after each piece.
+Not fixed unilaterally: it is live marketing copy and the choice between
+*remove the promise* and *move the button behind an approved ambassador with a
+code* belongs to the owner. Asked, with the backend question that decides it
+(does that `utm_campaign` grant anything at all?).
 
-## What I need from @staynjokede
+---
 
-1. Approve the order, or change it.
-2. §1 is live and wrong now — say if it should ship on its own, ahead of
-   everything else.
+## Phase 4 — The face card (deferred, flagged)
+
+`public/ambassadors/face-card/index.html` contains **no referral code**. Today's
+printed cards therefore carry nothing to credit anybody — the feature's most
+physical distribution channel does not distribute the code. Wiring it means
+extending the deliberately React-free static page in raw JS. Real work, worth
+its own decision, not smuggled into phase 1.
+
+---
+
+## Open questions for @staynjokede
+
+1. **Where does the ambassador's own screen live, and can a v1 user reach it?**
+   Live users are on v1 — the v2 cookie is written only by the developer toggle.
+   A v2-only route linked from the welcome email 404s for every real ambassador.
+   Build it reachable from v1 too, or hold the links until cutover?
+2. **The share promise** (phase 3): remove the words, or move the button?
+3. Order. My recommendation: **1 now**, 3 as soon as you answer, 2 when the
+   shapes settle, 4 last.
+
+## On the estimates
+
+Sized in human days out of habit. Tonight: four items quoted at a day and a half
+took 1 hour 10, and the two above quoted at 2¼ hours took 44 minutes. Treat every
+number here as an upper bound and expect the real one after each phase.
