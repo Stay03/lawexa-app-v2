@@ -120,11 +120,22 @@
   // Returns true if an existing application gates the form (hides it).
   function showStatus(app) {
     if (app.status === 'rejected') return false; // allow a fresh application
-    var title = app.status === 'approved' ? 'You’re in!' : 'Application received';
-    var msg = app.status === 'approved'
-      ? 'Your ambassador application has been <b>approved</b>. Our team will reach out with next steps — keep an eye on your inbox.'
+    var approved = app.status === 'approved';
+    var title = approved ? 'You’re in!' : 'Application received';
+    var msg = approved
+      ? 'Your ambassador application has been <b>approved</b>. Pick your referral code and start sharing your link.'
       : 'Your application is <b>' + esc(app.status_label || 'pending') + '</b> and under review. We review weekly, so you’ll hear from us by email soon.';
-    showGate(title, msg, null, null);
+    // THE APPROVED CARD USED TO BE A DEAD END — "we'll reach out", and nothing
+    // to press. It is also the one surface that already knows this person is an
+    // approved ambassador, which makes it the natural door to their code. The
+    // referral screen lives outside both apps precisely so this link works for
+    // everybody, whichever app they are on.
+    showGate(
+      title,
+      msg,
+      approved ? { href: '/ambassadors/referrals', label: 'Get your referral link' } : null,
+      null
+    );
     return true;
   }
 
@@ -313,19 +324,39 @@
   }
 
   // ---- Share / invite ----
-  var SHARE_TEXT = 'Join me as a Lawexa Campus Ambassador. Sign up here and get 10 free messages to start:';
+  //
+  // THIS BUTTON PROMISED SOMETHING IT COULD NOT DELIVER (fixed 2026-08-11).
+  // It shared the APPLY page — utm tags, no referral code — under the words
+  // "Sign up here and get 10 free messages to start". The free pack is granted
+  // on referral attribution and nothing else, so for everybody who ever pressed
+  // it, that sentence was not true.
+  //
+  // THE FIRST FIX WAS TO GIVE IT THE SHARER'S CODE. Then the button was
+  // measured rather than reasoned about: it lives inside `#success`, the block
+  // shown the moment somebody submits an application. At that moment they have
+  // just applied — they are not approved and cannot have a code — and the
+  // approved path hides `#success` outright (`showGate`). So a code-aware
+  // branch here would never once run.
+  //
+  // It says what is true where it stands: come and be an ambassador. The
+  // sharing that carries a code lives on the referral screen, which is where
+  // somebody who HAS a code already is.
+  function shareText() {
+    return 'Join me as a Lawexa Campus Ambassador. Applications are open:';
+  }
   function shareUrl() {
-    return location.origin + '/ambassadors?utm_source=ambassador&utm_medium=referral&utm_campaign=ambassador-10-free';
+    return location.origin + '/ambassadors?utm_source=ambassador&utm_medium=referral&utm_campaign=ambassador-apply';
   }
   function showShareFallback(url, copied) {
     var note = document.getElementById('shareNote');
     if (note && copied) note.innerHTML = 'Link copied! Paste it anywhere, or share via:';
     var box = document.getElementById('shareFallback');
     if (!box) return;
-    var full = encodeURIComponent(SHARE_TEXT + ' ' + url);
+    var text = shareText();
+    var full = encodeURIComponent(text + ' ' + url);
     box.innerHTML =
       '<a class="btn btn-ghost" target="_blank" rel="noopener" href="https://wa.me/?text=' + full + '" style="margin:4px">WhatsApp</a>' +
-      '<a class="btn btn-ghost" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=' + encodeURIComponent(SHARE_TEXT) + '&url=' + encodeURIComponent(url) + '" style="margin:4px">X</a>';
+      '<a class="btn btn-ghost" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url) + '" style="margin:4px">X</a>';
     box.style.display = 'block';
   }
   function wireShare() {
@@ -334,10 +365,11 @@
     btn.dataset.wired = '1';
     btn.addEventListener('click', function () {
       var url = shareUrl();
+      var text = shareText();
       if (navigator.share) {
-        navigator.share({ title: 'Lawexa Campus Ambassador', text: SHARE_TEXT + ' ', url: url }).catch(function () {});
+        navigator.share({ title: 'Lawexa Campus Ambassador', text: text + ' ', url: url }).catch(function () {});
       } else if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(SHARE_TEXT + ' ' + url).then(
+        navigator.clipboard.writeText(text + ' ' + url).then(
           function () { showShareFallback(url, true); },
           function () { showShareFallback(url, false); }
         );
