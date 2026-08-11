@@ -3,6 +3,8 @@ import type { ApiResponse } from '@/types/api';
 import type {
   AmbassadorApplication,
   AmbassadorCodeState,
+  AmbassadorDailySignup,
+  AmbassadorFinancials,
   AmbassadorListParams,
   AmbassadorPerformance,
   AmbassadorListResponse,
@@ -42,6 +44,33 @@ export const adminAmbassadorsApi = {
       `/admin/ambassador-applications/${uuid}/reject`,
       { review_notes: data.review_notes }
     );
+    return response.data;
+  },
+
+  // Every ambassador and what their referrals were worth. One call, no paging:
+  // ambassadors who referred nobody are INCLUDED with zeros, because "did
+  // nothing" and "not in the list" are different answers.
+  getFinancials: async (): Promise<ApiResponse<AmbassadorFinancials>> => {
+    const response = await apiClient.get<ApiResponse<AmbassadorFinancials>>(
+      '/admin/ambassadors/financials'
+    );
+    return response.data;
+  },
+
+  /**
+   * The day-by-day record behind `unusual_activity`.
+   *
+   * This is what makes the flag usable rather than accusing: it cannot itself
+   * tell a lecture-hall demo from somebody farming, so an admin needs the days
+   * to decide. Newest first, and only days that had signups.
+   */
+  getDailySignups: async (
+    userUuid: string,
+    days = 30
+  ): Promise<ApiResponse<{ days: number; signups: AmbassadorDailySignup[] }>> => {
+    const response = await apiClient.get<
+      ApiResponse<{ days: number; signups: AmbassadorDailySignup[] }>
+    >(`/admin/ambassadors/${userUuid}/daily-signups`, { params: { days } });
     return response.data;
   },
 };

@@ -14,6 +14,7 @@ import {
   Handshake,
   BookOpen,
   Upload,
+  Coins,
   GraduationCap,
   Library,
   Sparkles,
@@ -38,7 +39,10 @@ import {
 
 const contentNavItems = [
   { title: 'Content Requests', url: '/admin/content-requests', icon: MessageSquareQuote },
-  { title: 'Ambassadors', url: '/admin/ambassadors', icon: GraduationCap },
+  // `excludePaths` so the applications row does not stay lit while the
+  // financials page is open — the same shape as Cases below.
+  { title: 'Ambassadors', url: '/admin/ambassadors', icon: GraduationCap, excludePaths: ['/admin/ambassadors/financials'] },
+  { title: 'Ambassador Money', url: '/admin/ambassadors/financials', icon: Coins },
   { title: 'Cases', url: '/admin/cases', icon: Scale, excludePaths: ['/admin/cases/enrichments', '/admin/cases/principle-review'] },
   { title: 'Case Enrichment', url: '/admin/cases/enrichments', icon: Sparkles },
   { title: 'Principle Review', url: '/admin/cases/principle-review', icon: ClipboardCheck },

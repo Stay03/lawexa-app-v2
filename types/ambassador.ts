@@ -122,6 +122,83 @@ export interface AmbassadorPerformance {
   last_referral_at: string | null;
 }
 
+/**
+ * Money, per currency, as decimal STRINGS.
+ *
+ * ── WHY IT IS A MAP AND NOT A NUMBER ───────────────────────────────────────
+ * Lawexa is paid in naira and in dollars. Until 2026-08-11 the server added
+ * them together, so "139,200 naira plus 17 dollars" arrived as 255,221 of
+ * nothing — a figure that is not money in any currency and cannot honestly be
+ * labelled. Our audit is what found it. They are now separate and NOTHING IS
+ * CONVERTED, because converting needs a rate and any rate here would be
+ * invented.
+ *
+ * THE VALUES STAY STRINGS. They are summed exactly on the server; parsing them
+ * into a float throws that exactness away for no gain, since the client only
+ * ever formats them. No arithmetic, client-side totals included — `totals`
+ * exists so nobody has to do any.
+ *
+ * NO MONEY AT ALL IS `{}`, not `"0.00"` — there is no currency to name.
+ */
+export type MoneyByCurrency = Record<string, string>;
+
+/** Their heaviest single day, and when it was. `signups` counts PEOPLE — it was
+ *  once a bare number that could equally have been read as a weekday, which is
+ *  why it now carries its date. Null/0 for somebody who has referred nobody. */
+export interface BusiestDay {
+  date: string | null;
+  signups: number;
+}
+
+/**
+ * One row of the admin financials table.
+ *
+ * `revenue` IS WHAT THE REFERRED PEOPLE SPENT. It is not commission and not
+ * earnings — nobody has decided ambassadors are paid anything, so no column
+ * built on this may be called "earnings" or "owed".
+ *
+ * `gifted_messages` is a COUNT OF MESSAGES, not money: granted packs are
+ * zero-amount rows and any naira figure would be invented.
+ *
+ * `unusual_activity` flags more than 20 signups in one day. It is a prompt to
+ * look, never an accusation — an ambassador demoing to a lecture hall trips it
+ * exactly as a farmer would — so it may not be drawn as a warning or a block.
+ */
+export interface AmbassadorFinancialRow {
+  user_uuid: string;
+  /** Opens the application behind the row. Null only if it has been removed. */
+  application_uuid: string | null;
+  name: string;
+  email: string;
+  code: string | null;
+  referred_count: number;
+  paid_count: number;
+  revenue: MoneyByCurrency;
+  gifted_messages: number;
+  last_referral_at: string | null;
+  busiest_day: BusiestDay;
+  unusual_activity: boolean;
+}
+
+export interface AmbassadorFinancialTotals {
+  ambassadors: number;
+  referred_count: number;
+  paid_count: number;
+  revenue: MoneyByCurrency;
+  gifted_messages: number;
+}
+
+export interface AmbassadorFinancials {
+  ambassadors: AmbassadorFinancialRow[];
+  totals: AmbassadorFinancialTotals;
+}
+
+/** One day on an ambassador's record — the evidence behind the flag. */
+export interface AmbassadorDailySignup {
+  date: string;
+  signups: number;
+}
+
 export interface ApproveAmbassadorData {
   review_notes?: string;
 }
