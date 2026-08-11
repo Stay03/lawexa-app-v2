@@ -4,6 +4,7 @@ import type {
   AmbassadorApplication,
   AmbassadorCodeState,
   AmbassadorListParams,
+  AmbassadorPerformance,
   AmbassadorListResponse,
   ApproveAmbassadorData,
   RejectAmbassadorData,
@@ -92,6 +93,16 @@ export const ambassadorsApi = {
     const response = await apiClient.post<ApiResponse<AmbassadorCodeState>>(
       '/ambassadors/code',
       { code }
+    );
+    return response.data;
+  },
+
+  // Their own numbers. No names and no emails come back — an ambassador is not
+  // staff — and there is no earnings figure, because nobody has decided they
+  // are paid anything.
+  getPerformance: async (): Promise<ApiResponse<AmbassadorPerformance>> => {
+    const response = await apiClient.get<ApiResponse<AmbassadorPerformance>>(
+      '/ambassadors/performance'
     );
     return response.data;
   },

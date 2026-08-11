@@ -32,13 +32,17 @@ import type { AmbassadorCode } from '@/types/ambassador';
  * to. (`/ambassadors/code` does answer `403` for a non-ambassador, but reaching
  * for that would mean asking a question we already have the answer to.)
  *
- * ── WHAT IS DELIBERATELY NOT ON THIS SCREEN YET ────────────────────────────
- * Their numbers. `GET /ambassadors/performance` is being reshaped tonight after
- * our audit found that `referred_count` counted almost everybody twice — once
- * as a guest, again at registration — so the number is about to change meaning
- * and go down. A screen that shows somebody a count of their own work must not
- * show one that is about to be corrected under them. It lands when the shape
- * is settled and somebody has actually seen it render.
+ * ── THE THREE NUMBERS ARE THREE DIFFERENT QUESTIONS ────────────────────────
+ * Signed up, got their free messages, ever paid. They are shown together and
+ * labelled apart, because the middle one is the promise this person personally
+ * made when they handed out their code, and it is the only one that tells them
+ * whether it was kept. `paid_count` deliberately excludes the welcome pack, so
+ * our own giveaway can never inflate it.
+ *
+ * They arrived late and on purpose: an audit found `referred_count` counted
+ * almost everybody twice — once as a guest, again at registration — and the
+ * screen waited until that was corrected. Showing somebody a count of their own
+ * work that is about to be revised downwards is worse than showing nothing.
  */
 
 /* ── Small parts ─────────────────────────────────────────────────────────── */
@@ -71,6 +75,23 @@ function Panel({
         <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>
       </div>
       {action}
+    </div>
+  );
+}
+
+/**
+ * One number and what it actually means.
+ *
+ * THE LABEL IS DOING REAL WORK HERE. "12" under the word "Referrals" invites
+ * every reading the API spent tonight ruling out — clicks, visitors, people who
+ * looked. The words say what was counted.
+ */
+function Tally({ value, label, note }: { value: number; label: string; note: string }) {
+  return (
+    <div className="rounded-xl border border-border/60 p-3">
+      <p className="text-2xl leading-none font-semibold tabular-nums">{value}</p>
+      <p className="mt-1.5 text-sm font-medium">{label}</p>
+      <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{note}</p>
     </div>
   );
 }
@@ -217,6 +238,12 @@ export function ReferralScreen() {
     enabled: approved,
   });
 
+  const performance = useQuery({
+    queryKey: ['ambassador-performance'],
+    queryFn: () => ambassadorsApi.getPerformance(),
+    enabled: approved,
+  });
+
   if (application.isPending) {
     return (
       <div aria-hidden className="mx-auto w-full max-w-md space-y-4 px-6 py-16">
@@ -289,6 +316,11 @@ export function ReferralScreen() {
 
   const current = codeState.data?.data?.current ?? null;
   const history = codeState.data?.data?.history ?? [];
+  const numbers = performance.data?.data ?? null;
+  /** Prefer the per-code tallies: a retired code that can show it brought nine
+   *  people answers the question far better than one that only proves it still
+   *  exists. Falls back to the code list when the numbers have not landed. */
+  const retiredTallies = numbers?.by_code.filter((entry) => !entry.is_current) ?? null;
   const retired = history.filter((entry) => !entry.is_current);
 
   const onClaimed = (next: {
@@ -300,6 +332,8 @@ export function ReferralScreen() {
       message: '',
       data: next,
     });
+    // The code changed, so every tally keyed by code is now stale.
+    void client.invalidateQueries({ queryKey: ['ambassador-performance'] });
   };
 
   return (
@@ -359,6 +393,46 @@ export function ReferralScreen() {
             )}
           </section>
 
+          {/* THE NUMBERS. Absent rather than zeroed while they load — a zero
+              somebody's work has not earned is worse than a gap. */}
+          {performance.isPending ? (
+            <div aria-hidden className="grid grid-cols-3 gap-2">
+              <Skeleton className="h-24 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
+            </div>
+          ) : numbers ? (
+            <section className="space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                <Tally
+                  value={numbers.referred_count}
+                  label="Signed up"
+                  note="Made an account"
+                />
+                <Tally
+                  value={numbers.confirmed_count}
+                  label="Got the gift"
+                  note="Confirmed their email"
+                />
+                <Tally
+                  value={numbers.paid_count}
+                  label="Ever paid"
+                  note="Not counting the gift"
+                />
+              </div>
+              {numbers.last_referral_at && (
+                <p className="text-xs text-muted-foreground">
+                  Last one arrived{' '}
+                  {new Date(numbers.last_referral_at).toLocaleDateString(undefined, {
+                    day: 'numeric',
+                    month: 'long',
+                  })}
+                  .
+                </p>
+              )}
+            </section>
+          ) : null}
+
           <section className="space-y-3 border-t pt-6">
             <ClaimForm current={current.code} onDone={onClaimed} />
           </section>
@@ -376,11 +450,21 @@ export function ReferralScreen() {
                 counting for you.
               </p>
               <ul className="space-y-1.5 pt-1">
-                {retired.map((entry) => (
+                {(retiredTallies ?? retired).map((entry) => (
                   <li key={entry.code} className="flex items-center gap-2">
                     <code className="min-w-0 flex-1 truncate rounded bg-secondary px-2 py-1 text-xs text-muted-foreground">
                       {entry.code}
                     </code>
+                    {/* THE PROOF, not just the promise. "Still works" is a
+                        claim; "brought 3 people" is the thing they actually
+                        wanted to know when they changed their code. */}
+                    {'referred_count' in entry && (
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {entry.referred_count === 1
+                          ? '1 person'
+                          : `${entry.referred_count} people`}
+                      </span>
+                    )}
                     <CopyButton value={referralUrl(entry.code)} label="Link" />
                   </li>
                 ))}

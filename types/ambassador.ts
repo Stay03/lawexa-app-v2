@@ -51,13 +51,12 @@ export interface AmbassadorListParams {
   page?: number;
 }
 
-/* ── Referral codes (2026-08-11) ─────────────────────────────────────────────
-   Only the CODE half is typed here. The performance and admin-financials
-   payloads are deliberately absent: @backendclaude is changing both tonight
-   (`revenue` was summing naira and dollars into one meaningless number, and
-   `referred_count` counted almost everybody twice — once as a guest, again at
-   registration). Typing a shape that is mid-change is how a screen ships
-   against a field nobody can explain. They land when he says they are settled.
+/* ── Referral codes and numbers (2026-08-11) ────────────────────────────────
+   The code half was typed first, and the performance half deliberately waited:
+   an audit found `referred_count` counted almost everybody twice — once as a
+   guest, again at registration — and `revenue` was summing naira and dollars
+   into one meaningless figure. Both were corrected and are live, so the shapes
+   below are the settled ones.
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
@@ -80,6 +79,47 @@ export interface AmbassadorCode {
 export interface AmbassadorCodeState {
   current: AmbassadorCode | null;
   history: AmbassadorCode[];
+}
+
+/** One code's own tally. Present for every code they have ever held, current
+ *  and retired, and a code that brought nobody appears as zero rather than
+ *  being left out — "brought nobody" and "not listed" are different answers. */
+export interface AmbassadorCodeTally {
+  code: string;
+  is_current: boolean;
+  referred_count: number;
+}
+
+/**
+ * What an ambassador is shown about their own work.
+ *
+ * EVERY ONE OF THESE THREE COUNTS MEANS SOMETHING DIFFERENT, and the labels on
+ * screen have to keep them apart:
+ *  - `referred_count` — people who CREATED AN ACCOUNT. Not link clicks and not
+ *    visitors. A guest who never registered is not counted, and somebody who
+ *    was a guest before registering is not counted twice. Say "signed up",
+ *    never "opened your link".
+ *  - `confirmed_count` — how many of those confirmed their email, which is the
+ *    moment the free pack is granted. This is the promise the ambassador
+ *    personally made when they handed the code out, so it is the one that tells
+ *    them whether it was kept.
+ *  - `paid_count` — ever paid Lawexa money, subscribed or bought a pack, even
+ *    if later cancelled. Excludes refunds, unconverted trials, the free plan
+ *    and gifts — INCLUDING the welcome pack every referred person gets, so it
+ *    can never be inflated by our own giveaway.
+ *
+ * `last_referral_at` is null when they have referred nobody. There is no
+ * earnings figure here and there is not meant to be: nobody has decided
+ * ambassadors are paid anything.
+ */
+export interface AmbassadorPerformance {
+  code: string | null;
+  retired_codes: string[];
+  by_code: AmbassadorCodeTally[];
+  referred_count: number;
+  confirmed_count: number;
+  paid_count: number;
+  last_referral_at: string | null;
 }
 
 export interface ApproveAmbassadorData {
