@@ -1,4 +1,7 @@
+import { LogOut, UserMinus, UserPlus, type LucideIcon } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
+import type { Message } from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /**
@@ -54,6 +57,60 @@ export function DayDivider({ label }: { label: string }) {
     <div role="separator" aria-label={label} className="flex justify-center py-1">
       <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * MembershipLine — somebody joined, left, or was removed.
+ *
+ * ── RECESSIVE, LIKE THE DAY LABEL, AND FOR THE SAME REASON ─────────────────
+ * These are furniture. A join is not something a reader comes back for, so this
+ * borrows `DayDivider`'s grammar — centred, small, muted, no pill, no rule —
+ * rather than the unread line's. Gold still means unread and nothing else.
+ *
+ * ── THE SENTENCE IS THE SERVER'S, DELIBERATELY ─────────────────────────────
+ * The API sends the whole line already written ("Ada Obi joined the channel"),
+ * and it is rendered verbatim. `metadata.user_uuid` is there so the name could
+ * be linked, but linking it would mean finding the name INSIDE that sentence —
+ * a substring match against a display name, which breaks on a name that
+ * contains the word "joined", on a rename, and on any wording change the
+ * backend makes. The whole sentence, unparsed, cannot drift from what the
+ * server decided happened.
+ *
+ * ── THE THREE STAY THREE ───────────────────────────────────────────────────
+ * `member_left` and `member_removed` get different glyphs as well as different
+ * words. Collapsing them — even visually — misrepresents somebody who was
+ * removed as having walked out, in front of everybody who reads the channel.
+ * Any unknown type falls back to the plain sentence with no glyph, which is
+ * still true and still readable.
+ */
+const MEMBERSHIP_GLYPHS: Readonly<Record<string, LucideIcon>> = {
+  member_joined: UserPlus,
+  member_left: LogOut,
+  member_removed: UserMinus,
+};
+
+export function MembershipLine({ message }: { message: Message }) {
+  const type = message.metadata.type;
+  const Glyph = type ? MEMBERSHIP_GLYPHS[type] : undefined;
+  const text = message.content.trim();
+  if (!text) return null;
+
+  return (
+    <div
+      role="separator"
+      aria-label={text}
+      className="flex items-center justify-center gap-1.5 py-1"
+    >
+      {Glyph && (
+        <Glyph aria-hidden className="size-3 shrink-0 text-muted-foreground/70" />
+      )}
+      {/* `aria-hidden`: the separator's own label already reads the sentence,
+          and without this a screen reader says it twice. */}
+      <span aria-hidden className="text-[11px] leading-snug text-muted-foreground">
+        {text}
       </span>
     </div>
   );

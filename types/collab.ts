@@ -299,7 +299,41 @@ export type MessageType =
   | 'text'
   | 'ai_divider'
   | 'quiz_game_live'
-  | 'quiz_game_finished';
+  | 'quiz_game_finished'
+  | 'member_joined'
+  | 'member_left'
+  | 'member_removed';
+
+/**
+ * The three membership lines (backend 2026-08-11, live 01:16 UTC).
+ *
+ * FURNITURE, NOT CONVERSATION. The server posts a real message into the channel
+ * when somebody joins, leaves or is removed. Drawn as a bubble they read as
+ * though that person sat down and typed "Ada Obi joined the channel", which is
+ * exactly what our contractual plain-text fallback did on the day they shipped.
+ *
+ * `member_left` and `member_removed` are DELIBERATELY DIFFERENT and must stay
+ * so: rendering a removal as "left" misrepresents that person in front of the
+ * whole channel.
+ *
+ * On these, `is_ai` is `false` AND `author` is `null` — either test identifies
+ * one on its own. `metadata.user_uuid` says who the line is about.
+ */
+export const MEMBERSHIP_MESSAGE_TYPES = [
+  'member_joined',
+  'member_left',
+  'member_removed',
+] as const satisfies readonly MessageType[];
+
+export type MembershipMessageType = (typeof MEMBERSHIP_MESSAGE_TYPES)[number];
+
+export function isMembershipMessage(message: Message): boolean {
+  const type = message.metadata.type;
+  return (
+    type !== undefined &&
+    (MEMBERSHIP_MESSAGE_TYPES as readonly string[]).includes(type)
+  );
+}
 
 export interface MessageMetadata {
   mentions: MessageMention[];
@@ -321,6 +355,9 @@ export interface MessageMetadata {
    *  live game and its parent quiz — the W6 Join / Results actions' handles. */
   game_uuid?: string;
   quiz_uuid?: string;
+  /** Membership lines only: WHO the line is about. Not the author — these
+   *  lines have no author at all. */
+  user_uuid?: string;
   /** On every AI-authored message since 2026-08-03 (no backfill — `null` on
    *  older history and on human messages). Equals the summon's
    *  `execution_id` exactly; the responding pill clears on the FIRST match. */

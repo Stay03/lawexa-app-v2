@@ -40,7 +40,7 @@ import { canManageChannel, isLocalMessageUuid } from '../model';
 import { channelsQueries } from '../queries';
 import { outboxGet, useOutboxMessages } from '../send-outbox';
 import { ChannelFeedSkeleton, ChannelIntro, FeedErrorState } from '../screen/states';
-import { DayDivider, UnreadDivider } from './FeedDivider';
+import { DayDivider, MembershipLine, UnreadDivider } from './FeedDivider';
 import { formatImageTarget } from './image-target';
 import { MessageActionsSheet } from './MessageActionsSheet';
 import { MessageGroupRow } from './MessageGroupRow';
@@ -1041,6 +1041,8 @@ export function ChannelFeed({
                 switch (item.kind) {
                   case 'day':
                     return <DayDivider key={item.key} label={item.label} />;
+                  case 'membership':
+                    return <MembershipLine key={item.key} message={item.message} />;
                   case 'unread':
                     return (
                       <UnreadDivider

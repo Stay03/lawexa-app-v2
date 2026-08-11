@@ -81,9 +81,31 @@ export function captureAttribution(): void {
 /**
  * Returns the stored attribution payload, or an empty object if none exists
  * or we're on the server. Safe to spread into request bodies.
+ *
+ * ── IT CAPTURES FIRST, AND THAT IS THE WHOLE POINT (2026-08-11) ────────────
+ * `referral_code` rides this payload, and the referral it credits is written
+ * ONCE — on whichever auth call the visitor hits first, which for almost
+ * everybody is the guest token, before they have signed up at all. The API doc
+ * is blunt about it: attribution is never rewritten, so a code that misses that
+ * first call is lost with nothing to trace it by.
+ *
+ * Capture used to happen only in `<AttributionBootstrap />`'s effect
+ * (`app/layout.tsx`). `useGuestAuth` acquires its token in an effect too, and
+ * React runs effects CHILD FIRST — so nothing ordered the write before the
+ * read. What actually saved it was unrelated and accidental: the guest call
+ * awaits an async fingerprint, so the bootstrap always won the race. Make that
+ * fingerprint synchronous one day and every first-time visitor's referral
+ * disappears silently.
+ *
+ * So the read captures first. `captureAttribution` is idempotent and
+ * first-touch, so this costs one `sessionStorage` probe and cannot overwrite a
+ * payload already taken — and any caller, present or future, is correct without
+ * knowing any of the above. The bootstrap stays for the visit where no auth
+ * call is made at all.
  */
 export function getStoredAttribution(): AttributionPayload {
   if (typeof window === 'undefined') return {};
+  captureAttribution();
   const raw = sessionStorage.getItem(ATTRIBUTION_KEY);
   if (!raw) return {};
   try {

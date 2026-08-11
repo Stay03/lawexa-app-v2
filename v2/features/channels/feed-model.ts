@@ -1,5 +1,5 @@
 import { formatDayLabel, isSameCalendarDay } from '@/lib/utils/collab';
-import type { Message, SlimUser } from '@/types/collab';
+import { isMembershipMessage, type Message, type SlimUser } from '@/types/collab';
 import type { RespondingTurn } from './lawexa/turns';
 import { GROUP_WINDOW_MS } from './model';
 
@@ -50,12 +50,28 @@ export interface RespondingItem {
   turn: RespondingTurn;
 }
 
+/**
+ * Somebody joined, left, or was removed — a quiet line, never a bubble.
+ *
+ * The server posts these as real messages with no author, so without their own
+ * item kind they fall into the author-run branch below and are drawn as though
+ * the person typed "Ada Obi joined the channel" into the chat. They also merge
+ * with a genuinely author-less run (a hard-deleted human), which is worse: a
+ * join line and a dead person's message in one bubble.
+ */
+export interface MembershipItem {
+  kind: 'membership';
+  key: string;
+  message: Message;
+}
+
 export type FeedItem =
   | MessageGroupItem
   | DayItem
   | QuizCardItem
   | UnreadDividerItem
-  | RespondingItem;
+  | RespondingItem
+  | MembershipItem;
 
 /** Flatten the cursor pages (newest-first) into chronological order. */
 export function flattenMessages(
@@ -81,6 +97,20 @@ export function flattenMessages(
  * the line, outside it. A bounded inaccuracy, accepted: re-deriving on every
  * prepend would move a line the reader may already be using as a bookmark.
  * `null` = nothing unread (land at bottom).
+ *
+ * ── AND IT COUNTS ROWS THE SERVER DOES NOT (2026-08-11) ────────────────────
+ * `unread_count` deliberately excludes the membership lines — a join is not
+ * something to come back and read — but they still sit in this array. So each
+ * membership line among the newest N messages pushes this anchor one row too
+ * NEW, and that many genuinely unread messages render above the line rather
+ * than below it.
+ *
+ * Left as is, and stated rather than hidden. It is the same bounded inaccuracy
+ * the dropped `ai_divider` already introduces, the error is one row per join in
+ * the unread tail, and the alternative — counting backwards while skipping
+ * server-uncounted types — puts a second, guessed copy of the server's counting
+ * rule in the client, which drifts the moment the server changes what it counts.
+ * Revisit only if the server sends the anchor itself.
  */
 export function unreadAnchorUuid(
   messages: readonly Message[],
@@ -172,6 +202,22 @@ export function buildFeedItems(
     if (type === 'quiz_game_live' || type === 'quiz_game_finished') {
       flushSeparators();
       items.push({ kind: 'quiz-card', key: `quiz-${message.uuid}`, message });
+      group = null;
+      continue;
+    }
+
+    // Membership lines, same rule: their own row, and they close the run.
+    // Closing it matters as much as the row does — these have NO author, so
+    // left in the grouping branch they would merge with a hard-deleted human's
+    // messages, which are also author-less, and put a join line inside somebody
+    // else's bubble.
+    if (isMembershipMessage(message)) {
+      flushSeparators();
+      items.push({
+        kind: 'membership',
+        key: `membership-${message.uuid}`,
+        message,
+      });
       group = null;
       continue;
     }
