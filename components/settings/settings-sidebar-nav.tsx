@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   User,
   Settings,
@@ -14,9 +15,11 @@ import {
   Gauge,
   Building2,
   FlaskConical,
+  Ticket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { ambassadorsApi } from '@/lib/api/ambassadors';
 import { canAccessSpaces } from '@/lib/utils/spaces-access';
 import { canAccessV2Preview } from '@/lib/utils/v2-access';
 
@@ -82,6 +85,12 @@ const navItems = [
     icon: LinkIcon,
   },
   {
+    label: 'Referrals',
+    description: 'Your ambassador code and link',
+    href: '/settings/referrals',
+    icon: Ticket,
+  },
+  {
     label: 'Developer',
     description: 'Preview builds & flags',
     href: '/settings/developer',
@@ -97,9 +106,36 @@ export function SettingsSidebarNav() {
   // account since Aug 3, 2026; only guests/bots are filtered out.
   const canSpaces = canAccessSpaces(role);
   const canV2Preview = canAccessV2Preview(role);
+
+  /**
+   * ── REFERRALS CANNOT BE FILTERED ON A ROLE, BECAUSE THERE ISN'T ONE ────────
+   * Every other row here is decided by `role`, which arrives with the session
+   * and costs nothing. An ambassador is not a role and deliberately never will
+   * be — roles are a priority ladder where each check asks "at least X", so
+   * inserting one changes the meaning of every existing check for somebody
+   * whose abilities do not change. An ambassador is an ordinary user with an
+   * APPROVED application, and only the server knows that.
+   *
+   * So this one row costs a request. It is kept cheap and quiet:
+   *  - a long `staleTime`, because an application is approved once and does not
+   *    change while somebody clicks around their settings;
+   *  - the same query key the referral screen itself uses, so opening the page
+   *    reuses this answer instead of asking again;
+   *  - and the row simply is not rendered until the answer arrives, rather than
+   *    being rendered disabled or reserved — a settings list that shifts under
+   *    the cursor is worse than one that finishes assembling.
+   */
+  const application = useQuery({
+    queryKey: ['ambassador-application'],
+    queryFn: () => ambassadorsApi.getMyApplication(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const isAmbassador = application.data?.data?.status === 'approved';
+
   const items = navItems.filter((item) => {
     if (item.href === '/settings/organization') return canSpaces;
     if (item.href === '/settings/developer') return canV2Preview;
+    if (item.href === '/settings/referrals') return isAmbassador;
     return true;
   });
 

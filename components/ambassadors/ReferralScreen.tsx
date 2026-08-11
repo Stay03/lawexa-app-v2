@@ -60,11 +60,16 @@ function Panel({
   title,
   children,
   action,
+  /** `h1` standing alone on its own page; `h2` inside settings, which already
+   *  has one. Two `h1`s is not a style question — it announces two documents. */
+  heading = 'h1',
 }: {
   title: string;
   children: React.ReactNode;
   action?: React.ReactNode;
+  heading?: 'h1' | 'h2';
 }) {
+  const Heading = heading;
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 px-6 py-16 text-center">
       <span
@@ -74,7 +79,7 @@ function Panel({
         <Ticket className="size-6" />
       </span>
       <div className="space-y-1.5">
-        <h1 className="text-base font-semibold">{title}</h1>
+        <Heading className="text-base font-semibold">{title}</Heading>
         <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>
       </div>
       {action}
@@ -241,7 +246,20 @@ function ClaimForm({
 
 /* ── The screen ──────────────────────────────────────────────────────────── */
 
-export function ReferralScreen() {
+/**
+ * `standalone` is its own page at `/ambassadors/referrals` — it brings the
+ * heading and the column, because nothing around it does. `settings` is the
+ * same screen inside the settings shell, which already supplies the page
+ * container, the "Settings" heading and the sidebar; there it wears a Card like
+ * its siblings and brings no second `h1`.
+ */
+export type ReferralFraming = 'standalone' | 'settings';
+
+export function ReferralScreen({
+  framing = 'standalone',
+}: {
+  framing?: ReferralFraming;
+} = {}) {
   const client = useQueryClient();
   /**
    * `navigator.share` EXISTS ON THE CLIENT AND NOT ON THE SERVER, so reading it
@@ -274,6 +292,11 @@ export function ReferralScreen() {
     enabled: approved,
   });
 
+  const inSettings = framing === 'settings';
+  /** Settings already owns the page's `h1`. Derived here rather than at each
+   *  panel so the refusals and the real screen cannot disagree. */
+  const panelHeading = inSettings ? 'h2' : 'h1';
+
   if (application.isPending) {
     return (
       <div aria-hidden className="mx-auto w-full max-w-md space-y-4 px-6 py-16">
@@ -288,6 +311,7 @@ export function ReferralScreen() {
   if (application.isError) {
     return (
       <Panel
+        heading={panelHeading}
         title="We couldn't open this"
         action={
           <Button onClick={() => void application.refetch()}>Try again</Button>
@@ -305,6 +329,7 @@ export function ReferralScreen() {
   if (!record) {
     return (
       <Panel
+        heading={panelHeading}
         title="You're not an ambassador yet"
         action={
           <Button asChild>
@@ -320,7 +345,7 @@ export function ReferralScreen() {
 
   if (record.status === 'pending') {
     return (
-      <Panel title="Your application is with us">
+      <Panel heading={panelHeading} title="Your application is with us">
         We&rsquo;ll email you when it has been looked at. Your code and your link
         appear here once you&rsquo;re approved.
       </Panel>
@@ -330,6 +355,7 @@ export function ReferralScreen() {
   if (record.status !== 'approved') {
     return (
       <Panel
+        heading={panelHeading}
         title="This isn't open to you yet"
         action={
           <Button asChild variant="outline">
@@ -376,9 +402,22 @@ export function ReferralScreen() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-8 px-6 py-12">
+    <div
+      className={
+        inSettings
+          ? 'space-y-8 rounded-xl border bg-card p-6'
+          : 'mx-auto w-full max-w-md space-y-8 px-6 py-12'
+      }
+    >
+      {/* In settings the page already has an `h1` above the sidebar, so this
+          one steps down to an `h2`. Two `h1`s on a page is not a style
+          preference — it is what makes a screen reader announce two documents. */}
       <header className="space-y-1.5">
-        <h1 className="text-xl font-semibold">Your referral link</h1>
+        {inSettings ? (
+          <h2 className="text-lg font-semibold">Your referral link</h2>
+        ) : (
+          <h1 className="text-xl font-semibold">Your referral link</h1>
+        )}
         <p className="text-sm leading-relaxed text-muted-foreground">
           Anyone who joins Lawexa through your link is credited to you, and gets
           10 free messages once their email is confirmed.
