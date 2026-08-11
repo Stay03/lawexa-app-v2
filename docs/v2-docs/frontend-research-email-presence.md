@@ -114,6 +114,12 @@ channel menu's notification group — today one radio set of All / Mentions only
 Muted — becoming a shape that carries email separately. Small, and it waits on
 the backend contract.
 
+**Do not assume the storage is already there.** A per-account table of delivery
+methods DOES exist and looks exactly like the right home for this, but nothing
+in the messaging side reads it — it is used only by Radar, to decide where a
+scan alert goes (@backendclaude, checked 2026-08-11). Anybody picking this up
+who finds that table will think the hard part is done. It is not.
+
 Sources: [Slack presence and status](https://api.slack.com/apis/presence-and-status),
 [Guide to Slack notifications](https://slack.com/help/articles/360025446073-Guide-to-Slack-notifications),
 [When Slack goes inactive](https://staygreenonslack.com/when-does-slack-go-inactive),
