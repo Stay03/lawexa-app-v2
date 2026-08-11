@@ -170,7 +170,18 @@ export function InviteMemberDialog({
         </DialogHeader>
 
         {/* The strip sizes itself to what is actually offered: a reader with no
-            link half must not meet a two-column grid with a hole in it. */}
+            link half must not meet a two-column grid with a hole in it.
+
+            ── AND EVERY PART OF IT IS ALLOWED TO SHRINK (@arthur, 2026-08-11)
+            A third column turned this into the widest thing in the dialog on a
+            phone, and because a grid track's default `min-width` is `auto` — its
+            content's minimum, not zero — the track refused to go below the
+            label. The strip pushed the dialog past the screen and took the Copy
+            button, the closing words of every sentence and half the third tab
+            with it. `min-w-0` on the track is what lets the grid do its job.
+            The labels lost their prepositions in the same pass: three of them
+            at 393px is not the place for "In this space", which wrapped to two
+            lines beside two that did not. */}
         <div
           className={cn(
             'grid gap-1 rounded-lg bg-muted p-1',
@@ -179,10 +190,10 @@ export function InviteMemberDialog({
         >
           {(
             [
-              { id: 'people', label: 'In this space', icon: Users },
-              { id: 'email', label: 'By email', icon: Mail },
+              { id: 'people', label: linkScope ? 'Space' : 'In this space', icon: Users },
+              { id: 'email', label: linkScope ? 'Email' : 'By email', icon: Mail },
               ...(linkScope
-                ? ([{ id: 'link', label: 'By link', icon: Link2 }] as const)
+                ? ([{ id: 'link', label: 'Link', icon: Link2 }] as const)
                 : []),
             ] as const
           ).map(({ id, label, icon: Icon }) => (
@@ -191,15 +202,15 @@ export function InviteMemberDialog({
               type="button"
               onClick={() => setTab(id)}
               className={cn(
-                'v2-interactive flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
+                'v2-interactive flex min-w-0 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium whitespace-nowrap',
                 'transition-colors duration-150 motion-reduce:transition-none',
                 tab === id
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <Icon aria-hidden className="size-4" />
-              {label}
+              <Icon aria-hidden className="size-4 shrink-0" />
+              <span className="truncate">{label}</span>
             </button>
           ))}
         </div>

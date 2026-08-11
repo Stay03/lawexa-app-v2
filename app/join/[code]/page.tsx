@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { JoinScreen } from '@/components/join/JoinScreen';
+import { getApiUrl } from '@/lib/constants/seo';
 
 /**
  * `/join/{code}` — the screen an invite link lands on.
@@ -43,6 +44,26 @@ import { JoinScreen } from '@/components/join/JoinScreen';
  * `noindex` STAYS. An invite code is a key: it may be unfurled in a chat, and
  * it must never be sitting in a search result. Unfurling and indexing are
  * different things and this allows only the first.
+ *
+ * ── AND IT SHIPPED BROKEN, FOR ONE CHARACTER (@arthur, 2026-08-11) ─────────
+ * `NEXT_PUBLIC_API_URL` is the ORIGIN — `https://prod-api.lawexa.com` — and
+ * every other caller in the app appends `/api` itself (`lib/api/client.ts`
+ * builds its `baseURL` that way). This function read it as though it already
+ * contained `/api`, so the real request went to `/invite-links/{code}`, got a
+ * 404, fell into the `!response.ok` branch, and returned the generic card. For
+ * every invite ever sent.
+ *
+ * IT WAS INVISIBLE BECAUSE THE FALLBACK STRING WAS RIGHT. The `??` default has
+ * `/api` in it, so a machine with no env var — which is what a quick local
+ * check looks like — produced a perfect card, and a machine with the env var
+ * set produced a broken one. The env var being SET is the failing case, which
+ * is the opposite of where anybody looks.
+ *
+ * Two rules out of it. Compose the API base through `getApiUrl()` like the rest
+ * of the app rather than reading the variable raw, and verify a share card by
+ * reading the deployed page's `<meta>` tags — not by opening the page and
+ * seeing it look right. The card and the page are different renders and only
+ * one of them was ever checked.
  */
 export async function generateMetadata({
   params,
@@ -58,7 +79,7 @@ export async function generateMetadata({
 
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? 'https://prod-api.lawexa.com/api'}/invite-links/${code}`,
+      `${getApiUrl()}/api/invite-links/${code}`,
       { headers: { Accept: 'application/json' }, next: { revalidate: 60 } },
     );
     if (!response.ok) return fallback;
