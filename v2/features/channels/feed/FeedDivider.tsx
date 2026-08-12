@@ -1,4 +1,4 @@
-import { LogOut, UserMinus, UserPlus, type LucideIcon } from 'lucide-react';
+import { GitBranch, LogOut, UserMinus, UserPlus, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { Message } from '@/types/collab';
@@ -63,7 +63,8 @@ export function DayDivider({ label }: { label: string }) {
 }
 
 /**
- * MembershipLine — somebody joined, left, or was removed.
+ * QuietSystemLine — the lines the server writes itself: somebody joined, left
+ * or was removed, and a conversation branching into a thread.
  *
  * ── RECESSIVE, LIKE THE DAY LABEL, AND FOR THE SAME REASON ─────────────────
  * These are furniture. A join is not something a reader comes back for, so this
@@ -85,16 +86,24 @@ export function DayDivider({ label }: { label: string }) {
  * removed as having walked out, in front of everybody who reads the channel.
  * Any unknown type falls back to the plain sentence with no glyph, which is
  * still true and still readable.
+ *
+ * ── THE THREAD LINE READS, IT DOES NOT YET TRAVEL ──────────────────────────
+ * `thread_started` carries a `thread_uuid` and could be a way in to the thread.
+ * It is drawn as a plain sentence for now because opening threads is a feature
+ * nobody has asked for yet; this exists so that the line the server already
+ * posts is not attributed to "Deleted account", which is what an author-less
+ * row does in the ordinary message path.
  */
-const MEMBERSHIP_GLYPHS: Readonly<Record<string, LucideIcon>> = {
+const SYSTEM_LINE_GLYPHS: Readonly<Record<string, LucideIcon>> = {
   member_joined: UserPlus,
   member_left: LogOut,
   member_removed: UserMinus,
+  thread_started: GitBranch,
 };
 
-export function MembershipLine({ message }: { message: Message }) {
+export function QuietSystemLine({ message }: { message: Message }) {
   const type = message.metadata.type;
-  const Glyph = type ? MEMBERSHIP_GLYPHS[type] : undefined;
+  const Glyph = type ? SYSTEM_LINE_GLYPHS[type] : undefined;
   const text = message.content.trim();
   if (!text) return null;
 

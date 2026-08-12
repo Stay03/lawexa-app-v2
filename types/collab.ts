@@ -302,7 +302,8 @@ export type MessageType =
   | 'quiz_game_finished'
   | 'member_joined'
   | 'member_left'
-  | 'member_removed';
+  | 'member_removed'
+  | 'thread_started';
 
 /**
  * The three membership lines (backend 2026-08-11, live 01:16 UTC).
@@ -327,11 +328,31 @@ export const MEMBERSHIP_MESSAGE_TYPES = [
 
 export type MembershipMessageType = (typeof MEMBERSHIP_MESSAGE_TYPES)[number];
 
-export function isMembershipMessage(message: Message): boolean {
+/**
+ * Every message the server writes ITSELF, rather than carrying for a person.
+ *
+ * THE SHARED PROPERTY IS THE DANGEROUS ONE: all of these have `author: null`,
+ * and so does a hard-deleted human. The feed groups by author uuid, so any one
+ * of these left in the ordinary-message path either merges into a deleted
+ * person's run or draws its own bubble headed "Deleted account" — the server's
+ * own sentence attributed to a ghost. That is why this list exists and why
+ * anything added to it must also be given a branch in `feed-model`.
+ *
+ * `thread_started` (backend 2026-08-12) is the newest: "{name} started a
+ * thread: {title}", carrying `thread_uuid` and a `root_message_uuid` that is
+ * null for a thread begun with no message behind it. Verified in the server's
+ * own `postSystemMessage`, which writes `user_id => null`.
+ */
+export const QUIET_SYSTEM_MESSAGE_TYPES = [
+  ...MEMBERSHIP_MESSAGE_TYPES,
+  'thread_started',
+] as const satisfies readonly MessageType[];
+
+export function isQuietSystemLine(message: Message): boolean {
   const type = message.metadata.type;
   return (
     type !== undefined &&
-    (MEMBERSHIP_MESSAGE_TYPES as readonly string[]).includes(type)
+    (QUIET_SYSTEM_MESSAGE_TYPES as readonly string[]).includes(type)
   );
 }
 
@@ -358,6 +379,13 @@ export interface MessageMetadata {
   /** Membership lines only: WHO the line is about. Not the author — these
    *  lines have no author at all. */
   user_uuid?: string;
+  /** `thread_started` only: the branch that was opened. Its uuid IS a channel
+   *  uuid — a thread is a channel — so every channel endpoint takes it. */
+  thread_uuid?: string;
+  /** `thread_started` only: the message the branch came off, or `null` when the
+   *  thread was started cold. The server writes the key either way, so branch
+   *  on the VALUE and never on whether the key is present. */
+  root_message_uuid?: string | null;
   /** On every AI-authored message since 2026-08-03 (no backfill — `null` on
    *  older history and on human messages). Equals the summon's
    *  `execution_id` exactly; the responding pill clears on the FIRST match. */

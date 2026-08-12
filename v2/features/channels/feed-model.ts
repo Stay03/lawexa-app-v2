@@ -1,5 +1,5 @@
 import { formatDayLabel, isSameCalendarDay } from '@/lib/utils/collab';
-import { isMembershipMessage, type Message, type SlimUser } from '@/types/collab';
+import { isQuietSystemLine, type Message, type SlimUser } from '@/types/collab';
 import type { RespondingTurn } from './lawexa/turns';
 import { GROUP_WINDOW_MS } from './model';
 
@@ -59,8 +59,8 @@ export interface RespondingItem {
  * with a genuinely author-less run (a hard-deleted human), which is worse: a
  * join line and a dead person's message in one bubble.
  */
-export interface MembershipItem {
-  kind: 'membership';
+export interface QuietSystemLineItem {
+  kind: 'quiet-line';
   key: string;
   message: Message;
 }
@@ -71,7 +71,7 @@ export type FeedItem =
   | QuizCardItem
   | UnreadDividerItem
   | RespondingItem
-  | MembershipItem;
+  | QuietSystemLineItem;
 
 /** Flatten the cursor pages (newest-first) into chronological order. */
 export function flattenMessages(
@@ -206,16 +206,17 @@ export function buildFeedItems(
       continue;
     }
 
-    // Membership lines, same rule: their own row, and they close the run.
-    // Closing it matters as much as the row does — these have NO author, so
-    // left in the grouping branch they would merge with a hard-deleted human's
-    // messages, which are also author-less, and put a join line inside somebody
-    // else's bubble.
-    if (isMembershipMessage(message)) {
+    // The server's own lines — joined, left, removed, and a thread being
+    // started. Same rule: their own row, and they close the run. Closing it
+    // matters as much as the row does — these have NO author, so left in the
+    // grouping branch they would merge with a hard-deleted human's messages,
+    // which are also author-less, and put a join line inside somebody else's
+    // bubble.
+    if (isQuietSystemLine(message)) {
       flushSeparators();
       items.push({
-        kind: 'membership',
-        key: `membership-${message.uuid}`,
+        kind: 'quiet-line',
+        key: `system-${message.uuid}`,
         message,
       });
       group = null;
