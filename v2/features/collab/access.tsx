@@ -160,6 +160,79 @@ export interface ChannelAccess {
   canReadLists: boolean;
 }
 
+/**
+ * Where the viewer stands in one THREAD. Everything in {@link ChannelAccess}
+ * still means what it means; `isFollowing` is the one fact that is new, and it
+ * is not an access question at all.
+ */
+export interface ThreadAccess extends ChannelAccess {
+  /**
+   * Whether this reader FOLLOWS the thread — `is_member` on a thread, which
+   * means something completely different from what it means on a channel.
+   *
+   * You do not join a thread (`POST /channels/{thread}/join` answers 422:
+   * "Threads are not joined — post in one to follow it"). You follow one by
+   * posting in it, and following buys notifications and a read pointer, never
+   * access. So this gates the two surfaces that hang off a MEMBERSHIP ROW and
+   * nothing else: the notify-level control, and `POST /read` — whose service
+   * opens with `firstOrFail()` on that row, so every dwell, Esc and jump in a
+   * thread the reader has not spoken in fires a request that cannot succeed.
+   */
+  isFollowing: boolean;
+}
+
+/**
+ * Resolve a THREAD's access, which is its PARENT's access.
+ *
+ * ── WHY THIS IS NOT `channelAccess(thread)` ────────────────────────────────
+ * That function reads `is_member` + `visibility`, and on a thread `is_member`
+ * is FOLLOW state, not access. A private parent plus a thread the reader has
+ * never spoken in therefore resolved to `closed` — the designed refusal, with
+ * its "Ask to join" — for someone who may read every word of it. It was the
+ * wrong answer AND the wrong door: the ask 422s on a thread too.
+ *
+ * The server says it plainly in `ChannelPolicy`, as an explicit matrix rather
+ * than by discovery: `view`, `previewMessages`, `viewMessages`, `post` and
+ * `viewMembers` all delegate to the PARENT; `update`/`delete` belong to the
+ * thread (its starter is its Owner member); `invite`/`manageMembers` are always
+ * DENY. So read/participate come from the parent, verbatim — which is also why
+ * a parent member who never followed a thread can still post, react and pin in
+ * it. That is Slack-normal: the room may touch its own tangent.
+ *
+ * ── WHEN THE PARENT IS NOT THERE ───────────────────────────────────────────
+ * `parent` is `null` while its detail is still resolving and after a refusal,
+ * and the fallback is FOLLOW state — not because following grants anything, but
+ * because it is PROOF: the reader posted in this thread, and `post` delegates
+ * to the parent, so the parent let them. A non-follower with no parent is an
+ * open question, and the honest answer to an open question is the refusal, not
+ * a guess in either direction. The screen holds its pending frame until the
+ * parent lands rather than painting either one.
+ */
+export function threadAccess(
+  thread: Pick<Channel, 'is_member'>,
+  parent: Pick<Channel, 'is_member' | 'visibility'> | null,
+): ThreadAccess {
+  const isFollowing = thread.is_member === true;
+  if (parent === null) {
+    return isFollowing
+      ? {
+          state: 'member',
+          canRead: true,
+          canParticipate: true,
+          canReadLists: true,
+          isFollowing,
+        }
+      : {
+          state: 'closed',
+          canRead: false,
+          canParticipate: false,
+          canReadLists: false,
+          isFollowing,
+        };
+  }
+  return { ...channelAccess(parent), isFollowing };
+}
+
 /** Resolve {@link ChannelAccess} from a channel the server has already
  *  released to this viewer. Pure — the screen calls it in render. */
 export function channelAccess(

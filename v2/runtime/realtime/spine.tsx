@@ -9,6 +9,7 @@ import {
   type ChannelCountsApplication,
 } from '@/v2/features/channels/cache';
 import { channelsQueries } from '@/v2/features/channels/queries';
+import { channelDisplayName } from '@/v2/features/channels/thread-model';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { invitationsQueries } from '@/v2/features/invitations/queries';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
@@ -104,7 +105,9 @@ async function resolveChannelContext(
     );
     return {
       notifyLevel: response.data.my_notify_level ?? null,
-      channelName: response.data.name ?? application.channelName,
+      // A mention can land inside a THREAD, whose `name` is a generated slug —
+      // so the toast reads the display name, never the row's raw name.
+      channelName: channelDisplayName(response.data) || application.channelName,
     };
   } catch {
     return { notifyLevel: null, channelName: application.channelName };

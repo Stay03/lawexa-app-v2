@@ -11,6 +11,7 @@ import type {
 } from '@/types/collab';
 import type { SpaceRollupDeltas } from '@/v2/features/spaces/cache';
 import { channelsQueries } from './queries';
+import { channelDisplayName } from './thread-model';
 
 /**
  * channels cache — the reference-stable writers the realtime spine and the W2
@@ -575,7 +576,9 @@ export interface ChannelCountsApplication {
   found: boolean;
   /** The channel's space, read from the cached row (`null` when not found). */
   spaceUuid: string | null;
-  /** For the mention toast's description (`null` when not found). */
+  /** For the mention toast's description (`null` when not found). Already
+   *  resolved through {@link channelDisplayName}, so a mention inside a thread
+   *  reads "In Where should the invite live?" and never "In thread--0f3a1c…". */
   channelName: string | null;
   /** The caller's notify level from the cached row; `null` = unknown. */
   notifyLevel: NotifyLevel | null;
@@ -686,7 +689,7 @@ export function applyChannelCounts(
   return {
     found: prev !== null,
     spaceUuid: prev?.space.uuid ?? null,
-    channelName: prev?.name ?? null,
+    channelName: prev ? channelDisplayName(prev) : null,
     notifyLevel: prev?.my_notify_level ?? null,
     deltas,
   };

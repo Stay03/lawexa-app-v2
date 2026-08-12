@@ -22,6 +22,7 @@ import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { MESSAGE_MEASURE } from '../feed/measure';
+import { channelDisplayName } from '../thread-model';
 
 /**
  * states — the channel screen's loading shapes, its designed refusals, and the
@@ -148,6 +149,7 @@ export function ChannelIntro({
 }) {
   const visibilityFace = channelVisibilityFace(channel.visibility);
   const VisibilityIcon = visibilityFace.icon;
+  const displayName = channelDisplayName(channel);
   const total = channel.active_members_count;
   const countLabel = `${total} ${total === 1 ? 'member' : 'members'}`;
   const created = channel.created_at ? new Date(channel.created_at) : null;
@@ -158,17 +160,17 @@ export function ChannelIntro({
 
   return (
     <div className="flex flex-col items-start gap-3 pb-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-      <PlaceCrest uuid={channel.uuid} name={channel.name} size="lg" />
+      <PlaceCrest uuid={channel.uuid} name={displayName} size="lg" />
 
       <div className="min-w-0">
         <h2 className="flex items-center gap-1.5 text-xl leading-tight font-semibold">
           <VisibilityIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
           <span className="sr-only">{channel.visibility_label}</span>
-          <span className="min-w-0 break-words">{channel.name}</span>
+          <span className="min-w-0 break-words">{displayName}</span>
         </h2>
         <p className={cn('mt-1.5 text-sm leading-relaxed text-muted-foreground', MESSAGE_MEASURE)}>
           {channel.description?.trim() ||
-            `This is the very beginning of ${channel.name}. Everything written here stays with the channel.`}
+            `This is the very beginning of ${displayName}. Everything written here stays with the channel.`}
         </p>
       </div>
 
@@ -248,16 +250,26 @@ export function ChannelIntro({
  * brought them here — "someone started a quiz", which stays true whatever the
  * game is doing by the time they read it. It never claims one is running now.
  *
+ * ── IN A THREAD, THE DOOR IS THE PARENT'S DOOR ─────────────────────────────
+ * Threads are not joined: `POST /channels/{thread}/join` answers 422 ("Threads
+ * are not joined — post in one to follow it"). Every ruling that governs a
+ * thread — read it, post in it — is its parent channel's ruling, so the reader
+ * standing here is previewing the PARENT, and joining the parent is what turns
+ * this dock into a composer. Same one button, aimed at the place that decides.
+ *
  * Hook-free: the screen owns the mutation, the pending flag and the error.
  */
 export function ChannelPreviewDock({
   channelName,
+  parentChannelName,
   quizIsLive,
   onJoin,
   isJoining,
   error,
 }: {
   channelName: string;
+  /** Non-null when the place being read is a THREAD — see the docblock. */
+  parentChannelName: string | null;
   /** The navigation named a `?game=` this reader is not allowed to open. */
   quizIsLive: boolean;
   onJoin: () => void;
@@ -280,8 +292,17 @@ export function ChannelPreviewDock({
         <div className="flex items-center gap-2.5">
           <Eye aria-hidden className="size-4 shrink-0 text-muted-foreground" />
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            You&rsquo;re reading {channelName}.{' '}
-            <span className="text-foreground">Join to reply.</span>
+            {parentChannelName === null ? (
+              <>
+                You&rsquo;re reading {channelName}.{' '}
+                <span className="text-foreground">Join to reply.</span>
+              </>
+            ) : (
+              <>
+                You&rsquo;re reading a thread in {parentChannelName}.{' '}
+                <span className="text-foreground">Join the channel to reply.</span>
+              </>
+            )}
           </p>
           <Button size="sm" className="shrink-0" onClick={onJoin} disabled={isJoining}>
             {isJoining ? (
@@ -389,6 +410,43 @@ export function ChannelClosedState({
             </p>
           )}
         </div>
+      }
+    />
+  );
+}
+
+/**
+ * ThreadClosedState — a thread whose PARENT the reader may not read.
+ *
+ * It is reachable and it is not the same shape as {@link ChannelClosedState}.
+ * The server releases a thread's metadata to anyone who may see the parent
+ * exists (a space member looking at a private channel), so a pasted thread
+ * address lands here with a real title in hand and no way into the room it came
+ * out of.
+ *
+ * ── AND IT CARRIES NO ACTION, WHICH IS THE WHOLE DIFFERENCE ────────────────
+ * A private CHANNEL has a door: "Ask to join", and an admin decides. A thread
+ * has none — `joinChannel` and `requestToJoin` both open with the same guard and
+ * answer 422 ("Threads are not joined — post in one to follow it"). The way in
+ * is to be let into the parent, which is a conversation with a person and not a
+ * button on this screen. Offering one here would be a control that fails, which
+ * is the one shape the access model forbids.
+ */
+export function ThreadClosedState({
+  parentChannelName,
+}: {
+  /** `null` when the payload did not name the parent — see `Channel`. */
+  parentChannelName: string | null;
+}) {
+  return (
+    <CollabMessage
+      icon={Lock}
+      tone="accent"
+      title="This thread is out of reach"
+      description={
+        parentChannelName === null
+          ? "It branched out of a channel you are not in, and only that channel's members can read it. If somebody sent you here, ask them to let you in."
+          : `It branched out of ${parentChannelName}, and only that channel's members can read it. If somebody sent you here, ask them to let you in.`
       }
     />
   );

@@ -54,6 +54,7 @@ import {
 import { channelsQueries } from '../queries';
 import { useRemovedChannelFiles } from '../removed-files';
 import { useRestoredFailures } from '../send-outbox';
+import { channelDisplayName } from '../thread-model';
 import { MemberAvatar, LawexaAvatar } from '../ui/avatars';
 import type { TypingUser } from '../room';
 import { useHeldValue } from '../use-held-value';
@@ -1871,7 +1872,7 @@ function ChannelComposerBody({
         // The visible line is fixed and the channel's name is in the label —
         // see {@link PLACEHOLDER} for why the two say different things.
         placeholder={PLACEHOLDER}
-        aria-label={`Message ${channel.name}`}
+        aria-label={`Message ${channelDisplayName(channel)}`}
         // `w-full`, not `flex-1`: the shell's wrapper is the flex item now, and
         // it is what widens to the full row once the message outgrows one line.
         //

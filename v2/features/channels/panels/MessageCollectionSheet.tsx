@@ -19,6 +19,7 @@ import { useTogglePin, useToggleSave } from '../engagement-mutations';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { messagePreviewText } from '../model';
 import { channelsQueries } from '../queries';
+import { channelDisplayName } from '../thread-model';
 import { LawexaAvatar, MemberAvatar } from '../ui/avatars';
 import { RelativeTime } from '../ui/RelativeTime';
 
@@ -90,7 +91,7 @@ export function PinnedMessagesSheet({
       open={open}
       onOpenChange={onOpenChange}
       title="Pinned messages"
-      subtitle={`Kept by everyone in ${channel.name}`}
+      subtitle={`Kept by everyone in ${channelDisplayName(channel)}`}
       emptyTitle="Nothing pinned yet"
       emptyDescription={
         canUnpin

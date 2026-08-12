@@ -9,6 +9,10 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { Member } from '@/types/collab';
 import { channelsQueries } from '@/v2/features/channels/queries';
+import {
+  channelDisplayName,
+  threadParentHref,
+} from '@/v2/features/channels/thread-model';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { ChannelFormDialog } from '@/v2/features/spaces/dialogs/ChannelFormDialog';
 import { SpaceMembersSheet } from '@/v2/features/spaces/detail/SpaceMembersSheet';
@@ -314,8 +318,39 @@ function CollabPlaceFrame({
   const spaceName = identity?.name ?? null;
   const spaceType = identity?.type ?? null;
   const headerSpaceUuid = identity?.uuid ?? null;
-  const channelName = channelUuid === null ? null : (channel?.name ?? null);
-  const backHref = channelUuid === null ? '/spaces' : `/spaces/${spaceUuid ?? ''}`;
+  const channelName =
+    channelUuid === null || channel === null ? null : channelDisplayName(channel);
+
+  /**
+   * "Up" out of a thread is its PARENT CHANNEL, not the space.
+   *
+   * A thread has two containers and only one of them is where the reader came
+   * from: the space is where it is FILED, the parent is the conversation it is
+   * PART OF. Threads never appear in the rail (the listings apply `topLevel()`),
+   * so a chevron to the space would drop the reader in a list that does not
+   * contain the thing they just left. The `?m=` on it lands the parent on the
+   * branched message, restoring the place rather than the room.
+   *
+   * The label travels with the address, because "Back to the space" is simply
+   * untrue once the address is a channel.
+   */
+  const threadHref = channel === null ? null : threadParentHref(channel);
+  const backHref =
+    threadHref ??
+    (channelUuid === null ? '/spaces' : `/spaces/${spaceUuid ?? ''}`);
+  const backLabel =
+    threadHref === null ? 'Back to the space' : 'Back to the channel';
+
+  /**
+   * Which row the rail lights. A thread has no row of its own — `listChannels`
+   * applies `topLevel()`, deliberately, so a space's channel list is its
+   * channels and not every tangent inside them. Lighting nothing while a thread
+   * is open would say the reader has left the space; lighting the PARENT says
+   * what is true, which is that they are still inside that conversation.
+   */
+  const railChannelUuid = channel?.is_thread
+    ? (channel.parent_channel_uuid ?? null)
+    : channelUuid;
 
   useEffect(() => {
     if (placeRefused) {
@@ -330,6 +365,7 @@ function CollabPlaceFrame({
       spaceType,
       channelName,
       backHref,
+      backLabel,
       openRail,
     });
     return () => clearCollabHeader();
@@ -340,6 +376,7 @@ function CollabPlaceFrame({
     spaceType,
     channelName,
     backHref,
+    backLabel,
     openRail,
   ]);
 
@@ -422,7 +459,7 @@ function CollabPlaceFrame({
             ) : (
               <SpaceRail
                 scope={scope}
-                activeChannelUuid={channelUuid}
+                activeChannelUuid={railChannelUuid}
                 atLobby={isSpaceRoute}
                 // The docked rail shows no ages — its rows are single-line —
                 // so it takes no clock, and no minute tick re-renders it.
@@ -459,7 +496,7 @@ function CollabPlaceFrame({
           open={rail.open}
           onOpenChange={rail.setOpen}
           onNavigate={closeRailInPlace}
-          activeChannelUuid={channelUuid}
+          activeChannelUuid={railChannelUuid}
           atLobby={isSpaceRoute}
         />
       )}

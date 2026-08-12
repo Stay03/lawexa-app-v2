@@ -239,9 +239,68 @@ export interface ChannelSpaceRef {
   type: SpaceType;
 }
 
+/**
+ * The message a thread was branched from — a LIVE server-side read of a message
+ * that lives in the PARENT channel, so it can never come out of the thread's own
+ * history. Deliberately the `reply_to` shape and discipline (the backend says so
+ * in its own words), minus the fields that shape does not need here.
+ *
+ * IT CARRIES NO `created_at`, measured against the resource on 2026-08-12: the
+ * root has no time on it, so nothing may date it.
+ *
+ * `content_preview` is `null` — never `""` — once the root is soft-deleted, and
+ * the author is KEPT in that case: "branched from a deleted message from X" is
+ * more use than a blank. ~200 chars, ellipsised, the same cut `reply_to` makes.
+ */
+export interface ThreadRootMessage {
+  uuid: string;
+  /** `{uuid, name, avatar_url}` on the wire — `null` for a hard-deleted human. */
+  author: SlimUser | null;
+  /** ~200-char plaintext preview; `null` once the root is deleted. */
+  content_preview: string | null;
+  is_deleted: boolean;
+  type?: MessageType;
+}
+
 export interface Channel {
   uuid: string;
+  /**
+   * A CHANNEL'S NAME IS ITS NAME; A THREAD'S IS A MACHINE SLUG. `channels`
+   * carries `UNIQUE(space_id, name)`, so a thread is created as
+   * `thread--{uuid}` and its human text lives in {@link Channel.title}. The
+   * resource's own docblock puts it plainly: "the `name` is a generated slug —
+   * do not show it to anyone". Read every displayed name through
+   * `channelDisplayName` (`v2/features/channels/thread-model.ts`), which is the
+   * one place that knows which of the two a given channel has.
+   */
   name: string;
+  /**
+   * Whether this channel is a THREAD — a tangent branched out of another
+   * channel's message. A thread IS a channel: every channel endpoint takes its
+   * uuid, and `/channels/{threadUuid}` is its address.
+   *
+   * The five fields below it are its own; all of them are `when($isThread)` on
+   * the wire and therefore absent on an ordinary channel.
+   */
+  is_thread: boolean;
+  /** The channel this thread was branched out of — the way back. */
+  parent_channel_uuid?: string | null;
+  /**
+   * The parent's name, so the way back can be a LABEL rather than a uuid
+   * (backend 2026-08-12). Treated as optional and degraded around: a client that
+   * has not seen this deploy — or a payload that omits it — must fall back to
+   * reading the parent channel itself rather than printing a placeholder.
+   */
+  parent_channel_name?: string | null;
+  /** The thread's human title, derived by the server from its root message. */
+  title?: string | null;
+  /**
+   * The message the thread came from. `null` for a thread started cold AND for
+   * one whose root was HARD-deleted — the two are indistinguishable on the wire,
+   * so any copy written for it must be true of both. Withheld entirely (absent,
+   * not null) from a viewer who may see that the tangent exists but not read it.
+   */
+  root_message?: ThreadRootMessage | null;
   description: string | null;
   visibility: ChannelVisibility;
   visibility_label: string;

@@ -40,7 +40,9 @@ import { canManageChannel, isLocalMessageUuid } from '../model';
 import { channelsQueries } from '../queries';
 import { outboxGet, useOutboxMessages } from '../send-outbox';
 import { ChannelFeedSkeleton, ChannelIntro, FeedErrorState } from '../screen/states';
+import { channelDisplayName } from '../thread-model';
 import { DayDivider, QuietSystemLine, UnreadDivider } from './FeedDivider';
+import { ThreadOpening } from './ThreadOpening';
 import { formatImageTarget } from './image-target';
 import { MessageActionsSheet } from './MessageActionsSheet';
 import { MessageGroupRow } from './MessageGroupRow';
@@ -170,6 +172,10 @@ export interface ChannelFeedHandle {
 
 export interface ChannelFeedProps {
   channel: Channel;
+  /** The parent channel's name when `channel` is a THREAD — {@link
+   *  ThreadOpening} names where the root came from. `null` on an ordinary
+   *  channel, and while the name is still resolving. */
+  parentName: string | null;
   viewerId: number | null;
   viewerUuid: string | null;
   reporter: ChannelReadReporter;
@@ -209,6 +215,7 @@ export interface ChannelFeedProps {
 
 export function ChannelFeed({
   channel,
+  parentName,
   viewerId,
   viewerUuid,
   reporter,
@@ -963,6 +970,15 @@ export function ChannelFeed({
   );
 
   const isChannelAdmin = canManageChannel(channel);
+  /* WHAT STANDS AT THE HEAD OF THE TRANSCRIPT. A channel opens with its birth
+     certificate; a thread opens with the message it branched from, which is a
+     different fact about a different place (see {@link ThreadOpening}). Derived
+     once and consumed by both call sites below — the empty state and the head
+     of loaded history — so the two can never disagree about which block a
+     thread gets. */
+  const threadOpening = channel.is_thread ? (
+    <ThreadOpening channel={channel} parentName={parentName} />
+  ) : null;
   const sheetIsMine =
     !!sheetMessage?.author &&
     !!viewerUuid &&
@@ -977,7 +993,7 @@ export function ChannelFeed({
         onScroll={handleScroll}
         onKeyDown={handleKeyDown}
         role="log"
-        aria-label={`Messages in ${channel.name}`}
+        aria-label={`Messages in ${channelDisplayName(channel)}`}
         aria-busy={isPending || isFetchingNextPage}
         className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
@@ -999,15 +1015,17 @@ export function ChannelFeed({
                  is none left to fetch — with older pages outstanding the feed
                  branch renders, carrying its "Load older messages" button. */
           renderItems.length === 0 && !hasNextPage ? (
-            <ChannelIntro
-              channel={channel}
-              members={members}
-              onOpenRoster={onOpenRoster}
-              onAddPeople={onAddPeople}
-              // No action for a previewer: the way forward here is joining,
-              // and that button already stands in the dock below.
-              onWriteFirstMessage={canParticipate ? onFocusComposer : undefined}
-            />
+            (threadOpening ?? (
+              <ChannelIntro
+                channel={channel}
+                members={members}
+                onOpenRoster={onOpenRoster}
+                onAddPeople={onAddPeople}
+                // No action for a previewer: the way forward here is joining,
+                // and that button already stands in the dock below.
+                onWriteFirstMessage={canParticipate ? onFocusComposer : undefined}
+              />
+            ))
           ) : (
             <div className="flex flex-col gap-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
               {hasNextPage ? (
@@ -1029,12 +1047,14 @@ export function ChannelFeed({
                    a channel should teach what it is every time you reach its
                    beginning, not only on the one day it was empty. Without the
                    write-first action — there already is a first message. */
-                <ChannelIntro
-                  channel={channel}
-                  members={members}
-                  onOpenRoster={onOpenRoster}
-                  onAddPeople={onAddPeople}
-                />
+                (threadOpening ?? (
+                  <ChannelIntro
+                    channel={channel}
+                    members={members}
+                    onOpenRoster={onOpenRoster}
+                    onAddPeople={onAddPeople}
+                  />
+                ))
               )}
 
               {renderItems.map(({ item, groupOrdinal }) => {

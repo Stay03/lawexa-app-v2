@@ -80,8 +80,13 @@ export interface CollabHeaderContext {
   spaceType: SpaceType | null;
   /** `null` on a space route: there, the space name IS the title. */
   channelName: string | null;
-  /** Where the mobile back chevron goes — the space, or the spaces list. */
+  /** Where the mobile back chevron goes — the space, the spaces list, or (out
+   *  of a thread) the parent channel it branched from. */
   backHref: string;
+  /** The chevron's accessible name. It travels with `backHref`, because a glyph
+   *  labelled "Back to the space" that leads to a channel is a lie told only to
+   *  the readers who cannot see where it points. */
+  backLabel: string;
   /** Opens the space drawer. MUST be referentially stable (see the docblock). */
   openRail: () => void;
 }
@@ -118,6 +123,7 @@ function isSame(
     left.spaceType === right.spaceType &&
     left.channelName === right.channelName &&
     left.backHref === right.backHref &&
+    left.backLabel === right.backLabel &&
     left.openRail === right.openRail
   );
 }

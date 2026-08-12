@@ -38,7 +38,11 @@ import {
 import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Message, NotifyLevel, SlimUser } from '@/types/collab';
-import { channelAccess } from '@/v2/features/collab/access';
+import {
+  channelAccess,
+  threadAccess,
+  type ChannelAccess,
+} from '@/v2/features/collab/access';
 import { ChannelJoinRequestsSheet } from '@/v2/features/invites/ChannelJoinRequestsSheet';
 import { useRequestChannelAccess } from '@/v2/features/invites/queries';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
@@ -64,6 +68,7 @@ import {
 import { canManageChannel, parseChannelTab, type ChannelTab } from '../model';
 import { channelsQueries } from '../queries';
 import { useChannelRoom } from '../room';
+import { channelDisplayName, threadParentHref } from '../thread-model';
 import { FilesTab } from '../files/FilesTab';
 import { ListsTab } from '../lists/ListsTab';
 import { ChannelMembersSheet } from '../members/ChannelMembersSheet';
@@ -72,7 +77,11 @@ import { GameOverlay } from '../quiz/GameOverlay';
 import { LiveQuizBar } from '../quiz/LiveQuizBar';
 import { QuizLibrarySheet } from '../quiz/QuizLibrarySheet';
 import { EnablePushNudge } from './EnablePushNudge';
-import { ChannelPlaceHeader, type HeaderLens } from './PlaceHeader';
+import {
+  ChannelPlaceHeader,
+  type HeaderLens,
+  type HeaderParent,
+} from './PlaceHeader';
 import { CHANNEL_SECTIONS, SectionSwitch, type SectionCounts } from './SectionSwitch';
 import {
   ChannelAccessDeniedState,
@@ -80,6 +89,7 @@ import {
   ChannelErrorState,
   ChannelPreviewDock,
   ChannelScreenFrame,
+  ThreadClosedState,
 } from './states';
 import { LawexaMark } from '../ui/avatars';
 
@@ -178,6 +188,30 @@ import { LawexaMark } from '../ui/avatars';
  * `ai` is the list, `ai:{uuid}` is one transcript — so drilling in costs no
  * history entry and Back leaves the sheet rather than walking back up through
  * it. Its own back chevron is what returns to the list.
+ *
+ * ── A THREAD IS THIS SCREEN TOO, WITH ONE FEWER HALF ───────────────────────
+ * A thread IS a channel — `/channels/{threadUuid}` is its address, every
+ * endpoint takes its uuid, and the notification dispatcher already pushes that
+ * address — so it arrives here rather than at a mode or a panel. Three things
+ * change, and each is a consequence of what the SERVER says a thread is:
+ *
+ *  1. ITS NAME IS A SLUG. `channels` is `UNIQUE(space_id, name)`, so the server
+ *     names a thread `thread--{uuid}` and puts the words in `title`. Every name
+ *     on this screen therefore goes through `channelDisplayName`.
+ *  2. ITS GATE IS ITS PARENT'S GATE, so the parent's detail is fetched and
+ *     {@link threadAccess} derives read/participate from it. `is_member` on a
+ *     thread is FOLLOW state, not access — see the read-pointer note below.
+ *  3. HALF THE MENU IS A DENY. Edit would overwrite the slug; invite, manage
+ *     members, join and ask-to-join are refused server-side (403 by policy, 422
+ *     by service); leave is an un-follow nobody has designed; quizzes belong to
+ *     a room, not to a tangent. All of them are gated by MOUNT, on `isThread`
+ *     explicitly — NOT on `canManage`, which answers TRUE for the person who
+ *     started the thread (they are its Owner member) and would therefore hand
+ *     exactly the wrong reader the controls that fail.
+ *
+ * WHAT A THREAD KEEPS is everything that is the conversation: the feed, the
+ * composer, engagement, pins, saved, the Lawexa history, Lists, Files, the
+ * roster (read-only), and Delete for whoever may delete it.
  */
 export function ChannelScreen({
   channelUuid,
@@ -200,12 +234,53 @@ export function ChannelScreen({
 
   const detailQuery = useQuery(channelsQueries.detail(channelUuid, { viewerId }));
   const channel = detailQuery.data?.data;
+  const isThread = channel?.is_thread === true;
+  const parentUuid = channel?.parent_channel_uuid ?? null;
+
+  /* ── The channel a thread came out of ─────────────────────────────────────
+        FETCHED, because it is what decides everything: `ChannelPolicy`
+        delegates a thread's `view`, `previewMessages`, `viewMessages`, `post`
+        and `viewMembers` to the parent, so the thread's own payload cannot
+        answer whether this reader may read or write in it.
+
+        IT COSTS NOTHING ON AN IN-APP PATH. This is the same cache entry the
+        parent's own screen mounts, and every way into a thread from inside the
+        app comes through the parent (its `thread_started` line, and Phase 2's
+        stub) — so the entry is warm and this resolves without a request. The
+        one cold case is an address arriving from outside: a mention deep link,
+        a push, a pasted URL. There it is one extra serial call, and the screen
+        waits for it rather than painting a gate it would have to correct. */
+  const parentQuery = useQuery({
+    ...channelsQueries.detail(parentUuid ?? '', { viewerId }),
+    enabled: isThread && parentUuid !== null,
+  });
+  const parent = parentQuery.data?.data ?? null;
+  /** A DISABLED query reports `isPending` forever, so the uuid is part of the
+   *  test: a thread whose payload named no parent must not wait for a request
+   *  that was never made. */
+  const parentPending =
+    isThread && parentUuid !== null && parentQuery.isPending;
+
   /** `null` until the channel lands — every gate below reads `undefined` in
    *  that window rather than guessing, so a pending screen opens no panel and
-   *  refuses no deep link it would have honoured a frame later. */
-  const access = channel ? channelAccess(channel) : null;
+   *  refuses no deep link it would have honoured a frame later. A thread's gate
+   *  is its parent's ({@link threadAccess}); a channel's is its own. */
+  const threadGate =
+    channel && channel.is_thread ? threadAccess(channel, parent) : null;
+  const access: ChannelAccess | null =
+    threadGate ?? (channel ? channelAccess(channel) : null);
   const canRead = access?.canRead === true;
   const canParticipate = access?.canParticipate === true;
+  /**
+   * FOLLOWING is not access, and it gates exactly two things.
+   *
+   * On a thread `is_member` means the reader has posted in it, which buys them
+   * a membership ROW — notifications, and a read pointer. It buys no access
+   * whatsoever (that is the parent's ruling), and it is not something anybody
+   * asks for: `POST /channels/{thread}/join` answers 422. On an ordinary
+   * channel there is no such distinction, so this is simply membership.
+   */
+  const isFollowing = threadGate ? threadGate.isFollowing : canParticipate;
 
   /* ── The people in the header, and in the channel's intro ─────────────────
         The header shows FACES now, not the word "4 members", so it needs the
@@ -247,9 +322,21 @@ export function ChannelScreen({
      presence room admits active channel members alone (`broadcasting/auth`
      refuses everyone else), and `POST /read` is on the blocked list — so a
      previewer joins no room and advances no pointer, and therefore has no
-     unread state anywhere on this screen. */
+     unread state anywhere on this screen.
+
+     THE PRESENCE ROOM STAYS ON PARTICIPATION, INCLUDING IN A THREAD, and that
+     is not an oversight: `broadcasting/auth` authorises `presence-channels.
+     {uuid}` with `viewMessages`, which on a thread delegates to the PARENT. So
+     every parent member is admitted to a thread's room whether or not they
+     follow it — which is right, because they can all post in it. */
   const room = useChannelRoom(channelUuid, { enabled: canParticipate });
-  const reporter = useChannelReadPointer(channelUuid, { enabled: canParticipate });
+  /* THE READ POINTER IS GATED ON FOLLOW STATE, NOT PARTICIPATION, and only in a
+     thread do the two differ. `markRead` opens with `firstOrFail()` on the
+     caller's membership row, so in a thread a parent member who has not spoken
+     yet has no row and every dwell, Esc and jump-pill click would fire a
+     request that cannot succeed. It fails silently — `silentError` — which is
+     exactly why it has to be stopped here rather than noticed later. */
+  const reporter = useChannelReadPointer(channelUuid, { enabled: isFollowing });
 
   // Initialise from the LIVE URL when it exists: quiet writes mirror state
   // into the URL without touching the router's cached searchParams, so a
@@ -287,6 +374,20 @@ export function ChannelScreen({
   // both and hooks cannot run after a return. `canManage` is re-used verbatim
   // by the header menu below, so the gate and the affordance cannot drift.
   const canManage = channel ? canManageChannel(channel) : false;
+  /**
+   * GOVERNANCE THAT A THREAD DOES NOT HAVE, and the trap this constant exists
+   * to disarm.
+   *
+   * `canManageChannel` reads `my_role`, and the person who starts a thread is
+   * added as its OWNER member — so on a thread it answers TRUE for them.
+   * Everything gated on it alone would therefore appear for exactly one reader
+   * and fail for them: Edit would rename a slug the server generated and no
+   * surface shows, and the join-requests sheet lists requests that cannot exist
+   * (`requestToJoin` 422s on a thread). Delete is the one governance verb a
+   * thread really does have — `ChannelPolicy` keeps `update`/`delete` on the
+   * thread itself — so it stays on `canManage`.
+   */
+  const canGovernChannel = canManage && !isThread;
 
   /**
    * Every panel over this channel — the edit dialog, the roster, the pinned and
@@ -307,17 +408,21 @@ export function ChannelScreen({
    * well. `undefined` until the channel lands: the pending screen renders no
    * panels, and refusing on an unresolved role would strip a real admin's
    * deep link.
+   *
+   * THREE OF THEM DO NOT EXIST IN A THREAD at all — `edit`, `requests` and
+   * `quizzes` — so a copied `/channels/{thread}?panel=edit` degrades to the
+   * conversation instead of opening a form that would rename a machine slug.
    */
   const panel = useUrlOverlay('panel', {
     canOpen: channel
       ? {
-          edit: canManage,
+          edit: canGovernChannel,
           members: canRead,
           pinned: canRead,
           saved: canParticipate,
-          quizzes: canParticipate,
+          quizzes: canParticipate && !isThread,
           ai: canRead,
-          requests: canManage,
+          requests: canGovernChannel,
         }
       : undefined,
   });
@@ -339,8 +444,9 @@ export function ChannelScreen({
     // Values are bare uuids, so the gate is the whole param: joining a quiz is
     // on the blocked list, so only a participant reaches the branch that
     // renders `GameOverlay` — and therefore only a participant's screen ever
-    // asks the quiz endpoints for anything.
-    canOpen: channel ? canParticipate : undefined,
+    // asks the quiz endpoints for anything. Quizzes belong to a ROOM and not to
+    // a tangent inside one, so a thread has no game mode either.
+    canOpen: channel ? canParticipate && !isThread : undefined,
   });
   const closeGame = game.close;
   const gameUuid = game.value;
@@ -411,7 +517,14 @@ export function ChannelScreen({
   }, []);
 
   const router = useRouter();
-  const joinMutation = useJoinChannel(channelUuid);
+  /** IN A THREAD, THE DOOR IS THE PARENT'S DOOR. Threads are not joined — the
+   *  service answers 422 — and it is the parent's membership that decides
+   *  whether this reader may reply here, so the dock's one button joins that.
+   *  The `?? channelUuid` tail cannot be reached (the dock stands only in
+   *  `preview`, which a thread reaches only once its parent has resolved); it is
+   *  there because a hook cannot be conditional and a uuid cannot be null. */
+  const joinTargetUuid = (isThread ? parentUuid : channelUuid) ?? channelUuid;
+  const joinMutation = useJoinChannel(joinTargetUuid);
   const askMutation = useRequestChannelAccess(channelUuid);
   const leaveMutation = useLeaveChannel(channelUuid);
   const deleteMutation = useDeleteChannel(channelUuid);
@@ -563,7 +676,12 @@ export function ChannelScreen({
 
   /* ── Three-state detail region ────────────────────────────────────────── */
 
-  if (detailQuery.isPending) {
+  /* THE PARENT IS PART OF "PENDING" FOR A THREAD, and it has to be. Everything
+     below branches on an access answer the parent owns, so painting before it
+     lands would mean drawing a refusal for someone who may read every word —
+     and then swapping it for the room a beat later. A screen that corrects
+     itself in front of the reader is worse than one that has not finished. */
+  if (detailQuery.isPending || parentPending) {
     return <ChannelScreenFrame />;
   }
 
@@ -592,6 +710,28 @@ export function ChannelScreen({
    *  because several affordances exist ONLY here (the read-only Lawexa door,
    *  the dock that stands where the composer stands). */
   const isPreview = access.state === 'preview';
+  /** The one name this screen prints — a channel's own, or a thread's title. */
+  const displayName = channelDisplayName(channel);
+
+  /* ── The way back out of a thread ─────────────────────────────────────────
+        THE PARENT'S NAME HAS TWO SOURCES AND ONE PREFERENCE. The thread's own
+        payload carries `parent_channel_name`, which is there precisely so a
+        cold landing needs no second request to label its way back; the parent
+        detail this screen already fetched for the access ruling is the fallback
+        for a payload that predates it. `null` means neither is in hand yet, and
+        that is what the header's and the opening block's skeletons are for — a
+        stand-in word would change under the reader once the real one arrived.
+
+        (A parent is never itself a thread — the server refuses to branch inside
+        a branch — but the name still goes through the one function that owns
+        this question, so no surface is left deciding it locally.) */
+  const parentName = isThread
+    ? (channel.parent_channel_name ??
+      (parent ? channelDisplayName(parent) : null))
+    : null;
+  const parentHref = threadParentHref(channel);
+  const headerParent: HeaderParent | null =
+    parentHref === null ? null : { href: parentHref, name: parentName };
 
   /* WHICH SECTIONS THIS READER CAN REACH — derived from the access model, one
      entry per tab, so the control and the pane can never disagree about what is
@@ -667,23 +807,31 @@ export function ChannelScreen({
         </DropdownMenuGroup>
       )}
 
-      <DropdownMenuLabel className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Bell aria-hidden className="size-3.5" />
-        Notifications
-      </DropdownMenuLabel>
-      {/* N1: the mutation assigns `my_notify_level` into every cached channel
-          row + re-rolls the space (Ruling A). */}
-      <DropdownMenuRadioGroup
-        value={notifyLevel}
-        onValueChange={(value) => notifyMutation.mutate(value as NotifyLevel)}
-      >
-        <DropdownMenuRadioItem value="all">All messages</DropdownMenuRadioItem>
-        <DropdownMenuRadioItem value="mentions_only">
-          Mentions only
-        </DropdownMenuRadioItem>
-        <DropdownMenuRadioItem value="muted">Muted</DropdownMenuRadioItem>
-      </DropdownMenuRadioGroup>
-      <DropdownMenuSeparator />
+      {/* NOTIFICATION SETTINGS NEED A MEMBERSHIP ROW TO WRITE TO, and in a
+          thread only a FOLLOWER has one: `PATCH /members/me` would 404 for a
+          parent member who has not spoken here yet. Following is what starts
+          the notifications, so there is nothing to set until then. */}
+      {isFollowing && (
+        <>
+          <DropdownMenuLabel className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Bell aria-hidden className="size-3.5" />
+            Notifications
+          </DropdownMenuLabel>
+          {/* N1: the mutation assigns `my_notify_level` into every cached channel
+              row + re-rolls the space (Ruling A). */}
+          <DropdownMenuRadioGroup
+            value={notifyLevel}
+            onValueChange={(value) => notifyMutation.mutate(value as NotifyLevel)}
+          >
+            <DropdownMenuRadioItem value="all">All messages</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="mentions_only">
+              Mentions only
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="muted">Muted</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+        </>
+      )}
       <DropdownMenuItem onClick={() => panel.show('members')}>
         <Users aria-hidden className="size-4" />
         Members
@@ -692,31 +840,41 @@ export function ChannelScreen({
         <LawexaMark />
         Lawexa sessions
       </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => panel.show('quizzes')}>
-        <Trophy aria-hidden className="size-4" />
-        Quizzes
-      </DropdownMenuItem>
-      {canManage && (
+      {/* A quiz belongs to a ROOM. Running one inside a tangent would be a
+          second live game in the same conversation, played by a different
+          subset of the same people. */}
+      {!isThread && (
+        <DropdownMenuItem onClick={() => panel.show('quizzes')}>
+          <Trophy aria-hidden className="size-4" />
+          Quizzes
+        </DropdownMenuItem>
+      )}
+      {canGovernChannel && (
         <DropdownMenuItem onClick={() => panel.show('requests')}>
           <UserCheck aria-hidden className="size-4" />
           Waiting to join
         </DropdownMenuItem>
       )}
-      {canManage && (
+      {canGovernChannel && (
         <DropdownMenuItem onClick={() => panel.show('edit')}>
           <Pencil aria-hidden className="size-4" />
           Edit channel
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />
-      <DropdownMenuItem variant="destructive" onClick={() => setLeaveOpen(true)}>
-        <LogOut aria-hidden className="size-4" />
-        Leave channel
-      </DropdownMenuItem>
+      {/* LEAVING A THREAD IS NOT A THING YOU CAN DO. Its membership is follow
+          state you granted yourself by posting, and un-following is deliberately
+          undesigned — there is no verb behind this row, so there is no row. */}
+      {!isThread && (
+        <DropdownMenuItem variant="destructive" onClick={() => setLeaveOpen(true)}>
+          <LogOut aria-hidden className="size-4" />
+          Leave channel
+        </DropdownMenuItem>
+      )}
       {canManage && (
         <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
           <Trash2 aria-hidden className="size-4" />
-          Delete channel
+          {isThread ? 'Delete thread' : 'Delete channel'}
         </DropdownMenuItem>
       )}
     </>
@@ -725,6 +883,7 @@ export function ChannelScreen({
   const identityHeader = (
     <ChannelPlaceHeader
       channel={channel}
+      parent={headerParent}
       // `null` for anyone with no presence room — a previewer, a refusal. They
       // are told the member count in words rather than shown faces that would
       // claim a presence nobody measured (see `PlaceHeader`).
@@ -753,7 +912,15 @@ export function ChannelScreen({
         whether the server releases a private channel's DETAIL to a space member
         who never joined. It does: `200` with `is_member: false`, while the
         messages and the roster each answer `403`. So the reader holds a real
-        name and a real refusal, and the panel can offer the door. ─────────── */
+        name and a real refusal, and the panel can offer the door.
+
+        A THREAD REACHES IT TOO, AND WITHOUT THE DOOR. The server releases a
+        thread's metadata to anyone who may see that the tangent exists, so a
+        pasted address lands here with a real title and no way in. There is no
+        "ask" to offer: `joinChannel` and `requestToJoin` both refuse a thread
+        with the same 422, and the only real way forward is being let into the
+        PARENT, which is a conversation with a person. See
+        {@link ThreadClosedState}. ────────────────────────────────────────── */
   if (!canRead) {
     return (
       <div className="flex h-full min-h-0 flex-col">
@@ -763,13 +930,17 @@ export function ChannelScreen({
             full-height screen; top-aligned it read as a message that had lost
             its conversation. */}
         <div className="mx-auto flex w-full max-w-3xl flex-1 items-center justify-center px-4">
-          <ChannelClosedState
-            channelName={channel.name}
-            asked={askedToJoin}
-            onAsk={handleAskToJoin}
-            isAsking={askMutation.isPending}
-            error={askError}
-          />
+          {isThread ? (
+            <ThreadClosedState parentChannelName={parentName} />
+          ) : (
+            <ChannelClosedState
+              channelName={displayName}
+              asked={askedToJoin}
+              onAsk={handleAskToJoin}
+              isAsking={askMutation.isPending}
+              error={askError}
+            />
+          )}
         </div>
       </div>
     );
@@ -826,15 +997,21 @@ export function ChannelScreen({
         {/* The earned moment for closed-app push (W5). Members only: a
             previewer gets no notifications from a channel they have not
             joined, so asking them for permission would be asking for nothing.
-            Renders a zero-height inert row when there is nothing to ask. */}
-        {canParticipate && <EnablePushNudge />}
+            Renders a zero-height inert row when there is nothing to ask.
+
+            NOT IN A THREAD. The nudge asks for a browser permission on behalf
+            of the whole app, and a tangent is the wrong moment to ask: the
+            reader is here for one conversation, they may not follow it, and the
+            parent channel is where the same ask actually earns its place. */}
+        {canParticipate && !isThread && <EnablePushNudge />}
 
         {/* The standing door into a running game (W6) — renders nothing at all
             when no quiz is live here, so the channel's geometry is unchanged
             the rest of the time. Members only, and this is a MOUNT gate, not a
             visual one: the bar probes for a live game, and joining one is on
-            the blocked list, so a previewer's screen must not ask. */}
-        {canParticipate && (
+            the blocked list, so a previewer's screen must not ask. Threads have
+            no quizzes, so the probe is not made there either. */}
+        {canParticipate && !isThread && (
           <LiveQuizBar
             channelUuid={channel.uuid}
             viewerId={viewerId}
@@ -874,6 +1051,7 @@ export function ChannelScreen({
             <ChannelFeed
               ref={feedRef}
               channel={channel}
+              parentName={parentName}
               viewerId={viewerId}
               viewerUuid={viewerUuid}
               reporter={reporter}
@@ -886,8 +1064,11 @@ export function ChannelScreen({
               onFocusComposer={focusComposer}
               onOpenRoster={() => panel.show('members')}
               // Inviting is governance, so the intro only offers it to someone
-              // who can actually complete it.
-              onAddPeople={canManage ? () => panel.show('members') : undefined}
+              // who can actually complete it — and nobody may invite into a
+              // thread at all (the policy denies it outright).
+              onAddPeople={
+                canGovernChannel ? () => panel.show('members') : undefined
+              }
               onViewAiSession={openAiSession}
               onOpenGame={openGame}
               composer={
@@ -941,7 +1122,12 @@ export function ChannelScreen({
                      refusal effect strips the param from the address bar a frame
                      later — the prop is what survives it. */
                   <ChannelPreviewDock
-                    channelName={channel.name}
+                    channelName={displayName}
+                    // Non-null ⇒ this is a thread, and the door is the parent's
+                    // (see the dock's own docblock). `preview` is only reachable
+                    // in a thread once the parent has resolved, so the name is
+                    // in hand wherever this branch renders.
+                    parentChannelName={parentName}
                     quizIsLive={initialGameUuid !== null}
                     onJoin={handleJoin}
                     isJoining={joinMutation.isPending}
@@ -1046,7 +1232,7 @@ export function ChannelScreen({
           a previewer's tree must not contain them at all. The three READ
           lenses below stay mounted for both audiences — their queries are
           `enabled: open`, and both audiences may open them. */}
-      {canParticipate && (
+      {canParticipate && !isThread && (
         <QuizLibrarySheet
           channel={channel}
           viewerId={viewerId}
@@ -1080,7 +1266,7 @@ export function ChannelScreen({
           footer that offers it is gated rather than the sheet. */}
       <ChannelAiSessionsSheet
         channelUuid={channel.uuid}
-        channelName={channel.name}
+        channelName={displayName}
         viewerId={viewerId}
         canReset={canParticipate}
         open={aiOpen}
@@ -1099,13 +1285,13 @@ export function ChannelScreen({
         {...panel.bind('members')}
       />
 
-      {/* The other end of "Ask to join". Gated on the same `canManage` as its
-          menu item, and on the same `?panel=` mechanism as every other sheet,
-          so Back closes it. */}
-      {canManage && (
+      {/* The other end of "Ask to join". Gated on the same `canGovernChannel`
+          as its menu item, and on the same `?panel=` mechanism as every other
+          sheet, so Back closes it. */}
+      {canGovernChannel && (
         <ChannelJoinRequestsSheet
           channelUuid={channel.uuid}
-          channelName={channel.name}
+          channelName={displayName}
           {...panel.bind('requests')}
         />
       )}
@@ -1115,7 +1301,7 @@ export function ChannelScreen({
           fields re-derived from the current channel (the house dialog
           contract). The one gate is governance, which does not change while
           the dialog is on screen. */}
-      {canManage && (
+      {canGovernChannel && (
         <ChannelEditDialog
           key={panel.keyFor('edit')}
           channel={channel}
@@ -1123,48 +1309,71 @@ export function ChannelScreen({
         />
       )}
 
-      <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Leave {channel.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You&rsquo;ll stop receiving messages from this channel. You can
-              rejoin later if it&rsquo;s public or you&rsquo;re invited again.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={leaveMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                leaveMutation.mutate(undefined, {
-                  onSuccess: () => {
-                    setLeaveOpen(false);
-                    router.push(`/spaces/${channel.space.uuid}`);
-                  },
-                });
-              }}
-              disabled={leaveMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {leaveMutation.isPending && (
-                <Loader2 aria-hidden className="mr-1 size-4 animate-spin" />
-              )}
-              Leave
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* NO LEAVE DIALOG IN A THREAD, because there is no leave: following is
+          granted by posting and un-following is deliberately undesigned. The
+          menu row is gone above; this is the surface behind it. */}
+      {!isThread && (
+        <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave {displayName}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You&rsquo;ll stop receiving messages from this channel. You can
+                rejoin later if it&rsquo;s public or you&rsquo;re invited again.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={leaveMutation.isPending}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  leaveMutation.mutate(undefined, {
+                    onSuccess: () => {
+                      setLeaveOpen(false);
+                      router.push(`/spaces/${channel.space.uuid}`);
+                    },
+                  });
+                }}
+                disabled={leaveMutation.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {leaveMutation.isPending && (
+                  <Loader2 aria-hidden className="mr-1 size-4 animate-spin" />
+                )}
+                Leave
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
+      {/* THE CONFIRM NAMES WHAT IS BEING DESTROYED, and for a thread that is
+          "this thread" rather than its title: a title is a sentence somebody
+          typed and can run to 200 characters, which makes a poor dialog
+          heading. Deleting it lands on the parent at the branched message —
+          the conversation the tangent came out of is the place to be returned
+          to, and the space's channel list never held the thread anyway. */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {channel.name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isThread ? 'Delete this thread?' : `Delete ${displayName}?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This deletes the channel and its messages for everyone. This
-              can&rsquo;t be undone.
+              {isThread ? (
+                <>
+                  This deletes the thread and everything written in it, for
+                  everyone. The message it branched from stays where it is. This
+                  can&rsquo;t be undone.
+                </>
+              ) : (
+                <>
+                  This deletes the channel and its messages for everyone. This
+                  can&rsquo;t be undone.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1177,7 +1386,7 @@ export function ChannelScreen({
                 deleteMutation.mutate(undefined, {
                   onSuccess: () => {
                     setDeleteOpen(false);
-                    router.push(`/spaces/${channel.space.uuid}`);
+                    router.push(parentHref ?? `/spaces/${channel.space.uuid}`);
                   },
                 });
               }}

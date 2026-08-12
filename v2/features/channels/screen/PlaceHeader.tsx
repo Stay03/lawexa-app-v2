@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronDown, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronLeft, MoreHorizontal } from 'lucide-react';
 
 import { channelVisibilityFace } from '@/lib/collab/visibility';
 
@@ -16,11 +16,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { Channel, SlimUser } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { ChannelTab } from '../model';
+import { channelDisplayName } from '../thread-model';
 import type { ChannelPresence } from '../room';
 import { HereNow } from './HereNow';
 import { SectionSwitch, type ChannelSection, type SectionCounts } from './SectionSwitch';
@@ -135,6 +137,20 @@ const NO_FACES: readonly SlimUser[] = [];
  * 32px control, and 44px holds that with room to spare — the standards' primary
  * tap target, exactly. The strip now reads as subordinate to the shell bar
  * above it, which is what it is.
+ *
+ * ── AND IN A THREAD IT LEADS WITH THE WAY BACK, AT EVERY WIDTH ─────────────
+ * A thread is the one place in this product a reader can arrive at without ever
+ * having seen where it came from — a mention deep-links straight into it. So the
+ * chip is not a breadcrumb for wide windows the way the space chip is; it is the
+ * first thing in the bar on a phone as well, because on a phone it is the only
+ * thing that says what conversation this tangent belongs to.
+ *
+ * THE CONTROL WORKS BEFORE ITS LABEL DOES. The address is known the moment the
+ * thread lands (`parent_channel_uuid` rides the payload), while the parent's
+ * NAME may still be resolving — so the chip is live and its label is a
+ * {@link Skeleton}. It must never render a stand-in word: a label that flashes
+ * from "Channel" to "litigation" is a control changing its meaning under the
+ * reader's thumb, which is worse than a bar that has not finished loading.
  */
 
 export interface HeaderLens {
@@ -144,8 +160,17 @@ export interface HeaderLens {
   onSelect: () => void;
 }
 
+/** A thread's way back, resolved by the screen. */
+export interface HeaderParent {
+  /** The parent channel, landing on the branched message — see `thread-model`. */
+  href: string;
+  /** `null` while the parent's name is still resolving (see the docblock). */
+  name: string | null;
+}
+
 export function ChannelPlaceHeader({
   channel,
+  parent,
   presence,
   onOpenRoster,
   sections,
@@ -156,6 +181,8 @@ export function ChannelPlaceHeader({
   menu,
 }: {
   channel: Channel;
+  /** The thread's way back. `null` on an ordinary channel — see the docblock. */
+  parent: HeaderParent | null;
   /** Who is here now. `null` for a reader with no room — see the docblock. */
   presence: ChannelPresence | null;
   /** Opens the roster. Omitted where the roster is not readable. */
@@ -173,6 +200,7 @@ export function ChannelPlaceHeader({
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const visibilityFace = channelVisibilityFace(channel.visibility);
   const VisibilityIcon = visibilityFace.icon;
+  const displayName = channelDisplayName(channel);
   const description = channel.description?.trim() || null;
   const total = channel.active_members_count;
   const countLabel = `${total} ${total === 1 ? 'member' : 'members'}`;
@@ -183,6 +211,8 @@ export function ChannelPlaceHeader({
         <div className="flex h-11 items-center gap-2 md:h-14">
           {/* ── Identity ─────────────────────────────────────────────── */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
+            {parent && <BackChip parent={parent} />}
+
             <VisibilityIcon
               aria-hidden
               className="size-4 shrink-0 text-muted-foreground"
@@ -221,7 +251,7 @@ export function ChannelPlaceHeader({
                       FOCUS_RING,
                     )}
                   >
-                    <span className="min-w-0 truncate">{channel.name}</span>
+                    <span className="min-w-0 truncate">{displayName}</span>
                     <ChevronDown
                       aria-hidden
                       className={cn(
@@ -234,17 +264,26 @@ export function ChannelPlaceHeader({
                   {/* The heading's OWN text below `md:`, where the button above
                       is `display:none` and would otherwise take the name out of
                       the accessibility tree along with the pixels. */}
-                  <span className="md:hidden">{channel.name}</span>
+                  <span className="md:hidden">{displayName}</span>
                 </>
               ) : (
-                <span className="min-w-0 md:truncate">{channel.name}</span>
+                <span className="min-w-0 md:truncate">{displayName}</span>
               )}
             </h1>
 
             {/* ── The purpose (below `md:` only) ─────────────────────────
                 What this bar can say that the shell bar above it cannot — and,
                 since the name went, where the description's disclosure lives at
-                this width. See the docblock. */}
+                this width. See the docblock.
+
+                THE VISIBILITY FALLBACK STANDS DOWN BEHIND A BACK CHIP. It is
+                the line a channel with nothing to disclose shows instead, and
+                a thread has nothing to disclose by construction — so on a
+                phone it would spend the one narrow line that matters saying
+                "Open" beside a glyph that already means it, next to the chip
+                that says which conversation this tangent came out of. The chip
+                wins that space; the `sr-only` label above still states the
+                visibility for anyone reading the bar rather than seeing it. */}
             {description ? (
               <button
                 type="button"
@@ -268,14 +307,14 @@ export function ChannelPlaceHeader({
                   )}
                 />
               </button>
-            ) : (
+            ) : parent === null ? (
               <span
                 aria-hidden
                 className="min-w-0 truncate text-sm text-muted-foreground md:hidden"
               >
                 {channel.visibility_label}
               </span>
-            )}
+            ) : null}
 
             {/* The space as a real object, not a text link: the same crest the
                 space's own lane and header carry, so the reader recognises
@@ -364,6 +403,50 @@ export function ChannelPlaceHeader({
 }
 
 const DESCRIPTION_ID = 'v2-channel-description';
+
+/**
+ * A thread's way back — chevron, then the parent channel's name.
+ *
+ * IT IS A LINK, NOT A HISTORY MOVE. A reader can land in a thread with no
+ * history behind it at all (a mention, a push, a pasted address), and `back()`
+ * would take them out of the app. This goes to the PLACE.
+ *
+ * THE NAME IS THE ONLY PART THAT WAITS. `href` is known as soon as the thread
+ * lands, so the control is live and focusable from the first frame; the label is
+ * a bar until the parent's name is resolved, and the accessible name is honest
+ * in both states rather than being read off an empty span.
+ *
+ * CAPPED AND SHRINKABLE, in that order. The cap stops a long parent name from
+ * taking the bar; `shrink` (the space chip's own setting, for the same reason)
+ * means that when the row is still too tight the CHIP gives way before the
+ * thread's title does — the title is the place the reader is in, and the chip is
+ * the context around it.
+ */
+function BackChip({ parent }: { parent: HeaderParent }) {
+  return (
+    <Link
+      href={parent.href}
+      aria-label={
+        parent.name === null ? 'Back to the channel' : `Back to ${parent.name}`
+      }
+      className={cn(
+        'v2-interactive flex min-w-0 max-w-32 shrink items-center gap-0.5 rounded-full border py-0.5 pr-2.5 pl-1.5 md:max-w-40',
+        'text-xs text-muted-foreground',
+        'transition-colors duration-150 hover:bg-secondary hover:text-foreground motion-reduce:transition-none',
+        FOCUS_RING,
+      )}
+    >
+      <ChevronLeft aria-hidden className="size-3.5 shrink-0" />
+      {parent.name === null ? (
+        <Skeleton aria-hidden className="my-0.5 h-3 w-14 rounded" />
+      ) : (
+        <span aria-hidden className="min-w-0 truncate">
+          {parent.name}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 /**
  * ActionCluster — the trailing action group, and the end of the row of

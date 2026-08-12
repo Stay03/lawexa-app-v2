@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { GitBranch, LogOut, UserMinus, UserPlus, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -87,12 +88,27 @@ export function DayDivider({ label }: { label: string }) {
  * Any unknown type falls back to the plain sentence with no glyph, which is
  * still true and still readable.
  *
- * ── THE THREAD LINE READS, IT DOES NOT YET TRAVEL ──────────────────────────
- * `thread_started` carries a `thread_uuid` and could be a way in to the thread.
- * It is drawn as a plain sentence for now because opening threads is a feature
- * nobody has asked for yet; this exists so that the line the server already
- * posts is not attributed to "Deleted account", which is what an author-less
- * row does in the ordinary message path.
+ * ── THE THREAD LINE IS THE FIRST DOOR INTO A THREAD ────────────────────────
+ * `thread_started` carries `metadata.thread_uuid`, and that uuid IS a channel
+ * uuid — a thread is a channel — so the way in is an ordinary address,
+ * `/channels/{thread_uuid}`. It stays in this recessive grammar rather than
+ * becoming a card: the line is still furniture, and the reader who wants the
+ * tangent will follow the sentence that names it.
+ *
+ * THE WHOLE SENTENCE IS THE TARGET, and the server's words are still never
+ * parsed. The line reads "{name} started a thread: {title}", and linking only
+ * the title would mean finding the title INSIDE that sentence — a substring
+ * match that breaks on a title containing the word "thread", on any wording
+ * change the backend makes, and on a title the server truncated. One link
+ * around the sentence cannot drift from what the server decided happened.
+ *
+ * ── AND IT BECOMES A `group`, NOT A `separator` ────────────────────────────
+ * `role="separator"` without a tabindex is on ARIA's presentational-children
+ * list: the accessibility tree keeps the separator and DISCARDS everything
+ * inside it — including a link. This is the same trap {@link UnreadDivider}
+ * documents above, met a second time. So the LINKED variant is a `role="group"`,
+ * whose name the link inside it survives; the unlinked variants keep the
+ * separator they genuinely are.
  */
 const SYSTEM_LINE_GLYPHS: Readonly<Record<string, LucideIcon>> = {
   member_joined: UserPlus,
@@ -107,20 +123,63 @@ export function QuietSystemLine({ message }: { message: Message }) {
   const text = message.content.trim();
   if (!text) return null;
 
-  return (
-    <div
-      role="separator"
-      aria-label={text}
-      className="flex items-center justify-center gap-1.5 py-1"
-    >
+  const threadUuid =
+    type === 'thread_started' ? (message.metadata.thread_uuid ?? null) : null;
+
+  /* `aria-hidden` on both halves: the row's own label already reads the
+     sentence, and without this a screen reader says it twice. `group-hover:`
+     matches nothing at all in the unlinked variant, which has no `group`
+     ancestor — so one fragment serves both. */
+  const line = (
+    <>
       {Glyph && (
-        <Glyph aria-hidden className="size-3 shrink-0 text-muted-foreground/70" />
+        <Glyph
+          aria-hidden
+          className={cn(
+            'size-3 shrink-0 text-muted-foreground/70',
+            'transition-colors duration-150 group-hover:text-foreground motion-reduce:transition-none',
+          )}
+        />
       )}
-      {/* `aria-hidden`: the separator's own label already reads the sentence,
-          and without this a screen reader says it twice. */}
-      <span aria-hidden className="text-[11px] leading-snug text-muted-foreground">
+      <span
+        aria-hidden
+        className={cn(
+          'min-w-0 truncate text-[11px] leading-snug text-muted-foreground',
+          'transition-colors duration-150 group-hover:text-foreground motion-reduce:transition-none',
+        )}
+      >
         {text}
       </span>
+    </>
+  );
+
+  if (threadUuid === null) {
+    return (
+      <div
+        role="separator"
+        aria-label={text}
+        className="flex items-center justify-center gap-1.5 py-1"
+      >
+        {line}
+      </div>
+    );
+  }
+
+  return (
+    <div role="group" aria-label={text} className="flex justify-center py-1">
+      {/* The link's own name is the VERB, not the sentence — the group beside
+          it already carries that, and repeating it would announce the line
+          twice. Same division `UnreadDivider` makes with "Mark as read". */}
+      <Link
+        href={`/channels/${threadUuid}`}
+        aria-label="Open this thread"
+        className={cn(
+          'v2-interactive group flex min-w-0 items-center gap-1.5 rounded px-1',
+          FOCUS_RING,
+        )}
+      >
+        {line}
+      </Link>
     </div>
   );
 }

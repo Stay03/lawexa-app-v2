@@ -68,7 +68,7 @@ export function CollabHeaderBack({ context }: { context: CollabHeaderContext }) 
       size="icon"
       className="size-9 shrink-0 rounded-full text-muted-foreground lg:hidden"
     >
-      <Link href={context.backHref} aria-label="Back to the space">
+      <Link href={context.backHref} aria-label={context.backLabel}>
         <ChevronLeft aria-hidden className="size-5" />
       </Link>
     </Button>

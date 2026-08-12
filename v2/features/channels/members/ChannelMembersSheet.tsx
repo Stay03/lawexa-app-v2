@@ -22,6 +22,7 @@ import {
 } from '../membership-mutations';
 import { canManageChannel } from '../model';
 import { channelsQueries } from '../queries';
+import { channelDisplayName } from '../thread-model';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { MemberRow } from './MemberRow';
 
@@ -36,6 +37,14 @@ import { MemberRow } from './MemberRow';
  *
  * Role/remove failures fall to the global mutation error channel; invite
  * failures surface inline in the dialog (its contract).
+ *
+ * ── IN A THREAD IT IS READ-ONLY, AND `canManageChannel` DOES NOT SAY SO ────
+ * A thread's roster is its FOLLOWER list, and the server denies `invite` and
+ * `manageMembers` on a thread outright — no role passes, not even the platform
+ * admin's. `canManageChannel` cannot express that: the person who started the
+ * thread is its Owner member, so it answers TRUE for them and would hand them an
+ * Invite button and three role menus that can only 403. The thread test is
+ * therefore explicit and sits in front of the role test, not inside it.
  */
 export function ChannelMembersSheet({
   channel,
@@ -50,7 +59,8 @@ export function ChannelMembersSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const canManage = canManageChannel(channel);
+  const canManage = !channel.is_thread && canManageChannel(channel);
+  const displayName = channelDisplayName(channel);
   /** Its own param, not a value of the screen's `?panel=`: invite opens ON TOP
    *  of this sheet, and one param holds one value. The URL reads
    *  `?panel=members&invite=1`, so Back closes invite, then the roster. Gated on
@@ -112,7 +122,7 @@ export function ChannelMembersSheet({
         <SheetHeader className="border-b">
           <SheetTitle>Members</SheetTitle>
           <p className="text-sm text-muted-foreground">
-            {channel.active_members_count} in {channel.name}
+            {channel.active_members_count} in {displayName}
           </p>
         </SheetHeader>
 
@@ -169,7 +179,7 @@ export function ChannelMembersSheet({
         key={invitePanel.keyFor()}
         open={invitePanel.open}
         onOpenChange={invitePanel.setOpen}
-        title={`Invite to ${channel.name}`}
+        title={`Invite to ${displayName}`}
         description="Add someone from this space, or invite a new person by email."
         onInvite={handleInvite}
         candidates={candidates}
@@ -177,7 +187,7 @@ export function ChannelMembersSheet({
         linkScope={{
           spaceUuid: channel.space.uuid,
           channelUuid: channel.uuid,
-          placeName: `#${channel.name}`,
+          placeName: `#${displayName}`,
         }}
       />
     </Sheet>
