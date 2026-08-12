@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { Activity, FileText, FileSearch, Radar, FileCode2, ArrowRight } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { JobHealthCard, type JobHealthCount } from '@/components/admin/observability';
+import {
+  JobHealthCard,
+  SystemHealthPanel,
+  type JobHealthCount,
+} from '@/components/admin/observability';
+import { useSystemHealth } from '@/lib/hooks/useSystemHealth';
 import { useCaseIngestionSummary } from '@/lib/hooks/useAdminCaseIngestions';
 import { useFileExtractionSummary } from '@/lib/hooks/useAdminFileExtractions';
 import { useRadarScanSummary } from '@/lib/hooks/useAdminRadarScans';
@@ -19,6 +24,7 @@ const SIBLING_LINKS = [
 ];
 
 export default function OperationsDashboardPage() {
+  const health = useSystemHealth();
   const ingestions = useCaseIngestionSummary();
   const extractions = useFileExtractionSummary();
   const scans = useRadarScanSummary();
@@ -75,6 +81,16 @@ export default function OperationsDashboardPage() {
           Health of the async job families at a glance. Red cards need a look.
         </p>
       </div>
+
+      {/* Above the job families, because mail and the queue are what all four
+          of them run on: if the workers are stopped, every card below is
+          reporting on work that is not moving. */}
+      <SystemHealthPanel
+        health={health.data?.data}
+        message={health.data?.message}
+        isLoading={health.isPending}
+        isError={health.isError}
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <JobHealthCard
