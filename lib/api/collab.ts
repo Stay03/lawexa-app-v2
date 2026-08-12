@@ -64,6 +64,7 @@ import type {
   TaskListItemsResponse,
   TaskListResponse,
   TaskListSummaryListResponse,
+  ThreadListParams,
   ToggleReactionPayload,
   TransferOwnershipPayload,
   UpdateChannelPayload,
@@ -372,6 +373,43 @@ export const channelsApi = {
     const response = await apiClient.post<ChannelResponse>(
       `/channels/${uuid}/threads`,
       payload
+    );
+    return response.data;
+  },
+
+  /**
+   * This channel's own threads — every tangent branched out of it, newest
+   * activity first, with a brand-new SILENT thread at the top.
+   *
+   * IT EXISTS BECAUSE THE ROLLUPS COUNT WHAT THE LISTINGS HIDE. `listChannels`
+   * and `listUserChannels` apply `topLevel()`, so a thread never appears in the
+   * rail, the drawer or `/channels` — correct — but the space's
+   * `unread_channels_count` and `mention_count` do NOT exclude threads. An
+   * unread thread therefore lights a space's dot and the app badge, and this is
+   * the only surface that can say what the badge is about. Backend author,
+   * 2026-08-12: the rollups stay as they are, "the badge is telling the truth".
+   *
+   * PAGE-BASED, NOT THE CURSOR THE MESSAGE FEED USES — see
+   * {@link ThreadListParams}. `mine` is sent as `1` because it is read as a
+   * boolean query flag server-side; omitted entirely when false, so the All
+   * request is the bare URL.
+   *
+   * Authorized by `previewMessages`, so a space member previewing an open
+   * parent may read this list without having joined anything.
+   */
+  getThreads: async (
+    uuid: string,
+    params: ThreadListParams = {}
+  ): Promise<ChannelListResponse> => {
+    const response = await apiClient.get<ChannelListResponse>(
+      `/channels/${uuid}/threads`,
+      {
+        params: {
+          mine: params.mine ? 1 : undefined,
+          per_page: params.per_page ?? 20,
+          page: params.page ?? 1,
+        },
+      }
     );
     return response.data;
   },

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Bell,
   Bookmark,
+  GitBranch,
   Loader2,
   LogOut,
   Pencil,
@@ -72,6 +73,7 @@ import { channelDisplayName, threadParentHref } from '../thread-model';
 import { FilesTab } from '../files/FilesTab';
 import { ListsTab } from '../lists/ListsTab';
 import { ChannelMembersSheet } from '../members/ChannelMembersSheet';
+import { ThreadsSheet } from '../threads/ThreadsSheet';
 import { ChannelEditDialog } from '../dialogs/ChannelEditDialog';
 import { GameOverlay } from '../quiz/GameOverlay';
 import { LiveQuizBar } from '../quiz/LiveQuizBar';
@@ -176,13 +178,18 @@ import { LawexaMark } from '../ui/avatars';
  * cannot enter is told so in the dock instead of meeting silence.
  *
  * EVERY OVERLAY ANSWERS BACK (owner round, Aug 4). `?game=` and the `?panel=`
- * family — edit, members, pinned, saved, quizzes and the Lawexa sessions sheet
- * — all run on the shared {@link useUrlOverlay}, which W6's hand-rolled block
- * here was the prototype for: open PUSHes one entry, re-targeting REPLACES,
- * dismissal walks back over that entry, and one `popstate` adopter settles it
- * all. Two params rather than one because a game is a MODE that can be running
- * while a panel is open, so they must be able to coexist; the six panels are
- * mutually exclusive and share one.
+ * family — edit, members, pinned, saved, threads, quizzes and the Lawexa
+ * sessions sheet — all run on the shared {@link useUrlOverlay}, which W6's
+ * hand-rolled block here was the prototype for: open PUSHes one entry,
+ * re-targeting REPLACES, dismissal walks back over that entry, and one
+ * `popstate` adopter settles it all. Two params rather than one because a game
+ * is a MODE that can be running while a panel is open, so they must be able to
+ * coexist; the seven panels are mutually exclusive and share one.
+ *
+ * `?mine=` RIDES ALONGSIDE `?panel=threads` and is NOT an overlay: it is the
+ * threads list's own All/Following filter, mirrored with a quiet REPLACE the
+ * way `?tab=` is, because a filter is a change of view rather than a place and
+ * must not cost a Back press (see {@link ThreadsSheet}).
  *
  * THE SESSIONS SHEET IS THE `swap()` CASE. Its two levels live in one value —
  * `ai` is the list, `ai:{uuid}` is one transcript — so drilling in costs no
@@ -213,7 +220,10 @@ import { LawexaMark } from '../ui/avatars';
  *
  * WHAT A THREAD KEEPS is everything that is the conversation: the feed, the
  * composer, engagement, pins, saved, the Lawexa history, Lists, Files, the
- * roster (read-only), and Delete for whoever may delete it.
+ * roster (read-only), and Delete for whoever may delete it. What it does NOT
+ * keep is the threads lens: branching is one level deep, so a thread's own
+ * threads list is empty by construction and a lens over it would be a door onto
+ * a room nothing can ever enter.
  */
 export function ChannelScreen({
   channelUuid,
@@ -397,9 +407,13 @@ export function ChannelScreen({
    * panels, and refusing on an unresolved role would strip a real admin's
    * deep link.
    *
-   * THREE OF THEM DO NOT EXIST IN A THREAD at all — `edit`, `requests` and
-   * `quizzes` — so a copied `/channels/{thread}?panel=edit` degrades to the
-   * conversation instead of opening a form that would rename a machine slug.
+   * FOUR OF THEM DO NOT EXIST IN A THREAD at all — `edit`, `requests`,
+   * `quizzes` and `threads` — so a copied `/channels/{thread}?panel=edit`
+   * degrades to the conversation instead of opening a form that would rename a
+   * machine slug. `threads` is on that list because branching is ONE LEVEL
+   * DEEP: a thread's own threads list answers 200 with an empty page for ever
+   * (measured on prod 2026-08-12), so the lens would be a door onto a room that
+   * cannot be filled.
    */
   const panel = useUrlOverlay('panel', {
     canOpen: channel
@@ -408,6 +422,7 @@ export function ChannelScreen({
           members: canRead,
           pinned: canRead,
           saved: canParticipate,
+          threads: canRead && !isThread,
           quizzes: canParticipate && !isThread,
           ai: canRead,
           requests: canGovernChannel,
@@ -735,6 +750,21 @@ export function ChannelScreen({
      messages, never a second place to read them (DIRECTION 14). Each is gated
      by what its endpoint will actually answer. */
   const lenses: HeaderLens[] = [];
+  /* THREADS LEADS THE CLUSTER, and it is the one lens that is not optional.
+     Pins and saves are lenses over MESSAGES a reader chose to keep; this is a
+     lens over the channel's own CONVERSATIONS, and the space rollups count
+     threads while every channel listing hides them — so an unread thread lights
+     a space's dot with no row anywhere else in the product to explain it. It is
+     also the only way to reach a thread started with no message behind it.
+     Absent inside a thread: branching is one level deep. */
+  if (canRead && !isThread) {
+    lenses.push({
+      id: 'threads',
+      label: 'Threads',
+      icon: GitBranch,
+      onSelect: () => panel.show('threads'),
+    });
+  }
   if (canRead) {
     lenses.push({
       id: 'pinned',
@@ -1220,6 +1250,22 @@ export function ChannelScreen({
           viewerId={viewerId}
           onOpenGame={openGame}
           {...panel.bind('quizzes')}
+        />
+      )}
+
+      {/* The channel's own conversations. Mount-gated on `!isThread` for the
+          same reason the panel is: branching is one level deep, so a thread's
+          threads list is permanently empty and the sheet would have nothing to
+          be. Reading it is open to a previewer (the endpoint authorizes on
+          `previewMessages`); BRANCHING is not, which only changes the sentence
+          the empty state ends on. */}
+      {!isThread && (
+        <ThreadsSheet
+          channel={channel}
+          viewerId={viewerId}
+          canBranch={canParticipate}
+          onNavigate={closePanel}
+          {...panel.bind('threads')}
         />
       )}
 

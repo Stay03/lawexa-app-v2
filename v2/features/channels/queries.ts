@@ -298,6 +298,59 @@ export const channelsQueries = {
       refetchOnMount: REFETCH_ON_VISIT,
     }),
 
+  /* ── The channel's own threads (Threads Phase 4) ───────────────────────────
+     A list of CHANNELS, not of messages, and deliberately NOT under the
+     `lists()` prefix that `mine`/`bySpace` share: those are the surfaces the
+     `.channel.unread` writers fan over, and a thread is excluded from every one
+     of them server-side (`topLevel()`). Filing thread rows there would hand
+     those writers rows that the rail and the drawer must never show. */
+
+  /** Invalidation handle for one channel's threads list (both filters). */
+  threadsOf: (channelUuid: string) =>
+    [...channelsQueries.all, 'threads', channelUuid] as const,
+
+  /**
+   * The threads branched out of one channel — newest activity first, with a
+   * brand-new silent thread at the TOP so a standalone one is reachable.
+   *
+   * PAGE-INFINITE, NOT CURSOR. `messages` two leaves up is cursor-paginated and
+   * this is not; the endpoint ignores `?cursor=` outright (measured on prod
+   * 2026-08-12), so copying that leaf's `getNextPageParam` here would page for
+   * ever over page one.
+   *
+   * `mine` IS IN THE KEY because it is a different list, not a filter over one:
+   * All and Following are separate server queries with their own totals, so
+   * they must not share a cache entry and overwrite each other's pages.
+   *
+   * STANDARD tier and no `REFETCH_ON_VISIT`. The panel is `enabled: open`, so
+   * its observer is mounted long before the reader opens anything and a
+   * mount-time flag would fire while the query was still disabled — inert
+   * configuration. `staleTime` is the lever that actually works here: opening
+   * the panel more than a minute after the last fetch re-reads the unread
+   * tallies, which are the reason this list exists.
+   */
+  threads: ({
+    channelUuid,
+    mine,
+    viewerId,
+  }: MessagesOptions & { mine: boolean }) =>
+    infiniteQueryOptions({
+      queryKey: [
+        ...channelsQueries.threadsOf(channelUuid),
+        { mine },
+        { viewerId },
+      ] as const,
+      queryFn: ({ pageParam }) =>
+        channelsApi.getThreads(channelUuid, { mine, per_page: 20, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) =>
+        lastPage.pagination.current_page < lastPage.pagination.last_page
+          ? lastPage.pagination.current_page + 1
+          : undefined,
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+    }),
+
   /* ── Lawexa sessions (phase-5 W3) ──────────────────────────────────────────
      The session INDEX is length-aware; a session's TRANSCRIPT is cursor-
      paginated (newest-first, like message history) and complete — it carries

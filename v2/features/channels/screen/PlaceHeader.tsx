@@ -448,12 +448,18 @@ function BackChip({ parent }: { parent: HeaderParent }) {
  * ActionCluster — the trailing action group, and the end of the row of
  * identical grey squares.
  *
- * THE LENSES ARE ONE OBJECT. Pinned and Saved (and, for a previewer who has no
- * menu to hold it, the Lawexa history) are the same KIND of move: a lens over
- * this channel's own messages. So they share one bordered container and read as
- * a segmented control — one thing with two positions — while the overflow, a
- * different kind of move entirely, is a LABELLED button beside it. Weight now
- * follows meaning: two quiet glyphs in one frame, then a word.
+ * THE LENSES ARE ONE OBJECT. Threads, Pinned and Saved (and, for a previewer
+ * who has no menu to hold it, the Lawexa history) are the same KIND of move: a
+ * lens over what is already in this channel, never a second place to read it.
+ * So they share one bordered container and read as a segmented control — one
+ * thing with a few positions — while the overflow, a different kind of move
+ * entirely, is a LABELLED button beside it. Weight follows meaning: quiet
+ * glyphs in one frame, then a word.
+ *
+ * THREADS LEADS THE FRAME because it is the only one that is a lens over
+ * CONVERSATIONS rather than over messages, and the only one a reader can be
+ * sent looking for by a badge they cannot otherwise explain (the space rollups
+ * count threads; every channel listing hides them).
  *
  * `aria-pressed` is deliberately absent: opening a lens is a navigation, not a
  * toggle, and the panel it opens is not a state of this button.
@@ -466,8 +472,8 @@ function BackChip({ parent }: { parent: HeaderParent }) {
  *
  * So at that width the lenses fold INTO the overflow, as labelled rows at the
  * head of the menu — which is the better affordance for them on a phone anyway:
- * two 28px unlabelled glyphs become two thumb-sized rows that say what they
- * open. They fold only when there IS a menu to fold into. A previewer has none
+ * unlabelled 28px glyphs become thumb-sized rows that say what they open. They
+ * fold only when there IS a menu to fold into. A previewer has none
  * (every item in it is a write they do not have), so their lenses keep the
  * frame and their bar has no overflow — one object either way, never both and
  * never neither. At `md:`+ nothing here changes at all.

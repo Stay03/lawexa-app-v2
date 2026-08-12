@@ -45,6 +45,44 @@ export function channelDisplayName(
  * thread with no root (started cold, or its root hard-deleted) still has a
  * parent, and lands on it plainly.
  */
+/**
+ * The three states a thread can be in for one reader, in the grammar Phase 2
+ * settled on and `ThreadLine` (`feed/MessageRow.tsx`) already draws:
+ *
+ *   'none'      not following → muted title. You have never spoken here; the
+ *               thread is a door, not an obligation.
+ *   'caught-up' following, nothing new → full-strength title.
+ *   'behind'    following, and behind → semibold title + the house gold dot.
+ *
+ * WEIGHT SAYS "DO YOU BELONG", THE DOT SAYS "IS THERE SOMETHING NEW". A gold
+ * NUMBER means a mention and only ever a mention in this product, so neither
+ * surface spends one on an unread tally.
+ *
+ * TWO PAYLOAD SHAPES, ONE GRAMMAR, WHICH IS WHY THIS IS HERE. Under a message
+ * the thread arrives as a {@link MessageThreadStub} whose `my_unread_count` is
+ * `null` for a non-follower; in the threads list it arrives as a whole Channel,
+ * where following is `is_member` and the tally is `unread_count` — and a
+ * non-follower's row OMITS both counts entirely (measured on prod 2026-08-12:
+ * `is_member: false`, no `unread_count`, no `mention_count`,
+ * `active_members_count: 0`). Reading `unread_count ?? 0` alone would therefore
+ * report a stranger's thread as "following, caught up", which is the one state
+ * the weight is supposed to rule out.
+ *
+ * MUTE IS NOT APPLIED, unlike `channelUnreadGrammar` for an ordinary channel.
+ * That is deliberate and matches `ThreadLine`: a thread's membership row exists
+ * only because the reader posted in it, so its notify level is not a decision
+ * anybody made about this tangent, and quieting the dot on it would hide the
+ * news the space rollup is already counting.
+ */
+export type ThreadUnreadState = 'none' | 'caught-up' | 'behind';
+
+export function threadUnreadState(
+  thread: Pick<Channel, 'is_member' | 'unread_count'>,
+): ThreadUnreadState {
+  if (thread.is_member !== true) return 'none';
+  return (thread.unread_count ?? 0) > 0 ? 'behind' : 'caught-up';
+}
+
 export function threadParentHref(
   channel: Pick<Channel, 'is_thread' | 'parent_channel_uuid' | 'root_message'>,
 ): string | null {

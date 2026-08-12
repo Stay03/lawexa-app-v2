@@ -934,6 +934,31 @@ export interface MessageListParams {
   cursor?: string;
 }
 
+/**
+ * `GET /channels/{uuid}/threads` — the tangents branched out of one channel.
+ *
+ * PAGE-BASED, WHICH IS THE TRAP. The message history one route away is CURSOR-
+ * paginated, so neither one's paging code may be copied onto the other
+ * (`InlineReplies` carries the same warning for the replies endpoint). Measured
+ * on prod 2026-08-12: the response is length-aware (`current_page`/`last_page`),
+ * `?cursor=` is ignored outright, and `per_page` is 1–100 with 101 answering
+ * 422.
+ *
+ * The rows are ordered by newest activity, and a brand-new SILENT thread sorts
+ * to the TOP — deliberately, because a standalone thread hangs under no message
+ * and this list is the only way to reach it at all.
+ */
+export interface ThreadListParams {
+  /**
+   * Narrow to the threads this viewer FOLLOWS. Following is granted by posting
+   * in a thread, never asked for (`POST /channels/{thread}/join` answers 422),
+   * so this is "the ones I have spoken in", not "the ones I subscribed to".
+   */
+  mine?: boolean;
+  per_page?: number;
+  page?: number;
+}
+
 export interface MemberListParams {
   search?: string;
   per_page?: number;
