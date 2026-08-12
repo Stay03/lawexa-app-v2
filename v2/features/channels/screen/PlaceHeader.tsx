@@ -16,7 +16,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import type { Channel, SlimUser } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
@@ -145,12 +144,10 @@ const NO_FACES: readonly SlimUser[] = [];
  * first thing in the bar on a phone as well, because on a phone it is the only
  * thing that says what conversation this tangent belongs to.
  *
- * THE CONTROL WORKS BEFORE ITS LABEL DOES. The address is known the moment the
- * thread lands (`parent_channel_uuid` rides the payload), while the parent's
- * NAME may still be resolving — so the chip is live and its label is a
- * {@link Skeleton}. It must never render a stand-in word: a label that flashes
- * from "Channel" to "litigation" is a control changing its meaning under the
- * reader's thumb, which is worse than a bar that has not finished loading.
+ * THE CHIP ARRIVES WHOLE. Its address AND its label both ride the thread's own
+ * payload (`parent_channel_uuid`, `parent_channel_name`), so there is no frame
+ * in which the way back is live but unnamed — see {@link BackChip} for what a
+ * payload that omits the name gets instead.
  */
 
 export interface HeaderLens {
@@ -164,7 +161,8 @@ export interface HeaderLens {
 export interface HeaderParent {
   /** The parent channel, landing on the branched message — see `thread-model`. */
   href: string;
-  /** `null` while the parent's name is still resolving (see the docblock). */
+  /** `null` only when the payload omitted `parent_channel_name` — never a
+   *  loading state (see {@link BackChip}). */
   name: string | null;
 }
 
@@ -411,10 +409,14 @@ const DESCRIPTION_ID = 'v2-channel-description';
  * history behind it at all (a mention, a push, a pasted address), and `back()`
  * would take them out of the app. This goes to the PLACE.
  *
- * THE NAME IS THE ONLY PART THAT WAITS. `href` is known as soon as the thread
- * lands, so the control is live and focusable from the first frame; the label is
- * a bar until the parent's name is resolved, and the accessible name is honest
- * in both states rather than being read off an empty span.
+ * NOTHING HERE WAITS ANY MORE. Both halves ride the thread's own payload —
+ * `parent_channel_uuid` and, since 2026-08-12, `parent_channel_name` — so the
+ * chip arrives whole on the first frame. `name` stays nullable because the
+ * field is optional on the wire, and a payload that omits it gets the word
+ * "Back" rather than a stand-in name or a shimmer that would never end: a label
+ * that flashed from "Channel" to "litigation" would be a control changing its
+ * meaning under the reader's thumb, and a permanent bar would promise a name
+ * that is not coming.
  *
  * CAPPED AND SHRINKABLE, in that order. The cap stops a long parent name from
  * taking the bar; `shrink` (the space chip's own setting, for the same reason)
@@ -426,9 +428,7 @@ function BackChip({ parent }: { parent: HeaderParent }) {
   return (
     <Link
       href={parent.href}
-      aria-label={
-        parent.name === null ? 'Back to the channel' : `Back to ${parent.name}`
-      }
+      aria-label={parent.name === null ? 'Back' : `Back to ${parent.name}`}
       className={cn(
         'v2-interactive flex min-w-0 max-w-32 shrink items-center gap-0.5 rounded-full border py-0.5 pr-2.5 pl-1.5 md:max-w-40',
         'text-xs text-muted-foreground',
@@ -437,13 +437,9 @@ function BackChip({ parent }: { parent: HeaderParent }) {
       )}
     >
       <ChevronLeft aria-hidden className="size-3.5 shrink-0" />
-      {parent.name === null ? (
-        <Skeleton aria-hidden className="my-0.5 h-3 w-14 rounded" />
-      ) : (
-        <span aria-hidden className="min-w-0 truncate">
-          {parent.name}
-        </span>
-      )}
+      <span aria-hidden className="min-w-0 truncate">
+        {parent.name ?? 'Back'}
+      </span>
     </Link>
   );
 }

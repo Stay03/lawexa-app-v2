@@ -7,6 +7,7 @@ import type {
   MessageAttachment,
   MessageListResponse,
   MessageReaction,
+  MessageThreadStub,
   NotifyLevel,
 } from '@/types/collab';
 import type { SpaceRollupDeltas } from '@/v2/features/spaces/cache';
@@ -46,9 +47,10 @@ import { channelDisplayName } from './thread-model';
  * is taken from the payload whenever the payload defines it.
  *
  * ENGAGEMENT WRITERS (the third family): {@link applyReactionToggled},
- * {@link applyPinState} and {@link applyBookmarkState} are per-message field
- * deltas onto the same `messagesOf(channel)` caches — the same
- * `setQueryData`-from-events sanction, same no-op stability contract.
+ * {@link applyPinState}, {@link applyBookmarkState} and — since threads
+ * (2026-08-12) — {@link applyThreadStub} are per-message field deltas onto the
+ * same `messagesOf(channel)` caches: the same `setQueryData`-from-events
+ * sanction, the same no-op stability contract.
  *
  * ATTACHMENTS CROSS EVERY FAMILY (2026-08-05). A message's `attachments` are
  * library files, so a FILE event has to reach the MESSAGE caches:
@@ -108,13 +110,23 @@ export function mergeViewerFields(previous: Message, incoming: Message): Message
     incoming.reply_count === undefined && previous.reply_count !== undefined;
   const needsLastReply =
     incoming.last_reply_at === undefined && previous.last_reply_at !== undefined;
+  /* THE THREAD STUB IS OMITTED THE SAME WAY, AND FOR A STRONGER REASON. Its
+     `my_unread_count` is PER-VIEWER, so the stub cannot ride a broadcast at all
+     — the backend omits it from `message.created`/`updated` and from the
+     send/edit responses, exactly as it omits `reactions`. Without this arm a
+     stranger fixing a typo would strip the thread line off every open screen
+     that had it. `null` is a real answer here (this message has no thread) and
+     is taken from the payload; only an ABSENT key is carried across. */
+  const needsThread =
+    incoming.thread === undefined && previous.thread !== undefined;
   if (
     !needsBookmark &&
     !needsReactions &&
     !needsPin &&
     !needsAttachments &&
     !needsReplyCount &&
-    !needsLastReply
+    !needsLastReply &&
+    !needsThread
   ) {
     return incoming;
   }
@@ -126,6 +138,7 @@ export function mergeViewerFields(previous: Message, incoming: Message): Message
     ...(needsAttachments ? { attachments: previous.attachments } : {}),
     ...(needsReplyCount ? { reply_count: previous.reply_count } : {}),
     ...(needsLastReply ? { last_reply_at: previous.last_reply_at } : {}),
+    ...(needsThread ? { thread: previous.thread } : {}),
   };
 }
 
@@ -289,6 +302,81 @@ export function applyPinState(
   patchMessage(queryClient, channelUuid, messageUuid, (row) =>
     row.is_pinned === isPinned ? row : { ...row, is_pinned: isPinned },
   );
+}
+
+/**
+ * Everything a caller can actually establish about the thread under one
+ * message. It is {@link MessageThreadStub} with the per-viewer half made
+ * OPTIONAL, because the two callers know different amounts:
+ *  - `.thread.updated` carries the SHARED count and nothing else (the event
+ *    cannot carry a per-viewer number, which is why the whole stub is omitted
+ *    from every broadcast);
+ *  - the create mutation knows whether the caller now follows the thread, but
+ *    the channel resource it gets back carries no message count.
+ * Anything left out is taken from the cached stub — see {@link applyThreadStub}.
+ */
+export interface ThreadStubPatch {
+  uuid: string;
+  title: string;
+  /** Absent ⇒ keep whatever the cached stub says (0 when there is none). */
+  message_count?: number;
+  /** Absent ⇒ keep the viewer's own tally. NEVER write a guess here. */
+  my_unread_count?: number | null;
+  last_message_at?: string | null;
+}
+
+/**
+ * Set the thread stub on the message it hangs under.
+ *
+ * THE UNREAD TALLY IS THE VIEWER'S AND IS ONLY EVER WRITTEN BY SOMEBODY WHO
+ * KNOWS IT. `.thread.updated` deliberately omits it — a broadcast reaches every
+ * member of the parent room and one number cannot be true for all of them — so
+ * a live count-up must move `message_count` and leave `my_unread_count` exactly
+ * as it was. Overwriting it with 0 would tell a reader who is behind that they
+ * are caught up; overwriting it with null would say they do not follow a thread
+ * they are following. Absent means absent.
+ *
+ * It writes only the TRANSCRIPT caches. The pins and saved panels hold their own
+ * copies of whole `Message` rows, but neither draws the thread line (only
+ * `MessageRow` does, and only the feed renders it), so patching them would be
+ * work nobody can see; both refetch on open anyway.
+ *
+ * A message that is not in the loaded pages is a legitimate no-op — the same
+ * rule the pin and reaction writers keep.
+ */
+export function applyThreadStub(
+  queryClient: QueryClient,
+  channelUuid: string,
+  rootMessageUuid: string,
+  patch: ThreadStubPatch,
+): void {
+  patchMessage(queryClient, channelUuid, rootMessageUuid, (row) => {
+    const current = row.thread ?? null;
+    const next: MessageThreadStub = {
+      uuid: patch.uuid,
+      title: patch.title,
+      message_count: patch.message_count ?? current?.message_count ?? 0,
+      my_unread_count:
+        patch.my_unread_count !== undefined
+          ? patch.my_unread_count
+          : (current?.my_unread_count ?? null),
+      last_message_at:
+        patch.last_message_at !== undefined
+          ? patch.last_message_at
+          : (current?.last_message_at ?? null),
+    };
+    if (
+      current !== null &&
+      current.uuid === next.uuid &&
+      current.title === next.title &&
+      current.message_count === next.message_count &&
+      current.my_unread_count === next.my_unread_count &&
+      current.last_message_at === next.last_message_at
+    ) {
+      return row;
+    }
+    return { ...row, thread: next };
+  });
 }
 
 /** Apply the PRIVATE save state. REST-only by design — nothing broadcasts it,

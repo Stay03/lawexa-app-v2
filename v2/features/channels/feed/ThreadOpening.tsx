@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { GitBranch } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
 import type { Channel } from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { threadParentHref } from '../thread-model';
@@ -36,17 +35,20 @@ import { MESSAGE_MEASURE } from './measure';
  *    root was HARD-deleted are the same `null` on the wire, indistinguishable.
  *    So the sentence says only what is true of both: there is no first message.
  *
- * IT CARRIES NO TIME, because the payload carries none — `root_message` has no
- * `created_at` (measured against `ChannelResource`, 2026-08-12). A date guessed
- * from the thread's own `created_at` would be the moment somebody branched it,
- * not the moment the message was written, and those can be days apart.
+ * IT CARRIES NO TIME, though since 2026-08-12 the payload does
+ * (`root_message.created_at`). This block is a QUOTE, in `ReplyQuote`'s
+ * grammar, and no quote in this feed is dated — the message itself is one tap
+ * away, in the place that dates it. What a time here would have to be careful
+ * about is which one: the thread's own `created_at` is the moment somebody
+ * branched it, and those can be days apart.
  */
 export function ThreadOpening({
   channel,
   parentName,
 }: {
   channel: Channel;
-  /** `null` while the parent's name is still resolving — a bar, never a word. */
+  /** `null` only when the payload omitted `parent_channel_name` — never a
+   *  loading state, so the "in …" clause is simply dropped. */
   parentName: string | null;
 }) {
   const root = channel.root_message ?? null;
@@ -107,15 +109,17 @@ function RootQuote({
         <span className="min-w-0 truncate font-medium text-foreground/80">
           {authorName}
         </span>
-        <span aria-hidden className="text-muted-foreground">
-          ·
-        </span>
-        {parentName === null ? (
-          <Skeleton aria-hidden className="h-3 w-20 rounded" />
-        ) : (
-          <span className="min-w-0 truncate text-muted-foreground">
-            in {parentName}
-          </span>
+        {/* THE PLACE IS DROPPED, NOT STOOD IN FOR, when the payload did not
+            name it — separator and all, so nothing is left dangling. */}
+        {parentName !== null && (
+          <>
+            <span aria-hidden className="text-muted-foreground">
+              ·
+            </span>
+            <span className="min-w-0 truncate text-muted-foreground">
+              in {parentName}
+            </span>
+          </>
         )}
       </span>
       <span className={cn('block pt-1 text-sm leading-relaxed', MESSAGE_MEASURE)}>

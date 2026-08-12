@@ -198,9 +198,11 @@ import { LawexaMark } from '../ui/avatars';
  *  1. ITS NAME IS A SLUG. `channels` is `UNIQUE(space_id, name)`, so the server
  *     names a thread `thread--{uuid}` and puts the words in `title`. Every name
  *     on this screen therefore goes through `channelDisplayName`.
- *  2. ITS GATE IS ITS PARENT'S GATE, so the parent's detail is fetched and
- *     {@link threadAccess} derives read/participate from it. `is_member` on a
- *     thread is FOLLOW state, not access — see the read-pointer note below.
+ *  2. ITS GATE IS THE PARENT'S GATE, AND THE SERVER SAYS SO ITSELF. The payload
+ *     carries `can_read` / `can_post` — the policy, not a re-derivation — so
+ *     {@link threadAccess} reads them and this screen fetches nothing else.
+ *     `is_member` on a thread is FOLLOW state, not access — see the
+ *     read-pointer note below.
  *  3. HALF THE MENU IS A DENY. Edit would overwrite the slug; invite, manage
  *     members, join and ask-to-join are refused server-side (403 by policy, 422
  *     by service); leave is an un-follow nobody has designed; quizzes belong to
@@ -237,36 +239,22 @@ export function ChannelScreen({
   const isThread = channel?.is_thread === true;
   const parentUuid = channel?.parent_channel_uuid ?? null;
 
-  /* ── The channel a thread came out of ─────────────────────────────────────
-        FETCHED, because it is what decides everything: `ChannelPolicy`
-        delegates a thread's `view`, `previewMessages`, `viewMessages`, `post`
-        and `viewMembers` to the parent, so the thread's own payload cannot
-        answer whether this reader may read or write in it.
-
-        IT COSTS NOTHING ON AN IN-APP PATH. This is the same cache entry the
-        parent's own screen mounts, and every way into a thread from inside the
-        app comes through the parent (its `thread_started` line, and Phase 2's
-        stub) — so the entry is warm and this resolves without a request. The
-        one cold case is an address arriving from outside: a mention deep link,
-        a push, a pasted URL. There it is one extra serial call, and the screen
-        waits for it rather than painting a gate it would have to correct. */
-  const parentQuery = useQuery({
-    ...channelsQueries.detail(parentUuid ?? '', { viewerId }),
-    enabled: isThread && parentUuid !== null,
-  });
-  const parent = parentQuery.data?.data ?? null;
-  /** A DISABLED query reports `isPending` forever, so the uuid is part of the
-   *  test: a thread whose payload named no parent must not wait for a request
-   *  that was never made. */
-  const parentPending =
-    isThread && parentUuid !== null && parentQuery.isPending;
+  /* ── NO SECOND FETCH FOR A THREAD, SINCE 2026-08-12 ───────────────────────
+        This screen used to fetch the PARENT's detail before it could paint
+        anything, because `ChannelPolicy` delegates a thread's read and write
+        abilities to the parent and the thread's own payload could not answer.
+        The backend now publishes the answer — `can_read` / `can_post`, stamped
+        from the same abilities the endpoints authorize — and the parent's NAME
+        with it, so a thread renders from its own payload alone. A cold landing
+        (a mention deep link, a push, a pasted URL) costs one request, not two,
+        and there is no window in which the gate is unknown. */
 
   /** `null` until the channel lands — every gate below reads `undefined` in
    *  that window rather than guessing, so a pending screen opens no panel and
    *  refuses no deep link it would have honoured a frame later. A thread's gate
-   *  is its parent's ({@link threadAccess}); a channel's is its own. */
-  const threadGate =
-    channel && channel.is_thread ? threadAccess(channel, parent) : null;
+   *  is the server's own ruling ({@link threadAccess}); a channel's is derived
+   *  from its membership and visibility. */
+  const threadGate = channel && channel.is_thread ? threadAccess(channel) : null;
   const access: ChannelAccess | null =
     threadGate ?? (channel ? channelAccess(channel) : null);
   const canRead = access?.canRead === true;
@@ -520,9 +508,9 @@ export function ChannelScreen({
   /** IN A THREAD, THE DOOR IS THE PARENT'S DOOR. Threads are not joined — the
    *  service answers 422 — and it is the parent's membership that decides
    *  whether this reader may reply here, so the dock's one button joins that.
-   *  The `?? channelUuid` tail cannot be reached (the dock stands only in
-   *  `preview`, which a thread reaches only once its parent has resolved); it is
-   *  there because a hook cannot be conditional and a uuid cannot be null. */
+   *  The `?? channelUuid` tail cannot be reached (the server names a thread's
+   *  parent on every thread payload); it is there because a hook cannot be
+   *  conditional and a uuid cannot be null. */
   const joinTargetUuid = (isThread ? parentUuid : channelUuid) ?? channelUuid;
   const joinMutation = useJoinChannel(joinTargetUuid);
   const askMutation = useRequestChannelAccess(channelUuid);
@@ -676,12 +664,11 @@ export function ChannelScreen({
 
   /* ── Three-state detail region ────────────────────────────────────────── */
 
-  /* THE PARENT IS PART OF "PENDING" FOR A THREAD, and it has to be. Everything
-     below branches on an access answer the parent owns, so painting before it
-     lands would mean drawing a refusal for someone who may read every word —
-     and then swapping it for the room a beat later. A screen that corrects
-     itself in front of the reader is worse than one that has not finished. */
-  if (detailQuery.isPending || parentPending) {
+  /* ONE PENDING TEST, FOR A THREAD AS WELL AS A CHANNEL. The detail carries the
+     access ruling now, so there is nothing else to wait for and no window in
+     which this screen could paint a refusal it would have to take back a beat
+     later. */
+  if (detailQuery.isPending) {
     return <ChannelScreenFrame />;
   }
 
@@ -714,21 +701,17 @@ export function ChannelScreen({
   const displayName = channelDisplayName(channel);
 
   /* ── The way back out of a thread ─────────────────────────────────────────
-        THE PARENT'S NAME HAS TWO SOURCES AND ONE PREFERENCE. The thread's own
-        payload carries `parent_channel_name`, which is there precisely so a
-        cold landing needs no second request to label its way back; the parent
-        detail this screen already fetched for the access ruling is the fallback
-        for a payload that predates it. `null` means neither is in hand yet, and
-        that is what the header's and the opening block's skeletons are for — a
-        stand-in word would change under the reader once the real one arrived.
+        ONE SOURCE: the thread's own `parent_channel_name`, which exists
+        precisely so a cold landing needs no second request to label its way
+        back (measured on prod 2026-08-12 — present on the show AND on the
+        threads listing, and NOT withheld by the metadata trim, so even the
+        refusal panel can name the room it is refusing).
 
-        (A parent is never itself a thread — the server refuses to branch inside
-        a branch — but the name still goes through the one function that owns
-        this question, so no surface is left deciding it locally.) */
-  const parentName = isThread
-    ? (channel.parent_channel_name ??
-      (parent ? channelDisplayName(parent) : null))
-    : null;
+        `null` only if a payload omits the field altogether. That is not a
+        loading state and is not drawn as one: the chip reads "Back" and the
+        root quote drops its "in …" clause, which is the honest degrade. A
+        stand-in WORD would be a lie; a permanent shimmer would be worse. */
+  const parentName = isThread ? (channel.parent_channel_name ?? null) : null;
   const parentHref = threadParentHref(channel);
   const headerParent: HeaderParent | null =
     parentHref === null ? null : { href: parentHref, name: parentName };
@@ -1124,9 +1107,8 @@ export function ChannelScreen({
                   <ChannelPreviewDock
                     channelName={displayName}
                     // Non-null ⇒ this is a thread, and the door is the parent's
-                    // (see the dock's own docblock). `preview` is only reachable
-                    // in a thread once the parent has resolved, so the name is
-                    // in hand wherever this branch renders.
+                    // (see the dock's own docblock). It rides the thread's own
+                    // payload, so it is in hand on the same frame as the gate.
                     parentChannelName={parentName}
                     quizIsLive={initialGameUuid !== null}
                     onJoin={handleJoin}

@@ -1,12 +1,14 @@
 'use client';
 
 import { memo, useId, useState } from 'react';
+import Link from 'next/link';
 import {
   AlertCircle,
   AtSign,
   Bookmark,
   ChevronRight,
   CornerUpLeft,
+  GitBranch,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -25,8 +27,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
-import type { Message, MessageAttachment } from '@/types/collab';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import type {
+  Message,
+  MessageAttachment,
+  MessageThreadStub,
+} from '@/types/collab';
+import { FOCUS_RING, UnreadDot } from '@/v2/shell/designs/modules';
 import { useEngagementThrottled } from '../engagement-throttle';
 import {
   MESSAGE_MAX_LENGTH,
@@ -83,6 +89,13 @@ import { LawexaMark } from '../ui/avatars';
  *  - touch: long-press lifts the FULL action set into the feed's single bottom
  *    sheet (`onOpenActions`), unchanged, with Copy text and Select text — the
  *    whole message and any part of it — at its head.
+ *
+ * STARTING A THREAD JOINED THE MENU, NOT THE CLUSTER (2026-08-12). Three verbs
+ * is the decree above and the reason the cluster exists at all, so branching is
+ * a NAMED row in the overflow and in the touch sheet — which it wants to be
+ * anyway: "Start a thread" and "Reply" are one glyph apart and worlds apart in
+ * what they do to the room. What the row gains is {@link ThreadLine}, under the
+ * message, once a thread exists.
  *
  * THE SEND LADDER (§5, exact): optimistic insert → `sending` (subtle dim,
  * no words) → sent (nothing at all) → `failed` (red icon + Retry inline,
@@ -144,6 +157,10 @@ export interface MessageRowActions {
   onDiscardFailed: (localUuid: string) => void;
   /** Touch long-press → the feed's single action sheet. */
   onOpenActions: (message: Message) => void;
+  /** Branch this message into a thread, or open the one it already has — one
+   *  verb for both, because the server's create is idempotent on the root and
+   *  a message that already carries a stub never asks at all. */
+  onOpenThread: (message: Message) => void;
   /** Tap a reply quote, or a row in a message's opened answers → jump to (and
    *  wash) that message. */
   onJumpToMessage: (messageUuid: string) => void;
@@ -164,11 +181,13 @@ export interface MessageRowActions {
 export const MessageRow = memo(function MessageRow({
   message,
   canEngage,
+  canBranch,
   isMine,
   canDelete,
   viewerUuid,
   showGutterTime,
   editing,
+  threadError,
   actions,
 }: {
   message: Message;
@@ -185,6 +204,14 @@ export const MessageRow = memo(function MessageRow({
    */
   canEngage: boolean;
   /**
+   * May a thread be branched off this message at all? FALSE INSIDE A THREAD,
+   * where it is a hard server refusal rather than a taste: `createThread` 422s
+   * ("A thread cannot be started from inside a thread") because branching is one
+   * level deep by design. A plain boolean rather than the channel, so the row's
+   * `memo` still holds.
+   */
+  canBranch: boolean;
+  /**
    * Did the viewer write this message? Carries BOTH facts that depend on it,
    * rather than two booleans that must be kept equal: `PATCH .../messages/
    * {uuid}` is author-only (digest §C), so authorship IS the edit permission,
@@ -197,6 +224,10 @@ export const MessageRow = memo(function MessageRow({
   showGutterTime: boolean;
   /** Feed-owned edit mode (one row at a time; the touch sheet opens it too). */
   editing: boolean;
+  /** The server's own sentence when branching this message was refused, or
+   *  `null` — feed-owned, one row at a time. See the render for why it has no
+   *  dismiss control. */
+  threadError: string | null;
   actions: MessageRowActions;
 }) {
   const sendState = useSendState(message.uuid);
@@ -441,6 +472,15 @@ export const MessageRow = memo(function MessageRow({
           onToggle={(emoji) => actions.onToggleReaction(message, emoji)}
         />
 
+        {/* THE THREAD LINE LEADS, AND THE TWO ARE NOT THE SAME OBJECT. Answers
+            belong to this message and open underneath it; a thread is a room
+            the conversation moved to. The door out is stated before the
+            disclosure that stays, and the glyphs (branch / chevron) say which
+            is which before either is read. */}
+        {message.thread != null && (
+          <ThreadLine thread={message.thread} messageContent={message.content} />
+        )}
+
         <ReplyCountLine
           count={message.reply_count}
           open={repliesOpen}
@@ -496,6 +536,24 @@ export const MessageRow = memo(function MessageRow({
             </p>
           </div>
         </div>
+
+        {/* WHY BRANCHING REPORTS IN PLACE AND NOT IN A TOAST. This screen
+            raises none (the W2 house rule), and both refusals the server can
+            answer here are about THIS message — "the message you are branching
+            was not found in this channel" when somebody deleted it between the
+            render and the press, and the one-level rule. So the sentence stands
+            under the message it is about, in the send ladder's grammar.
+
+            NO DISMISS CONTROL, and it does not need one: the case that actually
+            fires is a deleted root, and `.message.deleted` takes the whole row —
+            this line with it — moments later. Pressing the verb again replaces
+            it, and leaving the channel clears it. */}
+        {threadError !== null && (
+          <p className="mt-1 flex items-start gap-1.5 text-xs font-medium text-destructive">
+            <AlertCircle aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+            <span>{threadError}</span>
+          </p>
+        )}
 
         {/* THE SEND LADDER'S LAST RUNG, and the one place a write can outlive
             the right to make it. A row reaches `failed` while the viewer was a
@@ -631,6 +689,17 @@ export const MessageRow = memo(function MessageRow({
                     )}
                     {pinned ? 'Unpin from channel' : 'Pin to channel'}
                   </DropdownMenuItem>
+                  {/* BRANCHING IS A MENU VERB, NOT A FOURTH GLYPH. The cluster
+                      is three verbs by decree (see the docblock) and a seventh
+                      grey square was the complaint that produced it. It also
+                      needs a NAME: "start a thread" and "reply" are one glyph
+                      apart and worlds apart in what they do to the room. */}
+                  {canBranch && (
+                    <DropdownMenuItem onClick={() => actions.onOpenThread(message)}>
+                      <GitBranch aria-hidden className="size-4" />
+                      {message.thread ? 'Open thread' : 'Start a thread'}
+                    </DropdownMenuItem>
+                  )}
                   {sessionUuid && (
                     <DropdownMenuItem
                       onClick={() => actions.onViewAiSession(sessionUuid)}
@@ -795,6 +864,106 @@ function MessageEditBox({
  * to the count, and it is set in muted italics so the words "2 files" can never
  * be mistaken for something somebody typed.
  */
+/**
+ * The standing door into the thread branched from this message — the title, how
+ * big the conversation got, and whether any of it is new to this reader.
+ *
+ * ── A LINK, AND A BRANCH GLYPH, BECAUSE IT LEAVES ──────────────────────────
+ * {@link ReplyCountLine} sits directly under it and is a DISCLOSURE: a chevron,
+ * `aria-expanded`, answers that open in place. This one goes to another room.
+ * So it is an anchor — openable in a new tab, copyable, restorable by Back —
+ * and it wears the same `GitBranch` mark the thread's own opening block wears,
+ * never a chevron. A chevron promises expansion; that promise is already made,
+ * one line below, by something that keeps it.
+ *
+ * ── THE THREE UNREAD STATES, IN THE HOUSE'S EXISTING GRAMMAR ───────────────
+ * `my_unread_count` is `null`, `0` or `n`, and all three are different facts:
+ *
+ *   null  not following  → muted title. You have never spoken here; the thread
+ *                          is a door, not an obligation.
+ *   0     following, caught up → foreground title. It is yours, and it is quiet.
+ *   n     following, behind    → semibold title + the house gold dot.
+ *
+ * WEIGHT SAYS "DO YOU BELONG", THE DOT SAYS "IS THERE SOMETHING NEW" — the same
+ * two signals the space lobby's channel rows carry, so a reader learns them
+ * once. And the dot is a DOT: a gold NUMBER means a mention and only a mention
+ * everywhere in this product, and inventing a second numeric badge would spend
+ * that meaning on something that is not one.
+ *
+ * There is no Follow control, because there is no endpoint behind one. You
+ * follow a thread by posting in it (`POST /channels/{thread}/join` answers 422),
+ * so the only honest affordance is the door itself.
+ *
+ * A thread nobody has written in yet shows no count rather than "0 messages" —
+ * the same rule the reply line keeps, and a brand-new branch is legitimately
+ * empty until its starter says the first thing.
+ */
+/**
+ * THE TITLE IS USUALLY AN ECHO OF THE MESSAGE IT HANGS UNDER, AND IS DROPPED
+ * WHEN IT IS. Branching sends no title, so the server derives one from the root
+ * message's own opening — which means the line would repeat, word for word, the
+ * sentence sitting directly above it. (The `thread_started` system line further
+ * down says it a third time; that sentence is the server's and is rendered
+ * verbatim by rule, so this is the copy we can do something about.)
+ *
+ * It is NOT dropped unconditionally: a thread can be given a title of its own
+ * through the API, and that title is real information. The test is whether the
+ * message already opens with it — the server truncates with an ellipsis, so the
+ * comparison is against the title with any trailing ellipsis removed. When it
+ * is an echo the line says "Thread"; when it is not, it says what it is.
+ */
+function threadLineLabel(thread: MessageThreadStub, messageContent: string): string {
+  const title = thread.title.replace(/[….]+$/, '').trim();
+  if (title === '') return 'Thread';
+  return messageContent.trim().startsWith(title) ? 'Thread' : thread.title;
+}
+
+function ThreadLine({
+  thread,
+  messageContent,
+}: {
+  thread: MessageThreadStub;
+  messageContent: string;
+}) {
+  const unread = thread.my_unread_count;
+  const behind = unread !== null && unread > 0;
+  const label = threadLineLabel(thread, messageContent);
+  return (
+    <Link
+      href={`/channels/${thread.uuid}`}
+      title={thread.title}
+      className={cn(
+        'v2-interactive mt-1 -mx-1 flex w-fit max-w-full items-center gap-1.5 rounded px-1 py-0.5',
+        'text-xs',
+        'transition-colors duration-150 hover:bg-muted motion-reduce:transition-none',
+        FOCUS_RING,
+      )}
+    >
+      <GitBranch aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+      <span
+        className={cn(
+          'min-w-0 truncate',
+          unread === null
+            ? 'text-muted-foreground'
+            : behind
+              ? 'font-semibold text-foreground'
+              : 'text-foreground',
+        )}
+      >
+        {label}
+      </span>
+      {behind && <UnreadDot className="size-1.5" />}
+      {thread.message_count > 0 && (
+        <span className="shrink-0 text-muted-foreground">
+          {thread.message_count === 1
+            ? '1 message'
+            : `${thread.message_count} messages`}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 /**
  * "3 replies" — the one mark in the feed that says a message started something.
  *

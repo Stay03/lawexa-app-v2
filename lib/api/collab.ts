@@ -26,6 +26,7 @@ import type {
   CreateListPayload,
   CreateOrganizationPayload,
   CreateSpacePayload,
+  CreateThreadPayload,
   DiscoverSpacesParams,
   DiscoverSpacesResponse,
   InviteAcceptResponse,
@@ -344,6 +345,33 @@ export const channelsApi = {
     const response = await apiClient.post<ApiResponse<null>>(
       `/channels/${uuid}/leave`,
       {}
+    );
+    return response.data;
+  },
+
+  /**
+   * Start a thread in this channel — the CHANNEL is the collection, not the
+   * message, because a thread can be started with no message at all.
+   *
+   * IT RETURNS A CHANNEL, and a thread IS a channel: `/channels/{uuid}` is its
+   * address and every channel endpoint takes its uuid. `201` created it, `200`
+   * means this message already had one and that is the SAME OUTCOME to the
+   * person who pressed — both mean "you are in the thread for this message" —
+   * so callers must not tell them apart (measured on prod 2026-08-12: the same
+   * uuid comes back, with the message "This message already has a thread.").
+   *
+   * `422` is the real refusal, and it is a sentence worth showing: the branched
+   * message was not found in this channel (missing, foreign or deleted are
+   * folded into ONE answer so the endpoint is not an existence oracle), or the
+   * channel is itself a thread (branching is one level deep).
+   */
+  createThread: async (
+    uuid: string,
+    payload: CreateThreadPayload
+  ): Promise<ChannelResponse> => {
+    const response = await apiClient.post<ChannelResponse>(
+      `/channels/${uuid}/threads`,
+      payload
     );
     return response.data;
   },

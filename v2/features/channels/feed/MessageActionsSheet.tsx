@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   CornerUpLeft,
+  GitBranch,
   Pencil,
   Pin,
   PinOff,
@@ -39,6 +40,12 @@ import { LawexaMark } from '../ui/avatars';
  * (44px, the HIG floor) and closes the sheet on pick — one gesture in, one
  * gesture out. The verbs below it hold the desktop cluster's order, so the two
  * input worlds agree about where a SHARED action lives.
+ *
+ * STARTING A THREAD IS SUCH A SHARED ACTION (2026-08-12), and it sits beside
+ * Reply rather than at the foot of the list: the two are the ways to answer, and
+ * what separates them is only where the answer goes. It is absent inside a
+ * thread — the server refuses a branch of a branch — and it is the same label
+ * the pointer menu shows, which flips to "Open thread" once one exists.
  *
  * COPY TEXT IS THE ONE ACTION THAT IS TOUCH-ONLY, and it is not a nicety
  * (owner round, Aug 4). `.v2-touch-hold` suppresses the callout and — on coarse
@@ -78,8 +85,10 @@ export function MessageActionsSheet({
   message,
   canEdit,
   canDelete,
+  canBranch,
   onClose,
   onReply,
+  onOpenThread,
   onEdit,
   onDelete,
   onToggleReaction,
@@ -92,8 +101,12 @@ export function MessageActionsSheet({
   message: Message | null;
   canEdit: boolean;
   canDelete: boolean;
+  /** False inside a thread — the server refuses a branch of a branch. */
+  canBranch: boolean;
   onClose: () => void;
   onReply: (message: Message) => void;
+  /** Branch this message, or open the thread it already has. */
+  onOpenThread: (message: Message) => void;
   onEdit: (message: Message) => void;
   onDelete: (message: Message) => void;
   onToggleReaction: (message: Message, emoji: string) => void;
@@ -213,6 +226,21 @@ export function MessageActionsSheet({
             >
               <CornerUpLeft aria-hidden className="size-4" />
             </SheetAction>
+            {/* Next to Reply, because they are the two ways to answer and the
+                difference between them is where the answer goes: under this
+                message, or in a room of its own. Same verb and same label as the
+                pointer cluster's menu row — one action, two input worlds. */}
+            {canBranch && (
+              <SheetAction
+                label={message.thread ? 'Open thread' : 'Start a thread'}
+                onClick={() => {
+                  onClose();
+                  onOpenThread(message);
+                }}
+              >
+                <GitBranch aria-hidden className="size-4" />
+              </SheetAction>
+            )}
             <SheetAction
               label={saved ? 'Remove from saved' : 'Save message'}
               pressed={saved}

@@ -12,6 +12,7 @@ import type {
   ReactionToggledPayload,
   SlimUser,
   TaskList,
+  ThreadUpdatedPayload,
 } from '@/types/collab';
 import type {
   QuizAnswerProgressPayload,
@@ -32,6 +33,7 @@ import {
   applyMessageUpdated,
   applyPinState,
   applyReactionToggled,
+  applyThreadStub,
   noteChannelMembershipChanged,
 } from './cache';
 import {
@@ -122,6 +124,11 @@ import { channelQuizQueries } from './quiz/queries';
  *    list cannot be hand-patched).
  *  - `.ai.turn_started` / `.ai.turn_failed` → the responding-row machine
  *    (`./lawexa/turns.ts` holds the rules and the reasoning).
+ *
+ * THREADS ADDED ONE EVENT (2026-08-12). `.thread.updated` rides the PARENT's
+ * room and counts the stub under a root message up as people talk in the branch
+ * — the shared number only; the viewer's own unread tally cannot be broadcast
+ * and is never touched here.
  *
  * W6 BOUND THE LIVE-QUIZ SEAM (2026-08-04). The eight `.quiz.game.*` events
  * ride THIS room (digest §B — no second subscription exists or may exist), so
@@ -398,6 +405,31 @@ export function useChannelRoom(
     };
     room.listen('.message.pinned', onPinChanged);
     room.listen('.message.unpinned', onPinChanged);
+
+    /* ── The thread stub, counting up live (Threads T1.7) ─────────────────────
+          Broadcast on the PARENT's room, not the thread's, on purpose: the
+          people who need it are the ones looking at the feed the thread was
+          branched out of. Anyone inside the thread is already receiving its
+          `.message.created` events.
+
+          `my_unread_count` IS NOT IN THE PAYLOAD AND MUST NOT BE INVENTED. One
+          broadcast reaches every member of this room and a per-viewer tally
+          cannot be true for all of them, so the writer moves the shared count
+          and leaves the viewer's own alone (see `applyThreadStub`).
+
+          A STANDALONE THREAD IS A NO-OP HERE. `root_message_uuid: null` means
+          the thread hangs under no message, so there is no stub in this feed to
+          update — the event reaches the parent's room anyway (the threads list,
+          Phase 4, is what it is for) and this writer has nothing to do. */
+    room.listen('.thread.updated', (payload: ThreadUpdatedPayload) => {
+      if (payload.root_message_uuid === null) return;
+      applyThreadStub(queryClient, channelUuid, payload.root_message_uuid, {
+        uuid: payload.thread_uuid,
+        title: payload.title,
+        message_count: payload.message_count,
+        last_message_at: payload.last_message_at,
+      });
+    });
 
     /* ── Lawexa turns (§B, §F.6/§F.7) ───────────────────────────────────── */
 

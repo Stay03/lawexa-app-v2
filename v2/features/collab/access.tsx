@@ -182,7 +182,7 @@ export interface ThreadAccess extends ChannelAccess {
 }
 
 /**
- * Resolve a THREAD's access, which is its PARENT's access.
+ * Resolve a THREAD's access from the thread's own payload.
  *
  * ── WHY THIS IS NOT `channelAccess(thread)` ────────────────────────────────
  * That function reads `is_member` + `visibility`, and on a thread `is_member`
@@ -191,46 +191,67 @@ export interface ThreadAccess extends ChannelAccess {
  * its "Ask to join" — for someone who may read every word of it. It was the
  * wrong answer AND the wrong door: the ask 422s on a thread too.
  *
- * The server says it plainly in `ChannelPolicy`, as an explicit matrix rather
- * than by discovery: `view`, `previewMessages`, `viewMessages`, `post` and
- * `viewMembers` all delegate to the PARENT; `update`/`delete` belong to the
- * thread (its starter is its Owner member); `invite`/`manageMembers` are always
- * DENY. So read/participate come from the parent, verbatim — which is also why
- * a parent member who never followed a thread can still post, react and pin in
- * it. That is Slack-normal: the room may touch its own tangent.
+ * ── WHY IT IS NOT THE PARENT'S ACCESS EITHER, ANY MORE (2026-08-12) ────────
+ * It was, and correctly: `ChannelPolicy` delegates a thread's `view`,
+ * `previewMessages`, `viewMessages`, `post` and `viewMembers` to the PARENT, so
+ * the thread's own payload could not answer, and the screen had to fetch the
+ * parent's detail before it could paint a gate. The backend now publishes the
+ * answer itself — `can_read` and `can_post` are stamped from `$user->can(...)`
+ * on the very abilities the endpoints authorize — so this reads the POLICY
+ * rather than re-deriving it, and the derivation is gone rather than kept as a
+ * second opinion. Two sources for one question is how they drift.
  *
- * ── WHEN THE PARENT IS NOT THERE ───────────────────────────────────────────
- * `parent` is `null` while its detail is still resolving and after a refusal,
- * and the fallback is FOLLOW state — not because following grants anything, but
- * because it is PROOF: the reader posted in this thread, and `post` delegates
- * to the parent, so the parent let them. A non-follower with no parent is an
- * open question, and the honest answer to an open question is the refusal, not
- * a guess in either direction. The screen holds its pending frame until the
- * parent lands rather than painting either one.
+ * They also answer a case the derivation had to reason about and could only get
+ * right by accident: reading delegates to `previewMessages`, which admits a
+ * space member who never joined an OPEN parent, while posting delegates to
+ * `post`, which is active parent membership and nothing else. That viewer may
+ * read every thread in the channel and post in none, and `preview` is exactly
+ * that state. (Its mirror is still true and is why a thread is not `closed` for
+ * most people who have not spoken in it: a parent MEMBER can post, react and
+ * pin in a thread they never followed. The room may touch its own tangent.)
+ *
+ * ── ABSENT IS THE REFUSAL, NOT A GUESS ─────────────────────────────────────
+ * Both keys are `when()`-gated on a viewer context having been stamped, so a
+ * payload serialized without one carries neither. That is "we did not ask", and
+ * the honest answer to a question nobody asked is the designed refusal —
+ * `ThreadClosedState`, which names no wall and offers no action.
+ *
+ * `canReadLists` follows `can_post` rather than `can_read`, which keeps the
+ * channel model's ruling verbatim: list READS are not on the backend's open
+ * list, so they stay closed to anyone who cannot write (see the long note on
+ * {@link ChannelAccess}).
  */
 export function threadAccess(
-  thread: Pick<Channel, 'is_member'>,
-  parent: Pick<Channel, 'is_member' | 'visibility'> | null,
+  thread: Pick<Channel, 'is_member' | 'can_read' | 'can_post'>,
 ): ThreadAccess {
   const isFollowing = thread.is_member === true;
-  if (parent === null) {
-    return isFollowing
-      ? {
-          state: 'member',
-          canRead: true,
-          canParticipate: true,
-          canReadLists: true,
-          isFollowing,
-        }
-      : {
-          state: 'closed',
-          canRead: false,
-          canParticipate: false,
-          canReadLists: false,
-          isFollowing,
-        };
+  const canPost = thread.can_post === true;
+  const canRead = thread.can_read === true;
+  if (canPost) {
+    return {
+      state: 'member',
+      canRead: true,
+      canParticipate: true,
+      canReadLists: true,
+      isFollowing,
+    };
   }
-  return { ...channelAccess(parent), isFollowing };
+  if (canRead) {
+    return {
+      state: 'preview',
+      canRead: true,
+      canParticipate: false,
+      canReadLists: false,
+      isFollowing,
+    };
+  }
+  return {
+    state: 'closed',
+    canRead: false,
+    canParticipate: false,
+    canReadLists: false,
+    isFollowing,
+  };
 }
 
 /** Resolve {@link ChannelAccess} from a channel the server has already

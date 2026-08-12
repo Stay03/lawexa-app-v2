@@ -9,11 +9,13 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useRouter } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { ArrowDown, Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { extractApiError } from '@/lib/utils/api-error';
 import type { Channel, Message, SlimUser } from '@/types/collab';
 import type { ChannelReadReporter } from '@/v2/features/channels/mark-read';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
@@ -39,6 +41,7 @@ import { useEditChannelMessage, useDeleteChannelMessage, useSendChannelMessage, 
 import { canManageChannel, isLocalMessageUuid } from '../model';
 import { channelsQueries } from '../queries';
 import { outboxGet, useOutboxMessages } from '../send-outbox';
+import { useStartThread } from '../threads/mutations';
 import { ChannelFeedSkeleton, ChannelIntro, FeedErrorState } from '../screen/states';
 import { channelDisplayName } from '../thread-model';
 import { DayDivider, QuietSystemLine, UnreadDivider } from './FeedDivider';
@@ -245,6 +248,12 @@ export function ChannelFeed({
     channelsQueries.messages({ channelUuid: channel.uuid, viewerId }),
   );
 
+  /** A thread is a ROUTE (`/channels/{threadUuid}`) — the screen keys itself by
+   *  channel and remounts wholesale, and it is the same address the
+   *  notification dispatcher already pushes. So opening one is a push, not a
+   *  mode this component could hold. */
+  const router = useRouter();
+
   const editMutation = useEditChannelMessage(channel.uuid);
   const deleteMutation = useDeleteChannelMessage(channel.uuid);
   const retryMutation = useSendChannelMessage(channel.uuid);
@@ -252,6 +261,11 @@ export function ChannelFeed({
   const reactionMutation = useToggleReaction(channel.uuid);
   const pinMutation = useTogglePin(channel.uuid);
   const saveMutation = useToggleSave(channel.uuid);
+  const startThreadMutation = useStartThread(channel.uuid);
+  /** NO THREADS INSIDE THREADS. One level is the server's rule, not a taste —
+   *  `createThread` answers 422 from inside one — so the verb is absent rather
+   *  than present-and-failing, in both input worlds. */
+  const canBranch = !channel.is_thread;
 
   /* ── The transcript = cache pages + any outbox rows a refetch evicted.
         The cache is refetchable state (join-time reconcile, reconnect
@@ -390,6 +404,18 @@ export function ChannelFeed({
     [messages, sheetMessageUuid],
   );
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
+  /**
+   * The server's refusal when branching a message failed, and which message it
+   * was about — one at a time, exactly like the edit and the sheet, because two
+   * red sentences in one transcript would be two failures the reader has to
+   * sort out. This screen raises no toasts (the W2 house rule), so it is
+   * rendered under the message it concerns; see {@link MessageRow} for why it
+   * carries no dismiss control.
+   */
+  const [threadFailure, setThreadFailure] = useState<{
+    messageUuid: string;
+    message: string;
+  } | null>(null);
   /** "Select text": one row at a time, handed back to the platform's own
    *  selection. FEED-OWNED for exactly the reason the sheet is — "one at a
    *  time" is only a rule if one thing enforces it — but held as a DOM stamp
@@ -896,6 +922,7 @@ export function ChannelFeed({
   const reactionMutate = reactionMutation.mutate;
   const pinMutate = pinMutation.mutate;
   const saveMutate = saveMutation.mutate;
+  const startThreadMutate = startThreadMutation.mutate;
   const textSelectExit = textSelect.exit;
   const rowActions = useMemo<MessageRowActions>(
     () => ({
@@ -948,6 +975,41 @@ export function ChannelFeed({
         if (isLocalMessageUuid(message.uuid)) return;
         saveMutate({ messageUuid: message.uuid, saved: message.is_bookmarked !== true });
       },
+      /* ONE VERB, TWO PATHS, AND THE SHORT ONE IS THE COMMON ONE. A message
+         whose stub this feed already holds needs no request at all — the thread
+         exists, its uuid is in hand, and asking again would only be told so.
+         Everything else posts the branch and goes where the answer points,
+         whether the server created it (201) or handed back the one somebody
+         else started a second earlier (200): both mean "you are in the thread
+         for this message".
+
+         `isLocalMessageUuid` is the same belt-and-braces the three toggles
+         above keep. An outbox row has no server identity to branch, and the
+         cluster is already hidden while one is in flight. */
+      onOpenThread: (message) => {
+        if (isLocalMessageUuid(message.uuid)) return;
+        setThreadFailure(null);
+        const existing = message.thread;
+        if (existing) {
+          router.push(`/channels/${existing.uuid}`);
+          return;
+        }
+        startThreadMutate(
+          { rootMessageUuid: message.uuid },
+          {
+            onSuccess: (response) =>
+              router.push(`/channels/${response.data.uuid}`),
+            // The server's own sentence, under the message it is about: the
+            // root was deleted between the render and the press, or this
+            // channel is itself a thread. Neither is worth a generic apology.
+            onError: (error) =>
+              setThreadFailure({
+                messageUuid: message.uuid,
+                message: extractApiError(error).message,
+              }),
+          },
+        );
+      },
       onViewAiSession,
       // A PUSH, so Back closes the viewer — and `show` is idempotent, so a
       // double-tapped tile still costs exactly one entry.
@@ -963,6 +1025,13 @@ export function ChannelFeed({
       reactionMutate,
       pinMutate,
       saveMutate,
+      startThreadMutate,
+      router,
+      // The setter is listed for the reason `ChannelScreen` states on its own
+      // callbacks: a `useState` setter's identity never changes, but an
+      // inferred dependency missing from the source array makes the React
+      // Compiler skip optimising the whole component.
+      setThreadFailure,
       onViewAiSession,
       showImage,
       textSelectExit,
@@ -1112,8 +1181,11 @@ export function ChannelFeed({
                         virtualize={groupOrdinal <= groupCount - 1 - UNVIRTUALIZED_TAIL}
                         viewerUuid={viewerUuid}
                         canEngage={canParticipate}
+                        canBranch={canBranch}
                         isChannelAdmin={isChannelAdmin}
                         editingUuid={editingUuid}
+                        threadErrorUuid={threadFailure?.messageUuid ?? null}
+                        threadError={threadFailure?.message ?? null}
                         actions={rowActions}
                       />
                     );
@@ -1226,8 +1298,10 @@ export function ChannelFeed({
             message={sheetMessage}
             canEdit={sheetIsMine}
             canDelete={sheetIsMine || isChannelAdmin}
+            canBranch={canBranch}
             onClose={() => setSheetMessageUuid(null)}
             onReply={(message) => onStartReply(message)}
+            onOpenThread={rowActions.onOpenThread}
             onEdit={(message) => setEditingUuid(message.uuid)}
             onDelete={(message) => setDeleteTarget(message)}
             onToggleReaction={rowActions.onToggleReaction}

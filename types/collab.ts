@@ -245,9 +245,6 @@ export interface ChannelSpaceRef {
  * history. Deliberately the `reply_to` shape and discipline (the backend says so
  * in its own words), minus the fields that shape does not need here.
  *
- * IT CARRIES NO `created_at`, measured against the resource on 2026-08-12: the
- * root has no time on it, so nothing may date it.
- *
  * `content_preview` is `null` — never `""` — once the root is soft-deleted, and
  * the author is KEPT in that case: "branched from a deleted message from X" is
  * more use than a blank. ~200 chars, ellipsised, the same cut `reply_to` makes.
@@ -260,6 +257,13 @@ export interface ThreadRootMessage {
   content_preview: string | null;
   is_deleted: boolean;
   type?: MessageType;
+  /**
+   * When the ROOT was written — not when the thread was branched off it, which
+   * can be days later and is the thread's own `created_at` (backend 2026-08-12;
+   * measured on prod the same day). Optional because a payload that predates
+   * that deploy omits it.
+   */
+  created_at?: string;
 }
 
 export interface Channel {
@@ -279,17 +283,42 @@ export interface Channel {
    * channel's message. A thread IS a channel: every channel endpoint takes its
    * uuid, and `/channels/{threadUuid}` is its address.
    *
-   * The five fields below it are its own; all of them are `when($isThread)` on
-   * the wire and therefore absent on an ordinary channel.
+   * Every field below it down to `root_message_uuid` is its own; all of them
+   * are `when($isThread)` on the wire and therefore absent on an ordinary
+   * channel.
    */
   is_thread: boolean;
+  /**
+   * MAY THIS VIEWER READ THIS THREAD — and, below it, write in it (backend
+   * 2026-08-12, measured on prod the same day). Thread-only: both are absent on
+   * an ordinary channel, and absent on any thread payload serialized without a
+   * viewer context. Absent therefore means "the server was not asked", which
+   * `threadAccess` answers with the refusal rather than a guess.
+   *
+   * THEY REPLACE A DERIVATION, AND THEY ARE NOT THE SAME THING AS `is_member`.
+   * On a thread `is_member` is FOLLOW state — it carries the read pointer and
+   * the badges — and it is FALSE for every parent member who has not spoken
+   * here yet, who may nevertheless read every word and post freely. These two
+   * are stamped from `$user->can(...)` on the very abilities the endpoints
+   * authorize, so they cannot promise what the next request refuses.
+   *
+   * TWO BOOLEANS AND NOT ONE, because the policy separates them: reading
+   * delegates to `previewMessages` on the parent, which also admits a space
+   * member who never joined an OPEN parent, while posting delegates to `post`,
+   * which is active parent membership and nothing else. That viewer reads the
+   * tangent and cannot answer in it.
+   */
+  can_read?: boolean;
+  can_post?: boolean;
   /** The channel this thread was branched out of — the way back. */
   parent_channel_uuid?: string | null;
   /**
    * The parent's name, so the way back can be a LABEL rather than a uuid
-   * (backend 2026-08-12). Treated as optional and degraded around: a client that
-   * has not seen this deploy — or a payload that omits it — must fall back to
-   * reading the parent channel itself rather than printing a placeholder.
+   * (backend 2026-08-12; measured on prod, present on the thread show AND on
+   * the threads listing, and NOT withheld by the metadata trim). Optional
+   * because the field postdates the first threads deploy; a payload that omits
+   * it leaves the way back unlabelled rather than fetching the parent to name
+   * it.
    */
   parent_channel_name?: string | null;
   /** The thread's human title, derived by the server from its root message. */
@@ -301,6 +330,18 @@ export interface Channel {
    * not null) from a viewer who may see that the tangent exists but not read it.
    */
   root_message?: ThreadRootMessage | null;
+  /**
+   * The same uuid as `root_message.uuid`, flat (backend 2026-08-12), so "was
+   * this thread ever anchored to a message" is answerable without reaching into
+   * an object that may itself be null.
+   *
+   * WITHHELD UNDER THE SAME TRIM as the preview — absent, not null — because
+   * the root lives in the parent, and handing its uuid to somebody who may not
+   * read that parent would say "a message with this id exists in a room you
+   * cannot enter". `null` is a real answer here (standalone, or a hard-deleted
+   * root), so a trimmed payload must not be mistaken for one.
+   */
+  root_message_uuid?: string | null;
   description: string | null;
   visibility: ChannelVisibility;
   visibility_label: string;
@@ -535,6 +576,39 @@ export interface MessageAttachment {
   created_at: string;
 }
 
+/**
+ * The thread branched from ONE message, as the parent's feed sees it (backend
+ * 2026-08-12) — the standing door under the bubble, and the only thing about a
+ * thread that appears in the parent's transcript at all. A thread's messages
+ * are not in that list and never were: they carry the THREAD's `channel_uuid`.
+ *
+ * ── `message_count` IS SHARED, `my_unread_count` IS NOT ────────────────────
+ * The count of messages is the same number for everybody. The unread tally is
+ * per-viewer, and it is the reason the whole stub is omitted from broadcasts —
+ * exactly as `reactions` are, and for exactly the same reason: the per-viewer
+ * half cannot be broadcast. The live `.thread.updated` event carries the shared
+ * count only, so a writer fed by it must leave `my_unread_count` alone.
+ */
+export interface MessageThreadStub {
+  /** The thread's own uuid. A thread IS a channel, so this addresses
+   *  `/channels/{uuid}` and every channel endpoint. */
+  uuid: string;
+  /** The human title (never the `thread--{uuid}` slug), ≤120 chars. */
+  title: string;
+  /** How many messages are in the thread — shared, the same for everyone. */
+  message_count: number;
+  /**
+   * How many of them this viewer has not read. THREE STATES, ALL DIFFERENT:
+   * `null` = they do not follow the thread (following is granted by posting in
+   * it, and it is what buys a read pointer at all); `0` = they follow it and
+   * are caught up; `n` = they follow it and are behind. `null` and `0` are NOT
+   * the same and must not draw the same.
+   */
+  my_unread_count: number | null;
+  /** ISO time of the newest message in the thread; `null` when it has none. */
+  last_message_at: string | null;
+}
+
 export interface Message {
   uuid: string;
   channel_uuid: string;
@@ -598,6 +672,21 @@ export interface Message {
   reply_count?: number;
   /** ISO time of the newest reply; absent when there are none. */
   last_reply_at?: string | null;
+
+  /**
+   * The thread branched from this message ({@link MessageThreadStub}), under
+   * the SAME transport rules as `reply_count` above and for the same reason —
+   * it is hydrated per page by the lists that look, and OMITTED (never nulled)
+   * everywhere nothing looked.
+   *
+   * SO THE THREE VALUES MEAN THREE THINGS. `undefined` = this payload did not
+   * say, so a cached stub must be carried across rather than blanked
+   * (`mergeViewerFields`); `null` = this message has no thread, which is the
+   * server actually saying so; an object = it has one. A writer that reads a
+   * missing key as `null` would strip the thread line off every open screen the
+   * moment somebody fixed a typo in the message.
+   */
+  thread?: MessageThreadStub | null;
 
   /**
    * Files this message carries (backend, 2026-08-05), in the order the sender
@@ -771,6 +860,28 @@ export interface MessagePinPayload {
   is_pinned: boolean;
   pinned_by_uuid: string | null;
   pinned_at: string | null;
+}
+
+/**
+ * `.thread.updated` on the PARENT channel's presence room (backend
+ * 2026-08-12) — a message was posted into one of its threads, or deleted from
+ * one, so the stub under the root message counts up live.
+ *
+ * IT IS THE {@link MessageThreadStub} SHAPE MINUS THE PER-VIEWER HALF, plus the
+ * two uuids that say which message in this feed it belongs under. There is no
+ * `my_unread_count` and there cannot be: one broadcast reaches every member of
+ * the room. A writer fed by this must leave the viewer's tally untouched.
+ *
+ * `root_message_uuid` is `null` for a STANDALONE thread — one started with no
+ * message behind it, which has no stub in the parent's feed to update.
+ */
+export interface ThreadUpdatedPayload {
+  parent_channel_uuid: string;
+  thread_uuid: string;
+  root_message_uuid: string | null;
+  title: string;
+  message_count: number;
+  last_message_at: string | null;
 }
 
 /**
@@ -958,6 +1069,26 @@ export interface UpdateChannelPayload {
   description?: string;
   visibility?: ChannelVisibility;
   settings?: Record<string, unknown>;
+}
+
+/**
+ * `POST /channels/{uuid}/threads` — one endpoint, two shapes (backend ruling
+ * 2026-08-12).
+ *
+ * WITH `root_message_uuid` the thread is BRANCHED from that message, and the
+ * server derives the title from the message's own first line — so a branch
+ * sends no title at all. The call is IDEMPOTENT on the root: a message that
+ * already has a live thread comes back with 200 instead of 201, so two people
+ * tapping the same message land in the same room.
+ *
+ * WITHOUT it the thread STANDS ALONE, `title` is required (there is nothing to
+ * borrow words from) and every call makes a new one — there is no identity to
+ * collapse onto.
+ */
+export interface CreateThreadPayload {
+  root_message_uuid?: string;
+  /** ≤120 chars. Required only for a standalone thread. */
+  title?: string;
 }
 
 /******************************************************************************

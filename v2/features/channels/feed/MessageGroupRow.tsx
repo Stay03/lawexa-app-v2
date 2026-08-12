@@ -64,8 +64,11 @@ export const MessageGroupRow = memo(function MessageGroupRow({
   virtualize,
   viewerUuid,
   canEngage,
+  canBranch,
   isChannelAdmin,
   editingUuid,
+  threadErrorUuid,
+  threadError,
   actions,
 }: {
   author: SlimUser | null;
@@ -78,8 +81,15 @@ export const MessageGroupRow = memo(function MessageGroupRow({
   /** False in the feed's read-only mode — a plain boolean rather than the
    *  access object, so the row's `memo` still holds across re-renders. */
   canEngage: boolean;
+  /** False inside a thread — the server refuses a branch of a branch. */
+  canBranch: boolean;
   isChannelAdmin: boolean;
   editingUuid: string | null;
+  /** Which message a branch was refused on, and the server's sentence for it.
+   *  Two primitives rather than an object so this memo holds: an object would
+   *  be a fresh reference on every feed render for every group on screen. */
+  threadErrorUuid: string | null;
+  threadError: string | null;
   actions: MessageRowActions;
 }) {
   const first = messages[0];
@@ -156,6 +166,7 @@ export const MessageGroupRow = memo(function MessageGroupRow({
                 key={message.uuid}
                 message={message}
                 canEngage={canEngage}
+                canBranch={canBranch}
                 isMine={isMine}
                 canDelete={isMine || isChannelAdmin}
                 viewerUuid={viewerUuid}
@@ -163,6 +174,9 @@ export const MessageGroupRow = memo(function MessageGroupRow({
                 // second time on the same line would be the same fact twice.
                 showGutterTime={index > 0}
                 editing={editingUuid === message.uuid}
+                threadError={
+                  threadErrorUuid === message.uuid ? threadError : null
+                }
                 actions={actions}
               />
             );
