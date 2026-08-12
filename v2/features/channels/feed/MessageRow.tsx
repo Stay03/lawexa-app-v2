@@ -1,13 +1,13 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useId, useState } from 'react';
 import {
   AlertCircle,
   AtSign,
   Bookmark,
+  ChevronRight,
   CornerUpLeft,
   Loader2,
-  MessagesSquare,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -36,6 +36,7 @@ import {
 } from '../model';
 import { useSendState } from '../send-outbox';
 import { useHeldValue } from '../use-held-value';
+import { InlineReplies } from './InlineReplies';
 import { LawexaMessageContent } from './LawexaMessageContent';
 import { MESSAGE_MEASURE } from './measure';
 import { MessageAttachments } from './MessageAttachments';
@@ -143,10 +144,9 @@ export interface MessageRowActions {
   onDiscardFailed: (localUuid: string) => void;
   /** Touch long-press → the feed's single action sheet. */
   onOpenActions: (message: Message) => void;
-  /** Tap a reply quote → jump to (and wash) the quoted message. */
+  /** Tap a reply quote, or a row in a message's opened answers → jump to (and
+   *  wash) that message. */
   onJumpToMessage: (messageUuid: string) => void;
-  /** Open the conversation hanging off this message. */
-  onOpenReplies: (message: Message) => void;
   /** Toggle one emoji on this message (the exact string, §F.9). */
   onToggleReaction: (message: Message, emoji: string) => void;
   /** Pin / unpin for everyone — any active member may do both (§C). */
@@ -201,6 +201,10 @@ export const MessageRow = memo(function MessageRow({
 }) {
   const sendState = useSendState(message.uuid);
   const saveThrottled = useEngagementThrottled('bookmark');
+  /** Per-row and deliberately local: opening one message's answers is not a
+   *  place you can be linked to, and the feed has no business remembering it. */
+  const [repliesOpen, setRepliesOpen] = useState(false);
+  const repliesRegionId = useId();
 
   const hasText = message.content !== '';
   const attachments = message.attachments ?? EMPTY_ATTACHMENTS;
@@ -439,8 +443,38 @@ export const MessageRow = memo(function MessageRow({
 
         <ReplyCountLine
           count={message.reply_count}
-          onOpen={() => actions.onOpenReplies(message)}
+          open={repliesOpen}
+          regionId={repliesRegionId}
+          onToggle={() => setRepliesOpen((wasOpen) => !wasOpen)}
         />
+
+        {/* Opens and CLOSES as a tween, which is why the list stays mounted
+            rather than being swapped in on `repliesOpen` — an unmount cannot
+            animate. It costs nothing while shut: the query inside is
+            `enabled: open`, so a feed full of answered messages is silent
+            until a reader actually asks one of them. */}
+        {(message.reply_count ?? 0) > 0 && (
+          <div
+            aria-hidden={!repliesOpen}
+            inert={!repliesOpen}
+            className={cn(
+              'grid transition-[grid-template-rows,opacity] duration-200 ease-out',
+              'motion-reduce:transition-none',
+              repliesOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+            )}
+          >
+            <div className="overflow-hidden">
+              <InlineReplies
+                channelUuid={message.channel_uuid}
+                rootUuid={message.uuid}
+                count={message.reply_count ?? 0}
+                open={repliesOpen}
+                regionId={repliesRegionId}
+                onJump={actions.onJumpToMessage}
+              />
+            </div>
+          </div>
+        )}
 
         {/* See the docblock: a hint, writer-only, never red, nothing to press,
             and always mounted so an edit can open or close it as a tween. */}
@@ -775,19 +809,30 @@ function MessageEditBox({
  * It is a button because it opens something, and it is quiet because most
  * messages in a busy channel have replies and a loud badge on every third row
  * would be worse than the noise it is meant to organise.
+ *
+ * IT IS A DISCLOSURE, NOT A DOORWAY. It opens the answers underneath the
+ * message it belongs to (`InlineReplies`); it used to raise a side sheet, which
+ * the owner rejected for covering the room. The chevron is what tells a reader
+ * that pressing expands rather than navigates away.
  */
 function ReplyCountLine({
   count,
-  onOpen,
+  open,
+  regionId,
+  onToggle,
 }: {
   count: number | undefined;
-  onOpen: () => void;
+  open: boolean;
+  regionId: string;
+  onToggle: () => void;
 }) {
   if (!count) return null;
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={regionId}
       className={cn(
         'v2-interactive mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 -mx-1',
         'text-xs font-medium text-primary',
@@ -795,7 +840,13 @@ function ReplyCountLine({
         FOCUS_RING,
       )}
     >
-      <MessagesSquare aria-hidden className="size-3.5" />
+      <ChevronRight
+        aria-hidden
+        className={cn(
+          'size-3.5 transition-transform duration-200 motion-reduce:transition-none',
+          open && 'rotate-90',
+        )}
+      />
       {count === 1 ? '1 reply' : `${count} replies`}
     </button>
   );

@@ -55,7 +55,6 @@ import {
   PinnedMessagesSheet,
   SavedMessagesSheet,
 } from '../panels/MessageCollectionSheet';
-import { RepliesSheet } from '../panels/RepliesSheet';
 import {
   useDeleteChannel,
   useJoinChannel,
@@ -276,25 +275,11 @@ export function ChannelScreen({
    *  {@link ChannelClosedState} for why storing it any longer would go stale. */
   const [askedToJoin, setAskedToJoin] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
-  /**
-   * The message whose replies are being read.
-   *
-   * HELD AS THE MESSAGE, NOT AS A UUID IN THE URL, and deliberately so. Every
-   * other panel here is a place (`members`, `pinned`); this one is a lens on one
-   * row of a feed that may not be loaded on a fresh page load. A `?panel=` value
-   * would promise a deep link that could not always be honoured — the same trap
-   * the `?m=` jump already has, where an old message may be beyond the pages we
-   * hold. Keeping it in state means the panel can only be opened from a row that
-   * is on screen, which is the only case that can actually work.
-   */
-  const [repliesRoot, setRepliesRoot] = useState<Message | null>(null);
-  /** `setRepliesRoot` is listed for the reason given on {@link selectTab}. */
-  const openReplies = useCallback(
-    (message: Message) => {
-      setRepliesRoot(message);
-    },
-    [setRepliesRoot],
-  );
+  /* A message's replies are NOT a panel and are not held here. They open in
+     place, under the message, inside the row itself (`InlineReplies`). This
+     screen once owned a `repliesRoot` for a side sheet; the sheet was rejected
+     for covering the room, and nothing above the row needs to know which
+     message a reader has expanded. */
   const composerRef = useRef<ChannelComposerHandle>(null);
   const feedRef = useRef<ChannelFeedHandle>(null);
 
@@ -904,7 +889,6 @@ export function ChannelScreen({
               // who can actually complete it.
               onAddPeople={canManage ? () => panel.show('members') : undefined}
               onViewAiSession={openAiSession}
-              onOpenReplies={openReplies}
               onOpenGame={openGame}
               composer={
                 canParticipate ? (
@@ -1113,16 +1097,6 @@ export function ChannelScreen({
         viewerId={viewerId}
         viewerUuid={viewerUuid}
         {...panel.bind('members')}
-      />
-
-      <RepliesSheet
-        channelUuid={channel.uuid}
-        root={repliesRoot}
-        viewerUuid={viewerUuid}
-        open={repliesRoot !== null}
-        onOpenChange={(next) => {
-          if (!next) setRepliesRoot(null);
-        }}
       />
 
       {/* The other end of "Ask to join". Gated on the same `canManage` as its
