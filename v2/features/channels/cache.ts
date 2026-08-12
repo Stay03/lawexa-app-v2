@@ -97,7 +97,24 @@ export function mergeViewerFields(previous: Message, incoming: Message): Message
   const needsPin = incoming.is_pinned === undefined && previous.is_pinned !== undefined;
   const needsAttachments =
     incoming.attachments === undefined && previous.attachments !== undefined;
-  if (!needsBookmark && !needsReactions && !needsPin && !needsAttachments) {
+  /* THE REPLY TALLY RIDES LISTS AND NOTHING ELSE (backend, 2026-08-12). It is
+     omitted — not zeroed — on broadcasts and on the send/edit responses, so
+     without this an edit would silently strip "3 replies" off a message on
+     every screen that had it open. Same failure as the bookmark wipe that made
+     this function necessary, which is why it belongs here rather than in a
+     special case at the edit call site. */
+  const needsReplyCount =
+    incoming.reply_count === undefined && previous.reply_count !== undefined;
+  const needsLastReply =
+    incoming.last_reply_at === undefined && previous.last_reply_at !== undefined;
+  if (
+    !needsBookmark &&
+    !needsReactions &&
+    !needsPin &&
+    !needsAttachments &&
+    !needsReplyCount &&
+    !needsLastReply
+  ) {
     return incoming;
   }
   return {
@@ -106,6 +123,8 @@ export function mergeViewerFields(previous: Message, incoming: Message): Message
     ...(needsReactions ? { reactions: previous.reactions } : {}),
     ...(needsPin ? { is_pinned: previous.is_pinned } : {}),
     ...(needsAttachments ? { attachments: previous.attachments } : {}),
+    ...(needsReplyCount ? { reply_count: previous.reply_count } : {}),
+    ...(needsLastReply ? { last_reply_at: previous.last_reply_at } : {}),
   };
 }
 

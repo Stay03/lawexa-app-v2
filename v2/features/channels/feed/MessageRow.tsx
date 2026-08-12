@@ -7,6 +7,7 @@ import {
   Bookmark,
   CornerUpLeft,
   Loader2,
+  MessagesSquare,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -144,6 +145,8 @@ export interface MessageRowActions {
   onOpenActions: (message: Message) => void;
   /** Tap a reply quote → jump to (and wash) the quoted message. */
   onJumpToMessage: (messageUuid: string) => void;
+  /** Open the conversation hanging off this message. */
+  onOpenReplies: (message: Message) => void;
   /** Toggle one emoji on this message (the exact string, §F.9). */
   onToggleReaction: (message: Message, emoji: string) => void;
   /** Pin / unpin for everyone — any active member may do both (§C). */
@@ -432,6 +435,11 @@ export const MessageRow = memo(function MessageRow({
           reactions={message.reactions}
           readOnly={!canEngage}
           onToggle={(emoji) => actions.onToggleReaction(message, emoji)}
+        />
+
+        <ReplyCountLine
+          count={message.reply_count}
+          onOpen={() => actions.onOpenReplies(message)}
         />
 
         {/* See the docblock: a hint, writer-only, never red, nothing to press,
@@ -753,6 +761,46 @@ function MessageEditBox({
  * to the count, and it is set in muted italics so the words "2 files" can never
  * be mistaken for something somebody typed.
  */
+/**
+ * "3 replies" — the one mark in the feed that says a message started something.
+ *
+ * ── ABSENT IS NOT ZERO, AND THAT IS THE WHOLE CARE HERE ────────────────────
+ * `reply_count` rides message LISTS and is omitted from broadcasts and from the
+ * send/edit responses. `undefined` therefore means "this payload did not say",
+ * not "none" — and the cache carries the old value across rather than letting a
+ * typo fix blank it (`mergeViewerFields`). This renders nothing for `undefined`
+ * AND nothing for `0`, which look the same on screen and should: a message
+ * nobody answered wears no mark at all.
+ *
+ * It is a button because it opens something, and it is quiet because most
+ * messages in a busy channel have replies and a loud badge on every third row
+ * would be worse than the noise it is meant to organise.
+ */
+function ReplyCountLine({
+  count,
+  onOpen,
+}: {
+  count: number | undefined;
+  onOpen: () => void;
+}) {
+  if (!count) return null;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        'v2-interactive mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 -mx-1',
+        'text-xs font-medium text-primary',
+        'transition-colors duration-150 hover:bg-primary/10 motion-reduce:transition-none',
+        FOCUS_RING,
+      )}
+    >
+      <MessagesSquare aria-hidden className="size-3.5" />
+      {count === 1 ? '1 reply' : `${count} replies`}
+    </button>
+  );
+}
+
 function ReplyQuote({
   replyTo,
   onJump,

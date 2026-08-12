@@ -39,6 +39,7 @@ import type {
   MemberResponse,
   MessageListParams,
   MessageListResponse,
+  MessageRepliesResponse,
   MessageResponse,
   MyOrganizationResponse,
   NotifyLevelPayload,
@@ -558,6 +559,24 @@ export const invitationsApi = {
 
 /** Channel messages — cursor paginated, newest-first. */
 export const messagesApi = {
+  /**
+   * One message's replies, oldest first — the conversation hanging off it.
+   *
+   * PAGE-BASED, not the cursor the feed uses. Do not copy the feed's paging
+   * code onto it; they are different shapes and measured as such.
+   */
+  replies: async (
+    channelUuid: string,
+    messageUuid: string,
+    page = 1
+  ): Promise<MessageRepliesResponse> => {
+    const response = await apiClient.get<MessageRepliesResponse>(
+      `/channels/${channelUuid}/messages/${messageUuid}/replies`,
+      { params: { page } }
+    );
+    return response.data;
+  },
+
   list: async (
     channelUuid: string,
     params: MessageListParams = {}

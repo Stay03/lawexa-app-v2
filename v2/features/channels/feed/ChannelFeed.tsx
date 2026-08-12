@@ -202,6 +202,8 @@ export interface ChannelFeedProps {
   onAddPeople?: () => void;
   /** Open the sessions sheet on one session (screen-owned surface). */
   onViewAiSession: (sessionUuid: string) => void;
+  /** Open the conversation hanging off a message — the screen owns the panel. */
+  onOpenReplies: (message: Message) => void;
   /** Open the channel's live-quiz mode on a game (screen-owned `?game=`) —
    *  the quiz system cards' Join / results action (W6). */
   onOpenGame: (gameUuid: string) => void;
@@ -223,6 +225,7 @@ export function ChannelFeed({
   onOpenRoster,
   onAddPeople,
   onViewAiSession,
+  onOpenReplies,
   onOpenGame,
   ref,
 }: ChannelFeedProps) {
@@ -926,6 +929,12 @@ export function ChannelFeed({
       onJumpToMessage: (messageUuid) => {
         flashMessage(messageUuid);
       },
+      // An unacknowledged row has no server uuid to ask about, and cannot have
+      // been replied to yet either.
+      onOpenReplies: (message) => {
+        if (isLocalMessageUuid(message.uuid)) return;
+        onOpenReplies(message);
+      },
       // Engagement never applies to an unacknowledged row — there is no server
       // uuid to address yet. The cluster is already hidden while a row is in
       // the outbox (`canAct`), so this guard is belt-and-braces for the sheet.
@@ -957,6 +966,7 @@ export function ChannelFeed({
       pinMutate,
       saveMutate,
       onViewAiSession,
+      onOpenReplies,
       showImage,
       textSelectExit,
     ],

@@ -494,6 +494,24 @@ export interface Message {
   /** Per-viewer reaction buckets; feed ONLY, never broadcast (3f). */
   reactions?: MessageReaction[];
 
+  /* ── How many answers this message drew (backend 2026-08-12) ──────────────
+     `reply_count` and `last_reply_at` ride every message LIST so the feed can
+     draw "3 replies" without asking a second question.
+
+     THEY ARE OMITTED, NOT ZEROED, on broadcasts and on the send/edit responses
+     — measured on prod, and the backend's doc leads on it. So `undefined` here
+     means UNKNOWN, never none: reading a missing key as 0 would wipe a real
+     "3 replies" line off every open screen the moment somebody fixed a typo in
+     the message. `mergeViewerFields` carries them across exactly like the
+     bookmark and reaction fields above, for the same reason and in the same
+     place.
+
+     Deleted replies count for neither. A reply can itself carry a count — the
+     data is a tree — but the panel deliberately reads one level. */
+  reply_count?: number;
+  /** ISO time of the newest reply; absent when there are none. */
+  last_reply_at?: string | null;
+
   /**
    * Files this message carries (backend, 2026-08-05), in the order the sender
    * listed them — `attachment_ids` order is preserved server-side (measured) —
@@ -1043,6 +1061,24 @@ export type ChannelMemberListResponse = LengthAwareResponse<Member>;
 export type SpaceMemberListResponse = LengthAwareResponse<Member>;
 export type MemberResponse = ItemResponse<Member>;
 export type MessageListResponse = CursorResponse<Message>;
+
+/**
+ * One message's replies.
+ *
+ * PAGE-BASED, NOT CURSOR-BASED, unlike the channel feed — measured against prod
+ * (`{current_page, per_page, total, last_page, from, to}`, 30 a page). Worth
+ * stating because everything else about messages in this app is a cursor, and
+ * the two paginations are not interchangeable.
+ *
+ * OLDEST FIRST, also unlike the feed, which is newest-first and reversed on the
+ * client. A conversation is read downwards, so this arrives in reading order and
+ * needs no flipping.
+ *
+ * Rows are FULLY HYDRATED — bookmarks, reactions, attachments, their own reply
+ * counts — so the panel can render them with the same row component as the feed
+ * rather than a thinner copy of it.
+ */
+export type MessageRepliesResponse = LengthAwareResponse<Message>;
 export type MessageResponse = ItemResponse<Message>;
 /** `data` of a message-send response — a Message plus an optional AI dispatch. */
 export type SentMessage = Message & { ai?: AiDispatch };
