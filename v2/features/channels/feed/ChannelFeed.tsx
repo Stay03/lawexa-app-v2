@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { ArrowDown, Loader2, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -113,9 +113,37 @@ import {
  *
  * DEEP LINKS (`?m=`, W1 carry-forward N5): the target is flash-washed via a
  * DOM `data-flash` attribute (no React state — rows stay memo-stable and the
- * wash can't re-render the list). A target older than the loaded pages pulls
- * up to {@link TARGET_FETCH_PAGE_CAP} older pages before giving up silently —
- * mention deep-links overwhelmingly point into the newest page.
+ * wash can't re-render the list).
+ *
+ * ── REACHING A MESSAGE THAT IS NOT LOADED (2026-08-12) ─────────────────────
+ * There are four ways a reader asks to be taken to a message — a `?m=` deep
+ * link, the pinned/saved panels, a reply quote, a row in the replies index —
+ * and since this wave there is ONE path behind all four ({@link
+ * ChannelFeedProps.ref} and `rowActions.onJumpToMessage` are the same
+ * callback). What that path does depends on where the message is:
+ *
+ *  1. ON SCREEN — flash it. No request, no state.
+ *  2. NOT LOADED — open a WINDOW around it: `GET .../messages?around_message_uuid=`
+ *     answers with the page it sits on plus roughly half a page either side, in
+ *     ONE request. Measured 2026-08-12: the jump that used to cost five page
+ *     pulls (and often failed anyway) now costs one.
+ *  3. THE WINDOW ROUTE FAILED for any reason other than the server's refusal —
+ *     fall back to the old bounded hunt, up to {@link TARGET_FETCH_PAGE_CAP}
+ *     older pages.
+ *  4. 422, or history exhausted — the message is not in this channel. Say so.
+ *
+ * A WINDOW IS A SECOND CACHE ENTRY, NOT A SPLICE (`queries.ts` states the key
+ * geography). Grafting the window onto the live pages would put the jumped-to
+ * message directly under the oldest loaded one with a gap of unfetched history
+ * between them and nothing saying so. So the feed shows EITHER the live
+ * transcript OR one contiguous window, and `readingThePast` — derived from the
+ * pages themselves, never tracked — is which. While the past is on screen the
+ * read pointer reports nothing (the foot of a window is not the newest
+ * message), unacknowledged sends stay in the outbox rather than being drawn
+ * under a message from last week, and the jump pill becomes "Jump to present".
+ * Paging works in BOTH directions from a window, on the two cursors it came
+ * back with; paging one all the way up to the present turns it back into a live
+ * transcript with no state change anywhere.
  *
  * W3 ADDITIONS:
  *  - ENGAGEMENT: react / pin / save dispatchers join the stable row-actions
@@ -128,10 +156,10 @@ import {
  *    mark-read sentinel. Watching is feed-local single-slot state — one glance
  *    at a time keeps the transcript readable, and the panel is lazy anyway.
  *  - JUMP HANDLE: {@link ChannelFeedHandle} lets the screen's pinned/saved
- *    panels land on a message. It reuses the SAME bounded page-pull the `?m=`
- *    deep link uses, so a pin from last week resolves exactly like a
- *    notification link — and, unlike a URL write, it costs no navigation and
- *    can't fight the router's cached search params.
+ *    panels land on a message. It reuses the SAME resolver the `?m=` deep link
+ *    uses, so a pin from last week resolves exactly like a notification link —
+ *    and, unlike a URL write, it costs no navigation and can't fight the
+ *    router's cached search params.
  *
  * SELECT TEXT (@arthur, 2026-08-07) gives one message's words back to the
  * finger, and it is owned here for the same reason the action sheet is: only
@@ -162,14 +190,19 @@ const BOTTOM_THRESHOLD_PX = 80;
 const UNVIRTUALIZED_TAIL = 3;
 const FLASH_MS = 1600;
 const TARGET_FETCH_PAGE_CAP = 5;
+/** One sentence for the two ways a message can be out of reach for good — the
+ *  server's 422, and a history that has been read to its end without it. They
+ *  mean the same thing to the reader, so they say the same thing. */
+const MESSAGE_NOT_HERE = "Couldn't find that message here.";
 
 const useIsomorphicLayoutEffect =
   typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 /** What the screen can ask the feed to do imperatively (panels + deep jumps). */
 export interface ChannelFeedHandle {
-  /** Scroll to a message and wash it. Pulls older pages when it isn't loaded,
-   *  and gives up silently rather than erroring on a stale target. */
+  /** Scroll to a message and wash it. Opens a window around it when it isn't
+   *  loaded (one request), and says so in the transcript's own quiet notice
+   *  rather than erroring when it cannot be reached at all. */
   jumpToMessage: (messageUuid: string) => void;
 }
 
@@ -236,18 +269,6 @@ export function ChannelFeed({
   onOpenGame,
   ref,
 }: ChannelFeedProps) {
-  const {
-    data,
-    isPending,
-    isError,
-    refetch,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
-  } = useInfiniteQuery(
-    channelsQueries.messages({ channelUuid: channel.uuid, viewerId }),
-  );
-
   /** A thread is a ROUTE (`/channels/{threadUuid}`) — the screen keys itself by
    *  channel and remounts wholesale, and it is the same address the
    *  notification dispatcher already pushes. So opening one is a push, not a
@@ -267,24 +288,254 @@ export function ChannelFeed({
    *  than present-and-failing, in both input worlds. */
   const canBranch = !channel.is_thread;
 
-  /* ── The transcript = cache pages + any outbox rows a refetch evicted.
-        The cache is refetchable state (join-time reconcile, reconnect
+  /* ── Refs for the scroll contract ─────────────────────────────────────────
+        HOISTED ABOVE THE DATA, and that is a change of order rather than of
+        substance: a jump can now decide WHICH history is on screen, so the
+        target resolver has to be settled before the transcript's source can
+        be. Everything from here to `activeTarget` reads no server data. ── */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const didInitialScrollRef = useRef(false);
+  /** A history pull in flight: the viewport's distance from the CONTENT
+   *  BOTTOM at request time. Bottom-anchored (not the old-scrollHeight
+   *  delta, which was only correct at scrollTop 0 — audit H3), restored in a
+   *  layout effect when the fetch settles, and it suppresses the follower
+   *  while armed so a mid-pull resize can never teleport the view. */
+  const pendingRestoreRef = useRef<number | null>(null);
+  const atBottomRef = useRef(true);
+  const followRafRef = useRef<number | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Flash-wash + scroll a loaded message into view (DOM-only — no state).
+   *  `instant` is the INITIAL landing's mode (audit M7): the first frames
+   *  must not sweep down from the top, so the opening scroll snaps; only
+   *  post-load flashes (reply jumps, late deep-link resolution) glide. */
+  const flashMessage = useCallback((uuid: string, options?: { instant?: boolean }) => {
+    const root = rootRef.current;
+    const el = root?.querySelector<HTMLElement>(`[data-message-uuid="${CSS.escape(uuid)}"]`);
+    if (!el) return false;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({
+      block: 'center',
+      behavior: options?.instant || reduced ? 'auto' : 'smooth',
+    });
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    for (const other of root?.querySelectorAll('[data-flash]') ?? []) {
+      other.removeAttribute('data-flash');
+    }
+    el.setAttribute('data-flash', '');
+    flashTimerRef.current = setTimeout(() => {
+      el.removeAttribute('data-flash');
+      flashTimerRef.current = null;
+    }, FLASH_MS);
+    return true;
+  }, []);
+
+  /** Arm a history pull's position restore, bottom-anchored (audit H3). */
+  const beginHistoryPull = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    pendingRestoreRef.current = el.scrollHeight - el.scrollTop;
+  }, []);
+
+  const consumedTargetRef = useRef<string | null>(null);
+
+  /* ── Imperative jump (pinned / saved panels). A REQUEST, not a target: it
+        carries a nonce so asking for the SAME message twice re-arms the
+        resolver instead of being swallowed as "already consumed". It shares
+        the `?m=` resolver below, so an unloaded pin resolves exactly like a
+        notification deep link.
+
+        `fromTarget` IS THE EXPIRY, and it exists because a panel jump must not
+        outlive the navigation it happened during. A request is honoured only
+        while the `?m=` prop is still the value it was made against; the moment
+        a LATER navigation changes that prop, the stale request is ignored and
+        the new deep link wins. Without it the first panel jump would sit in
+        state forever and every subsequent `?m=` arriving at this already-
+        mounted channel — every mention toast, every push — would resolve to
+        nothing. Expressed as a derived comparison rather than an effect that
+        clears state, so there is no setState-in-effect and no ordering race
+        between the clear and the next prop. ──────────────────────────────── */
+  const [jumpRequest, setJumpRequest] = useState<{
+    uuid: string;
+    key: string;
+    /** The `?m=` value in force when this jump was requested (`null` = none). */
+    fromTarget: string | null;
+  } | null>(null);
+  const jumpNonceRef = useRef(0);
+
+  /**
+   * Ask to be taken to a message. ONE ENTRANCE for all four ways a reader asks:
+   * the pinned/saved panels (through {@link ChannelFeedHandle}), a reply quote,
+   * a row in the replies index, and the AI sessions sheet's "summoned by".
+   *
+   * IT WAS NOT ONE ENTRANCE BEFORE, and that is the unfinished half of the
+   * owner's 2026-08-12 report. The panels went through the resolver; the reply
+   * quote and the replies index called `flashMessage` and stopped there — so
+   * tapping a quote whose message was not loaded did not merely fail to reach
+   * it, it never asked for it, and the notice built for exactly that failure
+   * could not appear either. The paths are now the same path.
+   */
+  const requestJump = useCallback(
+    (messageUuid: string) => {
+      // Already on screen: flash it now, with no state change at all.
+      if (flashMessage(messageUuid)) return;
+      jumpNonceRef.current += 1;
+      setJumpRequest({
+        uuid: messageUuid,
+        key: `${messageUuid}#${jumpNonceRef.current}`,
+        fromTarget: targetMessageUuid,
+      });
+    },
+    [flashMessage, targetMessageUuid],
+  );
+
+  useImperativeHandle(ref, () => ({ jumpToMessage: requestJump }), [requestJump]);
+
+  /** What the resolver is currently chasing. A panel jump outranks the `?m=`
+   *  it was made during (it is the reader's more recent intent), but a NEWER
+   *  `?m=` outranks the panel jump (see `fromTarget` above). Memoised so the
+   *  resolver effect keys on a CHANGE of target, not on every render — a fresh
+   *  object literal would re-run it on any unrelated re-render. */
+  const activeTarget = useMemo(() => {
+    if (jumpRequest !== null && jumpRequest.fromTarget === targetMessageUuid) {
+      return { uuid: jumpRequest.uuid, key: jumpRequest.key };
+    }
+    return targetMessageUuid
+      ? { uuid: targetMessageUuid, key: targetMessageUuid }
+      : null;
+  }, [jumpRequest, targetMessageUuid]);
+
+  /* ── THE CHANNEL'S OWN HISTORY: anchored at the newest message, growing
+        backwards, and the entry the realtime writers append arrivals to. ── */
+  const liveQuery = useInfiniteQuery(
+    channelsQueries.messages({ channelUuid: channel.uuid, viewerId, around: null }),
+  );
+  const liveRows = useMemo(
+    () => flattenMessages(liveQuery.data?.pages),
+    [liveQuery.data],
+  );
+
+  /* ── THE WINDOW AROUND AN UNREACHED TARGET ─────────────────────────────────
+        One request instead of five. Which message to open a window around is
+        DERIVED, not stored: it is the active target, whenever that target is
+        not in the live pages and older pages remain. So the window opens as a
+        consequence of asking for something out of reach, and closes again the
+        moment the message is in hand — no effect writes it, and nothing can be
+        left armed.
+
+        THE FOUR GUARDS, each for a different reason:
+         - a stood-down key: the reader pressed "Jump to present" (or dismissed
+           the notice) and must not be dragged straight back into the past;
+         - `hasNextPage`: with the whole history loaded, a message that is not
+           in it is not in the channel — the answer is already known, and
+           spending a request to be told 422 would be theatre;
+         - the membership test: the common case is a target in the newest page,
+           which costs nothing at all;
+         - a LOCAL uuid: an unacknowledged row has no server identity, so the
+           server could only refuse it. (It is also always on screen, so this
+           is belt-and-braces — the same guard the engagement verbs keep.) */
+  const [standDownKey, setStandDownKey] = useState<string | null>(null);
+  const windowAround =
+    activeTarget !== null &&
+    standDownKey !== activeTarget.key &&
+    !isLocalMessageUuid(activeTarget.uuid) &&
+    liveQuery.hasNextPage &&
+    !liveRows.some((message) => message.uuid === activeTarget.uuid)
+      ? activeTarget.uuid
+      : null;
+
+  const windowQuery = useInfiniteQuery({
+    ...channelsQueries.messages({
+      channelUuid: channel.uuid,
+      viewerId,
+      around: windowAround,
+    }),
+    enabled: windowAround !== null,
+    // Hold the transcript that is already on screen while the window loads, so
+    // a jump never blinks back to the live tail on its way somewhere else. With
+    // `windowAround` null this is inert: the key is then the live key and the
+    // data is simply there.
+    placeholderData: keepPreviousData,
+    // THE ONE PLACE THIS FLAG IS EARNED (standards §2 keeps it ON everywhere
+    // else). Which page a message sits on does not change, so a successful
+    // window has nothing to re-ask; and a FAILED one is the case the flag
+    // actually governs — an errored query is stale by definition, so without
+    // this every return to the tab would re-send a request the server has
+    // already refused, for as long as the notice stands.
+    refetchOnWindowFocus: false,
+  });
+
+  /* A 422 is the server saying the message is not in this channel — the same
+     answer it gives for a uuid that never existed, deliberately. It is final,
+     and it is exactly the "Couldn't find that message here" state that already
+     existed. Any OTHER failure is a transport problem, and the bounded page
+     hunt below is still the honest fallback for it. */
+  const windowError =
+    windowAround !== null && windowQuery.isError ? windowQuery.error : null;
+  const targetNotInChannel =
+    windowError !== null && extractApiError(windowError).status === 422;
+  const windowFellBack = windowError !== null && !targetNotInChannel;
+  const showingWindow = windowAround !== null && windowError === null;
+  const source = showingWindow ? windowQuery : liveQuery;
+  /** The window is asked for but not yet in hand — the transcript on screen is
+   *  still the previous one, so nothing may page it. */
+  const windowSettling = showingWindow && windowQuery.isPlaceholderData;
+
+  const sourcePages = source.data?.pages;
+  /* ── The transcript = the active source's pages + any outbox rows a refetch
+        evicted. The cache is refetchable state (join-time reconcile, reconnect
         invalidation) and server pages can never contain an unacknowledged
         row — the outbox is that row's durable home, merged back here so a
         background refetch can NEVER silently drop an unsent message (§5's
         ban, structurally enforced). Cache-present rows are not duplicated,
         and the merge is CHRONOLOGICAL (audit L13) so a failed send keeps the
-        place it was written in instead of drifting to the end. ─────────────── */
-  const cachedMessages = useMemo(() => flattenMessages(data?.pages), [data]);
+        place it was written in instead of drifting to the end.
+
+        THE OUTBOX ONLY MERGES INTO A TRANSCRIPT THAT ENDS AT THE PRESENT, and
+        the pages say whether this one does: `prev_cursor` on the newest page is
+        null exactly when that page holds the channel's newest message. A row
+        the server has not acknowledged belongs at the end of the conversation,
+        and the end of a window from last week is not that place — it would be
+        drawn under a message from days ago. It waits in the outbox instead (it
+        is not lost; that is its durable home) and appears the moment the reader
+        is back in the present. The same fact drives the read pointer and the
+        jump pill below, and it is the same one `cache.ts` uses to decide where
+        a live arrival may be written. ─────────────────────────────────────── */
+  const readingThePast =
+    sourcePages !== undefined &&
+    sourcePages.length > 0 &&
+    sourcePages[0].pagination.prev_cursor !== null;
+  const cachedMessages = useMemo(() => flattenMessages(sourcePages), [sourcePages]);
   const outboxRows = useOutboxMessages(channel.uuid);
   const messages = useMemo(
-    () => mergeOutboxRows(cachedMessages, outboxRows),
-    [cachedMessages, outboxRows],
+    () =>
+      readingThePast ? cachedMessages : mergeOutboxRows(cachedMessages, outboxRows),
+    [readingThePast, cachedMessages, outboxRows],
   );
+  /** The read pointer's target, and it is read off the LIVE pages whatever is
+   *  on screen: "newest" is a fact about the channel, not about the window the
+   *  reader happens to be looking at. Local uuids are skipped, so the outbox
+   *  never mattered here. */
   const newestReal = useMemo(
-    () => newestRealMessageUuid(messages, isLocalMessageUuid),
-    [messages],
+    () => newestRealMessageUuid(liveRows, isLocalMessageUuid),
+    [liveRows],
   );
+
+  /* The live query owns the skeleton and the error state — both are about the
+     channel's history, not about one jump. A refused window must never blank
+     the transcript the reader is already reading. */
+  const { isPending, isError, refetch } = liveQuery;
+  const {
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+    fetchPreviousPage,
+  } = source;
 
   /* ── The unread anchor, captured ONCE at open (§5: persists for the view
         session). Guarded render-adjust — React's sanctioned form — because
@@ -312,7 +563,13 @@ export function ChannelFeed({
      a "New" line on screen has not done what it said. Feed-local, so it lasts
      exactly as long as this view of the channel. */
   const [unreadCleared, setUnreadCleared] = useState(false);
-  const activeAnchor = unreadCleared ? null : (anchor?.uuid ?? null);
+  /* The gold line is a fact about the PRESENT — "you had read up to here when
+     you arrived" — so it is not drawn over a window from last week, where it
+     would sit in the middle of history claiming everything below it is new.
+     The anchor itself is untouched and the line is back where it was the moment
+     the reader returns. */
+  const activeAnchor =
+    unreadCleared || readingThePast ? null : (anchor?.uuid ?? null);
   /** The viewport's distance from the CONTENT BOTTOM at the moment the line is
    *  dismissed — the same bottom-anchored measure the history-pull restore
    *  uses, for the same reason: removing the divider shortens the transcript
@@ -353,29 +610,18 @@ export function ChannelFeed({
     return { renderItems: withOrdinals, groupCount: ordinal };
   }, [messages, activeAnchor, anchoredByMessage]);
 
-  /* ── Refs for the scroll contract ─────────────────────────────────────── */
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const dockRef = useRef<HTMLDivElement>(null);
-  const didInitialScrollRef = useRef(false);
-  /** A history pull in flight: the viewport's distance from the CONTENT
-   *  BOTTOM at request time. Bottom-anchored (not the old-scrollHeight
-   *  delta, which was only correct at scrollTop 0 — audit H3), restored in a
-   *  layout effect when the fetch settles, and it suppresses the follower
-   *  while armed so a mid-pull resize can never teleport the view. */
-  const pendingRestoreRef = useRef<number | null>(null);
-  const atBottomRef = useRef(true);
-  const followRafRef = useRef<number | null>(null);
-  const messagesLenRef = useRef(messages.length);
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   /* ── Jump pill: a TIME watermark captured at detach (audit H1). The count
         is "messages strictly newer than the newest message the reader had
         when they looked away" — so a history PREPEND (older by definition)
-        can never inflate it, only genuine arrivals count (DIRECTION 10). ── */
+        can never inflate it, only genuine arrivals count (DIRECTION 10).
+
+        AND IT IS ALSO THE WAY BACK FROM A WINDOW. A reader in the past is by
+        definition not at the newest message, so the pill stands whether or not
+        they have scrolled — and it says "Jump to present", because "Latest"
+        over a transcript that ends last Tuesday would be a promise about the
+        wrong end of the wrong pages. ─────────────────────────────────────── */
   const [detachedWatermark, setDetachedWatermark] = useState<number | null>(null);
-  const showPill = detachedWatermark !== null;
+  const showPill = readingThePast || detachedWatermark !== null;
   const pillCount = useMemo(() => {
     if (detachedWatermark === null) return 0;
     // Chronological list: scan from the newest end and stop at the first
@@ -452,95 +698,6 @@ export function ChannelFeed({
   const image = useUrlOverlay('image');
   const { show: showImage, swap: swapImage, close: closeImage } = image;
 
-  /** Flash-wash + scroll a loaded message into view (DOM-only — no state).
-   *  `instant` is the INITIAL landing's mode (audit M7): the first frames
-   *  must not sweep down from the top, so the opening scroll snaps; only
-   *  post-load flashes (reply jumps, late deep-link resolution) glide. */
-  const flashMessage = useCallback((uuid: string, options?: { instant?: boolean }) => {
-    const root = rootRef.current;
-    const el = root?.querySelector<HTMLElement>(`[data-message-uuid="${CSS.escape(uuid)}"]`);
-    if (!el) return false;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({
-      block: 'center',
-      behavior: options?.instant || reduced ? 'auto' : 'smooth',
-    });
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    for (const other of root?.querySelectorAll('[data-flash]') ?? []) {
-      other.removeAttribute('data-flash');
-    }
-    el.setAttribute('data-flash', '');
-    flashTimerRef.current = setTimeout(() => {
-      el.removeAttribute('data-flash');
-      flashTimerRef.current = null;
-    }, FLASH_MS);
-    return true;
-  }, []);
-
-  /** Arm a history pull's position restore, bottom-anchored (audit H3). */
-  const beginHistoryPull = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    pendingRestoreRef.current = el.scrollHeight - el.scrollTop;
-  }, []);
-
-  const consumedTargetRef = useRef<string | null>(null);
-
-  /* ── Imperative jump (pinned / saved panels). A REQUEST, not a target: it
-        carries a nonce so asking for the SAME message twice re-arms the
-        resolver instead of being swallowed as "already consumed". It shares
-        the `?m=` resolver below, so an unloaded pin pulls history exactly like
-        a notification deep link.
-
-        `fromTarget` IS THE EXPIRY, and it exists because a panel jump must not
-        outlive the navigation it happened during. A request is honoured only
-        while the `?m=` prop is still the value it was made against; the moment
-        a LATER navigation changes that prop, the stale request is ignored and
-        the new deep link wins. Without it the first panel jump would sit in
-        state forever and every subsequent `?m=` arriving at this already-
-        mounted channel — every mention toast, every push — would resolve to
-        nothing. Expressed as a derived comparison rather than an effect that
-        clears state, so there is no setState-in-effect and no ordering race
-        between the clear and the next prop. ──────────────────────────────── */
-  const [jumpRequest, setJumpRequest] = useState<{
-    uuid: string;
-    key: string;
-    /** The `?m=` value in force when this jump was requested (`null` = none). */
-    fromTarget: string | null;
-  } | null>(null);
-  const jumpNonceRef = useRef(0);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      jumpToMessage: (messageUuid: string) => {
-        // Already on screen: flash it now, with no state change at all.
-        if (flashMessage(messageUuid)) return;
-        jumpNonceRef.current += 1;
-        setJumpRequest({
-          uuid: messageUuid,
-          key: `${messageUuid}#${jumpNonceRef.current}`,
-          fromTarget: targetMessageUuid,
-        });
-      },
-    }),
-    [flashMessage, targetMessageUuid],
-  );
-
-  /** What the resolver is currently chasing. A panel jump outranks the `?m=`
-   *  it was made during (it is the reader's more recent intent), but a NEWER
-   *  `?m=` outranks the panel jump (see `fromTarget` above). Memoised so the
-   *  resolver effect keys on a CHANGE of target, not on every render — a fresh
-   *  object literal would re-run it on any unrelated re-render. */
-  const activeTarget = useMemo(() => {
-    if (jumpRequest !== null && jumpRequest.fromTarget === targetMessageUuid) {
-      return { uuid: jumpRequest.uuid, key: jumpRequest.key };
-    }
-    return targetMessageUuid
-      ? { uuid: targetMessageUuid, key: targetMessageUuid }
-      : null;
-  }, [jumpRequest, targetMessageUuid]);
-
   /* ── First paint lands at the right place (layout effect: no wrong-end
         frame). Priority: `?m=` target (when already loaded) → unread line →
         bottom. ─────────────────────────────────────────────────────────── */
@@ -585,7 +742,7 @@ export function ChannelFeed({
     pendingRestoreRef.current = null;
     atBottomRef.current =
       el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_THRESHOLD_PX;
-  }, [data, isFetchingNextPage]);
+  }, [sourcePages, isFetchingNextPage]);
 
   /* ── Unread-line dismissal restore — the same bottom-anchored maths as the
         pull above, on its own ref and its own effect so the protected history
@@ -606,7 +763,47 @@ export function ChannelFeed({
     unreadClearRestoreRef.current = null;
   }, [unreadCleared]);
 
-  /* ── Own-send scroll (passive effect, ref sync). ──────────────────────── */
+  /* ── Landing in a window — a LAYOUT effect, and for the same reason the
+        first paint is one: the transcript has just been replaced wholesale, so
+        the reader's scroll position now points at rows that are no longer
+        there. Correcting it after paint would draw one frame of somebody else's
+        conversation. INSTANT, not smooth, for the reason audit M7 gives about
+        the opening scroll: thirty unfamiliar rows sweeping past is not what
+        "take me there" looks like.
+
+        It marks the target consumed, so the passive resolver below sees the
+        landing has already happened (layout effects run before passive ones in
+        the same commit) and does not flash it a second time. ─────────────── */
+  useIsomorphicLayoutEffect(() => {
+    if (activeTarget === null || !showingWindow || windowSettling) return;
+    if (consumedTargetRef.current === activeTarget.key) return;
+    if (!messages.some((message) => message.uuid === activeTarget.uuid)) return;
+    // The middle of a window is never the bottom of one, so the follower must
+    // stand down before it chases the end of history the reader did not ask for.
+    atBottomRef.current = false;
+    if (flashMessage(activeTarget.uuid, { instant: true })) {
+      consumedTargetRef.current = activeTarget.key;
+    }
+  }, [activeTarget, showingWindow, windowSettling, messages, flashMessage]);
+
+  /** Armed by "Jump to present": the scroll cannot happen in the click, because
+   *  the pages it would scroll are the ones about to be taken off screen. */
+  const returnToPresentRef = useRef(false);
+  /* ── Landing back in the present. The live pages are still in cache, so the
+        swap costs no request and this runs in the very next commit. ──────── */
+  useIsomorphicLayoutEffect(() => {
+    if (!returnToPresentRef.current || readingThePast) return;
+    returnToPresentRef.current = false;
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    atBottomRef.current = true;
+  }, [readingThePast, messages]);
+
+  /* ── Own-send scroll (passive effect, ref sync). Seeded with the FIRST
+        render's length, so a transcript that painted straight out of a warm
+        cache is not read as thirty messages having just arrived. ─────────── */
+  const messagesLenRef = useRef(messages.length);
   useEffect(() => {
     const el = scrollRef.current;
     const prevLen = messagesLenRef.current;
@@ -785,17 +982,39 @@ export function ChannelFeed({
     // `canParticipate` joins the clause rather than wrapping the effect: the
     // hook must still be told `null` if the flag ever flips off, so nothing
     // stays armed from a previous state.
+    //
+    // `readingThePast` joins it for a stronger reason than tidiness: the
+    // sentinel sits at the foot of whatever is on screen, and the foot of a
+    // window from last week is an OLD message. Reporting it would tell the read
+    // pointer that the newest message the reader has seen is one from days ago —
+    // §5's clause read literally says the opposite, and the reader scrolling to
+    // the end of a window has not seen anything since.
     reportNewestVisible(
-      canParticipate && active && bottomVisible ? newestReal : null,
+      canParticipate && active && bottomVisible && !readingThePast
+        ? newestReal
+        : null,
     );
-  }, [canParticipate, active, bottomVisible, newestReal, reportNewestVisible]);
+  }, [
+    canParticipate,
+    active,
+    bottomVisible,
+    readingThePast,
+    newestReal,
+    reportNewestVisible,
+  ]);
 
-  /* ── Targets outside the loaded pages (`?m=` deep links AND panel jumps):
-        pull older pages, bounded. Each pull is position-restored
-        (`beginHistoryPull`), so the viewport holds still while pages arrive;
-        giving up (no more pages, or the page cap) leaves the reader exactly
-        where they were. The per-target page budget resets with each new
-        request, so a second jump is not starved by the first one's spend. ── */
+  /* ── THE FALLBACK, and since 2026-08-12 that is all it is: pull older pages,
+        bounded, one page at a time. The window route above answers the same
+        question in a single request and gets first refusal; this runs only
+        where it cannot — no window was asked for at all (the target is loaded,
+        or the whole history already is, or the reader stood one down), or the
+        one that was asked for failed on the wire rather than being refused.
+
+        Each pull is position-restored (`beginHistoryPull`), so the viewport
+        holds still while pages arrive; giving up (no more pages, or the page
+        cap) leaves the reader exactly where they were. The per-target page
+        budget resets with each new request, so a second jump is not starved by
+        the first one's spend. ────────────────────────────────────────────── */
   const targetFetchCountRef = useRef(0);
   const budgetForKeyRef = useRef<string | null>(null);
   /** Set when a jump ran out of road. Null whenever a jump is in flight or has
@@ -827,18 +1046,60 @@ export function ChannelFeed({
     setRetryNonce((n) => n + 1);
   }, [setUnreachedTarget, setRetryNonce]);
 
-  /** Whether that notice is still TRUE, derived rather than cleared. It stops
-   *  being true the instant the message lands in the loaded pages (the reader
-   *  pressed "Load older" themselves, or "Keep looking" found it) or a newer
-   *  jump takes over — so no effect ever has to reach in and tidy it up. */
-  const showUnreached =
-    unreachedTarget !== null &&
-    activeTarget !== null &&
-    unreachedTarget.key === activeTarget.key &&
-    !messages.some((message) => message.uuid === activeTarget.uuid);
+  /**
+   * What the pill slot says about a jump that has not landed — DERIVED rather
+   * than cleared, so it cannot outlive the thing it is about: it stops being
+   * true the instant the message is on screen (the reader pressed "Load older"
+   * themselves, or "Keep looking" found it) or a newer jump takes over, and no
+   * effect ever has to reach in and tidy it up.
+   *
+   * The server's own refusal comes first, because it is the more certain of the
+   * two: a 422 means the message is not in this channel at all, and no amount
+   * of paging will produce it.
+   */
+  const jumpNotice = useMemo<{ text: string; canKeepLooking: boolean } | null>(() => {
+    if (activeTarget === null) return null;
+    if (messages.some((message) => message.uuid === activeTarget.uuid)) return null;
+    if (targetNotInChannel) {
+      return { text: MESSAGE_NOT_HERE, canKeepLooking: false };
+    }
+    if (unreachedTarget === null || unreachedTarget.key !== activeTarget.key) {
+      return null;
+    }
+    return unreachedTarget.morePagesExist
+      ? { text: 'That message is further back.', canKeepLooking: true }
+      : { text: MESSAGE_NOT_HERE, canKeepLooking: false };
+  }, [activeTarget, messages, targetNotInChannel, unreachedTarget]);
+
+  /**
+   * Stop asking for this message, by every route at once.
+   *
+   * Both halves are needed and neither is enough alone: standing the window
+   * down without marking the target consumed would hand it straight to the page
+   * hunt, which would spend five requests re-discovering what the server has
+   * already refused; marking it consumed without standing the window down would
+   * leave the refusal — and its notice — exactly where it was.
+   */
+  const stopChasingTarget = useCallback(() => {
+    if (activeTarget === null) return;
+    consumedTargetRef.current = activeTarget.key;
+    setStandDownKey(activeTarget.key);
+  }, [activeTarget, setStandDownKey]);
+
+  const dismissJumpNotice = useCallback(() => {
+    stopChasingTarget();
+    setUnreachedTarget(null);
+  }, [stopChasingTarget, setUnreachedTarget]);
+
   useEffect(() => {
     if (!activeTarget || consumedTargetRef.current === activeTarget.key) return;
     if (messages.length === 0) return;
+    /* THE WINDOW OWNS THIS TARGET while it is in flight or has answered — one
+       request either lands it or refuses it, and walking backwards a page at a
+       time underneath that would be the same journey made twice. The hunt takes
+       over only when the window failed on the wire; a 422 is an answer, not a
+       failure, and there is nothing further back to look for. */
+    if (windowAround === activeTarget.uuid && !windowFellBack) return;
 
     if (budgetForKeyRef.current !== activeTarget.key) {
       budgetForKeyRef.current = activeTarget.key;
@@ -847,8 +1108,8 @@ export function ChannelFeed({
 
     if (messages.some((message) => message.uuid === activeTarget.uuid)) {
       consumedTargetRef.current = activeTarget.key;
-      // NOT cleared here. A standing notice is hidden by DERIVATION below
-      // (`showUnreached`), which needs no state write at all: it stops being
+      // NOT cleared here. A standing notice is hidden by DERIVATION above
+      // (`jumpNotice`), which needs no state write at all: it stops being
       // true the moment the message is in `messages` or a newer jump starts.
       // Covers the post-landing arrival, a late navigation to an already-open
       // channel (the initial-scroll effect runs once), and every panel jump.
@@ -891,6 +1152,8 @@ export function ChannelFeed({
     fetchNextPage,
     flashMessage,
     beginHistoryPull,
+    windowAround,
+    windowFellBack,
     // Not read in the body: it exists so "Keep looking" re-arms this effect.
     retryNonce,
   ]);
@@ -915,13 +1178,25 @@ export function ChannelFeed({
   };
 
   const jumpToLatest = () => {
-    const el = scrollRef.current;
-    if (el) {
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
+    if (readingThePast) {
+      /* LEAVING A WINDOW IS A DATA CHANGE, NOT A SCROLL, and scrolling here
+         would move the pages that are about to be taken off screen. Standing
+         the window down swaps the transcript back to the live pages — still in
+         cache, so it costs no request — and the layout effect that watches for
+         that puts the reader at the bottom of them before the frame paints. */
+      returnToPresentRef.current = true;
+      stopChasingTarget();
+    } else {
+      const el = scrollRef.current;
+      if (el) {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
+      }
     }
     // Jump-pill click is a mark-read trigger (§5) — for a member. A previewer
-    // has no pointer to advance, so the pill is purely a scroll.
+    // has no pointer to advance, so the pill is purely a scroll. `newestReal`
+    // is the LIVE newest whichever transcript is on screen, so this is the same
+    // mark whether the reader was detached in the present or away in the past.
     if (canParticipate && newestReal) reporter.markReadNow(newestReal);
   };
 
@@ -975,6 +1250,24 @@ export function ChannelFeed({
     void fetchNextPage();
   };
 
+  /**
+   * Walk a window FORWARD, towards the present, on the `prev_cursor` it came
+   * back with. Only ever offered inside one — the live transcript's newest page
+   * has a null `prev_cursor`, so `hasPreviousPage` is false there and this
+   * button does not exist.
+   *
+   * NO POSITION RESTORE, because there is nothing to restore: newer pages are
+   * appended BELOW the reader and every row above them keeps its place. What
+   * WOULD move them is the bottom-follower — a reader who pressed this at the
+   * foot of the window is "at the bottom", and the follower would sweep them
+   * past the thirty messages they just asked to see. Standing it down is the
+   * whole correction, and their own next scroll re-decides it.
+   */
+  const handleLoadNewer = () => {
+    atBottomRef.current = false;
+    void fetchPreviousPage();
+  };
+
   /* ── Row actions (stable object — rows are memoised on it). ───────────── */
   const editMutate = editMutation.mutate;
   const deleteMutate = deleteMutation.mutate;
@@ -1017,9 +1310,10 @@ export function ChannelFeed({
         textSelectExit();
         setSheetMessageUuid(message.uuid);
       },
-      onJumpToMessage: (messageUuid) => {
-        flashMessage(messageUuid);
-      },
+      // THE SAME ENTRANCE THE PANELS USE — see `requestJump`. This used to be
+      // a bare `flashMessage`, which meant a reply quote or a replies-index row
+      // pointing at an unloaded message did nothing and said nothing.
+      onJumpToMessage: requestJump,
       // Engagement never applies to an unacknowledged row — there is no server
       // uuid to address yet. The cluster is already hidden while a row is in
       // the outbox (`canAct`), so this guard is belt-and-braces for the sheet.
@@ -1081,7 +1375,7 @@ export function ChannelFeed({
       editMutate,
       retryMutate,
       discardFailed,
-      flashMessage,
+      requestJump,
       reactionMutate,
       pinMutate,
       saveMutate,
@@ -1123,7 +1417,9 @@ export function ChannelFeed({
         onKeyDown={handleKeyDown}
         role="log"
         aria-label={`Messages in ${channelDisplayName(channel)}`}
-        aria-busy={isPending || isFetchingNextPage}
+        aria-busy={
+          isPending || isFetchingNextPage || isFetchingPreviousPage || windowSettling
+        }
         className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         {/* The log region is PRE-MOUNTED (it exists before any message), so
@@ -1163,7 +1459,10 @@ export function ChannelFeed({
                     variant="outline"
                     size="sm"
                     onClick={handleLoadOlder}
-                    disabled={isFetchingNextPage}
+                    // `windowSettling`: the pages on screen belong to the
+                    // transcript we are LEAVING, so their cursors are not this
+                    // query's to spend.
+                    disabled={isFetchingNextPage || windowSettling}
                   >
                     {isFetchingNextPage && (
                       <Loader2 aria-hidden className="size-4 animate-spin" />
@@ -1252,6 +1551,35 @@ export function ChannelFeed({
                 }
               })}
 
+              {/* THE WAY BACK OUT OF A WINDOW, one page at a time — the mirror
+                  of "Load older" at the head, and it only exists inside one:
+                  the live transcript's newest page carries a null
+                  `prev_cursor`, so there is never anything newer to ask for
+                  there. Below the messages because that is where the messages
+                  it fetches will appear. */}
+              {hasPreviousPage && (
+                /* pb-11 = 44px, MEASURED not guessed: the jump pill floats over
+                   the transcript's tail and its row is 36px plus an 8px gap to
+                   the dock (measured at 430px and 1280px — the pill is one
+                   size). Everything else at the foot of a transcript is a
+                   message, which the pill has always been allowed to cover
+                   because pressing it takes you past it; this is a BUTTON, and
+                   a button half under a pill is a button you cannot press. */
+                <div className="flex justify-center pb-11">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLoadNewer}
+                    disabled={isFetchingPreviousPage || windowSettling}
+                  >
+                    {isFetchingPreviousPage && (
+                      <Loader2 aria-hidden className="size-4 animate-spin" />
+                    )}
+                    Load newer messages
+                  </Button>
+                </div>
+              )}
+
               {/* Turns whose `.ai.turn_started` carried no `message_uuid`
                   (digest §F.7's contradiction) can't be anchored, so they
                   queue here at the foot of the transcript — a designed
@@ -1281,7 +1609,7 @@ export function ChannelFeed({
             because that is where this screen already speaks about movement.
             Quiet, not an error: failing to reach a message from last month is
             an ordinary limit, and the reader has done nothing wrong. */}
-        {showUnreached && unreachedTarget !== null && (
+        {jumpNotice !== null && (
           <div className="mb-2 flex justify-center px-3">
             <div
               role="status"
@@ -1290,12 +1618,8 @@ export function ChannelFeed({
                 'bg-secondary text-xs text-secondary-foreground shadow-lg',
               )}
             >
-              <span className="min-w-0 truncate">
-                {unreachedTarget.morePagesExist
-                  ? 'That message is further back.'
-                  : "Couldn't find that message here."}
-              </span>
-              {unreachedTarget.morePagesExist && (
+              <span className="min-w-0 truncate">{jumpNotice.text}</span>
+              {jumpNotice.canKeepLooking && (
                 <button
                   type="button"
                   onClick={keepLookingForTarget}
@@ -1309,7 +1633,7 @@ export function ChannelFeed({
               )}
               <button
                 type="button"
-                onClick={() => setUnreachedTarget(null)}
+                onClick={dismissJumpNotice}
                 aria-label="Dismiss"
                 className={cn(
                   'v2-interactive shrink-0 rounded-full text-muted-foreground',
@@ -1344,11 +1668,13 @@ export function ChannelFeed({
             )}
           >
             <ArrowDown aria-hidden className="size-4" />
-            {pillCount === 0
-              ? 'Latest'
-              : pillCount === 1
-                ? '1 new message'
-                : `${pillCount} new messages`}
+            {readingThePast
+              ? 'Jump to present'
+              : pillCount === 0
+                ? 'Latest'
+                : pillCount === 1
+                  ? '1 new message'
+                  : `${pillCount} new messages`}
           </button>
         </div>
 

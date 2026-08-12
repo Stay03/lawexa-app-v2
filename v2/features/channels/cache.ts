@@ -156,6 +156,18 @@ function messageEntries(queryClient: QueryClient, channelUuid: string) {
  * since W3 — SKIPPING a row that is already present is also what protects its
  * per-viewer engagement fields from a redelivered `message.created` that omits
  * them (§F.2). A brand-new row legitimately has none of them.
+ *
+ * AND ONLY WHERE THE HEAD ACTUALLY IS (2026-08-12). Since the feed can open a
+ * WINDOW around an old message (`queries.ts`, the `around` entry), not every
+ * cached entry under this channel's prefix ends at the present. Prepending an
+ * arrival to a window from last month would draw a message sent seconds ago
+ * directly under one from August 11th — the entry's own newest row.
+ *
+ * The entry says which it is, so nothing has to be told: `prev_cursor` on the
+ * first page is `null` exactly when that page already holds the channel's
+ * newest message. A window therefore takes no arrivals, and the moment a reader
+ * pages one all the way up to the present it starts taking them again, with no
+ * state anywhere tracking which entry is which.
  */
 export function applyMessageCreated(
   queryClient: QueryClient,
@@ -163,6 +175,7 @@ export function applyMessageCreated(
 ): void {
   for (const [queryKey, data] of messageEntries(queryClient, message.channel_uuid)) {
     if (!data || data.pages.length === 0) continue;
+    if (data.pages[0].pagination.prev_cursor !== null) continue;
     const exists = data.pages.some((page) =>
       page.data.some((row) => row.uuid === message.uuid),
     );

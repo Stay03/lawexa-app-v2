@@ -653,6 +653,10 @@ export const messagesApi = {
         params: {
           per_page: params.per_page ?? 30,
           cursor: params.cursor || undefined,
+          // Never sent alongside a cursor — the server lets the cursor win, so
+          // sending both would ask two questions and hear one answered. The
+          // caller decides which of the two this request is.
+          around_message_uuid: params.around_message_uuid || undefined,
         },
       }
     );

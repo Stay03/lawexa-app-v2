@@ -13,6 +13,7 @@ import type {
   MemberListParams,
   MessageListParams,
 } from '@/types/collab';
+import { extractApiError } from '@/lib/utils/api-error';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 
 /**
@@ -183,25 +184,67 @@ export const channelsQueries = {
    * `REFETCH_ON_VISIT`: an infinite history refetches every loaded page, and
    * re-entering a busy channel five pages deep must paint from cache instantly
    * (the owner feel directive), not re-download its history.
+   *
+   * ── `around` IS A SECOND ENTRY, NOT A FILTER (2026-08-12) ──────────────────
+   * `around: null` is THE channel's history, anchored at the newest message and
+   * growing backwards — the entry that has always been here, that the realtime
+   * writers append arrivals to, and that the reader is in whenever they are in
+   * the present.
+   *
+   * `around: <uuid>` is a WINDOW around one old message, and it is a separate
+   * cache entry on purpose. Splicing that window into the live entry would put
+   * the jumped-to message directly under the oldest loaded one with a gap of
+   * unfetched history between them and nothing saying so — a transcript that
+   * reads as continuous and is not. Two entries cannot lie about that: each one
+   * is contiguous, and the feed shows exactly one of them at a time.
+   *
+   * BOTH DIRECTIONS PAGE FROM THE WINDOW. `getNextPageParam` walks further back
+   * as it always has; `getPreviousPageParam` walks forward towards the present
+   * on `prev_cursor`, which is `null` on the live entry's first page (so
+   * `hasPreviousPage` is false there and nothing changes for the live view) and
+   * `null` again once a window has been paged all the way up to the newest
+   * message.
+   *
+   * The parameter rides page ONE only — see the queryFn.
    */
   messages: ({
     channelUuid,
     viewerId,
+    around,
     ...params
-  }: Omit<MessageListParams, 'cursor'> & MessagesOptions) =>
+  }: Omit<MessageListParams, 'cursor' | 'around_message_uuid'> &
+    MessagesOptions & {
+      /** The message to open a window around; `null` = the live history. */
+      around: string | null;
+    }) =>
     infiniteQueryOptions({
       queryKey: [
         ...channelsQueries.messagesOf(channelUuid),
         params,
+        { around },
         { viewerId },
       ] as const,
       queryFn: ({ pageParam }) =>
         messagesApi.list(channelUuid, {
           ...params,
           cursor: pageParam ?? undefined,
+          // PAGE ONE ONLY. Every page after it is reached by one of the two
+          // cursors the window came back with, and the server lets a cursor win
+          // over this parameter anyway.
+          around_message_uuid: pageParam === null ? (around ?? undefined) : undefined,
         }),
       initialPageParam: null as string | null,
       getNextPageParam: (lastPage) => lastPage.pagination.next_cursor ?? undefined,
+      getPreviousPageParam: (firstPage) =>
+        firstPage.pagination.prev_cursor ?? undefined,
+      // A 422 IS THE SERVER'S FINAL ANSWER, so it must not be spent twice. The
+      // route answers 422 for a message that is not in this channel — the same
+      // answer it gives for a uuid that never existed anywhere, deliberately, so
+      // it cannot be used to probe elsewhere. Nothing about a second attempt
+      // could change it. Every other failure keeps the client default's one
+      // retry.
+      retry: (failureCount, error) =>
+        extractApiError(error).status !== 422 && failureCount < 1,
       staleTime: STALE_TIMES.realtime,
       gcTime: GC_TIMES.list,
     }),

@@ -932,6 +932,25 @@ export interface ChannelListParams {
 export interface MessageListParams {
   per_page?: number;
   cursor?: string;
+  /**
+   * Land on the page ONE message sits on, with roughly half a page either side
+   * of it — the request a jump to an unloaded message makes instead of walking
+   * backwards through history a page at a time.
+   *
+   * Measured on prod 2026-08-12 (`per_page=30`): the answer is a 30-row window
+   * with the target at index 15, and BOTH cursors filled in, so paging carries
+   * on from there in either direction — `next_cursor` further back,
+   * `prev_cursor` forward towards the present (and `prev_cursor` is `null`
+   * exactly when the window already holds the newest message).
+   *
+   * THE CURSOR WINS if both are sent, so the two are never sent together.
+   *
+   * A uuid that is not in THIS channel answers 422 — identically to one that
+   * never existed anywhere, deliberately, so the route cannot be used to probe
+   * what exists elsewhere. That refusal is final: it is the same answer every
+   * time, so it must not be retried.
+   */
+  around_message_uuid?: string;
 }
 
 /**
