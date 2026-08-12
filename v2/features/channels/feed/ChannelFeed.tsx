@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { ArrowDown, Loader2 } from 'lucide-react';
+import { ArrowDown, Loader2, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -798,6 +798,44 @@ export function ChannelFeed({
         request, so a second jump is not starved by the first one's spend. ── */
   const targetFetchCountRef = useRef(0);
   const budgetForKeyRef = useRef<string | null>(null);
+  /** Set when a jump ran out of road. Null whenever a jump is in flight or has
+   *  landed, so the notice can never outlive the thing it is about. */
+  const [unreachedTarget, setUnreachedTarget] = useState<{
+    key: string;
+    /** Older pages remain, so "keep looking" is a real offer rather than a
+     *  button that would spend another five requests finding nothing. */
+    morePagesExist: boolean;
+  } | null>(null);
+
+  /**
+   * Spend another budget on the same target. The reader asked for this, so it
+   * is not a silent retry — and the budget resets rather than growing, which
+   * keeps one press bounded exactly like the first attempt was.
+   *
+   * THE NONCE IS WHAT MAKES THE BUTTON WORK, and its absence is a bug I shipped
+   * into my own fix for exactly this class of problem: clearing the two refs
+   * changes nothing the hunting effect DEPENDS on, so the effect never re-ran
+   * and "Keep looking" quietly did nothing. Measured — zero further requests.
+   * The nonce is state, so it re-arms the effect the way a new target would.
+   */
+  const [retryNonce, setRetryNonce] = useState(0);
+  const keepLookingForTarget = useCallback(() => {
+    targetFetchCountRef.current = 0;
+    consumedTargetRef.current = null;
+    budgetForKeyRef.current = null;
+    setUnreachedTarget(null);
+    setRetryNonce((n) => n + 1);
+  }, [setUnreachedTarget, setRetryNonce]);
+
+  /** Whether that notice is still TRUE, derived rather than cleared. It stops
+   *  being true the instant the message lands in the loaded pages (the reader
+   *  pressed "Load older" themselves, or "Keep looking" found it) or a newer
+   *  jump takes over — so no effect ever has to reach in and tidy it up. */
+  const showUnreached =
+    unreachedTarget !== null &&
+    activeTarget !== null &&
+    unreachedTarget.key === activeTarget.key &&
+    !messages.some((message) => message.uuid === activeTarget.uuid);
   useEffect(() => {
     if (!activeTarget || consumedTargetRef.current === activeTarget.key) return;
     if (messages.length === 0) return;
@@ -809,6 +847,9 @@ export function ChannelFeed({
 
     if (messages.some((message) => message.uuid === activeTarget.uuid)) {
       consumedTargetRef.current = activeTarget.key;
+      // NOT cleared here. A standing notice is hidden by DERIVATION below
+      // (`showUnreached`), which needs no state write at all: it stops being
+      // true the moment the message is in `messages` or a newer jump starts.
       // Covers the post-landing arrival, a late navigation to an already-open
       // channel (the initial-scroll effect runs once), and every panel jump.
       if (didInitialScrollRef.current) flashMessage(activeTarget.uuid);
@@ -821,9 +862,26 @@ export function ChannelFeed({
       return;
     }
     if (!hasNextPage || targetFetchCountRef.current >= TARGET_FETCH_PAGE_CAP) {
-      // Give up silently — the feed stays where it is (never an error state
-      // for a stale deep link or a pin older than the page budget).
+      /* STOP, BUT SAY SO. This used to give up in silence, and the owner
+         reported the consequence on 2026-08-12: he tapped a reply quote, the
+         message was older than the page budget, and the screen simply did not
+         move. He then scrolled and pressed "Load older" by hand until it
+         appeared — doing the work this had quietly abandoned. A tap that
+         produces nothing at all reads as a broken app, not as a limit.
+
+         The two ways to fail are different and are told apart, because one has
+         a next step and the other does not: pages remain (the budget ran out,
+         so the reader can ask for more), or there are none (the message is not
+         in this channel's history at all — deleted, or a stale link). */
       consumedTargetRef.current = activeTarget.key;
+      /* The one state write in this effect, and it cannot be derived: the
+         second failure mode (`!hasNextPage` on the very first evaluation)
+         schedules no fetch, so no further render is guaranteed to happen and
+         a derived value would never be computed. It is terminal and runs at
+         most ONCE per target — `consumedTargetRef` is set on the line above
+         and gates re-entry — so it cannot loop. */
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setUnreachedTarget({ key: activeTarget.key, morePagesExist: hasNextPage });
     }
   }, [
     activeTarget,
@@ -833,6 +891,8 @@ export function ChannelFeed({
     fetchNextPage,
     flashMessage,
     beginHistoryPull,
+    // Not read in the body: it exists so "Keep looking" re-arms this effect.
+    retryNonce,
   ]);
 
   /* ── Scroll + keyboard handlers (event callbacks — setState allowed). ─── */
@@ -1217,6 +1277,51 @@ export function ChannelFeed({
           Out of flow (absolute), so nothing here can shift the transcript;
           the measured dock var reserves clearance instead. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+        {/* A jump that ran out of road says so HERE, in the pill's own slot,
+            because that is where this screen already speaks about movement.
+            Quiet, not an error: failing to reach a message from last month is
+            an ordinary limit, and the reader has done nothing wrong. */}
+        {showUnreached && unreachedTarget !== null && (
+          <div className="mb-2 flex justify-center px-3">
+            <div
+              role="status"
+              className={cn(
+                'pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full px-3.5 py-1.5',
+                'bg-secondary text-xs text-secondary-foreground shadow-lg',
+              )}
+            >
+              <span className="min-w-0 truncate">
+                {unreachedTarget.morePagesExist
+                  ? 'That message is further back.'
+                  : "Couldn't find that message here."}
+              </span>
+              {unreachedTarget.morePagesExist && (
+                <button
+                  type="button"
+                  onClick={keepLookingForTarget}
+                  className={cn(
+                    'v2-interactive shrink-0 rounded-full font-medium text-primary underline',
+                    FOCUS_RING,
+                  )}
+                >
+                  Keep looking
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setUnreachedTarget(null)}
+                aria-label="Dismiss"
+                className={cn(
+                  'v2-interactive shrink-0 rounded-full text-muted-foreground',
+                  FOCUS_RING,
+                )}
+              >
+                <X aria-hidden className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Jump-to-latest pill — gold, counted, symmetric tween, inert when
             hidden (NewRowsPill DNA pointed downward). */}
         <div
