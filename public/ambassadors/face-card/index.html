@@ -144,6 +144,17 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .btn-ink{background:var(--ink-black);color:var(--gold-soft);}
 .btn-ink:hover{background:var(--ink-700);transform:translateY(-2px);}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+/* NOT READY, BUT NOT DEAD EITHER. @arthur, 2026-08-13: a card went out with
+   "Your Name" on it, so the buttons must not look ready before the card is.
+   They stay visibly unavailable and still answer a tap by naming what is
+   missing, because a button that silently does nothing teaches nothing. Not
+   the `disabled` attribute for the same reason: it eats the click. */
+.btn[aria-disabled="true"]{background:var(--cream-deep);color:var(--ink-300);box-shadow:none;cursor:not-allowed;}
+.btn[aria-disabled="true"]:hover{background:var(--cream-deep);transform:none;}
+.needs{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:500;color:var(--ink-500);margin:11px 0 0;
+  transition:opacity .2s var(--ease);}
+.needs svg{width:14px;height:14px;flex:none;color:var(--gold-deep);}
+.needs[hidden]{display:none;}
 
 .cap{margin-top:20px;}
 .cap label{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ink-700);margin-bottom:7px;}
@@ -174,12 +185,12 @@ footer a{color:var(--gold-deep);font-weight:600;}
   .nav .kit{display:none;}
   .panel{padding:24px 20px;}
   .stage{padding:18px;}
-  /* UPLOAD HAS TO BE ON THE FIRST SCREEN — it is the only thing to do here, and
+  /* UPLOAD HAS TO BE ON THE FIRST SCREEN, it is the only thing to do here, and
      it sat about 30px below the fold on a 390x844 phone. @arthur, 2026-08-08.
 
      THE CAP IS ON WIDTH, AND THAT IS THE WHOLE POINT. I first capped the height
      and it changed nothing, because in Post shape the card is SQUARE and its
-     height follows its width — it was never touching the height limit. Worse,
+     height follows its width, so it was never touching the height limit. Worse,
      trimming the stage padding to buy space made the card WIDER and therefore
      TALLER, and the fold moved the wrong way. Only a width cap moves it.
 
@@ -188,8 +199,8 @@ footer a{color:var(--gold-deep);font-weight:600;}
      the card is still big enough to judge and the upload box is properly in view
      rather than technically in view. */
   .card-canvas{max-width:68%;max-height:min(42vh,420px);}
-  /* The words above cost ~235px before anything happens. Trimmed, not removed —
-     they still say what the page is for. */
+  /* The words above cost ~235px before anything happens. Trimmed, not removed,
+     because they still say what the page is for. */
   .intro{padding:16px 0 12px;}
   .intro h1{font-size:30px;margin:6px 0 0;}
   .intro p{font-size:14.5px;margin:8px auto 0;}
@@ -272,9 +283,10 @@ footer a{color:var(--gold-deep);font-weight:600;}
       <div class="block">
         <p class="grouplabel"><span class="n">4</span>Download &amp; share</p>
         <div class="actions">
-          <button class="btn btn-gold" id="dl"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-download"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M12 15V3" />  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />  <path d="m7 10 5 5 5-5" /></svg>Download</button>
-          <button class="btn btn-ink" id="share"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-share-2"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <circle cx="18" cy="5" r="3" />  <circle cx="6" cy="12" r="3" />  <circle cx="18" cy="19" r="3" />  <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" />  <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>Share</button>
+          <button class="btn btn-gold" id="dl" aria-disabled="true"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-download"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M12 15V3" />  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />  <path d="m7 10 5 5 5-5" /></svg>Download</button>
+          <button class="btn btn-ink" id="share" aria-disabled="true"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-share-2"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <circle cx="18" cy="5" r="3" />  <circle cx="6" cy="12" r="3" />  <circle cx="18" cy="19" r="3" />  <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" />  <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>Share</button>
         </div>
+        <p class="needs" id="needs" hidden></p>
         <div class="cap">
           <label for="caption">Caption <button class="copy" id="copyCap"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-copy"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>Copy</button></label>
           <textarea id="caption"></textarea>
@@ -511,6 +523,7 @@ footer a{color:var(--gold-deep);font-weight:600;}
         clampOffsets(); draw();
         drop.classList.add('has'); drop.innerHTML=`<img class="thumb" src="${e.target.result}" alt=""><div class="meta"><h4>Photo added</h4><p>Drag on the card to position · zoom below</p></div><span class="ic"><!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-refresh-cw"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />  <path d="M21 3v5h-5" />  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />  <path d="M8 16H3v5" /></svg></span>`;
         icons(); zoomWrap.classList.add('show'); cv.classList.add('grab');
+        refreshReady();
         document.getElementById('dragHint').innerHTML='<!-- @license lucide-static v1.28.0 - ISC --><svg aria-hidden="true"  class="lucide lucide-move"  xmlns="http://www.w3.org/2000/svg"    viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round">  <path d="M12 2v20" />  <path d="m15 19-3 3-3-3" />  <path d="m19 9 3 3-3 3" />  <path d="M2 12h20" />  <path d="m5 9-3 3 3 3" />  <path d="m9 5 3-3 3 3" /></svg>Drag your photo on the card to position it'; icons();
       }; img.src=e.target.result; };
     r.readAsDataURL(f); }
@@ -540,7 +553,7 @@ footer a{color:var(--gold-deep);font-weight:600;}
     /* THE SCHOOL IS THE PART THAT CAN BLOW THE LIMIT, SO IT IS THE PART THAT
        GOES. The form caps a school at 46 characters, but the page prefills it
        from the ambassador's application, and a value set in code walks straight
-       past `maxlength` — measured: a 60-character school arrives intact. Rather
+       past `maxlength`. Measured: a 60-character school arrives intact. Rather
        than truncate somebody's school, build the caption with it and drop the
        clause only if the result would be cut by X anyway. A caption without the
        school reads fine; one cut mid-word does not, and it is cut in public.
@@ -558,8 +571,35 @@ www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
     return body(at).length <= 280 ? body(at) : body(''); }
   const caption=document.getElementById('caption');
   function refreshCaption(){ if(!capDirty) caption.value=defCaption(); }
-  nameI.addEventListener('input',()=>{ state.name=nameI.value; draw(); });
-  instI.addEventListener('input',()=>{ state.institution=instI.value; refreshCaption(); draw(); });
+  /* THE FIELDS ARE THE TRUTH, AND NOTHING ELSE GETS TO REMEMBER THEM.
+     @arthur, 2026-08-13: an ambassador posted a card that said "Your Name" and
+     "Your University" with his own photo on it, and the gate below let it out.
+     Cause: the gate read the INPUTS while the canvas drew from `state`, and the
+     only thing keeping the two equal was the `input` event. A browser restoring
+     the form on back/forward refills the inputs and fires nothing, so the
+     fields looked filled, the gate agreed, and the canvas drew placeholders.
+     Reproduced exactly that way before this was written.
+
+     So `state` is no longer a second copy anybody can typo out of sync. It is
+     refreshed from the fields on every event that can change them, on the
+     restores that change them silently, and once more immediately before any
+     export. */
+  function syncDetails(){
+    const n=nameI.value, i=instI.value;
+    if(n===state.name && i===state.institution) return false;
+    state.name=n; state.institution=i;
+    /* Redrawing here rather than at the call sites is the whole guarantee: the
+       gate calls this before it answers, so the picture is never behind the
+       fields at the moment we decide whether the card may leave. */
+    refreshCaption(); draw();
+    return true;
+  }
+  function onDetailsChanged(){ syncDetails(); refreshReady(); }
+  /* `change` and `pageshow` are not belt and braces, they are the two the
+     `input` event misses: autofill on some engines, and the bfcache restore
+     that caused the bug. */
+  ['input','change'].forEach(ev=>{ nameI.addEventListener(ev,onDetailsChanged); instI.addEventListener(ev,onDetailsChanged); });
+  window.addEventListener('pageshow',onDetailsChanged);
   caption.addEventListener('input',()=>{ capDirty=true; });
 
   caption.value=defCaption();
@@ -568,14 +608,14 @@ www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
      The first version carried the name and school as parameters in the link the
      welcome email sends. It worked, and it was wrong twice over: a link that
      holds somebody's name can be forwarded, logged and screenshotted, and this
-     page fetches a font from Google — which would have received that name and
+     page fetches a font from Google, which would have received that name and
      school with every card. The ambassador page next door already reads the
      signed-in account, so the mechanism existed and was not used.
 
      THE ONE CASE IT DOES NOT COVER, STATED PLAINLY: a link tapped inside Gmail
      opens Gmail's own browser, which does not share the sign-in. That reader
      looks signed-out to us, so the boxes stay empty and a quiet line offers the
-     way in. No wall — they can still make a card by typing two things.
+     way in. No wall, they can still make a card by typing two things.
 
      Institution follows the same order the email does: law school first, then
      university. Failure is silent by design; an empty form is a working form. */
@@ -595,7 +635,7 @@ www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
 
     /* TWO SOURCES, AND THE ORDER IS THE POINT (@backendclaude, 2026-08-08).
        The SCHOOL comes from the ambassador's own application, because that is
-       the same source the welcome email reads — so the card and the email can
+       the same source the welcome email reads, so the card and the email can
        never disagree about where somebody studies. The profile is the fallback
        and can be years stale, or missing outright: a profile row may not exist
        at all, in which case the whole block is absent rather than its fields
@@ -613,9 +653,11 @@ www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
         var p = (u && u.profile) || {};
         var name = (u && u.name) || (a && a.name) || '';
         var school = (a && (a.law_school || a.university)) || p.law_school || p.university || '';
-        if(name && !nameI.value){ nameI.value = name; state.name = name; }
-        if(school && !instI.value){ instI.value = school; state.institution = school; }
-        refreshCaption(); draw();
+        if(name && !nameI.value) nameI.value = name;
+        if(school && !instI.value) instI.value = school;
+        /* Through the one door, so a prefilled field cannot end up on the card
+           any differently from a typed one. */
+        onDetailsChanged();
       });
   })();
 
@@ -633,42 +675,80 @@ www.lawexa.com @lawexaai #Lawexa #CampusAmbassador`;
   function fileName(){ const n=(state.name.trim()||'lawexa-ambassador').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return `${n||'lawexa-ambassador'}-card.png`; }
   function getBlob(){ return new Promise(res=>cv.toBlob(res,'image/png',0.95)); }
   let downloaded=false;
-  async function downloadCard(){ const b=await getBlob(); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=fileName(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); downloaded=true; }
+  async function downloadCard(){ if(detailsMissing()) return false;
+    const b=await getBlob(); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=fileName(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); downloaded=true; return true; }
   /* NOTHING LEAVES THIS PAGE WITH "Your Name" ON IT. @arthur, 2026-08-08: the
      placeholders are drawn on the card, so an empty form still produces a
-     downloadable, postable card that says "Your Name" and "Your University" —
-     and the person only finds out after it is on their timeline. Checked here
-     rather than in the download itself so the share buttons get the same guard
-     from one place. Focuses the first empty field, because a refusal that does
-     not say where to look is just a wall. */
-  function detailsMissing(){
+     downloadable, postable card that says "Your Name" and "Your University",
+     and the person only finds out after it is on their timeline.
+
+     WHAT THE CARD IS MISSING IS ASKED OF THE CARD ITSELF. Every answer comes
+     from `state`, which is exactly what the canvas draws, so the gate cannot
+     disagree with the picture the way it did on 2026-08-13. The guard sits
+     inside downloadCard() as well, so no path out of this page can skip it. */
+  function missing(){
+    syncDetails();
     /* A PHOTO COUNTS AS A DETAIL. @arthur, 2026-08-08: Share handed out a card
        with the placeholder silhouette on it. The circle is the point of the
        card, so an empty one is as wrong as an empty name. */
-    if(!state.img){ document.getElementById('drop').scrollIntoView({block:'center',behavior:'smooth'});
-      showToast('Add your photo first - it is the middle of the card.'); return true; }
-    const first = !nameI.value.trim() ? nameI : (!instI.value.trim() ? instI : null);
-    if(!first) return false;
-    first.focus();
-    first.scrollIntoView({block:'center',behavior:'smooth'});
-    showToast(first===nameI ? 'Add your name first — it is printed on the card.'
-                            : 'Add your institution first — it is printed on the card.');
+    if(!state.img) return {what:'photo', el:document.getElementById('drop'),
+      say:'Add your photo first, it is the middle of the card.'};
+    if(!state.name.trim()) return {what:'name', el:nameI,
+      say:'Add your name first, it is printed on the card.'};
+    if(!state.institution.trim()) return {what:'institution', el:instI,
+      say:'Add your institution first, it is printed on the card.'};
+    return null;
+  }
+  /* Focuses the field it is refusing over, because a refusal that does not say
+     where to look is just a wall. */
+  function detailsMissing(){
+    const m=missing();
+    refreshReady(m);
+    if(!m) return false;
+    if(m.el.focus) m.el.focus();
+    m.el.scrollIntoView({block:'center',behavior:'smooth'});
+    showToast(m.say);
     return true;
   }
-  document.getElementById('dl').addEventListener('click',async()=>{ if(detailsMissing()) return; await downloadCard(); showToast('Card downloaded. Post it anywhere and tag @lawexaai.'); });
+  const dlBtn=document.getElementById('dl'), shareBtn=document.getElementById('share'), needs=document.getElementById('needs');
+  const NEEDS_ICON='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+  const WORDS={photo:'a photo', name:'your name', institution:'your institution'};
+  /* Says what is left BEFORE the tap, so the refusal is never a surprise. The
+     buttons carry aria-disabled rather than disabled, so they still answer a
+     tap by naming the missing field instead of doing nothing at all. Takes the
+     answer as an argument when the caller already has one, so a click never
+     asks the same question twice. */
+  function refreshReady(known){
+    const m = known===undefined ? missing() : known;
+    dlBtn.setAttribute('aria-disabled', m?'true':'false');
+    shareBtn.setAttribute('aria-disabled', m?'true':'false');
+    if(!m){ needs.hidden=true; return; }
+    needs.textContent='';
+    needs.insertAdjacentHTML('beforeend',NEEDS_ICON);
+    const say=document.createElement('span');
+    say.textContent='Add '+WORDS[m.what]+' to download or share.';
+    needs.appendChild(say);
+    needs.hidden=false;
+  }
+  dlBtn.addEventListener('click',async()=>{ if(!await downloadCard()) return; showToast('Card downloaded. Post it anywhere and tag @lawexaai.'); });
 
   async function copyCaption(){ try{ await navigator.clipboard.writeText(caption.value); return true; }catch(e){ caption.select(); try{document.execCommand('copy');}catch(_){}; return true; } }
   document.getElementById('copyCap').addEventListener('click',async()=>{ await copyCaption(); showToast('Caption copied.'); });
 
-  document.getElementById('share').addEventListener('click',async()=>{
+  shareBtn.addEventListener('click',async()=>{
     if(detailsMissing()) return;
     const b=await getBlob(); const f=new File([b],fileName(),{type:'image/png'});
     if(navigator.canShare && navigator.canShare({files:[f]})){
       try{ await navigator.share({files:[f],text:caption.value,title:'Lawexa Campus Ambassador'}); return; }
       catch(e){ if(e && e.name==='AbortError') return; }
     }
-    await downloadCard(); await copyCaption(); showToast('Card saved and caption copied. Post it anywhere and tag @lawexaai.');
+    if(!await downloadCard()) return;
+    await copyCaption(); showToast('Card saved and caption copied. Post it anywhere and tag @lawexaai.');
   });
+
+  /* The card starts empty, so the buttons start unavailable. Also catches the
+     restored form that the load below does not know about yet. */
+  refreshReady();
 
   
 })();
