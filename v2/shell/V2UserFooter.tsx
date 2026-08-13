@@ -40,7 +40,9 @@ import { FOCUS_RING } from './designs/modules';
  * be tagged yet", and this is the sentence that ends it. It retires itself the
  * moment a handle exists.
  *
- * Signed out → a tasteful sign-in affordance instead of the account row.
+ * Signed out OR a guest → the two doors into an account, never the account row.
+ * See the guest note in the body for why a guest is not simply a signed-in user
+ * with fewer permissions here.
  */
 export function V2UserFooter({
   user,
@@ -53,16 +55,43 @@ export function V2UserFooter({
    *  a nav row now. The persistent sidebar passes nothing. */
   onNavigate?: () => void;
 }) {
+  /**
+   * A GUEST IS NOT AN ACCOUNT, AND THIS ROW WAS TREATING IT AS ONE.
+   *
+   * Reported by @arthur on 2026-08-13 with a screenshot: a guest opening the
+   * drawer saw "Guest User · Set a handle · Free" and no way to sign up or sign
+   * in ANYWHERE. The bug is the `!user` test below — a guest has a session, so
+   * it fell through to the account row and was offered the one thing a guest
+   * can never do. Guest accounts are view-only until they register, so there is
+   * no profile to open and no handle to set.
+   *
+   * Both doors are offered, not one. A guest arrived here without an account,
+   * so registering is the likely intent and leads; somebody who already has an
+   * account and is browsing signed-out needs the quieter second door.
+   */
+  const isGuest = user?.role === 'guest';
+
   const planQuery = useQuery({
     ...subscriptionQueries.current(),
-    enabled: !!user,
+    // A guest has no subscription to read, so this asked a question nobody
+    // needed the answer to on every drawer open.
+    enabled: !!user && !isGuest,
   });
 
-  if (!user) {
+  if (!user || isGuest) {
     return (
-      <Button asChild className={cn('w-full', className)}>
-        <Link href="/login">Sign in</Link>
-      </Button>
+      <div className={cn('grid gap-1.5', className)}>
+        <Button asChild className="w-full">
+          <Link href="/register" onClick={onNavigate}>
+            Create account
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" className="w-full">
+          <Link href="/login" onClick={onNavigate}>
+            Sign in
+          </Link>
+        </Button>
+      </div>
     );
   }
 
