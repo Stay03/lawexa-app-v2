@@ -63,7 +63,7 @@ export function ConversationRow({
         href={`/c/${id}`}
         aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}`}
         className={cn(
-          'group v2-interactive flex min-h-14 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60 active:bg-secondary',
+          'group v2-interactive flex min-h-14 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60',
           FOCUS_RING,
         )}
       >

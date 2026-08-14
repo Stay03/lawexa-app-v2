@@ -158,6 +158,58 @@ html.v2-document-lock body {
 }
 
 /* -----------------------------------------------------------------------------
+   THE PRESS ITSELF (mobile native overhaul, phase 1).
+
+   The rule above takes the browser's grey tap flash away. For 633 of the app's
+   729 tappable sites nothing was ever put back, so on a phone most of the app
+   did not answer a finger at all: `hover:` compiles inside `@media (hover:
+   hover)` in Tailwind 4 and never runs on a touch screen. This is the answer,
+   and `touch-press.tsx` is the hand that decides WHICH element wears it.
+
+   IT IS LAYERED, AND THAT IS LOAD-BEARING. Every other rule in this sheet is
+   unlayered, and unlayered CSS beats Tailwind v4's `@layer utilities` — so an
+   unlayered version of this rule would silently OVERRIDE the handful of
+   deliberate `active:` states in the app (the reaction pill's scale, the quiz
+   answer card) instead of composing with them. Inside the layer, the selector's
+   specificity still beats a bare utility, so the transition below wins where it
+   must without taking the layer's precedence.
+
+   OPACITY, NOT BACKGROUND. Background is the channel the existing press states
+   already use, and it is also the one property that cannot be set from a shared
+   rule without knowing what the element's own background is. Opacity is what
+   iOS does (SwiftUI's default button drops its label to about 0.2), works on
+   any element whatever it is painted with, and composes with a tint where a
+   component has one.
+
+   INSTANT DOWN, EASED BACK. The press sets `transition-duration: 0s`, so it
+   lands on the frame the finger does; the release runs 150ms on Material's
+   standard curve. The existing press states in the app all inherited
+   `transition-colors`, which eased them IN over 150ms — the opposite of both
+   platforms.
+
+   NO SCALE HERE. A scale change is motion animation under WCAG 2.3.3 and would
+   have to be withdrawn for anyone who asks for less motion; an opacity change
+   is explicitly NOT motion animation and is safe to keep for everyone, which is
+   why this needs no reduced-motion branch at all.
+
+   `data-press-host` is set once, permanently, the first time an element is
+   pressed. It is what opts that element into the transition, so nothing that
+   has never been pressed has its transitions rewritten.
+   -------------------------------------------------------------------------- */
+@layer utilities {
+  html.v2-document-lock [data-press-host] {
+    transition-property: opacity, background-color, border-color, color, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  html.v2-document-lock [data-press-host][data-pressed] {
+    opacity: var(--v2-press-opacity, 0.62);
+    transition-duration: 0s;
+  }
+}
+
+/* -----------------------------------------------------------------------------
    Touch-and-hold target (owner, Aug 4: "i like the hold to show message options
    on mobile but on some devices when it comes up it also triggers the text
    selector which highlights the text which is very messy").

@@ -110,7 +110,7 @@ export function HomePrompts({
             type="button"
             onClick={() => onSelect(label)}
             className={cn(
-              'v2-interactive min-h-11 rounded-2xl border border-border px-4 py-3 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground active:bg-secondary',
+              'v2-interactive min-h-11 rounded-2xl border border-border px-4 py-3 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
               FOCUS_RING,
             )}
           >

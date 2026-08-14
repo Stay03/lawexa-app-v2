@@ -154,7 +154,7 @@ const RailChannelRow = memo(function RailChannelRow({
           withPreview ? 'min-h-12 items-start' : 'min-h-9 items-center',
           active
             ? 'bg-secondary'
-            : 'hover:bg-secondary/60 active:bg-secondary/80',
+            : 'hover:bg-secondary/60',
           FOCUS_RING,
         )}
       >

@@ -14,6 +14,7 @@ import { V2Drawer } from '@/v2/shell/V2Drawer';
 import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
+import { TouchPress } from '@/v2/shell/touch-press';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
@@ -150,6 +151,11 @@ export default async function V2Layout({
           on soft-nav away) — the document-scroll lock must follow the shell's
           lifecycle because React never unloads the stylesheet. */}
       <DocumentLock />
+      {/* Marks the closest tappable ancestor of a finger with `data-pressed`,
+          which is the only thing that makes 633 of the app's 729 tappable sites
+          answer a touch at all (see the module for the count and the platform
+          numbers). One passive listener; renders null. */}
+      <TouchPress />
       {/* Back/Forward + reload scroll restoration for the shell's ONE scroll
           container — the div is invisible to both native restoration and the
           router, so it restores itself. Push scroll stays Next's (see the

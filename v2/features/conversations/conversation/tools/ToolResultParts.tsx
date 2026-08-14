@@ -148,7 +148,7 @@ export function ResultRowLink({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'group v2-interactive flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary active:bg-secondary/80',
+        'group v2-interactive flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary',
         FOCUS_RING,
       )}
     >

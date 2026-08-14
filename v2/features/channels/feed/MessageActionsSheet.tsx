@@ -417,10 +417,10 @@ function SheetAction({
         'v2-interactive flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-1.5 text-left text-sm font-medium',
         'transition-colors duration-150 motion-reduce:transition-none',
         destructive
-          ? 'text-destructive active:bg-destructive/10'
+          ? 'text-destructive'
           : pressed
-            ? 'text-primary active:bg-primary/10'
-            : 'text-foreground active:bg-muted',
+            ? 'text-primary'
+            : 'text-foreground',
         disabled && 'pointer-events-none opacity-50',
         FOCUS_RING,
       )}

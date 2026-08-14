@@ -95,7 +95,7 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
         className={cn(
           'group flex min-w-0 items-start gap-3 rounded-xl px-3 py-2.5',
           'transition-colors duration-150 motion-reduce:transition-none v2-interactive',
-          'hover:bg-secondary/50 active:bg-secondary/70',
+          'hover:bg-secondary/50',
           FOCUS_RING,
         )}
       >

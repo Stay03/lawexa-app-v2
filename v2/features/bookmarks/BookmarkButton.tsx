@@ -66,7 +66,7 @@ export function BookmarkButton({
         <Bookmark
           aria-hidden
           className={cn(
-            'size-4 transition-transform motion-safe:duration-150 active:scale-90',
+            'size-4',
             isBookmarked && 'fill-current',
           )}
         />
@@ -89,7 +89,7 @@ export function BookmarkButton({
       <Bookmark
         aria-hidden
         className={cn(
-          'size-4 transition-transform motion-safe:duration-150 active:scale-90',
+          'size-4',
           isBookmarked && 'fill-current',
         )}
       />

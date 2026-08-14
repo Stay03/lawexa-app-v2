@@ -121,7 +121,7 @@ export const SpaceRow = memo(function SpaceRow({
         href={`/spaces/${space.uuid}`}
         className={cn(
           'group flex min-h-20 min-w-0 items-center gap-3.5 rounded-xl border border-border bg-background px-3 py-3',
-          'transition-colors duration-150 hover:bg-secondary/40 active:bg-secondary/60',
+          'transition-colors duration-150 hover:bg-secondary/40',
           'motion-reduce:transition-none v2-interactive',
           FOCUS_RING,
         )}

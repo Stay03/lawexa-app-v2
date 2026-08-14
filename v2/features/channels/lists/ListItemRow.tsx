@@ -98,6 +98,9 @@ export function ListItemRow({
         type="button"
         aria-label="Reorder item"
         disabled={!canDrag}
+        // The shared press mark is wrong on a grip: a grip stays down for the
+        // whole drag, and the row it is dragging is already showing that.
+        data-press="none"
         {...attributes}
         {...listeners}
         className={cn(

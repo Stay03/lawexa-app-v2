@@ -215,7 +215,7 @@ function RemoveFromFolderButton({
     >
       <FolderMinus
         aria-hidden
-        className="size-4 transition-transform motion-safe:duration-150 active:scale-90"
+        className="size-4"
       />
     </button>
   );

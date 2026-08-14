@@ -83,7 +83,7 @@ export const MyChannelRow = memo(function MyChannelRow({
         href={`/channels/${channel.uuid}`}
         className={cn(
           'group flex min-w-0 items-start gap-3 rounded-xl px-2 py-3',
-          'transition-colors duration-150 hover:bg-secondary/50 active:bg-secondary/70',
+          'transition-colors duration-150 hover:bg-secondary/50',
           'motion-reduce:transition-none v2-interactive',
           FOCUS_RING,
         )}

@@ -130,7 +130,7 @@ export function HomeSectionRow({
       <Link
         href={href}
         className={cn(
-          'v2-interactive group flex min-h-11 items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60 active:bg-secondary',
+          'v2-interactive group flex min-h-11 items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60',
           FOCUS_RING,
         )}
       >

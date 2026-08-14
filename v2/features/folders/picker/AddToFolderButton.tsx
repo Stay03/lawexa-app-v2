@@ -50,7 +50,7 @@ export function AddToFolderButton({ target }: { target: FolderItemTarget }) {
       >
         <FolderPlus
           aria-hidden
-          className="size-4 transition-transform motion-safe:duration-150 active:scale-90"
+          className="size-4"
         />
         <span>Add to folder</span>
       </button>

@@ -139,7 +139,7 @@ export function ModuleRow({
         href={href}
         aria-label={ariaLabel}
         className={cn(
-          'group v2-interactive flex min-h-11 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary/60 active:bg-secondary',
+          'group v2-interactive flex min-h-11 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary/60',
           FOCUS_RING,
         )}
       >
