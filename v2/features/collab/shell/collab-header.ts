@@ -89,6 +89,24 @@ export interface CollabHeaderContext {
   backLabel: string;
   /** Opens the space drawer. MUST be referentially stable (see the docblock). */
   openRail: () => void;
+  /**
+   * WHO PAINTS THE TOP BAR ON A PHONE (mobile overhaul, phase 3).
+   *
+   * A channel screen used to wear two: the shell bar named the place and the
+   * place bar described it, 101px of chrome before the first message and the
+   * channel's identity split across both. Every chat app worth copying runs
+   * ONE bar on a conversation, so below `md:` the channel screen now owns it
+   * outright and the shell bar stands down.
+   *
+   * It is a published signal rather than a route test in the header because
+   * the screen is the only thing that knows whether it has a bar to give: a
+   * space lobby has none, so there the shell bar still paints.
+   *
+   * The shell bar hides on this with a CSS variant, never a viewport hook —
+   * the standing rule in this shell is that the correct bar paints before
+   * hydration.
+   */
+  barOwner: 'shell' | 'screen';
 }
 
 let context: CollabHeaderContext | null = null;

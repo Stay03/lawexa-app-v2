@@ -367,6 +367,10 @@ function CollabPlaceFrame({
       backHref,
       backLabel,
       openRail,
+      // A channel screen carries its own bar on a phone; a space lobby does
+      // not, so there the shell bar stays. `channelName` is null on exactly the
+      // space routes, which is why it is the test.
+      barOwner: channelName === null ? 'shell' : 'screen',
     });
     return () => clearCollabHeader();
   }, [

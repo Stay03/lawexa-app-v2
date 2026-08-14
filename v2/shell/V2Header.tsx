@@ -106,7 +106,19 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         : null;
 
   return (
-    <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-2 px-3">
+    <div
+      className={cn(
+        // The notch strip is painted by whichever bar is showing. It used to
+        // ride the shell's header ROW, which meant a stood-down bar would have
+        // left a dead padded strip above the screen (the trap the dock already
+        // documents for the bottom edge).
+        'v2-safe-top grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-2 px-3',
+        // ONE BAR ON A PHONE. Inside a channel the screen paints its own, so
+        // this one gets out of the way below `md:` — see `barOwner` in
+        // collab-header.ts. A CSS variant, never a viewport hook.
+        collab?.barOwner === 'screen' && 'max-md:hidden',
+      )}
+    >
       {/* LEFT cluster. */}
       <div className="flex min-w-0 items-center gap-2">
         {/* Mobile: hamburger opens the drawer. The id is the focus-restore target

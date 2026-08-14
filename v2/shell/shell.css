@@ -130,6 +130,25 @@ html.v2-document-lock body {
 .v2-safe-left {
   padding-left: env(safe-area-inset-left, 0px);
 }
+
+/* -----------------------------------------------------------------------------
+   THE SCREEN'S OWN TOP BAR (mobile overhaul, phase 3).
+
+   On a phone a channel screen carries the only bar there is: the shell's stands
+   down below `md:` (see `barOwner` in collab-header.ts), so the notch strip is
+   this bar's to pad and to paint. Above `md:` the shell bar is back and pads
+   itself, so this must NOT add a second inset — hence the media query rather
+   than the shared `.v2-safe-top` class.
+
+   The breakpoint is Tailwind's `md` (48rem = 768px) written by hand, because a
+   utility cannot express "only when the other bar is gone". If that breakpoint
+   ever moves, this moves with it.
+   -------------------------------------------------------------------------- */
+@media (max-width: 47.999rem) {
+  html.v2-document-lock .v2-screen-bar {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
 .v2-safe-right {
   padding-right: env(safe-area-inset-right, 0px);
 }

@@ -515,7 +515,8 @@ export function ChannelErrorState({ onRetry }: { onRetry: () => void }) {
  * the transcript-width composer. `app/v2/channels/[channelId]/loading.tsx`
  * renders it `still` and inert; the live screen renders it (pulsing) while the
  * channel detail resolves. Geometry mirrors the live screen exactly — the same
- * bar height AT EACH WIDTH (`h-11` below `md:`, `h-14` from there up), the same
+ * bar height AT EACH WIDTH (`h-14` everywhere since the phone bar became the
+ * screen's only bar in the mobile overhaul), the same
  * `max-w-3xl` column, the same composer cap — so the hand-off is content
  * resolving, not a layout swap.
  *
@@ -534,7 +535,7 @@ export function ChannelScreenFrame({ still = false }: { still?: boolean }) {
     <div className="relative flex h-full min-h-0 flex-col">
       {/* The one header bar */}
       <div className="shrink-0 border-b">
-        <div className="mx-auto flex h-11 w-full max-w-3xl items-center gap-2 px-4 md:h-14">
+        <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-2 px-4">
           <Skeleton className={cn('size-4 shrink-0 rounded', bar)} />
           <Skeleton
             className={cn('h-3.5 min-w-0 flex-1 rounded md:h-4 md:w-36 md:flex-none', bar)}

@@ -46,7 +46,11 @@ export function AppShell({ children, header, dock }: AppShellProps) {
   return (
     <div className="v2-shell">
       {header != null ? (
-        <header className="v2-shell__header v2-safe-top">{header}</header>
+        // `v2-safe-top` lives on the BAR now, not on this row: a row that pads
+        // itself for the notch and then shows nothing is a dead strip above the
+        // screen, and on a phone inside a channel this row shows nothing at all
+        // (the screen owns the bar there).
+        <header className="v2-shell__header">{header}</header>
       ) : null}
       {/* The id lets full-page surfaces root IntersectionObservers against the
           REAL scroll container (see use-shell-scroll-root.ts) — a viewport root

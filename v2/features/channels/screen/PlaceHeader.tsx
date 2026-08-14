@@ -171,6 +171,7 @@ export function ChannelPlaceHeader({
   parent,
   presence,
   onOpenRoster,
+  onOpenAbout,
   sections,
   section,
   onSelectSection,
@@ -185,6 +186,10 @@ export function ChannelPlaceHeader({
   presence: ChannelPresence | null;
   /** Opens the roster. Omitted where the roster is not readable. */
   onOpenRoster?: () => void;
+  /** Opens the channel's details, which on a phone is what the whole identity
+   *  cluster is for: the description, who can see it, and the space it is in
+   *  all left the bar when it went down to one row. */
+  onOpenAbout: () => void;
   /** Sections this reader can reach. One entry = no control at all. */
   sections: readonly ChannelSection[];
   section: ChannelTab;
@@ -203,12 +208,71 @@ export function ChannelPlaceHeader({
   const total = channel.active_members_count;
   const countLabel = `${total} ${total === 1 ? 'member' : 'members'}`;
 
+  /** What the phone bar says under the channel's name. The description is what
+   *  the channel is FOR, so it wins; a thread says where it branched from,
+   *  because that is the thing a reader lands in a thread wanting; and a plain
+   *  channel with no description falls back to who can see it. */
+  const phoneSubtitle = description ?? (parent?.name ? `Thread in ${parent.name}` : null) ?? channel.visibility_label;
+
   return (
-    <div className="shrink-0 border-b">
+    <div className="v2-screen-bar shrink-0 border-b bg-background">
       <div className="mx-auto w-full max-w-3xl px-4">
-        <div className="flex h-11 items-center gap-2 md:h-14">
-          {/* ── Identity ─────────────────────────────────────────────── */}
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex h-14 items-center gap-2">
+          {/* ── THE PHONE BAR (mobile overhaul, phase 3) ──────────────────
+              Below `md:` this row is the ONLY bar on the screen: the shell's
+              stands down (see `barOwner` in collab-header.ts). So it carries
+              what a conversation header carries in every chat app worth
+              copying — back, the place, who is here, one overflow — and the
+              identity is one tap that opens the details rather than four
+              things competing for one narrow line. */}
+          <Link
+            href={parent?.href ?? `/spaces/${channel.space.uuid}`}
+            aria-label={parent?.name ? `Back to ${parent.name}` : 'Back to the space'}
+            className={cn(
+              'v2-interactive -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full md:hidden',
+              'text-muted-foreground',
+              FOCUS_RING,
+            )}
+          >
+            <ChevronLeft aria-hidden className="size-5" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={onOpenAbout}
+            className={cn(
+              'v2-interactive flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pr-1 text-left md:hidden',
+              FOCUS_RING,
+            )}
+          >
+            <SpaceCrest
+              uuid={channel.space.uuid}
+              name={channel.space.name}
+              type={channel.space.type}
+              size="sm"
+              className="size-8 shrink-0 rounded-lg"
+            />
+            {/* The `min-w-0` chain again: without it on both the span and its
+                children the name refuses to shrink and pushes the faces off
+                the bar instead of ellipsizing. */}
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="min-w-0 truncate text-sm font-semibold leading-tight text-foreground">
+                {displayName}
+              </span>
+              <span className="min-w-0 truncate text-[11px] leading-tight text-muted-foreground">
+                {phoneSubtitle}
+              </span>
+            </span>
+          </button>
+
+          {/* The name is the screen's heading, and it cannot live inside the
+              button above: a button holds phrasing content, and a heading is
+              not that. So the heading is stated once, invisibly, for the
+              readers who navigate by headings. */}
+          <h1 className="sr-only md:hidden">{displayName}</h1>
+
+          {/* ── Identity, `md:` and up (unchanged) ───────────────────── */}
+          <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
             {parent && <BackChip parent={parent} />}
 
             <VisibilityIcon
@@ -269,50 +333,12 @@ export function ChannelPlaceHeader({
               )}
             </h1>
 
-            {/* ── The purpose (below `md:` only) ─────────────────────────
-                What this bar can say that the shell bar above it cannot — and,
-                since the name went, where the description's disclosure lives at
-                this width. See the docblock.
-
-                THE VISIBILITY FALLBACK STANDS DOWN BEHIND A BACK CHIP. It is
-                the line a channel with nothing to disclose shows instead, and
-                a thread has nothing to disclose by construction — so on a
-                phone it would spend the one narrow line that matters saying
-                "Open" beside a glyph that already means it, next to the chip
-                that says which conversation this tangent came out of. The chip
-                wins that space; the `sr-only` label above still states the
-                visibility for anyone reading the bar rather than seeing it. */}
-            {description ? (
-              <button
-                type="button"
-                aria-expanded={descriptionOpen}
-                aria-controls={DESCRIPTION_ID}
-                onClick={() => setDescriptionOpen((open) => !open)}
-                className={cn(
-                  'v2-interactive flex min-w-0 flex-1 items-center gap-1 rounded md:hidden',
-                  'text-sm text-muted-foreground',
-                  'transition-colors duration-150 hover:text-foreground motion-reduce:transition-none',
-                  FOCUS_RING,
-                )}
-              >
-                <span className="min-w-0 truncate">{description}</span>
-                <ChevronDown
-                  aria-hidden
-                  className={cn(
-                    'size-4 shrink-0',
-                    'transition-transform duration-200 motion-reduce:transition-none',
-                    descriptionOpen && 'rotate-180',
-                  )}
-                />
-              </button>
-            ) : parent === null ? (
-              <span
-                aria-hidden
-                className="min-w-0 truncate text-sm text-muted-foreground md:hidden"
-              >
-                {channel.visibility_label}
-              </span>
-            ) : null}
+            {/* THE PURPOSE LINE HAS GONE FROM THE PHONE BAR. It was the
+                disclosure trigger at this width, and the reason the bar could
+                change height while a reader was reading. The description now
+                lives in the details surface the identity opens, whole rather
+                than truncated to one line. `md:` and up keeps the disclosure
+                on the name itself, which is where it always was. */}
 
             {/* The space as a real object, not a text link: the same crest the
                 space's own lane and header carry, so the reader recognises

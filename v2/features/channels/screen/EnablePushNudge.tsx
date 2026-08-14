@@ -74,11 +74,14 @@ export function EnablePushNudge() {
       )}
     >
       <div className="overflow-hidden">
-        {/* NO `border-b`. The channel gets ONE hairline, and it belongs to the
-            header above this bar; a second rule here made the chrome read as
-            two stacked bars rather than one header with something attached to
-            it. The tint is what separates the nudge from the transcript. */}
-        <div className="bg-primary/5 px-4 py-2">
+        {/* A CARD, AND OPAQUE. It used to be a tinted full-width row pinned
+            under the header, where a translucent tint was enough to separate it
+            from the transcript because nothing scrolled behind it. In the
+            mobile overhaul it moved down beside the composer, which floats OVER
+            the feed — and the first film showed messages reading straight
+            through it. Above the composer it has to be a card with a ground of
+            its own: opaque background, its own border, its own corners. */}
+        <div className="rounded-xl border bg-background px-3 py-2 shadow-sm">
           <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
             <Icon
               aria-hidden

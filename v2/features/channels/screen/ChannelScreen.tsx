@@ -78,6 +78,7 @@ import { ChannelEditDialog } from '../dialogs/ChannelEditDialog';
 import { GameOverlay } from '../quiz/GameOverlay';
 import { LiveQuizBar } from '../quiz/LiveQuizBar';
 import { QuizLibrarySheet } from '../quiz/QuizLibrarySheet';
+import { ChannelAboutSheet } from './ChannelAboutSheet';
 import { EnablePushNudge } from './EnablePushNudge';
 import {
   ChannelPlaceHeader,
@@ -426,6 +427,11 @@ export function ChannelScreen({
           quizzes: canParticipate && !isThread,
           ai: canRead,
           requests: canGovernChannel,
+          // What the channel IS. Open to anyone who can read the channel,
+          // because it says nothing the bar did not already say out loud; on a
+          // phone it is what the identity cluster opens now that the bar is
+          // one row (mobile overhaul, phase 3).
+          about: canRead,
         }
       : undefined,
   });
@@ -897,6 +903,7 @@ export function ChannelScreen({
     <ChannelPlaceHeader
       channel={channel}
       parent={headerParent}
+      onOpenAbout={() => panel.show('about')}
       // `null` for anyone with no presence room — a previewer, a refusal. They
       // are told the member count in words rather than shown faces that would
       // claim a presence nobody measured (see `PlaceHeader`).
@@ -1007,17 +1014,6 @@ export function ChannelScreen({
       <div className="flex min-h-0 flex-1 flex-col" inert={gameOpen}>
         {identityHeader}
 
-        {/* The earned moment for closed-app push (W5). Members only: a
-            previewer gets no notifications from a channel they have not
-            joined, so asking them for permission would be asking for nothing.
-            Renders a zero-height inert row when there is nothing to ask.
-
-            NOT IN A THREAD. The nudge asks for a browser permission on behalf
-            of the whole app, and a tangent is the wrong moment to ask: the
-            reader is here for one conversation, they may not follow it, and the
-            parent channel is where the same ask actually earns its place. */}
-        {canParticipate && !isThread && <EnablePushNudge />}
-
         {/* The standing door into a running game (W6) — renders nothing at all
             when no quiz is live here, so the channel's geometry is unchanged
             the rest of the time. Members only, and this is a MOUNT gate, not a
@@ -1094,10 +1090,22 @@ export function ChannelScreen({
                      `motion-reduce` gets none either. */
                   <div
                     className={cn(
+                      'flex flex-col gap-2',
                       justJoined &&
                         'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-200',
                     )}
                   >
+                    {/* THE PUSH ASK LIVES DOWN HERE NOW (mobile overhaul,
+                        phase 3). It used to be a tinted row pinned under the
+                        two header bars, which is the stack the owner called a
+                        mess; an announcement above the composer is where a
+                        chat app puts one, and the feed already measures this
+                        whole region and re-pins the transcript when its height
+                        changes, so appearing and dismissing costs the reader
+                        no scroll position. Members only, never in a thread:
+                        the nudge asks for a permission on behalf of the whole
+                        app, and a tangent is the wrong moment to ask. */}
+                    {!isThread && <EnablePushNudge />}
                     <ChannelComposer
                       ref={composerRef}
                       channel={channel}
@@ -1268,6 +1276,15 @@ export function ChannelScreen({
           {...panel.bind('threads')}
         />
       )}
+
+      {/* What this channel is. On a phone it is what the bar's identity opens
+          now that there is one bar (mobile overhaul, phase 3); at every width
+          it is a `?panel=` value like the rest, so Back closes it. */}
+      <ChannelAboutSheet
+        channel={channel}
+        onOpenRoster={canRead ? () => panel.show('members') : undefined}
+        {...panel.bind('about')}
+      />
 
       {/* Unpin is a write, so a previewer gets the list without the verb —
           the same reading surface, minus a control that would only 403. */}
