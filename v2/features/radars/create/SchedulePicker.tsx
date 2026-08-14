@@ -147,7 +147,7 @@ export function SchedulePicker({
           <div
             role="radiogroup"
             aria-label="How often to scan"
-            className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-secondary/60 p-0.5"
+            className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
           >
             {FREQUENCY_OPTIONS.map((option) => {
               const checked = builder.frequency === option.value;

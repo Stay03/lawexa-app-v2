@@ -158,7 +158,7 @@ export function MessageActionsSheet({
             {/* The tray scrolls horizontally on narrow phones rather than
                 wrapping to a second row — a reaction picker that changes
                 height as you look at it is a moving target for a thumb. */}
-            <div className="v2-quiet-scroll -mx-1 mb-1 overflow-x-auto px-1 pb-1">
+            <div className="v2-quiet-scroll -mx-1 mb-1 overflow-x-auto overscroll-x-contain px-1 pb-1">
               <ReactionTrayRow
                 reactions={message.reactions}
                 disabled={reactionThrottled}

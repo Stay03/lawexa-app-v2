@@ -77,7 +77,7 @@ export function FormattingBar({
           role="toolbar"
           aria-label="Formatting"
           aria-orientation="horizontal"
-          className="v2-quiet-scroll flex items-center gap-0.5 overflow-x-auto px-2 py-1.5"
+          className="v2-quiet-scroll flex items-center gap-0.5 overflow-x-auto overscroll-x-contain px-2 py-1.5"
         >
           {/* Undo/redo are MOBILE-ONLY (a physical keyboard has ⌘Z / ⌘⇧Z, a
               touch keyboard has nothing) and sit FIRST — prime reach. */}

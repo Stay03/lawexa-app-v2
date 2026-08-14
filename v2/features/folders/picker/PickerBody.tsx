@@ -306,7 +306,7 @@ export function PickerBody({
       {trail.length > 0 ? (
         <nav
           aria-label="Where you are"
-          className="-mx-1 flex items-center gap-0.5 overflow-x-auto px-1 pb-0.5 text-xs"
+          className="-mx-1 flex items-center gap-0.5 overflow-x-auto overscroll-x-contain px-1 pb-0.5 text-xs"
         >
           <TrailStep label="Your folders" onClick={() => goTo([])} />
           {trail.map((crumb, index) => {

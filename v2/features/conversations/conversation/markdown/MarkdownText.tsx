@@ -64,7 +64,7 @@ const MARKDOWN_COMPONENTS: Components = { a: CaseMentionLink };
 const PROSE_CLASS =
   'prose prose-sm dark:prose-invert max-w-none overflow-x-hidden break-words ' +
   '[&_a]:text-primary [&_a.case-mention]:no-underline ' +
-  '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:overflow-x-auto';
+  '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:overflow-x-auto [&_pre]:overscroll-x-contain';
 
 /** Split markdown into independently-renderable blocks (blank-line separated),
  *  never splitting inside a fenced code block. Pure — safe to call in render. */

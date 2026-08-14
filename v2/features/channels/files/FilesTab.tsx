@@ -212,7 +212,7 @@ export function FilesTab({
                   onChange={setLens}
                   ariaLabel="Filter files by type"
                   panelId={PANEL_ID}
-                  className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-secondary/60 p-0.5"
+                  className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
                   tabClassName={(selected) =>
                     cn(
                       'v2-interactive min-h-8 shrink-0 rounded-full px-3.5 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',

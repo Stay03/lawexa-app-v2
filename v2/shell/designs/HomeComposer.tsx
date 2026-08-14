@@ -528,7 +528,7 @@ export function HomeComposer({
               // Horizontally-scrollable toolbar keeps every control reachable at
               // 320px without wrapping the row. py-0.5: overflow-x-auto forces
               // overflow-y to auto, which would clip the + focus ring otherwise.
-              <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {/* Plus-menu: Attach + consolidated privacy toggles. */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

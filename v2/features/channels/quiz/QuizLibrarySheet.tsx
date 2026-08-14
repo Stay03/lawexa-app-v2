@@ -329,7 +329,7 @@ export function QuizLibrarySheet({
                 value={source}
                 onChange={(next) => setSource(next)}
                 ariaLabel="Which quizzes to show"
-                className="v2-quiet-scroll -m-1 flex min-w-0 items-center gap-4 overflow-x-auto p-1"
+                className="v2-quiet-scroll -m-1 flex min-w-0 items-center gap-4 overflow-x-auto overscroll-x-contain p-1"
                 tabClassName={(selected) =>
                   cn(
                     'v2-interactive relative flex min-h-9 shrink-0 items-center rounded-none',

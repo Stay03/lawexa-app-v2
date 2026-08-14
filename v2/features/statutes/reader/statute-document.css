@@ -432,6 +432,10 @@
  *  scrolls horizontally. */
 .v2-statute-doc .akn-table-wrap {
   overflow-x: auto;
+  /* A flick past the end of a wide table must stay in the table: at the end of
+     a scroller the browser hands the gesture on, and in a WebView that gesture
+     is the system back-swipe (mobile overhaul, phase 6). */
+  overscroll-behavior-x: contain;
   margin: 1rem 0;
   border-radius: 0.5rem;
   border: 1px solid var(--border);

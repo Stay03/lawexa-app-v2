@@ -75,7 +75,7 @@ export function UserMessageRow({ message }: { message: ChatMessage }) {
     >
       {pastedTexts.length > 0 ? (
         <>
-          <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
+          <div className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
             {pastedTexts.map((text, index) => (
               <PastedContentCard key={index} content={text} />
             ))}

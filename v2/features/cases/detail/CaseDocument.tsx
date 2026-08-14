@@ -609,7 +609,13 @@ function LawTypeTabs({
       value={value}
       onChange={onChange}
       ariaLabel="Filter principles by law type"
-      className="inline-flex items-center gap-0.5 self-start rounded-full bg-secondary/60 p-0.5"
+      // The tabs are data-driven (one per law type this case carries), so the
+      // strip has no fixed width: without a scroller a case with many law types
+      // overflowed the column with nothing to say so. `overscroll-x-contain`
+      // for the same reason every other strip has it — at the end of a sideways
+      // scroller the flick is handed on, and in a WebView that is the system
+      // back-swipe (mobile overhaul, phase 6).
+      className="inline-flex max-w-full items-center gap-0.5 self-start overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
       tabClassName={(selected) =>
         cn(
           'v2-interactive inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',

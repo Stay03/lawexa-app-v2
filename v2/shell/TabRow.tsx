@@ -39,10 +39,18 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  *
  * THE CALL SITE OWNS every visual class. `className` is the container's full
  * class list — including any horizontal-scroll affordance, which cannot be
- * baked in here: the radar strip scrolls the tablist itself (`max-w-full
- * overflow-x-auto`), while the statute country row scrolls an edge-bleed
- * wrapper OUTSIDE the tablist, and an unconditional inner scroller would
- * defeat that bleed and clip focus rings on rows that never overflow.
+ * baked in here: a strip that overflows scrolls the tablist itself
+ * (`max-w-full overflow-x-auto overscroll-x-contain`), while a strip that never
+ * overflows must not have an inner scroller at all, which would only clip its
+ * focus rings. (This paragraph used to describe the statute country row as an
+ * edge-bleed wrapper outside the tablist. That stopped being true on
+ * 2026-08-07, when the bleed was taken off it — see CountryTabs.)
+ *
+ * A SCROLLING STRIP MUST CONTAIN ITS OVERSCROLL. At the end of a sideways
+ * scroller the browser hands the flick on, and in a WebView that gesture is the
+ * system back-swipe, so a reader flicking through tabs could leave the screen.
+ * Every scrolling consumer carries `overscroll-x-contain` (mobile overhaul,
+ * phase 6).
  * `tabClassName(selected)` styles each tab button, and the children render
  * function fills it (label, flag, count — whatever the surface's grammar
  * says). Selection state stays with the host, which is how the URL keeps

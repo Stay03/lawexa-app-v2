@@ -540,7 +540,7 @@ export function ConversationComposer({
             (the removing-set + timer mirror of the attachment chips), so removals are
             symmetric rather than an abrupt vanish. */}
         {pastedItems.length > 0 && (
-          <div className="mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
+          <div className="mb-2 flex gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1">
             {pastedItems.map((item) => {
               const isRemoving = removingPasted.has(item.id);
               return (
