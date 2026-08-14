@@ -23,8 +23,11 @@ import {
 import { canManageChannel } from '../model';
 import { channelsQueries } from '../queries';
 import { channelDisplayName } from '../thread-model';
+import type { ChannelPresence } from '../room';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { MemberRow } from './MemberRow';
+import { PresentMemberRow } from './PresentMemberRow';
+import { groupRoster, type RosterRow } from './roster-groups';
 
 /**
  * ChannelMembersSheet — roster, role management and invites for a channel
@@ -50,12 +53,19 @@ export function ChannelMembersSheet({
   channel,
   viewerId,
   viewerUuid,
+  presence,
   open,
   onOpenChange,
 }: {
   channel: Channel;
   viewerId: number | null;
   viewerUuid: string | null;
+  /** Who is in the room right now, handed down from the screen that joined it.
+   *  `null` for a reader with no room at all. The sheet never joins its own:
+   *  the room's lifecycle belongs to the screen, and a second join of the same
+   *  presence channel from one client is at best redundant. Sharing the screen's
+   *  object also means this list and the faces in the header cannot disagree. */
+  presence: ChannelPresence | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -83,6 +93,19 @@ export function ChannelMembersSheet({
   const members = useMemo(
     () => membersQuery.data?.data ?? [],
     [membersQuery.data],
+  );
+
+  /** Three groups, or `null` when the room has not answered and grouping would
+   *  be a claim rather than a fact. See {@link groupRoster} for why presence
+   *  leads and the fetched page follows. */
+  const groups = useMemo(
+    () =>
+      groupRoster({
+        members,
+        presence,
+        totalMembers: channel.active_members_count,
+      }),
+    [members, presence, channel.active_members_count],
   );
 
   // Space members not yet in this channel — addable directly by uuid
@@ -156,16 +179,73 @@ export function ChannelMembersSheet({
                 </Button>
               </div>
             ) : (
-              members.map((member) => (
-                <MemberRow
-                  key={member.user.uuid}
-                  member={member}
-                  isSelf={member.user.uuid === viewerUuid}
-                  onPromote={canManage ? (m) => handleRole(m, 'admin') : undefined}
-                  onDemote={canManage ? (m) => handleRole(m, 'member') : undefined}
-                  onRemove={canManage ? handleRemove : undefined}
-                />
-              ))
+              (() => {
+                const row = (entry: RosterRow) =>
+                  entry.member ? (
+                    <MemberRow
+                      key={entry.uuid}
+                      member={entry.member}
+                      isSelf={entry.uuid === viewerUuid}
+                      onPromote={canManage ? (m) => handleRole(m, 'admin') : undefined}
+                      onDemote={canManage ? (m) => handleRole(m, 'member') : undefined}
+                      onRemove={canManage ? handleRemove : undefined}
+                    />
+                  ) : (
+                    // Present, but not on the page of members we fetched, or
+                    // (in a thread) not on the roster at all. Shown with what
+                    // presence knows and nothing invented.
+                    <PresentMemberRow
+                      key={entry.uuid}
+                      row={entry}
+                      isSelf={entry.uuid === viewerUuid}
+                    />
+                  );
+
+                // The room has not answered, or there is no room: the flat list
+                // this sheet has always shown.
+                if (!groups) {
+                  return members.map((member) => (
+                    <MemberRow
+                      key={member.user.uuid}
+                      member={member}
+                      isSelf={member.user.uuid === viewerUuid}
+                      onPromote={canManage ? (m) => handleRole(m, 'admin') : undefined}
+                      onDemote={canManage ? (m) => handleRole(m, 'member') : undefined}
+                      onRemove={canManage ? handleRemove : undefined}
+                    />
+                  ));
+                }
+
+                return (
+                  <>
+                    {groups.hereNow.length > 0 && (
+                      <RosterGroup label={`Here now, ${groups.hereNow.length}`}>
+                        {groups.hereNow.map(row)}
+                      </RosterGroup>
+                    )}
+                    {groups.hereNotLooking.length > 0 && (
+                      <RosterGroup
+                        label={`Here, not looking, ${groups.hereNotLooking.length}`}
+                      >
+                        {groups.hereNotLooking.map(row)}
+                      </RosterGroup>
+                    )}
+                    {groups.everyoneElse.length > 0 && (
+                      <RosterGroup label="Everyone else">
+                        {groups.everyoneElse.map(row)}
+                      </RosterGroup>
+                    )}
+                    {/* The roster fetches one page. Saying nothing here would
+                        let the list read as the whole channel when it is not. */}
+                    {groups.notFetched > 0 && (
+                      <p className="py-3 text-center text-xs text-muted-foreground">
+                        and {groups.notFetched} more{' '}
+                        {groups.notFetched === 1 ? 'member' : 'members'}
+                      </p>
+                    )}
+                  </>
+                );
+              })()
             )}
           </div>
         </div>
@@ -211,5 +291,27 @@ function MembersRosterSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * One labelled band of the roster. The label carries its own count rather than
+ * leaving the reader to tally faces, except on the last group, whose size is a
+ * page of members and not a fact about the channel.
+ */
+function RosterGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="pt-2 first:pt-0">
+      <h3 className="pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </h3>
+      <div className="divide-y">{children}</div>
+    </section>
   );
 }

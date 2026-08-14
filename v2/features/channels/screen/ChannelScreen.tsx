@@ -1325,6 +1325,9 @@ export function ChannelScreen({
 
       <ChannelMembersSheet
         channel={channel}
+        // The SAME presence object the header's faces read, so the roster's
+        // "here now" and the header's count can never disagree.
+        presence={canParticipate ? room.presence : null}
         viewerId={viewerId}
         viewerUuid={viewerUuid}
         {...panel.bind('members')}
