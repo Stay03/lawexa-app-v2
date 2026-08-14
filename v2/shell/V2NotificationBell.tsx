@@ -43,13 +43,17 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import {
+  notificationChannelUuid,
+  notificationMessageUuid,
   presentNotification,
   type NotificationDestination,
   type NotificationMark,
   type NotificationPresentation,
 } from '@/v2/features/notifications/presentation';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
+import { warmChannelHistory } from '@/v2/features/channels/warm';
 import { optimisticMutation } from '@/v2/runtime/mutations';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { NotificationDeliveryControls } from './NotificationDeliveryControls';
 import type {
   DeleteNotificationResponse,
@@ -240,6 +244,9 @@ function NotificationPanel({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  // The cache is partitioned by viewer, so warming a transcript needs to know
+  // whose transcript it is.
+  const viewerId = useV2Session().userId;
   // The panel has TWO views behind one surface (audit L4). Settings SWAP with
   // the list instead of stacking under it: stacked, they pushed the rest of the
   // panel off a short viewport and read as something bolted on the end.
@@ -354,6 +361,21 @@ function NotificationPanel({
     if (destination.kind === 'none') return;
     onNavigate();
     if (destination.kind === 'internal') {
+      // WARM THE TRANSCRIPT ONE BEAT BEFORE NAVIGATING. The spine already warms
+      // on the socket event, which covers a session that was running when the
+      // message arrived; this covers the case it cannot — the app opened cold
+      // from a push, where no event was ever received and this press is the
+      // first the client hears of the channel. `force`, because a row someone
+      // has just pressed is not a candidate to be throttled.
+      const channelUuid = notificationChannelUuid(notification);
+      if (channelUuid) {
+        warmChannelHistory(queryClient, {
+          channelUuid,
+          messageUuid: notificationMessageUuid(notification),
+          viewerId,
+          force: true,
+        });
+      }
       router.push(destination.href);
       return;
     }

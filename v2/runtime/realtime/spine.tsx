@@ -9,6 +9,7 @@ import {
   type ChannelCountsApplication,
 } from '@/v2/features/channels/cache';
 import { channelsQueries } from '@/v2/features/channels/queries';
+import { warmChannelHistory } from '@/v2/features/channels/warm';
 import { channelDisplayName } from '@/v2/features/channels/thread-model';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { invitationsQueries } from '@/v2/features/invitations/queries';
@@ -144,7 +145,23 @@ function handleChannelUnread(
     }
   }
 
-  // 3. Toast/sound — mentions only, so the (possibly fetching) resolution is
+  // 3. WARM THE TRANSCRIPT, so the message this event is about is already in
+  //    the cache if the reader opens the channel. The event names the channel
+  //    and the message but carries no content (protocol.ts), and the transcript
+  //    is never stale by design, so without this the row only arrives after the
+  //    screen has painted — the owner watching it appear is what this phase is
+  //    for. `warm.ts` owns every reason to decline, including the one that
+  //    matters here: it never touches a channel somebody is looking at.
+  warmChannelHistory(queryClient, {
+    channelUuid: event.channel_uuid,
+    messageUuid: event.message_uuid ?? null,
+    viewerId,
+    // A mention is the notification a person actually presses, so it does not
+    // wait its turn behind the throttle.
+    force: event.is_mention,
+  });
+
+  // 4. Toast/sound — mentions only, so the (possibly fetching) resolution is
   //    never paid for plain traffic.
   if (!event.is_mention) return;
   void resolveChannelContext(

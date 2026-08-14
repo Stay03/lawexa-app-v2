@@ -218,6 +218,26 @@ export function notificationChannelUuid(
   return /^\/channels\/([^/?#]+)/.exec(destination.href)?.[1] ?? null;
 }
 
+/**
+ * Which message is this row about? Read the same two ways as the channel above:
+ * the stamped field on a modern row, else the row's own address, whose `?m=`
+ * is the message a press would jump to.
+ *
+ * It is only ever used to ask the cache "do you already have this one", so a
+ * null is harmless: the caller warms anyway rather than skipping.
+ */
+export function notificationMessageUuid(
+  notification: Notification,
+): string | null {
+  const stamped = trimmedOrNull(notification.message_uuid);
+  if (stamped) return stamped;
+  const destination = resolveDestination(notification.action_url);
+  if (destination.kind !== 'internal') return null;
+  const query = destination.href.split('?')[1];
+  if (!query) return null;
+  return trimmedOrNull(new URLSearchParams(query).get('m'));
+}
+
 /** Present one inbox row. */
 export function presentNotification(
   notification: Notification,
