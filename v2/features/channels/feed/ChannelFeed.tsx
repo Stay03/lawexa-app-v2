@@ -14,6 +14,7 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { ArrowDown, Loader2, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Channel, Message, SlimUser } from '@/types/collab';
@@ -304,6 +305,18 @@ export function ChannelFeed({
    *  layout effect when the fetch settles, and it suppresses the follower
    *  while armed so a mid-pull resize can never teleport the view. */
   const pendingRestoreRef = useRef<number | null>(null);
+  /**
+   * WHETHER OFF-SCREEN GROUPS MAY BE ESTIMATED RATHER THAN MEASURED.
+   *
+   * They may, but only where the browser keeps the reader's place when an
+   * estimate above them is corrected. Safari does not (no scroll anchoring, on
+   * the iPhone and the Mac alike), and that is the whole of the "load more moves
+   * the screen" and "scrolling up is glitchy" reports: the restore below is
+   * exact at the moment it runs, and then the guessed heights resolve after
+   * paint and walk the transcript out from under the reader. See
+   * {@link useScrollAnchoring}.
+   */
+  const canAnchor = useScrollAnchoring();
   const atBottomRef = useRef(true);
   const followRafRef = useRef<number | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1537,7 +1550,9 @@ export function ChannelFeed({
                         messages={item.messages}
                         posinset={groupOrdinal}
                         setsize={groupCount}
-                        virtualize={groupOrdinal <= groupCount - 1 - UNVIRTUALIZED_TAIL}
+                        virtualize={
+                          canAnchor && groupOrdinal <= groupCount - 1 - UNVIRTUALIZED_TAIL
+                        }
                         viewerUuid={viewerUuid}
                         canEngage={canParticipate}
                         canBranch={canBranch}

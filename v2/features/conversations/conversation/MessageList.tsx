@@ -19,6 +19,7 @@ import {
   type ErrorMessage,
 } from '@/types/chat';
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
+import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
 import { groupMessages, type MessageGroup } from './message-groups';
 import { UserMessageRow } from './rows/UserMessageRow';
 import { AssistantMessageRow } from './rows/AssistantMessageRow';
@@ -83,8 +84,17 @@ const BOTTOM_THRESHOLD_PX = 80;
  * Four real groups is about one phone screenful, so the region the user actually
  * looks at on arrival is measured rather than estimated. Everything further up
  * stays virtualized and resolves off-screen, where a height change costs nothing
- * (the browser's scroll anchoring absorbs it and the follower is already pinned to
- * a bottom that did not move).
+ * — AS LONG AS THE BROWSER KEEPS THE READER'S PLACE. That sentence used to end
+ * "the browser's scroll anchoring absorbs it", stated as a fact about browsers.
+ * It is a fact about Chrome and Firefox. Safari has never implemented scroll
+ * anchoring, so on an iPhone or a Mac every guessed height that resolved above
+ * the viewport moved the page under the reader: "when scrolling up it looks very
+ * glitchy and broken", reported on both, in this screen and in channels.
+ *
+ * So virtualization is now gated on the capability itself
+ * ({@link useScrollAnchoring}). Where the browser cannot hold the reader's
+ * place, every group is measured and nothing settles; where it can, the
+ * optimisation is untouched, and Safari 27 will earn it back by itself.
  */
 const UNVIRTUALIZED_TAIL = 3;
 
@@ -168,6 +178,9 @@ export function MessageList({
   const groups = useMemo(() => groupMessages(messages), [messages]);
   const streamStartTime = useMemo(() => computeStreamStart(messages), [messages]);
   const lastGroupIndex = groups.length - 1;
+  /** Off-screen groups are only estimated where the browser can keep the
+   *  reader's place while the estimate is corrected. See the module. */
+  const canAnchor = useScrollAnchoring();
   /**
    * WHILE A TURN IS RUNNING, THIS ROW IS ALWAYS ON (owner, July 25: "as long as it's
    * still streaming that part should always show").
@@ -374,7 +387,7 @@ export function MessageList({
                     // UNVIRTUALIZED_TAIL. They are the screenful the reader lands
                     // on, so they must be MEASURED, not estimated, or the view
                     // settles under them after the first paint.
-                    virtualize={gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
+                    virtualize={canAnchor && gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
                     isLastGroup={gi === lastGroupIndex}
                     hasLaterUserTurn={
                       group.type === 'single' &&
