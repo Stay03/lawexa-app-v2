@@ -2,8 +2,12 @@
 
 Date: 14 August 2026.
 
-**Read this before quoting the phase as done: the reported defect was not
-reproduced, and this change is hardening rather than a proven fix.**
+**CONFIRMED IN THE FIELD, 14 August 2026, after this shipped.** Arthur, who
+reported it, says the scrolling and the load-more above are both good now on his
+iPhone. So the change fixed the defect on the engine it lives in. Everything
+below was written before that confirmation and is left exactly as it was: it is
+the record of shipping a fix I could not reproduce in the lab, and of what I
+would have needed to close it if the field had said otherwise.
 
 ## What shipped
 
@@ -50,9 +54,15 @@ It does **not** prove the fix works, and I will not claim it does.
   dependency on the missing capability. That is worth shipping on its own terms.
   It is not evidence.
 
-## What is needed to close it
+## What was needed to close it, and what closed it
 
-From Arthur, two facts and one recording:
+The field closed it: the person who reported it says it is good on the device it
+was reported on. That is the strongest evidence available for a defect that
+exists only on an engine I have no copy of, and it is the reason the mechanism
+in `plan.md` should be treated as the confirmed cause rather than the leading
+theory.
+
+The rest of this section is what I had asked for before that answer arrived:
 
 1. His iOS version and his macOS Safari version. If either is Safari 27 or
    later, the capability is present and the cause is something else entirely.

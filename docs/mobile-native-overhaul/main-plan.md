@@ -132,6 +132,15 @@ wrapper switches are named in that phase's plan.
 
 ### Phase 6, modals become screens
 
+**It also carries the member list grouping.** Owner, 14 August: the channel and
+thread member lists should separate who is here from everyone else. Decided the
+same day, after checking what the data can actually support: three groups from
+what we already receive, which is **here now**, **here but not looking** (a
+member in the channel whose tab is in the background, which the room already
+tells us and nothing has ever shown), and **everyone else**. No backend ask. It
+is built here rather than sooner because this is the phase that rebuilds that
+list as a screen, and doing it twice is the thing this order exists to prevent.
+
 The long forms and the lists become routed screens on a phone and stay dialogs on
 a desktop, using one plain route rendered responsively. Intercepting routes are
 the wrong tool here and the plan says why. Confirmations stay dialogs.
