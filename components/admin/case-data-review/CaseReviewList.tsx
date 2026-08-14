@@ -43,6 +43,14 @@ export function CaseReviewList({
      repeating it down a list of fifteen would be noise. */
   const hasBlocked = rows.some((row) => row.fix.state === 'blocked');
 
+  /* The dashed chips mean something, and a style with no key is meaning nobody
+     can read. Bound to the server's own `needs_source_content` rather than a
+     list of problem keys kept by hand here, so it cannot drift from what the
+     API considers repairable. */
+  const hasSourceProblem = rows.some((row) =>
+    row.problems.some((problem) => problem.needs_source_content)
+  );
+
   return (
     <div className="grid gap-3">
       {hasBlocked && (
@@ -51,6 +59,16 @@ export function CaseReviewList({
           citation would be built from the case itself, so a case with no
           identified court would produce something that reads like a citation
           and identifies nothing.
+        </p>
+      )}
+      {hasSourceProblem && (
+        <p className="px-1 text-xs text-muted-foreground">
+          A problem shown in a{' '}
+          <span className="rounded-full border border-dashed border-border px-1.5 py-0.5">
+            dashed outline
+          </span>{' '}
+          can only be settled by the judgment text itself. Nothing on this
+          screen repairs one.
         </p>
       )}
       <div className="grid gap-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
