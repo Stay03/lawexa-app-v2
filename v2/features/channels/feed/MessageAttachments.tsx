@@ -69,12 +69,24 @@ import { useFreshFileUrl, useOpenFileInNewTab } from './use-file-url';
  * six photos was six tiles tall and pushed the conversation off the screen.
  * Pictures now group ahead of the named files and spend ONE row of the feed:
  * one picture keeps the capped single tile, two split the row at equal width
- * and equal height, three or more become a fixed-height strip that scrolls
- * sideways. The strip's cap is deliberately narrower than three tiles, so the
+ * and equal height, three or more become a strip that scrolls sideways. The
  * last visible tile is always cut mid-image; a cut tile reads as "there is
  * more" where a row that just fits reads as all of them (the argument
  * CountryTabs already makes for its chips). However many pictures a message
  * carries, it spends the height of one.
+ *
+ * THE CUT IS SIZED FROM THE ROW, NOT FROM A CAP. The strip first held tiles of
+ * a fixed 10rem and left the affordance to its max-width, which only ever
+ * bounded the WIDEST feed: at any narrower width the visible tiles were
+ * whatever happened to fit, and on a screen where that landed near a whole
+ * number two tiles sat flush with no third showing, so the row read as all of
+ * them. Owner, 2026-08-14, on his own device: "it shows perfectly two images
+ * so it's impossible to know there's more to slide. It should always show half
+ * or part of an image irrespective of screen size." A tile is therefore a
+ * FRACTION of the scrollport rather than a length: two and a half tiles fill
+ * the row at every width, so half a tile is always cut, and the same max-width
+ * now does the one job a cap can do honestly — hold the tile at its 10rem best
+ * on the widest feed instead of letting it grow.
  *
  * `overscroll-x-contain` on the strip is load-bearing: a fling past the last
  * tile would otherwise hand the gesture to the browser, and in a WebView that
@@ -91,9 +103,9 @@ import { useFreshFileUrl, useOpenFileInNewTab } from './use-file-url';
  * inside a horizontal scrollport it judges the clipped tiles off screen, so a
  * strip arrived as a row of grey squares that only painted once the reader
  * scrolled it (filmed, 2026-08-14): the exact opposite of "there are pictures
- * here". The first three strip tiles are eager because two and a half fit at
- * the cap, so three covers the widest case, where the third is half visible;
- * the rest stay lazy and paint as they scroll in. The single tile and the
+ * here". The first three strip tiles are eager because two and a half tiles
+ * fill the row at every width, so the third is the half-cut one on every
+ * screen; the rest stay lazy and paint as they scroll in. The single tile and the
  * pair are always fully visible, so they are always eager. Vertical laziness
  * loses nothing: a message far up the transcript is not rendered at all.
  *
@@ -187,14 +199,14 @@ type ImageRowLayout = 'single' | 'pair' | 'strip';
 /**
  * The row per layout. The single tile needs no row plan. The pair's cap is
  * two single tiles and the gap between them (2 x 15rem + 0.375rem), so a pair
- * never outgrows the one-picture messages around it. The strip's content cap
- * is two and a half square tiles (2.5 x 10rem + 2 x 0.375rem = 25.75rem; the
- * max-w adds the 0.25rem ring padding on each side, border box), so on any
- * feed wide enough to reach the cap the third tile is cut mid-image at the
- * right edge, and the cut is the scroll affordance. The negative margin buys
- * the padding back, so the tiles stay flush with the message's text while the
- * scrollport keeps room to paint the offset focus ring it would otherwise
- * clip.
+ * never outgrows the one-picture messages around it. The strip's cap is the
+ * width at which its proportional tile reaches 10rem, its best size (2.5 x
+ * 10rem + 2 x 0.375rem = 25.75rem, plus the 0.25rem ring padding each side,
+ * border box); past that the row stops growing rather than inflating the
+ * tiles. The cut tile is the tile's own doing, at every width — see
+ * {@link STRIP_TILE_BOX}. The negative margin buys the padding back, so the
+ * tiles stay flush with the message's text while the scrollport keeps room to
+ * paint the offset focus ring it would otherwise clip.
  */
 const IMAGE_ROW: Record<ImageRowLayout, string | undefined> = {
   single: undefined,
@@ -206,17 +218,31 @@ const IMAGE_ROW: Record<ImageRowLayout, string | undefined> = {
   ),
 };
 
-/** The strip's box lives on the `li`: every tile must hold this footprint
- *  before any image loads, or the row would re-shape as bytes arrive. Square,
- *  because the row mixes portrait screenshots with landscape photos and a
- *  square punishes neither orientation; it is where chat apps settle. */
-const STRIP_TILE_BOX = 'size-40 shrink-0';
+/**
+ * The strip's box lives on the `li`: every tile must hold this footprint
+ * before any image loads, or the row would re-shape as bytes arrive. Square,
+ * because the row mixes portrait screenshots with landscape photos and a
+ * square punishes neither orientation; it is where chat apps settle.
+ *
+ * THE WIDTH IS A FRACTION OF THE ROW, AND THAT IS THE WHOLE AFFORDANCE. Two
+ * and a half tiles fill the scrollport at every width — 2.5w + 2 gaps = 100%,
+ * so w = (100% - 0.75rem) / 2.5 — which means half a tile is cut at the right
+ * edge on a 320px phone, on a tablet and on the widest feed alike. A fixed
+ * length cannot promise that: it leaves the remainder to the screen, and a
+ * screen that divides evenly shows a flush row that reads as complete
+ * (measured on the owner's device, 2026-08-14). `shrink-0` is load-bearing —
+ * without it flex would shrink the tiles to fit, and a row that fits is the
+ * bug. The percentage resolves against the scrollport's content box, not the
+ * scrolled width, so the fraction stays true however many pictures follow.
+ */
+const STRIP_TILE_BOX = 'aspect-square w-[calc((100%-0.75rem)/2.5)] shrink-0';
 
 /** How many strip tiles load eagerly. Lazy loading judges the scrollport's
  *  clipped tiles off screen, so the tiles a reader actually sees must say
- *  eager themselves (see the module docblock). Two and a half fit at the cap,
- *  so three covers the widest case, where the third is half visible; from the
- *  fourth on a tile genuinely is off screen, and lazy is honest again. */
+ *  eager themselves (see the module docblock). Exactly two and a half tiles
+ *  are visible at EVERY width now, so three is the count on every screen: the
+ *  third is the half-cut one. From the fourth on a tile genuinely is off
+ *  screen, and lazy is honest again. */
 const EAGER_STRIP_TILES = 3;
 
 /** The loaded tile's size per layout: the strip's `li` owns the box, so its
