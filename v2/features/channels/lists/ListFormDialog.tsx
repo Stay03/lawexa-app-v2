@@ -4,19 +4,12 @@ import { useState, type KeyboardEvent } from 'react';
 import { Loader2, Plus, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { CreateListItemInput, TaskList } from '@/types/collab';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { useCreateList, useUpdateList } from '../lists-files-mutations';
 import {
   LIST_DESCRIPTION_MAX,
@@ -136,108 +129,17 @@ export function ListFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit list' : 'New list'}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? 'Update this list’s title and description.'
-              : 'Create a shared task list for everyone in this channel.'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="list-title">Title</Label>
-            <Input
-              id="list-title"
-              maxLength={LIST_TITLE_MAX}
-              placeholder="e.g. Filing checklist"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="list-description">Description</Label>
-            <Textarea
-              id="list-description"
-              maxLength={LIST_DESCRIPTION_MAX}
-              rows={2}
-              placeholder="Optional — what is this list for?"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
-
-          {!isEdit && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Items</Label>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {items.length}/{LIST_MAX_ITEMS}
-                </span>
-              </div>
-
-              {items.length > 0 && (
-                <div className="space-y-2">
-                  {items.map((item, index) => (
-                    <div key={item.key} className="flex items-center gap-2">
-                      <Input
-                        maxLength={LIST_ITEM_MAX}
-                        placeholder={`Item ${index + 1}`}
-                        value={item.content}
-                        onChange={(event) =>
-                          setItems((prev) =>
-                            prev.map((draft) =>
-                              draft.key === item.key
-                                ? { ...draft, content: event.target.value }
-                                : draft,
-                            ),
-                          )
-                        }
-                        onKeyDown={(event) =>
-                          handleItemKeyDown(event, index === items.length - 1)
-                        }
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 shrink-0 text-muted-foreground"
-                        onClick={() =>
-                          setItems((prev) =>
-                            prev.filter((draft) => draft.key !== item.key),
-                          )
-                        }
-                        aria-label={`Remove item ${index + 1}`}
-                      >
-                        <X aria-hidden className="size-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setItems((prev) => [...prev, newItemDraft()])}
-                disabled={items.length >= LIST_MAX_ITEMS}
-              >
-                <Plus aria-hidden className="size-4" />
-                Add item
-              </Button>
-            </div>
-          )}
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </div>
-
-        <DialogFooter>
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEdit ? 'Edit list' : 'New list'}
+      description={
+        isEdit
+          ? 'Update this list’s title and description.'
+          : 'Create a shared task list for everyone in this channel.'
+      }
+      footer={
+        <>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -249,8 +151,98 @@ export function ListFormDialog({
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
             {isEdit ? 'Save changes' : 'Create list'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="list-title">Title</Label>
+          <Input
+            id="list-title"
+            maxLength={LIST_TITLE_MAX}
+            placeholder="e.g. Filing checklist"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="list-description">Description</Label>
+          <Textarea
+            id="list-description"
+            maxLength={LIST_DESCRIPTION_MAX}
+            rows={2}
+            placeholder="Optional — what is this list for?"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </div>
+
+        {!isEdit && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Items</Label>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {items.length}/{LIST_MAX_ITEMS}
+              </span>
+            </div>
+
+            {items.length > 0 && (
+              <div className="space-y-2">
+                {items.map((item, index) => (
+                  <div key={item.key} className="flex items-center gap-2">
+                    <Input
+                      maxLength={LIST_ITEM_MAX}
+                      placeholder={`Item ${index + 1}`}
+                      value={item.content}
+                      onChange={(event) =>
+                        setItems((prev) =>
+                          prev.map((draft) =>
+                            draft.key === item.key
+                              ? { ...draft, content: event.target.value }
+                              : draft,
+                          ),
+                        )
+                      }
+                      onKeyDown={(event) =>
+                        handleItemKeyDown(event, index === items.length - 1)
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 shrink-0 text-muted-foreground"
+                      onClick={() =>
+                        setItems((prev) =>
+                          prev.filter((draft) => draft.key !== item.key),
+                        )
+                      }
+                      aria-label={`Remove item ${index + 1}`}
+                    >
+                      <X aria-hidden className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => setItems((prev) => [...prev, newItemDraft()])}
+              disabled={items.length >= LIST_MAX_ITEMS}
+            >
+              <Plus aria-hidden className="size-4" />
+              Add item
+            </Button>
+          </div>
+        )}
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+    </ResponsiveOverlay>
   );
 }

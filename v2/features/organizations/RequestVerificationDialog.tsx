@@ -5,18 +5,11 @@ import { FileText, Loader2, Upload, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { extractApiError } from '@/lib/utils/api-error';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import {
   BN_NUMBER_MAX,
   CAC_ACCEPT_ATTR,
@@ -106,85 +99,13 @@ export function RequestVerificationDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Verify {organizationName}</DialogTitle>
-          <DialogDescription>
-            Send your business number and CAC document. A reviewer checks them and
-            the badge appears on your organization when it&rsquo;s approved.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="bn-number">Business (BN) number</Label>
-            <Input
-              id="bn-number"
-              maxLength={BN_NUMBER_MAX}
-              autoComplete="off"
-              placeholder="e.g. BN1234567"
-              value={bnNumber}
-              onChange={(event) => setBnNumber(event.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="cac-document">CAC document</Label>
-            <input
-              ref={inputRef}
-              id="cac-document"
-              type="file"
-              accept={CAC_ACCEPT_ATTR}
-              className="sr-only"
-              onChange={handlePick}
-            />
-
-            {file ? (
-              <div className="flex items-center gap-2 rounded-lg border bg-secondary/40 px-3 py-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-                <FileText aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate text-sm" title={file.name}>
-                  {file.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setFile(null)}
-                  aria-label={`Remove ${file.name}`}
-                  className={cn(
-                    'v2-interactive flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground motion-reduce:transition-none',
-                    FOCUS_RING,
-                  )}
-                >
-                  <X aria-hidden className="size-4" />
-                </button>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                className="v2-interactive w-full justify-start font-normal"
-                onClick={() => inputRef.current?.click()}
-              >
-                <Upload aria-hidden className="size-4 shrink-0" />
-                Choose a file
-              </Button>
-            )}
-            <p className="text-xs text-muted-foreground">
-              PDF, JPG or PNG, up to 10&nbsp;MB.
-            </p>
-          </div>
-
-          {error && (
-            <p
-              role="alert"
-              className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-            >
-              {error}
-            </p>
-          )}
-        </div>
-
-        <DialogFooter>
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`Verify ${organizationName}`}
+      description="Send your business number and CAC document. A reviewer checks them and the badge appears on your organization when it’s approved."
+      footer={
+        <>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -196,8 +117,76 @@ export function RequestVerificationDialog({
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
             Submit for review
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="bn-number">Business (BN) number</Label>
+          <Input
+            id="bn-number"
+            maxLength={BN_NUMBER_MAX}
+            autoComplete="off"
+            placeholder="e.g. BN1234567"
+            value={bnNumber}
+            onChange={(event) => setBnNumber(event.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="cac-document">CAC document</Label>
+          <input
+            ref={inputRef}
+            id="cac-document"
+            type="file"
+            accept={CAC_ACCEPT_ATTR}
+            className="sr-only"
+            onChange={handlePick}
+          />
+
+          {file ? (
+            <div className="flex items-center gap-2 rounded-lg border bg-secondary/40 px-3 py-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+              <FileText aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-sm" title={file.name}>
+                {file.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFile(null)}
+                aria-label={`Remove ${file.name}`}
+                className={cn(
+                  'v2-interactive flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground motion-reduce:transition-none',
+                  FOCUS_RING,
+                )}
+              >
+                <X aria-hidden className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="v2-interactive w-full justify-start font-normal"
+              onClick={() => inputRef.current?.click()}
+            >
+              <Upload aria-hidden className="size-4 shrink-0" />
+              Choose a file
+            </Button>
+          )}
+          <p className="text-xs text-muted-foreground">
+            PDF, JPG or PNG, up to 10&nbsp;MB.
+          </p>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          >
+            {error}
+          </p>
+        )}
+      </div>
+    </ResponsiveOverlay>
   );
 }

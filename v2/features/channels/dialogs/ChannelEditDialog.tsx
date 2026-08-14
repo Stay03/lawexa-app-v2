@@ -6,14 +6,6 @@ import { Loader2 } from 'lucide-react';
 import { channelVisibilityFace } from '@/lib/collab/visibility';
 
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { QuizHostPolicy } from '@/types/channel-quiz';
 import type { Channel, ChannelVisibility } from '@/types/collab';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { useUpdateChannel } from '../membership-mutations';
 import { readQuizHostPolicy } from '../quiz/model';
 
@@ -98,112 +91,13 @@ export function ChannelEditDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit channel</DialogTitle>
-          <DialogDescription>
-            Update this channel&rsquo;s details.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="channel-name">Name</Label>
-            <Input
-              id="channel-name"
-              maxLength={80}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Visibility</Label>
-            <Select
-              value={visibility}
-              onValueChange={(value) => setVisibility(value as ChannelVisibility)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              {/* THE SAME THREE STATES AS THE CREATE DIALOG, from the same
-                  table. This screen is the second door onto the mistake: it
-                  offered only two, and called private "invite only", so an
-                  existing channel could be switched to private by somebody who
-                  believed that still meant invisible. */}
-              <SelectContent>
-                {(['space_public', 'private', 'hidden'] as const).map(
-                  (value) => {
-                    const face = channelVisibilityFace(value);
-                    return (
-                      <SelectItem key={value} value={value}>
-                        {face.title} &mdash; {face.label}
-                      </SelectItem>
-                    );
-                  },
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="channel-description">Description</Label>
-            <Textarea
-              id="channel-description"
-              maxLength={5000}
-              rows={3}
-              placeholder="What is this channel about?"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
-
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="channel-ai-mentions-notify">
-                Notify members when Lawexa @mentions them
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Off by default, so Lawexa can&rsquo;t ping everyone. Human
-                @mentions always notify.
-              </p>
-            </div>
-            <Switch
-              id="channel-ai-mentions-notify"
-              checked={aiMentionsNotify}
-              onCheckedChange={setAiMentionsNotify}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="channel-quiz-host-policy">Who can run quizzes</Label>
-            <Select
-              value={quizHostPolicy}
-              onValueChange={(value) =>
-                setQuizHostPolicy(value as QuizHostPolicy)
-              }
-            >
-              <SelectTrigger id="channel-quiz-host-policy" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all_members">
-                  Anyone in the channel
-                </SelectItem>
-                <SelectItem value="admins_only">Admins only</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Covers both writing a quiz and starting a live game. Everyone can
-              play either way.
-            </p>
-          </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </div>
-
-        <DialogFooter>
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Edit channel"
+      description="Update this channel’s details."
+      footer={
+        <>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -215,8 +109,104 @@ export function ChannelEditDialog({
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
             Save changes
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="channel-name">Name</Label>
+          <Input
+            id="channel-name"
+            maxLength={80}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Visibility</Label>
+          <Select
+            value={visibility}
+            onValueChange={(value) => setVisibility(value as ChannelVisibility)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            {/* THE SAME THREE STATES AS THE CREATE DIALOG, from the same
+                table. This screen is the second door onto the mistake: it
+                offered only two, and called private "invite only", so an
+                existing channel could be switched to private by somebody who
+                believed that still meant invisible. */}
+            <SelectContent>
+              {(['space_public', 'private', 'hidden'] as const).map(
+                (value) => {
+                  const face = channelVisibilityFace(value);
+                  return (
+                    <SelectItem key={value} value={value}>
+                      {face.title} &mdash; {face.label}
+                    </SelectItem>
+                  );
+                },
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="channel-description">Description</Label>
+          <Textarea
+            id="channel-description"
+            maxLength={5000}
+            rows={3}
+            placeholder="What is this channel about?"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="channel-ai-mentions-notify">
+              Notify members when Lawexa @mentions them
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Off by default, so Lawexa can&rsquo;t ping everyone. Human
+              @mentions always notify.
+            </p>
+          </div>
+          <Switch
+            id="channel-ai-mentions-notify"
+            checked={aiMentionsNotify}
+            onCheckedChange={setAiMentionsNotify}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="channel-quiz-host-policy">Who can run quizzes</Label>
+          <Select
+            value={quizHostPolicy}
+            onValueChange={(value) =>
+              setQuizHostPolicy(value as QuizHostPolicy)
+            }
+          >
+            <SelectTrigger id="channel-quiz-host-policy" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all_members">
+                Anyone in the channel
+              </SelectItem>
+              <SelectItem value="admins_only">Admins only</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Covers both writing a quiz and starting a live game. Everyone can
+            play either way.
+          </p>
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+    </ResponsiveOverlay>
   );
 }

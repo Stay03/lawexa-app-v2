@@ -5,14 +5,6 @@ import { Link2, Loader2, Mail, Search, UserPlus, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -25,6 +17,7 @@ import {
 import { extractApiError } from '@/lib/utils/api-error';
 import type { InviteMemberPayload, SlimUser } from '@/types/collab';
 import { InviteLinkSection } from '@/v2/features/invites/InviteLinkSection';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { MemberAvatar } from '../ui/avatars';
 
 /**
@@ -156,19 +149,45 @@ export function InviteMemberDialog({
   );
 
   return (
-    <Dialog
+    <ResponsiveOverlay
       open={open}
       onOpenChange={(next) => {
         if (!next) reset();
         onOpenChange(next);
       }}
+      title={title}
+      description={description}
+      /* ── ONE FOOTER, CHOSEN BY TAB ────────────────────────────────────
+         It used to be three, one inside each tab's branch, which read as
+         local until the overlay needed a footer that STAYS while the body
+         scrolls. Two of the three were the same button anyway, so lifting
+         them out removed a copy as well as a nesting. */
+      footer={
+        tab === 'email' ? (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleEmailSubmit()}
+              disabled={submitting || !email.trim()}
+            >
+              {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
+              Send invite
+            </Button>
+          </>
+        ) : (
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Done
+          </Button>
+        )
+      }
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          {description && <DialogDescription>{description}</DialogDescription>}
-        </DialogHeader>
-
+      <div className="space-y-4">
         {/* The strip sizes itself to what is actually offered: a reader with no
             link half must not meet a two-column grid with a hole in it.
 
@@ -299,12 +318,6 @@ export function InviteMemberDialog({
                 <p className="text-sm text-destructive">{pickerError}</p>
               )}
             </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Done
-              </Button>
-            </DialogFooter>
           </div>
         ) : tab === 'email' ? (
           <div className="space-y-4">
@@ -327,23 +340,6 @@ export function InviteMemberDialog({
             </div>
             {roleField}
             {emailError && <p className="text-sm text-destructive">{emailError}</p>}
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => void handleEmailSubmit()}
-                disabled={submitting || !email.trim()}
-              >
-                {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
-                Send invite
-              </Button>
-            </DialogFooter>
           </div>
         ) : (
           /* `linkScope` is what put this tab on the strip, so it is present
@@ -359,16 +355,10 @@ export function InviteMemberDialog({
                 spaceUuid={linkScope.spaceUuid}
                 channelUuid={linkScope.channelUuid}
                 framing="standalone"
-              />
-              <DialogFooter>
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
-                  Done
-                </Button>
-              </DialogFooter>
-            </div>
+              />            </div>
           )
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveOverlay>
   );
 }

@@ -66,7 +66,18 @@ export function SettingsSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+      {/* THIS SHEET ALREADY SAID `w-full` AND WAS STILL THREE QUARTERS WIDE.
+          `SheetContent` sizes itself with `data-[side=right]:w-3/4`, and an
+          attribute selector outranks a bare class of the same specificity
+          however late it is written — so the plain `w-full` here was a dead
+          class, silently discarded, and the sheet read as fixed while opening
+          at 75% of a phone with the radar showing down one side. Both widths
+          are variant-matched now, which is the only shape that actually wins
+          (mobile overhaul, phase 7). */}
+      <SheetContent
+        side="right"
+        className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
+      >
         <SheetHeader>
           <SheetTitle>Radar settings</SheetTitle>
           <SheetDescription>

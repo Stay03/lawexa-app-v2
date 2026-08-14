@@ -4,14 +4,6 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -24,6 +16,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Organization, OrganizationType } from '@/types/collab';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import {
   ORGANIZATION_DESCRIPTION_MAX,
   ORGANIZATION_NAME_MAX,
@@ -98,122 +91,17 @@ export function OrganizationFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? 'Edit organization' : 'Create an organization'}
-          </DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? 'Update your organization’s details.'
-              : 'An organization can own shared spaces and earn a verified badge.'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="org-name">Name</Label>
-            <Input
-              id="org-name"
-              maxLength={ORGANIZATION_NAME_MAX}
-              placeholder="e.g. Lawexa Partners"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="org-type">Type</Label>
-            <Select
-              value={type}
-              onValueChange={(value) => setType(value as OrganizationType)}
-              disabled={typeLocked}
-            >
-              <SelectTrigger id="org-type" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ORGANIZATION_TYPES.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {typeLocked && (
-              <p className="text-xs text-muted-foreground">
-                The type is fixed once an organization is verified.
-              </p>
-            )}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="org-email">Email</Label>
-              <Input
-                id="org-email"
-                type="email"
-                autoComplete="off"
-                placeholder="contact@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="org-website">Website</Label>
-              <Input
-                id="org-website"
-                type="url"
-                autoComplete="off"
-                placeholder="https://example.com"
-                value={website}
-                onChange={(event) => setWebsite(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="org-city">City</Label>
-              <Input
-                id="org-city"
-                autoComplete="off"
-                value={city}
-                onChange={(event) => setCity(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="org-country">Country</Label>
-              <Input
-                id="org-country"
-                autoComplete="off"
-                value={country}
-                onChange={(event) => setCountry(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="org-description">Description</Label>
-            <Textarea
-              id="org-description"
-              maxLength={ORGANIZATION_DESCRIPTION_MAX}
-              rows={3}
-              placeholder="What does this organization do?"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
-
-          {error && (
-            <p
-              role="alert"
-              className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-            >
-              {error}
-            </p>
-          )}
-        </div>
-
-        <DialogFooter>
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEdit ? 'Edit organization' : 'Create an organization'}
+      description={
+        isEdit
+          ? 'Update your organization’s details.'
+          : 'An organization can own shared spaces and earn a verified badge.'
+      }
+      footer={
+        <>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -225,8 +113,110 @@ export function OrganizationFormDialog({
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
             {isEdit ? 'Save changes' : 'Create organization'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="org-name">Name</Label>
+          <Input
+            id="org-name"
+            maxLength={ORGANIZATION_NAME_MAX}
+            placeholder="e.g. Lawexa Partners"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="org-type">Type</Label>
+          <Select
+            value={type}
+            onValueChange={(value) => setType(value as OrganizationType)}
+            disabled={typeLocked}
+          >
+            <SelectTrigger id="org-type" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ORGANIZATION_TYPES.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {typeLocked && (
+            <p className="text-xs text-muted-foreground">
+              The type is fixed once an organization is verified.
+            </p>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="org-email">Email</Label>
+            <Input
+              id="org-email"
+              type="email"
+              autoComplete="off"
+              placeholder="contact@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="org-website">Website</Label>
+            <Input
+              id="org-website"
+              type="url"
+              autoComplete="off"
+              placeholder="https://example.com"
+              value={website}
+              onChange={(event) => setWebsite(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="org-city">City</Label>
+            <Input
+              id="org-city"
+              autoComplete="off"
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="org-country">Country</Label>
+            <Input
+              id="org-country"
+              autoComplete="off"
+              value={country}
+              onChange={(event) => setCountry(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="org-description">Description</Label>
+          <Textarea
+            id="org-description"
+            maxLength={ORGANIZATION_DESCRIPTION_MAX}
+            rows={3}
+            placeholder="What does this organization do?"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          >
+            {error}
+          </p>
+        )}
+      </div>
+    </ResponsiveOverlay>
   );
 }

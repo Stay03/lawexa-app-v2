@@ -5,14 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Briefcase, Building2, Globe, GraduationCap, Loader2, Lock, User } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +13,7 @@ import type { Space, SpaceType } from '@/types/collab';
 import { ChoiceCards, type Choice } from '@/v2/features/collab/kit/ChoiceCards';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { organizationsQueries } from '@/v2/features/organizations/queries';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { SPACE_DESCRIPTION_MAX, SPACE_NAME_MAX } from '../model';
 import { useCreateSpace, useUpdateSpace } from '../mutations';
 
@@ -271,121 +264,33 @@ export function SpaceFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* ── TALLER THAN A PHONE, SO IT IS BUILT AS THREE BANDS ──────────────
-          A header that stays, a body that scrolls, a footer that stays.
+    /* ── TALLER THAN A PHONE, SO ON A PHONE IT IS THE WHOLE PHONE ──────────
+       This form is the reason `ResponsiveOverlay` exists. Measured on a 360px
+       phone it came to ~1,115px — the two `ChoiceCards` groups stack below
+       `sm:` and cost ~217px each — inside a 640px screen. As a centred box
+       taller than the viewport it hung off BOTH ends by equal amounts, so
+       Save, Cancel and the close X were off-screen at once with no scroll able
+       to reach them (the page is locked and the dialog is portalled outside the
+       app's only scroll region). That is the bug Arthur photographed on
+       2026-08-07.
 
-          It used to be one block, and the block WAS the dialog. Measured on a
-          360px phone it came to ~1,115px — the two `ChoiceCards` groups stack
-          below `sm:` and cost ~217px each — inside a 640px screen. A centred
-          box taller than the viewport hangs off BOTH ends by equal amounts, so
-          Save, Cancel and the close X were all off-screen at once with no
-          scroll anywhere able to reach them: the page is locked and the dialog
-          is portalled outside the app's only scroll region. That is the bug
-          Arthur photographed (owner review, 2026-08-07).
-
-          `DialogContent` now caps and scrolls by default, which on its own
-          makes Save reachable. This file goes further, because reachable-by-
-          scrolling is not the same as reachable: the primary action of a long
-          form should never be something the reader has to go looking for.
-          `overflow-hidden` takes the scroller off the box, `flex flex-col`
-          makes the middle band the only thing that moves, and Save stays in
-          view at every height. Same shape as `QuizFormDialog`, which had
-          already worked this out. */}
-      <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 px-6 pt-6 pr-12 pb-4">
-          <DialogTitle>{isEdit ? 'Edit space' : 'Create a space'}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? 'Update this space’s details. Everyone in it sees the change.'
-              : 'A space groups channels for one team, one matter or one subject.'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6">
-          {/* The preview leads on a phone (you see the object before you
-              describe it) and sits beside the fields from `sm` up. */}
-          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_13rem]">
-            <div className="order-2 min-w-0 space-y-4 sm:order-1">
-              <div className="space-y-2">
-                <Label htmlFor={`${uid}-name`}>Name</Label>
-                <Input
-                  id={`${uid}-name`}
-                  maxLength={SPACE_NAME_MAX}
-                  placeholder="e.g. Firm HQ"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  onKeyDown={(event) => {
-                    // IME Enter confirms the composition; it must never submit.
-                    if (
-                      event.key === 'Enter' &&
-                      !event.nativeEvent.isComposing
-                    ) {
-                      event.preventDefault();
-                      handleSubmit();
-                    }
-                  }}
-                />
-              </div>
-
-              <ChoiceCards
-                legend="Type"
-                choices={TYPE_CHOICES}
-                value={type}
-                onChange={setType}
-              />
-
-              {!isEdit && organization ? (
-                <ChoiceCards
-                  legend="Owner"
-                  choices={ownerChoices}
-                  value={owner}
-                  onChange={setOwner}
-                />
-              ) : null}
-
-              <div className="space-y-2">
-                <Label htmlFor={`${uid}-description`}>Description</Label>
-                <Textarea
-                  id={`${uid}-description`}
-                  maxLength={SPACE_DESCRIPTION_MAX}
-                  rows={3}
-                  placeholder="What is this space for?"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </div>
-
-              <ChoiceCards
-                legend="Who can join"
-                choices={PRIVACY_CHOICES}
-                value={privacy}
-                onChange={setPrivacy}
-              />
-            </div>
-
-            <div className="order-1 sm:order-2">
-              <SpacePreview
-                uuid={space?.uuid ?? null}
-                name={name}
-                type={type}
-                isPrivate={isPrivate}
-                ownerLabel={ownerLabel}
-              />
-            </div>
-          </div>
-
-          {error && (
-            <p
-              role="alert"
-              className="mt-4 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
-            >
-              {error}
-            </p>
-          )}
-        </div>
-
-        <DialogFooter className="shrink-0 border-t px-6 py-4">
+       Capping the box made Save reachable. Reachable by scrolling is not the
+       same as reachable, and a box is the wrong shape for a form this long at
+       any height. The overlay keeps the three bands — a header that stays, a
+       body that scrolls, a footer that stays — and on a phone gives them the
+       whole screen. Above `md:` it is the same centred card it always was. */
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEdit ? 'Edit space' : 'Create a space'}
+      description={
+        isEdit
+          ? 'Update this space’s details. Everyone in it sees the change.'
+          : 'A space groups channels for one team, one matter or one subject.'
+      }
+      className="md:max-w-2xl"
+      footer={
+        <>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -397,9 +302,87 @@ export function SpaceFormDialog({
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
             {isEdit ? 'Save changes' : 'Create space'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      {/* The preview leads on a phone (you see the object before you describe
+          it) and sits beside the fields from `sm` up. */}
+      <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_13rem]">
+        <div className="order-2 min-w-0 space-y-4 sm:order-1">
+          <div className="space-y-2">
+            <Label htmlFor={`${uid}-name`}>Name</Label>
+            <Input
+              id={`${uid}-name`}
+              maxLength={SPACE_NAME_MAX}
+              placeholder="e.g. Firm HQ"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                // IME Enter confirms the composition; it must never submit.
+                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  handleSubmit();
+                }
+              }}
+            />
+          </div>
+
+          <ChoiceCards
+            legend="Type"
+            choices={TYPE_CHOICES}
+            value={type}
+            onChange={setType}
+          />
+
+          {!isEdit && organization ? (
+            <ChoiceCards
+              legend="Owner"
+              choices={ownerChoices}
+              value={owner}
+              onChange={setOwner}
+            />
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor={`${uid}-description`}>Description</Label>
+            <Textarea
+              id={`${uid}-description`}
+              maxLength={SPACE_DESCRIPTION_MAX}
+              rows={3}
+              placeholder="What is this space for?"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
+
+          <ChoiceCards
+            legend="Who can join"
+            choices={PRIVACY_CHOICES}
+            value={privacy}
+            onChange={setPrivacy}
+          />
+        </div>
+
+        <div className="order-1 sm:order-2">
+          <SpacePreview
+            uuid={space?.uuid ?? null}
+            name={name}
+            type={type}
+            isPrivate={isPrivate}
+            ownerLabel={ownerLabel}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p
+          role="alert"
+          className="mt-4 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
+        >
+          {error}
+        </p>
+      )}
+    </ResponsiveOverlay>
   );
 }
 

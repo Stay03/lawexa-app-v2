@@ -85,10 +85,10 @@ motion between screens needs the screens to be final.
 | 2 | Warm transcript | Independent of layout. Fixes the notification path in the cache, not the UI. | shipped `4df2345` |
 | 3 | Mobile header | The back control lives in the header, so the header shape must settle before back is rebuilt. | shipped `168c588` |
 | 4 | Scrolling in a long conversation | A daily-use defect, reported from the field, in code nothing else touches. Moving it up cost nothing. | shipped `3359bb8`, confirmed by the reporter |
-| 5 | Navigation and back | The history stack, real back controls, client side jumps, one create affordance. | next |
-| 6 | Edge gestures | Depends on 5 making every step a real history entry. | |
-| 7 | Modals become screens, and the member list groups | Needs 3, 5 and 6, because a screen is only a screen if back works. | |
-| 8 | Skeletons | After 7, or twenty-two of them get written twice. | |
+| 5 | Navigation and back | The history stack, real back controls, client side jumps, one create affordance. | shipped `ce0c0ea` |
+| 6 | Edge gestures | Depends on 5 making every step a real history entry. | shipped `539f9b6` |
+| 7 | Modals become screens, and the member list groups | Needs 3, 5 and 6, because a screen is only a screen if back works. | shipped `313d37d` + `91430ea` (member list), this wave (screens) |
+| 8 | Skeletons | After 7, or twenty-two of them get written twice. | next |
 | 9 | Motion and pull to refresh | On the shapes that are now final. | |
 | 10 | Language sweep | Last, so it catches every word the nine phases above wrote. | |
 
@@ -151,9 +151,19 @@ tells us and nothing has ever shown), and **everyone else**. No backend ask. It
 is built here rather than sooner because this is the phase that rebuilds that
 list as a screen, and doing it twice is the thing this order exists to prevent.
 
-The long forms and the lists become routed screens on a phone and stay dialogs on
-a desktop, using one plain route rendered responsively. Intercepting routes are
-the wrong tool here and the plan says why. Confirmations stay dialogs.
+The long forms and the lists fill a phone screen and stay dialogs on a desktop,
+from one element whose shape changes in CSS. Confirmations stay dialogs.
+
+**AMENDED WHEN THE PHASE WAS BUILT, 14 August.** This section used to say the
+forms become ROUTED screens, "one plain route rendered responsively". They did
+not, and the reason is worth carrying forward: every one of these overlays is
+already bound to `useUrlOverlay`, which pushes one stamped history entry on open
+and pops its own entry on close — so hardware Back already closed them, and
+after phase 6 the edge swipe did too, because the edge swipe IS hardware Back.
+Twelve real routes would have added a path the reader cannot see, twelve loading
+boundaries for phase 8 to write, and a second mechanism doing the first one's
+job with two ways for them to disagree. The gap was never routing. It was
+geometry. The full argument is in the phase folder's `plan.md`.
 
 ### Phase 8, skeletons
 

@@ -6,14 +6,6 @@ import { Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -26,6 +18,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { extractApiError } from '@/lib/utils/api-error';
 import type {
   ChannelQuiz,
@@ -342,135 +335,38 @@ export function QuizFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle>
-            {isEdit
-              ? 'Edit quiz'
-              : destination === 'library'
-                ? 'New quiz in your library'
-                : `New quiz in ${channelName}`}
-          </DialogTitle>
-          <DialogDescription>
-            Up to {QUIZ_MAX_QUESTIONS} questions. Everyone answers on their own
-            device, and faster right answers score more.
-          </DialogDescription>
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      className="md:max-w-2xl"
+      title={
+        isEdit
+          ? 'Edit quiz'
+          : destination === 'library'
+            ? 'New quiz in your library'
+            : `New quiz in ${channelName}`
+      }
+      description={
+        <>
+          Up to {QUIZ_MAX_QUESTIONS} questions. Everyone answers on their own
+          device, and faster right answers score more.
           {/* THE CONSEQUENCE, STATED — one line, only while it is still a
-              choice. An edit cannot move a quiz, so it says nothing. */}
+              choice. An edit cannot move a quiz, so it says nothing. It is a
+              `span` and not a `p` because `DialogDescription` IS a paragraph,
+              and a paragraph inside a paragraph is markup the browser silently
+              rewrites — closing the outer one early and leaving the sentence
+              orphaned outside the element the dialog is described by. */}
           {!isEdit && (
-            <p className="text-xs text-muted-foreground">
+            <span className="mt-1 block text-xs">
               {destination === 'library'
                 ? 'It stays yours and appears in no channel until you run it in one — then that channel can see it too.'
                 : `It belongs to ${channelName} and to you, and it is in your library either way.`}
-            </p>
+            </span>
           )}
-        </DialogHeader>
-
-        <div className="max-h-[60vh] space-y-5 overflow-y-auto px-6 py-5">
-          {isEdit && detailQuery.isPending ? (
-            <QuizFormSkeleton />
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="quiz-title">Title</Label>
-                <Input
-                  id="quiz-title"
-                  maxLength={QUIZ_TITLE_MAX}
-                  placeholder="e.g. Land law — week 4"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="quiz-description">Description</Label>
-                <Textarea
-                  id="quiz-description"
-                  maxLength={QUIZ_DESCRIPTION_MAX}
-                  rows={2}
-                  placeholder="Optional — what is this quiz for?"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </div>
-
-              <div className="space-y-3 rounded-lg border p-3">
-                <SettingRow
-                  id="quiz-leaderboard"
-                  label="Show the leaderboard between questions"
-                  hint="Off keeps the scores a surprise until the podium."
-                  checked={settings.show_leaderboard}
-                  onChange={(value) =>
-                    setSettings((prev) => ({ ...prev, show_leaderboard: value }))
-                  }
-                />
-                <SettingRow
-                  id="quiz-late-join"
-                  label="Let people join after it starts"
-                  hint="Late joiners play from the next question."
-                  checked={settings.allow_late_join}
-                  onChange={(value) =>
-                    setSettings((prev) => ({ ...prev, allow_late_join: value }))
-                  }
-                />
-              </div>
-
-              {!mayEditQuestions && (
-                <p className="rounded-lg border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground">
-                  You can change this quiz&rsquo;s title, description and
-                  settings. Its questions belong to its author.
-                </p>
-              )}
-
-              {frozen && (
-                <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground">
-                  This quiz has already been played, so its questions are locked
-                  — scores would stop meaning anything if they could change
-                  underneath. The title, description and settings can still be
-                  saved. To change the questions, write a new quiz.
-                </p>
-              )}
-
-              {mayEditQuestions && !frozen && (
-                <div className="space-y-4">
-                  {questions.map((question, index) => (
-                    <QuestionCard
-                      key={question.key}
-                      index={index}
-                      draft={question}
-                      canRemove={questions.length > 1}
-                      onChange={(patch) => updateQuestion(question.key, patch)}
-                      onChangeType={(type) => setType(question.key, type)}
-                      onRemove={() =>
-                        setQuestions((prev) =>
-                          prev.filter((entry) => entry.key !== question.key),
-                        )
-                      }
-                    />
-                  ))}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={questions.length >= QUIZ_MAX_QUESTIONS}
-                    onClick={() =>
-                      setQuestions((prev) => [...prev, newQuestion()])
-                    }
-                  >
-                    <Plus aria-hidden className="size-4" />
-                    Add question ({questions.length}/{QUIZ_MAX_QUESTIONS})
-                  </Button>
-                </div>
-              )}
-
-              {error && <p className="text-sm text-destructive">{error}</p>}
-            </>
-          )}
-        </div>
-
-        <DialogFooter className="border-t px-6 py-4">
+        </>
+      }
+      footer={
+        <>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -492,9 +388,112 @@ export function QuizFormDialog({
                 ? 'Save changes'
                 : 'Create quiz'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        {isEdit && detailQuery.isPending ? (
+          <QuizFormSkeleton />
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="quiz-title">Title</Label>
+              <Input
+                id="quiz-title"
+                maxLength={QUIZ_TITLE_MAX}
+                placeholder="e.g. Land law — week 4"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quiz-description">Description</Label>
+              <Textarea
+                id="quiz-description"
+                maxLength={QUIZ_DESCRIPTION_MAX}
+                rows={2}
+                placeholder="Optional — what is this quiz for?"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-3 rounded-lg border p-3">
+              <SettingRow
+                id="quiz-leaderboard"
+                label="Show the leaderboard between questions"
+                hint="Off keeps the scores a surprise until the podium."
+                checked={settings.show_leaderboard}
+                onChange={(value) =>
+                  setSettings((prev) => ({ ...prev, show_leaderboard: value }))
+                }
+              />
+              <SettingRow
+                id="quiz-late-join"
+                label="Let people join after it starts"
+                hint="Late joiners play from the next question."
+                checked={settings.allow_late_join}
+                onChange={(value) =>
+                  setSettings((prev) => ({ ...prev, allow_late_join: value }))
+                }
+              />
+            </div>
+
+            {!mayEditQuestions && (
+              <p className="rounded-lg border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground">
+                You can change this quiz&rsquo;s title, description and
+                settings. Its questions belong to its author.
+              </p>
+            )}
+
+            {frozen && (
+              <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground">
+                This quiz has already been played, so its questions are locked
+                — scores would stop meaning anything if they could change
+                underneath. The title, description and settings can still be
+                saved. To change the questions, write a new quiz.
+              </p>
+            )}
+
+            {mayEditQuestions && !frozen && (
+              <div className="space-y-4">
+                {questions.map((question, index) => (
+                  <QuestionCard
+                    key={question.key}
+                    index={index}
+                    draft={question}
+                    canRemove={questions.length > 1}
+                    onChange={(patch) => updateQuestion(question.key, patch)}
+                    onChangeType={(type) => setType(question.key, type)}
+                    onRemove={() =>
+                      setQuestions((prev) =>
+                        prev.filter((entry) => entry.key !== question.key),
+                      )
+                    }
+                  />
+                ))}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={questions.length >= QUIZ_MAX_QUESTIONS}
+                  onClick={() =>
+                    setQuestions((prev) => [...prev, newQuestion()])
+                  }
+                >
+                  <Plus aria-hidden className="size-4" />
+                  Add question ({questions.length}/{QUIZ_MAX_QUESTIONS})
+                </Button>
+              </div>
+            )}
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </>
+        )}
+      </div>
+    </ResponsiveOverlay>
   );
 }
 

@@ -4,14 +4,6 @@ import { useState } from 'react';
 import { Loader2, Timer } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -24,6 +16,7 @@ import {
 import { extractApiError } from '@/lib/utils/api-error';
 import type { InviteMemberPayload } from '@/types/collab';
 import { InviteLinkSection } from '@/v2/features/invites/InviteLinkSection';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 
 /**
  * InvitePeopleDialog — invite by email, with a role. Shared by the space and
@@ -119,7 +112,7 @@ export function InvitePeopleDialog({
   };
 
   return (
-    <Dialog
+    <ResponsiveOverlay
       open={open}
       onOpenChange={(next) => {
         if (!next) {
@@ -128,89 +121,13 @@ export function InvitePeopleDialog({
         }
         onOpenChange(next);
       }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
-            {description ??
-              'They get an invitation they can accept from their own Invitations page.'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="invite-email">Email address</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              autoComplete="off"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(event) => handleEmailChange(event.target.value)}
-              onKeyDown={(event) => {
-                // IME Enter confirms the composition; it must never submit.
-                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  void submit();
-                }
-              }}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="invite-role">Role</Label>
-            <Select
-              value={role}
-              onValueChange={(value) => setRole(value as 'admin' | 'member')}
-            >
-              <SelectTrigger id="invite-role" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="admin">Admin — can invite and manage</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* The throttle rest is POLITE, and a polite region has to already
-              exist to be announced — inserting one with its text already in
-              place is unreliable across screen readers. So the live region is
-              permanent and empty until there is something to say, and the
-              visible line is its `aria-hidden` twin. Without this the Send
-              button simply went quiet for a screen-reader user. */}
-          <p role="status" aria-live="polite" className="sr-only">
-            {throttled
-              ? 'That is a lot of invitations in one minute. Wait a moment and send this one again.'
-              : ''}
-          </p>
-          {throttled && (
-            <p
-              aria-hidden
-              className="flex items-start gap-2 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-            >
-              <Timer aria-hidden className="mt-0.5 size-4 shrink-0" />
-              That&rsquo;s a lot of invitations in one minute. Give it a moment and
-              send this one again.
-            </p>
-          )}
-          {error && (
-            <p
-              role="alert"
-              className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-            >
-              {error}
-            </p>
-          )}
-
-          {/* UNDER the address field, not beside it. Typing an email is the
-              thing most people came to do; the link is what they need when the
-              person they are inviting has no Lawexa account to address. */}
-          {linkScope && <InviteLinkSection spaceUuid={linkScope.spaceUuid} />}
-        </div>
-
-        <DialogFooter>
+      title={title}
+      description={
+        description ??
+        'They get an invitation they can accept from their own Invitations page.'
+      }
+      footer={
+        <>
           <Button variant="outline" onClick={close} disabled={submitting}>
             Cancel
           </Button>
@@ -221,8 +138,80 @@ export function InvitePeopleDialog({
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
             Send invitation
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="invite-email">Email address</Label>
+          <Input
+            id="invite-email"
+            type="email"
+            autoComplete="off"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(event) => handleEmailChange(event.target.value)}
+            onKeyDown={(event) => {
+              // IME Enter confirms the composition; it must never submit.
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                void submit();
+              }
+            }}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="invite-role">Role</Label>
+          <Select
+            value={role}
+            onValueChange={(value) => setRole(value as 'admin' | 'member')}
+          >
+            <SelectTrigger id="invite-role" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="member">Member</SelectItem>
+              <SelectItem value="admin">Admin — can invite and manage</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* The throttle rest is POLITE, and a polite region has to already
+            exist to be announced — inserting one with its text already in
+            place is unreliable across screen readers. So the live region is
+            permanent and empty until there is something to say, and the
+            visible line is its `aria-hidden` twin. Without this the Send
+            button simply went quiet for a screen-reader user. */}
+        <p role="status" aria-live="polite" className="sr-only">
+          {throttled
+            ? 'That is a lot of invitations in one minute. Wait a moment and send this one again.'
+            : ''}
+        </p>
+        {throttled && (
+          <p
+            aria-hidden
+            className="flex items-start gap-2 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          >
+            <Timer aria-hidden className="mt-0.5 size-4 shrink-0" />
+            That&rsquo;s a lot of invitations in one minute. Give it a moment and
+            send this one again.
+          </p>
+        )}
+        {error && (
+          <p
+            role="alert"
+            className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          >
+            {error}
+          </p>
+        )}
+
+        {/* UNDER the address field, not beside it. Typing an email is the
+            thing most people came to do; the link is what they need when the
+            person they are inviting has no Lawexa account to address. */}
+        {linkScope && <InviteLinkSection spaceUuid={linkScope.spaceUuid} />}
+      </div>
+    </ResponsiveOverlay>
   );
 }

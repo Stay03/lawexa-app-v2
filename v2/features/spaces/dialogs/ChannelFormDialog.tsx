@@ -7,20 +7,13 @@ import { channelVisibilityFace } from '@/lib/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { ChannelVisibility } from '@/types/collab';
 import { ChoiceCards, type Choice } from '@/v2/features/collab/kit/ChoiceCards';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { CHANNEL_DESCRIPTION_MAX, CHANNEL_NAME_MAX } from '../model';
 import { useCreateChannel } from '../mutations';
 
@@ -129,92 +122,13 @@ export function ChannelFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create a channel</DialogTitle>
-          <DialogDescription>
-            Channels are where the conversation happens — one per topic works
-            better than one per person.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <ChannelPreview
-            name={name}
-            visibility={visibility}
-            description={description}
-          />
-
-          <div className="space-y-2">
-            <Label htmlFor={`${uid}-name`}>Name</Label>
-            <div className="relative">
-              <span
-                aria-hidden
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
-              >
-                #
-              </span>
-              <Input
-                id={`${uid}-name`}
-                className="pl-7"
-                maxLength={CHANNEL_NAME_MAX}
-                placeholder="general"
-                aria-describedby={`${uid}-name-hint`}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  // IME Enter confirms the composition; it must never submit.
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                    event.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-              />
-            </div>
-            <p id={`${uid}-name-hint`} className="text-xs text-muted-foreground">
-              Short and lowercase reads best — <code>general</code>,{' '}
-              <code>matter-4471</code>.
-            </p>
-          </div>
-
-          <ChoiceCards
-            legend="Who can join"
-            choices={VISIBILITY_CHOICES}
-            value={visibility}
-            onChange={setVisibility}
-          />
-
-          <div className="space-y-2">
-            <Label htmlFor={`${uid}-description`}>
-              What&rsquo;s this channel for?
-            </Label>
-            <Textarea
-              id={`${uid}-description`}
-              maxLength={CHANNEL_DESCRIPTION_MAX}
-              rows={3}
-              aria-describedby={`${uid}-description-hint`}
-              placeholder="Filings, hearings and deadlines for matter 4471."
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-            <p id={`${uid}-description-hint`} className="text-xs text-muted-foreground">
-              Optional. It shows in the channel header and greets whoever opens
-              it first.
-            </p>
-          </div>
-
-          {error && (
-            <p
-              role="alert"
-              className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
-            >
-              {error}
-            </p>
-          )}
-        </div>
-
-        <DialogFooter>
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Create a channel"
+      description="Channels are where the conversation happens — one per topic works better than one per person."
+      footer={
+        <>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -226,9 +140,84 @@ export function ChannelFormDialog({
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
             Create channel
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <ChannelPreview
+          name={name}
+          visibility={visibility}
+          description={description}
+        />
+
+        <div className="space-y-2">
+          <Label htmlFor={`${uid}-name`}>Name</Label>
+          <div className="relative">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+            >
+              #
+            </span>
+            <Input
+              id={`${uid}-name`}
+              className="pl-7"
+              maxLength={CHANNEL_NAME_MAX}
+              placeholder="general"
+              aria-describedby={`${uid}-name-hint`}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                // IME Enter confirms the composition; it must never submit.
+                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  handleSubmit();
+                }
+              }}
+            />
+          </div>
+          <p id={`${uid}-name-hint`} className="text-xs text-muted-foreground">
+            Short and lowercase reads best — <code>general</code>,{' '}
+            <code>matter-4471</code>.
+          </p>
+        </div>
+
+        <ChoiceCards
+          legend="Who can join"
+          choices={VISIBILITY_CHOICES}
+          value={visibility}
+          onChange={setVisibility}
+        />
+
+        <div className="space-y-2">
+          <Label htmlFor={`${uid}-description`}>
+            What&rsquo;s this channel for?
+          </Label>
+          <Textarea
+            id={`${uid}-description`}
+            maxLength={CHANNEL_DESCRIPTION_MAX}
+            rows={3}
+            aria-describedby={`${uid}-description-hint`}
+            placeholder="Filings, hearings and deadlines for matter 4471."
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+          <p id={`${uid}-description-hint`} className="text-xs text-muted-foreground">
+            Optional. It shows in the channel header and greets whoever opens
+            it first.
+          </p>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
+          >
+            {error}
+          </p>
+        )}
+      </div>
+    </ResponsiveOverlay>
   );
 }
 

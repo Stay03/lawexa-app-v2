@@ -187,8 +187,16 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
 
       {/* INVITE LINKS AND THE WAITING LIST — admin surfaces, on the same
           url-overlay mechanism as Edit so Back closes them (W1 rule). */}
+      {/* BOTH SHEETS FILL A PHONE, and both have to say it in the variant shape:
+          `SheetContent` sets `data-[side=right]:w-3/4`, and an attribute
+          selector beats a bare `w-full` however late it is written. Left plain,
+          these two admin queues opened at three quarters of the screen with the
+          space page showing down one side (mobile overhaul, phase 7). */}
       <Sheet {...panel.bind('invites')}>
-        <SheetContent side="right" className="overflow-y-auto">
+        <SheetContent
+          side="right"
+          className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+        >
           <SheetHeader>
             <SheetTitle>Invite by link</SheetTitle>
             <SheetDescription>
@@ -202,7 +210,10 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
       </Sheet>
 
       <Sheet {...panel.bind('requests')}>
-        <SheetContent side="right" className="overflow-y-auto">
+        <SheetContent
+          side="right"
+          className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+        >
           <SheetHeader>
             <SheetTitle>Waiting to join</SheetTitle>
             <SheetDescription>

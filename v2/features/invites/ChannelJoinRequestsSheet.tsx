@@ -39,7 +39,16 @@ export function ChannelJoinRequestsSheet({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto">
+      {/* THE WIDTH MUST BE VARIANT-MATCHED OR IT IS A DEAD CLASS. `SheetContent`
+          sizes itself with `data-[side=right]:w-3/4`, and an attribute selector
+          outranks a bare `w-full` written later — so a sheet that means to fill
+          a phone has to say so in the same shape. Without it this queue opened
+          at three quarters of the screen with the page showing down one side,
+          which is the one thing phase 7 exists to remove. */}
+      <SheetContent
+        side="right"
+        className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+      >
         <SheetHeader>
           <SheetTitle>Waiting to join</SheetTitle>
           <SheetDescription>
