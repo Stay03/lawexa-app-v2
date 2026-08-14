@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import { ArrowLeft } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -66,13 +67,14 @@ export function NoteDocument({
   // referrer or a remembered tab: stateless, correct on a cold deep link, and
   // it cannot go stale.
   const backHref = isOwn ? '/notes?tab=mine' : '/notes';
+  const back = useBackTo(backHref);
 
   return (
     <article className="flex flex-col gap-8">
       <header className="flex flex-col gap-3 border-b border-border/60 pb-6">
         <p>
           <Link
-            href={backHref}
+            {...back}
             className={cn(
               'v2-interactive inline-flex min-h-8 items-center gap-1.5 rounded-full pr-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
               FOCUS_RING,

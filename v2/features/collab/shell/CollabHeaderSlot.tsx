@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import { ChevronLeft, PanelLeft } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -61,6 +62,8 @@ import {
 
 /** The mobile/tablet "up" control — present wherever the rail is not docked. */
 export function CollabHeaderBack({ context }: { context: CollabHeaderContext }) {
+  // Back when the space really is behind you, a link when it is not.
+  const back = useBackTo(context.backHref);
   return (
     <Button
       asChild
@@ -68,7 +71,7 @@ export function CollabHeaderBack({ context }: { context: CollabHeaderContext }) 
       size="icon"
       className="size-9 shrink-0 rounded-full text-muted-foreground lg:hidden"
     >
-      <Link href={context.backHref} aria-label={context.backLabel}>
+      <Link {...back} aria-label={context.backLabel}>
         <ChevronLeft aria-hidden className="size-5" />
       </Link>
     </Button>

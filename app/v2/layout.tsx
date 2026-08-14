@@ -15,6 +15,7 @@ import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
 import { TouchPress } from '@/v2/shell/touch-press';
+import { RouteTrail } from '@/v2/shell/route-trail';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
@@ -156,6 +157,13 @@ export default async function V2Layout({
           answer a touch at all (see the module for the count and the platform
           numbers). One passive listener; renders null. */}
       <TouchPress />
+      {/* Remembers where this tab has been, so a back control can go BACK when
+          the parent really is behind you instead of pushing a duplicate entry.
+          Only does anything on browsers with no Navigation API; where there is
+          one, the browser already knows exactly. Renders null. */}
+      <Suspense fallback={null}>
+        <RouteTrail />
+      </Suspense>
       {/* Back/Forward + reload scroll restoration for the shell's ONE scroll
           container — the div is invisible to both native restoration and the
           router, so it restores itself. Push scroll stays Next's (see the

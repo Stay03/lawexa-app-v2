@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 
@@ -37,6 +38,7 @@ import '../detail/case-document.css';
  * summary's, so the same paragraph rendered differently on the two pages.
  */
 export function CaseReportScreen({ slug }: { slug: string }) {
+  const back = useBackTo(`/cases/${slug}`);
   const query = useQuery(casesQueries.report(slug));
   const detail = query.data?.data ?? null;
   const report = detail?.full_report ?? null;
@@ -85,7 +87,7 @@ export function CaseReportScreen({ slug }: { slug: string }) {
     <div className={CASE_COLUMN}>
       <div className="v2-case-doc flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         <Link
-          href={`/cases/${slug}`}
+          {...back}
           className={cn(
             'v2-interactive inline-flex min-h-9 w-fit items-center gap-1.5 rounded-full px-2 -ml-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
             FOCUS_RING,

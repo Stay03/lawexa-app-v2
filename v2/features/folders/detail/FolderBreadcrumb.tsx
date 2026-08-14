@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -54,6 +55,7 @@ export function FolderBreadcrumb({ folder }: { folder: FolderRecord }) {
 
   const upHref = parent ? folderHref(parent.uuid) : '/folders';
   const upLabel = parent ? parent.name : 'Folders';
+  const up = useBackTo(upHref);
 
   return (
     <>
@@ -107,7 +109,7 @@ export function FolderBreadcrumb({ folder }: { folder: FolderRecord }) {
 
       {/* Phone: one named link up. */}
       <Link
-        href={upHref}
+        {...up}
         className={cn(
           'v2-interactive -ml-2 inline-flex min-h-9 max-w-full items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:text-foreground sm:hidden',
           FOCUS_RING,

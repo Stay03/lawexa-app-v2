@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import { ArrowLeft, Check, Link2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -47,12 +48,13 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
   const tone = statuteStatusTone(detail.status);
   const commenced = formatStatuteDate(detail.commencement_date);
   const documentType = formatDocumentType(detail.document_type);
+  const back = useBackTo('/statutes');
 
   return (
     <header className="flex flex-col gap-3 border-b border-border/60 pb-6">
       <p>
         <Link
-          href="/statutes"
+          {...back}
           className={cn(
             'v2-interactive inline-flex min-h-8 items-center gap-1.5 rounded-full pr-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
             FOCUS_RING,

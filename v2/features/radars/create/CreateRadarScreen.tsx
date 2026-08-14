@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowUpRight, CheckCircle2, Hourglass } from 'lucide-react';
 import { toast } from 'sonner';
@@ -39,6 +40,7 @@ import { useCreateRadar } from './use-create-radar';
  *     mutation) — the study's honest-error rule.
  */
 export function CreateRadarScreen() {
+  const back = useBackTo('/radars');
   const { signedIn, role } = useV2Session();
   const router = useRouter();
   const createRadar = useCreateRadar();
@@ -99,7 +101,7 @@ export function CreateRadarScreen() {
     <div className={LIST_COLUMN}>
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         <Link
-          href="/radars"
+          {...back}
           className={cn(
             'v2-interactive -ml-2 inline-flex min-h-9 w-fit items-center gap-1.5 rounded-full px-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
             FOCUS_RING,

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor } from '@tiptap/react';
@@ -87,6 +88,7 @@ export function NoteEditorScreen({
   /** The note being edited, or `null` for a note that does not exist yet. */
   initialRecord: NoteRecord | null;
 }) {
+  const back = useBackTo('/notes?tab=mine');
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId: viewerId } = useV2Session();
@@ -362,7 +364,7 @@ export function NoteEditorScreen({
     <div className={NOTE_PAPER_COLUMN}>
       <div className="mb-6 flex min-h-9 items-center justify-between gap-3">
         <Link
-          href="/notes?tab=mine"
+          {...back}
           className={cn(
             'v2-interactive -ml-2 inline-flex min-h-9 items-center gap-1.5 rounded-full px-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
             FOCUS_RING,

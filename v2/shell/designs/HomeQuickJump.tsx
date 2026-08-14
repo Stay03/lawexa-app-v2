@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { GraduationCap, Landmark, NotebookPen, Scale } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -11,9 +12,17 @@ import { CHAT_QUICK_JUMP, CHAT_QUICK_JUMP_ITEM } from './home-frame';
 
 /**
  * HomeQuickJump — the Chat tab's quiet MOBILE-ONLY quick-jump row (owner #20:
- * desktop already has the sidebar, so this is `md:hidden`). Real `<a>` links to
- * the canonical clean paths, which fall through the v2 proxy to the v1 screens —
- * deliberately full-page navigations, not client-side router links.
+ * desktop already has the sidebar, so this is `md:hidden`).
+ *
+ * THESE WERE PLAIN ANCHORS, AND THAT COST THE WHOLE APP. The reason written
+ * here was true when it was written: the four paths fell through the v2 proxy
+ * to v1 screens, so a full page load was the honest thing to do. Every one of
+ * them has since migrated — `/cases`, `/statutes`, `/notes` and `/quiz` are all
+ * v2 routes now — and the anchors stayed. So on the mobile home screen, the
+ * four most travelled links in the product were each tearing the app down and
+ * rebooting it: session fetch, query cache, realtime connection, all of it,
+ * every tap. They are router links now, which is what they were always going
+ * to become on the day those screens moved.
  *
  * EXTRACTED from `ChatHome` so the route-level fallback can reserve this row at
  * its EXACT geometry. That matters more than it looks: the pills wrap, and where
@@ -67,7 +76,7 @@ export function HomeQuickJump() {
   return (
     <nav aria-label="Quick links" className={CHAT_QUICK_JUMP}>
       {actions.map(({ href, label, Icon }) => (
-        <a
+        <Link
           key={href}
           href={href}
           className={cn(
@@ -79,7 +88,7 @@ export function HomeQuickJump() {
         >
           <Icon className="size-4 shrink-0" aria-hidden />
           {label}
-        </a>
+        </Link>
       ))}
     </nav>
   );

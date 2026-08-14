@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import { ChevronDown, ChevronLeft, MoreHorizontal } from 'lucide-react';
 
 import { channelVisibilityFace } from '@/lib/collab/visibility';
@@ -213,6 +214,9 @@ export function ChannelPlaceHeader({
    *  because that is the thing a reader lands in a thread wanting; and a plain
    *  channel with no description falls back to who can see it. */
   const phoneSubtitle = description ?? (parent?.name ? `Thread in ${parent.name}` : null) ?? channel.visibility_label;
+  /** Back really goes back when the parent is the screen behind; on a cold
+   *  landing it stays the link it has always been. */
+  const backToParent = useBackTo(parent?.href ?? `/spaces/${channel.space.uuid}`);
 
   return (
     <div className="v2-screen-bar shrink-0 border-b bg-background">
@@ -226,7 +230,7 @@ export function ChannelPlaceHeader({
               identity is one tap that opens the details rather than four
               things competing for one narrow line. */}
           <Link
-            href={parent?.href ?? `/spaces/${channel.space.uuid}`}
+            {...backToParent}
             aria-label={parent?.name ? `Back to ${parent.name}` : 'Back to the space'}
             className={cn(
               'v2-interactive -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full md:hidden',
@@ -451,9 +455,10 @@ const DESCRIPTION_ID = 'v2-channel-description';
  * the context around it.
  */
 function BackChip({ parent }: { parent: HeaderParent }) {
+  const back = useBackTo(parent.href);
   return (
     <Link
-      href={parent.href}
+      {...back}
       aria-label={parent.name === null ? 'Back' : `Back to ${parent.name}`}
       className={cn(
         'v2-interactive flex min-w-0 max-w-32 shrink items-center gap-0.5 rounded-full border py-0.5 pr-2.5 pl-1.5 md:max-w-40',
