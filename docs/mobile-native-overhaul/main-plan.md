@@ -1,8 +1,10 @@
 # Mobile native overhaul
 
 The v2 app is a good web app on a phone. It is not yet an app. This is the work
-that closes that gap, in nine phases, in the order that stops any phase being
-built twice.
+that closes that gap, in ten phases, in the order that stops any phase being
+built twice. It began as nine; scrolling was added as phase 4 on 14 August when
+Arthur reported it, because a defect people meet every day outranks polish and it
+lives in code no other phase touches.
 
 Owner brief, 14 August 2026: "for the native looking thing on mobile I don't
 mind a massive rewrite. Fix issues in whole instead of quick fixes." And: "First
@@ -70,24 +72,25 @@ his eyes.
 
 ---
 
-## The nine phases, and why in this order
+## The ten phases, and why in this order
 
 The rule that decides the order: nothing may be built on a shape that a later
 phase changes. Skeletons come after modals become screens, because each new
 screen is a new route with its own loading state. Motion comes last, because
 motion between screens needs the screens to be final.
 
-| # | Phase | Wave | Why here |
+| # | Phase | Why here | State |
 |---|---|---|---|
-| 1 | Touch feedback | 1 | Moves no structure, so it cannot clash with anything below. Felt on every screen the same day. |
-| 2 | Warm transcript | 1 | Independent of layout. Fixes the notification path in the cache, not the UI. |
-| 3 | Mobile header | 2 | The back control lives in the header, so the header shape must be settled before back is rebuilt. |
-| 4 | Navigation and back | 2 | The history stack, real back controls, client side jumps, and one create affordance. |
-| 5 | Edge gestures | 2 | Depends on step 4 making every step a real history entry. |
-| 6 | Modals become screens | 3 | Needs 3, 4 and 5, because a screen is only a screen if back works. |
-| 7 | Skeletons | 4 | After 6, or 22 of them get written twice. |
-| 8 | Motion and pull to refresh | 5 | On the shapes that are now final. |
-| 9 | Em dash sweep | 5 | Last, so it catches every word the eight phases above wrote. |
+| 1 | Touch feedback | Moves no structure, so it cannot clash with anything below. Felt on every screen the same day. | shipped `7fbb38d` |
+| 2 | Warm transcript | Independent of layout. Fixes the notification path in the cache, not the UI. | shipped `4df2345` |
+| 3 | Mobile header | The back control lives in the header, so the header shape must settle before back is rebuilt. | shipped `168c588` |
+| 4 | Scrolling in a long conversation | A daily-use defect, reported from the field, in code nothing else touches. Moving it up cost nothing. | shipped `3359bb8`, confirmed by the reporter |
+| 5 | Navigation and back | The history stack, real back controls, client side jumps, one create affordance. | next |
+| 6 | Edge gestures | Depends on 5 making every step a real history entry. | |
+| 7 | Modals become screens, and the member list groups | Needs 3, 5 and 6, because a screen is only a screen if back works. | |
+| 8 | Skeletons | After 7, or twenty-two of them get written twice. | |
+| 9 | Motion and pull to refresh | On the shapes that are now final. | |
+| 10 | Language sweep | Last, so it catches every word the nine phases above wrote. | |
 
 ### Phase 1, touch feedback
 
@@ -105,6 +108,13 @@ one of the channel's messages when the unread event arrives, so opening the
 channel is a cache read. Where a backend change would make this exact rather than
 approximate, that ask is written and taken to backend.
 
+### Phase 4, scrolling in a long conversation
+
+Both transcripts guess the height of off-screen messages, and Chrome quietly
+corrects the reader's position when a guess is replaced by the truth. Safari has
+never had that feature, which is why this only ever showed on an iPhone and a
+Mac. The guessing is now gated on the capability itself.
+
 ### Phase 3, mobile header
 
 One bar on a phone. Back on the leading edge, the place identity as one tap
@@ -112,14 +122,14 @@ target that opens the details surface, one or two actions, and everything else i
 an overflow. This is what every messaging app converged on and it is where about
 45px of permanent chrome comes back.
 
-### Phase 4, navigation and back
+### Phase 5, navigation and back
 
 An app owned route stack so a back control knows whether there is anywhere to go
 back to: pop when the parent is genuinely behind you, push only on a cold
 landing. Plus the plain anchors that reboot the app, and one consistent create
 affordance.
 
-### Phase 5, edge gestures
+### Phase 6, edge gestures
 
 Research says plainly: do not hand build swipe to go back in the browser. iOS
 runs its own edge gesture that cannot be turned off, Android runs the system
@@ -130,7 +140,7 @@ edge conflicts honest. A custom swipe is defensible only inside the Android and
 iOS wrapper, where the native gesture is off and we own the edge, and the two
 wrapper switches are named in that phase's plan.
 
-### Phase 6, modals become screens
+### Phase 7, modals become screens
 
 **It also carries the member list grouping.** Owner, 14 August: the channel and
 thread member lists should separate who is here from everyone else. Decided the
@@ -145,18 +155,18 @@ The long forms and the lists become routed screens on a phone and stay dialogs o
 a desktop, using one plain route rendered responsively. Intercepting routes are
 the wrong tool here and the plan says why. Confirmations stay dialogs.
 
-### Phase 7, skeletons
+### Phase 8, skeletons
 
 One skeleton per destination. Kill the wrong shape, kill the chain, and keep the
 house discipline of a still fallback handing over to a pulsing one only where the
 geometry is identical.
 
-### Phase 8, motion and pull to refresh
+### Phase 9, motion and pull to refresh
 
 Movement between screens, and pull to refresh on the lists that a person expects
 to pull.
 
-### Phase 9, em dash sweep
+### Phase 10, language sweep
 
 Every word this overhaul wrote, checked for the em dash the owner does not want,
 and for plain language.
@@ -182,9 +192,10 @@ and for plain language.
 - `phase-1-touch-feedback/`
 - `phase-2-warm-transcript/`
 - `phase-3-mobile-header/`
-- `phase-4-navigation-and-back/`
-- `phase-5-edge-gestures/`
-- `phase-6-modals-to-screens/`
-- `phase-7-skeletons/`
-- `phase-8-motion-and-refresh/`
-- `phase-9-language-sweep/`
+- `phase-4-scroll-smoothness/`
+- `phase-5-navigation-and-back/`
+- `phase-6-edge-gestures/`
+- `phase-7-modals-to-screens/`
+- `phase-8-skeletons/`
+- `phase-9-motion-and-refresh/`
+- `phase-10-language-sweep/`
