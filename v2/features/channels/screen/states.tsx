@@ -529,7 +529,31 @@ export function ChannelErrorState({ onRetry }: { onRetry: () => void }) {
  * screen: the sections ride inside the bar at `md:`+ and a bottom bar on a
  * phone, and neither of those reserves a row above the transcript.
  */
-export function ChannelScreenFrame({ still = false }: { still?: boolean }) {
+/**
+ * ChannelScreenFrame - the channel shape while it loads.
+ *
+ * -- IT TAKES A NAME, AND THAT IS THE POINT (owner, 15 August 2026) --------
+ * "For channel, the first is a complete skeleton no text, the second has the
+ * name of the channel on the header but skeleton on the messages."
+ *
+ * Measured on a throttled connection: the nameless stage ran 5.2s to 9.6s and
+ * the named one did not arrive until 28.4s. Nineteen seconds of a channel the
+ * reader had just tapped, refusing to say which channel it was - while its
+ * name sat in the list cache the whole time.
+ *
+ * So the frame shows the REAL name when one is known and the silhouette bar
+ * only when it is not. The route boundary and the live screen feed it from
+ * the same place, which is what turns two different greys into one shape
+ * that fills in.
+ */
+export function ChannelScreenFrame({
+  still = false,
+  name = null,
+}: {
+  still?: boolean;
+  /** The channel name when it is already known; null keeps the bar. */
+  name?: string | null;
+}) {
   const bar = still ? 'animate-none' : undefined;
   return (
     <div className="relative flex h-full min-h-0 flex-col">
@@ -537,9 +561,15 @@ export function ChannelScreenFrame({ still = false }: { still?: boolean }) {
       <div className="shrink-0 border-b">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-2 px-4">
           <Skeleton className={cn('size-4 shrink-0 rounded', bar)} />
-          <Skeleton
-            className={cn('h-3.5 min-w-0 flex-1 rounded md:h-4 md:w-36 md:flex-none', bar)}
-          />
+          {name ? (
+            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground md:flex-none">
+              {name}
+            </span>
+          ) : (
+            <Skeleton
+              className={cn('h-3.5 min-w-0 flex-1 rounded md:h-4 md:w-36 md:flex-none', bar)}
+            />
+          )}
           <Skeleton className={cn('hidden h-6 w-28 rounded-full md:block', bar)} />
           <div className="flex items-center justify-end gap-1.5 md:flex-1">
             <Skeleton className={cn('size-6 shrink-0 rounded-full', bar)} />
