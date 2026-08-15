@@ -1,17 +1,17 @@
-import { SegmentFallback } from '@/v2/shell/segment-fallback';
+import { StatuteFallback } from '@/v2/features/statutes/reader/StatuteScreen';
 
 /**
- * The `statutes` SEGMENT boundary — neutral, for the reason written out in full
- * in `app/v2/cases/loading.tsx`.
+ * The `statutes` SEGMENT boundary — the fallback for whatever child is being
+ * navigated INTO under `/statutes`, and that child is always a STATUTE
+ * (the list has its own boundary inside the `(library)` route group).
  *
- * It carried the READER's shape and, like cases, still wrapped its own list:
- * `(library)` gave the list an inner fallback without taking it out of this
- * boundary, so entering the segment cold and landing on the list painted a
- * document silhouette first.
- *
- * `statutes/[slug]/loading.tsx` already exists and is closer to the changed
- * segment on a list→statute click, so the reader keeps its document skeleton.
+ * Same reasoning as `app/v2/cases/loading.tsx`, which carries the full note:
+ * under the v2 rewrite proxy the client cannot prefetch parameterised routes,
+ * so this boundary shows on every list→statute click for a full server round
+ * trip — it must therefore be the READER's shape, so the reader sees document
+ * skeleton → document skeleton → the Act, and the hand-offs move nothing.
+ * Do not "simplify" the two loading files back into one.
  */
 export default function StatutesSegmentLoading() {
-  return <SegmentFallback label="Loading statutes section" />;
+  return <StatuteFallback />;
 }
