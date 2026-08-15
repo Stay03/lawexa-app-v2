@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
@@ -10,8 +10,10 @@ import { collabAccessState } from '@/v2/features/collab/model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { useUrlSearch } from '@/v2/runtime/use-url-search';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { useSearchPosition } from '@/v2/search-position';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
+import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { SearchField, SearchFieldShape } from '@/v2/shell/SearchField';
 import { TabRow } from '@/v2/shell/TabRow';
 import { channelsQueries } from '../queries';
@@ -83,10 +85,8 @@ export function MyChannelsScreen() {
   // `Date.now()` runs in render (React Compiler lint).
   const [now] = useState(() => Date.now());
 
-  useEffect(() => {
-    setHeaderContext({ title: 'My channels', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
+  // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
+  const searchAtTop = useSearchPosition() === 'top';
 
   const query = useQuery({
     ...channelsQueries.mine({ viewerId }),
@@ -135,8 +135,29 @@ export function MyChannelsScreen() {
   const showNoMatch =
     !showSkeleton && !showError && !showEmpty && visible.length === 0;
 
+  // SHOWN AT EVERY WIDTH. The brief asked for this field at `sm:`+, and that
+  // was wrong for this surface specifically: `/channels` is the natural MOBILE
+  // entry point into the conversations, phones are where a person has the most
+  // channels and the least screen to scan them with, and the term rides the URL
+  // — so a hidden field would also let a shared link land a phone on a quietly
+  // narrowed list with nothing on screen to say why.
+  //
+  // Built ONCE and rendered in whichever position the developer switch names,
+  // so the two placements cannot drift in placeholder or label.
+  const searchField = (
+    <SearchField
+      value={search.inputValue}
+      onChange={search.onInputChange}
+      onClear={search.onClear}
+      placeholder="Search channels"
+      label="Search your channels by name or space"
+    />
+  );
+
   return (
-    <div className={LIST_COLUMN}>
+    <div className={LIST_COLUMN_DOCKED}>
+      <ScreenTitle />
+
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <TabRow
           tabs={MY_CHANNEL_LENSES}
@@ -157,21 +178,9 @@ export function MyChannelsScreen() {
           {(tab) => tab.label}
         </TabRow>
 
-        {/* SHOWN AT EVERY WIDTH. The brief asked for this field at `sm:`+, and
-            that was wrong for this surface specifically: `/channels` is the
-            natural MOBILE entry point into the conversations, phones are where
-            a person has the most channels and the least screen to scan them
-            with, and the term rides the URL — so a hidden field would also let
-            a shared link land a phone on a quietly narrowed list with nothing
-            on screen to say why. */}
-        <SearchField
-          className="w-full sm:max-w-56"
-          value={search.inputValue}
-          onChange={search.onInputChange}
-          onClear={search.onClear}
-          placeholder="Search channels"
-          label="Search your channels by name or space"
-        />
+        {searchAtTop ? (
+          <div className="w-full sm:max-w-56">{searchField}</div>
+        ) : null}
       </div>
 
       <span role="status" aria-live="polite" className="sr-only">
@@ -232,6 +241,14 @@ export function MyChannelsScreen() {
           </div>
         )}
       </div>
+
+      {/* The floating search pill. No floating action: nothing is created from
+          this screen — a channel is made inside the space that owns it. */}
+      {searchAtTop ? null : (
+        <ScreenDock>
+          <ScreenDockSearch>{searchField}</ScreenDockSearch>
+        </ScreenDock>
+      )}
     </div>
   );
 }
@@ -249,17 +266,26 @@ export function MyChannelsScreen() {
  * shapes they will become.
  */
 export function MyChannelsFallback() {
+  const searchAtTop = useSearchPosition() === 'top';
   return (
     <>
       <span role="status" className="sr-only">
         Loading your channels
       </span>
-      <div aria-hidden inert className={LIST_COLUMN}>
+      <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
+        <ScreenTitle />
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="h-9 w-48 self-start rounded-full bg-secondary/60" />
-          <SearchFieldShape className="w-full sm:max-w-56" />
+          {searchAtTop ? <SearchFieldShape className="w-full sm:max-w-56" /> : null}
         </div>
         <MyChannelsSkeleton />
+        {searchAtTop ? null : (
+          <ScreenDock>
+            <ScreenDockSearch>
+              <SearchFieldShape />
+            </ScreenDockSearch>
+          </ScreenDock>
+        )}
       </div>
     </>
   );

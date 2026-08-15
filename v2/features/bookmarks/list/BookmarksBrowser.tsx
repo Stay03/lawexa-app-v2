@@ -9,6 +9,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { bookmarksQueries } from '../queries';
@@ -96,10 +97,21 @@ function liveStatus(loading: boolean, removing: number): string {
     : `Removed ${removing} items from your bookmarks`;
 }
 
-/** The centred reading column every state shares (`page-columns.ts`), so this
- *  page, `/cases`, `/statutes` and `/conversations` are one measure. */
+/**
+ * The centred reading column every state shares (`page-columns.ts`), so this
+ * page, `/cases`, `/statutes` and `/conversations` are one measure. The plain
+ * column, not the docked one: this screen floats nothing.
+ *
+ * The screen's `h1` is drawn here, so the signed-out panel is under a page that
+ * still says what it is and every state carries exactly one heading.
+ */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className={LIST_COLUMN}>{children}</div>;
+  return (
+    <div className={LIST_COLUMN}>
+      <ScreenTitle />
+      {children}
+    </div>
+  );
 }
 
 export function BookmarksBrowser() {

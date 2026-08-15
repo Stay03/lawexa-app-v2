@@ -1,34 +1,31 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense } from 'react';
 
+import { useSearchPosition } from '@/v2/search-position';
 import { SearchFieldShape } from '@/v2/shell/SearchField';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
+import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { ConversationsList } from './ConversationsList';
 import { ConversationsListSkeleton } from './states';
 
 /**
  * ConversationsScreen — the `/conversations` client root.
  *
- * Two jobs, both above the `useSearchParams` Suspense boundary so neither
- * depends on the URL:
+ * One job, above the `useSearchParams` Suspense boundary so it does not depend
+ * on the URL: wrapping the `useSearchParams` consumer in a `Suspense` boundary
+ * (§E keep / Next requirement), with a fallback that mirrors the loading state
+ * so the hand-off to real content is seamless.
  *
- *  1. PUBLISHES the header centre-slot title. On a non-home route the header
- *     shows the route's published context (owner #43); this page publishes a
- *     static "Conversations" on mount and clears it on unmount (an external-store
- *     write — not React setState — so it is React-Compiler-clean in an effect,
- *     the same seam the conversation controller uses). `setHeaderContext` is
- *     idempotent, so the publish is safe to run once. NOTE (verified first-hand):
- *     `/conversations` is not in the header's `expectsContext` set (only `/c/*`
- *     is), so the centre shows NO skeleton — correct, because the title is a
- *     known static string, not late-resolving; it simply cross-fades in (200ms)
- *     the moment this effect publishes. No header change is required.
- *
- *  2. Wraps the `useSearchParams` consumer in a `Suspense` boundary (§E keep /
- *     Next requirement), with a fallback that mirrors the loading state so the
- *     hand-off to real content is seamless.
+ * IT NO LONGER PUBLISHES A HEADER TITLE. It used to publish a static
+ * "Conversations" to the bar's centre slot on mount. `/conversations` is a
+ * TOP-LEVEL screen, and the bar on one of those carries no title at all — the
+ * title lives in the page body now (`ScreenTitle`, fed by
+ * `top-level-route.ts`). The effect and its cleanup were removed rather than
+ * left dormant, because a screen that still published one would put its own
+ * name on the pixels twice.
  *
  * `signedIn` is READ FROM CONTEXT rather than taken as a prop. It is the same
  * server-verified `!!session` value as before — the v2 layout computes it once
@@ -44,11 +41,6 @@ import { ConversationsListSkeleton } from './states';
 export function ConversationsScreen() {
   const { signedIn } = useV2Session();
 
-  useEffect(() => {
-    setHeaderContext({ title: 'Conversations', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
-
   return (
     <Suspense fallback={<ConversationsFallback />}>
       <ConversationsList signedIn={signedIn} />
@@ -57,14 +49,20 @@ export function ConversationsScreen() {
 }
 
 /**
- * Suspense fallback — the search field + list skeleton in the reading column.
- * The field is STATIC CHROME, so it is a still reserved SHAPE, not a pulse: it
- * waits on no request (its value lives in `useConversationsSearch`, its
- * placeholder is a literal). This mirrors `app/v2/conversations/loading.tsx`
- * exactly, so route boundary → this fallback → the live field is one continuous
- * still shape and never reads static → pulsing → content (standards §8).
+ * Suspense fallback — the title, the search field and the list skeleton in the
+ * reading column. The field is STATIC CHROME, so it is a still reserved SHAPE,
+ * not a pulse: it waits on no request (its value lives in
+ * `useConversationsSearch`, its placeholder is a literal). This mirrors
+ * `app/v2/conversations/loading.tsx` exactly, so route boundary → this fallback
+ * → the live field is one continuous still shape and never reads static →
+ * pulsing → content (standards §8).
+ *
+ * The field's shape is reserved WHERE IT WILL LAND — the floating dock by
+ * default, the flow if the developer switch says so — so the hand-off is a
+ * resolve in place rather than a move across the screen.
  */
 function ConversationsFallback() {
+  const searchAtTop = useSearchPosition() === 'top';
   return (
     <>
       <span role="status" className="sr-only">
@@ -74,9 +72,17 @@ function ConversationsFallback() {
           DELETED (not reconciled) when content arrives, so anything focusable in
           here would lose focus and caret mid-interaction. The announcement rides
           the sibling `role="status"` node, which is never inert. */}
-      <div aria-hidden inert className={LIST_COLUMN}>
-        <SearchFieldShape className="mb-4" />
+      <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
+        <ScreenTitle />
+        {searchAtTop ? <SearchFieldShape className="mb-4" /> : null}
         <ConversationsListSkeleton />
+        {searchAtTop ? null : (
+          <ScreenDock>
+            <ScreenDockSearch>
+              <SearchFieldShape />
+            </ScreenDockSearch>
+          </ScreenDock>
+        )}
       </div>
     </>
   );

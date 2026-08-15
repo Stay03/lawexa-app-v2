@@ -3,9 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
@@ -14,7 +12,9 @@ import { usePendingInvitationCount } from '@/v2/features/invitations/use-pending
 import { useV2Session } from '@/v2/runtime/session-context';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
+import { ScreenDock, ScreenFab } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import {
   SpaceFormDialog,
   spaceCreationHref,
@@ -79,10 +79,21 @@ const PANEL_ID = 'spaces-list-panel';
 /** The one panel this screen puts in `?panel=`. */
 const CREATE_PANEL = 'new';
 
-/** The centred reading column every state shares (`page-columns.ts`), so this
- *  page, `/cases`, `/bookmarks` and `/conversations` are one measure. */
+/**
+ * The centred reading column every state shares (`page-columns.ts`), so this
+ * page, `/cases`, `/bookmarks` and `/conversations` are one measure — the
+ * DOCKED variant, because "New space" floats at the bottom here and a `sticky`
+ * element needs a containing block a full screen tall.
+ *
+ * The screen's `h1` is drawn here, so every state carries exactly one heading.
+ */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className={LIST_COLUMN}>{children}</div>;
+  return (
+    <div className={LIST_COLUMN_DOCKED}>
+      <ScreenTitle />
+      {children}
+    </div>
+  );
 }
 
 export function SpacesBrowser() {
@@ -157,14 +168,12 @@ export function SpacesBrowser() {
 
   return (
     <PageShell>
+      {/* "New space" has left this row for the floating action, so the tabs and
+          the conditional invitations pill are all that remain — and the pill
+          now expands into the space it was always fighting for. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SpaceTypeTabs value={filter} onChange={setFilter} panelId={PANEL_ID} />
         <PendingPill count={pendingInvitations} />
-
-        <Button size="sm" className="ml-auto shrink-0" onClick={openCreate}>
-          <Plus aria-hidden className="size-4" />
-          New space
-        </Button>
       </div>
 
       {/* The ONE live region for this surface. The route fallback's
@@ -233,6 +242,15 @@ export function SpacesBrowser() {
           router.push(spaceCreationHref(spaceUuid, defaultChannelUuid));
         }}
       />
+
+      {/* The one thing this screen is for, LAST in the flow so `mt-auto` has
+          nothing after it to fight. It is a `<button>`, not a link: creating a
+          space opens a dialog this screen owns (`?panel=new`, written by
+          `useUrlOverlay` so Back closes it), and a link that goes nowhere would
+          be a lie to everyone who inspects where it points. */}
+      <ScreenDock>
+        <ScreenFab onClick={openCreate} label="New space" />
+      </ScreenDock>
     </PageShell>
   );
 }

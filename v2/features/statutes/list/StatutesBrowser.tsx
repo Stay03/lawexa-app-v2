@@ -9,8 +9,11 @@ import { Button } from '@/components/ui/button';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlSearch } from '@/v2/runtime/use-url-search';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
+import { useSearchPosition } from '@/v2/search-position';
 import { SearchField } from '@/v2/shell/SearchField';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { STATUTE_COUNTRIES_PLACEHOLDER, statutesQueries } from '../queries';
@@ -54,15 +57,29 @@ import {
 /** Stable empty rows reference — a fresh `[]` per render would churn the memo. */
 const NO_ROWS: readonly StatuteRowModel[] = [];
 
-/** The centred reading column every state shares (`page-columns.ts`). */
+/**
+ * The centred reading column every state shares (`page-columns.ts`) — the
+ * DOCKED variant, because the search pill floats at the bottom here and a
+ * `sticky` element needs a containing block a full screen tall.
+ *
+ * The screen's `h1` is drawn here, so the signed-out panel is under a page that
+ * still says what it is and every state carries exactly one heading.
+ */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className={LIST_COLUMN}>{children}</div>;
+  return (
+    <div className={LIST_COLUMN_DOCKED}>
+      <ScreenTitle />
+      {children}
+    </div>
+  );
 }
 
 export function StatutesBrowser() {
   const { signedIn, userId: viewerId } = useV2Session();
   const searchParams = useSearchParams();
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
+  // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
+  const searchAtTop = useSearchPosition() === 'top';
 
   const activeSearch = committedSearch.trim();
   const countrySlug = searchParams.get('country')?.trim() ?? '';
@@ -133,17 +150,22 @@ export function StatutesBrowser() {
     );
   }
 
+  // Built ONCE and rendered in whichever position the developer switch names,
+  // so the two placements cannot drift in placeholder, label or busy state.
+  const searchField = (
+    <SearchField
+      value={inputValue}
+      onChange={onInputChange}
+      onClear={onClear}
+      busy={dim}
+      placeholder="Search statutes by title..."
+      label="Search statutes by title"
+    />
+  );
+
   return (
     <PageShell>
-      <SearchField
-        value={inputValue}
-        onChange={onInputChange}
-        onClear={onClear}
-        busy={dim}
-        placeholder="Search statutes by title..."
-        label="Search statutes by title"
-        className="mb-3"
-      />
+      {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
 
       <div className="mb-3">
         <CountryTabs facets={facets} value={countrySlug} onChange={setCountry} />
@@ -202,6 +224,14 @@ export function StatutesBrowser() {
             ) : null}
           </div>
         </div>
+      )}
+
+      {/* The floating search pill. No floating action on `/statutes`: browsing
+          a library has no one obvious thing to do (the owner's own list). */}
+      {searchAtTop ? null : (
+        <ScreenDock>
+          <ScreenDockSearch>{searchField}</ScreenDockSearch>
+        </ScreenDock>
       )}
     </PageShell>
   );

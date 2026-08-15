@@ -48,7 +48,12 @@ export function HomeTabs() {
   return (
     <nav
       aria-label="Home view"
-      className="inline-flex items-center rounded-full bg-muted/50 p-0.5 md:p-1"
+      // `max-md:bg-muted` — OPAQUE on a phone, and that is not a colour tweak.
+      // The home is a top-level screen, so below `md:` nothing is painted behind
+      // the bar and the greeting scrolls underneath it; a half-transparent strip
+      // would let that text show through the one control the bar still carries.
+      // The desktop bar keeps its plate, so it keeps the lighter `/50`.
+      className="inline-flex items-center rounded-full bg-muted/50 p-0.5 max-md:bg-muted md:p-1"
     >
       {HOME_TABS.map((option) => {
         const current = option.value === active;

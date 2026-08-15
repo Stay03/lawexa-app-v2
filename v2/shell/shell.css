@@ -44,6 +44,12 @@ html.v2-document-lock body {
   height: 100dvh;
   height: calc(100dvh - var(--keyboard-inset, 0px));
   overflow: hidden;
+
+  /* The bar's height, in ONE place, because three rules need the same number:
+     the content region's resting top padding on a see-through screen, the
+     dissolve's reach, and the header row's collapse. 3.5rem is `h-14` on the
+     bar element in `V2Header`; if that changes, this changes with it. */
+  --v2-bar-h: calc(env(safe-area-inset-top, 0px) + 3.5rem);
 }
 
 /* The WIDTH twin of the `min-height: 0` note below, learned the hard way: a
@@ -62,9 +68,14 @@ html.v2-document-lock body {
 
 /* Header row (grid-row 1). Neutral solid background so the safe-area strip under
    the notch is filled by the bar rather than showing through — correct mobile
-   behaviour. Neutral token; phase-2 restyles the real header chrome. */
+   behaviour. Neutral token; phase-2 restyles the real header chrome.
+
+   `position: relative` is unconditional and costs nothing: it makes the bar the
+   containing block for the see-through fade below, which is a child of this
+   element on every route and paints on none of them until the modifier is on. */
 .v2-shell__header {
   grid-row: 1;
+  position: relative;
   background: var(--background);
 }
 
@@ -112,6 +123,154 @@ html.v2-document-lock body {
    itself, so a route with no dock content adds no notch strip and the row collapses. */
 .v2-shell__dock:has([data-v2-dock-content]) [data-v2-dock-reservation] {
   display: none;
+}
+
+/* -----------------------------------------------------------------------------
+   THE SEE-THROUGH BAR ON A TOP-LEVEL SCREEN (mobile native overhaul, phase 10).
+
+   On a screen you did NOT push into, the bar carries no title — so it stops
+   being a bar. Nothing is painted behind it, there is no rule line under it,
+   its controls sit on the page as round solid buttons, and the CONTENT passes
+   underneath them as it scrolls. `top-level-route.ts` decides which screens
+   those are, off the address, and `ShellFrame` puts `.v2-shell--open` on the
+   grid root for them.
+
+   ── WHY THE ROW COLLAPSES INSTEAD OF THE BAR FLOATING ──────────────────────
+   `position: fixed` is forbidden in this shell and the reason is two blocks up:
+   fixed elements break under the iOS keyboard, which is why the dock is a grid
+   row and not a fixed island. So the bar stays a grid item in row 1 and row 1
+   is collapsed to `0` instead. The bar keeps its own intrinsic height
+   (`align-self: start`, without which a 0-height row would stretch it to
+   nothing) and overflows downward across row 2, painting above it on
+   `z-index`. Nothing leaves the flow, nothing is fixed, and the keyboard
+   contract is untouched: the shell is still `100dvh − keyboard-inset` and the
+   dock row is still where a docked composer goes.
+
+   ── WHY THE CONTENT IS STILL PADDED ────────────────────────────────────────
+   Passing under the bar is what SCROLLING does, not where the screen starts.
+   The content region is padded by exactly the bar's height, so at rest the
+   page's big title sits below the buttons and only travels under them when the
+   reader pushes it there.
+
+   ── WHAT FILLS THE NOTCH NOW ───────────────────────────────────────────────
+   The bar used to be painted solid for exactly one reason: `viewport-fit=cover`
+   lets content run under the notch, and something has to fill that strip. Going
+   transparent hands that job to the FADE, which is the better owner of it — the
+   fade's first stop is opaque `--background` and it is held opaque past the
+   whole safe-area inset, so the strip is filled exactly as before and the
+   content has already dissolved to nothing before it reaches the notch. The
+   `theme-color` metas in the v2 layout already name the same two colours, so
+   the browser's own chrome still matches.
+
+   ── WHY A GRADIENT AND NOT `mask-image` ON THE SCROLLER ────────────────────
+   A mask is the tidier idea and it was rejected on two grounds, one of them
+   fatal:
+
+    1. IT WOULD FADE THE FLOATING CONTROLS TOO. A mask applies to the masked
+       element and everything inside it, and the bottom search pill and the
+       floating action are `position: sticky` children of the scroll region
+       (`ScreenDock`) — the only place they can be, since `fixed` is banned and
+       a portal would paint them a frame late. A bottom mask would dissolve the
+       very controls that are supposed to sit ON TOP of the fade.
+    2. IT WOULD PUT A MASKED COMPOSITING LAYER ON THE APP'S ONE SCROLL
+       CONTAINER. `.v2-shell__content` is the single scroller for every screen,
+       and a mask on it is re-composited on every scroll frame. Phase 4 of this
+       overhaul was a scrolling defect a real reader reported; this is not the
+       element to spend frames on for an effect that is reproducible without
+       them.
+
+   A gradient is not an approximation here, it is arithmetic: masking content to
+   alpha `m` over an opaque backdrop and compositing that same backdrop at
+   `1 − m` over the content give identical pixels. The backdrop IS knowable and
+   uniform — the v2 layout's root paints `--background` and neither `.v2-shell`
+   nor the content region paints over it — so the two are the same picture, and
+   the gradient costs one static, non-scrolling paint instead of a per-frame
+   one.
+
+   ── BELOW `md:` ONLY, AND THAT IS A DECISION ───────────────────────────────
+   The rule came from phone recordings and the 192px of stacked chrome it is
+   removing is a phone problem. The desktop bar still carries the brand wordmark
+   and the rail control, which are furniture that wants a plate under it. So the
+   whole block is media-queried, exactly like `.v2-screen-bar` above, and the
+   breakpoint is Tailwind's `md` (48rem) written by hand for the same reason.
+   The TITLE still moves into the page at every width — that half is markup, not
+   this file — so the reader meets exactly one title however wide the screen is.
+   -------------------------------------------------------------------------- */
+@media (max-width: 47.999rem) {
+  html.v2-document-lock .v2-shell--open {
+    grid-template-rows: 0 1fr auto;
+  }
+
+  /* `z-index: 30` and not 20, and the number is load-bearing. The content
+     region creates NO stacking context of its own, so a `z-20` sticky child
+     inside it (the `ScreenDock`) sits in the same context as this bar — and a
+     tie is broken by document order, which the content wins because it comes
+     after the header. Thirty puts the bar above the floating pill for certain
+     on a short viewport, where the two can actually meet. */
+  html.v2-document-lock .v2-shell--open .v2-shell__header {
+    align-self: start;
+    z-index: 30;
+    background: none;
+  }
+
+  html.v2-document-lock .v2-shell--open .v2-shell__content {
+    padding-top: var(--v2-bar-h);
+  }
+
+  /* The dissolve. A child of the bar, so it needs no grid placement of its
+     own; `z-index: -1` puts it behind the bar's controls but still inside the
+     bar's stacking context, therefore still above the content region.
+
+     It reaches `0.75rem` BELOW the bar so the last of the fade lands clear of
+     the buttons rather than exactly on their edge, and the first stop is held
+     opaque past the safe-area inset so the notch strip is solid colour.
+
+     THE OPAQUE STOP IS 2.5rem PAST THE INSET, NOT 1.25rem, AND THAT WAS
+     MEASURED. The buttons sit between `0.75rem` and `2.75rem` below the inset,
+     so an opaque stop at `1.25rem` left the whole button row inside the FADING
+     part of the gradient. Filmed at 390px on a device reporting no safe-area
+     inset (every Android without a notch, and every desktop window), a case
+     title scrolling past was still legible through the gap between the crest
+     and the bell. It read as text colliding with the controls, which is the
+     exact fault the owner disliked in Claude's app and the reason he chose
+     ChatGPT's treatment instead.
+
+     Expressing it against the inset is still right: on a notched phone the bar
+     shifts down by the inset and the buttons shift with it, so the same
+     constant covers them in both cases. It was only ever too small. */
+  html.v2-document-lock .v2-shell--open .v2-shell__header-fade {
+    display: block;
+    position: absolute;
+    inset: 0 0 -0.75rem 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      var(--background) 0,
+      var(--background) calc(env(safe-area-inset-top, 0px) + 2.5rem),
+      transparent 100%
+    );
+  }
+}
+
+/* Inert on every other route and at every other width — the element is always
+   in the tree (it is shell structure, not conditional markup) and paints only
+   when the block above turns it on. */
+.v2-shell__header-fade {
+  display: none;
+}
+
+/* -----------------------------------------------------------------------------
+   THE FLOATING BOTTOM DOCK (`ScreenDock`).
+
+   Bottom padding for the home-indicator strip, in CSS rather than as a class
+   pair, because `v2-safe-bottom` and a `pb-*` utility both write
+   `padding-bottom` and the winner between them is Tailwind's ordering rather
+   than anything a reader of the markup can see. One declaration, one value,
+   no race.
+   -------------------------------------------------------------------------- */
+.v2-screen-dock {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* -----------------------------------------------------------------------------

@@ -16,3 +16,31 @@
  * text, so constants in a `.ts` file are detected).
  */
 export const LIST_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-16 pt-5 sm:pt-6';
+
+/**
+ * The SAME column, for a list that carries a `ScreenDock` (the floating search
+ * pill, the floating action, or both).
+ *
+ * Three differences, all of them load-bearing for the dock and none of them a
+ * change of measure:
+ *
+ *  - `flex min-h-full flex-col` — a `sticky bottom-0` element can never travel
+ *    further than its containing block, so the dock's parent has to be as tall
+ *    as the scroll region even when the list is short. `min-h-full` resolves
+ *    against the scroller's CONTENT box, which on a top-level screen is the
+ *    viewport less the see-through bar's padding — and the padding puts that
+ *    height back, so the column is exactly one screen tall and the dock sits
+ *    exactly on the bottom edge.
+ *  - `pb-16` STAYS, and the dock cancels it for itself with `-mb-16`. It is
+ *    kept because a dock is not guaranteed: with the search box switched to the
+ *    top, `/cases`, `/statutes`, `/folders`, `/conversations` and `/channels`
+ *    render no dock at all, and a list that ends flush against the bottom edge
+ *    is the regression this padding has always existed to prevent. Where a dock
+ *    DOES render it must sit on the very bottom edge, so it pulls itself down
+ *    over exactly that padding (see `ScreenDock`).
+ *  - the rows need no extra clearance for the dock: it settles into its flow
+ *    position at the very end of the list, so scrolling to the bottom reveals
+ *    the last row above it rather than under it.
+ */
+export const LIST_COLUMN_DOCKED =
+  'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';

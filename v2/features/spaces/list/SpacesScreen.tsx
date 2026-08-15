@@ -1,35 +1,28 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense } from 'react';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { SpacesBrowser } from './SpacesBrowser';
 import { SpacesListSkeleton } from './states';
 
 /**
- * SpacesScreen — the `/spaces` client root. Two jobs, both ABOVE the
- * `useSearchParams` boundary so neither depends on the URL (the
- * `BookmarksScreen` / `CasesScreen` shape):
+ * SpacesScreen — the `/spaces` client root. One job, ABOVE the
+ * `useSearchParams` boundary so it does not depend on the URL (the
+ * `BookmarksScreen` / `CasesScreen` shape): wrapping the `useSearchParams`
+ * consumer (`SpacesBrowser` reads the type tab) in the Suspense boundary Next
+ * requires, with a fallback that mirrors `loading.tsx` exactly — so route
+ * boundary → this fallback → live list is one continuous shape with nothing
+ * moving at either hand-off.
  *
- *  1. PUBLISHES the shell header's centre-slot title ("Spaces") on mount and
- *     clears it on unmount — an external-store write, not React state, which
- *     is why it is legal inside an effect under the React Compiler lint.
- *  2. Wraps the `useSearchParams` consumer (`SpacesBrowser` reads the type
- *     tab) in the Suspense boundary Next requires, with a fallback that
- *     mirrors `loading.tsx` exactly — so route boundary → this fallback →
- *     live list is one continuous shape with nothing moving at either
- *     hand-off.
+ * It no longer publishes a header title: `/spaces` is a TOP-LEVEL screen, whose
+ * bar carries none. See `CasesScreen` for the full note.
  *
  * Phase-5 W4, 2026-08-04.
  */
 export function SpacesScreen() {
-  useEffect(() => {
-    setHeaderContext({ title: 'Spaces', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
-
   return (
     <Suspense fallback={<SpacesFallback />}>
       <SpacesBrowser />
@@ -57,14 +50,14 @@ export function SpacesFallback() {
       <span role="status" className="sr-only">
         Loading your spaces
       </span>
-      <div aria-hidden inert className={LIST_COLUMN}>
-        {/* Only "New space" is reserved on the right: the invitations pill is
-            conditional chrome and is absent for nearly every reader, so
-            holding a slot for it would be reserving a shape that usually
-            never arrives. */}
+      <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
+        <ScreenTitle />
+        {/* Nothing is reserved on the right any more: "New space" has left the
+            toolbar for the floating action, and the invitations pill is
+            conditional chrome absent for nearly every reader, so holding a slot
+            for it would be reserving a shape that usually never arrives. */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Skeleton className="h-9 w-44 rounded-full" />
-          <Skeleton className="ml-auto h-8 w-28 rounded-md" />
         </div>
         <SpacesListSkeleton />
       </div>

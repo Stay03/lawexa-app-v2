@@ -8,7 +8,10 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { ConversationListItem } from '@/types/chat';
 import { useNewRows } from '@/v2/runtime/use-new-rows';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { useSearchPosition } from '@/v2/search-position';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
+import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { NewRowsPill } from '@/v2/shell/NewRowsPill';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
@@ -24,10 +27,22 @@ import {
   NextPageSkeleton,
 } from './states';
 
-/** The centred reading column every list state shares — the SHARED v2 list
- *  column (`page-columns.ts`), so this page and `/cases` cannot drift apart. */
+/**
+ * The centred reading column every list state shares — the SHARED v2 list
+ * column (`page-columns.ts`), so this page and `/cases` cannot drift apart. The
+ * DOCKED variant, because the search pill floats at the bottom here and a
+ * `sticky` element needs a containing block a full screen tall.
+ *
+ * The screen's `h1` is drawn here, so the guest panel is under a page that
+ * still says what it is and every state carries exactly one heading.
+ */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className={LIST_COLUMN}>{children}</div>;
+  return (
+    <div className={LIST_COLUMN_DOCKED}>
+      <ScreenTitle />
+      {children}
+    </div>
+  );
 }
 
 /** Stable empty rows reference — a fresh `[]` per render would defeat the
@@ -83,6 +98,8 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
   const { committedSearch, inputValue, onInputChange, onClear } =
     useConversationsSearch();
   const activeSearch = committedSearch.trim();
+  // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
+  const searchAtTop = useSearchPosition() === 'top';
 
   const query = useInfiniteQuery({
     ...conversationsQueries.infiniteList({ search: committedSearch, viewerId }),
@@ -163,15 +180,20 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
   // opacity with pointer-events-none (review finding 3).
   const dim = query.isPlaceholderData && query.isFetching;
 
+  // Built ONCE and rendered in whichever position the developer switch names
+  // (`v2/search-position.ts`), so the two placements cannot drift.
+  const searchBar = (
+    <ConversationsSearchBar
+      value={inputValue}
+      onChange={onInputChange}
+      onClear={onClear}
+      busy={query.isFetching && dim}
+    />
+  );
+
   return (
     <PageShell>
-      <ConversationsSearchBar
-        value={inputValue}
-        onChange={onInputChange}
-        onClear={onClear}
-        busy={query.isFetching && dim}
-        className="mb-4"
-      />
+      {searchAtTop ? <div className="mb-4">{searchBar}</div> : null}
 
       {/* Out-of-flow (`h-0`) overlay — mounted in every state so its exit tween
           always plays; `newCount` is 0 unless a real list is on screen. */}
@@ -231,6 +253,14 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
             ) : null}
           </div>
         </div>
+      )}
+
+      {/* The floating search pill. No floating action: a conversation is
+          started from the home composer, never from this list. */}
+      {searchAtTop ? null : (
+        <ScreenDock>
+          <ScreenDockSearch>{searchBar}</ScreenDockSearch>
+        </ScreenDock>
       )}
     </PageShell>
   );

@@ -108,12 +108,24 @@ const eslintConfig = defineConfig([
               target: ".",
               from: "./v2",
               // The sanctioned crossings, all dependency-free contract modules
-              // that pull no v2 runtime toward the v1 bundle: `@/v2/cookie` and
-              // `@/v2/stream-style` (the v2 preference surfaces in
-              // DeveloperSettings) and `@/v2/routes.manifest` (proxy).
-              except: ["cookie.ts", "routes.manifest.ts", "stream-style.ts"],
+              // that pull no v2 runtime toward the v1 bundle: `@/v2/cookie`,
+              // `@/v2/stream-style` and `@/v2/search-position` (the three v2
+              // preference surfaces in DeveloperSettings) and
+              // `@/v2/routes.manifest` (proxy).
+              //
+              // `search-position.ts` earns its place on the same terms as
+              // `stream-style.ts`: it imports `useSyncExternalStore` from React
+              // and nothing else at all — no v2 type, no v2 runtime, no
+              // transitive edge into the v2 tree — so adding it to the v1
+              // settings card cannot pull the v2 bundle behind it.
+              except: [
+                "cookie.ts",
+                "routes.manifest.ts",
+                "stream-style.ts",
+                "search-position.ts",
+              ],
               message:
-                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style and @/v2/routes.manifest are sanctioned crossings).",
+                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style, @/v2/search-position and @/v2/routes.manifest are sanctioned crossings).",
             },
           ],
         },

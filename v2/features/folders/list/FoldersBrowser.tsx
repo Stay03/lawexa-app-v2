@@ -9,8 +9,11 @@ import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlSearch } from '@/v2/runtime/use-url-search';
+import { useSearchPosition } from '@/v2/search-position';
 import { SearchField } from '@/v2/shell/SearchField';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
@@ -60,16 +63,30 @@ import {
 /** Stable empty rows reference — a fresh `[]` per render would churn the memo. */
 const NO_ROWS: readonly FolderRowModel[] = [];
 
-/** The centred reading column every state shares (`page-columns.ts`), so this
- *  page, `/cases`, `/notes` and `/bookmarks` are one measure. */
+/**
+ * The centred reading column every state shares (`page-columns.ts`), so this
+ * page, `/cases`, `/notes` and `/bookmarks` are one measure — the DOCKED
+ * variant, because the search pill floats at the bottom here and a `sticky`
+ * element needs a containing block a full screen tall.
+ *
+ * The screen's `h1` is drawn here, so the signed-out panel is under a page that
+ * still says what it is and every state carries exactly one heading.
+ */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className={LIST_COLUMN}>{children}</div>;
+  return (
+    <div className={LIST_COLUMN_DOCKED}>
+      <ScreenTitle />
+      {children}
+    </div>
+  );
 }
 
 export function FoldersBrowser() {
   const { signedIn, userId: viewerId } = useV2Session();
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
   const activeSearch = committedSearch.trim();
+  // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
+  const searchAtTop = useSearchPosition() === 'top';
 
   // Frozen at mount for the relative trail labels — the list refetches on every
   // visit (`REFETCH_ON_VISIT`), so the clock and the data move together, and no
@@ -164,19 +181,23 @@ export function FoldersBrowser() {
     );
   }
 
+  // Static chrome: it renders on the first frame and never waits on data
+  // (standards §8i). Built once and rendered in whichever position the
+  // developer switch names, so the two placements cannot drift.
+  const searchField = (
+    <SearchField
+      value={inputValue}
+      onChange={onInputChange}
+      onClear={onClear}
+      busy={dim}
+      placeholder="Search your folders..."
+      label="Search your folders by name"
+    />
+  );
+
   return (
     <PageShell>
-      {/* Static chrome: the search box and the New folder action render on the
-          first frame and never wait on data (standards §8i). */}
-      <SearchField
-        value={inputValue}
-        onChange={onInputChange}
-        onClear={onClear}
-        busy={dim}
-        placeholder="Search your folders..."
-        label="Search your folders by name"
-        className="mb-3"
-      />
+      {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
 
       <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
         <p className="min-w-0 truncate text-xs text-muted-foreground tabular-nums">
@@ -305,6 +326,18 @@ export function FoldersBrowser() {
           }}
         />
       ) : null}
+
+      {/* The floating search pill, LAST in the flow so `mt-auto` has nothing
+          after it to fight. NO floating action here, and that is a deliberate
+          hold rather than an oversight: the owner named three screens for one
+          (Notes, Radar, Spaces) and this was not among them, even though "New
+          folder" is the same shape of control as "New note". It stays inline,
+          in the row above, until he says otherwise. */}
+      {searchAtTop ? null : (
+        <ScreenDock>
+          <ScreenDockSearch>{searchField}</ScreenDockSearch>
+        </ScreenDock>
+      )}
     </PageShell>
   );
 }

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { FlaskConical, LogOut, Moon, MoreVertical, Sun, SunMoon } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -62,7 +63,14 @@ import { useScreenActions } from './screen-context';
  * The rows are guarded by the pathname they were published for, so a menu
  * opened a frame into a new screen can never run the last screen's Delete.
  */
-export function V2HeaderMenu() {
+export function V2HeaderMenu({
+  className,
+}: {
+  /** Extra classes for the TRIGGER. The bar passes the solid-circle treatment
+   *  here on a see-through top-level screen (`V2Header#OPEN_BAR_CONTROL`); the
+   *  dropdown this opens is untouched by it. */
+  className?: string;
+} = {}) {
   const mounted = useMounted();
   const { role } = useV2Session();
   const { resolvedTheme, setTheme } = useTheme();
@@ -78,7 +86,10 @@ export function V2HeaderMenu() {
         <Button
           variant="ghost"
           size="icon"
-          className="size-11 rounded-full text-muted-foreground md:size-9"
+          className={cn(
+            'size-11 rounded-full text-muted-foreground md:size-9',
+            className,
+          )}
           aria-label="More options"
         >
           <MoreVertical className="size-5" />

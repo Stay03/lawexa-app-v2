@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FlaskConical, TextCursorInput } from 'lucide-react';
+import { ArrowUpToLine, FlaskConical, TextCursorInput } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { V2_COOKIE_CLEAR, V2_COOKIE_SET, hasV2Cookie } from '@/v2/cookie';
 import { readStreamStyle, setStreamStyle } from '@/v2/stream-style';
+import { readSearchPosition, setSearchPosition } from '@/v2/search-position';
 
 export function DeveloperSettings() {
   // Lazy initializer reads the cookie once, on mount — never in an effect
@@ -28,6 +29,12 @@ export function DeveloperSettings() {
   // (no reload — the engine re-resolves its smoothers in place).
   const [lineStream, setLineStream] = useState(() => readStreamStyle() === 'line');
 
+  // And again for where a v2 list draws its search box. Bottom is the default,
+  // so the SWITCH asks the opposite question — "put it back at the top?" — and
+  // an untouched card reads "off", which is the honest picture of a default
+  // nobody has changed.
+  const [topSearch, setTopSearch] = useState(() => readSearchPosition() === 'top');
+
   function handleToggle(next: boolean) {
     document.cookie = next ? V2_COOKIE_SET : V2_COOKIE_CLEAR;
     // Hard navigation (not a router transition): a client push would keep stale
@@ -39,6 +46,11 @@ export function DeveloperSettings() {
   function handleStreamStyle(next: boolean) {
     setLineStream(next);
     setStreamStyle(next ? 'line' : 'flow');
+  }
+
+  function handleSearchPosition(next: boolean) {
+    setTopSearch(next);
+    setSearchPosition(next ? 'top' : 'bottom');
   }
 
   return (
@@ -88,6 +100,26 @@ export function DeveloperSettings() {
             id="v2-line-stream"
             checked={lineStream}
             onCheckedChange={handleStreamStyle}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="v2-top-search" className="flex items-center gap-2">
+              <ArrowUpToLine className="h-4 w-4" />
+              Search box at the top
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              By default the v2 list screens float their search box at the
+              bottom, within thumb reach. Turn this on to put it back in the
+              flow under the page title. Applies to the v2 lists only and takes
+              effect immediately.
+            </p>
+          </div>
+          <Switch
+            id="v2-top-search"
+            checked={topSearch}
+            onCheckedChange={handleSearchPosition}
           />
         </div>
       </CardContent>

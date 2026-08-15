@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -12,7 +12,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { QuizSession } from '@/types/quiz';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
@@ -56,6 +55,14 @@ import { TopicChips } from './TopicChips';
  *
  * The AUDIENCE gate is not here: `app/v2/quiz/layout.tsx` decides that once,
  * above every quiz surface.
+ *
+ * ── IT PUBLISHES NO BAR TITLE ANY MORE ──────────────────────────────────────
+ * `/quiz` is a TOP-LEVEL screen, and on one of those the bar carries no title:
+ * the title belongs in the page. This screen ALREADY had one — the hero
+ * sentence below is its `<h1>` — so the fix here was subtraction only. It is
+ * the reason `top-level-route.ts` gives `/quiz` a `null` title: `ScreenTitle`
+ * renders nothing for it, so adopting the shared grammar could not mint a
+ * second heading over the one this screen was designed around.
  */
 
 /** The hero action's geometry — shared with the route fallback so the reserved
@@ -67,11 +74,6 @@ export function QuizHubScreen() {
   const session = useV2Session();
   const { userId: viewerId } = session;
   const [topic, setTopic] = useState<string | null>(null);
-
-  useEffect(() => {
-    setHeaderContext({ title: 'Quiz', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
 
   // The snapshot's verdict, computed BEFORE the query so a doomed request is
   // never sent: an unverified registered account 403s on every `/quizzes/*`

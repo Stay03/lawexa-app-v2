@@ -1,27 +1,29 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense } from 'react';
 
+import { useSearchPosition } from '@/v2/search-position';
 import { SearchFieldShape } from '@/v2/shell/SearchField';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
+import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { CasesBrowser } from './CasesBrowser';
 import { CasesListSkeleton } from './states';
 
 /**
  * CasesScreen — the `/cases` client root.
  *
- * Two jobs, both ABOVE the `useSearchParams` boundary so neither depends on the
- * URL:
+ * ONE job now, ABOVE the `useSearchParams` boundary so it does not depend on
+ * the URL: wrapping the `useSearchParams` consumer in a Suspense boundary (a
+ * Next requirement), with a fallback that mirrors `loading.tsx` exactly so
+ * route boundary → this fallback → live content is one continuous shape.
  *
- *  1. PUBLISHES the header centre-slot title. On a non-home route the header
- *     shows the route's published context; this page publishes a static
- *     "Cases" on mount and clears it on unmount. That is an external-store
- *     write, not React state, which is why it is legal inside an effect under
- *     the React Compiler lint — the same seam `ConversationsScreen` uses.
- *  2. Wraps the `useSearchParams` consumer in a Suspense boundary (a Next
- *     requirement), with a fallback that mirrors `loading.tsx` exactly so
- *     route boundary → this fallback → live content is one continuous shape.
+ * THE SECOND JOB IS GONE, DELIBERATELY. This screen used to publish "Cases" to
+ * the header's centre slot on mount. `/cases` is a TOP-LEVEL screen, and on one
+ * of those the bar carries no title at all — the title lives in the page body
+ * (`ScreenTitle`, fed by `top-level-route.ts`). Publishing one as well would put
+ * the reader's screen name on the pixels twice; the effect and its cleanup were
+ * removed rather than left dormant.
  *
  * WHO CAN READ THIS. The route is public in the sense that matters for SEO — it
  * ships real metadata and it is in the sitemap — but the DATA is not: measured
@@ -34,11 +36,6 @@ import { CasesListSkeleton } from './states';
  * request.
  */
 export function CasesScreen() {
-  useEffect(() => {
-    setHeaderContext({ title: 'Cases', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
-
   return (
     <Suspense fallback={<CasesFallback />}>
       <CasesBrowser />
@@ -47,9 +44,19 @@ export function CasesScreen() {
 }
 
 /**
- * Suspense fallback — the search field and view tabs as reserved chrome shapes
- * (furniture, not content placeholders), over the real list skeleton. Identical
- * to `app/v2/cases/loading.tsx`, which imports the same pieces.
+ * Suspense fallback — the title, the view tabs and the search field as reserved
+ * chrome shapes (furniture, not content placeholders), over the real list
+ * skeleton. Identical to `app/v2/cases/loading.tsx`, which imports the same
+ * pieces.
+ *
+ * The title is drawn by the SAME component the live screen uses, so the words
+ * and the scale cannot drift; it is chrome the address already knows, so it
+ * needs no reservation and no shimmer.
+ *
+ * The search field is reserved WHERE IT WILL LAND — in the floating dock by
+ * default, in the flow if the developer switch says so — which is why this
+ * fallback reads the position store too. Reserving it in the wrong place would
+ * be worse than not reserving it: the hand-off would move it across the screen.
  *
  * The list skeleton pulses here exactly as it does inside the live screen
  * (standards §8i). A wait is a wait: the reader cannot tell an RSC payload from
@@ -57,6 +64,7 @@ export function CasesScreen() {
  * into the middle of the load.
  */
 export function CasesFallback() {
+  const searchAtTop = useSearchPosition() === 'top';
   return (
     <>
       <span role="status" className="sr-only">
@@ -65,12 +73,20 @@ export function CasesFallback() {
       {/* `aria-hidden` + `inert` per standards §8ii: a Suspense fallback is
           DELETED (not reconciled) when content arrives, so anything focusable
           in here would lose focus and caret mid-interaction. */}
-      <div aria-hidden inert className={LIST_COLUMN}>
-        <SearchFieldShape className="mb-3" />
+      <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
+        <ScreenTitle />
+        {searchAtTop ? <SearchFieldShape className="mb-3" /> : null}
         <div className="mb-3 flex items-center">
           <div className="h-9 w-40 rounded-full bg-secondary/60" />
         </div>
         <CasesListSkeleton />
+        {searchAtTop ? null : (
+          <ScreenDock>
+            <ScreenDockSearch>
+              <SearchFieldShape />
+            </ScreenDockSearch>
+          </ScreenDock>
+        )}
       </div>
     </>
   );

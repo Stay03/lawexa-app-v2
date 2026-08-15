@@ -142,7 +142,16 @@ const MARK_ICONS: Readonly<Record<NotificationMark, LucideIcon>> = {
   general: Bell,
 };
 
-export function V2NotificationBell({ signedIn }: { signedIn: boolean }) {
+export function V2NotificationBell({
+  signedIn,
+  className,
+}: {
+  signedIn: boolean;
+  /** Extra classes for the TRIGGER. The bar passes the solid-circle treatment
+   *  here on a see-through top-level screen (`V2Header#OPEN_BAR_CONTROL`); the
+   *  panel this opens is untouched by it. */
+  className?: string;
+}) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
@@ -161,7 +170,10 @@ export function V2NotificationBell({ signedIn }: { signedIn: boolean }) {
     <Button
       variant="ghost"
       size="icon"
-      className="relative size-11 rounded-full text-muted-foreground md:size-9"
+      className={cn(
+        'relative size-11 rounded-full text-muted-foreground md:size-9',
+        className,
+      )}
       aria-label={
         hasBadge
           ? `Notifications, ${count} unread`

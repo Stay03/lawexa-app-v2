@@ -27,7 +27,25 @@ import { HomeTabs } from './HomeTabs';
 import { homeTabForPath } from './home-tabs';
 import { useHeaderContext } from './header-context';
 import { pushedScreenFor, type PushedScreen } from './pushed-route';
+import { isTopLevelRoute } from './top-level-route';
 import { useScreenContext } from './screen-context';
+
+/**
+ * THE SEE-THROUGH BAR'S CONTROLS, on a top-level screen below `md:`.
+ *
+ * With nothing painted behind the bar (see the see-through block in
+ * `shell.css`), a `ghost` control is a bare glyph floating over whatever text
+ * happens to be sliding past it. The owner watched both phone apps do this and
+ * was explicit about which one is right: Claude's bare glyphs let text crowd
+ * the controls and he disliked it; ChatGPT's controls sit in solid filled
+ * circles, and that is what this is.
+ *
+ * Below `md:` only, because that is the only place the bar goes see-through.
+ * At `md:` and up the bar keeps its plate and its controls keep the ghost
+ * treatment they have always had.
+ */
+const OPEN_BAR_CONTROL =
+  'max-md:bg-secondary max-md:text-foreground max-md:shadow-sm';
 
 /**
  * V2Header — the top bar, deliberately UNCROWDED (a binding owner decision).
@@ -96,6 +114,26 @@ import { useScreenContext } from './screen-context';
  * A DOCUMENT screen (a case, a statute, a note) is the deliberate exception:
  * its masthead is the document's own first page, so the page keeps the title at
  * every width and the bar carries none. See `PushedTitle` in `pushed-route.ts`.
+ *
+ * ── AND ON A TOP-LEVEL SCREEN THE BAR STOPS BEING A BAR (phase 10) ─────────
+ * The other half of that rule, from the same recordings. A screen you did NOT
+ * push into carries no title in the bar, so there is nothing left for the bar
+ * to be: below `md:` nothing is painted behind it, the content scrolls
+ * underneath, and its controls sit on the page as solid round buttons
+ * ({@link OPEN_BAR_CONTROL}). The structural half — the collapsed header row,
+ * the content's resting padding, the dissolve, and what now fills the notch —
+ * is in `shell.css`; which screens those are is `top-level-route.ts`.
+ *
+ * Three things follow here:
+ *
+ *   - the CENTRE goes empty at every width, because the title has moved into
+ *     the page body (`ScreenTitle`). The home keeps the Chat|Work|Study strip,
+ *     which is a control and not a title;
+ *   - those screens no longer call `setHeaderContext`, so `title` is null on
+ *     them and nothing can put a second name on the screen;
+ *   - the hamburger, the bell and the overflow menu wear the solid circle. The
+ *     brand mark does not: it is a mark, legible on any ground, and it is the
+ *     one thing on this bar that is not a control.
  */
 export function V2Header({ user }: { user: SessionUser | null }) {
   const { setOpenMobile, state } = useSidebar();
@@ -155,6 +193,17 @@ export function V2Header({ user }: { user: SessionUser | null }) {
    */
   const pushed = pushedScreenFor(path);
   const isPushed = pushed !== null || collabRoute.kind !== 'none';
+  /**
+   * IS THIS A SCREEN THE READER DID NOT PUSH INTO? The other half of the same
+   * grammar, off the same kind of table (`top-level-route.ts`) for the same
+   * reason: a published answer arrives a paint late, and here that paint is the
+   * whole page jumping by the bar's height as the bar goes transparent.
+   *
+   * The two tables are disjoint, so this is never true at the same time as
+   * `isPushed`. It is not asserted at runtime because it cannot be made true by
+   * anything but an edit to one of the two tables, and both carry the rule.
+   */
+  const isTopLevel = isTopLevelRoute(path);
   // The two things a pushed screen's ADDRESS cannot know: a data-derived parent
   // and the screen's own menu rows. Guarded by the pathname it was published
   // for, so nothing here can outlive its screen.
@@ -196,7 +245,10 @@ export function V2Header({ user }: { user: SessionUser | null }) {
             id="v2-nav-trigger"
             variant="ghost"
             size="icon"
-            className="size-11 shrink-0 rounded-full md:hidden"
+            className={cn(
+              'size-11 shrink-0 rounded-full md:hidden',
+              isTopLevel && OPEN_BAR_CONTROL,
+            )}
             aria-label="Open menu"
             onClick={() => setOpenMobile(true)}
           >
@@ -253,9 +305,11 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         ) : null}
       </div>
 
-      {/* CENTRE — home tabs on `/`, route context elsewhere (owner #43). */}
+      {/* CENTRE — home tabs on `/`, route context elsewhere (owner #43), and
+          NOTHING on a top-level screen: its title lives in the page now. */}
       <HeaderCenter
         isHome={isHome}
+        isTopLevel={isTopLevel}
         pushed={pushed}
         expectsContext={expectsContext}
         title={title}
@@ -263,10 +317,15 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         collab={collab}
       />
 
-      {/* RIGHT cluster — bell + overflow menu (owner #28). Uncrowded by decree. */}
+      {/* RIGHT cluster — bell + overflow menu (owner #28). Uncrowded by decree.
+          On a see-through bar both wear the solid circle: with no plate behind
+          them a bare glyph reads as part of whatever is scrolling past. */}
       <div className="flex min-w-0 items-center justify-end gap-1">
-        <V2NotificationBell signedIn={signedIn} />
-        <V2HeaderMenu />
+        <V2NotificationBell
+          signedIn={signedIn}
+          className={isTopLevel ? OPEN_BAR_CONTROL : undefined}
+        />
+        <V2HeaderMenu className={isTopLevel ? OPEN_BAR_CONTROL : undefined} />
       </div>
     </div>
   );
@@ -351,9 +410,18 @@ function CollabRouteBack() {
  *
  * On a PUSHED screen the centre is answered by the route table instead, and only
  * below `md:` — see {@link PushedCentre}.
+ *
+ * On a TOP-LEVEL screen it is answered with nothing at all, at every width. The
+ * home is the single exception and the reason the two layers still exist: the
+ * Chat|Work|Study strip is a product CONTROL (owner #34), not a title, so it is
+ * the one thing that rides a see-through bar. Every other top-level screen
+ * prints its title in the page body (`ScreenTitle`), which is why they stopped
+ * publishing a header context — a bar that still had one would put the reader's
+ * screen name on the pixels twice.
  */
 function HeaderCenter({
   isHome,
+  isTopLevel,
   pushed,
   expectsContext,
   title,
@@ -361,6 +429,8 @@ function HeaderCenter({
   collab,
 }: {
   isHome: boolean;
+  /** True on a screen the reader did NOT push into (`top-level-route.ts`). */
+  isTopLevel: boolean;
   /** Non-null on a screen the reader pushed into (`pushed-route.ts`). */
   pushed: PushedScreen | null;
   expectsContext: boolean;
@@ -383,7 +453,7 @@ function HeaderCenter({
         inert={isHome || undefined}
         className="col-start-1 row-start-1 transition-opacity duration-200 motion-reduce:transition-none data-[active=false]:pointer-events-none data-[active=false]:opacity-0"
       >
-        {isHome ? null : collab ? (
+        {isHome || isTopLevel ? null : collab ? (
           <CollabHeaderTitle context={collab} />
         ) : pushed ? (
           <PushedCentre pushed={pushed} title={title} />

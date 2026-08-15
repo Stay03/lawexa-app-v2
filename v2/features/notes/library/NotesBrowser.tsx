@@ -1,10 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -12,9 +10,11 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlSearch } from '@/v2/runtime/use-url-search';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
+import { useSearchPosition } from '@/v2/search-position';
 import { SearchField } from '@/v2/shell/SearchField';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { ScreenDock, ScreenDockSearch, ScreenFab } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { notesQueries } from '../queries';
@@ -77,10 +77,22 @@ const NO_ROWS: readonly NoteRowModel[] = [];
 
 const PANEL_ID = 'notes-list-panel';
 
-/** The centred reading column every state shares (`page-columns.ts`), so this
- *  page, `/cases`, `/statutes` and `/bookmarks` are one measure. */
+/**
+ * The centred reading column every state shares (`page-columns.ts`), so this
+ * page, `/cases`, `/statutes` and `/bookmarks` are one measure — the DOCKED
+ * variant, because the search pill and the New note action float at the bottom
+ * here and a `sticky` element needs a containing block a full screen tall.
+ *
+ * The screen's `h1` is drawn here, so the signed-out panel is under a page that
+ * still says what it is and every state carries exactly one heading.
+ */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className={LIST_COLUMN}>{children}</div>;
+  return (
+    <div className={LIST_COLUMN_DOCKED}>
+      <ScreenTitle />
+      {children}
+    </div>
+  );
 }
 
 export function NotesBrowser() {
@@ -90,6 +102,8 @@ export function NotesBrowser() {
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
   const activeSearch = committedSearch.trim();
   const canWrite = signedIn && canWriteNotes(role);
+  // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
+  const searchAtTop = useSearchPosition() === 'top';
 
   // Frozen at mount for the relative "updated" labels — no `Date.now()` runs
   // in render (React Compiler lint).
@@ -171,38 +185,33 @@ export function NotesBrowser() {
     );
   }
 
+  // Static chrome: it renders on the first frame and never waits on data
+  // (standards §8i — v1 hid its tabs behind the list's loading state, which is
+  // exactly what that rule forbids). Built once and rendered in whichever
+  // position the developer switch names, so the two placements cannot drift.
+  const searchField = (
+    <SearchField
+      value={inputValue}
+      onChange={onInputChange}
+      onClear={onClear}
+      busy={dim}
+      placeholder="Search notes by title or content..."
+      label="Search notes by title or content"
+    />
+  );
+
   return (
     <PageShell>
-      {/* Static chrome: the search box and the tab strip render on the first
-          frame and never wait on data (standards §8i — v1 hid its tabs behind
-          the list's loading state, which is exactly what that rule forbids). */}
-      <SearchField
-        value={inputValue}
-        onChange={onInputChange}
-        onClear={onClear}
-        busy={dim}
-        placeholder="Search notes by title or content..."
-        label="Search notes by title or content"
-        className="mb-3"
-      />
+      {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
 
-      <div className="mb-3 flex items-center justify-between gap-3">
+      {/* The tab strip is alone on its row now. "New note" used to sit at the
+          end of it, wearing its label only from `sm:` up because the row could
+          not hold both on a phone — so the one thing a reader comes to this
+          screen to DO was an unlabelled circle at exactly the width where it
+          mattered most. It is the floating action below, where it has room for
+          its word at every width. */}
+      <div className="mb-3 flex items-center">
         <NoteTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
-        {canWrite ? (
-          <Link
-            href="/notes/create"
-            className={cn(
-              'v2-interactive inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
-              FOCUS_RING,
-            )}
-          >
-            <Plus aria-hidden className="size-4" />
-            {/* The label is the affordance on a desktop; on a phone the row
-                has to hold the tab strip too, so the icon carries it and the
-                accessible name comes from the visually-hidden word. */}
-            <span className="sr-only sm:not-sr-only">New note</span>
-          </Link>
-        ) : null}
       </div>
 
       {/* The ONE live region for this surface. The route fallback's
@@ -283,6 +292,17 @@ export function NotesBrowser() {
           </div>
         )}
       </div>
+
+      {/* The floating layer: the one action this screen has, above the search
+          pill. A guest can read notes but never author one, so they get the
+          pill alone — and because the action is out of the flow, its absence
+          leaves no gap anywhere. */}
+      {canWrite || !searchAtTop ? (
+        <ScreenDock>
+          {canWrite ? <ScreenFab href="/notes/create" label="New note" /> : null}
+          {searchAtTop ? null : <ScreenDockSearch>{searchField}</ScreenDockSearch>}
+        </ScreenDock>
+      ) : null}
     </PageShell>
   );
 }

@@ -11,9 +11,12 @@ import { getTrendingLabel } from '@/types/trending';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlSearch } from '@/v2/runtime/use-url-search';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
+import { useSearchPosition } from '@/v2/search-position';
 import { SearchField } from '@/v2/shell/SearchField';
 import { TabRow } from '@/v2/shell/TabRow';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
+import { ScreenTitle } from '@/v2/shell/ScreenTitle';
+import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
@@ -66,10 +69,23 @@ import {
 /** Stable empty rows reference — a fresh `[]` per render would churn the memo. */
 const NO_ROWS: readonly CaseRowModel[] = [];
 
-/** The centred reading column every state shares — the SHARED v2 list column
- *  (`page-columns.ts`), identical to `/conversations` by construction. */
+/**
+ * The centred reading column every state shares — the SHARED v2 list column
+ * (`page-columns.ts`), identical to `/conversations` by construction. The
+ * DOCKED variant, because the search pill floats at the bottom of this screen
+ * and a `sticky` element needs a containing block a full screen tall.
+ *
+ * The screen's `h1` is drawn HERE rather than in the main branch, so the
+ * signed-out panel is under a page that still says what it is. Every state of
+ * this screen has exactly one heading, and it is this one.
+ */
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className={LIST_COLUMN}>{children}</div>;
+  return (
+    <div className={LIST_COLUMN_DOCKED}>
+      <ScreenTitle />
+      {children}
+    </div>
+  );
 }
 
 export function CasesBrowser() {
@@ -77,6 +93,10 @@ export function CasesBrowser() {
   const searchParams = useSearchParams();
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
   const [requestOpen, setRequestOpen] = useState(false);
+  // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
+  // Bottom is the default and the owner's decision; top is the pre-overhaul
+  // arrangement, kept so the two can be compared on a real device.
+  const searchAtTop = useSearchPosition() === 'top';
 
   const activeSearch = committedSearch.trim();
   const tag = searchParams.get('tags')?.trim() ?? '';
@@ -157,29 +177,33 @@ export function CasesBrowser() {
     );
   }
 
+  // The search field renders on BOTH views (owner, July 29) so the surface
+  // never loses its most-used control — but search FILTERS the library, so on
+  // Trending the first keystroke's focus hands the reader back to the library
+  // view. The field stays mounted across the switch, so focus and the keystroke
+  // that caused it survive; `onFocusCapture` fires before the input's own
+  // handlers, making the swap invisible.
+  //
+  // Built ONCE and rendered in whichever position the switch names, so the two
+  // placements can never drift in placeholder, label or busy state.
+  const searchField = (
+    <div
+      onFocusCapture={view === 'trending' ? () => setView('library') : undefined}
+    >
+      <SearchField
+        value={inputValue}
+        onChange={onInputChange}
+        onClear={onClear}
+        busy={library.isFetching && dim}
+        placeholder="Search cases by title..."
+        label="Search cases by title"
+      />
+    </div>
+  );
+
   return (
     <PageShell>
-      {/* The search field renders on BOTH views (owner, July 29) so the surface
-          never loses its most-used control — but search FILTERS the library, so
-          on Trending the first keystroke's focus hands the reader back to the
-          library view. The field stays mounted across the switch, so focus and
-          the keystroke that caused it survive; `onFocusCapture` fires before
-          the input's own handlers, making the swap invisible. */}
-      <div
-        onFocusCapture={
-          view === 'trending' ? () => setView('library') : undefined
-        }
-      >
-        <SearchField
-          value={inputValue}
-          onChange={onInputChange}
-          onClear={onClear}
-          busy={library.isFetching && dim}
-          placeholder="Search cases by title..."
-          label="Search cases by title"
-          className="mb-3"
-        />
-      </div>
+      {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <ViewTabs value={view} onChange={setView} />
@@ -286,6 +310,15 @@ export function CasesBrowser() {
           defaultTitle={activeSearch || undefined}
         />
       ) : null}
+
+      {/* The floating search pill. `/cases` gets NO floating action: the owner
+          named the three screens that have one obvious main thing to do, and
+          browsing a library is not one of them. */}
+      {searchAtTop ? null : (
+        <ScreenDock>
+          <ScreenDockSearch>{searchField}</ScreenDockSearch>
+        </ScreenDock>
+      )}
     </PageShell>
   );
 }
