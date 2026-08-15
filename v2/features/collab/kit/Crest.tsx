@@ -190,19 +190,14 @@ export function PlaceCrest({
 }
 
 /** The crest's reserved shape — same box and radius, so the swap moves nothing.
- *  `still` for route fallbacks, which wait on a payload rather than a request. */
+ *  It pulses wherever it is drawn, route fallbacks included: one wait may only
+ *  have one appearance. */
 export function CrestSkeleton({
   size = 'md',
-  still = false,
   className,
 }: {
   size?: CrestSize;
-  still?: boolean;
   className?: string;
 }) {
-  return (
-    <Skeleton
-      className={cn('shrink-0', GEOMETRY[size].box, still && 'animate-none', className)}
-    />
-  );
+  return <Skeleton className={cn('shrink-0', GEOMETRY[size].box, className)} />;
 }

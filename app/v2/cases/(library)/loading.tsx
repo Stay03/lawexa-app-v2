@@ -11,9 +11,10 @@ import { CasesFallback } from '@/v2/features/cases/list/CasesScreen';
  *
  * Everything static inside it (the search field, the view tabs) is a STILL
  * RESERVED SHAPE, never a pulsing skeleton: those controls wait on no request
- * (standards §8i). Only the rows pulse, and even they hold still here — the
- * route fallback covers an RSC payload, and the query behind those rows is
- * usually already warm.
+ * (standards §8i). The rows are the part that waits, so the rows pulse, here
+ * exactly as they do on the live screen. A route fallback is itself waiting on
+ * a request, the RSC payload, and giving a wait one single appearance is what
+ * stops the hand-off reading as the load starting over.
  */
 export default function CasesLoading() {
   return <CasesFallback />;

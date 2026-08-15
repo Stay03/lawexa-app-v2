@@ -133,7 +133,7 @@ export function StatuteFallback() {
         Loading statute
       </span>
       <div aria-hidden inert className={STATUTE_COLUMN}>
-        <StatuteDocumentSkeleton still />
+        <StatuteDocumentSkeleton />
       </div>
     </>
   );

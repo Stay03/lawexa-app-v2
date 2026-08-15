@@ -69,23 +69,20 @@ function PageState({
  * TWO TEXT LINES, which is the folder row's median AND its maximum: a folder is
  * a name and a meta line, never a preview.
  */
-function FolderRowSkeleton({ still = false }: { still?: boolean }) {
-  // Threaded explicitly rather than switched off by a `[&_*]` descendant
-  // variant: an arbitrary variant that fails to generate fails SILENTLY.
-  const bar = still ? 'animate-none' : undefined;
+function FolderRowSkeleton() {
   return (
     <div className="flex items-start gap-2">
       <div className="flex min-w-0 flex-1 items-start gap-3 px-2 py-3">
-        <Skeleton className={cn('mt-0.5 size-9 shrink-0 rounded-lg', bar)} />
+        <Skeleton className="mt-0.5 size-9 shrink-0 rounded-lg" />
         <div className="min-w-0 flex-1 space-y-1.5">
-          <Skeleton className={cn('h-4 w-2/5 rounded', bar)} />
+          <Skeleton className="h-4 w-2/5 rounded" />
           <div className="flex items-center gap-2">
-            <Skeleton className={cn('h-3 w-24 rounded', bar)} />
-            <Skeleton className={cn('ml-auto h-3 w-16 shrink-0 rounded', bar)} />
+            <Skeleton className="h-3 w-24 rounded" />
+            <Skeleton className="ml-auto h-3 w-16 shrink-0 rounded" />
           </div>
         </div>
       </div>
-      <Skeleton className={cn('mt-3.5 size-9 shrink-0 rounded-full', bar)} />
+      <Skeleton className="mt-3.5 size-9 shrink-0 rounded-full" />
     </div>
   );
 }
@@ -95,21 +92,17 @@ function FolderRowSkeleton({ still = false }: { still?: boolean }) {
  * shared v2 list fade, so a reader moving between the library surfaces and this
  * one sees ONE loading language.
  *
- * `still` drops the pulse for a route fallback, where nothing is in flight
- * behind the shape (standards §8i: a pulse promises a request).
+ * It pulses everywhere it is drawn, the route fallback included (standards
+ * §8i). A wait is a wait: the reader cannot tell an RSC payload from a query,
+ * so two appearances for one wait would only print a seam into the middle of
+ * the load.
  */
-export function FoldersListSkeleton({
-  rows = 6,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
+export function FoldersListSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.14) }}>
-          <FolderRowSkeleton still={still} />
+          <FolderRowSkeleton />
         </div>
       ))}
     </div>

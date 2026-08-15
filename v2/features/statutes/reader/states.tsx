@@ -14,44 +14,45 @@ export const STATUTE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8'
 /**
  * The reader skeleton at the document's real geometry: breadcrumb line,
  * kicker, title, designation, status pill, actions row, then a part heading
- * and a few numbered provisions. `still` drops the pulse for a route
- * fallback, where nothing is in flight behind the shape (standards §8i).
+ * and a few numbered provisions. It pulses in every caller, route fallback
+ * included (standards §8i): the reader cannot tell an RSC payload from a
+ * query, so two appearances for one wait would only print a seam into the
+ * middle of the load.
  */
-export function StatuteDocumentSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+export function StatuteDocumentSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-9">
       {/* Header silhouette. */}
       <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        <Skeleton className={cn('h-3 w-20 rounded', bar)} />
-        <Skeleton className={cn('h-3 w-44 rounded', bar)} />
-        <Skeleton className={cn('h-8 w-3/4 rounded-lg md:h-9', bar)} />
-        <Skeleton className={cn('h-3.5 w-24 rounded', bar)} />
-        <Skeleton className={cn('h-6 w-24 rounded-full', bar)} />
+        <Skeleton className="h-3 w-20 rounded" />
+        <Skeleton className="h-3 w-44 rounded" />
+        <Skeleton className="h-8 w-3/4 rounded-lg md:h-9" />
+        <Skeleton className="h-3.5 w-24 rounded" />
+        <Skeleton className="h-6 w-24 rounded-full" />
         <div className="flex gap-2">
-          <Skeleton className={cn('h-9 w-28 rounded-full', bar)} />
-          <Skeleton className={cn('h-9 w-24 rounded-full', bar)} />
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <Skeleton className="h-9 w-24 rounded-full" />
         </div>
       </div>
 
       {/* Long-title silhouette. */}
       <div className="space-y-2">
-        <Skeleton className={cn('h-4 w-full rounded', bar)} />
-        <Skeleton className={cn('h-4 w-5/6 rounded', bar)} />
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-4 w-5/6 rounded" />
       </div>
 
       {/* Part heading + provisions silhouette. */}
       <div className="flex flex-col gap-3">
-        <Skeleton className={cn('h-3 w-16 rounded', bar)} />
-        <Skeleton className={cn('h-5 w-1/2 rounded', bar)} />
+        <Skeleton className="h-3 w-16 rounded" />
+        <Skeleton className="h-5 w-1/2 rounded" />
         <div className="space-y-4 pt-2">
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex gap-4">
-              <Skeleton className={cn('mt-1 h-3 w-7 shrink-0 rounded', bar)} />
+              <Skeleton className="mt-1 h-3 w-7 shrink-0 rounded" />
               <div className="min-w-0 flex-1 space-y-2">
-                <Skeleton className={cn('h-4 w-full rounded', bar)} />
+                <Skeleton className="h-4 w-full rounded" />
                 <Skeleton
-                  className={cn('h-4 rounded', bar)}
+                  className="h-4 rounded"
                   style={{ width: `${[92, 100, 78][i]}%` }}
                 />
               </div>
@@ -65,8 +66,8 @@ export function StatuteDocumentSkeleton({ still = false }: { still?: boolean }) 
 
 /**
  * The tail shown UNDER already-mounted blocks while the rest of a big
- * document mounts progressively — in-flight work, so it pulses; it never
- * replaces text already on screen.
+ * document mounts progressively. It pulses like every other skeleton here, and
+ * it never replaces text already on screen.
  */
 export function DocumentMountingTail() {
   return (

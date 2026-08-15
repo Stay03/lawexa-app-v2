@@ -12,9 +12,9 @@ import { SpaceScreenFrame } from './states';
  * it reads the uuid off `usePathname()` because `loading.tsx` is handed no
  * params (see `CachedChannelFrame` for why that is the right source).
  */
-export function CachedSpaceFrame({ still = false }: { still?: boolean }) {
+export function CachedSpaceFrame() {
   const route = parseCollabRoute(usePathname() ?? '');
   const uuid = route.kind === 'space' ? route.spaceUuid : null;
   const identity = useCachedSpaceIdentity(uuid);
-  return <SpaceScreenFrame still={still} identity={identity} />;
+  return <SpaceScreenFrame identity={identity} />;
 }

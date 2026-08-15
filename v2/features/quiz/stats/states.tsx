@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { BarChart3 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
@@ -12,20 +11,24 @@ import { QuizMessage } from '../ui/QuizMessage';
  * live in `../ui/states.tsx`.
  */
 
-/** The stats loading shape — four tiles, the chart card, two summary blocks. */
-export function StatsSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+/**
+ * The stats loading shape — four tiles, the chart card, two summary blocks.
+ *
+ * It pulses in both callers, the route fallback included (standards §8i): a
+ * reader cannot tell an RSC payload from a query, so both waits look the same.
+ */
+export function StatsSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className={cn('h-[92px] rounded-xl', bar)} />
+          <Skeleton key={index} className="h-[92px] rounded-xl" />
         ))}
       </div>
-      <Skeleton className={cn('h-64 rounded-xl', bar)} />
+      <Skeleton className="h-64 rounded-xl" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Skeleton className={cn('h-32 rounded-xl', bar)} />
-        <Skeleton className={cn('h-32 rounded-xl', bar)} />
+        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton className="h-32 rounded-xl" />
       </div>
     </div>
   );
@@ -54,8 +57,9 @@ export function StatsEmptyState() {
 
 /**
  * The stats route's fallback (`app/v2/quiz/stats/loading.tsx`) — the heading
- * rendered FOR REAL (static chrome waits on nothing) over the STILL skeleton
- * for the regions that genuinely are waiting.
+ * rendered FOR REAL (static chrome waits on nothing) over the skeleton for the
+ * regions that genuinely are waiting, pulsing here exactly as it does in the
+ * live screen.
  */
 export function StatsFallback() {
   return (
@@ -67,7 +71,7 @@ export function StatsFallback() {
           DELETED when content arrives, so nothing in it may hold focus. */}
       <div aria-hidden inert className={LIST_COLUMN}>
         <StatsHeading />
-        <StatsSkeleton still />
+        <StatsSkeleton />
       </div>
     </>
   );

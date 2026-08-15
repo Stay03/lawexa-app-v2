@@ -35,10 +35,13 @@ export function NotesScreen() {
 }
 
 /**
- * Suspense fallback — the search field and the tab strip as STILL RESERVED
- * SHAPES (they wait on no request, so they never pulse) over the real list
- * skeleton. Identical to `app/v2/notes/(library)/loading.tsx`, which imports
- * this component so the two can never drift.
+ * Suspense fallback — the search field and the tab strip as reserved shapes
+ * for the real controls (chrome, not content: the live screen puts the real
+ * field and the real tabs on those pixels), over the list skeleton, which
+ * pulses here exactly as it does on the live screen (standards §8i). A wait is
+ * a wait, and the reader cannot tell an RSC payload from a query. Identical to
+ * `app/v2/notes/(library)/loading.tsx`, which imports this component so the two
+ * can never drift.
  *
  * The "New note" affordance is NOT reserved here: whether it exists depends on
  * the viewer's role, and reserving space for a control that may never arrive
@@ -58,7 +61,7 @@ export function NotesFallback() {
         <div className="mb-3 flex items-center">
           <div className="h-9 w-44 max-w-full rounded-full bg-secondary/60" />
         </div>
-        <NotesListSkeleton still />
+        <NotesListSkeleton />
       </div>
     </>
   );

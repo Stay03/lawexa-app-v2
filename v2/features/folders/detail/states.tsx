@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { FolderOpen, FolderX, Search, WifiOff, type LucideIcon } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FOLDER_ITEM_NOUN } from '../item-row-model';
@@ -63,16 +62,15 @@ function PageState({
  * would defend against a settle that rarely happens while making the common one
  * — collapsing onto a two-line row — worse.
  */
-function StreamRowSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+function StreamRowSkeleton() {
   return (
     <div className="flex min-w-0 items-start gap-3 px-2 py-3">
-      <Skeleton className={cn('mt-0.5 size-9 shrink-0 rounded-lg', bar)} />
+      <Skeleton className="mt-0.5 size-9 shrink-0 rounded-lg" />
       <div className="min-w-0 flex-1 space-y-1.5">
-        <Skeleton className={cn('h-4 w-3/5 rounded', bar)} />
+        <Skeleton className="h-4 w-3/5 rounded" />
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
-          <Skeleton className={cn('ml-auto h-3 w-16 shrink-0 rounded', bar)} />
+          <Skeleton className="h-3 w-2/5 rounded" />
+          <Skeleton className="ml-auto h-3 w-16 shrink-0 rounded" />
         </div>
       </div>
     </div>
@@ -81,18 +79,12 @@ function StreamRowSkeleton({ still = false }: { still?: boolean }) {
 
 /** The stream's initial-load skeleton — progressive opacity down the stack, the
  *  shared v2 list fade. */
-export function FolderStreamSkeleton({
-  rows = 5,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
+export function FolderStreamSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.16) }}>
-          <StreamRowSkeleton still={still} />
+          <StreamRowSkeleton />
         </div>
       ))}
     </div>
@@ -116,28 +108,29 @@ export function FolderNextPageSkeleton() {
 
 /**
  * The WHOLE-PAGE skeleton: the trail, the header and the stream, in the exact
- * geometry the resolved page uses. Shared by the route fallback (`still`, where
- * nothing is in flight behind it) and the live pending state.
+ * geometry the resolved page uses. ONE drawing for the route fallback and the
+ * live pending state, and one appearance too: it pulses in both (standards
+ * §8i), because a reader cannot tell an RSC payload from a query and a shape
+ * that changed behaviour at the hand-off would read as the load starting again.
  *
  * The tab strip is NOT reserved: whether it exists depends on what the folder
  * turns out to hold, and reserving space for a control that may never arrive
  * would leave a permanent gap above every single-type folder.
  */
-export function FolderDetailSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+export function FolderDetailSkeleton() {
   return (
     <div aria-hidden className="flex flex-col">
-      <Skeleton className={cn('h-4 w-40 rounded', bar)} />
+      <Skeleton className="h-4 w-40 rounded" />
       <div className="mt-4 flex items-start gap-3">
-        <Skeleton className={cn('size-11 shrink-0 rounded-xl', bar)} />
+        <Skeleton className="size-11 shrink-0 rounded-xl" />
         <div className="min-w-0 flex-1 space-y-2 pt-0.5">
-          <Skeleton className={cn('h-6 w-3/5 rounded', bar)} />
-          <Skeleton className={cn('h-3.5 w-40 rounded', bar)} />
+          <Skeleton className="h-6 w-3/5 rounded" />
+          <Skeleton className="h-3.5 w-40 rounded" />
         </div>
-        <Skeleton className={cn('size-9 shrink-0 rounded-full', bar)} />
+        <Skeleton className="size-9 shrink-0 rounded-full" />
       </div>
       <div className="mt-6 border-t border-border/60 pt-2">
-        <FolderStreamSkeleton still={still} />
+        <FolderStreamSkeleton />
       </div>
     </div>
   );

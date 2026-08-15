@@ -18,9 +18,9 @@ import type { SpaceFilter } from '../model';
  * onward), now split so that the two the reader must tell apart fastest do not
  * look the same: emptiness gets the room, failure gets a strip.
  *
- * `still` follows the house rule: a ROUTE fallback reserves the shape WITHOUT
- * a pulse (it waits on an RSC payload, not a request); the live screen's
- * `isPending` region pulses, because a pulse promises a request is in flight.
+ * The skeleton pulses wherever it is drawn, the route fallback included. A wait
+ * is a wait: the reader cannot tell an RSC payload from a request, so giving
+ * one wait two appearances only prints a seam across the middle of the load.
  */
 
 /**
@@ -33,17 +33,16 @@ import type { SpaceFilter } from '../model';
  * unlike the old row, this skeleton reserves the row's ACTUAL height rather
  * than its median.
  */
-function SpaceLaneSkeleton({ still }: { still: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+function SpaceLaneSkeleton() {
   return (
     <div className="flex min-h-20 items-center gap-3.5 rounded-xl border border-border px-3 py-3">
-      <CrestSkeleton size="lg" still={still} />
+      <CrestSkeleton size="lg" />
       <div className="min-w-0 flex-1 space-y-2.5">
-        <Skeleton className={cn('h-4 w-2/5 rounded', bar)} />
+        <Skeleton className="h-4 w-2/5 rounded" />
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('h-4 w-16 shrink-0 rounded', bar)} />
-          <Skeleton className={cn('h-4 w-20 shrink-0 rounded', bar)} />
-          <Skeleton className={cn('ml-auto h-4 w-24 shrink-0 rounded', bar)} />
+          <Skeleton className="h-4 w-16 shrink-0 rounded" />
+          <Skeleton className="h-4 w-20 shrink-0 rounded" />
+          <Skeleton className="ml-auto h-4 w-24 shrink-0 rounded" />
         </div>
       </div>
     </div>
@@ -52,18 +51,12 @@ function SpaceLaneSkeleton({ still }: { still: boolean }) {
 
 /** The initial-load skeleton — gap-separated lanes with progressive opacity
  *  down the stack, the shared v2 list fade. */
-export function SpacesListSkeleton({
-  rows = 5,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
+export function SpacesListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col gap-2">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.16) }}>
-          <SpaceLaneSkeleton still={still} />
+          <SpaceLaneSkeleton />
         </div>
       ))}
     </div>

@@ -11,7 +11,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { RadarStatus } from '@/types/radar';
@@ -60,40 +59,34 @@ function PageState({
  * including the meta line's TWO ZONES: the schedule bar on the left and a
  * right-anchored bar for the clock facts.
  */
-function RadarRowSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+function RadarRowSkeleton() {
   return (
     <div className="flex items-start gap-2 px-2 py-3.5">
       <div className="min-w-0 flex-1 space-y-2">
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('size-2 shrink-0 rounded-full', bar)} />
-          <Skeleton className={cn('h-4 w-1/2 rounded', bar)} />
+          <Skeleton className="size-2 shrink-0 rounded-full" />
+          <Skeleton className="h-4 w-1/2 rounded" />
         </div>
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('h-3 w-1/3 rounded', bar)} />
-          <Skeleton className={cn('ml-auto h-3 w-24 shrink-0 rounded', bar)} />
+          <Skeleton className="h-3 w-1/3 rounded" />
+          <Skeleton className="ml-auto h-3 w-24 shrink-0 rounded" />
         </div>
       </div>
-      <Skeleton className={cn('mt-1 size-8 shrink-0 rounded-full', bar)} />
+      <Skeleton className="mt-1 size-8 shrink-0 rounded-full" />
     </div>
   );
 }
 
 /** The initial-load skeleton — progressive opacity down the stack, the one
- *  loading language every v2 list surface speaks. `still` for route
- *  fallbacks, where no request is in flight behind the shape. */
-export function RadarListSkeleton({
-  rows = 5,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
+ *  loading language every v2 list surface speaks. It pulses in every caller,
+ *  the route fallback included: a reader cannot tell an RSC payload from a
+ *  query, so both waits wear the same appearance. */
+export function RadarListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.16) }}>
-          <RadarRowSkeleton still={still} />
+          <RadarRowSkeleton />
         </div>
       ))}
     </div>

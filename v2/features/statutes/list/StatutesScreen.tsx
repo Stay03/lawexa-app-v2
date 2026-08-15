@@ -39,9 +39,15 @@ export function StatutesScreen() {
 }
 
 /**
- * Suspense fallback — the search field and the tab row as STILL RESERVED
- * SHAPES (they wait on no request), over the real list skeleton. Identical to
- * `app/v2/statutes/(library)/loading.tsx`, which imports this component.
+ * Suspense fallback — the search field and the tab row as reserved chrome
+ * shapes (furniture, not content placeholders), over the real list skeleton.
+ * Identical to `app/v2/statutes/(library)/loading.tsx`, which imports this
+ * component.
+ *
+ * The list skeleton pulses here exactly as it does inside the live screen
+ * (standards §8i). A wait is a wait: the reader cannot tell an RSC payload from
+ * a query, so two appearances for one wait would only print a seam into the
+ * middle of the load.
  */
 export function StatutesFallback() {
   return (
@@ -57,7 +63,7 @@ export function StatutesFallback() {
         <div className="mb-3 flex items-center">
           <div className="h-9 w-72 max-w-full rounded-full bg-secondary/60" />
         </div>
-        <StatutesListSkeleton still />
+        <StatutesListSkeleton />
       </div>
     </>
   );

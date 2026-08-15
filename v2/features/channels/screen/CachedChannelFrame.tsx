@@ -16,9 +16,9 @@ import { ChannelScreenFrame } from './states';
  * which is exactly the address whose frame is being drawn, and it is SSR-safe —
  * `window.location` is neither.
  */
-export function CachedChannelFrame({ still = false }: { still?: boolean }) {
+export function CachedChannelFrame() {
   const route = parseCollabRoute(usePathname() ?? '');
   const uuid = route.kind === 'channel' ? route.channelUuid : null;
   const identity = useCachedChannelIdentity(uuid);
-  return <ChannelScreenFrame still={still} identity={identity} />;
+  return <ChannelScreenFrame identity={identity} />;
 }

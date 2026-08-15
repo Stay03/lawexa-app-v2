@@ -275,7 +275,7 @@ export function InvitationsFallback() {
         Checking for invitations
       </span>
       <div aria-hidden inert className={LIST_COLUMN}>
-        <InvitationsSkeleton still />
+        <InvitationsSkeleton />
       </div>
     </>
   );

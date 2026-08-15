@@ -32,9 +32,11 @@ import { channelDisplayName } from '../thread-model';
  * wave (2026-08-05). Everything here is presentational and hook-free, so the
  * route fallback can render it `aria-hidden` + `inert`.
  *
- * `still` follows the house rule (quiz `states.tsx` precedent): a route
- * fallback reserves shape WITHOUT the pulse (it waits on an RSC payload, not
- * a query); the live screen's `isPending` regions pulse.
+ * EVERY SHAPE IN HERE PULSES, in the route fallback and on the live screen
+ * alike. One wait gets one appearance: a reader cannot tell an RSC payload from
+ * a query, so a frozen fallback that begins shimmering at the hand-off reads as
+ * the load starting again, which is exactly what the owner filmed on this
+ * screen.
  */
 
 /* ── Feed shapes ──────────────────────────────────────────────────────────── */
@@ -43,28 +45,25 @@ import { channelDisplayName } from '../thread-model';
  *  the `MessageGroupRow` geometry INCLUDING its measure, so the swap from
  *  skeleton to text moves no line ending. */
 function MessageGroupSkeleton({
-  still,
   lines,
   nameWidth,
 }: {
-  still: boolean;
   lines: 1 | 2;
   nameWidth: string;
 }) {
-  const bar = still ? 'animate-none' : undefined;
   return (
     <div className="flex gap-3 px-1">
-      <Skeleton className={cn('mt-0.5 size-8 shrink-0 rounded-full', bar)} />
+      <Skeleton className="mt-0.5 size-8 shrink-0 rounded-full" />
       {/* `text-[0.9375rem]` with no text in it: `ch` resolves against the
           element's own font size, so this is what makes the skeleton's 66ch
           the SAME width as the body text that replaces it. */}
       <div className={cn('min-w-0 flex-1 space-y-2 text-[0.9375rem]', MESSAGE_MEASURE)}>
         <div className="flex items-baseline gap-2">
-          <Skeleton className={cn('h-3.5 rounded', bar)} style={{ width: nameWidth }} />
-          <Skeleton className={cn('h-3 w-10 rounded', bar)} />
+          <Skeleton className="h-3.5 rounded" style={{ width: nameWidth }} />
+          <Skeleton className="h-3 w-10 rounded" />
         </div>
-        <Skeleton className={cn('h-3.5 w-4/5 rounded', bar)} />
-        {lines === 2 && <Skeleton className={cn('h-3.5 w-3/5 rounded', bar)} />}
+        <Skeleton className="h-3.5 w-4/5 rounded" />
+        {lines === 2 && <Skeleton className="h-3.5 w-3/5 rounded" />}
       </div>
     </div>
   );
@@ -72,7 +71,7 @@ function MessageGroupSkeleton({
 
 /** The feed's pending shape — a realistic median of author runs with the
  *  house progressive-opacity fade (§8iv: reserve near the middle). */
-export function ChannelFeedSkeleton({ still = false }: { still?: boolean }) {
+export function ChannelFeedSkeleton() {
   const rows: { lines: 1 | 2; nameWidth: string }[] = [
     { lines: 2, nameWidth: '7rem' },
     { lines: 1, nameWidth: '5rem' },
@@ -84,7 +83,7 @@ export function ChannelFeedSkeleton({ still = false }: { still?: boolean }) {
     <div aria-hidden className="flex flex-col gap-5 pt-2">
       {rows.map((row, index) => (
         <div key={index} style={{ opacity: Math.max(0.3, 1 - index * 0.15) }}>
-          <MessageGroupSkeleton still={still} lines={row.lines} nameWidth={row.nameWidth} />
+          <MessageGroupSkeleton lines={row.lines} nameWidth={row.nameWidth} />
         </div>
       ))}
     </div>
@@ -513,8 +512,8 @@ export function ChannelErrorState({ onRetry }: { onRetry: () => void }) {
 /**
  * The channel screen's frame at rest: the ONE header bar, the feed column, and
  * the transcript-width composer. `app/v2/channels/[channelId]/loading.tsx`
- * renders it `still` and inert; the live screen renders it (pulsing) while the
- * channel detail resolves.
+ * renders it inert; the live screen renders it while the channel detail
+ * resolves. It pulses in both, because both are the same wait to the reader.
  *
  * ── THE BAR IS TRACED OFF `ChannelPlaceHeader`, ELEMENT BY ELEMENT ─────────
  * Same wrapper (`v2-screen-bar`, so the notch strip is padded in BOTH states —
@@ -574,14 +573,11 @@ export interface ChannelFrameIdentity {
 }
 
 export function ChannelScreenFrame({
-  still = false,
   identity = null,
 }: {
-  still?: boolean;
   /** The tapped row's identity; `null` on a cold arrival keeps the silhouette. */
   identity?: ChannelFrameIdentity | null;
 }) {
-  const bar = still ? 'animate-none' : undefined;
   const VisibilityIcon = identity
     ? channelVisibilityFace(identity.visibility).icon
     : null;
@@ -597,7 +593,7 @@ export function ChannelScreenFrame({
                 known: the frame is inert, and a chevron that cannot be pressed
                 is worse than one that has not arrived. */}
             <div className="-ml-2 flex size-10 shrink-0 items-center justify-center md:hidden">
-              <Skeleton className={cn('size-5 rounded', bar)} />
+              <Skeleton className="size-5 rounded" />
             </div>
 
             {/* Phone: the identity cluster, crest + two lines. `flex-1` because
@@ -613,7 +609,7 @@ export function ChannelScreenFrame({
                   className="size-8 shrink-0 rounded-lg"
                 />
               ) : (
-                <Skeleton className={cn('size-8 shrink-0 rounded-lg', bar)} />
+                <Skeleton className="size-8 shrink-0 rounded-lg" />
               )}
               {identity ? (
                 <span className="flex min-w-0 flex-1 flex-col">
@@ -626,8 +622,8 @@ export function ChannelScreenFrame({
                 </span>
               ) : (
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <Skeleton className={cn('h-3.5 w-32 max-w-full rounded', bar)} />
-                  <Skeleton className={cn('h-2.5 w-20 max-w-full rounded', bar)} />
+                  <Skeleton className="h-3.5 w-32 max-w-full rounded" />
+                  <Skeleton className="h-2.5 w-20 max-w-full rounded" />
                 </div>
               )}
             </div>
@@ -641,14 +637,14 @@ export function ChannelScreenFrame({
                   className="size-4 shrink-0 text-muted-foreground"
                 />
               ) : (
-                <Skeleton className={cn('size-4 shrink-0 rounded', bar)} />
+                <Skeleton className="size-4 shrink-0 rounded" />
               )}
               {identity ? (
                 <span className="min-w-0 truncate text-base leading-tight font-semibold">
                   {identity.name}
                 </span>
               ) : (
-                <Skeleton className={cn('h-4 w-36 shrink-0 rounded', bar)} />
+                <Skeleton className="h-4 w-36 shrink-0 rounded" />
               )}
               {identity ? (
                 <span className="hidden min-w-0 max-w-56 shrink items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-1 text-xs text-muted-foreground md:inline-flex lg:hidden">
@@ -662,9 +658,7 @@ export function ChannelScreenFrame({
                   <span className="min-w-0 truncate">{identity.space.name}</span>
                 </span>
               ) : (
-                <Skeleton
-                  className={cn('h-6 w-28 shrink-0 rounded-full lg:hidden', bar)}
-                />
+                <Skeleton className="h-6 w-28 shrink-0 rounded-full lg:hidden" />
               )}
             </div>
 
@@ -674,23 +668,21 @@ export function ChannelScreenFrame({
               {[0, 1, 2].map((index) => (
                 <Skeleton
                   key={index}
-                  className={cn('ring-background size-6 rounded-full ring-2', bar)}
+                  className="ring-background size-6 rounded-full ring-2"
                 />
               ))}
             </div>
 
             {/* The overflow. Icon-only below `sm:`, where the live button drops
                 the word "More". */}
-            <Skeleton
-              className={cn('h-8 w-8 shrink-0 rounded-lg sm:w-[4.5rem]', bar)}
-            />
+            <Skeleton className="h-8 w-8 shrink-0 rounded-lg sm:w-[4.5rem]" />
           </div>
         </div>
       </div>
       {/* Feed column */}
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="mx-auto w-full max-w-3xl px-4 pt-4">
-          <ChannelFeedSkeleton still={still} />
+          <ChannelFeedSkeleton />
         </div>
       </div>
       {/* The composer, on the transcript's own column. 82px is the live
@@ -700,7 +692,7 @@ export function ChannelScreenFrame({
           the real one mounted. */}
       <div className="absolute inset-x-0 bottom-0">
         <div className="v2-safe-bottom mx-auto w-full max-w-3xl px-4 pb-3">
-          <Skeleton className={cn('h-[5.125rem] w-full rounded-2xl', bar)} />
+          <Skeleton className="h-[5.125rem] w-full rounded-2xl" />
         </div>
       </div>
     </div>

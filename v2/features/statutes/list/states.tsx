@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { Landmark, SearchX, WifiOff, type LucideIcon } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -49,43 +48,38 @@ function PageState({
  * right-anchored bar for the year + status, so the silhouette settles onto the
  * resolved row rather than sliding a bar across it.
  */
-function StatuteRowSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+function StatuteRowSkeleton() {
   return (
     <div className="flex items-start gap-2 px-2 py-3">
       <div className="min-w-0 flex-1 space-y-1.5">
-        <Skeleton className={cn('h-4 w-1/2 rounded', bar)} />
+        <Skeleton className="h-4 w-1/2 rounded" />
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
-          <Skeleton className={cn('ml-auto h-3 w-20 shrink-0 rounded', bar)} />
+          <Skeleton className="h-3 w-2/5 rounded" />
+          <Skeleton className="ml-auto h-3 w-20 shrink-0 rounded" />
         </div>
         <div className="space-y-1 pt-0.5">
-          <Skeleton className={cn('h-3.5 w-full rounded', bar)} />
-          <Skeleton className={cn('h-3.5 w-3/4 rounded', bar)} />
+          <Skeleton className="h-3.5 w-full rounded" />
+          <Skeleton className="h-3.5 w-3/4 rounded" />
         </div>
       </div>
-      <Skeleton className={cn('mt-2 size-9 shrink-0 rounded-full', bar)} />
+      <Skeleton className="mt-2 size-9 shrink-0 rounded-full" />
     </div>
   );
 }
 
 /**
  * The initial-load skeleton — six rows with progressive opacity down the
- * stack, the shared v2 list fade. `still` drops the pulse for a route
- * fallback, where nothing is in flight behind the shape (standards §8i).
+ * stack, the shared v2 list fade. It pulses in every caller, route fallback
+ * included (standards §8i): the reader cannot tell an RSC payload from a
+ * query, so two appearances for one wait would only print a seam into the
+ * middle of the load.
  */
-export function StatutesListSkeleton({
-  rows = 6,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
+export function StatutesListSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.14) }}>
-          <StatuteRowSkeleton still={still} />
+          <StatuteRowSkeleton />
         </div>
       ))}
     </div>

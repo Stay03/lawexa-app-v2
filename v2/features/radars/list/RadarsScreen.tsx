@@ -33,9 +33,10 @@ export function RadarsScreen() {
 }
 
 /**
- * Suspense fallback — the tab strip and the create button as STILL RESERVED
- * SHAPES (they wait on no request), over the real list skeleton. Identical to
- * `app/v2/radars/loading.tsx`, which imports this component.
+ * Suspense fallback — the tab strip and the create button as plain reserved
+ * shapes (they wait on no request, so neither of them pulses), over the list
+ * skeleton, which pulses here exactly as it does in the live screen. Identical
+ * to `app/v2/radars/loading.tsx`, which imports this component.
  */
 export function RadarsFallback() {
   return (
@@ -50,7 +51,7 @@ export function RadarsFallback() {
           <div className="h-9 w-56 rounded-full bg-secondary/60" />
           <div className="h-9 w-28 rounded-full bg-secondary/60" />
         </div>
-        <RadarListSkeleton still />
+        <RadarListSkeleton />
       </div>
     </>
   );

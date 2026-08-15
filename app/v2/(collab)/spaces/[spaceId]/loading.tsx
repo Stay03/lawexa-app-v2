@@ -6,8 +6,10 @@ import { CachedSpaceFrame } from '@/v2/features/spaces/detail/CachedSpaceFrame';
  * ONE SILHOUETTE, NOT TWO: it draws the SAME `SpaceScreenFrame` the live
  * screen shows while its detail query resolves — identity block, activity
  * digest, side regions — imported from the feature's `states.tsx` so the two
- * can never drift. `still` (no pulse): a route boundary waits on an RSC
- * payload, not a query; the live screen's own pending render pulses.
+ * can never drift. The silhouette pulses here just as it does on the live
+ * screen (standards §8). One wait may only have one appearance: a reader has
+ * no way to tell an RSC payload from a query, and a shape that sits frozen and
+ * then starts shimmering reads as the load beginning again.
  *
  * IT GOES THROUGH `CachedSpaceFrame`, which fills the identity block in from
  * the row the reader tapped when that row is still in the cache — the crest,
@@ -29,7 +31,7 @@ export default function SpaceLoading() {
         Loading this space
       </span>
       <div aria-hidden inert>
-        <CachedSpaceFrame still />
+        <CachedSpaceFrame />
       </div>
     </>
   );

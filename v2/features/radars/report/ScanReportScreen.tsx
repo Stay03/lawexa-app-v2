@@ -36,7 +36,7 @@ import './report.css';
  *                   class.
  *  PUBLIC / GUEST   the same reading surface off the public endpoint.
  *
- * A RUNNING scan renders the live indicator over a held document silhouette
+ * A RUNNING scan renders the live indicator over the document silhouette
  * and the query polls itself every 10s until terminal (the leaf's own
  * `refetchInterval` — for the public shape too, so a share link opened
  * mid-scan resolves without a reload). A FAILED scan is an owner-only
@@ -183,7 +183,10 @@ export function ScanReportScreen({
           </span>
           Scan in progress — the report appears here when it completes
         </div>
-        <ReportSkeleton still />
+        {/* Still, not shimmering: this wait is minutes long, and §8 / WCAG
+            2.2.2 both forbid a pulse past five seconds. The pill above carries
+            the liveness. */}
+        <ReportSkeleton settled />
       </div>
     );
   }
@@ -310,9 +313,25 @@ export function ScanReportScreen({
   );
 }
 
-/** The report silhouette: kicker, title, meta, toolbar band, prose bars. */
-export function ReportSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+/**
+ * The report silhouette: kicker, title, meta, toolbar band, prose bars.
+ *
+ * ── ONE APPEARANCE PER WAIT, WITH ONE EXCEPTION THAT IS NOT ABOUT BOUNDARIES ─
+ * It pulses in the route fallback, like every other wait in v2: a reader cannot
+ * tell an RSC payload from a query, so the two must not look different.
+ *
+ * `settled` is the OTHER rule, and the two are easy to confuse. It is not about
+ * which boundary is drawing, it is about HOW LONG. Standards §8 and WCAG 2.2.2
+ * (Pause, Stop, Hide) both say a skeleton must not pulse past five seconds, and
+ * a wait known to be longer settles to a still placeholder. A running scan is
+ * an agent writing a report server-side over minutes, polled every ten seconds.
+ * Shimmering at someone for minutes is the exact thing that rule forbids.
+ *
+ * The liveness is carried by the "Scan in progress" pill above it, which keeps
+ * its ping. One thing moves, and it is the thing that means "still working".
+ */
+export function ReportSkeleton({ settled = false }: { settled?: boolean }) {
+  const bar = settled ? 'animate-none' : undefined;
   return (
     <div aria-hidden className="flex flex-col gap-7">
       <div className="flex flex-col gap-3">
@@ -364,7 +383,8 @@ function ReportState({
   );
 }
 
-/** The route fallback — the report silhouette, held still. */
+/** The route fallback — the report silhouette, pulsing as it does in the live
+ *  screen. */
 export function ReportFallback() {
   return (
     <>
@@ -372,7 +392,7 @@ export function ReportFallback() {
         Loading report
       </span>
       <div aria-hidden inert className={cn('v2-radar-report', REPORT_COLUMN)}>
-        <ReportSkeleton still />
+        <ReportSkeleton />
       </div>
     </>
   );

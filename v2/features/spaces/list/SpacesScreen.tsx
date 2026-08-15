@@ -38,10 +38,14 @@ export function SpacesScreen() {
 }
 
 /**
- * Suspense fallback — the toolbar as a STILL RESERVED SHAPE (it waits on no
- * request, so it never pulses) over the real list skeleton. Identical to
- * `app/v2/spaces/(list)/loading.tsx`, which imports this component so the two
- * can never drift.
+ * Suspense fallback — the toolbar's reserved shape over the real list skeleton.
+ * Identical to `app/v2/spaces/(list)/loading.tsx`, which imports this component
+ * so the two can never drift.
+ *
+ * Every shape in it pulses, exactly as the live screen's own pending render
+ * does. A wait is a wait: the reader cannot tell a route payload from a
+ * request, so freezing half of one load and shimmering the other half would
+ * only print a seam across the middle of it.
  *
  * `aria-hidden` + `inert` (standards §8ii): a Suspense fallback is DELETED,
  * not reconciled, when content arrives — so anything focusable inside would
@@ -59,10 +63,10 @@ export function SpacesFallback() {
             holding a slot for it would be reserving a shape that usually
             never arrives. */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Skeleton className="h-9 w-44 animate-none rounded-full" />
-          <Skeleton className="ml-auto h-8 w-28 animate-none rounded-md" />
+          <Skeleton className="h-9 w-44 rounded-full" />
+          <Skeleton className="ml-auto h-8 w-28 rounded-md" />
         </div>
-        <SpacesListSkeleton still />
+        <SpacesListSkeleton />
       </div>
     </>
   );

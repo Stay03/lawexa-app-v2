@@ -25,9 +25,10 @@ import {
  * (`app/v2/(collab)/spaces/[spaceId]/loading.tsx` imports
  * {@link SpaceScreenFrame}), so the two shapes can never drift.
  *
- * `still` is the house rule: a route fallback reserves the shape WITHOUT a
- * pulse (nothing is in flight behind it — it waits on an RSC payload); the
- * live screen's `isPending` regions pulse.
+ * ONE APPEARANCE FOR ONE WAIT. The silhouette pulses in the route fallback and
+ * on the live screen alike. The reader cannot tell an RSC payload from a
+ * request, so a frozen fallback followed by a shimmering pending region would
+ * read as the loading starting over halfway through.
  *
  * ── THE FALLBACK DRAWS THE PANE, NOT THE PAGE ──────────────────────────────
  * The rail is rendered by the `(collab)` layout, and `loading.tsx` wraps the
@@ -39,34 +40,27 @@ import {
 
 /** One channel-row skeleton at {@link SpaceChannelRow}'s exact geometry — the
  *  36px tile, the two text lines, the right-anchored age. */
-function ChannelRowSkeleton({ still }: { still: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+function ChannelRowSkeleton() {
   return (
     <div className="flex items-start gap-3 px-3 py-2.5">
-      <Skeleton className={cn('mt-0.5 size-9 shrink-0 rounded-lg', bar)} />
+      <Skeleton className="mt-0.5 size-9 shrink-0 rounded-lg" />
       <div className="min-w-0 flex-1 space-y-2">
-        <Skeleton className={cn('h-4 w-1/3 rounded', bar)} />
-        <Skeleton className={cn('h-3 w-3/5 rounded', bar)} />
+        <Skeleton className="h-4 w-1/3 rounded" />
+        <Skeleton className="h-3 w-3/5 rounded" />
       </div>
-      <Skeleton className={cn('mt-1 h-3 w-8 shrink-0 rounded', bar)} />
+      <Skeleton className="mt-1 h-3 w-8 shrink-0 rounded" />
     </div>
   );
 }
 
 /** The activity digest's pending shape — rows at the real geometry, with the
  *  house progressive-opacity fade. */
-export function ChannelListSkeleton({
-  rows = 4,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
+export function ChannelListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.18) }}>
-          <ChannelRowSkeleton still={still} />
+          <ChannelRowSkeleton />
         </div>
       ))}
     </div>
@@ -110,14 +104,11 @@ export interface SpaceFrameIdentity {
  * its own request. Those keep their shapes, which is what a shape is for.
  */
 export function SpaceScreenFrame({
-  still = false,
   identity = null,
 }: {
-  still?: boolean;
   /** The tapped row's identity; `null` on a cold arrival keeps the silhouette. */
   identity?: SpaceFrameIdentity | null;
 }) {
-  const bar = still ? 'animate-none' : undefined;
   return (
     <div className={SPACE_LOBBY_COLUMN}>
       <div className="border-b pb-5">
@@ -130,7 +121,7 @@ export function SpaceScreenFrame({
               size="lg"
             />
           ) : (
-            <CrestSkeleton size="lg" still={still} />
+            <CrestSkeleton size="lg" />
           )}
           {identity ? (
             <div className="min-w-0 flex-1">
@@ -147,8 +138,8 @@ export function SpaceScreenFrame({
             </div>
           ) : (
             <div className="min-w-0 flex-1 space-y-2.5">
-              <Skeleton className={cn('h-3 w-40 rounded', bar)} />
-              <Skeleton className={cn('h-7 w-2/5 rounded', bar)} />
+              <Skeleton className="h-3 w-40 rounded" />
+              <Skeleton className="h-7 w-2/5 rounded" />
             </div>
           )}
         </div>
@@ -162,7 +153,7 @@ export function SpaceScreenFrame({
             </p>
           ) : null
         ) : (
-          <Skeleton className={cn('mt-3 h-3.5 w-3/5 rounded', bar)} />
+          <Skeleton className="mt-3 h-3.5 w-3/5 rounded" />
         )}
         {/* The action row is 36px tall, set by the presence stack: `size="md"`
             avatars are 32px and its button pads them by 2px each way. The pill
@@ -170,27 +161,27 @@ export function SpaceScreenFrame({
             landed and took the whole lobby down with it — measured, 15 August
             2026. The `New channel` button beside it is the shorter 32px. */}
         <div className="mt-4 flex items-center gap-3">
-          <Skeleton className={cn('h-9 w-24 rounded-full', bar)} />
-          <Skeleton className={cn('h-8 w-32 rounded-md', bar)} />
+          <Skeleton className="h-9 w-24 rounded-full" />
+          <Skeleton className="h-8 w-32 rounded-md" />
         </div>
       </div>
 
       <div className={SPACE_LOBBY_GRID}>
         <div className="min-w-0">
-          <Skeleton className={cn('mb-2 h-4 w-28 rounded', bar)} />
-          <ChannelListSkeleton still={still} />
+          <Skeleton className="mb-2 h-4 w-28 rounded" />
+          <ChannelListSkeleton />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
           <div>
-            <Skeleton className={cn('mb-2 h-4 w-20 rounded', bar)} />
+            <Skeleton className="mb-2 h-4 w-20 rounded" />
             {/* The SAME component the live People block draws while its roster
                 is in flight, so the fallback reserves the rows and the button
                 that are actually coming. */}
-            <LobbyPeopleSkeleton still={still} />
+            <LobbyPeopleSkeleton />
           </div>
           <div>
-            <Skeleton className={cn('mb-2 h-4 w-16 rounded', bar)} />
-            <LobbyFactsSkeleton still={still} />
+            <Skeleton className="mb-2 h-4 w-16 rounded" />
+            <LobbyFactsSkeleton />
           </div>
         </div>
       </div>

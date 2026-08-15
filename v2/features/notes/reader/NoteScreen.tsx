@@ -149,7 +149,7 @@ export function NoteFallback() {
           DELETED, not reconciled, when content arrives, so anything focusable
           in here would lose focus mid-interaction. */}
       <div aria-hidden inert className={NOTE_COLUMN}>
-        <NoteDocumentSkeleton still />
+        <NoteDocumentSkeleton />
       </div>
     </>
   );

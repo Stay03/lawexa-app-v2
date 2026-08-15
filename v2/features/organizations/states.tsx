@@ -2,7 +2,6 @@
 
 import { Building2, WifiOff } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
@@ -17,23 +16,23 @@ import { LIST_COLUMN } from '@/v2/shell/page-columns';
 
 /**
  * The screen's silhouette — identity header, then the verification panel.
- * `app/v2/organization/loading.tsx` renders it `still` and inert; the live
- * screen renders it (pulsing) while `/my-organization` resolves, so the
- * hand-off is content resolving rather than a layout swap.
+ * `app/v2/organization/loading.tsx` renders it inert; the live screen renders
+ * it while `/my-organization` resolves. ONE appearance across both: it pulses
+ * either way (standards §8i), so the hand-off is content resolving rather than
+ * a layout swap or a shape that suddenly comes to life.
  */
-export function OrganizationScreenFrame({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+export function OrganizationScreenFrame() {
   return (
     <div className={LIST_COLUMN}>
       <div className="flex items-start gap-3">
-        <Skeleton className={cn('size-11 shrink-0 rounded-xl', bar)} />
+        <Skeleton className="size-11 shrink-0 rounded-xl" />
         <div className="min-w-0 flex-1 space-y-2.5">
-          <Skeleton className={cn('h-7 w-2/5 rounded', bar)} />
-          <Skeleton className={cn('h-3.5 w-3/5 rounded', bar)} />
+          <Skeleton className="h-7 w-2/5 rounded" />
+          <Skeleton className="h-3.5 w-3/5 rounded" />
         </div>
-        <Skeleton className={cn('h-8 w-24 shrink-0 rounded-md', bar)} />
+        <Skeleton className="h-8 w-24 shrink-0 rounded-md" />
       </div>
-      <Skeleton className={cn('mt-5 h-20 w-full rounded-xl', bar)} />
+      <Skeleton className="mt-5 h-20 w-full rounded-xl" />
     </div>
   );
 }

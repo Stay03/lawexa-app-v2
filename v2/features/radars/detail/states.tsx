@@ -12,7 +12,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -114,58 +113,56 @@ export function ScanGapNotice({
 /** One scan-row silhouette (dot + title / two-zone meta line + menu stub) —
  *  the resolved row right-anchors its clock facts, so the short meta bar sits
  *  at the text block's right edge here too. */
-export function ScanRowSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+export function ScanRowSkeleton() {
   return (
     <div className="flex items-center gap-3 px-2 py-3">
-      <Skeleton className={cn('size-2 shrink-0 rounded-full', bar)} />
+      <Skeleton className="size-2 shrink-0 rounded-full" />
       <div className="min-w-0 flex-1 space-y-1.5">
-        <Skeleton className={cn('h-4 w-3/5 rounded', bar)} />
+        <Skeleton className="h-4 w-3/5 rounded" />
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('h-3 w-1/5 rounded', bar)} />
-          <Skeleton className={cn('ml-auto h-3 w-16 shrink-0 rounded', bar)} />
+          <Skeleton className="h-3 w-1/5 rounded" />
+          <Skeleton className="ml-auto h-3 w-16 shrink-0 rounded" />
         </div>
       </div>
-      <Skeleton className={cn('size-8 shrink-0 rounded-full', bar)} />
+      <Skeleton className="size-8 shrink-0 rounded-full" />
     </div>
   );
 }
 
 /** The scan list's initial-load skeleton — progressive fade down the stack. */
-export function ScanListSkeleton({
-  rows = 4,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
+export function ScanListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.2) }}>
-          <ScanRowSkeleton still={still} />
+          <ScanRowSkeleton />
         </div>
       ))}
     </div>
   );
 }
 
-/** The whole-page skeleton: header block → tabs → rows, at real geometry. */
-export function RadarDetailSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+/**
+ * The whole-page skeleton: header block → tabs → rows, at real geometry.
+ *
+ * It pulses in every caller, the route fallback included. A wait is a wait: the
+ * reader cannot tell an RSC payload from a query, so two appearances for one
+ * load would only read as the loading starting over.
+ */
+export function RadarDetailSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-5">
       <div className="flex flex-col gap-3 border-b border-border/60 pb-5">
-        <Skeleton className={cn('h-3 w-24 rounded', bar)} />
-        <Skeleton className={cn('h-7 w-3/5 rounded-lg', bar)} />
-        <Skeleton className={cn('h-3.5 w-4/5 rounded', bar)} />
+        <Skeleton className="h-3 w-24 rounded" />
+        <Skeleton className="h-7 w-3/5 rounded-lg" />
+        <Skeleton className="h-3.5 w-4/5 rounded" />
         <div className="flex gap-2 pt-1">
-          <Skeleton className={cn('h-9 w-28 rounded-full', bar)} />
-          <Skeleton className={cn('size-9 rounded-full', bar)} />
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <Skeleton className="size-9 rounded-full" />
         </div>
       </div>
-      <Skeleton className={cn('h-9 w-80 max-w-full rounded-full', bar)} />
-      <ScanListSkeleton still={still} />
+      <Skeleton className="h-9 w-80 max-w-full rounded-full" />
+      <ScanListSkeleton />
     </div>
   );
 }

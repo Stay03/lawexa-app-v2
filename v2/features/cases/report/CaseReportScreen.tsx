@@ -166,7 +166,7 @@ export function CaseReportScreen({ slug }: { slug: string }) {
   );
 }
 
-/** The route fallback — the same document shape, held still. */
+/** The route fallback — the same pulsing document shape as the live screen. */
 export function CaseReportFallback() {
   return (
     <>
@@ -174,7 +174,7 @@ export function CaseReportFallback() {
         Loading the full judgment
       </span>
       <div aria-hidden inert className={CASE_COLUMN}>
-        <CaseDocumentSkeleton still />
+        <CaseDocumentSkeleton />
       </div>
     </>
   );

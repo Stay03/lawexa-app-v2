@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { GraduationCap, WifiOff } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QuizMessage } from './QuizMessage';
@@ -16,10 +15,10 @@ import { QuizMessage } from './QuizMessage';
  * (`VerifyEmailState.tsx`) rather than pulling every skeleton in this file into
  * the client bundle behind it.
  *
- * `still` on every skeleton follows the house rule: a PULSE promises a request
- * is in flight. A route-level fallback waits on an RSC payload while the query
- * behind it is often already warm, so it reserves the shape without the pulse;
- * a live `isPending` query pulses.
+ * Every skeleton here pulses, in each of its callers, the route fallback
+ * included (standards §8i). A wait is a wait: the reader cannot tell an RSC
+ * payload from a query, so giving each of those its own appearance would only
+ * print a seam into the middle of the load.
  */
 
 /* ── Session rows ───────────────────────────────────────────────────────── */
@@ -31,21 +30,20 @@ import { QuizMessage } from './QuizMessage';
  * resolved row puts it (the Resume/Review affordance is the separate bar
  * outside).
  */
-function SessionRowSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+function SessionRowSkeleton() {
   return (
     <div className="flex min-h-11 items-center gap-3 px-2 py-3">
       <div className="min-w-0 flex-1 space-y-2">
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('size-2 shrink-0 rounded-full', bar)} />
-          <Skeleton className={cn('h-4 w-28 rounded', bar)} />
+          <Skeleton className="size-2 shrink-0 rounded-full" />
+          <Skeleton className="h-4 w-28 rounded" />
         </div>
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('h-3 w-2/5 rounded', bar)} />
-          <Skeleton className={cn('ml-auto h-3 w-16 shrink-0 rounded', bar)} />
+          <Skeleton className="h-3 w-2/5 rounded" />
+          <Skeleton className="ml-auto h-3 w-16 shrink-0 rounded" />
         </div>
       </div>
-      <Skeleton className={cn('h-3 w-12 shrink-0 rounded', bar)} />
+      <Skeleton className="h-3 w-12 shrink-0 rounded" />
     </div>
   );
 }
@@ -55,18 +53,12 @@ function SessionRowSkeleton({ still = false }: { still?: boolean }) {
  * loading language every v2 list surface speaks. `rows` defaults to a realistic
  * MEDIAN (standards §8iv: reserve near the middle, never at the page cap).
  */
-export function SessionListSkeleton({
-  rows = 5,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
+export function SessionListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.16) }}>
-          <SessionRowSkeleton still={still} />
+          <SessionRowSkeleton />
         </div>
       ))}
     </div>

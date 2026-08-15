@@ -599,8 +599,9 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
   );
 }
 
-/** The route fallback — the detail skeleton, held still, in the shared
- *  column. Identical to `app/v2/radars/[radarUuid]/loading.tsx`. */
+/** The route fallback — the detail skeleton, pulsing as it does in the live
+ *  screen, in the shared column. Identical to
+ *  `app/v2/radars/[radarUuid]/loading.tsx`. */
 export function RadarDetailFallback() {
   return (
     <>
@@ -608,7 +609,7 @@ export function RadarDetailFallback() {
         Loading radar
       </span>
       <div aria-hidden inert className={LIST_COLUMN}>
-        <RadarDetailSkeleton still />
+        <RadarDetailSkeleton />
       </div>
     </>
   );

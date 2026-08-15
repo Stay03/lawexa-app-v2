@@ -314,6 +314,25 @@ Before adding a skeleton, answer *"what request is this waiting on?"* If there i
 it gets a **reserved shape** at the real geometry — quiet, still, and **never pulsing** —
 or it gets rendered outright. A pulse is reserved for a real in-flight read.
 
+**Scope limit: that rule is about static chrome, not about which boundary you are inside.**
+A route-level `loading.tsx` fallback IS waiting on a request, the RSC payload, so it pulses
+like anything else that is waiting. Every skeleton that represents a wait gets ONE
+appearance, whichever boundary happens to draw it.
+
+This closes a rule we shipped and have now removed. v2 carried a `still?: boolean` prop that
+dropped the pulse in route fallbacks, reasoning that a fallback "waits on an RSC payload, not
+a query" and therefore had no request behind it. It cited this section as its authority,
+which this section never said. Two things were wrong with it. The premise was wrong, because
+an RSC payload is a request. And the effect was worse than the premise: the fallback and the
+live screen draw the same shape, so a reader saw that shape hold perfectly still for seconds
+and then watched every bar on it start shimmering in a single frame at the hand-off.
+Measured on a channel at 390px on a throttled connection: 29 visible skeletons with 0
+animating while the boundary held, then 26 visible with 26 animating one frame later. The
+owner read it as the page loading twice, and he was right to. The distinction was invisible
+plumbing. No reader can tell "waiting for the route" from "waiting for the data", so printing
+the difference on screen bought nothing and cost a seam in the middle of every load.
+**Do not reintroduce a still variant for boundary skeletons.**
+
 ### (ii) `loading.tsx` holds the page's real outer SHAPE, and nothing interactive
 
 Next compiles `loading.tsx` into the `fallback` of a `<Suspense>` around `page.tsx`
@@ -394,17 +413,25 @@ role-gated modules, client-resolved content.
 
 **Pulse discipline** — a skeleton must not animate under `prefers-reduced-motion`, and must
 not pulse past 5s (WCAG 2.2.2 Pause, Stop, Hide); a long wait settles to a still
-placeholder. **CLOSED FOR v2:** `components/ui/skeleton.tsx` still hard-codes bare
-`animate-pulse`, but `v2/shell/shell.css` now carries
+placeholder. **CLOSED:** `components/ui/skeleton.tsx` now carries the guard itself, as
+`animate-pulse motion-reduce:animate-none`, so every caller of the primitive is covered in
+v1 and v2 alike and needs no local guard.
+
+This used to be delegated to `v2/shell/shell.css`, which still carries
 `@media (prefers-reduced-motion: reduce) { html.v2-document-lock .animate-pulse { animation: none } }`
-— scoped to the class `DocumentLock` puts on `<html>` only while the v2 layout is mounted, so it
-stills EVERY v2 skeleton (including hand-rolled bars the primitive fix would miss) and is
-provably inert the moment the user soft-navs into v1. **New v2 skeletons therefore need no
-local guard.** The remaining local `motion-reduce:animate-none` in `ModuleSkeleton`/`QuizModule`
-is redundant and can be deleted. Fixing the primitive itself stays the long-term goal for
-v1's sake; it is v1-shared, so it needs a byte-identity call (the change is
-reduced-motion-only and cannot alter v1's default rendering, but it does alter v1's emitted
-class strings).
+as belt and braces for hand-rolled bars that never call the primitive. That rule ALONE is not
+enough, and the reason is worth keeping. It keys off a class `DocumentLock` adds inside an
+effect, so it cannot apply until hydration, and on a hard navigation a route fallback is on
+screen for the whole time before hydration. While fallbacks were held still, that gap was
+invisible. Now that they pulse, it would shimmer at a reduced-motion reader for the entire
+initial load, so the guard has to be plain CSS sitting on the primitive.
+
+Use `motion-reduce:animate-none`, never `motion-safe:animate-pulse`. `cn` runs tailwind-merge,
+which drops an earlier `animate-pulse` when a caller passes its own `animate-*` class. A
+`motion-safe:`-prefixed pulse sits in a DIFFERENT merge group, so it would survive a caller's
+override and leave raw stylesheet order to pick the winner, silently. The chosen form is also
+purely additive for v1: it changes the emitted class string but cannot alter v1's rendering
+for any reader who has not asked for reduced motion.
 
 ### Corollary: never render a skeleton over content already in cache
 

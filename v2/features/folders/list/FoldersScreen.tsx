@@ -35,10 +35,13 @@ export function FoldersScreen() {
 }
 
 /**
- * Suspense fallback — the search field and the action row as STILL RESERVED
- * SHAPES (they wait on no request, so they never pulse) over the real list
- * skeleton. Identical to `app/v2/folders/(library)/loading.tsx`, which imports
- * this component so the two can never drift.
+ * Suspense fallback — the search field and the action row as reserved shapes
+ * for the real controls (chrome, not content: the live screen puts the real
+ * field and the real pill on those pixels), over the list skeleton, which
+ * pulses here exactly as it does on the live screen (standards §8i). A wait is
+ * a wait, and the reader cannot tell an RSC payload from a query. Identical to
+ * `app/v2/folders/(library)/loading.tsx`, which imports this component so the
+ * two can never drift.
  *
  * The "New folder" pill IS reserved here, unlike the notes library's "New
  * note": that one is role-gated and may never arrive, while this one exists for
@@ -59,7 +62,7 @@ export function FoldersFallback() {
         <div className="mb-3 flex min-h-9 items-center justify-end">
           <div className="h-9 w-9 rounded-full bg-primary/60 sm:w-32" />
         </div>
-        <FoldersListSkeleton still />
+        <FoldersListSkeleton />
       </div>
     </>
   );

@@ -18,46 +18,46 @@ export const CASE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
  * row, and a few paragraphs of body — so the hand-off to the real case moves
  * nothing.
  *
- * `still` drops the pulse for a route fallback, where nothing is in flight
- * behind the shape (standards §8i).
+ * It pulses in every caller, route fallback included (standards §8i). A wait is
+ * a wait: the reader cannot tell an RSC payload from a query, so showing them
+ * two different appearances only prints a seam into the middle of the load.
  */
-export function CaseDocumentSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+export function CaseDocumentSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-9">
       {/* The header silhouette: kicker · name · citation · topic · outcome ·
           actions. */}
       <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        <Skeleton className={cn('h-3 w-48 rounded', bar)} />
-        <Skeleton className={cn('h-8 w-4/5 rounded-lg md:h-9', bar)} />
-        <Skeleton className={cn('h-3.5 w-2/5 rounded', bar)} />
-        <Skeleton className={cn('h-4 w-3/5 rounded', bar)} />
-        <Skeleton className={cn('h-6 w-28 rounded-full', bar)} />
+        <Skeleton className="h-3 w-48 rounded" />
+        <Skeleton className="h-8 w-4/5 rounded-lg md:h-9" />
+        <Skeleton className="h-3.5 w-2/5 rounded" />
+        <Skeleton className="h-4 w-3/5 rounded" />
+        <Skeleton className="h-6 w-28 rounded-full" />
         <div className="flex gap-2">
-          <Skeleton className={cn('h-9 w-24 rounded-full', bar)} />
-          <Skeleton className={cn('h-9 w-24 rounded-full', bar)} />
+          <Skeleton className="h-9 w-24 rounded-full" />
+          <Skeleton className="h-9 w-24 rounded-full" />
         </div>
       </div>
 
       {/* The principles silhouette: numeral gutter + two lines of law. */}
       <div className="flex flex-col gap-2">
-        <Skeleton className={cn('h-4 w-32 rounded', bar)} />
+        <Skeleton className="h-4 w-32 rounded" />
         <div className="flex gap-4">
-          <Skeleton className={cn('mt-1 h-3 w-6 shrink-0 rounded', bar)} />
+          <Skeleton className="mt-1 h-3 w-6 shrink-0 rounded" />
           <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className={cn('h-4 w-full rounded', bar)} />
-            <Skeleton className={cn('h-4 w-11/12 rounded', bar)} />
+            <Skeleton className="h-4 w-full rounded" />
+            <Skeleton className="h-4 w-11/12 rounded" />
           </div>
         </div>
       </div>
 
       <div className="flex flex-col gap-2">
-        <Skeleton className={cn('h-4 w-28 rounded', bar)} />
+        <Skeleton className="h-4 w-28 rounded" />
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, index) => (
             <Skeleton
               key={index}
-              className={cn('h-4 rounded', bar)}
+              className="h-4 rounded"
               style={{ width: `${[100, 97, 99, 92, 100, 68][index]}%` }}
             />
           ))}

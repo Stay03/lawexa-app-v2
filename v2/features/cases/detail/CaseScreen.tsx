@@ -312,7 +312,7 @@ export function CaseFallback() {
         Loading case
       </span>
       <div aria-hidden inert className={CASE_COLUMN}>
-        <CaseDocumentSkeleton still />
+        <CaseDocumentSkeleton />
       </div>
     </>
   );

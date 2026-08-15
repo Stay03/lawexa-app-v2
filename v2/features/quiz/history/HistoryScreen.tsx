@@ -176,10 +176,11 @@ function HistoryHeading() {
 
 /**
  * The history route's fallback (`app/v2/quiz/history/loading.tsx`) — the SAME
- * heading, rendered for real, over a STILL row skeleton. The heading waits on
+ * heading, rendered for real, over the row skeleton. The heading waits on
  * nothing, so skeletoning it would be a lie that also delays it; the rows do
- * wait, but this boundary covers an RSC payload while the query behind them is
- * often already warm, so they hold still rather than pulse.
+ * wait, and they pulse here exactly as they do in the live screen. This
+ * boundary covers an RSC payload rather than a query, but the reader cannot
+ * tell those apart, so the wait keeps one appearance throughout.
  */
 export function HistoryFallback() {
   return (
@@ -191,7 +192,7 @@ export function HistoryFallback() {
           DELETED when content arrives, so nothing in it may hold focus. */}
       <div aria-hidden inert className={LIST_COLUMN}>
         <HistoryHeading />
-        <SessionListSkeleton rows={6} still />
+        <SessionListSkeleton rows={6} />
       </div>
     </>
   );

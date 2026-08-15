@@ -175,30 +175,17 @@ export function HomeSectionRow({
  * section cap because that IS the real count here: unlike the old modules, a home
  * section never renders more than three, so reserving three cannot over-reserve.
  */
-export function HomeSectionSkeleton({
-  rows = HOME_SECTION_ROWS,
-  still = false,
-}: {
-  rows?: number;
-  /**
-   * Reserve the shape without the pulse. A pulse promises a request is in flight;
-   * the route fallback has none behind it (it waits on an RSC payload while the
-   * queries below it are often already warm), and pulsing over data we hold is
-   * what the standing corollary forbids.
-   */
-  still?: boolean;
-}) {
-  const bar = still ? 'animate-none' : undefined;
+export function HomeSectionSkeleton({ rows = HOME_SECTION_ROWS }: { rows?: number }) {
   return (
     <ul className="flex flex-col divide-y divide-border/60" aria-hidden>
       {Array.from({ length: rows }).map((_, index) => (
         <li key={index} className="flex min-h-11 items-center gap-3 px-2 py-2.5">
-          <Skeleton className={cn('size-4 shrink-0 rounded', bar)} />
+          <Skeleton className="size-4 shrink-0 rounded" />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Skeleton className={cn('h-3.5 w-1/2 rounded', bar)} />
-            <Skeleton className={cn('h-3 w-3/4 rounded', bar)} />
+            <Skeleton className="h-3.5 w-1/2 rounded" />
+            <Skeleton className="h-3 w-3/4 rounded" />
           </div>
-          <Skeleton className={cn('h-3 w-8 shrink-0 rounded', bar)} />
+          <Skeleton className="h-3 w-8 shrink-0 rounded" />
         </li>
       ))}
     </ul>

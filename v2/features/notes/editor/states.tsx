@@ -181,18 +181,19 @@ export function NoteEditorErrorState({ onRetry }: { onRetry: () => void }) {
  * The editor's resting silhouette — a title line and the first few lines of a
  * body, in the paper's own measure.
  *
- * `still` follows the house rule: a PULSE promises a request is in flight, and a
- * route-level fallback is waiting on an RSC payload, not on data. So
- * `loading.tsx` renders it still and an in-page pending query lets it pulse.
+ * It pulses wherever it is drawn, `loading.tsx` included (standards §8i). A
+ * wait is a wait: the reader cannot tell an RSC payload from a query, so two
+ * appearances for one wait would only print a seam into the middle of the load.
+ * These bars are plain divs rather than the `Skeleton` primitive, so the pulse
+ * is spelled out on each of them.
  */
-export function NoteEditorSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : 'motion-safe:animate-pulse';
+export function NoteEditorSkeleton() {
   return (
     // 24px between the title and the body — the same `mt-6` the real editor puts
     // between its title box and `EditorContent`, so the hand-off from fallback to
     // screen moves nothing.
     <div aria-hidden className="space-y-6">
-      <div className={cn('h-10 w-3/5 rounded-lg bg-secondary/60 sm:h-12', bar)} />
+      <div className="h-10 w-3/5 rounded-lg bg-secondary/60 motion-safe:animate-pulse sm:h-12" />
       <div className="space-y-3">
         {[
           'w-full',
@@ -205,7 +206,7 @@ export function NoteEditorSkeleton({ still = false }: { still?: boolean }) {
           <div
             key={index}
             style={{ opacity: Math.max(0.25, 1 - index * 0.13) }}
-            className={cn('h-4 rounded bg-secondary/50', width, bar)}
+            className={cn('h-4 rounded bg-secondary/50 motion-safe:animate-pulse', width)}
           />
         ))}
       </div>

@@ -47,9 +47,14 @@ export function CasesScreen() {
 }
 
 /**
- * Suspense fallback — the search field and view tabs as STILL RESERVED SHAPES
- * (they wait on no request), over the real list skeleton. Identical to
- * `app/v2/cases/loading.tsx`, which imports the same pieces.
+ * Suspense fallback — the search field and view tabs as reserved chrome shapes
+ * (furniture, not content placeholders), over the real list skeleton. Identical
+ * to `app/v2/cases/loading.tsx`, which imports the same pieces.
+ *
+ * The list skeleton pulses here exactly as it does inside the live screen
+ * (standards §8i). A wait is a wait: the reader cannot tell an RSC payload from
+ * a query, so giving the two waits different appearances only prints a seam
+ * into the middle of the load.
  */
 export function CasesFallback() {
   return (
@@ -65,7 +70,7 @@ export function CasesFallback() {
         <div className="mb-3 flex items-center">
           <div className="h-9 w-40 rounded-full bg-secondary/60" />
         </div>
-        <CasesListSkeleton still />
+        <CasesListSkeleton />
       </div>
     </>
   );

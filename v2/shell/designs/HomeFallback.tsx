@@ -107,7 +107,9 @@ import {
  *    on this route's server work: its text is built from the signed-in first name
  *    that `verifySession()` resolves. It reuses `HomeGreeting`'s own skeleton
  *    geometry so the hand-off is skeleton → identical skeleton → text.
- *  • THE SECTION STACK gets real headings over STILL `HomeSectionSkeleton` rows (a pulse promises a request; this boundary waits on an RSC payload, and the section queries beneath it are often already warm) —
+ *  • THE SECTION STACK gets real headings over pulsing `HomeSectionSkeleton`
+ *    rows. A wait wears one appearance wherever it is drawn, so this matches
+ *    what each module renders while its own query is pending —
  *    exactly what each module renders while its query is pending, so the fallback
  *    and the first mounted frame are the same picture.
  *
@@ -251,11 +253,11 @@ function TabFrame({ tab }: { tab: Exclude<HomeTab, 'chat'> }) {
           title="Recent conversations"
           action={{ href: '/conversations', label: 'All', prefetch: false }}
         >
-          <HomeSectionSkeleton still />
+          <HomeSectionSkeleton />
         </HomeSection>
         {tab === 'study' ? (
           <HomeSection title="Recently viewed">
-            <HomeSectionSkeleton still />
+            <HomeSectionSkeleton />
           </HomeSection>
         ) : null}
       </div>

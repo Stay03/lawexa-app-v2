@@ -81,14 +81,13 @@ export function LobbyFact({
 }
 
 /** The About region's reserved shape — four fact rows at their real height. */
-export function LobbyFactsSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+export function LobbyFactsSkeleton() {
   return (
     <div aria-hidden className="flex flex-col">
       {['w-16', 'w-20', 'w-14', 'w-24'].map((width) => (
         <div key={width} className="flex items-center justify-between gap-3 py-1.5">
-          <Skeleton className={cn('h-3 w-14 rounded', bar)} />
-          <Skeleton className={cn('h-3 rounded', width, bar)} />
+          <Skeleton className="h-3 w-14 rounded" />
+          <Skeleton className={cn('h-3 rounded', width)} />
         </div>
       ))}
     </div>
@@ -104,14 +103,7 @@ export function LobbyFactsSkeleton({ still = false }: { still?: boolean }) {
  * moved everything below it by about 170px — while the file's own docblock
  * promised nothing moves. One component, two callers, no way to drift.
  */
-export function LobbyPeopleSkeleton({
-  rows = 3,
-  still = false,
-}: {
-  rows?: number;
-  still?: boolean;
-}) {
-  const bar = still ? 'animate-none' : undefined;
+export function LobbyPeopleSkeleton({ rows = 3 }: { rows?: number }) {
   const widths = ['w-24', 'w-20', 'w-28', 'w-24', 'w-16'];
   return (
     <div aria-hidden className="flex flex-col">
@@ -121,12 +113,12 @@ export function LobbyPeopleSkeleton({
           className="flex items-center gap-2 py-1"
           style={{ opacity: Math.max(0.3, 1 - index * 0.2) }}
         >
-          <Skeleton className={cn('size-6 shrink-0 rounded-full', bar)} />
-          <Skeleton className={cn('h-3 rounded', width, bar)} />
+          <Skeleton className="size-6 shrink-0 rounded-full" />
+          <Skeleton className={cn('h-3 rounded', width)} />
         </div>
       ))}
       {/* The "See all" / "Manage people" button below the list. */}
-      <Skeleton className={cn('mt-1 h-8 w-32 rounded-md', bar)} />
+      <Skeleton className="mt-1 h-8 w-32 rounded-md" />
     </div>
   );
 }

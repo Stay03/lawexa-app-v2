@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { Lock, NotebookPen, WifiOff, type LucideIcon } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -30,21 +29,22 @@ export const NOTE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
  * The reader skeleton at the document's real geometry: breadcrumb, byline
  * kicker, title, action row, then a few paragraphs of body.
  *
- * `still` drops the pulse for a route fallback, where nothing is in flight
- * behind the shape (standards §8i: a pulse promises a request).
+ * It pulses everywhere it is drawn, the route fallback included (standards
+ * §8i). A wait is a wait: the reader cannot tell an RSC payload from a query,
+ * so two appearances for one wait would only print a seam into the middle of
+ * the load.
  */
-export function NoteDocumentSkeleton({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+export function NoteDocumentSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-8">
       {/* Header silhouette: back link · kicker · title · actions. */}
       <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        <Skeleton className={cn('h-3 w-16 rounded', bar)} />
-        <Skeleton className={cn('h-3 w-40 rounded', bar)} />
-        <Skeleton className={cn('h-8 w-3/4 rounded-lg md:h-9', bar)} />
+        <Skeleton className="h-3 w-16 rounded" />
+        <Skeleton className="h-3 w-40 rounded" />
+        <Skeleton className="h-8 w-3/4 rounded-lg md:h-9" />
         <div className="flex gap-2 pt-1">
-          <Skeleton className={cn('h-9 w-24 rounded-full', bar)} />
-          <Skeleton className={cn('h-9 w-28 rounded-full', bar)} />
+          <Skeleton className="h-9 w-24 rounded-full" />
+          <Skeleton className="h-9 w-28 rounded-full" />
         </div>
       </div>
 
@@ -56,7 +56,7 @@ export function NoteDocumentSkeleton({ still = false }: { still?: boolean }) {
             {[100, 96, 99, 62].map((width, line) => (
               <Skeleton
                 key={line}
-                className={cn('h-4 rounded', bar)}
+                className="h-4 rounded"
                 style={{ width: `${width}%` }}
               />
             ))}

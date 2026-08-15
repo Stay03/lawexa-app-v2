@@ -7,8 +7,10 @@ import { CachedChannelFrame } from '@/v2/features/channels/screen/CachedChannelF
  * ONE SILHOUETTE, NOT TWO: this draws the SAME `ChannelScreenFrame` the live
  * screen shows while its detail query resolves — the one header bar, the feed
  * column, the composer — imported from the feature's `states.tsx` so the two
- * can never drift. `still` (no pulse): a route boundary waits on an RSC
- * payload, not a query; the live screen's own pending render pulses.
+ * can never drift. It pulses here exactly as it does on the live screen
+ * (standards §8). A wait is a wait: the reader cannot tell an RSC payload from
+ * a query, so showing them two different appearances only prints a seam into
+ * the middle of the load.
  *
  * IT GOES THROUGH `CachedChannelFrame`, which fills the bar in from the row the
  * reader tapped when that row is still in the cache. The shape is identical
@@ -31,7 +33,7 @@ export default function Loading() {
         Loading this channel
       </span>
       <div aria-hidden inert className="h-full min-h-0">
-        <CachedChannelFrame still />
+        <CachedChannelFrame />
       </div>
     </>
   );

@@ -638,8 +638,10 @@ function Dot() {
 }
 
 /**
- * The route fallback — the folder page's own skeleton, held still, in the
- * shared column. `app/v2/folders/loading.tsx` (the SEGMENT boundary, which is
+ * The route fallback — the folder page's own skeleton, pulsing exactly as it
+ * does on the live screen (standards §8i), in the shared column. A wait is a
+ * wait: the reader cannot tell an RSC payload from a query, so one wait gets
+ * one appearance. `app/v2/folders/loading.tsx` (the SEGMENT boundary, which is
  * what covers every list → folder click) imports this component rather than
  * redrawing it, so the two can never drift. The `[uuid]` segment needs no
  * boundary of its own: the one above it is already this exact shape.
@@ -654,7 +656,7 @@ export function FolderDetailFallback() {
           DELETED, not reconciled, when content arrives — so anything focusable
           in here would lose focus and caret mid-interaction. */}
       <div aria-hidden inert className={LIST_COLUMN}>
-        <FolderDetailSkeleton still />
+        <FolderDetailSkeleton />
       </div>
     </>
   );

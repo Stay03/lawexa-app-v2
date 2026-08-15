@@ -34,8 +34,10 @@ import { Skeleton } from '@/components/ui/skeleton';
  * that entire bundle just to draw a grey pill.
  *
  * MOTION — bars use the shared `Skeleton` primitive rather than hand-rolled
- * `animate-pulse` divs, so they inherit the v2 reduced-motion rule in `shell.css`
- * and any future change to the primitive.
+ * `animate-pulse` divs, so they inherit its `motion-reduce:animate-none` guard
+ * (which applies on the first paint, before hydration) and any future change to
+ * the primitive. They pulse in every consumer, route boundary included: one
+ * appearance for a wait, whichever boundary draws it (standards section 8i).
  * =============================================================================
  */
 

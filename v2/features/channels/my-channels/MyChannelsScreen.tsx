@@ -237,12 +237,16 @@ export function MyChannelsScreen() {
 }
 
 /**
- * Route fallback — the toolbar as a STILL reserved shape over the real list
- * skeleton. `app/v2/channels/(index)/loading.tsx` renders this, so the
- * boundary and the live screen are one continuous shape. `aria-hidden` +
- * `inert`: a fallback is deleted rather than reconciled, so nothing focusable
- * may live in it. The lens strip and the search box are STATIC CHROME — they
- * wait on no request — so both are reserved without a pulse.
+ * Route fallback — the toolbar's reserved shape over the real list skeleton.
+ * `app/v2/channels/(index)/loading.tsx` renders this, so the boundary and the
+ * live screen are one continuous shape. `aria-hidden` + `inert`: a fallback is
+ * deleted rather than reconciled, so nothing focusable may live in it.
+ *
+ * The list skeleton pulses here exactly as it does on the live screen. Two
+ * appearances for one wait would show the reader a load that stops and starts
+ * again in the middle. The lens strip and the search box are not skeletons at
+ * all: they are chrome that waits on nothing, so they are drawn as the plain
+ * shapes they will become.
  */
 export function MyChannelsFallback() {
   return (
@@ -255,7 +259,7 @@ export function MyChannelsFallback() {
           <div className="h-9 w-48 self-start rounded-full bg-secondary/60" />
           <SearchFieldShape className="w-full sm:max-w-56" />
         </div>
-        <MyChannelsSkeleton still />
+        <MyChannelsSkeleton />
       </div>
     </>
   );

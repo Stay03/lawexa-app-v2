@@ -211,16 +211,15 @@ function ResumeAction({ session }: { session: QuizSession }) {
 }
 
 /**
- * The hero's PENDING shape. It is a genuine wait on a request (the
- * active-session answer), so it pulses — unlike the route fallback below, which
- * waits on an RSC payload and holds still.
+ * The hero's PENDING shape. It pulses in both of its callers: the live wait on
+ * the active-session answer, and the route fallback below. A wait is a wait,
+ * and a reader cannot tell an RSC payload from a query.
  */
-function HeroReservation({ still = false }: { still?: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+function HeroReservation() {
   return (
     <div aria-hidden className="space-y-2">
-      <Skeleton className={cn(HERO_ACTION, bar)} />
-      <Skeleton className={cn('h-3 w-64 max-w-full rounded', bar)} />
+      <Skeleton className={HERO_ACTION} />
+      <Skeleton className="h-3 w-64 max-w-full rounded" />
     </div>
   );
 }
@@ -309,8 +308,9 @@ function HubLink({
  * no request, so per standards §8i they render FOR REAL rather than as grey
  * bars. Only the two genuinely data-blocked regions — the hero (which is
  * waiting on the active-session answer) and the recent list — are reserved, and
- * they hold STILL here because this boundary covers an RSC payload while the
- * query behind them is frequently already warm.
+ * they pulse here exactly as they do in the live screen. The reader is waiting
+ * either way, so the wait keeps one appearance from the first frame to the
+ * last.
  */
 export function QuizHubFallback() {
   return (
@@ -333,7 +333,7 @@ export function QuizHubFallback() {
         </header>
 
         <div className="mt-6">
-          <HeroReservation still />
+          <HeroReservation />
         </div>
 
         <div className="mt-9">
@@ -342,7 +342,7 @@ export function QuizHubFallback() {
               Recent sessions
             </p>
           </div>
-          <SessionListSkeleton rows={3} still />
+          <SessionListSkeleton rows={3} />
         </div>
       </div>
     </>

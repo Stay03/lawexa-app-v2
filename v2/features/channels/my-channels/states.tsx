@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { Hash, MessagesSquare, SearchX } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
@@ -17,8 +16,9 @@ import type { MyChannelsLens } from './model';
  * have no channels" and "the network died" look identical):
  *
  *  - SKELETON at the row's real geometry — crest, title line, meta line,
- *    right-anchored trail — so nothing moves at the swap. `still` for the
- *    route fallback, which waits on a payload rather than a request.
+ *    right-anchored trail — so nothing moves at the swap. It pulses in the
+ *    route fallback as well as on the live screen: one wait, one appearance,
+ *    with no seam where the route hands over to the query.
  *  - EMPTY teaches where channels come from and offers the way there, with a
  *    ghost of the populated list above it so the reader sees the shape they
  *    are about to make.
@@ -28,18 +28,17 @@ import type { MyChannelsLens } from './model';
  */
 
 /** One skeleton row at `MyChannelRow`'s exact geometry. */
-function MyChannelRowSkeleton({ still }: { still: boolean }) {
-  const bar = still ? 'animate-none' : undefined;
+function MyChannelRowSkeleton() {
   return (
     <div className="flex items-start gap-3 px-2 py-3">
-      <CrestSkeleton size="md" still={still} className="mt-0.5" />
+      <CrestSkeleton size="md" className="mt-0.5" />
       <div className="min-w-0 flex-1 space-y-2">
         <div className="flex items-center gap-2">
-          <Skeleton className={cn('h-4 w-1/3 rounded', bar)} />
+          <Skeleton className="h-4 w-1/3 rounded" />
         </div>
-        <Skeleton className={cn('h-3 w-3/5 rounded', bar)} />
+        <Skeleton className="h-3 w-3/5 rounded" />
       </div>
-      <Skeleton className={cn('mt-1 h-3 w-8 shrink-0 rounded', bar)} />
+      <Skeleton className="mt-1 h-3 w-8 shrink-0 rounded" />
     </div>
   );
 }
@@ -54,7 +53,7 @@ function MyChannelRowSkeleton({ still }: { still: boolean }) {
  */
 const SKELETON_GROUPS: readonly number[] = [3, 3];
 
-export function MyChannelsSkeleton({ still = false }: { still?: boolean }) {
+export function MyChannelsSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-5">
       {SKELETON_GROUPS.map((rows, group) => {
@@ -67,7 +66,7 @@ export function MyChannelsSkeleton({ still = false }: { still?: boolean }) {
         return (
           <div key={group}>
             <div className="px-2 pb-1">
-              <Skeleton className={cn('h-3 w-16 rounded', still && 'animate-none')} />
+              <Skeleton className="h-3 w-16 rounded" />
             </div>
             <div className="flex flex-col">
               {Array.from({ length: rows }).map((_, index) => (
@@ -75,7 +74,7 @@ export function MyChannelsSkeleton({ still = false }: { still?: boolean }) {
                   key={index}
                   style={{ opacity: Math.max(0.25, 1 - (offset + index) * 0.14) }}
                 >
-                  <MyChannelRowSkeleton still={still} />
+                  <MyChannelRowSkeleton />
                 </div>
               ))}
             </div>
