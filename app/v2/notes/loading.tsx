@@ -1,24 +1,22 @@
+import { DestinationFallback } from '@/v2/runtime/destination-fallback';
 import { NoteFallback } from '@/v2/features/notes/reader/NoteScreen';
+import { NotesFallback } from '@/v2/features/notes/library/NotesScreen';
 
 /**
- * The `notes` SEGMENT boundary — the fallback for whatever child is being
- * navigated INTO under `/notes`, and that child is a NOTE (the library has its
- * own boundary inside the `(library)` route group).
+ * The `notes` SEGMENT boundary — it paints the shape of the DESTINATION.
  *
- * Same reasoning as `app/v2/cases/loading.tsx` and
- * `app/v2/statutes/loading.tsx`, which carry the full note: under the v2
- * rewrite proxy the client cannot prefetch parameterised routes, so this
- * boundary shows on EVERY list→note click for a full server round trip. It
- * must therefore be the READER's shape, so the reader sees document skeleton →
- * the note, and the hand-off moves nothing.
- *
- * THE AUTHORING ROUTES ARE THE ONE COMPROMISE, and it is the shallow one: this
- * also covers the first beat of `/notes/create` and `/notes/{slug}/edit` until
- * each of those segments' own `loading.tsx` arrives. A document silhouette
- * ahead of an editor is a near miss — same column, same title-then-body
- * shape — whereas making this boundary NEUTRAL to be safe would put a blank
- * beat ahead of every single note, which is the common path by a wide margin.
+ * Notes has a third kind of child, the authoring routes (`create`,
+ * `[slug]/edit`). They are deliberately NOT named as index paths: an editor is
+ * a document-shaped column, so the reader silhouette is a near miss rather than
+ * a wrong one, and each of them carries its own boundary underneath this.
+ * `destination-fallback.tsx` carries the full account.
  */
 export default function NotesSegmentLoading() {
-  return <NoteFallback />;
+  return (
+    <DestinationFallback
+      indexPaths={['/notes', '/v2/notes']}
+      index={<NotesFallback />}
+      document={<NoteFallback />}
+    />
+  );
 }

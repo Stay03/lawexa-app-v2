@@ -1,17 +1,20 @@
+import { DestinationFallback } from '@/v2/runtime/destination-fallback';
 import { StatuteFallback } from '@/v2/features/statutes/reader/StatuteScreen';
+import { StatutesFallback } from '@/v2/features/statutes/list/StatutesScreen';
 
 /**
- * The `statutes` SEGMENT boundary — the fallback for whatever child is being
- * navigated INTO under `/statutes`, and that child is always a STATUTE
- * (the list has its own boundary inside the `(library)` route group).
- *
- * Same reasoning as `app/v2/cases/loading.tsx`, which carries the full note:
- * under the v2 rewrite proxy the client cannot prefetch parameterised routes,
- * so this boundary shows on every list→statute click for a full server round
- * trip — it must therefore be the READER's shape, so the reader sees document
- * skeleton → document skeleton → the Act, and the hand-offs move nothing.
- * Do not "simplify" the two loading files back into one.
+ * The `statutes` SEGMENT boundary — it paints the shape of the DESTINATION.
+ * The `(library)` route group gives the list its own inner boundary without
+ * taking the list out of this one, so this file runs for both the list and the
+ * readers, and either shape chosen statically is wrong for the other half.
+ * `destination-fallback.tsx` carries the full account.
  */
 export default function StatutesSegmentLoading() {
-  return <StatuteFallback />;
+  return (
+    <DestinationFallback
+      indexPaths={['/statutes', '/v2/statutes']}
+      index={<StatutesFallback />}
+      document={<StatuteFallback />}
+    />
+  );
 }
