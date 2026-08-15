@@ -125,11 +125,16 @@ function DiscoverFrame({
 }) {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6">
-      <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
-        <Compass aria-hidden className="size-6 text-primary" />
+      {/* ONE TITLE PER SCREEN, AT EVERY WIDTH (phase 7). This route published
+          NOTHING to the shell's bar, so a phone met it with the hamburger, an
+          empty bar centre and no way back at all. "Find a space" is a fact about
+          the address, so the bar states it below `md:` and this heading is drawn
+          from `md:` up. It is stated at every width for assistive tech. */}
+      <h1 className="sr-only md:not-sr-only md:flex md:items-center md:gap-2 md:text-2xl md:font-semibold md:text-foreground">
+        <Compass aria-hidden className="hidden size-6 text-primary md:block" />
         Find a space
       </h1>
-      <p className="mt-1.5 text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground md:mt-1.5">
         Spaces anybody can find and join. Private ones never appear here.
       </p>
 

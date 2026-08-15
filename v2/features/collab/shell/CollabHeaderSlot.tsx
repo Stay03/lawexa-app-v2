@@ -4,13 +4,11 @@ import Link from 'next/link';
 import { useBackTo } from '@/v2/runtime/back-to';
 import { ChevronLeft, PanelLeft } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CrestSkeleton, SpaceCrest } from '@/v2/features/collab/kit/Crest';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
-  SPACE_DRAWER_TRIGGER_IDS,
+  SPACE_DRAWER_TRIGGER_ID,
   type CollabHeaderContext,
 } from './collab-header';
 
@@ -30,9 +28,10 @@ import {
  * breakpoints, not one, are what this slot has to answer:
  *
  *   < md    — no rail, no PlaceHeader extras. The header is the ONLY thing that
- *             can say where you are, so the centre carries the space crest, the
- *             channel name and the space name as a kicker, and the whole
- *             cluster is the button that opens the drawer.
+ *             can say where you are, so the centre carries the space crest and
+ *             the space's name. It is a TITLE and not a control (phase 7 — see
+ *             {@link CollabHeaderTitle}); the way into the channel list is the
+ *             lobby's own labelled "All channels" button.
  *   md–lg   — no rail, but PlaceHeader now names the channel and its space
  *             directly under this bar. Repeating the name here would print it
  *             twice on one screen, so the centre goes EMPTY and the only thing
@@ -80,8 +79,9 @@ export function CollabHeaderBack({ context }: { context: CollabHeaderContext }) 
 
 /**
  * The `md:`–`lg:` drawer toggle: a panel glyph in the left cluster, beside the
- * sidebar trigger whose idiom it borrows. Below `md:` the centre cluster is the
- * opener instead, and at `lg:` the rail is docked and neither exists.
+ * sidebar trigger whose idiom it borrows, and now the ONLY opener in this bar.
+ * Below `md:` the space lobby's own "All channels" button opens the drawer; at
+ * `lg:` the rail is docked and nothing needs opening at all.
  */
 export function CollabHeaderRailToggle({
   context,
@@ -90,7 +90,7 @@ export function CollabHeaderRailToggle({
 }) {
   return (
     <Button
-      id={SPACE_DRAWER_TRIGGER_IDS[1]}
+      id={SPACE_DRAWER_TRIGGER_ID}
       variant="ghost"
       size="icon"
       onClick={context.openRail}
@@ -106,15 +106,29 @@ export function CollabHeaderRailToggle({
   );
 }
 
-const CLUSTER =
-  'v2-interactive flex w-full min-w-0 items-center gap-2 rounded-lg px-1.5 py-1 transition-colors duration-150 hover:bg-secondary motion-reduce:transition-none';
+const CLUSTER = 'flex w-full min-w-0 items-center gap-2 px-1.5 py-1';
 
 /**
  * The header's centre payload, BELOW `md:` only — the crest, the channel name
- * and the space name under it, as one button that opens the channel list.
- * Fixed width per breakpoint, like the generic route context it replaces, so a
- * long channel name truncates instead of shoving the bell and the menu off the
- * bar.
+ * and the space name under it. Fixed width per breakpoint, like the generic
+ * route context it replaces, so a long name truncates instead of shoving the
+ * bell and the menu off the bar.
+ *
+ * ── IT IS A TITLE, NOT A DOOR (phase 7) ────────────────────────────────────
+ * The whole cluster used to be a BUTTON that opened the channel drawer. On
+ * `/spaces/{uuid}` that made the bar's own title the third navigation control
+ * in one row — hamburger at x12, back chevron at x64, and the title itself —
+ * which is the screen the owner filmed and called the worst in the product. A
+ * bar title says where you are; it does not take you somewhere.
+ *
+ * Nothing is lost by it, for two reasons. The space lobby's channel block
+ * carries a LABELLED "All channels" button (`lg:hidden`, `SpaceLobbyBlocks`),
+ * which is a better affordance than a crest that happens to be pressable
+ * because it says what it opens. And this slot ONLY EVER PAINTS ON A SPACE
+ * ADDRESS: it is `md:hidden`, and on `/channels/{uuid}` the whole shell bar is
+ * `max-md:hidden` because the channel screen wears its own (`screenOwnsPhoneBar`
+ * in `V2Header`) — so the two rules together left the button on no screen at
+ * all. It went with the second trigger id, which had nothing left to sit on.
  */
 export function CollabHeaderTitle({
   context,
@@ -129,15 +143,8 @@ export function CollabHeaderTitle({
 
   return (
     <div className="flex w-36 min-w-0 items-center min-[400px]:w-52 sm:w-64 md:hidden">
-      <button
-        id={SPACE_DRAWER_TRIGGER_IDS[0]}
-        type="button"
-        onClick={context.openRail}
-        aria-label={
-          spaceName ? `Channels in ${spaceName}` : 'Channels in this space'
-        }
-        className={cn(CLUSTER, FOCUS_RING)}
-      >
+      {/* No focus ring, no hover tint, no tab stop: it is not a control. */}
+      <span className={CLUSTER}>
         {spaceUuid !== null && spaceType !== null && spaceName !== null ? (
           <SpaceCrest
             uuid={spaceUuid}
@@ -162,7 +169,7 @@ export function CollabHeaderTitle({
             </span>
           ) : null}
         </span>
-      </button>
+      </span>
     </div>
   );
 }

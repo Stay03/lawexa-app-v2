@@ -22,9 +22,10 @@ export const STATUTE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8'
 export function StatuteDocumentSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-9">
-      {/* Header silhouette. */}
+      {/* Header silhouette. The "Statutes" back-link bar that opened this went
+          with the chip itself (phase 7): the way back is in the shell's bar,
+          which is already on screen while this shows. */}
       <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        <Skeleton className="h-3 w-20 rounded" />
         <Skeleton className="h-3 w-44 rounded" />
         <Skeleton className="h-8 w-3/4 rounded-lg md:h-9" />
         <Skeleton className="h-3.5 w-24 rounded" />

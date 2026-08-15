@@ -356,13 +356,23 @@ function CollabPlaceFrame({
    *
    * The label travels with the address, because "Back to the space" is simply
    * untrue once the address is a channel.
+   *
+   * IT WAS UNTRUE ON THE SPACE ROUTE TOO, and had been since this shipped. On
+   * `/spaces/{uuid}` there is no channel, so the address is `/spaces` — the
+   * LIST — and the chevron beside it still read "Back to the space", naming the
+   * place the reader was already standing in. Three addresses, three labels, and
+   * each one now says where it actually goes (owner, 15 August 2026).
    */
   const threadHref = channel === null ? null : threadParentHref(channel);
   const backHref =
     threadHref ??
     (channelUuid === null ? '/spaces' : `/spaces/${spaceUuid ?? ''}`);
   const backLabel =
-    threadHref === null ? 'Back to the space' : 'Back to the channel';
+    threadHref !== null
+      ? 'Back to the channel'
+      : channelUuid === null
+        ? 'Back to your spaces'
+        : 'Back to the space';
 
   /**
    * Which row the rail lights. A thread has no row of its own — `listChannels`

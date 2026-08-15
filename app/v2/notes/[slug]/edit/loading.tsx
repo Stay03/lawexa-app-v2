@@ -13,6 +13,10 @@ import {
  * §8i). The reader cannot tell this boundary's wait from the note query's wait,
  * so giving the two different appearances would only print a seam into the
  * middle of the load.
+ *
+ * THE RESERVED PILL IS ON THE RIGHT (phase 7): the row above the paper used to
+ * open with a "← Notes" chip and now holds only the save state and the note's
+ * own verbs, because the way back moved into the shell's bar.
  */
 export default function EditNoteLoading() {
   return (
@@ -21,7 +25,9 @@ export default function EditNoteLoading() {
         Loading the note editor
       </span>
       <div aria-hidden inert className={NOTE_PAPER_COLUMN}>
-        <div className="mb-6 h-9 w-24 rounded-full bg-secondary/60" />
+        <div className="mb-6 flex min-h-9 justify-end">
+          <div className="h-9 w-24 rounded-full bg-secondary/60" />
+        </div>
         <NoteEditorSkeleton />
       </div>
     </>

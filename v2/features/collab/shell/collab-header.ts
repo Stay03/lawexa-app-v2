@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import type { SpaceType } from '@/types/collab';
+import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 
 /**
  * collab-header — what the shell header shows while the reader is inside a
@@ -35,37 +36,41 @@ import type { SpaceType } from '@/types/collab';
  * Radix has no trigger to restore focus to on close — without help, focus lands
  * on `<body>` and keyboard and screen reader users lose their place.
  *
- * There are TWO openers because the header has to answer two different widths
- * with two different controls (see `CollabHeaderSlot`), and only one of them is
- * ever displayed. They therefore cannot share an id: duplicate ids are invalid,
- * and `getElementById` would hand back whichever came first in the document —
- * quite possibly the `display:none` one, whose `focus()` is a silent no-op.
+ * ── THERE USED TO BE TWO, AND ONE OF THEM WAS ON NO SCREEN ─────────────────
+ * The header carried a compact opener below `md:` (the crest cluster, which was
+ * a button) and a wide one from `md:` to `lg:`. The compact one was unreachable:
+ * it was `md:hidden`, and on `/channels/{uuid}` — the only address where a phone
+ * needs a drawer opener in this bar — the whole shell bar is `max-md:hidden`
+ * because the channel screen wears its own. On `/spaces/{uuid}` it made the
+ * bar's title a navigation control, which phase 7 removed. So one id remains,
+ * and it belongs to the `md:`–`lg:` panel toggle.
  *
- * The ids live in this dependency-free module so the header can carry them and
- * the sheet can find them without either importing the other.
+ * It lives in this dependency-free module so the header can carry it and the
+ * sheet can find it without either importing the other.
  */
-export const SPACE_DRAWER_TRIGGER_IDS = [
-  'v2-space-rail-trigger-compact',
-  'v2-space-rail-trigger-wide',
-] as const;
+export const SPACE_DRAWER_TRIGGER_ID = 'v2-space-rail-trigger-wide';
 
 /**
- * Focus whichever opener this width is actually showing.
+ * Focus the opener, when this width is showing one.
  *
  * `offsetParent === null` is the cheap, layout-accurate test for "hidden by a
- * `display:none` ancestor", which is exactly how the two variants are switched.
- * (It also reports null for `position: fixed`, which the header is not.) If
- * neither is on screen — the rail is docked, so no opener exists — focus is
- * left alone rather than thrown somewhere arbitrary.
+ * `display:none` ancestor", which is exactly how the toggle is switched. (It
+ * also reports null for `position: fixed`, which the header is not.)
+ *
+ * WHEN IT IS NOT ON SCREEN, focus goes to the shell's content region rather than
+ * being left to fall on `<body>`. Two real ways to get there: the rail is docked
+ * so no opener exists, or the reader is on a phone, where the drawer is opened
+ * by the lobby's own "All channels" button. Neither should cost a keyboard
+ * reader their place, and the content region is `tabIndex={-1}` for exactly
+ * this kind of hand-off.
  */
 export function focusSpaceDrawerTrigger(): void {
-  for (const id of SPACE_DRAWER_TRIGGER_IDS) {
-    const element = document.getElementById(id);
-    if (element !== null && element.offsetParent !== null) {
-      element.focus();
-      return;
-    }
+  const trigger = document.getElementById(SPACE_DRAWER_TRIGGER_ID);
+  if (trigger !== null && trigger.offsetParent !== null) {
+    trigger.focus();
+    return;
   }
+  document.getElementById(V2_SHELL_CONTENT_ID)?.focus();
 }
 
 export interface CollabHeaderContext {

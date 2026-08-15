@@ -1,12 +1,16 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
 import { useV2Session } from '@/v2/runtime/session-context';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
+import {
+  clearScreenContext,
+  setScreenContext,
+  type ScreenBack,
+} from '@/v2/shell/screen-context';
 import { notesQueries } from '../queries';
-import { noteDisplayTitle } from '../note-text';
 import { NoteDocument } from './NoteDocument';
 import {
   NOTE_COLUMN,
@@ -47,6 +51,7 @@ import {
  */
 export function NoteScreen({ slug }: { slug: string }) {
   const { signedIn, userId } = useV2Session();
+  const pathname = usePathname() ?? '';
 
   const query = useQuery({
     ...notesQueries.detail({ slug, viewerId: userId }),
@@ -54,16 +59,31 @@ export function NoteScreen({ slug }: { slug: string }) {
   });
   const note = query.data?.data ?? null;
 
-  // Publish the header centre title once it resolves, and clear it on the way
-  // out so the next route never inherits this note's name. An external-store
-  // write, not React state — which is what makes it legal inside an effect
-  // under the React Compiler lint.
-  const headerTitle = note ? noteDisplayTitle(note.title) : null;
+  /**
+   * THE BAR CARRIES NO TITLE HERE (phase 7): the note is a document and its
+   * masthead — author, updated, the name in the reading serif, the draft mark —
+   * is its title. What the bar DOES need from this screen is the way back,
+   * because the address cannot know it.
+   *
+   * THE WAY BACK KEEPS THE TAB (review F9). A reader who opened one of their
+   * own notes came from My notes, often from a list that exists nowhere else
+   * since a draft appears on no other surface, and returning them to All notes
+   * loses the place AND shows a stream their note is not in. Derived from
+   * OWNERSHIP against the server-verified session id, so it is stateless,
+   * correct on a cold deep link, and cannot go stale.
+   *
+   * `null` until the note lands, which leaves the route default (`/notes`)
+   * standing: a back control that works from the first frame and sharpens, never
+   * one that is missing while a request is in flight.
+   */
+  const own = note !== null && userId !== null && userId === note.user?.id;
   useEffect(() => {
-    if (!headerTitle) return;
-    setHeaderContext({ title: headerTitle, confidential: false });
-  }, [headerTitle]);
-  useEffect(() => () => clearHeaderContext(), []);
+    const back: ScreenBack | null = own
+      ? { href: '/notes?tab=mine', label: 'Back to your notes' }
+      : null;
+    setScreenContext({ pathname, back, actions: [] });
+  }, [pathname, own]);
+  useEffect(() => () => clearScreenContext(), []);
 
   if (!signedIn) {
     return (
@@ -116,13 +136,13 @@ export function NoteScreen({ slug }: { slug: string }) {
     );
   }
 
-  // OWNERSHIP, decided against the SERVER-VERIFIED session id — not against a
-  // client store, and not against the author's name. Not a security boundary
-  // either: the editor route and every save the API accepts have their own
-  // gates. It decides whether the Edit link is DRAWN, and a link that leads
-  // only to a refusal should not be.
-  const editHref =
-    userId !== null && userId === note.user?.id ? `/notes/${note.slug}/edit` : null;
+  // OWNERSHIP (`own`, above) is decided against the SERVER-VERIFIED session id —
+  // not against a client store, and not against the author's name. Not a
+  // security boundary either: the editor route and every save the API accepts
+  // have their own gates. It decides whether the Edit link is DRAWN, and a link
+  // that leads only to a refusal should not be. The same answer chooses the
+  // bar's way back, so the two can never disagree about whose note this is.
+  const editHref = own ? `/notes/${note.slug}/edit` : null;
 
   return (
     // `.v2-note-doc` scopes the reading typography (note-document.css).

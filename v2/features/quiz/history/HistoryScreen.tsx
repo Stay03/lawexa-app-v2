@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { History } from 'lucide-react';
@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { QuizSession } from '@/types/quiz';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
@@ -55,10 +54,14 @@ export function HistoryScreen() {
   const session = useV2Session();
   const { userId: viewerId } = session;
 
-  useEffect(() => {
-    setHeaderContext({ title: 'Quiz history', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
+  /**
+   * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7). "Quiz
+   * history" is a fact about the ADDRESS, stated once in
+   * `v2/shell/pushed-route.ts`, so the bar has it on the first frame rather than
+   * one effect later — and the heading below is drawn only from `md:` up, where
+   * the bar's title is hidden. It used to print in both places at once, 20px
+   * apart.
+   */
 
   // Never send a request the snapshot already knows will 403 — see the hub.
   const snapshotUnverified = needsEmailVerification(session);
@@ -143,7 +146,10 @@ function HistoryHeading() {
   return (
     <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+        {/* ONE TITLE PER SCREEN, AT EVERY WIDTH (phase 7) — see the note in
+            `HistoryScreen`. Stated for assistive tech at every width, drawn
+            only where the bar is not carrying it. */}
+        <h1 className="sr-only md:not-sr-only md:text-xl md:font-semibold md:tracking-tight md:text-foreground">
           Quiz history
         </h1>
         <p className="text-sm text-muted-foreground">

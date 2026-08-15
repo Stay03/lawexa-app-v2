@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, Clock, Target, TrendingUp } from 'lucide-react';
@@ -8,7 +7,6 @@ import { CheckCircle2, Clock, Target, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatSessionDate } from '@/lib/utils/quiz-format';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
@@ -54,10 +52,12 @@ export function StatsScreen() {
   const session = useV2Session();
   const { userId: viewerId } = session;
 
-  useEffect(() => {
-    setHeaderContext({ title: 'Your progress', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
+  /**
+   * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7). "Your
+   * progress" is a fact about the ADDRESS (`v2/shell/pushed-route.ts`), so the
+   * bar carries it on the first frame and in all five of the states below, and
+   * `StatsHeading` draws it only from `md:` up, where the bar's title is hidden.
+   */
 
   // Never send a request the snapshot already knows will 403 — see the hub.
   const snapshotUnverified = needsEmailVerification(session);

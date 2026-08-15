@@ -10,10 +10,8 @@ import {
   quietPushUrlParams,
   quietReplaceUrlParams,
 } from '@/v2/runtime/url-params';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { casesQueries } from '../queries';
-import { formatCaseName } from '../case-name';
 import { CaseAskDock } from './CaseAsk';
 import { useStartCaseChat, type CaseChatStart } from './CaseChatCore';
 import { CaseChatDocked, CaseChatSheet } from './CaseChatPanel';
@@ -163,21 +161,18 @@ function CaseBody({ slug }: { slug: string }) {
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
-  // The header centre gets the SHORT title (the July contract ships one —
-  // "Skye Bank Plc v Iwu") so a long multi-party name never truncates the bar.
-  const headerName = detail
-    ? formatCaseName(detail.short_title || detail.display_title || detail.title)
-    : null;
 
-  // Publish the header title once it resolves, and clear it on the way out so
-  // the next route never inherits this case's name. An external-store write, not
-  // React state — which is what makes it legal in an effect under the React
-  // Compiler lint.
-  useEffect(() => {
-    if (!headerName) return;
-    setHeaderContext({ title: headerName, confidential: false });
-  }, [headerName]);
-  useEffect(() => () => clearHeaderContext(), []);
+  /**
+   * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7).
+   *
+   * This screen used to put the SHORT title in the bar ("SPDC v Ereba") while
+   * the document below it was headed with the full one ("Spdc (nig.) Ltd v
+   * Ereba & Anor"): two names for one case, 69px apart, and the reader had no
+   * way to know they were the same. The document's masthead is the case's
+   * title — it carries the citation, the court, the date and the judges with it
+   * — so the bar carries none, and a pushed screen's bar is the back arrow and
+   * nothing else. See `PushedTitle` in `v2/shell/pushed-route.ts`.
+   */
 
   if (query.isPending) {
     return (

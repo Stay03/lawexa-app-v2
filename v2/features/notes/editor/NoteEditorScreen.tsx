@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useBackTo } from '@/v2/runtime/back-to';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor } from '@tiptap/react';
 import {
-  ArrowLeft,
   AtSign,
   BookOpen,
   ImagePlus,
@@ -27,7 +25,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { quietReplaceUrlPath } from '@/v2/runtime/url-params';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { NoteRecord } from '../types';
 import { NOTE_CONTENT_LIMIT, type NoteDraft } from './autosave-machine';
@@ -88,7 +85,6 @@ export function NoteEditorScreen({
   /** The note being edited, or `null` for a note that does not exist yet. */
   initialRecord: NoteRecord | null;
 }) {
-  const back = useBackTo('/notes?tab=mine');
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId: viewerId } = useV2Session();
@@ -298,13 +294,17 @@ export function NoteEditorScreen({
     element.style.height = `${element.scrollHeight}px`;
   }, []);
 
-  const headerTitle = record
-    ? record.title?.trim() || 'Untitled'
-    : 'New note';
-  useEffect(() => {
-    setHeaderContext({ title: headerTitle, confidential: false });
-  }, [headerTitle]);
-  useEffect(() => () => clearHeaderContext(), []);
+  /**
+   * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7).
+   *
+   * It used to publish the note's own name, which meant the bar was EMPTY for
+   * the whole of `EditNoteScreen`'s fetch (this component does not mount until
+   * the note lands) and then filled in. The bar now says what the ADDRESS knows
+   * — "Edit note" or "New note", from `v2/shell/pushed-route.ts` — so it is
+   * right on the first frame and in every state, including the wait and the
+   * refusals. The note's own name is in the title field an inch below, which is
+   * where the author is about to change it.
+   */
 
   // ── The restore offer ─────────────────────────────────────────────────────
   const mirrorLookup = useQuery(
@@ -362,18 +362,23 @@ export function NoteEditorScreen({
 
   return (
     <div className={NOTE_PAPER_COLUMN}>
-      <div className="mb-6 flex min-h-9 items-center justify-between gap-3">
-        <Link
-          {...back}
-          className={cn(
-            'v2-interactive -ml-2 inline-flex min-h-9 items-center gap-1.5 rounded-full px-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-            FOCUS_RING,
-          )}
-        >
-          <ArrowLeft aria-hidden className="size-4" />
-          Notes
-        </Link>
+      {/* THE SCREEN NAMES ITSELF, INVISIBLY. The bar prints "New note" or "Edit
+          note" for people who can see it, and a bar is not a heading: without
+          this the editor had no `h1` at all, so anyone navigating by headings
+          met a document that would not say what it was. Measured at 390px on
+          15 August 2026: zero `h1` elements on `/notes/create`.
 
+          It is NOT the note's title. The title is an editable field a few lines
+          below and it starts empty on a new note, so a heading built from it
+          would announce nothing on exactly the screen that needs naming most. */}
+      <h1 className="sr-only">{initialRecord === null ? 'New note' : 'Edit note'}</h1>
+
+      {/* The "← Notes" chip that opened this row has gone (phase 7): the shell's
+          bar carries the way back, and up out of the editor is the NOTE, not the
+          library. What is left is the writing status and the note's own verbs,
+          so the row is `justify-end` rather than a bar with one thing at each
+          edge. */}
+      <div className="mb-6 flex min-h-9 items-center justify-end gap-3">
         <div className="flex items-center gap-1.5">
           {/* THE ONE PIECE OF PERSISTENT DESKTOP CHROME, and only because the
               alternative is a dead end. Inserting an image or an `@case` puts

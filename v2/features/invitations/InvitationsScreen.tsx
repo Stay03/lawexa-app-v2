@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
@@ -8,7 +8,6 @@ import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { InvitationCard } from './InvitationCard';
 import {
@@ -93,10 +92,13 @@ export function InvitationsScreen() {
   /** The polite announcement after a successful accept. */
   const [announcement, setAnnouncement] = useState('');
 
-  useEffect(() => {
-    setHeaderContext({ title: 'Invitations', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
+  /**
+   * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7).
+   * "Invitations" is a fact about the ADDRESS, stated once in
+   * `v2/shell/pushed-route.ts` along with the way back this screen never had: it
+   * is reached from a notification or from the pending pill on `/spaces`, so it
+   * had the hamburger and no "up" at all.
+   */
 
   const organizationsQuery = useQuery({
     ...invitationsQueries.organizations({ viewerId }),
@@ -191,7 +193,17 @@ export function InvitationsScreen() {
       {/* No intro sentence. The header already says "Invitations", and every
           card below states in words who is asking and what for — a line of
           12px grey explaining the page to someone already reading it is the
-          chrome the redesign is removing. */}
+          chrome the redesign is removing.
+
+          THE HEADING IS STILL STATED, INVISIBLY. The bar carries the name of
+          this screen for people who can see it, and a bar is not a heading:
+          without this the document had no `h1` at all, so anyone navigating by
+          headings arrived at a page that would not say what it was. Measured
+          at 390px on 15 August 2026, before this line existed: zero `h1`
+          elements. `sr-only` rather than visible, because the bar already
+          prints it and printing it twice is the thing this pass removes. */}
+      <h1 className="sr-only">Invitations</h1>
+
 
       {/* The ONE live region for this surface: the loading state and the
           "joined" confirmation, both derived from render values so neither can

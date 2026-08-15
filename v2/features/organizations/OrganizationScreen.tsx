@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BadgeCheck,
@@ -40,7 +40,6 @@ import { collabAccessState } from '@/v2/features/collab/model';
 import { roleInRoster } from '@/v2/features/spaces/model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { OrganizationFormDialog } from './OrganizationFormDialog';
 import { OrganizationMembersSheet } from './OrganizationMembersSheet';
@@ -98,10 +97,14 @@ export function OrganizationScreen() {
    */
   const [justSubmittedVerification, setJustSubmittedVerification] = useState(false);
 
-  useEffect(() => {
-    setHeaderContext({ title: 'Organization', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
+  /**
+   * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7).
+   * "Organization" is a fact about the ADDRESS, stated once in
+   * `v2/shell/pushed-route.ts` along with the way back this screen never had.
+   * The ORGANIZATION'S OWN NAME stays in the page, where it is the first line of
+   * an identity block that carries its type, its verification badge, its email
+   * and where it is: a bar title would repeat the one fact and drop the rest.
+   */
 
   const organizationQuery = useQuery({
     ...organizationsQueries.mine({ viewerId }),

@@ -1,11 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { useBackTo } from '@/v2/runtime/back-to';
-import { ArrowLeft } from 'lucide-react';
-
 import { cn } from '@/lib/utils';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { NoteRecord } from '../types';
 import { formatNoteDate, noteDisplayTitle, noteHasTitle } from '../note-text';
 import { NoteActions } from './NoteActions';
@@ -20,7 +15,6 @@ import './note-document.css';
  *
  * ── THE HEADING BLOCK CARRIES IDENTITY ONLY, EACH FACT ONCE ─────────────────
  *
- *   back link   ← Notes
  *   kicker      author · updated {date} — provenance before the name, the
  *               same order the case and statute headers use
  *   title       the note's name, or "Untitled" in a quieter ink
@@ -59,32 +53,17 @@ export function NoteDocument({
   const body = note.content?.trim() ?? '';
   const isOwn = editHref !== null;
   const isOwnDraft = isOwn && note.status !== 'published';
-  // THE WAY BACK KEEPS THE TAB (review F9). A reader who opened one of their
-  // own notes came from My notes — often from a list that only exists there,
-  // since a draft appears on no other surface — and returning them to All
-  // notes loses the place AND shows a stream their note is not in. Derived
-  // from OWNERSHIP, which this component is already given, rather than from a
-  // referrer or a remembered tab: stateless, correct on a cold deep link, and
-  // it cannot go stale.
-  const backHref = isOwn ? '/notes?tab=mine' : '/notes';
-  const back = useBackTo(backHref);
+
+  // THE WAY BACK LEFT THIS BLOCK (phase 7). It was an "← Notes" chip at y76
+  // under a bar that already showed this note's name and the hamburger. The
+  // shell's bar owns it now, and it still KEEPS THE TAB (review F9): `NoteScreen`
+  // publishes `/notes?tab=mine` for a note the reader owns, because a draft
+  // appears on no other stream. That override lives with the ownership test that
+  // decides it, one level up, rather than being re-derived here.
 
   return (
     <article className="flex flex-col gap-8">
       <header className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        <p>
-          <Link
-            {...back}
-            className={cn(
-              'v2-interactive inline-flex min-h-8 items-center gap-1.5 rounded-full pr-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
-              FOCUS_RING,
-            )}
-          >
-            <ArrowLeft aria-hidden className="size-3.5" />
-            Notes
-          </Link>
-        </p>
-
         {author || updated ? (
           <p className="doc-kicker flex flex-wrap items-center gap-x-2 gap-y-1">
             {author ? <span>{author}</span> : null}

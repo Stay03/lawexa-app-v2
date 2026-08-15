@@ -1,21 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { useBackTo } from '@/v2/runtime/back-to';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowUpRight, CheckCircle2, Hourglass } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Hourglass } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { IBlockedReason } from '@/types/message-pack';
 import type { CreateRadarPayload, Radar } from '@/types/radar';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   RadarsGuestState,
   RadarsSignedOutState,
@@ -40,7 +36,6 @@ import { useCreateRadar } from './use-create-radar';
  *     mutation) — the study's honest-error rule.
  */
 export function CreateRadarScreen() {
-  const back = useBackTo('/radars');
   const { signedIn, role } = useV2Session();
   const router = useRouter();
   const createRadar = useCreateRadar();
@@ -49,10 +44,13 @@ export function CreateRadarScreen() {
     reason: IBlockedReason;
   } | null>(null);
 
-  useEffect(() => {
-    setHeaderContext({ title: 'New radar', confidential: false });
-    return () => clearHeaderContext();
-  }, []);
+  /**
+   * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7). "New
+   * radar" is a fact about the ADDRESS, so `v2/shell/pushed-route.ts` states it
+   * once and the bar has it on the first frame, in every state including the
+   * two refusals below. The "Back to radars" chip that opened the page has gone
+   * with it: the bar carries the way back.
+   */
 
   const handleSubmit = (
     payload: CreateRadarPayload,
@@ -100,19 +98,13 @@ export function CreateRadarScreen() {
   return (
     <div className={LIST_COLUMN}>
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-        <Link
-          {...back}
-          className={cn(
-            'v2-interactive -ml-2 inline-flex min-h-9 w-fit items-center gap-1.5 rounded-full px-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-            FOCUS_RING,
-          )}
-        >
-          <ArrowLeft aria-hidden className="size-4" />
-          Back to radars
-        </Link>
-
-        <header className="mb-6 mt-4 space-y-1">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+        {/* ONE TITLE PER SCREEN, AT EVERY WIDTH (phase 7): the shell's bar says
+            "New radar" below `md:`, so the heading is stated for assistive tech
+            and drawn only from `md:` up, where the bar's title is hidden. The
+            sentence under it stays at every width — it is the instruction, not
+            a second title. */}
+        <header className="mb-6 space-y-1 md:mt-4">
+          <h1 className="sr-only md:not-sr-only md:text-xl md:font-semibold md:tracking-tight md:text-foreground">
             New radar
           </h1>
           <p className="max-w-prose text-sm text-muted-foreground">

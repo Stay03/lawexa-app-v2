@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { FlaskConical, LogOut, Moon, MoreVertical, Sun, SunMoon } from 'lucide-react';
 
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -16,6 +18,7 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useMounted } from './use-mounted';
+import { useScreenActions } from './screen-context';
 
 /**
  * V2HeaderMenu — the header's right-cluster overflow menu (owner #28). The theme
@@ -44,6 +47,20 @@ import { useMounted } from './use-mounted';
  * miss the row. `/settings/developer` still lives in v1, so this is a genuine
  * cross-experience link — a real `<Link>`/anchor, so it is middle-clickable and
  * copyable rather than a JS-only jump.
+ *
+ * ── THE SCREEN'S OWN ROWS COME FIRST (phase 7) ─────────────────────────────
+ * A screen used to grow its own kebab in the page body under a bar that already
+ * had one: `/folders/{uuid}` at y124, `/spaces/{uuid}` at y183. Two identical
+ * glyphs, two different menus, and no way to tell from the outside which held
+ * Delete. The screen now publishes its rows (`screen-context.ts`) and they open
+ * at the HEAD of this menu, above a separator, so there is one overflow in the
+ * bar and one place to look. It is the same fold `PlaceHeader` already does with
+ * a channel's lenses on a phone.
+ *
+ * They lead rather than trail because they are what the reader came for; Theme
+ * and "Switch to classic Lawexa" are app furniture and belong under the rule.
+ * The rows are guarded by the pathname they were published for, so a menu
+ * opened a frame into a new screen can never run the last screen's Delete.
  */
 export function V2HeaderMenu() {
   const mounted = useMounted();
@@ -51,6 +68,7 @@ export function V2HeaderMenu() {
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const showDeveloper = canAccessV2Preview(role);
+  const screenActions = useScreenActions(usePathname() ?? '');
 
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
 
@@ -67,6 +85,25 @@ export function V2HeaderMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="w-56">
+        {screenActions.length > 0 ? (
+          // The separator rides the GROUP, not the last row, so a screen with
+          // no actions never opens this menu on a rule with nothing above it.
+          <DropdownMenuGroup>
+            {screenActions.map((action) => (
+              <DropdownMenuItem
+                key={action.id}
+                className="min-h-11 md:min-h-8"
+                variant={action.destructive ? 'destructive' : 'default'}
+                onSelect={action.onSelect}
+              >
+                <action.icon aria-hidden className="size-4" />
+                <span>{action.label}</span>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+          </DropdownMenuGroup>
+        ) : null}
+
         <DropdownMenuItem
           // 44px touch rows on mobile (a11y floor); default density on desktop.
           className="min-h-11 md:min-h-8"

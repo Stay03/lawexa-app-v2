@@ -120,14 +120,19 @@ export function FolderNextPageSkeleton() {
 export function FolderDetailSkeleton() {
   return (
     <div aria-hidden className="flex flex-col">
-      <Skeleton className="h-4 w-40 rounded" />
-      <div className="mt-4 flex items-start gap-3">
+      {/* THE SILHOUETTE FOLLOWS THE LIVE HEADER, WHICH LOST TWO THINGS ON A
+          PHONE (phase 7): the trail is `sm:` and up (the shell's bar carries the
+          way back below it), the name is `md:` and up (the bar carries it), and
+          the kebab has gone entirely — Rename and Delete are published to the
+          bar's one menu. Reserving any of the three here would have left the
+          rows below them jumping at the hand-off. */}
+      <Skeleton className="hidden h-4 w-40 rounded sm:block" />
+      <div className="flex items-start gap-3 sm:mt-4">
         <Skeleton className="size-11 shrink-0 rounded-xl" />
         <div className="min-w-0 flex-1 space-y-2 pt-0.5">
-          <Skeleton className="h-6 w-3/5 rounded" />
+          <Skeleton className="hidden h-6 w-3/5 rounded md:block" />
           <Skeleton className="h-3.5 w-40 rounded" />
         </div>
-        <Skeleton className="size-9 shrink-0 rounded-full" />
       </div>
       <div className="mt-6 border-t border-border/60 pt-2">
         <FolderStreamSkeleton />

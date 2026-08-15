@@ -37,9 +37,10 @@ export const NOTE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
 export function NoteDocumentSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-8">
-      {/* Header silhouette: back link · kicker · title · actions. */}
+      {/* Header silhouette: kicker · title · actions. The back-link bar that
+          opened this went with the chip itself (phase 7) — the way back is in
+          the shell's bar now, which is already painted while this shows. */}
       <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        <Skeleton className="h-3 w-16 rounded" />
         <Skeleton className="h-3 w-40 rounded" />
         <Skeleton className="h-8 w-3/4 rounded-lg md:h-9" />
         <div className="flex gap-2 pt-1">

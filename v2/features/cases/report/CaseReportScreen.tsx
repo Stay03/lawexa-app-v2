@@ -1,14 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
-import { useBackTo } from '@/v2/runtime/back-to';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { extractViewLimitError } from '@/lib/utils/api-error';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
@@ -38,18 +34,20 @@ import '../detail/case-document.css';
  * summary's, so the same paragraph rendered differently on the two pages.
  */
 export function CaseReportScreen({ slug }: { slug: string }) {
-  const back = useBackTo(`/cases/${slug}`);
   const query = useQuery(casesQueries.report(slug));
   const detail = query.data?.data ?? null;
   const report = detail?.full_report ?? null;
   const rawTitle = detail ? detail.display_title || detail.title : null;
   const title = rawTitle ? formatCaseName(rawTitle) : null;
 
-  useEffect(() => {
-    if (!title) return;
-    setHeaderContext({ title, confidential: false });
-  }, [title]);
-  useEffect(() => () => clearHeaderContext(), []);
+  /**
+   * THE WAY BACK IS THE BAR'S, NOT THE PAGE'S (phase 7). This screen carried a
+   * "Back to the case" chip at y76 under a bar that showed the same title
+   * again: two titles and, with the drawer, three ways out. The shell's bar now
+   * owns the back arrow (`/cases/{slug}` is one hop up from
+   * `/cases/{slug}/report`, so the address alone knows it) and the judgment's
+   * own masthead owns the title. Nothing is published to the header from here.
+   */
 
   if (query.isPending) {
     return (
@@ -86,17 +84,6 @@ export function CaseReportScreen({ slug }: { slug: string }) {
   return (
     <div className={CASE_COLUMN}>
       <div className="v2-case-doc flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-        <Link
-          {...back}
-          className={cn(
-            'v2-interactive inline-flex min-h-9 w-fit items-center gap-1.5 rounded-full px-2 -ml-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-            FOCUS_RING,
-          )}
-        >
-          <ArrowLeft aria-hidden className="size-4" />
-          Back to the case
-        </Link>
-
         <article className="flex flex-col gap-8">
           <header className="flex flex-col gap-2">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

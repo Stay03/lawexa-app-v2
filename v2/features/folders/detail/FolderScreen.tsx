@@ -1,9 +1,9 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,12 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
+import {
+  clearScreenContext,
+  setScreenContext,
+  type ScreenAction,
+  type ScreenBack,
+} from '@/v2/shell/screen-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
@@ -29,9 +35,12 @@ import {
   type FolderItemRowModel,
 } from '../item-row-model';
 import { folderItemKey, usePendingFolderItemRemovals } from '../item-mutations';
-import { useHiddenFolderUuids } from '../folder-mutations';
+import {
+  useDeleteFolderWithUndo,
+  useHiddenFolderUuids,
+  type DeletableFolder,
+} from '../folder-mutations';
 import { FolderPublicMark, FolderTile } from '../folder-bits';
-import { FolderActionsMenu } from '../FolderActionsMenu';
 import { FolderNameDialog } from '../FolderNameDialog';
 import { FolderRow } from '../list/FolderRow';
 import { FoldersSignedOutState } from '../list/states';
@@ -100,6 +109,7 @@ import {
 /** Stable empty references — a fresh `[]` per render would churn the memos. */
 const NO_ITEM_ROWS: readonly FolderItemRowModel[] = [];
 const NO_FOLDER_ROWS: readonly FolderRowModel[] = [];
+const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
 
 const PANEL_ID = 'folder-contents-panel';
 
@@ -114,6 +124,7 @@ export function FolderScreen({ uuid }: { uuid: string }) {
 function FolderBody({ uuid }: { uuid: string }) {
   const { signedIn, userId: viewerId } = useV2Session();
   const router = useRouter();
+  const pathname = usePathname() ?? '';
   const searchParams = useSearchParams();
 
   // Quiet-URL state — initialised from the URL once, then locally owned.
@@ -266,13 +277,85 @@ function FolderBody({ uuid }: { uuid: string }) {
   // Publish the folder's name to the header centre once it is known — through
   // the ROW MODEL, so a folder saved with a blank name reads "Untitled folder"
   // in the header exactly as it does in the h1, instead of leaving the header
-  // empty (L6). `folderRow` is pure, so calling it here costs nothing.
-  const headerTitle = folder ? folderRow(folder).name : null;
+  // empty (L6). `folderRow` is pure, so memoising it here costs one object.
+  const headerRow = useMemo(() => (folder ? folderRow(folder) : null), [folder]);
+  const headerTitle = headerRow?.name ?? null;
   useEffect(() => {
     if (!headerTitle) return;
     setHeaderContext({ title: headerTitle, confidential: false });
   }, [headerTitle]);
   useEffect(() => () => clearHeaderContext(), []);
+
+  /**
+   * ── THE FOLDER'S OWN CONTROLS LIVE IN THE BAR NOW (phase 7) ───────────────
+   *
+   * This page carried a kebab at y124, in its header block, under a shell bar
+   * that already had one at the top right: two identical glyphs, two different
+   * menus, and nothing on the outside to say which held Delete. Rename and
+   * Delete are published to the bar's single overflow instead
+   * (`v2/shell/screen-context.ts`).
+   *
+   * DELETE STILL CANNOT SHIP WITHOUT ITS UNDO. `FolderActionsMenu` used to own
+   * that guarantee by owning the press; the guarantee actually lives in
+   * `useDeleteFolderWithUndo`, which is what is called here — the undo window
+   * opens BEFORE the request, so nothing has been sent while it is open. The
+   * list row keeps the menu component unchanged; only this page folds.
+   *
+   * THE WAY BACK IS PUBLISHED WITH THEM, because a nested folder's parent is a
+   * fact about the payload and not about the address. `null` until the folder
+   * lands, which leaves the route default (`/folders`) standing rather than
+   * leaving the reader with no way up during the fetch.
+   */
+  const parentFolder = folder?.parent ?? null;
+  const back = useMemo<ScreenBack | null>(
+    () =>
+      parentFolder
+        ? {
+            href: folderHref(parentFolder.uuid),
+            label: `Back to ${parentFolder.name}`,
+          }
+        : null,
+    [parentFolder],
+  );
+  const deleteFolder = useDeleteFolderWithUndo();
+  const actions = useMemo<readonly ScreenAction[]>(() => {
+    if (!folder || !headerRow) return NO_SCREEN_ACTIONS;
+    const target: DeletableFolder = {
+      uuid: folder.uuid,
+      name: headerRow.name,
+      itemsCount: folder.items_count,
+      childrenCount: folder.children_count,
+    };
+    // The dialog opens on the REAL name, so a folder saved blank offers an
+    // empty field to type into rather than the words "Untitled folder".
+    const editableName = headerRow.hasName ? headerRow.name : '';
+    return [
+      {
+        id: 'rename',
+        label: 'Rename',
+        icon: Pencil,
+        onSelect: () =>
+          setRenameTarget({ uuid: target.uuid, name: editableName }),
+      },
+      {
+        id: 'delete',
+        label: 'Delete folder',
+        icon: Trash2,
+        destructive: true,
+        onSelect: () => {
+          deleteFolder(target);
+          // The route is about to stop existing, so go up one level — to the
+          // parent when there is one, otherwise to the library.
+          router.push(parentFolder ? folderHref(parentFolder.uuid) : '/folders');
+        },
+      },
+    ];
+  }, [folder, headerRow, parentFolder, deleteFolder, router]);
+
+  useEffect(() => {
+    setScreenContext({ pathname, back, actions });
+  }, [pathname, back, actions]);
+  useEffect(() => () => clearScreenContext(), []);
 
   if (!signedIn) {
     return (
@@ -326,7 +409,6 @@ function FolderBody({ uuid }: { uuid: string }) {
   }
 
   const row = folderRow(folder);
-  const parent = folder.parent ?? null;
   const trail = formatRelativeTime(row.trailAt, now);
   const showTabs = typesPresent.size > 1 || tab !== 'all';
   const showSubfolders = tab === 'all';
@@ -382,13 +464,24 @@ function FolderBody({ uuid }: { uuid: string }) {
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         <FolderBreadcrumb folder={folder} />
 
-        <header className="mt-3 flex items-start gap-3 border-b border-border/60 pb-5">
+        {/* `sm:mt-3` — below `sm:` the trail above renders nothing (the shell's
+            bar carries the way back), so the header starts at the top rather
+            than under a gap where a crumb used to be. */}
+        <header className="flex items-start gap-3 border-b border-border/60 pb-5 sm:mt-3">
           <FolderTile tint={row.tint} size="header" />
 
           <div className="min-w-0 flex-1">
+            {/* ONE TITLE PER SCREEN, AT EVERY WIDTH (phase 7). Below `md:` the
+                shell's bar prints the folder's name, so printing it again here
+                would be the same word twice, an inch apart. The heading is
+                still stated — a document whose only `h1` changed with the
+                viewport would be a different document at every width — it is
+                simply not drawn at the width where the bar has it. From `md:`
+                up the bar's title is `display:none` and this is the only one.
+                Same contract the channel screen already runs on. */}
             <h1
               className={cn(
-                'text-xl font-semibold tracking-tight',
+                'sr-only md:not-sr-only md:text-xl md:font-semibold md:tracking-tight',
                 row.hasName ? 'text-foreground' : 'italic text-muted-foreground',
               )}
             >
@@ -429,25 +522,8 @@ function FolderBody({ uuid }: { uuid: string }) {
             ) : null}
           </div>
 
-          <FolderActionsMenu
-            folder={{
-              uuid: folder.uuid,
-              name: row.name,
-              itemsCount: folder.items_count,
-              childrenCount: folder.children_count,
-            }}
-            onRename={() =>
-              setRenameTarget({
-                uuid: folder.uuid,
-                name: row.hasName ? row.name : '',
-              })
-            }
-            // The route is about to stop existing, so go up one level — to the
-            // parent when there is one, otherwise to the library.
-            onDeleted={() =>
-              router.push(parent ? folderHref(parent.uuid) : '/folders')
-            }
-          />
+          {/* The header's own kebab has gone: Rename and Delete are published to
+              the bar's single overflow menu (see the `actions` memo above). */}
         </header>
 
         <div className="mt-4 flex items-center justify-between gap-3">

@@ -126,20 +126,28 @@ export function SpaceScreenFrame({
           {identity ? (
             <div className="min-w-0 flex-1">
               <MetaLine lead={[identity.typeLabel, identity.ownerLabel]} />
-              <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-semibold tracking-tight text-foreground">
-                <span className="min-w-0 truncate">{identity.name}</span>
+              {/* The live header's heading rule, exactly (phase 7): the shell's
+                  bar carries the name below `md:`, so it is stated for assistive
+                  tech and drawn only from `md:` up. If these two drift, the
+                  boundary moves the lobby when it hands over. */}
+              <h1 className="sr-only md:not-sr-only md:mt-1 md:flex md:min-w-0 md:items-center md:gap-2 md:text-2xl md:font-semibold md:tracking-tight md:text-foreground">
+                <span className="min-w-0 md:truncate">{identity.name}</span>
                 {identity.isPrivate ? (
-                  <Lock
-                    aria-label="Private space"
-                    className="size-4 shrink-0 text-muted-foreground"
-                  />
+                  <>
+                    <Lock
+                      aria-hidden
+                      className="hidden size-4 shrink-0 text-muted-foreground md:block"
+                    />
+                    <span className="sr-only">Private space</span>
+                  </>
                 ) : null}
               </h1>
             </div>
           ) : (
             <div className="min-w-0 flex-1 space-y-2.5">
               <Skeleton className="h-3 w-40 rounded" />
-              <Skeleton className="h-7 w-2/5 rounded" />
+              {/* No title bar below `md:`: there is no title there to reserve. */}
+              <Skeleton className="hidden h-7 w-2/5 rounded md:block" />
             </div>
           )}
         </div>

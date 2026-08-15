@@ -1,13 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, Menu, ShieldCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import type { SessionUser } from '@/v2/runtime/session';
+import { useBackTo } from '@/v2/runtime/back-to';
 import {
   useCollabHeader,
   type CollabHeaderContext,
@@ -24,6 +26,8 @@ import { V2HeaderMenu } from './V2HeaderMenu';
 import { HomeTabs } from './HomeTabs';
 import { homeTabForPath } from './home-tabs';
 import { useHeaderContext } from './header-context';
+import { pushedScreenFor, type PushedScreen } from './pushed-route';
+import { useScreenContext } from './screen-context';
 
 /**
  * V2Header — the top bar, deliberately UNCROWDED (a binding owner decision).
@@ -70,6 +74,28 @@ import { useHeaderContext } from './header-context';
  *
  * Visibility is CSS-driven (`md:` variants), not `useIsMobile()`, so the correct
  * bar paints before hydration with no flash.
+ *
+ * ── A SCREEN YOU PUSHED INTO WEARS A DIFFERENT BAR (phase 7) ───────────────
+ * The owner's rule, taken from the Claude and ChatGPT phone apps: a top-level
+ * screen has the hamburger and puts its title in the PAGE; a screen you pushed
+ * into has a BACK ARROW and puts its title in the BAR. Never both controls,
+ * never both titles.
+ *
+ * Which one this is comes from `pushed-route.ts`, off the pathname, for the
+ * same reason `screenOwnsPhoneBar` does: a published signal answers a paint
+ * late, and the reader sees the hamburger swap to a chevron and the title jump
+ * from the page into the bar. So on a pushed screen:
+ *
+ *   - the hamburger is GONE (there is one way out of a pushed screen, and it is
+ *     back), replaced in the same slot by the back control;
+ *   - the LogoMark is gone with it: the phone needs an "up" more than a second
+ *     brand mark, which is the trade the collab routes already made;
+ *   - the centre carries the screen's title BELOW `md:` only, and the page
+ *     carries it from `md:` up, so exactly one title is on screen at any width.
+ *
+ * A DOCUMENT screen (a case, a statute, a note) is the deliberate exception:
+ * its masthead is the document's own first page, so the page keeps the title at
+ * every width and the bar carries none. See `PushedTitle` in `pushed-route.ts`.
  */
 export function V2Header({ user }: { user: SessionUser | null }) {
   const { setOpenMobile, state } = useSidebar();
@@ -96,7 +122,10 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   const path = pathname ?? '';
   const isConversation = path.startsWith('/c/');
   const isCase = /^\/cases\/[^/]/.test(path);
-  const expectsContext = isConversation || isCase;
+  // A case no longer publishes a bar title at all (its masthead is its title —
+  // see `pushed-route.ts`), so the only route left that expects one is a
+  // conversation. A pushed screen answers this question for itself below.
+  const expectsContext = isConversation;
   /**
    * ONE BAR ON A PHONE, DECIDED BY THE ADDRESS AND NOTHING ELSE.
    *
@@ -116,7 +145,21 @@ export function V2Header({ user }: { user: SessionUser | null }) {
    * screen must paint a bar in EVERY state it can be in, refusals included,
    * because this one is no longer there to fall back on.
    */
-  const screenOwnsPhoneBar = parseCollabRoute(path).kind === 'channel';
+  const collabRoute = parseCollabRoute(path);
+  const screenOwnsPhoneBar = collabRoute.kind === 'channel';
+  /**
+   * IS THIS A SCREEN THE READER PUSHED INTO? Off the address, never a publish
+   * (see the docblock). The collab routes are pushed too, and answer it from
+   * the same place — the route, not the context, so the hamburger never paints
+   * on `/spaces/{uuid}` before the crest arrives.
+   */
+  const pushed = pushedScreenFor(path);
+  const isPushed = pushed !== null || collabRoute.kind !== 'none';
+  // The two things a pushed screen's ADDRESS cannot know: a data-derived parent
+  // and the screen's own menu rows. Guarded by the pathname it was published
+  // for, so nothing here can outlive its screen.
+  const screen = useScreenContext(path);
+  const back = screen?.back ?? null;
   // Quiet orientation label for the left cluster — a category, NOT the title.
   const leftLabel = isHome
     ? 'Home'
@@ -142,22 +185,43 @@ export function V2Header({ user }: { user: SessionUser | null }) {
     >
       {/* LEFT cluster. */}
       <div className="flex min-w-0 items-center gap-2">
-        {/* Mobile: hamburger opens the drawer. The id is the focus-restore target
-            for V2Drawer's onCloseAutoFocus (no SheetTrigger exists). */}
-        <Button
-          id="v2-nav-trigger"
-          variant="ghost"
-          size="icon"
-          className="size-11 shrink-0 rounded-full md:hidden"
-          aria-label="Open menu"
-          onClick={() => setOpenMobile(true)}
-        >
-          <Menu className="size-5" />
-        </Button>
-        {/* Inside a space the phone needs an "up" more than it needs a second
-            brand mark — the crest in the centre already names where you are. */}
-        {collab ? (
-          <CollabHeaderBack context={collab} />
+        {/* Mobile: hamburger opens the drawer — on a TOP-LEVEL screen only. A
+            screen you pushed into has one way out and it is back; two controls
+            in one slot is the "three ways back" this pass exists to remove.
+            The id is the focus-restore target for V2Drawer's onCloseAutoFocus
+            (no SheetTrigger exists), and the drawer falls back to the shell's
+            content region on a route that has no hamburger. */}
+        {isPushed ? null : (
+          <Button
+            id="v2-nav-trigger"
+            variant="ghost"
+            size="icon"
+            className="size-11 shrink-0 rounded-full md:hidden"
+            aria-label="Open menu"
+            onClick={() => setOpenMobile(true)}
+          >
+            <Menu className="size-5" />
+          </Button>
+        )}
+
+        {/* The way out, in the slot the hamburger used to hold.
+            Three cases, in the order they are decided:
+             - a pushed screen from the table: its own back control, at EVERY
+               width (a desktop reader lost their only "up" when the body chips
+               went, and the rail cannot say "back to THIS case");
+             - a collab route: the collab slot's chevron once the place has
+               resolved, and a route-derived one until then. Both are a chevron
+               in the same box, so nothing moves; only the address sharpens, and
+               on `/spaces/{uuid}` it is `/spaces` either way;
+             - anything else: the compact brand mark, exactly as before. */}
+        {pushed ? (
+          <PushedBack screen={pushed} override={back} />
+        ) : collabRoute.kind !== 'none' ? (
+          collab ? (
+            <CollabHeaderBack context={collab} />
+          ) : (
+            <CollabRouteBack />
+          )
         ) : (
           <span className="flex shrink-0 items-center md:hidden">
             <LogoMark className="size-9" />
@@ -192,6 +256,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
       {/* CENTRE — home tabs on `/`, route context elsewhere (owner #43). */}
       <HeaderCenter
         isHome={isHome}
+        pushed={pushed}
         expectsContext={expectsContext}
         title={title}
         confidential={confidential}
@@ -208,6 +273,71 @@ export function V2Header({ user }: { user: SessionUser | null }) {
 }
 
 /**
+ * PushedBack — the one way out of a screen you pushed into.
+ *
+ * It is a `<Link>` and stays one: `useBackTo` keeps the real address (so
+ * middle-click, long-press preview and a screen reader all still work) and
+ * takes the history move ONLY when the parent really is the screen behind. A
+ * reader who arrived from a notification with nothing behind them gets the push
+ * they have always had, never a jump out of the app.
+ *
+ * The `override` is the screen's own answer where the address cannot have one
+ * (a nested folder's parent, a draft note's stream). Address and label move
+ * together, always: a control whose label disagrees with where it goes is the
+ * bug this pass was sent to fix on `/spaces/{uuid}`.
+ */
+function PushedBack({
+  screen,
+  override,
+}: {
+  screen: PushedScreen;
+  override: { href: string; label: string } | null;
+}) {
+  const back = useBackTo(override?.href ?? screen.backHref);
+  return (
+    <Button
+      asChild
+      variant="ghost"
+      size="icon"
+      className="size-11 shrink-0 rounded-full text-muted-foreground md:size-9"
+    >
+      <Link {...back} aria-label={override?.label ?? screen.backLabel}>
+        <ChevronLeft aria-hidden className="size-5" />
+      </Link>
+    </Button>
+  );
+}
+
+/**
+ * The collab routes' back control BEFORE their context has been published.
+ *
+ * The frame publishes a richer answer a moment later (a thread's parent
+ * channel, the space a channel belongs to) and `CollabHeaderBack` replaces this
+ * with it. Until then the only place this bar can honestly promise is the
+ * spaces list, which is also the FINAL answer on `/spaces/{uuid}` — so on the
+ * one route where a phone can see this, the address never changes at all.
+ *
+ * It exists because the alternative was worse: the slot used to fall back to
+ * the brand mark, so a cold landing in a space painted a logo where the way out
+ * belongs and then swapped it for a chevron.
+ */
+function CollabRouteBack() {
+  const back = useBackTo('/spaces');
+  return (
+    <Button
+      asChild
+      variant="ghost"
+      size="icon"
+      className="size-9 shrink-0 rounded-full text-muted-foreground lg:hidden"
+    >
+      <Link {...back} aria-label="Back to your spaces">
+        <ChevronLeft aria-hidden className="size-5" />
+      </Link>
+    </Button>
+  );
+}
+
+/**
  * HeaderCenter — the bar's centre slot. Home (`/`) shows the Chat|Work|Study tabs;
  * every other route shows its published context (owner #43). Both live as two
  * layers GRID-STACKED in one cell (`col/row-start-1`), so the swap is a pure
@@ -218,15 +348,21 @@ export function V2Header({ user }: { user: SessionUser | null }) {
  * hidden HomeTabs never sits in the tab order / a11y tree while a conversation is
  * open (and the hidden context never does on home). `motion-reduce` disables the
  * fade; the swap is then instant but still correct.
+ *
+ * On a PUSHED screen the centre is answered by the route table instead, and only
+ * below `md:` — see {@link PushedCentre}.
  */
 function HeaderCenter({
   isHome,
+  pushed,
   expectsContext,
   title,
   confidential,
   collab,
 }: {
   isHome: boolean;
+  /** Non-null on a screen the reader pushed into (`pushed-route.ts`). */
+  pushed: PushedScreen | null;
   expectsContext: boolean;
   title: string | null;
   confidential: boolean;
@@ -249,6 +385,8 @@ function HeaderCenter({
       >
         {isHome ? null : collab ? (
           <CollabHeaderTitle context={collab} />
+        ) : pushed ? (
+          <PushedCentre pushed={pushed} title={title} />
         ) : (
           <RouteContext
             title={title}
@@ -257,6 +395,44 @@ function HeaderCenter({
           />
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * PushedCentre — what a pushed screen's bar says, and at which widths.
+ *
+ * BELOW `md:` ONLY. From `md:` up the page shows its own heading and this goes
+ * `display:none`, which takes it out of the accessibility tree with the pixels,
+ * so the reader meets exactly one title at every width. That is the same
+ * contract the channel screen already runs on, applied to the rest of the
+ * product.
+ *
+ * A document screen (`kind: 'none'`) renders nothing at any width: its masthead
+ * IS its title. Rendering nothing here rather than an empty box keeps the
+ * centre column at zero width, so the back control and the right cluster sit
+ * where a two-item bar should put them.
+ */
+function PushedCentre({
+  pushed,
+  title,
+}: {
+  pushed: PushedScreen;
+  /** The published route title — read only when the screen asked for it. */
+  title: string | null;
+}) {
+  const slot = pushed.title;
+  if (slot.kind === 'none') return null;
+  return (
+    <div className="md:hidden">
+      <RouteContext
+        title={slot.kind === 'fixed' ? slot.text : title}
+        confidential={false}
+        // A fixed title is known before the first paint and never shimmers; a
+        // published one is genuinely late, so it gets the title-shaped skeleton
+        // rather than an empty centre that pops.
+        expectsContext={slot.kind === 'published'}
+      />
     </div>
   );
 }

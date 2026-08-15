@@ -1,15 +1,8 @@
 'use client';
 
-import { Lock, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Lock, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import type { Member, Space } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
@@ -33,32 +26,33 @@ import { memberCountLabel, spaceOwnerLabel } from '../model';
  * here, at full weight, for anyone who may use it, and is simply absent for
  * anyone who may not (a button that only 403s is worse than none).
  *
- * The destructive verbs stay behind the overflow, and Delete is owner-only.
- * The confirmation itself is NOT in the URL: a shareable, refresh-surviving
- * link that re-opens "Delete this space?" is an armed trigger.
+ * ── THE OVERFLOW LEFT THIS BLOCK (phase 7) ─────────────────────────────────
+ * Invite by link, Waiting to join, Edit space and Delete space sat behind a
+ * kebab at y183, under a shell bar that already carried one at the top right:
+ * two identical glyphs on one phone screen, holding two different menus. They
+ * are published to the bar's single overflow now (`SpaceScreen`, through
+ * `v2/shell/screen-context.ts`), Delete still owner-only and still confirmed by
+ * a dialog whose open state is deliberately NOT in the URL — a shareable,
+ * refresh-surviving link that re-opens "Delete this space?" is an armed trigger.
+ *
+ * ── AND THE NAME IS PRINTED ONCE PER WIDTH ─────────────────────────────────
+ * Below `md:` the shell's bar carries the crest and the space's name, so this
+ * `h1` is stated for assistive tech and drawn only from `md:` up. The lock rides
+ * with it, and its `aria-label` is inside the heading, so "Private space" is
+ * still announced at every width.
  */
 export function SpacePlaceHeader({
   space,
   members,
   canManage,
-  isOwner,
   onCreateChannel,
   onOpenRoster,
-  onEdit,
-  onInvites,
-  onRequests,
-  onDelete,
 }: {
   space: Space;
   members: readonly Member[];
   canManage: boolean;
-  isOwner: boolean;
   onCreateChannel: () => void;
   onOpenRoster: () => void;
-  onEdit: () => void;
-  onInvites: () => void;
-  onRequests: () => void;
-  onDelete: () => void;
 }) {
   const countLabel = memberCountLabel(space.active_members_count);
 
@@ -74,48 +68,22 @@ export function SpacePlaceHeader({
 
         <div className="min-w-0 flex-1">
           <MetaLine lead={[space.type_label, spaceOwnerLabel(space)]} />
-          <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-semibold tracking-tight text-foreground">
-            <span className="min-w-0 truncate">{space.name}</span>
+          <h1 className="sr-only md:not-sr-only md:mt-1 md:flex md:min-w-0 md:items-center md:gap-2 md:text-2xl md:font-semibold md:tracking-tight md:text-foreground">
+            <span className="min-w-0 md:truncate">{space.name}</span>
+            {/* The glyph is decorative and `display:none` below `md:`, so the
+                fact is carried by a WORD that survives at every width. An
+                `aria-label` on the icon would have gone silent with it. */}
             {space.is_private ? (
-              <Lock
-                aria-label="Private space"
-                className="size-4 shrink-0 text-muted-foreground"
-              />
+              <>
+                <Lock
+                  aria-hidden
+                  className="hidden size-4 shrink-0 text-muted-foreground md:block"
+                />
+                <span className="sr-only">Private space</span>
+              </>
             ) : null}
           </h1>
         </div>
-
-        {canManage ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="v2-interactive size-8 shrink-0"
-                aria-label="Space settings"
-              >
-                <MoreHorizontal aria-hidden className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onInvites}>Invite by link</DropdownMenuItem>
-              <DropdownMenuItem onClick={onRequests}>Waiting to join</DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit}>
-                <Pencil aria-hidden className="size-4" />
-                Edit space
-              </DropdownMenuItem>
-              {isOwner ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" onClick={onDelete}>
-                    <Trash2 aria-hidden className="size-4" />
-                    Delete space
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
       </div>
 
       {space.description ? (

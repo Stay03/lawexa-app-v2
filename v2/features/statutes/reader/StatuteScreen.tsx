@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useV2Session } from '@/v2/runtime/session-context';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { statutesQueries } from '../queries';
 import { StatuteDocument } from './StatuteDocument';
 import { StatuteHeader } from './StatuteHeader';
@@ -29,9 +27,7 @@ import {
  * to learn which Act they opened.
  *
  * The server shell above owns `generateMetadata`; this owns everything a
- * reader sees, including publishing the shell header's centre title (the
- * short designation when one exists — "Act 459" fits the bar where the full
- * name would truncate).
+ * reader sees.
  *
  * SIGNED-OUT: measured July 31, 2026, both statute reads 401 without a bearer
  * token — the queries are gated and the visitor gets the designed sign-in
@@ -56,12 +52,14 @@ export function StatuteScreen({
   });
   const detail = query.data?.data ?? null;
 
-  const headerTitle = detail ? detail.short_title || detail.title : null;
-  useEffect(() => {
-    if (!headerTitle) return;
-    setHeaderContext({ title: headerTitle, confidential: false });
-  }, [headerTitle]);
-  useEffect(() => () => clearHeaderContext(), []);
+  /**
+   * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7). The bar
+   * used to carry the short designation ("Act 9") while `StatuteHeader` below
+   * it was headed with the Act's full name: one instrument under two names, on
+   * one screen. The masthead keeps the name, with the country, the year, the
+   * status and what repealed it around it; the bar keeps the way back and
+   * nothing else. See `PushedTitle` in `v2/shell/pushed-route.ts`.
+   */
 
   if (!signedIn) {
     return (

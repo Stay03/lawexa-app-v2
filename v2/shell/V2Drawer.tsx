@@ -33,6 +33,7 @@ import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
 import { v2NewChat, visibleNavItems, type V2NavItem } from './nav.config';
+import { V2_SHELL_CONTENT_ID } from './shell-content';
 
 /**
  * V2Drawer — the mobile navigation drawer (Nav D, locked). ChatGPT-style
@@ -174,9 +175,20 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         // The drawer is opened by the external hamburger (no SheetTrigger), so
         // Radix has no trigger to restore focus to on close — without this,
         // focus lands on <body> and keyboard/AT users lose their place.
+        //
+        // THE HAMBURGER IS NOT ALWAYS THERE ANY MORE. Tapping a nav row closes
+        // this drawer and navigates, and a screen you pushed into wears a back
+        // arrow instead (`pushed-route.ts`), so the trigger the reader opened
+        // this with can be gone by the time it closes. The shell's content
+        // region is the honest second choice: it is already `tabIndex={-1}`
+        // for exactly this kind of hand-off, and it puts the reader at the top
+        // of what they just navigated to rather than on <body>.
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          document.getElementById('v2-nav-trigger')?.focus();
+          const target =
+            document.getElementById('v2-nav-trigger') ??
+            document.getElementById(V2_SHELL_CONTENT_ID);
+          target?.focus();
         }}
       >
         <SheetHeader className="sr-only">

@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { useBackTo } from '@/v2/runtime/back-to';
-import { ArrowLeft, Check, Link2 } from 'lucide-react';
+import { Check, Link2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { StatuteDetail } from '@/types/statute';
@@ -22,7 +20,6 @@ import {
  * StatuteHeader — the reader's heading block, in the case-document header
  * grammar: identity only, each fact exactly once.
  *
- *   breadcrumb   ← Statutes (back to the library)
  *   kicker       flag · country · year · document type — provenance first
  *   title        the Act's name, in the reading serif
  *   designation  the short title ("Act 459") — a reference string, sans
@@ -35,6 +32,13 @@ import {
  * document itself (the AKN preface renders it), and a fact lives in one
  * place. v1 printed the preamble in the header AND let the XML preface render
  * it again — the reader saw the enacting formula twice.
+ *
+ * ── THE WAY BACK LEFT THIS BLOCK (phase 7) ─────────────────────────────────
+ * It opened with an "← Statutes" chip at y76, under a bar that carried the
+ * hamburger and, in its centre, the SHORT designation ("Act 9") while the title
+ * below said the Act's full name. One instrument, two names, and two ways up.
+ * The shell's bar now owns the back arrow (`v2/shell/pushed-route.ts`) and this
+ * block owns the name, once.
  */
 
 const STATUS_BADGE: Record<StatuteStatusTone, string> = {
@@ -48,23 +52,9 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
   const tone = statuteStatusTone(detail.status);
   const commenced = formatStatuteDate(detail.commencement_date);
   const documentType = formatDocumentType(detail.document_type);
-  const back = useBackTo('/statutes');
 
   return (
     <header className="flex flex-col gap-3 border-b border-border/60 pb-6">
-      <p>
-        <Link
-          {...back}
-          className={cn(
-            'v2-interactive inline-flex min-h-8 items-center gap-1.5 rounded-full pr-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
-            FOCUS_RING,
-          )}
-        >
-          <ArrowLeft aria-hidden className="size-3.5" />
-          Statutes
-        </Link>
-      </p>
-
       {/* Provenance first — where, when, and what kind of instrument. */}
       <p className="doc-kicker flex flex-wrap items-center gap-x-2 gap-y-1">
         {countryCode ? (

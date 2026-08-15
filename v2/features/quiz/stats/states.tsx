@@ -81,7 +81,10 @@ export function StatsFallback() {
 export function StatsHeading() {
   return (
     <div className="mb-5 space-y-1">
-      <h1 className="text-xl font-semibold tracking-tight text-foreground">
+      {/* ONE TITLE PER SCREEN, AT EVERY WIDTH (phase 7): below `md:` the shell's
+          bar says "Your progress", so the heading is stated for assistive tech
+          and drawn only where the bar is not carrying it. */}
+      <h1 className="sr-only md:not-sr-only md:text-xl md:font-semibold md:tracking-tight md:text-foreground">
         Your progress
       </h1>
       <p className="text-sm text-muted-foreground">

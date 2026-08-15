@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Link2, Loader2, Pencil, Trash2, UserPlus } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -19,6 +19,11 @@ import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
+import {
+  clearScreenContext,
+  setScreenContext,
+  type ScreenAction,
+} from '@/v2/shell/screen-context';
 import {
   Sheet,
   SheetContent,
@@ -68,6 +73,9 @@ import {
  * space?" is an armed trigger, and this dialog carries the server's sentence
  * from the last failed attempt, which a restored URL cannot reproduce.
  */
+/** Stable empty reference — a fresh `[]` per render would churn the publish. */
+const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
+
 export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   const scope = useCollabSpaceScope();
   /* What the spaces list already knew about this space — crest, kicker, name,
@@ -113,6 +121,71 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
    * exactly the kind of quiet dead code that outlives the reason for it.
    */
 
+  /**
+   * ── THE SPACE'S OWN VERBS GO TO THE BAR'S ONE MENU (phase 7) ─────────────
+   *
+   * They were a kebab at y183, in the lobby's header block, under a shell bar
+   * that already had one at the top right. On a 390px phone that screen spent
+   * 225px on chrome before the first word and offered three ways out and two
+   * overflow menus. `screen-context.ts` folds these four rows into the bar's
+   * single menu, above a separator, and `SpacePlaceHeader` lost its trigger.
+   *
+   * THE ROWS FOLLOW THE SAME RULES THEY ALWAYS DID: nothing at all for a reader
+   * who cannot manage the space (a menu that only 403s is worse than none), and
+   * Delete for the OWNER only. `panel`'s own `canOpen` map is the second gate,
+   * so a copied `?panel=edit` still cannot hand a plain member the admin form.
+   *
+   * Every callback is `useCallback`-stable, which is what makes the publish a
+   * genuine no-op between renders rather than a new snapshot each time. They
+   * close over `panel.show` and NOT over `panel`: the dispatchers are stable but
+   * the object around them is a fresh literal on every render, so depending on
+   * it would mint a new action set each time and re-publish for nothing.
+   */
+  const pathname = usePathname() ?? '';
+  const showPanel = panel.show;
+  const openEdit = useCallback(() => showPanel('edit'), [showPanel]);
+  const openInvites = useCallback(() => showPanel('invites'), [showPanel]);
+  const openRequests = useCallback(() => showPanel('requests'), [showPanel]);
+  const openDelete = useCallback(() => {
+    setDeleteError(null);
+    setDeleteOpen(true);
+  }, []);
+
+  const isOwner = scope?.isOwner ?? false;
+  const actions = useMemo<readonly ScreenAction[]>(() => {
+    if (!canManage) return NO_SCREEN_ACTIONS;
+    const rows: ScreenAction[] = [
+      {
+        id: 'invites',
+        label: 'Invite by link',
+        icon: Link2,
+        onSelect: openInvites,
+      },
+      {
+        id: 'requests',
+        label: 'Waiting to join',
+        icon: UserPlus,
+        onSelect: openRequests,
+      },
+      { id: 'edit', label: 'Edit space', icon: Pencil, onSelect: openEdit },
+    ];
+    if (isOwner) {
+      rows.push({
+        id: 'delete',
+        label: 'Delete space',
+        icon: Trash2,
+        destructive: true,
+        onSelect: openDelete,
+      });
+    }
+    return rows;
+  }, [canManage, isOwner, openInvites, openRequests, openEdit, openDelete]);
+
+  useEffect(() => {
+    setScreenContext({ pathname, back: null, actions });
+  }, [pathname, actions]);
+  useEffect(() => () => clearScreenContext(), []);
+
   // Defensive, and never expected: this page is a child of the `(collab)`
   // layout, which always provides the scope. Drawing the silhouette is the
   // honest answer if that ever stops being true — never a crash, never a lie.
@@ -155,16 +228,8 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
         space={space}
         members={scope.members}
         canManage={canManage}
-        isOwner={scope.isOwner}
         onCreateChannel={scope.openCreateChannel}
         onOpenRoster={scope.openRoster}
-        onEdit={() => panel.show('edit')}
-        onInvites={() => panel.show('invites')}
-        onRequests={() => panel.show('requests')}
-        onDelete={() => {
-          setDeleteError(null);
-          setDeleteOpen(true);
-        }}
       />
 
       <div className={SPACE_LOBBY_GRID}>

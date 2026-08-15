@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useBackTo } from '@/v2/runtime/back-to';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -38,12 +37,16 @@ import type { FolderRecord } from '../types';
  * reader learns the depth without being handed a dead link or a made-up name.
  * When there is nothing between the root and the parent it does not render.
  *
- * ── MOBILE IS ONE NAMED LINK, NOT A SHRUNKEN CRUMB ──────────────────────────
- * Below `sm` the trail becomes a single "← Damages" (or "← Folders" at the
- * root): one 44px target that names where it goes, instead of four crumbs
- * competing for a phone's width. It is `display:none` on desktop and the crumb
- * is `display:none` on mobile, so only one of them is ever in the accessibility
- * tree.
+ * ── ON A PHONE THERE IS NO TRAIL AT ALL, AND THAT IS THE POINT ──────────────
+ * Below `sm` this used to collapse to a single "← Damages" chip at y76. The
+ * shell's bar now carries the way back on every screen you pushed into, and
+ * `FolderScreen` hands it this same address and this same name (see
+ * `screen-context.ts`), so the chip was the second of two identical controls,
+ * one above the other. It is gone; the trail is `sm:` and up only, where it is a
+ * real breadcrumb rather than a shrunken one.
+ *
+ * The ADDRESS is computed in `folder-row-model` terms here and in `FolderScreen`
+ * alike, from the one payload field that can address it.
  */
 export function FolderBreadcrumb({ folder }: { folder: FolderRecord }) {
   const parent = folder.parent ?? null;
@@ -52,10 +55,6 @@ export function FolderBreadcrumb({ folder }: { folder: FolderRecord }) {
   const named = parent ? 2 : 1;
   const hiddenCount = Math.max(0, segments.length - named);
   const hiddenPath = segments.slice(0, Math.max(0, segments.length - named)).join(' / ');
-
-  const upHref = parent ? folderHref(parent.uuid) : '/folders';
-  const upLabel = parent ? parent.name : 'Folders';
-  const up = useBackTo(upHref);
 
   return (
     <>
@@ -106,18 +105,6 @@ export function FolderBreadcrumb({ folder }: { folder: FolderRecord }) {
           </li>
         </ol>
       </nav>
-
-      {/* Phone: one named link up. */}
-      <Link
-        {...up}
-        className={cn(
-          'v2-interactive -ml-2 inline-flex min-h-9 max-w-full items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:text-foreground sm:hidden',
-          FOCUS_RING,
-        )}
-      >
-        <ChevronLeft aria-hidden className="size-3.5 shrink-0" />
-        <span className="truncate">{upLabel}</span>
-      </Link>
     </>
   );
 }
