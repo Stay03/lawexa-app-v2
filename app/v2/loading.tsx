@@ -1,3 +1,5 @@
+import { SegmentFallback } from '@/v2/shell/segment-fallback';
+
 /**
  * The v2 SEGMENT boundary — the fallback for ANY v2 page whose shell is not
  * client-available at navigation time, and therefore the one boundary that
@@ -30,12 +32,5 @@
  *      would be a lie about where the reader is going.
  */
 export default function V2SegmentLoading() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading page
-      </span>
-      <div aria-hidden className="min-h-full" />
-    </>
-  );
+  return <SegmentFallback label="Loading page" />;
 }

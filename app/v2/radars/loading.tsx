@@ -1,3 +1,5 @@
+import { SegmentFallback } from '@/v2/shell/segment-fallback';
+
 /**
  * The `radars` SEGMENT boundary.
  *
@@ -26,12 +28,5 @@
  * correctly-shaped boundary, and they take over the moment their shell arrives.
  */
 export default function RadarsSegmentLoading() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading radar
-      </span>
-      <div aria-hidden className="min-h-full" />
-    </>
-  );
+  return <SegmentFallback label="Loading radar section" />;
 }

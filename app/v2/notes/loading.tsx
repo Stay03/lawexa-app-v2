@@ -1,3 +1,5 @@
+import { SegmentFallback } from '@/v2/shell/segment-fallback';
+
 /**
  * The `notes` SEGMENT boundary.
  *
@@ -22,12 +24,5 @@
  * the moment its shell arrives.
  */
 export default function NotesSegmentLoading() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading note
-      </span>
-      <div aria-hidden className="min-h-full" />
-    </>
-  );
+  return <SegmentFallback label="Loading notes section" />;
 }
