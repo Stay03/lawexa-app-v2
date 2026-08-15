@@ -71,6 +71,30 @@ import type { QueryClient } from '@tanstack/react-query';
  *
  * Recorded here rather than discovered again: the first attempt at cases was
  * reverted on 15 August for exactly this reason.
+ *
+ * ── THE RECIPE FOR CASES, READ OFF THE CODE RATHER THAN GUESSED ────────────
+ * Written down so the next pass starts from findings instead of from scratch.
+ *
+ * `CaseDocument`'s identity block is lines ~197-264: kicker (flag, court,
+ * date), `h1`, citation + suit number, topic, outcome, and `CaseActions`.
+ * EVERY field it reads is either on `Case` or optional on `CaseDetail`, so the
+ * block types as `Case & Partial<CaseDetail>` and renders unchanged from a
+ * list row. That is the whole reason this is worth doing on cases first.
+ *
+ * Extract that block as `CaseIdentityHeader({ item })`, deriving `raw`, `name`,
+ * `date`, `countryCode` and `isLimited` INSIDE it. Do not try to lift those
+ * derivations out of `CaseDocument` at the same time: `countryCode` and
+ * `isLimited` are both read again below the header (`AboutThisCase`, the
+ * limit notice), so they stay where they are and the two one-line derivations
+ * are computed in both places. Two cheap pure calls beat threading props.
+ *
+ * Then `CaseScreen`'s pending branch becomes: seeded → the real header plus a
+ * body skeleton; cold → the full skeleton exactly as today.
+ *
+ * THE BODY NEEDS NO SPECIAL CASE. `CaseDocument` already falls back to
+ * `excerpt` when `body` is absent, and `excerpt` is on the list row — so a
+ * seeded case reads as a real case with a short summary and then lengthens.
+ * Nothing renders an absence as a fact, which is the trap this pattern invites.
  */
 
 /** A paginated list response, in either of the two shapes v2 caches. */
