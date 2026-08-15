@@ -88,8 +88,8 @@ motion between screens needs the screens to be final.
 | 5 | Navigation and back | The history stack, real back controls, client side jumps, one create affordance. | shipped `ce0c0ea` |
 | 6 | Edge gestures | Depends on 5 making every step a real history entry. | shipped `539f9b6` |
 | 7 | Modals become screens, and the member list groups | Needs 3, 5 and 6, because a screen is only a screen if back works. | shipped `313d37d` + `91430ea` (member list), this wave (screens) |
-| 8 | Skeletons | After 7, or twenty-two of them get written twice. | next |
-| 9 | Motion and pull to refresh | On the shapes that are now final. | |
+| 8 | Skeletons | After 7, or twenty-two of them get written twice. | shipped `858686d` |
+| 9 | Motion and pull to refresh | On the shapes that are now final. | next |
 | 10 | Language sweep | Last, so it catches every word the nine phases above wrote. | |
 
 ### Phase 1, touch feedback
@@ -170,6 +170,15 @@ geometry. The full argument is in the phase folder's `plan.md`.
 One skeleton per destination. Kill the wrong shape, kill the chain, and keep the
 house discipline of a still fallback handing over to a pulsing one only where the
 geometry is identical.
+
+**AMENDED WHEN THE PHASE WAS BUILT, 15 August.** The paragraph above and the
+"wrong skeleton, then another skeleton" entry in the fault list were written
+from the July audit and were largely out of date by the time this phase ran: the
+July skeleton pass had already fixed `cases`, `statutes`, `folders` and `quiz`,
+and the blank v2 root boundary is deliberate, not a defect. Three places did not
+follow the rule the codebase already states — radars, `notes/[slug]`, and
+`/spaces/discover` — and those are what shipped. The phase folder records what
+was checked and found already correct, so nobody re-opens it.
 
 ### Phase 9, motion and pull to refresh
 
