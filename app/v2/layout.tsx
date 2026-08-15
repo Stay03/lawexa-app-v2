@@ -16,6 +16,7 @@ import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
 import { TouchPress } from '@/v2/shell/touch-press';
 import { RouteTrail } from '@/v2/shell/route-trail';
+import { RouteMotion } from '@/v2/shell/route-motion';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
@@ -164,6 +165,13 @@ export default async function V2Layout({
       <Suspense fallback={null}>
         <RouteTrail />
       </Suspense>
+      {/* Route changes MOVE rather than cut: a short directional entrance on the
+          shell's content region at every pathname change: in from the right
+          going forward, in from the left coming back. Renders null; it writes
+          one attribute and never touches history, clicks or scrollTop. All of
+          it lives inside `@media (prefers-reduced-motion: no-preference)`, so
+          a reader who asked for less motion gets the old instant change. */}
+      <RouteMotion />
       {/* Back/Forward + reload scroll restoration for the shell's ONE scroll
           container — the div is invisible to both native restoration and the
           router, so it restores itself. Push scroll stays Next's (see the

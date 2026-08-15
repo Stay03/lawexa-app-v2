@@ -455,3 +455,86 @@ html.v2-document-lock body {
     animation: none;
   }
 }
+
+/* -----------------------------------------------------------------------------
+   ROUTE CHANGES MOVE (mobile native overhaul, phase 9).
+
+   Every route change used to cut: tap a case, a channel, a space or a note and
+   the screen was replaced between two frames, which on a phone reads as a flash
+   rather than as going somewhere. `route-motion.tsx` writes
+   `data-v2-route-enter` on the content region at each pathname change, and
+   these rules are the motion it names. That module's docblock carries the
+   reasoning: why the View Transitions API was measured and rejected, why this
+   element is the one that moves, and why the attribute alternates.
+
+   THE WHOLE BLOCK LIVES UNDER `no-preference`, which is the query
+   `motion-safe:` compiles to. Under `prefers-reduced-motion: reduce` neither
+   the rules nor the keyframes exist, so the attribute matches nothing and a
+   route change behaves exactly as it did before phase 9: the travel is gone
+   and nothing else is. There is deliberately no `animation: none` override to
+   keep in step with anything.
+
+   TRANSFORM AND OPACITY ONLY. Both are compositor properties: no reflow, no
+   layout shift, no effect on `scrollTop`, and the header and dock rows do not
+   move because they are separate grid items. `.v2-shell` is `overflow: hidden`,
+   so the translated region is clipped by the shell and cannot produce a
+   sideways scroll range, which is exactly what a transformed wrapper INSIDE
+   the scroller would have done, since a transformed descendant counts towards
+   its scroller's scrollable overflow.
+
+   NO FILL MODE. The animation must leave no transform behind: a `transform`
+   held by `forwards` would make the region a containing block for
+   `position: fixed` descendants for the rest of the visit.
+
+   FOUR KEYFRAMES FOR TWO DIRECTIONS. A CSS animation restarts only when
+   `animation-name` changes, so each direction needs a twin to alternate
+   between; otherwise a second navigation the same way would play nothing. The
+   parity is the price of not forcing a synchronous layout to re-trigger a
+   class at the busiest moment of a navigation.
+
+   1rem matches `slide-in-from-right-4`, and 200ms is the app's dominant
+   duration (88 uses); the curve is the same one the press states above run on.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes v2-route-enter-forward-a {
+    from {
+      opacity: 0;
+      transform: translate3d(1rem, 0, 0);
+    }
+  }
+  @keyframes v2-route-enter-forward-b {
+    from {
+      opacity: 0;
+      transform: translate3d(1rem, 0, 0);
+    }
+  }
+  @keyframes v2-route-enter-back-a {
+    from {
+      opacity: 0;
+      transform: translate3d(-1rem, 0, 0);
+    }
+  }
+  @keyframes v2-route-enter-back-b {
+    from {
+      opacity: 0;
+      transform: translate3d(-1rem, 0, 0);
+    }
+  }
+
+  html.v2-document-lock .v2-shell__content[data-v2-route-enter] {
+    animation-duration: 200ms;
+    animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  html.v2-document-lock .v2-shell__content[data-v2-route-enter='forward-a'] {
+    animation-name: v2-route-enter-forward-a;
+  }
+  html.v2-document-lock .v2-shell__content[data-v2-route-enter='forward-b'] {
+    animation-name: v2-route-enter-forward-b;
+  }
+  html.v2-document-lock .v2-shell__content[data-v2-route-enter='back-a'] {
+    animation-name: v2-route-enter-back-a;
+  }
+  html.v2-document-lock .v2-shell__content[data-v2-route-enter='back-b'] {
+    animation-name: v2-route-enter-back-b;
+  }
+}
