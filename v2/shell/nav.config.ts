@@ -1,7 +1,6 @@
 import {
   Bookmark,
   Boxes,
-  FileText,
   FolderClosed,
   GraduationCap,
   Library,
@@ -89,9 +88,10 @@ export const v2NewChat: V2NavLeaf = {
 };
 
 /**
- * Primary navigation, in display order. Mirrors v1's `app-sidebar` item set
+ * Primary navigation, in display order. It began as v1's `app-sidebar` item set
  * (Conversations, Library → Cases/Statutes/Notes/Files, Bookmarks, Spaces,
- * Quiz), minus the v1 clutter that isn't part of the v2 shell yet.
+ * Quiz), minus the v1 clutter that isn't part of the v2 shell yet. Files has
+ * since been removed from Library; the reason is written where the row was.
  */
 export const v2NavItems: V2NavItem[] = [
   { label: 'Conversations', href: '/conversations', icon: MessageSquare },
@@ -105,7 +105,15 @@ export const v2NavItems: V2NavItem[] = [
       { label: 'Statutes', href: '/statutes', icon: BookText },
       { label: 'Notes', href: '/notes', icon: NotebookPen },
       { label: 'Folders', href: '/folders', icon: FolderClosed },
-      { label: 'Files', href: '/files', icon: FileText },
+      // FILES IS DELIBERATELY NOT HERE. `/files` has no v2 route, so the proxy
+      // fell through to v1 and the row landed the reader on v1's onboarding
+      // wall, "What best describes you?", with no header and no way back into
+      // v2. Measured on production, 15 August 2026, on the phone audit.
+      //
+      // Taken out rather than repaired on the owner's instruction the same day:
+      // "Remove files, we'll work on vault and unify files and folders with new
+      // features later." So the row comes back with that work, and pointing it
+      // at a v1 page in the meantime would only teach people the app is broken.
     ],
   },
   { label: 'Bookmarks', href: '/bookmarks', icon: Bookmark },
