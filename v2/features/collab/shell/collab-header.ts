@@ -89,25 +89,28 @@ export interface CollabHeaderContext {
   backLabel: string;
   /** Opens the space drawer. MUST be referentially stable (see the docblock). */
   openRail: () => void;
-  /**
-   * WHO PAINTS THE TOP BAR ON A PHONE (mobile overhaul, phase 3).
-   *
-   * A channel screen used to wear two: the shell bar named the place and the
-   * place bar described it, 101px of chrome before the first message and the
-   * channel's identity split across both. Every chat app worth copying runs
-   * ONE bar on a conversation, so below `md:` the channel screen now owns it
-   * outright and the shell bar stands down.
-   *
-   * It is a published signal rather than a route test in the header because
-   * the screen is the only thing that knows whether it has a bar to give: a
-   * space lobby has none, so there the shell bar still paints.
-   *
-   * The shell bar hides on this with a CSS variant, never a viewport hook —
-   * the standing rule in this shell is that the correct bar paints before
-   * hydration.
-   */
-  barOwner: 'shell' | 'screen';
 }
+
+/**
+ * ── WHAT IS DELIBERATELY NOT IN THIS CONTEXT: WHO PAINTS THE PHONE BAR ──────
+ *
+ * A channel screen wears one bar below `md:` and the shell's stands down
+ * (mobile overhaul, phase 3). That used to be a `barOwner` field here, set by
+ * the frame to `'screen'` once its channel query landed and `'shell'` until
+ * then.
+ *
+ * It was wrong twice over. A published value arrives after an effect, so the
+ * first painted frame of a channel always showed the shell's bar; and it was
+ * derived from DATA (`channelName !== null`), so it stayed wrong for the whole
+ * fetch. The reader saw two stacked bars, then one, with the channel's name
+ * moving between them — the owner's complaint of 15 August 2026: "double
+ * skeleton, the title jumping from place to place".
+ *
+ * Which screen owns the bar is a fact about the ADDRESS, so `V2Header` reads it
+ * off `usePathname()` (see `screenOwnsPhoneBar` there) and nothing publishes
+ * it. Anything else in this context is genuinely late — a name, a crest — and
+ * is drawn skeleton-first because of it. Bar OWNERSHIP never was.
+ */
 
 let context: CollabHeaderContext | null = null;
 const listeners = new Set<() => void>();

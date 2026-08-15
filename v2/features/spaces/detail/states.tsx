@@ -6,7 +6,9 @@ import { Hash, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CrestSkeleton } from '@/v2/features/collab/kit/Crest';
+import type { SpaceType } from '@/types/collab';
+import { CrestSkeleton, SpaceCrest } from '@/v2/features/collab/kit/Crest';
+import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
@@ -72,26 +74,103 @@ export function ChannelListSkeleton({
 }
 
 /**
+ * What the frame may print before the space detail lands — every field of it
+ * carried by the row in the spaces list, and not one of them a permission.
+ */
+export interface SpaceFrameIdentity {
+  uuid: string;
+  name: string;
+  type: SpaceType;
+  /** "Work" / "Study" — the kicker's first fact. */
+  typeLabel: string;
+  /** `spaceOwnerLabel` of the row: the organisation, or "Personal". */
+  ownerLabel: string;
+  isPrivate: boolean;
+  /** The row's own description, or `null`. NOT "not yet loaded" — a space with
+   *  no description prints nothing here, and so does this. */
+  description: string | null;
+}
+
+/**
  * The whole lobby's silhouette — the identity block (crest, kicker, name,
  * description, presence + primary action), the activity digest, and the two
  * side regions. Geometry mirrors the live lobby, so the hand-off is content
  * resolving rather than a layout swap.
+ *
+ * ── AND IT TAKES THE IDENTITY THE LIST ALREADY HAD ─────────────────────────
+ * Owner, 15 August 2026: "for spaces the first skeleton is a full skeleton, the
+ * second one has some text and images and stuff". Two loading states that do
+ * not look alike read as two pages, not one page arriving. The row the reader
+ * tapped carries the crest, the kicker, the name, whether it is private and its
+ * description — so with `identity` supplied the first state IS the second one,
+ * and only the channel digest and the roster resolve later.
+ *
+ * THE ACTION ROW IS NEVER SEEDED. Whether this reader may create a channel is a
+ * ruling off `my_role`, and the presence stack needs a roster that arrives on
+ * its own request. Those keep their shapes, which is what a shape is for.
  */
-export function SpaceScreenFrame({ still = false }: { still?: boolean }) {
+export function SpaceScreenFrame({
+  still = false,
+  identity = null,
+}: {
+  still?: boolean;
+  /** The tapped row's identity; `null` on a cold arrival keeps the silhouette. */
+  identity?: SpaceFrameIdentity | null;
+}) {
   const bar = still ? 'animate-none' : undefined;
   return (
     <div className={SPACE_LOBBY_COLUMN}>
       <div className="border-b pb-5">
         <div className="flex items-start gap-4">
-          <CrestSkeleton size="lg" still={still} />
-          <div className="min-w-0 flex-1 space-y-2.5">
-            <Skeleton className={cn('h-3 w-40 rounded', bar)} />
-            <Skeleton className={cn('h-7 w-2/5 rounded', bar)} />
-          </div>
+          {identity ? (
+            <SpaceCrest
+              uuid={identity.uuid}
+              name={identity.name}
+              type={identity.type}
+              size="lg"
+            />
+          ) : (
+            <CrestSkeleton size="lg" still={still} />
+          )}
+          {identity ? (
+            <div className="min-w-0 flex-1">
+              <MetaLine lead={[identity.typeLabel, identity.ownerLabel]} />
+              <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-semibold tracking-tight text-foreground">
+                <span className="min-w-0 truncate">{identity.name}</span>
+                {identity.isPrivate ? (
+                  <Lock
+                    aria-label="Private space"
+                    className="size-4 shrink-0 text-muted-foreground"
+                  />
+                ) : null}
+              </h1>
+            </div>
+          ) : (
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <Skeleton className={cn('h-3 w-40 rounded', bar)} />
+              <Skeleton className={cn('h-7 w-2/5 rounded', bar)} />
+            </div>
+          )}
         </div>
-        <Skeleton className={cn('mt-3 h-3.5 w-3/5 rounded', bar)} />
+        {identity ? (
+          // A space with no description prints nothing, exactly as the live
+          // header does. Reserving a bar for prose that is not coming is how
+          // the block below ends up moving when it arrives empty.
+          identity.description ? (
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              {identity.description}
+            </p>
+          ) : null
+        ) : (
+          <Skeleton className={cn('mt-3 h-3.5 w-3/5 rounded', bar)} />
+        )}
+        {/* The action row is 36px tall, set by the presence stack: `size="md"`
+            avatars are 32px and its button pads them by 2px each way. The pill
+            below reserved 28px, so this row grew by 4px the moment the roster
+            landed and took the whole lobby down with it — measured, 15 August
+            2026. The `New channel` button beside it is the shorter 32px. */}
         <div className="mt-4 flex items-center gap-3">
-          <Skeleton className={cn('h-7 w-24 rounded-full', bar)} />
+          <Skeleton className={cn('h-9 w-24 rounded-full', bar)} />
           <Skeleton className={cn('h-8 w-32 rounded-md', bar)} />
         </div>
       </div>

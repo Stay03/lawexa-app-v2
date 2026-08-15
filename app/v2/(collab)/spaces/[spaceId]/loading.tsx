@@ -1,4 +1,4 @@
-import { SpaceScreenFrame } from '@/v2/features/spaces/detail/states';
+import { CachedSpaceFrame } from '@/v2/features/spaces/detail/CachedSpaceFrame';
 
 /**
  * Route-level loading boundary for `/spaces/[spaceId]`.
@@ -8,6 +8,10 @@ import { SpaceScreenFrame } from '@/v2/features/spaces/detail/states';
  * digest, side regions — imported from the feature's `states.tsx` so the two
  * can never drift. `still` (no pulse): a route boundary waits on an RSC
  * payload, not a query; the live screen's own pending render pulses.
+ *
+ * IT GOES THROUGH `CachedSpaceFrame`, which fills the identity block in from
+ * the row the reader tapped when that row is still in the cache — the crest,
+ * the kicker, the name, the description. The shape is identical either way.
  *
  * IT COVERS THE PANE ONLY. `loading.tsx` wraps the page and everything below
  * it, never the layout above — so the space rail rendered by `(collab)` stays
@@ -25,7 +29,7 @@ export default function SpaceLoading() {
         Loading this space
       </span>
       <div aria-hidden inert>
-        <SpaceScreenFrame still />
+        <CachedSpaceFrame still />
       </div>
     </>
   );

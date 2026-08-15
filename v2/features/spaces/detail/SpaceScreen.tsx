@@ -37,6 +37,7 @@ import {
   SpaceActivityBlock,
   SpacePeopleBlock,
 } from './SpaceLobbyBlocks';
+import { useCachedSpaceIdentity } from './cached-identity';
 import {
   SpaceAccessDeniedState,
   SpaceErrorState,
@@ -69,6 +70,11 @@ import {
  */
 export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   const scope = useCollabSpaceScope();
+  /* What the spaces list already knew about this space — crest, kicker, name,
+     description. It fills the frame below so the silhouette the route boundary
+     drew does not empty itself out when the boundary is deleted and this screen
+     takes over. Identity only: every ruling still waits for the detail. */
+  const cachedIdentity = useCachedSpaceIdentity(spaceUuid);
   const session = useV2Session();
   const router = useRouter();
   const deleteSpace = useDeleteSpace(spaceUuid);
@@ -110,9 +116,9 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   // Defensive, and never expected: this page is a child of the `(collab)`
   // layout, which always provides the scope. Drawing the silhouette is the
   // honest answer if that ever stops being true — never a crash, never a lie.
-  if (scope === null) return <SpaceScreenFrame />;
+  if (scope === null) return <SpaceScreenFrame identity={cachedIdentity} />;
 
-  if (scope.isSpacePending) return <SpaceScreenFrame />;
+  if (scope.isSpacePending) return <SpaceScreenFrame identity={cachedIdentity} />;
 
   if (scope.isSpaceError || space === null) {
     const status = scope.spaceErrorStatus ?? 0;

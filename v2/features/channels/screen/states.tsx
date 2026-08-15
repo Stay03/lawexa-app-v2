@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Channel, SlimUser } from '@/types/collab';
-import { PlaceCrest } from '@/v2/features/collab/kit/Crest';
+import { PlaceCrest, SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
@@ -514,36 +514,176 @@ export function ChannelErrorState({ onRetry }: { onRetry: () => void }) {
  * The channel screen's frame at rest: the ONE header bar, the feed column, and
  * the transcript-width composer. `app/v2/channels/[channelId]/loading.tsx`
  * renders it `still` and inert; the live screen renders it (pulsing) while the
- * channel detail resolves. Geometry mirrors the live screen exactly — the same
- * bar height AT EACH WIDTH (`h-14` everywhere since the phone bar became the
- * screen's only bar in the mobile overhaul), the same
- * `max-w-3xl` column, the same composer cap — so the hand-off is content
- * resolving, not a layout swap.
+ * channel detail resolves.
  *
- * THE LEADING BAR IS SHAPED DIFFERENTLY PER WIDTH, because the live bar is: at
- * `md:`+ it reserves a short, heading-weight name; below `md:` the name is in
- * the shell bar and this row carries the channel's purpose on one quiet line,
- * so the shape that resolves is a full-width text run, not a 9rem stub.
+ * ── THE BAR IS TRACED OFF `ChannelPlaceHeader`, ELEMENT BY ELEMENT ─────────
+ * Same wrapper (`v2-screen-bar`, so the notch strip is padded in BOTH states —
+ * without it a notched phone dropped the whole screen by the inset the moment
+ * the real bar arrived), same `max-w-3xl px-4` column, same `h-14` row, same
+ * `gap-2`, and the same children in the same order at each width:
  *
- * THERE IS NO TAB-STRIP ROW HERE ANY MORE, because there is none on the live
- * screen: the sections ride inside the bar at `md:`+ and a bottom bar on a
- * phone, and neither of those reserves a row above the transcript.
+ *   below `md:`  back chevron (`size-10`, `-ml-2`) · space crest (`size-8`
+ *                `rounded-lg`) · a TWO-LINE stack, the channel over its purpose
+ *                · the faces · one overflow button
+ *   `md:` and up the visibility glyph · the heading-weight name · the space
+ *                chip (`md:` → `lg:` only, where the live one runs)
+ *
+ * That list is the whole contract, and it is worth stating plainly because
+ * breaking it is what the owner filmed on 15 August 2026: the frame still drew
+ * the pre-phase-3 bar — one small square and a full-width text run — so the
+ * channel's name landed 112px to the left of where the real header would put
+ * it and slid across the screen on hand-off. A skeleton that reserves the wrong
+ * shape is worse than no skeleton: it promises a layout and then breaks it.
+ *
+ * IF `ChannelPlaceHeader`'S PHONE ROW CHANGES, THIS CHANGES WITH IT. There is
+ * no shared component to enforce that — the live bar holds a crest, a heading,
+ * a presence stack and a menu, none of which a hook-free inert fallback may
+ * mount — so the enforcement is this note and a measured screenshot.
+ *
+ * THERE IS NO TAB-STRIP ROW HERE, because there is none on the live screen:
+ * the sections ride inside the bar at `xl:`+ and a bottom bar on a phone, and
+ * neither reserves a row above the transcript.
+ *
+ * ── AND WHEN THE LIST ALREADY KNEW, IT SAYS SO ─────────────────────────────
+ * Owner, 15 August 2026: "why have full skeletons that are empty when the list
+ * page it's coming from already has some of the details needed". The row the
+ * reader tapped carries the channel's name, its purpose and its space — so with
+ * `identity` supplied the bar prints them from the first frame and the only
+ * thing that resolves later is the conversation itself.
+ *
+ * ONLY WHAT CANNOT BE STALE IS TAKEN. A name, a purpose and a space crest are
+ * settled facts about the room; whether this reader may WRITE in it is not, and
+ * is never seeded — the screen still waits for the detail before it rules on
+ * access, so nothing here can put up a Join button it has to take back. See
+ * {@link ChannelFrameIdentity}.
  */
-export function ChannelScreenFrame({ still = false }: { still?: boolean }) {
+
+/**
+ * What the frame may print before the channel detail lands: exactly the fields
+ * a cached list row carries and nothing derived from a permission.
+ */
+export interface ChannelFrameIdentity {
+  /** `channelDisplayName` of the row — a thread's title, a channel's name. */
+  name: string;
+  /** `channelPhoneSubtitle` of the row — the same line the live bar prints. */
+  subtitle: string;
+  /** The visibility glyph shown at `md:` and up. */
+  visibility: Channel['visibility'];
+  visibilityLabel: string;
+  space: Channel['space'];
+}
+
+export function ChannelScreenFrame({
+  still = false,
+  identity = null,
+}: {
+  still?: boolean;
+  /** The tapped row's identity; `null` on a cold arrival keeps the silhouette. */
+  identity?: ChannelFrameIdentity | null;
+}) {
   const bar = still ? 'animate-none' : undefined;
+  const VisibilityIcon = identity
+    ? channelVisibilityFace(identity.visibility).icon
+    : null;
   return (
     <div className="relative flex h-full min-h-0 flex-col">
-      {/* The one header bar */}
-      <div className="shrink-0 border-b">
-        <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-2 px-4">
-          <Skeleton className={cn('size-4 shrink-0 rounded', bar)} />
-          <Skeleton
-            className={cn('h-3.5 min-w-0 flex-1 rounded md:h-4 md:w-36 md:flex-none', bar)}
-          />
-          <Skeleton className={cn('hidden h-6 w-28 rounded-full md:block', bar)} />
-          <div className="flex items-center justify-end gap-1.5 md:flex-1">
-            <Skeleton className={cn('size-6 shrink-0 rounded-full', bar)} />
-            <Skeleton className={cn('h-8 w-16 shrink-0 rounded-lg', bar)} />
+      {/* The one header bar — see the docblock: this traces the live one. */}
+      <div className="v2-screen-bar shrink-0 border-b bg-background">
+        <div className="mx-auto w-full max-w-3xl px-4">
+          <div className="flex h-14 items-center gap-2">
+            {/* Phone: the way back. A box, not a bar — the glyph inside the
+                live control is what this reserves, and it is centred in the
+                same 40px target. It stays a shape even when the identity is
+                known: the frame is inert, and a chevron that cannot be pressed
+                is worse than one that has not arrived. */}
+            <div className="-ml-2 flex size-10 shrink-0 items-center justify-center md:hidden">
+              <Skeleton className={cn('size-5 rounded', bar)} />
+            </div>
+
+            {/* Phone: the identity cluster, crest + two lines. `flex-1` because
+                the live one is, so the trailing cluster sits at the same end of
+                the row in both. */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 py-1 pr-1 md:hidden">
+              {identity ? (
+                <SpaceCrest
+                  uuid={identity.space.uuid}
+                  name={identity.space.name}
+                  type={identity.space.type}
+                  size="sm"
+                  className="size-8 shrink-0 rounded-lg"
+                />
+              ) : (
+                <Skeleton className={cn('size-8 shrink-0 rounded-lg', bar)} />
+              )}
+              {identity ? (
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="min-w-0 truncate text-sm leading-tight font-semibold text-foreground">
+                    {identity.name}
+                  </span>
+                  <span className="min-w-0 truncate text-[11px] leading-tight text-muted-foreground">
+                    {identity.subtitle}
+                  </span>
+                </span>
+              ) : (
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <Skeleton className={cn('h-3.5 w-32 max-w-full rounded', bar)} />
+                  <Skeleton className={cn('h-2.5 w-20 max-w-full rounded', bar)} />
+                </div>
+              )}
+            </div>
+
+            {/* `md:` and up: glyph, name, space chip. The chip is a `span` and
+                not the live `Link` — nothing in a fallback may be pressable. */}
+            <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
+              {VisibilityIcon ? (
+                <VisibilityIcon
+                  aria-hidden
+                  className="size-4 shrink-0 text-muted-foreground"
+                />
+              ) : (
+                <Skeleton className={cn('size-4 shrink-0 rounded', bar)} />
+              )}
+              {identity ? (
+                <span className="min-w-0 truncate text-base leading-tight font-semibold">
+                  {identity.name}
+                </span>
+              ) : (
+                <Skeleton className={cn('h-4 w-36 shrink-0 rounded', bar)} />
+              )}
+              {identity ? (
+                <span className="hidden min-w-0 max-w-56 shrink items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-1 text-xs text-muted-foreground md:inline-flex lg:hidden">
+                  <SpaceCrest
+                    uuid={identity.space.uuid}
+                    name={identity.space.name}
+                    type={identity.space.type}
+                    size="sm"
+                    className="size-5 rounded"
+                  />
+                  <span className="min-w-0 truncate">{identity.space.name}</span>
+                </span>
+              ) : (
+                <Skeleton
+                  className={cn('h-6 w-28 shrink-0 rounded-full lg:hidden', bar)}
+                />
+              )}
+            </div>
+
+            {/* The faces, at `HereNow`'s own resting geometry — three discs,
+                `-space-x-1`, ringed in the background so the overlap reads. */}
+            <div aria-hidden className="flex shrink-0 -space-x-1">
+              {[0, 1, 2].map((index) => (
+                <Skeleton
+                  key={index}
+                  className={cn('ring-background size-6 rounded-full ring-2', bar)}
+                />
+              ))}
+            </div>
+
+            {/* The overflow. Icon-only below `sm:`, where the live button drops
+                the word "More". */}
+            <Skeleton
+              className={cn('h-8 w-8 shrink-0 rounded-lg sm:w-[4.5rem]', bar)}
+            />
           </div>
         </div>
       </div>
@@ -553,10 +693,14 @@ export function ChannelScreenFrame({ still = false }: { still?: boolean }) {
           <ChannelFeedSkeleton still={still} />
         </div>
       </div>
-      {/* The composer, on the transcript's own column */}
+      {/* The composer, on the transcript's own column. 82px is the live
+          composer's resting height, measured at 390px — a text row over its
+          own row of controls. `h-13` reserved 52px, which is the box without
+          the controls, so the transcript's clearance shrank by 30px the moment
+          the real one mounted. */}
       <div className="absolute inset-x-0 bottom-0">
         <div className="v2-safe-bottom mx-auto w-full max-w-3xl px-4 pb-3">
-          <Skeleton className={cn('h-13 w-full rounded-2xl', bar)} />
+          <Skeleton className={cn('h-[5.125rem] w-full rounded-2xl', bar)} />
         </div>
       </div>
     </div>

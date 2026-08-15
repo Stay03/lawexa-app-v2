@@ -32,6 +32,28 @@ export function channelDisplayName(
 }
 
 /**
+ * The second line of the phone bar — what a channel is FOR, in one line.
+ *
+ * The description wins, because that is what the reader wants to know; a thread
+ * says where it branched from, because that is what a reader who landed in one
+ * from a mention wants; and a plain channel with no description falls back to
+ * who can see it, which the lock glyph beside it can only imply.
+ *
+ * IT IS HERE RATHER THAN IN THE HEADER because two surfaces print it now: the
+ * live bar, and the loading frame that draws the same bar from the row the
+ * reader tapped. A subtitle that differed between them would be the frame
+ * saying one thing and the header saying another, one paint apart.
+ */
+export function channelPhoneSubtitle(
+  channel: Pick<Channel, 'description' | 'visibility_label'>,
+  /** The parent's name when this is a thread; `null` otherwise. */
+  parentName: string | null,
+): string {
+  const description = channel.description?.trim() || null;
+  return description ?? (parentName ? `Thread in ${parentName}` : null) ?? channel.visibility_label;
+}
+
+/**
  * Where a thread's way back goes: the parent channel, landing on the message
  * this thread branched out of.
  *

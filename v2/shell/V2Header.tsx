@@ -12,6 +12,7 @@ import {
   useCollabHeader,
   type CollabHeaderContext,
 } from '@/v2/features/collab/shell/collab-header';
+import { parseCollabRoute } from '@/v2/features/collab/shell/collab-route';
 import {
   CollabHeaderBack,
   CollabHeaderRailToggle,
@@ -96,6 +97,26 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   const isConversation = path.startsWith('/c/');
   const isCase = /^\/cases\/[^/]/.test(path);
   const expectsContext = isConversation || isCase;
+  /**
+   * ONE BAR ON A PHONE, DECIDED BY THE ADDRESS AND NOTHING ELSE.
+   *
+   * A channel screen carries its own bar below `md:` and this one stands down
+   * (mobile overhaul, phase 3). That used to be a signal the collab frame
+   * PUBLISHED once its channel query landed — which meant the answer arrived
+   * two paints late, and the phone showed the shell's bar, then the screen's,
+   * with the channel's name jumping between them. The owner filmed it: "double
+   * skeleton, the title jumping from place to place".
+   *
+   * Which screen owns the bar is a fact about the ROUTE. `/channels/{uuid}`
+   * always has a screen bar; `/spaces/{uuid}` never does. So it is read off the
+   * pathname, synchronously, before any request — the same answer on the server
+   * render, the first client paint and every paint after it.
+   *
+   * THE OTHER HALF OF THIS RULE LIVES IN `ChannelScreen`: on this route the
+   * screen must paint a bar in EVERY state it can be in, refusals included,
+   * because this one is no longer there to fall back on.
+   */
+  const screenOwnsPhoneBar = parseCollabRoute(path).kind === 'channel';
   // Quiet orientation label for the left cluster — a category, NOT the title.
   const leftLabel = isHome
     ? 'Home'
@@ -114,9 +135,9 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         // documents for the bottom edge).
         'v2-safe-top grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-2 px-3',
         // ONE BAR ON A PHONE. Inside a channel the screen paints its own, so
-        // this one gets out of the way below `md:` — see `barOwner` in
-        // collab-header.ts. A CSS variant, never a viewport hook.
-        collab?.barOwner === 'screen' && 'max-md:hidden',
+        // this one gets out of the way below `md:` — see `screenOwnsPhoneBar`
+        // above. A CSS variant, never a viewport hook.
+        screenOwnsPhoneBar && 'max-md:hidden',
       )}
     >
       {/* LEFT cluster. */}

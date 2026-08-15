@@ -22,7 +22,7 @@ import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { ChannelTab } from '../model';
-import { channelDisplayName } from '../thread-model';
+import { channelDisplayName, channelPhoneSubtitle } from '../thread-model';
 import type { ChannelPresence } from '../room';
 import { HereNow } from './HereNow';
 import { SectionSwitch, type ChannelSection, type SectionCounts } from './SectionSwitch';
@@ -209,11 +209,9 @@ export function ChannelPlaceHeader({
   const total = channel.active_members_count;
   const countLabel = `${total} ${total === 1 ? 'member' : 'members'}`;
 
-  /** What the phone bar says under the channel's name. The description is what
-   *  the channel is FOR, so it wins; a thread says where it branched from,
-   *  because that is the thing a reader lands in a thread wanting; and a plain
-   *  channel with no description falls back to who can see it. */
-  const phoneSubtitle = description ?? (parent?.name ? `Thread in ${parent.name}` : null) ?? channel.visibility_label;
+  /** What the phone bar says under the channel's name — resolved in
+   *  `thread-model` so the loading frame can print the same line. */
+  const phoneSubtitle = channelPhoneSubtitle(channel, parent?.name ?? null);
   /** Back really goes back when the parent is the screen behind; on a cold
    *  landing it stays the link it has always been. */
   const backToParent = useBackTo(parent?.href ?? `/spaces/${channel.space.uuid}`);

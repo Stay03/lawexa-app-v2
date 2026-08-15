@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
+import { useBackTo } from '@/v2/runtime/back-to';
 import {
   Bell,
   Bookmark,
+  ChevronLeft,
   GitBranch,
   Loader2,
   LogOut,
@@ -49,6 +52,7 @@ import { useRequestChannelAccess } from '@/v2/features/invites/queries';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   ChannelComposer,
   type ChannelComposerHandle,
@@ -78,6 +82,7 @@ import { ChannelEditDialog } from '../dialogs/ChannelEditDialog';
 import { GameOverlay } from '../quiz/GameOverlay';
 import { LiveQuizBar } from '../quiz/LiveQuizBar';
 import { QuizLibrarySheet } from '../quiz/QuizLibrarySheet';
+import { useCachedChannelIdentity } from './cached-identity';
 import { ChannelAboutSheet } from './ChannelAboutSheet';
 import { EnablePushNudge } from './EnablePushNudge';
 import {
@@ -246,6 +251,12 @@ export function ChannelScreen({
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
 
   const detailQuery = useQuery(channelsQueries.detail(channelUuid, { viewerId }));
+  /* What the list this reader came from already knew about this channel — the
+     name, the purpose, the space. It fills the frame below while the detail is
+     in flight, so the bar the route boundary drew does not empty itself out
+     between the boundary being deleted and the detail arriving. Identity only:
+     every access ruling still waits for the detail (see `CachedChannelFrame`). */
+  const cachedIdentity = useCachedChannelIdentity(channelUuid);
   const channel = detailQuery.data?.data;
   const isThread = channel?.is_thread === true;
   const parentUuid = channel?.parent_channel_uuid ?? null;
@@ -690,7 +701,7 @@ export function ChannelScreen({
      which this screen could paint a refusal it would have to take back a beat
      later. */
   if (detailQuery.isPending) {
-    return <ChannelScreenFrame />;
+    return <ChannelScreenFrame identity={cachedIdentity} />;
   }
 
   // `!access` is the SAME condition as `!channel` (it is derived from it),
@@ -699,17 +710,17 @@ export function ChannelScreen({
     const status = detailQuery.isError
       ? extractApiError(detailQuery.error).status
       : 0;
-    if (status === 403) {
-      return (
-        <div className="mx-auto w-full max-w-3xl px-4">
-          <ChannelAccessDeniedState />
-        </div>
-      );
-    }
     return (
-      <div className="mx-auto w-full max-w-3xl px-4">
-        <ChannelErrorState onRetry={() => void detailQuery.refetch()} />
-      </div>
+      <>
+        <RefusalBar />
+        <div className="mx-auto w-full max-w-3xl px-4">
+          {status === 403 ? (
+            <ChannelAccessDeniedState />
+          ) : (
+            <ChannelErrorState onRetry={() => void detailQuery.refetch()} />
+          )}
+        </div>
+      </>
     );
   }
 
@@ -1461,3 +1472,46 @@ const AI_PANEL_PREFIX = 'ai:';
  *  the header and the intro the SAME array every render (a fresh `[]` would
  *  re-render both on every unrelated cache write). */
 const NO_FACES: readonly SlimUser[] = [];
+
+/**
+ * RefusalBar — the bar a channel wears when there is no channel.
+ *
+ * Below `md:` the shell's bar stands down on every `/channels/{uuid}` address,
+ * decided by the pathname alone (see `screenOwnsPhoneBar` in `V2Header`). That
+ * is what stops the two-bar shuffle on the way in, and it comes with an
+ * obligation: on this route the SCREEN paints the phone's only bar in every
+ * state it can be in. A refusal is one of those states, and without this it
+ * would be the one screen in the product a phone reader could reach with no
+ * chrome at all — no way up, no way out but the system gesture.
+ *
+ * It carries the one control a refusal can honestly offer. There is no name to
+ * print (a 403 will not say whether the channel exists, and must not) and no
+ * crest to draw, so the bar holds the way back and nothing else — which is also
+ * why it is not `ChannelPlaceHeader` with empty slots.
+ *
+ * `md:hidden`, because at that width the shell's bar is back and this would be
+ * a second one. `/spaces` rather than the space it was in: a refused channel
+ * never named its space.
+ */
+function RefusalBar() {
+  const back = useBackTo('/spaces');
+  return (
+    <div className="v2-screen-bar shrink-0 border-b bg-background md:hidden">
+      <div className="mx-auto w-full max-w-3xl px-4">
+        <div className="flex h-14 items-center gap-2">
+          <Link
+            {...back}
+            aria-label="Back to your spaces"
+            className={cn(
+              'v2-interactive -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full',
+              'text-muted-foreground',
+              FOCUS_RING,
+            )}
+          >
+            <ChevronLeft aria-hidden className="size-5" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

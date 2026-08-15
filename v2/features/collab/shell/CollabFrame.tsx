@@ -13,7 +13,9 @@ import {
   channelDisplayName,
   threadParentHref,
 } from '@/v2/features/channels/thread-model';
+import { useCachedChannelIdentity } from '@/v2/features/channels/screen/cached-identity';
 import { collabAccessState } from '@/v2/features/collab/model';
+import { useCachedSpaceIdentity } from '@/v2/features/spaces/detail/cached-identity';
 import { ChannelFormDialog } from '@/v2/features/spaces/dialogs/ChannelFormDialog';
 import { SpaceMembersSheet } from '@/v2/features/spaces/detail/SpaceMembersSheet';
 import { canManageSpace, isSpaceOwner, roleInRoster } from '@/v2/features/spaces/model';
@@ -255,12 +257,33 @@ function CollabPlaceFrame({
   const placeRefused =
     spaceQuery.isError || (channelUuid !== null && channelQuery.isError);
 
+  /**
+   * The place's crest and name, from the freshest source that HAS one.
+   *
+   * The last two are the seeding the owner asked for on 15 August 2026 ("why
+   * have full skeletons that are empty when the list page already has some of
+   * the details"): the row the reader tapped is still in the cache, and it
+   * names the space either directly or through the channel's own `space` stub.
+   * So the header's crest and title paint on the first frame instead of
+   * shimmering for the length of a round trip.
+   *
+   * ORDER IS TRUTH, NOT PREFERENCE. A live payload always wins; a cached row is
+   * only consulted when there is nothing better, and it only ever supplies a
+   * uuid, a name and a type — none of which can have changed between the tap
+   * and the paint, and none of which is a permission.
+   */
+  const cachedSpace = useCachedSpaceIdentity(isSpaceRoute ? route.spaceUuid : null);
+  const cachedChannel = useCachedChannelIdentity(channelUuid);
+
   const identity: CollabSpaceIdentity | null = useMemo(
     () =>
-      space
+      (space
         ? { uuid: space.uuid, name: space.name, type: space.type }
-        : (channel?.space ?? null),
-    [space, channel],
+        : (channel?.space ?? cachedChannel?.space)) ??
+      (cachedSpace
+        ? { uuid: cachedSpace.uuid, name: cachedSpace.name, type: cachedSpace.type }
+        : null),
+    [space, channel, cachedChannel, cachedSpace],
   );
 
   const previews = useMemo(
@@ -367,10 +390,6 @@ function CollabPlaceFrame({
       backHref,
       backLabel,
       openRail,
-      // A channel screen carries its own bar on a phone; a space lobby does
-      // not, so there the shell bar stays. `channelName` is null on exactly the
-      // space routes, which is why it is the test.
-      barOwner: channelName === null ? 'shell' : 'screen',
     });
     return () => clearCollabHeader();
   }, [
