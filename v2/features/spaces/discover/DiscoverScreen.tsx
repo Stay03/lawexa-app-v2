@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Compass, Loader2, Search, Users } from 'lucide-react';
@@ -101,11 +101,28 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
   );
 }
 
-export function DiscoverScreen() {
-  const [term, setTerm] = useState('');
-  const query = useDiscoverSpaces({ search: term.trim() || undefined });
-  const rows = query.data?.data ?? [];
-
+/**
+ * The chrome, once. The title, the sentence under it and the search field are
+ * the same at every stage of the wait, so they are written in ONE place and the
+ * only thing that changes is what sits in the rows slot.
+ *
+ * This exists because the route boundary (`app/v2/spaces/discover/loading.tsx`)
+ * has to paint the identical shape the live screen paints, and a hand-drawn
+ * copy of a frame diverges from the real one within two design rounds — the
+ * lesson `home-frame.ts` was built to enforce, applied here.
+ *
+ * `search` is the FIELD, passed in rather than assumed: the live screen gives a
+ * real, typed-into input, and the fallback gives a still one that waits on
+ * nothing. Static controls are a reserved shape and never a pulsing skeleton
+ * (standards §8i) — only the rows pulse.
+ */
+function DiscoverFrame({
+  search,
+  children,
+}: {
+  search: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
@@ -121,6 +138,65 @@ export function DiscoverScreen() {
           aria-hidden
           className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
         />
+        {search}
+      </div>
+
+      <div className="mt-5">{children}</div>
+    </div>
+  );
+}
+
+/** The three waiting cards, shared by the route boundary and the live screen so
+ *  the hand-off between them moves nothing. */
+function DiscoverRowsFallback() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-28 w-full rounded-xl" />
+      <Skeleton className="h-28 w-full rounded-xl" />
+      <Skeleton className="h-28 w-full rounded-xl" />
+    </div>
+  );
+}
+
+/**
+ * The route-level fallback for `/spaces/discover`.
+ *
+ * Until the mobile overhaul's phase 8 this route had NO boundary of its own, so
+ * a cold arrival fell through to the deliberately-empty v2 segment boundary and
+ * the reader got a blank beat and then a finished page. Blank is the right
+ * answer for a boundary that cannot know its destination; it is the wrong answer
+ * for a destination that knows exactly what it looks like.
+ *
+ * The field here is `readOnly` rather than `disabled`: it is a picture of the
+ * control that is about to arrive, and a disabled control announces itself as
+ * refused. Read-only announces itself as not yet ready, which is the truth.
+ */
+export function DiscoverFallback() {
+  return (
+    <DiscoverFrame
+      search={
+        <Input
+          readOnly
+          value=""
+          placeholder="Search by name"
+          className="pl-9"
+          aria-label="Search public spaces"
+        />
+      }
+    >
+      <DiscoverRowsFallback />
+    </DiscoverFrame>
+  );
+}
+
+export function DiscoverScreen() {
+  const [term, setTerm] = useState('');
+  const query = useDiscoverSpaces({ search: term.trim() || undefined });
+  const rows = query.data?.data ?? [];
+
+  return (
+    <DiscoverFrame
+      search={
         <Input
           value={term}
           onChange={(event) => setTerm(event.target.value)}
@@ -128,15 +204,11 @@ export function DiscoverScreen() {
           className="pl-9"
           aria-label="Search public spaces"
         />
-      </div>
-
-      <div className="mt-5">
+      }
+    >
+      <>
         {query.isPending ? (
-          <div className="space-y-3">
-            <Skeleton className="h-28 w-full rounded-xl" />
-            <Skeleton className="h-28 w-full rounded-xl" />
-            <Skeleton className="h-28 w-full rounded-xl" />
-          </div>
+          <DiscoverRowsFallback />
         ) : query.isError ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             Couldn&rsquo;t load spaces. Check your connection and try again.
@@ -154,7 +226,7 @@ export function DiscoverScreen() {
             ))}
           </ul>
         )}
-      </div>
-    </div>
+      </>
+    </DiscoverFrame>
   );
 }
