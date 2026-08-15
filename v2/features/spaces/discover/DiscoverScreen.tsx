@@ -173,19 +173,31 @@ function DiscoverRowsFallback() {
  */
 export function DiscoverFallback() {
   return (
-    <DiscoverFrame
-      search={
-        <Input
-          readOnly
-          value=""
-          placeholder="Search by name"
-          className="pl-9"
-          aria-label="Search public spaces"
-        />
-      }
-    >
-      <DiscoverRowsFallback />
-    </DiscoverFrame>
+    <>
+      {/* EVERY FALLBACK IN v2 ANNOUNCES ITSELF, and not only for the screen
+          reader that is the point of it. Each line is distinct — "Loading case"
+          against "Loading cases" — so the SEQUENCE of announcements across a
+          navigation is the loading chain, readable by a test. That is what
+          finally caught the wrong-shaped skeleton on 15 August after it had
+          been declared fixed twice. A fallback that says nothing is invisible
+          to that test, and this one was. */}
+      <span role="status" className="sr-only">
+        Loading public spaces
+      </span>
+      <DiscoverFrame
+        search={
+          <Input
+            readOnly
+            value=""
+            placeholder="Search by name"
+            className="pl-9"
+            aria-label="Search public spaces"
+          />
+        }
+      >
+        <DiscoverRowsFallback />
+      </DiscoverFrame>
+    </>
   );
 }
 
