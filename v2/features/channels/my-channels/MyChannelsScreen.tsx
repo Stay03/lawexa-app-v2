@@ -16,16 +16,20 @@ import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
 import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { SearchField, SearchFieldShape } from '@/v2/shell/SearchField';
 import { TabRow } from '@/v2/shell/TabRow';
+import { roomActivityAt } from '../model';
 import { channelsQueries } from '../queries';
 import { groupByRecency } from '../recency';
 import {
   MY_CHANNEL_LENSES,
+  NO_MY_THREADS,
   matchesChannelSearch,
   matchesLens,
+  mergeMyRooms,
   parseMyChannelsLens,
   type MyChannelsLens,
 } from './model';
 import { MyChannelRow } from './MyChannelRow';
+import { MyThreadRow } from './MyThreadRow';
 import {
   MyChannelsEmptyState,
   MyChannelsErrorState,
@@ -34,26 +38,50 @@ import {
 } from './states';
 
 /**
- * MyChannelsScreen — the `/channels` index: every channel you belong to, in
- * one stream, with the last message previewed. It is the home screen of every
- * chat product, and until this wave nothing in the app linked to it (the fix
- * is the "Channels" nav row above Spaces — `v2/shell/nav.config.ts`).
+ * MyChannelsScreen — the `/channels` index: every channel and thread you belong
+ * to, in one stream, newest first. It is the home screen of every chat product,
+ * and until this wave nothing in the app linked to it (the fix is the "Channels"
+ * nav row above Spaces — `v2/shell/nav.config.ts`).
  *
  * ── IT SHARES THE SPINE'S CACHE ENTRY, ON PURPOSE ──────────────────────────
  * `channelsQueries.mine({ viewerId })` — NO extra params — is the EXACT key
  * the realtime spine mounts for every eligible viewer, so arriving here paints
- * a full list in the first frame with no request of its own, and the spine's
- * `.channel.unread` writers keep these rows live while the screen is open.
+ * the channel rows in the first frame from a cache somebody else filled, and the
+ * spine's `.channel.unread` writers keep them live while the screen is open.
  * Matching the spine's params is what buys that, and it is why the lens and
  * the search box below are CLIENT-SIDE LENSES over the cached rows rather than
  * request parameters: the params object is part of the key, so a `?search=`
  * on the wire would fork a second cache entry and mint a fetch per keystroke.
  *
+ * The THREAD half below is this screen's own request, the one thing here that is
+ * not free, and the gates further down are shaped around protecting that first
+ * frame from it. Its rows get the same live writers regardless: `myThreads` is
+ * keyed under the same `lists()` prefix the `.channel.unread` fan-out walks.
+ *
+ * ── THREADS ARE IN THIS LIST TOO (2026-08-16) ──────────────────────────────
+ * `GET /api/channels` applies `topLevel()` and returns channels only, so a
+ * reader tagged in a THREAD opened "My channels", met a screen of channels with
+ * previews, and could not see the thread that tagged them anywhere. That is the
+ * hole the space lobby had, reported again here with a screenshot. The fix is
+ * the same fix: `GET /threads`, the cross-space twin of that listing, read
+ * through `channelsQueries.myThreads` and merged into ONE ranked list by
+ * `mergeMyRooms`, so the thread that lit the badge can be row one.
+ *
+ * A thread joins the SAME date sections as a channel and is NOT given a section
+ * of its own. A heading called "Threads" would sort a triage list by kind, and
+ * kind is the one thing the reader is not triaging by: they are looking for
+ * what is new, and a thread is new in exactly the way a channel is.
+ *
  * ── WHAT THE SERVER DECIDES, AND WHAT THIS SCREEN THEREFORE DOES NOT ───────
- * `GET /api/channels` is server-sorted by newest activity (empty channels
- * last), so there is no sort control and the grouping never re-orders: Today /
- * This week / Earlier are HEADINGS cut into the server's ranking, not a
- * re-ranking of it.
+ * Both routes are server-sorted by newest activity, and the screen used to lean
+ * on that entirely: Today / This week / Earlier were HEADINGS cut into the
+ * server's ranking with no client sort at all. Merging a second ranked list ends
+ * that, because two lists each sorted by newest activity are not one list sorted
+ * by newest activity. So the merge now ranks, on the same
+ * `last_message_at ?? created_at` clock both thread routes order by
+ * (`roomActivityAt`), and the headings are cut into THAT. There is still no sort
+ * control: there is one order, and it is the server's rule applied to both
+ * halves.
  *
  * MUTED ROWS — CLAIM NOT YET VERIFIED ON THE WIRE. The July 18 exchange
  * describes this route as excluding muted channels unless they hold a mention
@@ -93,24 +121,52 @@ export function MyChannelsScreen() {
     enabled: eligible,
   });
 
+  /**
+   * The thread half. CALLED BARE, exactly as `mine` is, and for two reasons.
+   * The params object is part of the key, so a bare call is the entry any other
+   * consumer would reach for by default (the nav signal already does that with
+   * `mine`), and a spelt-out page size here would quietly fork a second entry
+   * the day one of them wants it. It also lands both halves on the same DEPTH:
+   * `getMyThreads` and `getMine` both default to 20 per page, so the merged list
+   * is cut off at one place rather than showing month-old threads beside
+   * channels that fell off a shorter page.
+   *
+   * Gated on `eligible` like its twin: an unverified or out-of-audience
+   * account's collab reads are refused at the door, so the request is not worth
+   * spending.
+   */
+  const threadsQuery = useQuery({
+    ...channelsQueries.myThreads({ viewerId }),
+    enabled: eligible,
+  });
+
   const searchParams = useSearchParams();
   const lens = parseMyChannelsLens(searchParams.get('lens'));
   const search = useUrlSearch();
   const { committedSearch, onClear } = search;
 
   const channels = useMemo(() => query.data?.data ?? [], [query.data]);
+  /* The frozen empty default while the threads list is pending, refused or
+     ungated: a fresh `[]` would give the merge memo below a new dependency on
+     every render and re-rank the whole list for nothing. */
+  const threads = threadsQuery.data?.data ?? NO_MY_THREADS;
+
+  const rooms = useMemo(() => mergeMyRooms(channels, threads), [channels, threads]);
 
   const visible = useMemo(
     () =>
-      channels.filter(
-        (channel) =>
-          matchesLens(channel, lens) && matchesChannelSearch(channel, committedSearch),
+      rooms.filter(
+        (room) => matchesLens(room, lens) && matchesChannelSearch(room, committedSearch),
       ),
-    [channels, lens, committedSearch],
+    [rooms, lens, committedSearch],
   );
 
+  /* Grouped on the SAME clock the merge ranked by, never on `last_message_at`
+     alone: a thread nobody has answered yet has a null stamp, and reading that
+     directly would date every newborn thread as "Earlier" while the row above it
+     said it was the newest thing here. */
   const sections = useMemo(
-    () => groupByRecency(visible, now, (channel) => channel.last_message_at),
+    () => groupByRecency(visible, now, roomActivityAt),
     [visible, now],
   );
 
@@ -123,15 +179,46 @@ export function MyChannelsScreen() {
     onClear();
   }, [onClear]);
 
-  const apiError = query.error ? extractApiError(query.error) : null;
+  /* One list, one "try again": the panel says it about the list, and the list
+     now has two halves. The two `refetch`s are read off the results first
+     because a query result object is a new reference on every render, so
+     depending on the results themselves would rebuild this callback each time. */
+  const refetchChannels = query.refetch;
+  const refetchThreads = threadsQuery.refetch;
+  const retry = useCallback(() => {
+    void refetchChannels();
+    void refetchThreads();
+  }, [refetchChannels, refetchThreads]);
+
+  const failure = query.error ?? threadsQuery.error;
+  const apiError = failure ? extractApiError(failure) : null;
   const explainedError =
     apiError && apiError.status >= 400 && apiError.status < 500
       ? apiError.message
       : undefined;
 
-  const showSkeleton = query.isPending;
-  const showError = query.isError && channels.length === 0;
-  const showEmpty = !showSkeleton && !showError && channels.length === 0;
+  /**
+   * ── THE GATES ARE ASYMMETRIC, ON PURPOSE ──────────────────────────────────
+   * The channel half is the one the spine keeps warm, so it decides the
+   * skeleton: waiting for the thread half as well would trade this screen's one
+   * prized property (arriving paints a full list in the FIRST FRAME, from a
+   * cache somebody else filled) for a cold skeleton on every first visit, since
+   * nothing mounts `myThreads` app-wide. Thread rows are additive, and they
+   * arrive with the list's own fade rather than replacing anything.
+   *
+   * The one case where the thread half does hold the paint is when there are no
+   * channels at all: claiming "No channels yet" while `/threads` is still in
+   * flight would flash an empty state at a reader who has threads, and an empty
+   * state that is then contradicted is worse than a beat of skeleton.
+   *
+   * EMPTINESS AND FAILURE BOTH COUNT BOTH HALVES. Guarding either on the
+   * channels alone would blank real thread rows behind a panel - the exact
+   * mistake that put this screen in a screenshot.
+   */
+  const nothingKnown = channels.length === 0 && threads.length === 0;
+  const showSkeleton = query.isPending || (nothingKnown && threadsQuery.isPending);
+  const showError = (query.isError || threadsQuery.isError) && nothingKnown;
+  const showEmpty = !showSkeleton && !showError && nothingKnown;
   const showNoMatch =
     !showSkeleton && !showError && !showEmpty && visible.length === 0;
 
@@ -150,7 +237,13 @@ export function MyChannelsScreen() {
       onChange={search.onInputChange}
       onClear={search.onClear}
       placeholder="Search channels"
-      label="Search your channels by name or space"
+      // The PLACEHOLDER stays as it was and the LABEL widens. Threads are in
+      // this list, but a thread IS a channel in this product's own vocabulary
+      // (which is why `channelDisplayName` exists at all), so "Search channels"
+      // promises nothing it does not deliver - while a longer placeholder would
+      // truncate in the narrow top position and say less, not more. The label is
+      // where the full scope belongs: it is read out, never clipped.
+      label="Search your channels and threads by name, space or parent channel"
     />
   );
 
@@ -198,10 +291,7 @@ export function MyChannelsScreen() {
         {showSkeleton ? (
           <MyChannelsSkeleton />
         ) : showError ? (
-          <MyChannelsErrorState
-            message={explainedError}
-            onRetry={() => void query.refetch()}
-          />
+          <MyChannelsErrorState message={explainedError} onRetry={retry} />
         ) : showEmpty ? (
           <MyChannelsEmptyState />
         ) : showNoMatch ? (
@@ -226,14 +316,23 @@ export function MyChannelsScreen() {
                     {section.label}
                   </h2>
                   <ul className="flex flex-col divide-y divide-border/60">
-                    {section.rows.map((channel, index) => (
-                      <MyChannelRow
-                        key={channel.uuid}
-                        channel={channel}
-                        now={now}
-                        index={offset + index}
-                      />
-                    ))}
+                    {section.rows.map((room, index) =>
+                      room.is_thread ? (
+                        <MyThreadRow
+                          key={room.uuid}
+                          thread={room}
+                          now={now}
+                          index={offset + index}
+                        />
+                      ) : (
+                        <MyChannelRow
+                          key={room.uuid}
+                          channel={room}
+                          now={now}
+                          index={offset + index}
+                        />
+                      ),
+                    )}
                   </ul>
                 </section>
               );

@@ -131,11 +131,11 @@ const NO_MATCH_COPY: Record<MyChannelsLens, { title: string; description: string
   },
   unread: {
     title: "You're all caught up",
-    description: 'Nothing is unread in any of your channels right now.',
+    description: 'Nothing is unread in any of your channels or threads right now.',
   },
   mentions: {
     title: 'No mentions waiting',
-    description: 'Nobody has @mentioned you in a channel you belong to.',
+    description: 'Nobody has @mentioned you in a channel or thread you belong to.',
   },
 };
 

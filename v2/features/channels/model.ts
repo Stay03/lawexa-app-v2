@@ -9,6 +9,7 @@ import {
   QUIET_GRAMMAR,
   type UnreadGrammar,
 } from '@/v2/features/collab/unread-grammar';
+import { channelDisplayName } from './thread-model';
 
 /**
  * channels model — the pure vocabulary of the W2 channel screen: tab parsing,
@@ -61,6 +62,69 @@ export function channelUnreadGrammar(channel: Channel): UnreadGrammar {
   const unread = !muted && (channel.unread_count ?? 0) > 0;
   if (!unread && mentions <= 0 && !muted) return QUIET_GRAMMAR;
   return { unread, mentions, muted };
+}
+
+/* ── Row ranking: when a room last moved (2026-08-16) ─────────────────────── */
+
+/**
+ * The fields a room is RANKED by. `Pick`ed rather than the whole `Channel` so a
+ * caller can rank a row it only holds part of, and so the two functions below
+ * state exactly what they read.
+ */
+export type RankableRoom = Pick<
+  Channel,
+  'last_message_at' | 'created_at' | 'is_thread' | 'title' | 'name'
+>;
+
+/**
+ * When this room last MOVED: its newest message or, for a room nobody has
+ * spoken in yet, the moment it was created.
+ *
+ * THE `?? created_at` IS THE NULL CASE, AND IT IS LOAD-BEARING. A brand-new
+ * thread carries `last_message_at: null` (a standalone one may hold it for
+ * days), and ranking on that field alone would sink every newborn thread to the
+ * bottom of a list whose one promise is "newest first". Both thread indexes
+ * (`GET /threads`, `GET /spaces/{uuid}/threads`) fall back to `created_at` for
+ * exactly this row, so a merge that did not agree with them would fight the
+ * server on every refetch.
+ *
+ * APPLIED TO BOTH KINDS ON PRINCIPLE: one list, one clock. Ranking a thread by
+ * its creation and a channel by nothing at all would mean two rows sitting side
+ * by side under one heading were dated by different rules. For a channel it
+ * fires only when nothing was ever said there, where creation genuinely IS the
+ * latest activity, and it is what lifts a channel made five minutes ago out of
+ * "Earlier".
+ *
+ * IT LIVES HERE, beside {@link channelUnreadGrammar}, for the same reason that
+ * one does (audit L2): a thread IS a channel on the wire, so the vocabulary for
+ * ranking channel rows belongs to the channels feature and not to whichever
+ * screen needed it first. The space lobby's digest still carries a private twin
+ * of this; that copy should be deleted in favour of this one the next time that
+ * file is open.
+ */
+export function roomActivityAt(
+  room: Pick<Channel, 'last_message_at' | 'created_at'>,
+): string {
+  return room.last_message_at ?? room.created_at;
+}
+
+/** {@link roomActivityAt} as epoch milliseconds. An unparseable stamp scores
+ *  `0`, which sorts it last rather than throwing the whole list into NaN. */
+function roomActivityRank(room: Pick<Channel, 'last_message_at' | 'created_at'>): number {
+  const parsed = Date.parse(roomActivityAt(room));
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Newest first; ties break on the DISPLAY name, never on `name`, because a
+ * thread's `name` is a machine slug nobody should sort by. For a channel the
+ * two are the same string, so a channel-only list is unaffected.
+ */
+export function compareRoomRecency(left: RankableRoom, right: RankableRoom): number {
+  const delta = roomActivityRank(right) - roomActivityRank(left);
+  return delta !== 0
+    ? delta
+    : channelDisplayName(left).localeCompare(channelDisplayName(right));
 }
 
 /* ── Permissions ──────────────────────────────────────────────────────────── */

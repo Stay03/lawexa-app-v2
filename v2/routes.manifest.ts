@@ -88,20 +88,23 @@
  * backend has stopped emitting the old paths AND v1 is gone (phase 7).
  */
 /**
- * `/settings` is EXACT, and that is the whole point of this entry.
+ * EVERY SETTINGS ENTRY IS EXACT, and that is the whole point of them.
  *
- * v2 claims the settings INDEX — the list of every option, in the row grammar
- * the owner settled on 16 August 2026 — and NOTHING under it. `/settings/profile`,
- * `/settings/billing`, `/settings/usage` and the rest keep falling through to
- * v1, unchanged, because they are real settings people need and a row that goes
- * nowhere is worse than one that goes to the page that works. Each joins this
- * list when it is rebuilt; the rows are already in
- * `v2/features/settings/rows.ts` and only their destination has to change.
+ * v2 claims the settings INDEX (the list of every option, in the row grammar
+ * the owner settled on 16 August 2026) and then, one at a time, the options
+ * behind it. `/settings/profile` is the first, rebuilt on 16 August 2026 as the
+ * screen that would tell us whether the settings design carries a form before
+ * the same shape was repeated eleven more times. `/settings/billing`,
+ * `/settings/usage` and the rest keep falling through to v1, unchanged, because
+ * they are real settings people need and a row that goes nowhere is worse than
+ * one that goes to the page that works. Each joins this list when it is
+ * rebuilt; the row is already in `v2/features/settings/rows.ts`, which also
+ * carries the short list of what else has to move with it.
  *
  * A wildcard here would swallow all thirteen v1 settings pages at once and
- * leave twelve of them 404ing in the v2 tree. `'/settings/organization'` below
- * stays where it is: it is the one settings path v2 already claimed, and it is
- * a redirect shell onto `/organization` (owner decision D7).
+ * leave eleven of them 404ing in the v2 tree. `'/settings/organization'` below
+ * stays where it is: it is a redirect shell onto `/organization` (owner
+ * decision D7).
  */
 export const V2_ROUTES = [
   '/',
@@ -120,8 +123,10 @@ export const V2_ROUTES = [
   '/channels/*',
   '/invitations',
   '/organization',
-  // The settings INDEX only — exact, never a wildcard. See the block above.
+  // The settings index and the options rebuilt so far. Each one EXACT, never a
+  // wildcard. See the block above.
   '/settings',
+  '/settings/profile',
   // Legacy collab addresses — v2-only redirect shells (see the block above).
   '/channel-invitations',
   '/space-invitations',

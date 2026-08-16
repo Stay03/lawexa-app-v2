@@ -19,12 +19,12 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
  * settings/rows — every door on the settings screen, in one table.
  *
  * ── WHERE EACH ROW ACTUALLY GOES TODAY (READ THIS BEFORE BUILDING ONE) ─────
- * This is the base of a screen that will be built option by option. ONE row
- * already lands in v2; the rest cross into the classic app through the proxy,
- * exactly as `v2/shell/nav.config.ts` describes for an unmigrated nav row —
- * v2 shell, v1 content, until the route joins `v2/routes.manifest.ts`.
+ * This is a screen built option by option. TWO rows already land in v2; the
+ * rest cross into the classic app through the proxy, exactly as
+ * `v2/shell/nav.config.ts` describes for an unmigrated nav row: v2 shell, v1
+ * content, until the route joins `v2/routes.manifest.ts`.
  *
- *   Profile         /settings/profile        → v1
+ *   Profile         /settings/profile        → V2 (rebuilt, 16 August 2026)
  *   Organization    /organization            → V2 (rebuilt, phase-5 W5)
  *   Usage           /settings/usage          → v1
  *   Billing         /settings/billing        → v1
@@ -34,12 +34,19 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
  *   Notifications   /settings/notifications  → v1
  *   Developer       /settings/developer      → v1
  *
- * BUILDING ONE IS TWO EDITS AND NOTHING ELSE: add the path to
- * `v2/routes.manifest.ts`, and change this row's `href` if the address moves
- * (Organization's did — owner decision D7 lifted it out from under `/settings`).
- * The row, its icon, its group and its audience are already here and do not
- * need to be invented again. A path under `/settings/` is therefore a reliable
- * marker of "still v1" for anyone reading this table.
+ * BUILDING ONE MOVES THREE FILES, and this table is not usually one of them.
+ * The row, its icon, its group and its audience are already here:
+ *
+ *  1. `v2/routes.manifest.ts`: add the EXACT path, so the proxy rewrites it
+ *     into the v2 tree instead of passing it to v1.
+ *  2. `v2/shell/pushed-route.ts`: add the address under `case 'settings'`, so
+ *     the screen gets its back arrow and its title in the bar.
+ *  3. this row's `href`, ONLY if the address moves. Organization's did (owner
+ *     decision D7 lifted it out from under `/settings`); Profile's did not, so
+ *     migrating it changed nothing here but the line above.
+ *
+ * A path under `/settings/` is therefore NOT a marker of "still v1" any more.
+ * The list above is.
  *
  * ── THREE v1 PAGES ARE DELIBERATELY NOT LISTED ─────────────────────────────
  * `/settings/account`, `/settings/api` and `/settings/privacy` render a
@@ -129,6 +136,11 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     label: 'Your account',
     rows: [
       {
+        // THE FIRST OPTION REBUILT IN v2 (16 August 2026), and the address did
+        // not move: `/settings/profile` is where it has always been, and
+        // `v2/routes.manifest.ts` now claims it. It went first because it is
+        // the option people actually open, and because a form is the thing the
+        // settings row grammar had not yet been asked to carry.
         id: 'profile',
         label: 'Profile',
         icon: User,

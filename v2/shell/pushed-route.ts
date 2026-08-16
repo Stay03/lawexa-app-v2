@@ -273,22 +273,34 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       }
       return null;
 
-    // ONLY the settings INDEX. Everything under `/settings/` falls through the
-    // proxy to v1, which wears its own chrome, so this table must not answer
-    // for an address that never reaches the v2 header.
+    // The settings INDEX, and the options REBUILT IN v2. Every other address
+    // under `/settings/` still falls through the proxy to v1, which wears its
+    // own chrome, so this table must not answer for one: an entry here for a v1
+    // page would promise a bar that never paints. A row joins this switch on
+    // the day its route joins `v2/routes.manifest.ts`, and not before.
     //
     // The reference apps put a HAMBURGER on their settings screen, because
     // settings is top-level in their navigation. In ours it is opened from the
     // header's overflow menu, which makes it a screen you pushed into: back
-    // arrow, title in the bar below `md:`, no hamburger. Home is the parent
-    // because the menu is on every screen and `useBackTo` still takes the real
-    // history step whenever the reader did come from somewhere.
+    // arrow, title in the bar below `md:`, no hamburger. Home is the parent of
+    // the index because the menu is on every screen, and `useBackTo` still
+    // takes the real history step whenever the reader did come from somewhere.
     case 'settings':
       if (depth === 1) {
         return {
           backHref: '/',
           backLabel: 'Back to home',
           title: fixed('Settings'),
+        };
+      }
+      // An option is always reached FROM the list of options, so the list is
+      // where "up" goes. The title is fixed: a settings screen is named by its
+      // address, never by the record it happens to be showing.
+      if (depth === 2 && second === 'profile') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Profile'),
         };
       }
       return null;

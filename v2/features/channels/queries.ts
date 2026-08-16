@@ -177,11 +177,17 @@ export const channelsQueries = {
 
   /**
    * The caller's threads across every space (`GET /threads`) - the twin of
-   * `mine`, for the "My channels" index that today shows only top-level rooms.
+   * `mine`, merged with it into the one ranked list `/channels` draws
+   * (`my-channels/model.ts`, `mergeMyRooms`). Read by `MyChannelsScreen` since
+   * 2026-08-16, which is what closed the cross-space half of the hole: the
+   * channel listing applies `topLevel()`, so a reader tagged in a thread could
+   * not see that thread anywhere on the screen named after their channels.
    *
-   * NO SCREEN READS THIS YET, deliberately. The two routes shipped as a pair and
-   * the pair is keyed as one, so the cross-space half cannot later be filed
-   * somewhere the writers do not reach; wiring the screen is its own change.
+   * CALLED BARE THERE, with no params, exactly as `mine` is called by both the
+   * screen and the nav signal. The params object is part of the key, so the bare
+   * entry is the one a second consumer will reach for by default, and both
+   * routes default to 20 per page - which keeps the two halves of the merged
+   * list cut off at the same depth.
    */
   myThreads: ({ viewerId, ...params }: ThreadIndexParams & ViewerScoped) =>
     queryOptions({

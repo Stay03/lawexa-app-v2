@@ -1,8 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+  focusManager,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type QueryKey,
+} from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
   applyChannelCounts,
@@ -45,8 +51,12 @@ import {
  *    notifications invalidation for EVERY signed-in user (plan W1 item 2: no
  *    role gate), `.channel.unread` → absolute-count writers, space rollup,
  *    then the dispatcher;
- *  - reconnect gap recovery — events are fire-and-forget (digest §F.11), so a
- *    re-established connection marks every collab surface stale;
+ *  - gap recovery — events are fire-and-forget (digest §F.11), so anything
+ *    missed is missed for good. TWO triggers, one recovery
+ *    ({@link invalidateCollabSurfaces}): a re-established connection, and a
+ *    return to a tab that was out of sight long enough for the socket to have
+ *    died unnoticed. The second exists because the first arrives far too late
+ *    to be the only one — see the effect;
  *  - the app-level badge: total mentions DERIVED from the baseline spaces
  *    query via `select` (a primitive, so the component re-renders only when
  *    the number changes) and pushed to title/favicon/OS badge in an effect.
@@ -76,6 +86,49 @@ import {
  */
 const COLD_FALLBACK_MIN_INTERVAL_MS = 15_000;
 const coldFallbackAtBySpace = new Map<string, number>();
+
+/**
+ * THE GAP RECOVERY SET: every collab surface fed by socket events, so every
+ * surface a delivery gap can leave lying. `channelsQueries.all` is `['channels']`
+ * and therefore a prefix of the message-history keys too, which is the point:
+ * the live transcript is `STALE_TIMES.realtime` (Infinity), so events are its
+ * ONLY freshness signal and no amount of remounting or window focus will ever
+ * re-ask on its own.
+ */
+const COLLAB_GAP_KEYS: readonly QueryKey[] = [
+  spacesQueries.all,
+  channelsQueries.all,
+  notificationsQueries.all,
+  invitationsQueries.all,
+];
+
+/**
+ * Mark every collab surface stale after a window in which events could have
+ * been missed. Active consumers refetch through the normal auth path; nothing
+ * else pays anything.
+ *
+ * `cancelRefetch: false` IS LOAD-BEARING. Invalidation defaults to
+ * cancel-and-restart, while TanStack's own focus refetch (`Query.onFocus`)
+ * dedupes with `cancelRefetch: false`. Both fire on a return to the tab, and
+ * which one lands first is an accident of listener order between this component
+ * and `QueryClient.mount`. Left at the default, the invalidation would abort and
+ * re-send the focus path's in-flight requests (or be aborted by them) every time
+ * the reader comes back, so the same list is fetched twice and the first answer
+ * is thrown away. Matching the focus path's option makes the two idempotent.
+ */
+function invalidateCollabSurfaces(queryClient: QueryClient): void {
+  for (const queryKey of COLLAB_GAP_KEYS) {
+    void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
+  }
+}
+
+/**
+ * How long the app must have been out of sight before a return counts as a gap.
+ * Reverb advertises a 30s activity timeout, so a shorter absence is one the
+ * socket almost certainly rode out with every event delivered, and re-asking
+ * would be noise on a screen that is already correct.
+ */
+const BACKGROUND_GAP_MS = 30_000;
 
 /**
  * Resolve what the dispatcher must know about the event's channel: the cached
@@ -206,6 +259,12 @@ export function RealtimeSpine() {
 
   const signedIn = session.signedIn;
 
+  /* When the app last went out of sight, or `null` when it is here or the
+     absence has already been accounted for. A REF, not state: nothing renders
+     from it, and it has to survive the socket effect re-running on a viewer
+     change without being reset by it. */
+  const hiddenAtRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!signedIn || !userUuid) return;
     const echo = getV2Echo();
@@ -247,16 +306,7 @@ export function RealtimeSpine() {
     let hasConnected = false;
     const unsubscribe = echo.connector.onConnectionChange((status) => {
       if (status !== 'connected') return;
-      if (hasConnected) {
-        void queryClient.invalidateQueries({ queryKey: spacesQueries.all });
-        void queryClient.invalidateQueries({ queryKey: channelsQueries.all });
-        void queryClient.invalidateQueries({
-          queryKey: notificationsQueries.all,
-        });
-        void queryClient.invalidateQueries({
-          queryKey: invitationsQueries.all,
-        });
-      }
+      if (hasConnected) invalidateCollabSurfaces(queryClient);
       hasConnected = true;
     });
 
@@ -268,6 +318,48 @@ export function RealtimeSpine() {
       disconnectV2Echo();
     };
   }, [signedIn, userUuid, viewerId, queryClient, router]);
+
+  /* ── RETURN-FROM-BACKGROUND CATCH-UP ────────────────────────────────────────
+        The reconnect recovery above is the right mechanism on the wrong
+        trigger. It waits for pusher-js to NOTICE the socket died: Reverb
+        advertises a 30s activity timeout and the client then allows 30s for the
+        pong, and a backgrounded tab has its timers frozen, so most of that clock
+        is paid AFTER the reader comes back. Meanwhile the transcript is
+        `STALE_TIMES.realtime`, so returning refetches the channel row, the
+        roster and the space rollups (all standard tier) but never the messages.
+        That is the reported bug exactly: an open channel screen, backgrounded,
+        a message arrives, and the reader watches an old screen for up to a
+        minute.
+
+        So the return itself is the trigger. `focusManager` and not a bespoke
+        `document.addEventListener`, because it is the same signal TanStack's own
+        refetch runs on: one source of truth for "the app is here", already
+        wired, already the thing tests fake. Its listener fires on both edges and
+        never on subscribe, which is why the hidden stamp is taken in the
+        callback rather than at subscribe time.
+
+        A SHORT ABSENCE ASKS FOR NOTHING (`BACKGROUND_GAP_MS`): the socket rides
+        those out and its events already did the work.
+
+        NO SOCKET KICK, DELIBERATELY. `connectionStatus()` reports `connected`
+        for a zombie, so gating on it would skip the exact case this exists for;
+        and there is no public way to force a reconnect short of
+        disconnect-then-connect, which would bounce a healthy connection and
+        blink this reader out of everyone else's presence faces. The socket is
+        left to heal on its own clock while the data catches up on ours. */
+  useEffect(() => {
+    if (!signedIn) return;
+    return focusManager.subscribe((focused) => {
+      if (!focused) {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+      const hiddenAt = hiddenAtRef.current;
+      hiddenAtRef.current = null;
+      if (hiddenAt === null || Date.now() - hiddenAt < BACKGROUND_GAP_MS) return;
+      invalidateCollabSurfaces(queryClient);
+    });
+  }, [signedIn, queryClient]);
 
   return null;
 }

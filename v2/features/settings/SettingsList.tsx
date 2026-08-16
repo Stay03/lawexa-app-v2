@@ -58,6 +58,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 export const SETTINGS_COLUMN = 'mx-auto w-full max-w-2xl px-4 pb-16 pt-4 sm:pt-6';
 
 /**
+ * THE FILLED BLOCK ITSELF: a rounded card of rows with a hairline between them.
+ *
+ * Exported because the settings screens that hold a FORM build their blocks out
+ * of the same shape (`SettingsForm.tsx`), and a second copy of these four
+ * utilities is a second block that reads as the same block only until one of
+ * them is retuned.
+ */
+export const SETTINGS_BLOCK =
+  'divide-y divide-border/70 overflow-hidden rounded-2xl bg-secondary';
+
+/**
  * A filled block of rows.
  *
  * `overflow-hidden` clips the rows' hover tint to the block's rounded corners,
@@ -90,9 +101,7 @@ export function SettingsBlock({
       <h2 id={headingId} className="sr-only">
         {label}
       </h2>
-      <ul className="divide-y divide-border/70 overflow-hidden rounded-2xl bg-secondary">
-        {children}
-      </ul>
+      <ul className={SETTINGS_BLOCK}>{children}</ul>
     </section>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { subscriptionQueries } from '@/v2/features/subscription/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { initialsOf } from './identity';
 
 /**
  * AccountCard — the block the settings screen opens with: who is signed in, and
@@ -99,17 +100,4 @@ export function AccountCard() {
       ) : null}
     </div>
   );
-}
-
-/** Up-to-two-letter initials from a display name (falls back to "?"). */
-function initialsOf(name: string | null): string {
-  const initials = (name ?? '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-  return initials || '?';
 }
