@@ -34,9 +34,9 @@ import { useScreenContext } from './screen-context';
  * THE SEE-THROUGH BAR'S CONTROLS, on a top-level screen below `md:` — a SOLID
  * disc each, and the only thing the bar paints in its own right.
  *
- * With no plate behind the bar (the only thing behind it is a strip of frosted
- * glass, which softens what scrolls past without hiding it: see the see-through
- * block in `shell.css`), a `ghost` control is a bare glyph floating over
+ * With no plate behind the bar (the only thing behind it is a thin strip that
+ * treats what scrolls past without hiding it: see the see-through block in
+ * `shell.css`), a `ghost` control is a bare glyph floating over
  * whatever text happens to be sliding past it. The owner watched both apps and
  * was explicit about which one is right: Claude's bare glyphs let text crowd
  * the controls and he disliked it; ChatGPT's controls sit in solid filled
@@ -76,6 +76,13 @@ import { useScreenContext } from './screen-context';
  * buttons as they are, and the strip sits at `z-index: -1` precisely so it
  * frosts the page and never them. It is a blur, not the haze he rejected
  * twice: every word stays on the screen and stays legible through it.
+ *
+ * ── AND THEN: "MAYBE A FADE SEEMS BETTER, THE BLUR FEELS WEIRD" ───────────
+ * A light wash was built as the alternative and both were filmed for him. The
+ * choice is one constant in `AppShell.tsx`; the blur is still what ships, and
+ * THESE DISCS ARE THE SAME EITHER WAY — the strip is at `z-index: -1` under
+ * both treatments, so whichever he picks, the buttons he said he likes are
+ * untouched by it.
  */
 const OPEN_BAR_CONTROL =
   'max-md:bg-secondary max-md:text-foreground max-md:shadow-sm';

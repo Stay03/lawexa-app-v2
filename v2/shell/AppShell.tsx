@@ -3,6 +3,26 @@ import { ShellFrame } from './ShellFrame';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
 
 /**
+ * WHAT THE SEE-THROUGH BAR PAINTS BEHIND ITSELF. Change this one word.
+ *
+ * `blur` is a strip of frosted glass; `fade` is a light wash of the page's own
+ * ground. Both are written in the see-through block of `shell.css`, share a box
+ * and differ only in the instrument, and the value lands on the header as
+ * `data-v2-bar-treatment` — so the CSS selects on it and nothing here branches.
+ *
+ * `blur` SHIPS, and changing that is the owner's call, not a build's. He asked
+ * for the blur by name, then said "maybe a fade seems better, the blur feels
+ * weird", and both were filmed side by side for him to choose from. Until he
+ * answers, the thing he has actually seen live stays live.
+ *
+ * If he picks the fade this constant is the whole change. If he keeps the blur,
+ * the fade rule and this switch come out together — a treatment nobody selects
+ * is dead code, and the union type is what makes deleting it a compile error
+ * rather than a silent orphan.
+ */
+const BAR_TREATMENT: 'blur' | 'fade' = 'blur';
+
+/**
  * AppShell — the v2 non-scrolling shell frame (Phase 1, WP6).
  *
  * Pure structure, no state of its own. It arranges its slots into the CSS grid
@@ -34,11 +54,11 @@ import { V2_SHELL_CONTENT_ID } from './shell-content';
  *    omitted header or an empty dock collapses its row without shifting the others.
  *  - On a TOP-LEVEL screen the header ROW collapses to zero and the bar paints
  *    OVER the content region, which is how content scrolls under it. The words
- *    pass BEHIND its round buttons and out the other side, going soft as they
- *    cross a strip of frosted glass and staying readable through it. The bar is
- *    still a grid item and still never `position: fixed` — see the see-through
- *    block in `shell.css` for the whole mechanism, the owner's three rounds on
- *    it, and what the blur costs.
+ *    pass BEHIND its round buttons and out the other side, treated as they
+ *    cross a strip and staying readable through it ({@link BAR_TREATMENT}). The
+ *    bar is still a grid item and still never `position: fixed` — see the
+ *    see-through block in `shell.css` for the whole mechanism, the owner's
+ *    rounds on it, and what each treatment costs.
  *
  * Visuals are deliberately neutral (existing tokens) — phase-2 owns the real
  * header/dock chrome; this WP ships only the mechanics any nav can slot into.
@@ -65,11 +85,14 @@ export function AppShell({ children, header, dock }: AppShellProps) {
         // (the screen owns the bar there).
         //
         // The row has NO child but the bar. On a top-level screen it paints no
-        // plate and no rule line, and the glass strip that frosts what scrolls
-        // under it is a `::before` on this element rather than a child, so
-        // nothing conditional lives in this markup. See the see-through block
-        // in `shell.css`.
-        <header className="v2-shell__header">{header}</header>
+        // plate and no rule line, and the strip that treats what scrolls under
+        // it is a `::before` on this element rather than a child. The attribute
+        // is a constant, not state: the same string on every route and every
+        // width, read only by the see-through block in `shell.css`, so there is
+        // still nothing conditional in this markup.
+        <header className="v2-shell__header" data-v2-bar-treatment={BAR_TREATMENT}>
+          {header}
+        </header>
       ) : null}
       {/* The id lets full-page surfaces root IntersectionObservers against the
           REAL scroll container (see use-shell-scroll-root.ts) — a viewport root

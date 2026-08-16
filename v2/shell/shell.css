@@ -163,26 +163,39 @@ html.v2-document-lock body {
    page's big title sits below the buttons and only travels under them when the
    reader pushes it there.
 
-   ── THE ONE THING PAINTED HERE IS A STRIP OF FROSTED GLASS ─────────────────
-   Three rounds arrived at this. For two of them the bar carried a DISSOLVE: a
-   gradient holding `--background` opaque past the buttons, so words melted away
-   before they reached them. The owner threw that out twice, the second time in
-   his own words ("you remember option 3 in your artifact and how there's
-   nothing at the header just the buttons? That's what I want"), and it went:
-   element, gradient and stub rule.
+   ── THE ONE THING PAINTED HERE IS A STRIP, AND IT HAS TWO TREATMENTS ───────
+   Three rounds arrived at the strip. For two of them the bar carried a
+   DISSOLVE: a gradient holding `--background` opaque past the buttons, so words
+   melted away before they reached them. The owner threw that out twice, the
+   second time in his own words ("you remember option 3 in your artifact and how
+   there's nothing at the header just the buttons? That's what I want"), and it
+   went: element, gradient and stub rule.
 
    Then he saw option 3 live and asked for the last step: "Good, it's not
    complete see through, close to what I want. Now I just need some little blur
    on that top header side, enough blur that the text is still readable."
 
-   THE INSTRUMENT IS BLUR, NOT OPACITY, and that distinction is the whole brief.
-   A wash HIDES the words, which is the thing he has now rejected twice. A blur
-   keeps every word on the screen and softens it as it passes: he can still tell
-   what a case is called through the strip, and the strip still reads as glass
-   rather than as a hole. So the rule below is a `backdrop-filter` first and the
-   tint is a small correction on top of it, not the other way round.
+   THE INSTRUMENT WAS BLUR, NOT OPACITY, and that distinction is the whole
+   brief. A wash that HIDES the words is the thing he has now rejected twice. A
+   blur keeps every word on the screen and softens it as it passes: he can still
+   tell what a case is called through the strip, and the strip still reads as
+   glass rather than as a hole.
 
-   THE THREE NUMBERS, AND WHY THEY ARE THOSE NUMBERS.
+   ── AND THEN: "MAYBE A FADE SEEMS BETTER, THE BLUR FEELS WEIRD" ────────────
+   His words on the shipped strip. So there are now TWO rules below, the same
+   box and the same geometry, differing only in the instrument, and one line in
+   `AppShell.tsx` picks which paints ({@link BAR_TREATMENT} there — the header
+   carries the choice as `data-v2-bar-treatment`). THE BLUR IS STILL THE
+   DEFAULT: he has seen it live and has not replaced it, and the fade must not
+   go live on a guess about which he prefers.
+
+   THE FADE IS DELIBERATELY LIGHT, AND THAT IS THE WHOLE DESIGN CONSTRAINT. A
+   fade strong enough to be obviously visible IS the dissolve he rejected twice,
+   rebuilt under a nicer word. It is judged the way the blur was judged, against
+   the SMALLEST text crossing the bar rather than the biggest: the strongest
+   wash at which the 14px grey snippet line is still READ, not guessed at.
+
+   THE THREE NUMBERS BEHIND THE BLUR, AND WHY THEY ARE THOSE NUMBERS.
 
     - `blur(1.5px)`. HIS SENTENCE MAKES READABILITY THE TEST, so the radius was
       judged against the SMALLEST thing that crosses the bar, not the biggest. A
@@ -196,9 +209,11 @@ html.v2-document-lock body {
       value is a CSS px, so it scales with the reader's zoom exactly as the text
       under it does.
     - A `--background` TINT AT 12%. The colour is the page's own ground, which
-      means it is INVISIBLE at rest: mixing `--background` over `--background`
-      is a no-op, so an unscrolled screen looks exactly as it did before this
-      rule existed, in both themes. It only shows once words are under it, where
+      means it is INVISIBLE at rest: laying `--background` over `--background`
+      changes nothing an eye can see, so an unscrolled screen looks exactly as
+      it did before this rule existed, in both themes (invisible, not bit-equal
+      — the fade's block below carries the measurement of the rounding both
+      treatments leave behind). It only shows once words are under it, where
       it gives the glass a body the blur alone does not. The same films at 0%,
       12% and 20% put its effect on legibility below the radius's by a wide
       margin, which is the licence to have it at all; 12% is a seventh of the
@@ -280,11 +295,11 @@ html.v2-document-lock body {
     padding-top: var(--v2-bar-h);
   }
 
-  /* THE GLASS. A pseudo-element rather than a child div, for the reason the
-     dock's fade is one: its geometry is `calc()` against `env()`, which is a
-     paragraph of unreadable arbitrary values as utility classes, and it is a
-     colour rather than content so nothing in the markup should have to carry
-     it.
+  /* THE GLASS — the treatment that SHIPS (`data-v2-bar-treatment="blur"`).
+     A pseudo-element rather than a child div, for the reason the dock's fade is
+     one: its geometry is `calc()` against `env()`, which is a paragraph of
+     unreadable arbitrary values as utility classes, and it is a colour rather
+     than content so nothing in the markup should have to carry it.
 
      `z-index: -1` is load-bearing twice over. It puts the strip behind the
      bar's own controls, so the solid discs stay solid and unblurred, while
@@ -307,7 +322,8 @@ html.v2-document-lock body {
      which is precisely the treatment the owner rejected. There it paints
      nothing at all and the bar is exactly what it was before this rule. */
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    html.v2-document-lock .v2-shell--open .v2-shell__header::before {
+    html.v2-document-lock .v2-shell--open
+      .v2-shell__header[data-v2-bar-treatment='blur']::before {
       content: '';
       position: absolute;
       inset: 0 0 -0.75rem 0;
@@ -329,6 +345,102 @@ html.v2-document-lock body {
         transparent 100%
       );
     }
+  }
+
+  /* THE FADE — the alternative (`data-v2-bar-treatment="fade"`), NOT live.
+     Same box, same `z-index`, same 12px overhang, held to the same 3.25rem line
+     and landing over the same 12px, so the pair the owner compares differs in
+     the INSTRUMENT and not in the geometry. There is no `backdrop-filter` here
+     at all; the tint is the whole treatment, which is why it is 22% where the
+     glass's is 12% — there the tint was a correction on top of a blur, here it
+     is the thing itself, and the two numbers are not comparable.
+
+     IT NEEDS NO `@supports` GATE AND THAT IS NOT AN OVERSIGHT. The blur's gate
+     exists because a browser without `backdrop-filter` would be left with the
+     tint alone and no blur to justify it — a bare wash, which is the treatment
+     he rejected. Here the wash IS the treatment, chosen at a strength that
+     leaves the words readable, so there is no degraded case to guard against:
+     `color-mix` and gradients work everywhere the app already runs.
+
+     THE ONE NUMBER. `--background` at 22%, and it was picked off film the way
+     the blur radius was: against the 14px grey snippet line, not the 28px `h1`.
+     Filmed at 390px in both themes at 15, 22, 26, 32 and 40% against a real
+     `/cases` list, in two frames — a long 15px case title level with the round
+     buttons, and the 14px grey line level with them — and then MEASURED off
+     those frames rather than only squinted at: darkest ink against the page
+     ground, sampled between the hamburger and the bell, where page text is all
+     that is painted.
+
+         14px grey line   clear   15%    22%    26%    32%    40%
+           light          4.74   3.59   3.15   2.92   2.65   2.30
+           dark           7.66   5.84   5.04   4.64   4.08   3.40
+
+     LIGHT IS THE BINDING THEME and 3:1 is where a line stops being read and
+     starts being guessed at. 22% is the last step that holds it (3.15); 26% is
+     the first one under (2.92). That is the whole derivation.
+
+     IT IS NOT NOTHING, EITHER. Over the same frames the 15px title goes from
+     19.8:1 to 10.5:1 in light and 19.0:1 to 11.7:1 in dark — about half its
+     contrast — so a word visibly softens as it crosses and not one is taken
+     away. For scale, the dissolve the owner rejected twice was fully OPAQUE
+     across the button row before it even began to fade.
+
+     WHAT THE PAIR MEASURES AT, SO NOBODY PICKS ON A HALF-FACT: the shipped blur
+     puts that same 14px line at 1.69:1 in light and 2.21:1 in dark, LOWER than
+     this fade at any strength filmed, because a 1.5px radius is most of the
+     width of a 14px stroke. That is a fact about the two instruments and not an
+     argument for either. The blur keeps the ink's average and destroys its
+     edges; the fade keeps the edges and lifts the average. Which of those reads
+     better is the owner's eye, not a ratio, which is why both were filmed.
+
+     IT IS INVISIBLE AT REST, exactly as the blur's tint is, and for the same
+     reason: the colour is the page's OWN `--background`, so laying it over
+     `--background` changes nothing an eye can see and an unscrolled screen is
+     what it was in both themes. It only shows once words are underneath.
+
+     "INVISIBLE", NOT "IDENTICAL", AND THE DIFFERENCE WAS MEASURED. Compositing
+     a premultiplied `oklab` mix back over sRGB rounds, so an unscrolled shot
+     with the strip on is not bit-equal to one with it off: at 390px the worst
+     channel anywhere in the band moves by 2/255 (fade) and 1/255 (glass, in
+     dark; in light it is bit-equal). That is below the threshold of a display,
+     let alone an eye, but it is not zero, and the honest word for it is
+     invisible rather than identical.
+
+     A FLAT HOLD, THEN A TAIL, RATHER THAN A RAMP FROM THE TOP. A ramp that is
+     strongest at the top edge is what "content dissolving off the screen" looks
+     like, and dissolving is the thing under a standing rejection. Holding one
+     low value across the whole button row instead means a word is treated the
+     same however far up the strip it has travelled, and the only gradient in
+     the rule is the 12px landing that keeps the bottom edge from cutting a word
+     in half across its x-height.
+
+     IT COSTS NOTHING PER FRAME, which is the one honest argument in its favour
+     over the glass. It is a static gradient on an out-of-flow pseudo-element:
+     no `backdrop-filter`, so no re-composite of the app's single scroll
+     container on every scrolled frame. The glass's cost was measured and found
+     to sit inside the unblurred arm's own spread (above), so this is not a
+     defect being fixed — it is a cost that simply is not spent.
+
+     AND IT WAS PUT THROUGH THE SAME THREE CHECKS THE GLASS WAS, in both themes
+     at 390px: the content region's box, its top padding and its scroll height
+     are unchanged with the strip on versus off; a hit-test across every gap
+     between the round controls returns the same element either way, so a finger
+     still reaches the rows underneath; and at 900px the pseudo-element has no
+     `content` at all, so the desktop bar keeps its plate untouched. */
+  html.v2-document-lock .v2-shell--open
+    .v2-shell__header[data-v2-bar-treatment='fade']::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 -0.75rem 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--background) 22%, transparent) 0,
+      color-mix(in oklab, var(--background) 22%, transparent)
+        calc(env(safe-area-inset-top, 0px) + 3.25rem),
+      transparent 100%
+    );
   }
 }
 
