@@ -58,6 +58,28 @@ import type { MouseEvent } from 'react';
  * tab", a crawler and a screen reader all keep the destination; only a plain
  * left click is ever intercepted. A back control rebuilt as a button would
  * lose all of that.
+ *
+ * ── TWO REACHES, BECAUSE A THREAD HAS TWO KINDS OF ARRIVAL ─────────────────
+ * The rule above — go back only when the LINK'S OWN destination is the entry
+ * behind — is right for a control whose promise is that one place. It is wrong
+ * for a thread, and the owner filmed why: from My channels he opened a thread,
+ * the OS back swipe walked thread → My channels → home correctly, and our
+ * chevron took him to the thread's PARENT CHANNEL, which he had never been in.
+ * The parent was not behind him, so the link pushed, exactly as designed.
+ *
+ * A thread's chevron is not promising the parent. It is promising OUT, and the
+ * parent is only its answer for the one arrival that has no "out": a mention, a
+ * push, a pasted address, where `back()` would leave the app. So a thread asks
+ * for `'anywhere'` — take the history step whenever ANY in-app screen is
+ * behind, and fall back to the parent link only when nothing is. Everything
+ * else keeps `'parent'`, which is the default and unchanged.
+ *
+ * "IN-APP" IS EXACT, NOT A GUESS. `navigation.entries()` holds this tab's
+ * SAME-ORIGIN entries only, so an index above zero means there really is one of
+ * our own screens behind — a reader who arrived from a search engine has index
+ * 0 and gets the link. The no-Navigation-API fallback reads the trail, which is
+ * built from this app's own pathnames and empty after a reload, so it is short
+ * rather than wrong: being unsure costs a duplicate entry, never a jump out.
  */
 
 /** The Navigation API surface used here, all of it read-only. Typed narrowly
@@ -143,12 +165,43 @@ function parentIsBehind(href: string): boolean {
 }
 
 /**
+ * Is ANY of this app's own screens the one immediately behind us?
+ *
+ * The looser question {@link BackReach}'s `'anywhere'` asks. It does not care
+ * WHICH screen — only that going back lands somewhere in this app rather than
+ * out of it.
+ */
+function anythingIsBehind(): boolean {
+  const navigation = navigationApi();
+  if (navigation) {
+    if (navigation.canGoBack === false) return false;
+    return (navigation.currentEntry?.index ?? -1) > 0;
+  }
+  return trail.length >= 2;
+}
+
+/**
+ * How far a back control may trust history.
+ *
+ *  'parent'    take the history step ONLY when the link's own destination is
+ *              the entry behind. The default, and every control whose promise
+ *              is that one place.
+ *  'anywhere'  take the history step whenever any in-app screen is behind, and
+ *              use the link only on a cold arrival. For a control that means
+ *              "out of here" rather than "to that place" — a thread's chevron.
+ */
+export type BackReach = 'parent' | 'anywhere';
+
+/**
  * Spread onto an existing back `<Link>`: `{...useBackTo(parentHref)}`.
  *
- * The href is unchanged. The click handler takes the history move instead only
- * when the parent really is one step behind.
+ * The href is unchanged. The click handler takes the history move instead when
+ * — per {@link BackReach} — going back is what the control actually promises.
  */
-export function useBackTo(href: string): {
+export function useBackTo(
+  href: string,
+  reach: BackReach = 'parent',
+): {
   href: string;
   onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 } {
@@ -168,11 +221,13 @@ export function useBackTo(href: string): {
       ) {
         return;
       }
-      if (!parentIsBehind(href)) return; // Let the link push.
+      const goBack =
+        reach === 'anywhere' ? anythingIsBehind() : parentIsBehind(href);
+      if (!goBack) return; // Let the link push.
       event.preventDefault();
       router.back();
     },
-    [router, href],
+    [router, href, reach],
   );
 
   return { href, onClick };

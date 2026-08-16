@@ -212,9 +212,16 @@ export function ChannelPlaceHeader({
   /** What the phone bar says under the channel's name — resolved in
    *  `thread-model` so the loading frame can print the same line. */
   const phoneSubtitle = channelPhoneSubtitle(channel, parent?.name ?? null);
-  /** Back really goes back when the parent is the screen behind; on a cold
-   *  landing it stays the link it has always been. */
-  const backToParent = useBackTo(parent?.href ?? `/spaces/${channel.space.uuid}`);
+  /** Back really goes back. IN A THREAD it goes back to wherever the reader
+   *  came from, which is very often not the parent channel (My channels, a
+   *  search, the threads sheet) — `'anywhere'`, and the parent link is kept for
+   *  the cold arrival that has nothing behind it. On an ordinary channel the
+   *  chevron still promises the SPACE, so it only steps back when the space is
+   *  genuinely the screen behind. See `BackReach` in `v2/runtime/back-to.ts`. */
+  const backToParent = useBackTo(
+    parent?.href ?? `/spaces/${channel.space.uuid}`,
+    parent ? 'anywhere' : 'parent',
+  );
 
   return (
     <div className="v2-screen-bar shrink-0 border-b bg-background">
@@ -433,9 +440,15 @@ const DESCRIPTION_ID = 'v2-channel-description';
 /**
  * A thread's way back — chevron, then the parent channel's name.
  *
- * IT IS A LINK, NOT A HISTORY MOVE. A reader can land in a thread with no
- * history behind it at all (a mention, a push, a pasted address), and `back()`
- * would take them out of the app. This goes to the PLACE.
+ * IT IS A LINK AND IT GOES BACK, in that order. The address is real, so the
+ * label stays true and the control keeps middle-click, preview and the
+ * accessibility tree. But a reader who reached this thread from somewhere else
+ * — My channels, the threads sheet, a search — is sent BACK there, because that
+ * is where "out of this tangent" leads for them. The parent link is what a COLD
+ * arrival gets (a mention, a push, a pasted address), where `back()` would take
+ * them out of the app entirely. `'anywhere'` in `v2/runtime/back-to.ts` is that
+ * rule; the label is written from `parent.name` either way, which is honest,
+ * because the address it names is where a cold arrival really lands.
  *
  * NOTHING HERE WAITS ANY MORE. Both halves ride the thread's own payload —
  * `parent_channel_uuid` and, since 2026-08-12, `parent_channel_name` — so the
@@ -453,7 +466,7 @@ const DESCRIPTION_ID = 'v2-channel-description';
  * the context around it.
  */
 function BackChip({ parent }: { parent: HeaderParent }) {
-  const back = useBackTo(parent.href);
+  const back = useBackTo(parent.href, 'anywhere');
   return (
     <Link
       {...back}
