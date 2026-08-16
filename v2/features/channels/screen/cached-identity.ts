@@ -31,16 +31,26 @@ import type { ChannelFrameIdentity } from './states';
  * push, a reload, or a channel in a list this reader never opened all take that
  * path. Nothing here degrades into a placeholder string.
  *
- * `channelsQueries.lists()` is the ONE prefix over every channel-row list — the
- * cross-space `mine()` and every per-space `bySpace()` — which is what the key
- * geography note in `queries.ts` calls load-bearing. One lookup reaches
- * whichever list the reader actually came from.
+ * `channelsQueries.lists()` is the ONE prefix over every channel-row list: the
+ * cross-space `mine()` and `myThreads()`, every per-space `bySpace()` and
+ * `threadsBySpace()`. That is what the key geography note in `queries.ts` calls
+ * load-bearing, and one lookup reaches whichever list the reader came from.
  *
- * THREADS ARE DELIBERATELY NOT FOUND HERE. Every channel listing applies
- * `topLevel()`, so a thread has no row to have been tapped, and a thread opened
- * from a mention or the threads panel keeps the silhouette. Rebuilding one from
- * a message's `thread` stub would mean printing a title off a payload shaped
- * for another purpose, which is how a wrong name reaches the screen.
+ * THREADS ARE FOUND HERE NOW, AND ONLY FROM A REAL ROW (2026-08-16). Until the
+ * space threads index went live this said threads were never found: every
+ * CHANNEL listing applies `topLevel()`, so a thread had no row to have been
+ * tapped. `channelsQueries.threadsBySpace` is a thread listing, it sits under
+ * this same prefix on purpose (see `queries.ts`), and the row behind the space
+ * lobby's thread rows is therefore in the cache when one is tapped. That row is
+ * a whole `Channel` off the wire, so seeding from it is the same settled-facts
+ * bargain as any other row, not the guess this block used to rule out, which
+ * was rebuilding a thread from a message's `thread` stub. That remains
+ * forbidden: a stub is shaped for the line under a message, and printing a
+ * title off it is how a wrong name reaches the screen.
+ *
+ * A thread reached from a mention or from the channel's own threads panel still
+ * keeps the silhouette: the panel's rows live under a different prefix
+ * (`threadsOf`, page-infinite) and a push arrives cold.
  *
  * It reads the cache and never writes it, and holds no state, so it is safe
  * inside a Suspense fallback that React will delete without warning.
@@ -58,10 +68,16 @@ export function useCachedChannelIdentity(
   if (!row) return null;
   return {
     name: channelDisplayName(row),
-    // No parent name: a listed row is never a thread (see above), so this
-    // resolves to the purpose or the visibility, exactly as the live bar
-    // resolves it for the same row.
-    subtitle: channelPhoneSubtitle(row, null),
+    // THE PARENT NAME IS PASSED, AND IT IS WHAT KEEPS THE TWO BARS AGREEING.
+    // `ChannelPlaceHeader` resolves this line as
+    // `channelPhoneSubtitle(channel, parent?.name ?? null)` off the same
+    // `parent_channel_name` field, so a thread reads "Thread in {parent}" in
+    // both. Hardcoding `null` here was correct while no listing could return a
+    // thread; today it would seed the visibility label and flip it one paint on,
+    // which is the exact divergence `channelPhoneSubtitle` was extracted to
+    // prevent. On an ordinary channel the field is absent and this is `null`,
+    // so nothing about a channel's subtitle changes.
+    subtitle: channelPhoneSubtitle(row, row.parent_channel_name ?? null),
     visibility: row.visibility,
     visibilityLabel: row.visibility_label,
     space: row.space,

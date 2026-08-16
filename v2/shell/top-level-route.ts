@@ -31,7 +31,7 @@
  * ── WHAT THE TABLE CARRIES ─────────────────────────────────────────────────
  * The screen's TITLE, and only that. Where it goes (the page body, at
  * `ScreenTitle`'s scale) and what else the screen shows (a search pill, a
- * floating action) are the screen's own business — a table that also owned
+ * create action) are the screen's own business — a table that also owned
  * those would have to know each screen's query state and each screen's create
  * dialog, which is how a shell config turns into a second copy of the app.
  *

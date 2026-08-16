@@ -273,6 +273,26 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       }
       return null;
 
+    // ONLY the settings INDEX. Everything under `/settings/` falls through the
+    // proxy to v1, which wears its own chrome, so this table must not answer
+    // for an address that never reaches the v2 header.
+    //
+    // The reference apps put a HAMBURGER on their settings screen, because
+    // settings is top-level in their navigation. In ours it is opened from the
+    // header's overflow menu, which makes it a screen you pushed into: back
+    // arrow, title in the bar below `md:`, no hamburger. Home is the parent
+    // because the menu is on every screen and `useBackTo` still takes the real
+    // history step whenever the reader did come from somewhere.
+    case 'settings':
+      if (depth === 1) {
+        return {
+          backHref: '/',
+          backLabel: 'Back to home',
+          title: fixed('Settings'),
+        };
+      }
+      return null;
+
     default:
       return null;
   }

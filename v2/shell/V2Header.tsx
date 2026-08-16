@@ -44,8 +44,30 @@ import { useScreenContext } from './screen-context';
  * At `md:` and up the bar keeps its plate and its controls keep the ghost
  * treatment they have always had.
  */
-const OPEN_BAR_CONTROL =
-  'max-md:bg-secondary max-md:text-foreground max-md:shadow-sm';
+/**
+ * The plate behind a control on a see-through bar.
+ *
+ * ── IT IS GLASS, NOT A CHIP (owner, 16 August 2026) ────────────────────────
+ * It was `bg-secondary`, an opaque grey disc. Filmed on his phone, the four
+ * controls read as "a row of blobs", which is a bar whether or not there is a
+ * line under it: "the header still looks like it's there, it's not clear or
+ * transparent."
+ *
+ * An opaque plate is the wrong instrument. The plate exists to keep a glyph
+ * legible over whatever is scrolling behind it, and translucency plus a blur
+ * does that while still showing the page moving underneath, which is the thing
+ * that makes it read as floating ON the content rather than as chrome above it.
+ *
+ * `supports-[backdrop-filter]` because a browser without it would otherwise get
+ * a 60% wash with nothing behind it and no legibility guarantee; there it falls
+ * back to the opaque token, which is the safe direction to fail in.
+ */
+const OPEN_BAR_CONTROL = [
+  'max-md:bg-background/85 max-md:text-foreground',
+  'max-md:supports-[backdrop-filter]:bg-background/55',
+  'max-md:supports-[backdrop-filter]:backdrop-blur-md',
+  'max-md:ring-1 max-md:ring-foreground/5',
+].join(' ');
 
 /**
  * V2Header — the top bar, deliberately UNCROWDED (a binding owner decision).

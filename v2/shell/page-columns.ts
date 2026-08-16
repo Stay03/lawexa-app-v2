@@ -19,7 +19,7 @@ export const LIST_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-16 pt-5 sm:pt-6';
 
 /**
  * The SAME column, for a list that carries a `ScreenDock` (the floating search
- * pill, the floating action, or both).
+ * pill).
  *
  * Three differences, all of them load-bearing for the dock and none of them a
  * change of measure:
@@ -40,7 +40,9 @@ export const LIST_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-16 pt-5 sm:pt-6';
  *    over exactly that padding (see `ScreenDock`).
  *  - the rows need no extra clearance for the dock: it settles into its flow
  *    position at the very end of the list, so scrolling to the bottom reveals
- *    the last row above it rather than under it.
+ *    the last row above it rather than under it. The dock's own box height is
+ *    therefore the resting gap, which is why its top padding and the length of
+ *    its dissolve are the same number (`ScreenDock`).
  */
 export const LIST_COLUMN_DOCKED =
   'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';

@@ -31,6 +31,36 @@ export const ACTION_PILL =
   'v2-interactive inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
 
 /**
+ * The ONE shape a list screen's PRIMARY CREATE ACTION wears — New note on
+ * `/notes`, New radar on `/radars`, New space on `/spaces`. It sits at the end
+ * of the screen's filter row, opposite the tab strip.
+ *
+ * ── WHY IT IS A CONSTANT AND NOT THREE CLASS STRINGS ───────────────────────
+ * The same reason as {@link ACTION_PILL} above: these three were a hand-rolled
+ * pill, a second hand-rolled pill and a `<Button size="sm">` (32px, `rounded-md`
+ * by default) — a set that read as a set only from a distance. One string, one
+ * height, one radius, and the element stays the call site's to choose: a
+ * destination is a `<Link>` (prefetchable, middle-clickable), a dialog is a
+ * `<button>`, and neither has to wear the other's clothes.
+ *
+ * ── THE WORD IS ALWAYS DRAWN ───────────────────────────────────────────────
+ * Notes' copy of this used to hide its label below `sm:` (`sr-only
+ * sm:not-sr-only`), so the one thing a reader comes to that screen to DO was an
+ * unlabelled `+` circle at exactly the width where it mattered most. The row it
+ * sits in is 358px wide on a 390px phone, against roughly 170px for a two-tab
+ * strip and 105px for a fully worded pill, so the word costs nothing there — and
+ * every call site carries `flex-wrap`, so at 320px the pill drops to a line of
+ * its own instead of squeezing the tabs or clipping. The label is therefore
+ * unconditional, and it is also the accessible name: no `aria-label` exists
+ * anywhere in this family to fall out of step with what is drawn.
+ *
+ * `min-h-9` matches {@link ACTION_PILL}, so the two pill families are one height
+ * wherever a screen shows both. Pair it with {@link FOCUS_RING} at the call site.
+ */
+export const CREATE_PILL =
+  'v2-interactive inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90';
+
+/**
  * The home surface's ONE signature entrance — a soft fade + 8px rise.
  * `fill-mode-both` holds each block hidden through its stagger delay so nothing
  * pre-flashes on the first frame; `motion-safe` + the globals reduced-motion

@@ -38,10 +38,10 @@ export function NotesScreen() {
  * `app/v2/notes/(library)/loading.tsx`, which imports this component so the two
  * can never drift.
  *
- * The "New note" floating action is NOT reserved here, and the reason is the
- * one it always was: whether it exists depends on the viewer's role, so
- * reserving it would hold a permanent gap for every guest. It is out of the
- * flow now, in the dock, so its arrival moves nothing anyway.
+ * "New note" is NOT reserved here, and the reason is the one it always was:
+ * whether it exists depends on the viewer's role, so reserving it would hold a
+ * permanent gap for every guest. It arrives at the END of the tab row, opposite
+ * the strip, so nothing already on the pixels moves when it does.
  */
 export function NotesFallback() {
   const searchAtTop = useSearchPosition() === 'top';
@@ -56,7 +56,7 @@ export function NotesFallback() {
       <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
         <ScreenTitle />
         {searchAtTop ? <SearchFieldShape className="mb-3" /> : null}
-        <div className="mb-3 flex items-center">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="h-9 w-44 max-w-full rounded-full bg-secondary/60" />
         </div>
         <NotesListSkeleton />

@@ -32,6 +32,31 @@ export function channelDisplayName(
 }
 
 /**
+ * "Thread in {parent}" - the one phrase that says where a thread branched
+ * from, shared by the phone bar's subtitle and the space digest's second line
+ * so a thread's provenance is worded once. `null` when the parent's name is
+ * not on the payload (the field postdates the first threads deploy), so each
+ * caller states its own fallback rather than printing "Thread in ".
+ */
+export function threadProvenanceLabel(
+  parentName: string | null | undefined,
+): string | null {
+  const name = parentName?.trim();
+  return name ? `Thread in ${name}` : null;
+}
+
+/**
+ * How many people have spoken in a thread - which is what following IS here,
+ * so the count and the word agree. `0` is a real value and reads as one: a
+ * branch nobody has answered yet has no followers, not "0 following". Shared
+ * by the channel's threads sheet and the space digest's thread row.
+ */
+export function followerLabel(count: number): string {
+  if (count === 0) return 'Nobody following yet';
+  return `${count} following`;
+}
+
+/**
  * The second line of the phone bar — what a channel is FOR, in one line.
  *
  * The description wins, because that is what the reader wants to know; a thread
@@ -50,7 +75,7 @@ export function channelPhoneSubtitle(
   parentName: string | null,
 ): string {
   const description = channel.description?.trim() || null;
-  return description ?? (parentName ? `Thread in ${parentName}` : null) ?? channel.visibility_label;
+  return description ?? threadProvenanceLabel(parentName) ?? channel.visibility_label;
 }
 
 /**

@@ -38,12 +38,11 @@ export function FoldersScreen() {
  * `app/v2/folders/(library)/loading.tsx`, which imports this component so the
  * two can never drift.
  *
- * The "New folder" pill IS still reserved here, unlike the notes library's "New
- * note": that one has moved out of the flow into the floating dock, while this
- * one is still an inline control (see `FoldersBrowser` — the owner named three
- * screens for a floating action and this was not one of them). It exists for
- * every signed-in reader, so reserving it prevents a jump rather than leaving a
- * permanent gap.
+ * The "New folder" pill IS reserved here, unlike the notes library's "New
+ * note". Both are inline controls in the row above the list; the difference is
+ * who gets them. This one exists for every signed-in reader, so reserving it
+ * prevents a jump, while "New note" depends on the viewer's role and reserving
+ * it would hold a permanent gap for every guest.
  */
 export function FoldersFallback() {
   const searchAtTop = useSearchPosition() === 'top';

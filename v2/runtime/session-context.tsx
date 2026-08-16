@@ -49,7 +49,7 @@ import type { AuthProvider, UserRole } from '@/types/auth';
  */
 
 /**
- * The client-readable session snapshot. Six primitives, all resolved on the
+ * The client-readable session snapshot. Nine primitives, all resolved on the
  * server before this provider mounts — there is no pending state, so no consumer
  * ever has to render a "session still resolving" branch.
  */
@@ -64,6 +64,37 @@ export interface V2SessionSnapshot {
   readonly userId: number | null;
   /** Full display name, or `null`. Call sites derive what they need from it. */
   readonly name: string | null;
+  /**
+   * The address this account signs in with, or `null` when signed out.
+   *
+   * WHY IT IS HERE AND NOT FETCHED. The settings screen opens with an account
+   * card, and the one fact that names an ACCOUNT rather than a person is the
+   * email: two people can share a display name, and the reader's own question
+   * on that card is "which account am I in?". The server already had it —
+   * `verifySession()` returns it on `SessionUser` and the layout throws it away
+   * — so publishing it costs nothing, where a page-level `verifySession()` call
+   * would cost an uncached `/auth/me` round trip on every navigation (the whole
+   * reason this module exists).
+   *
+   * SAFE TO RENDER, like every other field here: it is the viewer's OWN address,
+   * shown back to them, never anybody else's.
+   */
+  readonly email: string | null;
+  /**
+   * Public avatar URL, or `null` when unset or signed out. Published for the
+   * same reason as {@link V2SessionSnapshot.email} — an account card without a
+   * face is a row of text — and it is already a public URL, so it carries no
+   * privilege of its own.
+   */
+  readonly avatarUrl: string | null;
+  /**
+   * The viewer's own `@handle`, or `null` when the account has none yet — which
+   * also means nobody can tag them. Published for the same reason as the two
+   * fields above, and because it is the ONE fact the settings screen can state
+   * under a row label without asking anybody: it says whether the Profile door
+   * still has something behind it that needs doing.
+   */
+  readonly username: string | null;
   /** Server-verified role, or `null` when signed out. */
   readonly role: UserRole | null;
   /**
@@ -104,14 +135,37 @@ export function V2SessionProvider({
   signedIn,
   userId,
   name,
+  email,
+  avatarUrl,
+  username,
   role,
   isVerified,
   authProvider,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
-    () => ({ signedIn, userId, name, role, isVerified, authProvider }),
-    [signedIn, userId, name, role, isVerified, authProvider],
+    () => ({
+      signedIn,
+      userId,
+      name,
+      email,
+      avatarUrl,
+      username,
+      role,
+      isVerified,
+      authProvider,
+    }),
+    [
+      signedIn,
+      userId,
+      name,
+      email,
+      avatarUrl,
+      username,
+      role,
+      isVerified,
+      authProvider,
+    ],
   );
 
   return (

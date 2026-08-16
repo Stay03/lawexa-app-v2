@@ -104,8 +104,7 @@ export interface RailSections {
   rest: readonly RailRow[];
   /** Muted rooms, whatever their counts. Alphabetical, and always last. */
   muted: readonly RailRow[];
-  /** Every row, in the same order the sections are drawn — the flat list the
-   *  lobby ranks from, so the two surfaces can never disagree. */
+  /** Every row, in the same order the sections are drawn. */
   ordered: readonly RailRow[];
   /** How many rows the whole space has (never a page count — the per-space
    *  list is asked for 50 and a space with more is not a case we have). */
@@ -195,31 +194,16 @@ export function channelPreviewLine(row: RailRow): ChannelPreviewLine {
   return channel.last_message_at ? NO_PREVIEW_LINE : NEVER_USED;
 }
 
-/**
- * The lobby digest's ranking: unread first (already newest-first), then the
- * quiet rooms by recency, then the muted ones.
- *
- * It is NOT `sections.ordered`. The rail keeps its quiet section alphabetical
- * so rows never move under the cursor while the reader is aiming at one; the
- * lobby block is a digest that is read top-down and then left, so recency is
- * the right order there and nothing is being aimed at.
- *
- * ── MUTED ROOMS ARE LAST, NOT ABSENT ───────────────────────────────────────
- * Excluding them was wrong in a way that only showed on a phone: below the
- * docked rail's breakpoint the lobby is the space's ONLY channel list, so a
- * reader who had muted everything saw "Active here" empty while every room
- * they own sat one drawer-tap away with nothing saying so. They come last and
- * the row dims them, which is what a mute means — quieter, never hidden.
+/*
+ * THE LOBBY'S RANKING DOES NOT LIVE HERE. The space page's "Active here"
+ * digest re-ranks these sections by recency AND merges the space's THREADS
+ * into them — a surface-specific vocabulary, moved to
+ * `spaces/detail/activity-digest.ts` when threads joined it, because threads
+ * have no rail row by design (`topLevel()`) and this module must stay the
+ * rail's and drawer's shared truth. The tier test stays HERE, in
+ * `buildRailSections`, so the two surfaces can never disagree about what
+ * counts as unread.
  */
-export function activeRailRows(
-  sections: RailSections,
-  limit: number,
-): readonly RailRow[] {
-  if (sections.unread.length >= limit) return sections.unread.slice(0, limit);
-  const quiet = [...sections.rest].sort(byRecency);
-  const muted = [...sections.muted].sort(byRecency);
-  return [...sections.unread, ...quiet, ...muted].slice(0, limit);
-}
 
 /** Sort one space's channels into {@link RailSections}. Pure. */
 export function buildRailSections(

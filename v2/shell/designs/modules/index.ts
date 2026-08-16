@@ -20,6 +20,7 @@ export {
 } from './rows';
 export {
   ACTION_PILL,
+  CREATE_PILL,
   FOCUS_RING,
   REVEAL,
   CONTENT_FADE,

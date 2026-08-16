@@ -209,6 +209,13 @@ export default async function V2Layout({
           signedIn={!!session}
           userId={user?.id ?? null}
           name={user?.name ?? null}
+          // The account card on `/settings` names the ACCOUNT, not the person,
+          // and shows the face beside it. Both are already on the DTO this
+          // layout resolved; publishing them here keeps the settings screen from
+          // paying its own `/auth/me` round trip to say who is signed in.
+          email={user?.email ?? null}
+          avatarUrl={user?.avatar_url ?? null}
+          username={user?.username ?? null}
           role={user?.role ?? null}
           // Verification state travels with identity because the quiz surfaces
           // need it to render a designed "verify your email" panel rather than

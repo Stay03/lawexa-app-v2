@@ -255,8 +255,8 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
         </div>
       )}
 
-      {/* The floating search pill. No floating action: a conversation is
-          started from the home composer, never from this list. */}
+      {/* The floating search pill, and nothing else: a conversation is started
+          from the home composer, never from this list. */}
       {searchAtTop ? null : (
         <ScreenDock>
           <ScreenDockSearch>{searchBar}</ScreenDockSearch>

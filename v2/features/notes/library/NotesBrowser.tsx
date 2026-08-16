@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,8 +13,9 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlSearch } from '@/v2/runtime/use-url-search';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { useSearchPosition } from '@/v2/search-position';
+import { CREATE_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { SearchField } from '@/v2/shell/SearchField';
-import { ScreenDock, ScreenDockSearch, ScreenFab } from '@/v2/shell/ScreenDock';
+import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
 import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
@@ -80,8 +83,8 @@ const PANEL_ID = 'notes-list-panel';
 /**
  * The centred reading column every state shares (`page-columns.ts`), so this
  * page, `/cases`, `/statutes` and `/bookmarks` are one measure — the DOCKED
- * variant, because the search pill and the New note action float at the bottom
- * here and a `sticky` element needs a containing block a full screen tall.
+ * variant, because the search pill floats at the bottom here and a `sticky`
+ * element needs a containing block a full screen tall.
  *
  * The screen's `h1` is drawn here, so the signed-out panel is under a page that
  * still says what it is and every state carries exactly one heading.
@@ -204,14 +207,26 @@ export function NotesBrowser() {
     <PageShell>
       {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
 
-      {/* The tab strip is alone on its row now. "New note" used to sit at the
-          end of it, wearing its label only from `sm:` up because the row could
-          not hold both on a phone — so the one thing a reader comes to this
-          screen to DO was an unlabelled circle at exactly the width where it
-          mattered most. It is the floating action below, where it has room for
-          its word at every width. */}
-      <div className="mb-3 flex items-center">
+      {/* The tab strip and the one action this screen has, on one row. The
+          action spent a day as a floating button at the bottom of the screen
+          and the owner turned it down on sight ("Remove the floating button
+          from the bottom. It looks very messy"), so it is back beside the
+          tabs — but WITH ITS WORD SHOWING at every width, which is the one
+          thing the arrangement before it got wrong: the label was `sr-only` below
+          `sm:`, leaving an unlabelled circle on exactly the screens where the
+          affordance mattered most. `flex-wrap` is the safety net at 320px,
+          where the pill drops to its own line instead of squeezing the tabs. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <NoteTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
+        {/* A guest holds a real token and reads the library, but can never
+            author a note (`canWriteNotes`), so they are shown no create
+            affordance at all rather than one that would refuse them. */}
+        {canWrite ? (
+          <Link href="/notes/create" className={cn(CREATE_PILL, FOCUS_RING)}>
+            <Plus aria-hidden className="size-4" />
+            New note
+          </Link>
+        ) : null}
       </div>
 
       {/* The ONE live region for this surface. The route fallback's
@@ -293,16 +308,15 @@ export function NotesBrowser() {
         )}
       </div>
 
-      {/* The floating layer: the one action this screen has, above the search
-          pill. A guest can read notes but never author one, so they get the
-          pill alone — and because the action is out of the flow, its absence
-          leaves no gap anywhere. */}
-      {canWrite || !searchAtTop ? (
+      {/* The floating layer, and the search pill is now all it carries. With
+          the field switched to the top there is nothing left to float, so no
+          dock renders at all and the column's own `pb-16` is the list's bottom
+          breathing room (see `LIST_COLUMN_DOCKED`). */}
+      {searchAtTop ? null : (
         <ScreenDock>
-          {canWrite ? <ScreenFab href="/notes/create" label="New note" /> : null}
-          {searchAtTop ? null : <ScreenDockSearch>{searchField}</ScreenDockSearch>}
+          <ScreenDockSearch>{searchField}</ScreenDockSearch>
         </ScreenDock>
-      ) : null}
+      )}
     </PageShell>
   );
 }

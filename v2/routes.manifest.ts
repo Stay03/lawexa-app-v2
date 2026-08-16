@@ -87,6 +87,22 @@
  * old emails and old bookmarks point at them — delete them only when the
  * backend has stopped emitting the old paths AND v1 is gone (phase 7).
  */
+/**
+ * `/settings` is EXACT, and that is the whole point of this entry.
+ *
+ * v2 claims the settings INDEX — the list of every option, in the row grammar
+ * the owner settled on 16 August 2026 — and NOTHING under it. `/settings/profile`,
+ * `/settings/billing`, `/settings/usage` and the rest keep falling through to
+ * v1, unchanged, because they are real settings people need and a row that goes
+ * nowhere is worse than one that goes to the page that works. Each joins this
+ * list when it is rebuilt; the rows are already in
+ * `v2/features/settings/rows.ts` and only their destination has to change.
+ *
+ * A wildcard here would swallow all thirteen v1 settings pages at once and
+ * leave twelve of them 404ing in the v2 tree. `'/settings/organization'` below
+ * stays where it is: it is the one settings path v2 already claimed, and it is
+ * a redirect shell onto `/organization` (owner decision D7).
+ */
 export const V2_ROUTES = [
   '/',
   '/work',
@@ -104,6 +120,8 @@ export const V2_ROUTES = [
   '/channels/*',
   '/invitations',
   '/organization',
+  // The settings INDEX only — exact, never a wildcard. See the block above.
+  '/settings',
   // Legacy collab addresses — v2-only redirect shells (see the block above).
   '/channel-invitations',
   '/space-invitations',

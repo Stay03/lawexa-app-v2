@@ -978,6 +978,32 @@ export interface ThreadListParams {
   page?: number;
 }
 
+/**
+ * `GET /spaces/{uuid}/threads` and `GET /threads` - the thread twins of the two
+ * CHANNEL listings, live since 2026-08-16. Each returns the same
+ * `ChannelResource` rows its channel twin returns (a thread IS a channel), so
+ * there is no thread row shape and never was one.
+ *
+ * THEY EXIST BECAUSE THE CHANNEL LISTINGS APPLY `topLevel()` AND THE ROLLUPS DO
+ * NOT. A space's `mention_count` sums every channel in it, threads included
+ * (backend author, 2026-08-12: "the badge is telling the truth"), while
+ * `GET /spaces/{uuid}/channels` filters threads out — so before these routes the
+ * only honest way to explain a space's badge was one
+ * `GET /channels/{uuid}/threads` per channel, which is the request pattern the
+ * files and lists blocks were already refused for.
+ *
+ * ONLY PAGING IS SENT, DELIBERATELY. The channel listings also take `search`,
+ * `visibility`, `sort` and `order`; whether these two accept any of them is
+ * unmeasured, and a speculative parameter buys nothing here - both routes come
+ * back ordered by activity, newest first, which is the only order the surfaces
+ * reading them want. Widen this when something needs it AND the route has been
+ * measured, not before.
+ */
+export interface ThreadIndexParams {
+  per_page?: number;
+  page?: number;
+}
+
 export interface MemberListParams {
   search?: string;
   per_page?: number;

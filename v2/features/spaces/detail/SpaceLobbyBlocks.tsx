@@ -1,20 +1,20 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Building2, Globe, Lock, PanelLeft, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { formatDayLabel } from '@/lib/utils/collab';
-import type { Member, MemberRole, Space } from '@/types/collab';
+import type { Channel, Member, MemberRole, Space } from '@/types/collab';
 import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
-import {
-  activeRailRows,
-  type RailSections,
-} from '@/v2/features/collab/shell/collab-route';
+import type { RailSections } from '@/v2/features/collab/shell/collab-route';
 import { CONTENT_FADE } from '@/v2/shell/designs/modules';
 import { spaceOwnerLabel } from '../model';
+import { buildActivityDigest } from './activity-digest';
 import { LobbyFact, LobbyPeopleSkeleton, LobbySection } from './lobby-parts';
 import { SpaceChannelRow } from './SpaceChannelRow';
+import { SpaceThreadRow } from './SpaceThreadRow';
 import {
   ChannelListSkeleton,
   ChannelsEmptyState,
@@ -45,6 +45,16 @@ import {
  * what was last SAID rather than who is in the room. The space's own people
  * are right beside them, which is where the faces genuinely are.
  *
+ * THREADS were the third case, and they are the one that got fixed. The
+ * space's §17 mention rollup COUNTS them while `/spaces/{uuid}/channels`
+ * FILTERS them (`topLevel()`), so the owner was tagged in a thread, opened
+ * the space, and met a badge bigger than everything this page could show
+ * (measured 2026-08-14: space said 54, its one busy channel row said 9). The
+ * activity digest merges thread rows with the channel rows, newest first, and
+ * since 2026-08-16 it is fed by a real route: `GET /spaces/{uuid}/threads`,
+ * read through `channelsQueries.threadsBySpace` and injected by `SpaceScreen`
+ * through the `threads` prop. The ranking seam is `activity-digest.ts`.
+ *
  * ── THE DIGEST IS THE ONLY CHANNEL LIST BELOW `lg:` ────────────────────────
  * The rail docks at `lg:`; below it the drawer holds the full list and this
  * block is what the reader actually lands on. That is why its ranking includes
@@ -55,12 +65,13 @@ import {
 
 /* ── Active here ──────────────────────────────────────────────────────────── */
 
-/** How many channels the digest shows before the rail (or the drawer) takes
+/** How many rows the digest shows before the rail (or the drawer) takes
  *  over. Six is about a screenful beside the People and About regions. */
 const DIGEST_LIMIT = 6;
 
 export function SpaceActivityBlock({
   sections,
+  threads,
   isPending,
   isError,
   onRetry,
@@ -70,6 +81,19 @@ export function SpaceActivityBlock({
   now,
 }: {
   sections: RailSections;
+  /**
+   * The space's recently active THREADS, merged into the digest beside the
+   * channels — because the space's own mention rollup counts them and this
+   * block is where that number must be explainable. Empty is a real answer (a
+   * space where nobody has branched anything) and reads as one: the heading
+   * simply omits the thread fact. `SpaceScreen` owns the fetch; the empty
+   * default must be a stable reference, which is what `NO_SPACE_THREADS` in
+   * `activity-digest.ts` is for.
+   */
+  threads: readonly Channel[];
+  /** Both halves of the digest, not just the channels: the caller ORs the two
+   *  queries, because a single ranked list drawn half-built shows a wrong
+   *  order. Same for `isError` / `onRetry`. */
   isPending: boolean;
   isError: boolean;
   onRetry: () => void;
@@ -79,12 +103,18 @@ export function SpaceActivityBlock({
   onOpenRail: () => void;
   now: number;
 }) {
-  const rows = activeRailRows(sections, DIGEST_LIMIT);
-  const meta = isPending
-    ? null
-    : sections.unreadCount > 0
-      ? `${channelCountLabel(sections.total)} · ${sections.unreadCount} unread`
-      : channelCountLabel(sections.total);
+  // Memoised so the row objects keep their references between renders and the
+  // rows' `memo` holds — `sections` comes out of the frame's own memo and
+  // `threads` is either a query result (stable while the entry is) or the one
+  // frozen empty constant.
+  const digest = useMemo(
+    () => buildActivityDigest(sections, threads, DIGEST_LIMIT),
+    [sections, threads],
+  );
+  const meta = isPending ? null : digest.meta;
+  // Empty means NOTHING is known here — no channels and no threads. Guarding
+  // on channels alone would blank real thread rows behind an empty state.
+  const isEmpty = sections.total === 0 && threads.length === 0;
 
   return (
     <LobbySection
@@ -113,24 +143,23 @@ export function SpaceActivityBlock({
 
       {isPending ? (
         <ChannelListSkeleton />
-      ) : isError && sections.total === 0 ? (
+      ) : isError && isEmpty ? (
         <ChannelsErrorState onRetry={onRetry} />
-      ) : sections.total === 0 ? (
+      ) : isEmpty ? (
         <ChannelsEmptyState canCreate={canCreate} onCreate={onCreateChannel} />
       ) : (
         <ul className={cn('flex flex-col', CONTENT_FADE)}>
-          {rows.map((row) => (
-            <SpaceChannelRow key={row.channel.uuid} row={row} now={now} />
-          ))}
+          {digest.rows.map((row) =>
+            row.kind === 'channel' ? (
+              <SpaceChannelRow key={row.row.channel.uuid} row={row.row} now={now} />
+            ) : (
+              <SpaceThreadRow key={row.thread.uuid} row={row} now={now} />
+            ),
+          )}
         </ul>
       )}
     </LobbySection>
   );
-}
-
-/** "1 channel" / "4 channels" — a worded fact, never a bare numeral. */
-function channelCountLabel(count: number): string {
-  return `${count} ${count === 1 ? 'channel' : 'channels'}`;
 }
 
 /* ── People ───────────────────────────────────────────────────────────────── */

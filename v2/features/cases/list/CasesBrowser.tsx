@@ -311,9 +311,9 @@ export function CasesBrowser() {
         />
       ) : null}
 
-      {/* The floating search pill. `/cases` gets NO floating action: the owner
-          named the three screens that have one obvious main thing to do, and
-          browsing a library is not one of them. */}
+      {/* The floating search pill — the only thing that floats at the bottom of
+          a v2 screen (`ScreenDock`). `/cases` has no create action to place
+          anywhere: browsing a library is not one obvious thing to do. */}
       {searchAtTop ? null : (
         <ScreenDock>
           <ScreenDockSearch>{searchField}</ScreenDockSearch>

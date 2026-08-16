@@ -166,12 +166,12 @@ html.v2-document-lock body {
    A mask is the tidier idea and it was rejected on two grounds, one of them
    fatal:
 
-    1. IT WOULD FADE THE FLOATING CONTROLS TOO. A mask applies to the masked
-       element and everything inside it, and the bottom search pill and the
-       floating action are `position: sticky` children of the scroll region
-       (`ScreenDock`) — the only place they can be, since `fixed` is banned and
-       a portal would paint them a frame late. A bottom mask would dissolve the
-       very controls that are supposed to sit ON TOP of the fade.
+    1. IT WOULD FADE THE FLOATING CONTROL TOO. A mask applies to the masked
+       element and everything inside it, and the bottom search pill is a
+       `position: sticky` child of the scroll region (`ScreenDock`) — the only
+       place it can be, since `fixed` is banned and a portal would paint it a
+       frame late. A bottom mask would dissolve the very control that is
+       supposed to sit ON TOP of the fade.
     2. IT WOULD PUT A MASKED COMPOSITING LAYER ON THE APP'S ONE SCROLL
        CONTAINER. `.v2-shell__content` is the single scroller for every screen,
        and a mask on it is re-composited on every scroll frame. Phase 4 of this
@@ -241,13 +241,25 @@ html.v2-document-lock body {
   html.v2-document-lock .v2-shell--open .v2-shell__header-fade {
     display: block;
     position: absolute;
-    inset: 0 0 -0.75rem 0;
+    /* Reaches well BELOW the bar so the tail has room to finish. At `-0.75rem`
+       the gradient hit full transparency a few pixels under the buttons, which
+       left a band of half-dead text sitting right beneath them. The owner
+       filmed it and called the header "not clear or transparent": the smear was
+       what read as chrome, not the buttons. A fade needs distance to disappear
+       in. */
+    inset: 0 0 -2.75rem 0;
     z-index: -1;
     pointer-events: none;
+    /* Opaque past the buttons (they end 2.75rem below the inset), THEN a long
+       soft tail. Nothing may be legible anywhere near a control: in the app the
+       owner is copying, words are gone before they reach the chrome, not
+       dimmed under it. */
     background: linear-gradient(
       to bottom,
       var(--background) 0,
-      var(--background) calc(env(safe-area-inset-top, 0px) + 2.5rem),
+      var(--background) calc(env(safe-area-inset-top, 0px) + 2.75rem),
+      color-mix(in oklab, var(--background) 82%, transparent)
+        calc(env(safe-area-inset-top, 0px) + 4rem),
       transparent 100%
     );
   }
@@ -263,14 +275,61 @@ html.v2-document-lock body {
 /* -----------------------------------------------------------------------------
    THE FLOATING BOTTOM DOCK (`ScreenDock`).
 
-   Bottom padding for the home-indicator strip, in CSS rather than as a class
-   pair, because `v2-safe-bottom` and a `pb-*` utility both write
-   `padding-bottom` and the winner between them is Tailwind's ordering rather
-   than anything a reader of the markup can see. One declaration, one value,
-   no race.
+   Bottom padding in CSS rather than as a class pair, because `v2-safe-bottom`
+   and a `pb-*` utility both write `padding-bottom` and the winner between them
+   is Tailwind's ordering rather than anything a reader of the markup can see.
+   One declaration, one value, no race.
+
+   THE 1.25rem IS THE GAP THE PILL FLOATS IN, and it is on top of the
+   home-indicator strip rather than instead of it. At 0.75rem the plate sat
+   close enough to the bottom edge to read as bolted to it, which is half of
+   what the owner meant by "it's not looking nice… like the gpt example": in
+   that app there is background visible on all four sides of the pill. On a
+   phone reporting no inset that is now 20px; on a notched one the indicator
+   inset is added underneath, so the visible gap is the same in both cases.
    -------------------------------------------------------------------------- */
 .v2-screen-dock {
-  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* The dissolve the list passes into behind the pill — the bottom twin of the
+   header fade above, and the same arithmetic: compositing the known, uniform
+   `--background` over the content at `1 − m` gives the pixels a mask at alpha
+   `m` would, for one static paint instead of a per-frame one.
+
+   `z-index: -1` puts it behind the pill but INSIDE the dock's stacking context
+   (`z-20` on a positioned element makes one), so it still paints over the rows
+   scrolling underneath. `inset: 0` — the fade is exactly the dock's box, which
+   is not a rounding: the dock is the last child in the column's flow, so its
+   height IS the clearance the list keeps at the end of its travel. A fade
+   TALLER than that box would veil the final row at rest, which is the one row
+   the reader scrolled all that way to read.
+
+   THE STOPS ARE MEASURED FROM THE PILL, NOT SPACED EVENLY. The plate occupies
+   `inset + 1.25rem` to `inset + 4rem` (it is `h-11`), so the gradient is held
+   fully opaque to `inset + 4rem`: level with the pill and below it nothing may
+   be even half-legible, exactly as the header fade is held opaque past the
+   round buttons. Above that line the whole 2.5rem of `pt-10` is spent on the
+   tail, and the three stops in it follow a smoothstep rather than a straight
+   line — a linear ramp over so short a distance reads as an edge moving up the
+   screen, which is what made the first version look like a band with rows
+   disappearing into it rather than like content dissolving. */
+.v2-screen-dock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    var(--background) 0,
+    var(--background) calc(env(safe-area-inset-bottom, 0px) + 4rem),
+    color-mix(in oklab, var(--background) 82%, transparent)
+      calc(env(safe-area-inset-bottom, 0px) + 4.75rem),
+    color-mix(in oklab, var(--background) 45%, transparent)
+      calc(env(safe-area-inset-bottom, 0px) + 5.5rem),
+    transparent 100%
+  );
 }
 
 /* -----------------------------------------------------------------------------

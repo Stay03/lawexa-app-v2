@@ -64,6 +64,7 @@ import type {
   TaskListItemsResponse,
   TaskListResponse,
   TaskListSummaryListResponse,
+  ThreadIndexParams,
   ThreadListParams,
   ToggleReactionPayload,
   TransferOwnershipPayload,
@@ -138,6 +139,33 @@ export const spacesApi = {
           sort: params.sort || undefined,
           order: params.order || undefined,
           per_page: params.per_page ?? 50,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * The space's THREADS - the same `ChannelResource` rows {@link getChannels}
+   * returns, for the tangents that listing filters out (`topLevel()`). Ordered
+   * by activity, newest first, with a brand-new silent thread at the top so a
+   * standalone one is reachable. See {@link ThreadIndexParams} for why only
+   * paging is sent.
+   *
+   * Authorized as the channel listing is: a non-member is refused the space
+   * before this is ever asked, which is why the lobby waits for the space to
+   * succeed before enabling it.
+   */
+  getThreads: async (
+    spaceUuid: string,
+    params: ThreadIndexParams = {}
+  ): Promise<ChannelListResponse> => {
+    const response = await apiClient.get<ChannelListResponse>(
+      `/spaces/${spaceUuid}/threads`,
+      {
+        params: {
+          per_page: params.per_page ?? 20,
           page: params.page ?? 1,
         },
       }
@@ -231,6 +259,32 @@ export const channelsApi = {
     const response = await apiClient.get<ChannelListResponse>('/channels', {
       params: {
         search: params.search || undefined,
+        per_page: params.per_page ?? 20,
+        page: params.page ?? 1,
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * The caller's THREADS across all their spaces - the twin of {@link getMine}
+   * for the tangents that listing filters out (`topLevel()`), same
+   * `ChannelResource` rows, ordered by activity newest first.
+   *
+   * IT IS A TOP-LEVEL ROUTE (`GET /threads`) and lives on `channelsApi` rather
+   * than anywhere else for the reason the whole thread feature turns on: the row
+   * is a channel row. Nothing about this list is per-space, so there is no space
+   * uuid to bind it under.
+   *
+   * NOT YET READ BY ANY SCREEN. Wired as the pair of `spacesApi.getThreads`
+   * because the two routes shipped together and keying only half a pair is how
+   * the other half gets keyed wrong later; "My channels" is a separate change.
+   */
+  getMyThreads: async (
+    params: ThreadIndexParams = {}
+  ): Promise<ChannelListResponse> => {
+    const response = await apiClient.get<ChannelListResponse>('/threads', {
+      params: {
         per_page: params.per_page ?? 20,
         page: params.page ?? 1,
       },

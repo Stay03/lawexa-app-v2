@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { Link2, Loader2, Pencil, Trash2, UserPlus } from 'lucide-react';
 
 import {
@@ -15,7 +16,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { extractApiError } from '@/lib/utils/api-error';
+import { channelsQueries } from '@/v2/features/channels/queries';
 import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
+import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
@@ -35,6 +38,7 @@ import { InviteLinksPanel } from '@/v2/features/invites/InviteLinksPanel';
 import { SpaceJoinRequestsPanel } from '@/v2/features/invites/JoinRequestsPanel';
 import { SpaceFormDialog } from '../dialogs/SpaceFormDialog';
 import { useDeleteSpace } from '../mutations';
+import { NO_SPACE_THREADS } from './activity-digest';
 import { SPACE_LOBBY_COLUMN, SPACE_LOBBY_GRID } from './lobby-parts';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import {
@@ -95,6 +99,61 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
 
   const space = scope?.space ?? null;
   const canManage = scope?.canManage ?? false;
+
+  /**
+   * ── THE SPACE'S THREADS, THE LOBBY'S OWN READ ─────────────────────────────
+   * The one query this page mounts that the frame does not, and the reason is
+   * that nothing else wants it: the rail and the drawer are channels-only by
+   * design, so holding this in `CollabFrame` would make every channel route pay
+   * for a list only the lobby draws.
+   *
+   * GATED EXACTLY AS `CollabFrame` GATES `channelsQueries.bySpace` ON THIS
+   * ROUTE, and for the same two reasons. `eligible` because an unverified or
+   * out-of-audience account's collab reads are refused by the door before the
+   * network is worth spending (`collab/model.ts`). And it waits for the SPACE to
+   * have succeeded, which `space !== null` is exactly: `spaceQuery.data` is the
+   * only thing that fills it, and a 403 there means the reader is not a member,
+   * so the blocked read must not be requested. There is no parallel-fetch case
+   * to give up here, unlike on the channel route: this screen only exists at
+   * `/spaces/{uuid}`.
+   *
+   * `per_page: 50`, THE SAME PAGE THE CHANNEL LIST ASKS FOR, and the size is
+   * about ranking rather than about drawing. The digest paints six rows, so a
+   * bigger page buys nothing to draw; what it buys is a truer FIRST six. An
+   * unread thread sorts into the unread tier however old it is, and a thread
+   * that fell off the page cannot be ranked at all - so a short page is exactly
+   * how the mention this block exists to explain would go missing again. Both
+   * halves of one merged list are therefore cut off at the same depth, and the
+   * heading's "N threads" is a page count in the same way "N channels" already
+   * is.
+   */
+  const eligible = collabAccessState(session) === 'eligible';
+  const threadsQuery = useQuery({
+    ...channelsQueries.threadsBySpace({
+      spaceUuid,
+      viewerId: session.userId,
+      per_page: 50,
+    }),
+    enabled: eligible && space !== null,
+  });
+  /* The frozen empty default while the list is pending, refused or ungated:
+     a fresh `[]` here would give `SpaceActivityBlock`'s digest memo a new
+     dependency on every render and re-rank the whole list for nothing. */
+  const threads = threadsQuery.data?.data ?? NO_SPACE_THREADS;
+
+  /* ONE DIGEST, SO ONE PENDING STATE AND ONE ERROR STATE. The block ranks
+     channels and threads into a single list, so painting it while half of it is
+     still in flight would show a ranking that is wrong: the thread that should
+     be the first row arriving fourth, a beat later, under the reader's finger.
+     The two requests are fired together and run in parallel, so the wait is the
+     slower of them and not the sum. The retry is likewise both, because the
+     panel says "try again" about the list and the list has two halves. */
+  const retryChannels = scope?.retryChannels;
+  const refetchThreads = threadsQuery.refetch;
+  const retryActivity = useCallback(() => {
+    retryChannels?.();
+    void refetchThreads();
+  }, [retryChannels, refetchThreads]);
 
   /**
    * The edit dialog is the ONE overlay this page still owns — creating a
@@ -235,9 +294,14 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
       <div className={SPACE_LOBBY_GRID}>
         <SpaceActivityBlock
           sections={scope.sections}
-          isPending={scope.isChannelsPending}
-          isError={scope.isChannelsError}
-          onRetry={scope.retryChannels}
+          // THE ONE WIRING POINT for the space's threads, live since
+          // 2026-08-16 (`GET /spaces/{uuid}/threads`). The digest merges these
+          // with the channel rows so the space's mention badge has rows to land
+          // on; see the query mount above for the gate and the page size.
+          threads={threads}
+          isPending={scope.isChannelsPending || threadsQuery.isPending}
+          isError={scope.isChannelsError || threadsQuery.isError}
+          onRetry={retryActivity}
           canCreate={canManage}
           onCreateChannel={scope.openCreateChannel}
           onOpenRail={scope.openRail}

@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { SpacesBrowser } from './SpacesBrowser';
 import { SpacesListSkeleton } from './states';
@@ -50,14 +50,16 @@ export function SpacesFallback() {
       <span role="status" className="sr-only">
         Loading your spaces
       </span>
-      <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
+      <div aria-hidden inert className={LIST_COLUMN}>
         <ScreenTitle />
-        {/* Nothing is reserved on the right any more: "New space" has left the
-            toolbar for the floating action, and the invitations pill is
-            conditional chrome absent for nearly every reader, so holding a slot
-            for it would be reserving a shape that usually never arrives. */}
+        {/* Only "New space" is reserved on the right — it is back in the
+            toolbar from the floating action, and it is unconditional. The
+            invitations pill is not reserved: it is conditional chrome, absent
+            for nearly every reader, so holding a slot for it would be reserving
+            a shape that usually never arrives. */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Skeleton className="h-9 w-44 rounded-full" />
+          <Skeleton className="ml-auto h-9 w-28 rounded-full" />
         </div>
         <SpacesListSkeleton />
       </div>

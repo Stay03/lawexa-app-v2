@@ -328,11 +328,10 @@ export function FoldersBrowser() {
       ) : null}
 
       {/* The floating search pill, LAST in the flow so `mt-auto` has nothing
-          after it to fight. NO floating action here, and that is a deliberate
-          hold rather than an oversight: the owner named three screens for one
-          (Notes, Radar, Spaces) and this was not among them, even though "New
-          folder" is the same shape of control as "New note". It stays inline,
-          in the row above, until he says otherwise. */}
+          after it to fight. It is the only thing that floats here: "New folder"
+          stays inline in the row above, which is where every v2 create action
+          now lives — Notes, Radar and Spaces each spent a day with a floating
+          button instead and the owner turned all three down. */}
       {searchAtTop ? null : (
         <ScreenDock>
           <ScreenDockSearch>{searchField}</ScreenDockSearch>

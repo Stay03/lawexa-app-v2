@@ -242,7 +242,7 @@ export function MyChannelsScreen() {
         )}
       </div>
 
-      {/* The floating search pill. No floating action: nothing is created from
+      {/* The floating search pill, and nothing else: nothing is created from
           this screen — a channel is made inside the space that owns it. */}
       {searchAtTop ? null : (
         <ScreenDock>

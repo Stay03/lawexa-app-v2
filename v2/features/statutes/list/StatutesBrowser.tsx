@@ -226,8 +226,9 @@ export function StatutesBrowser() {
         </div>
       )}
 
-      {/* The floating search pill. No floating action on `/statutes`: browsing
-          a library has no one obvious thing to do (the owner's own list). */}
+      {/* The floating search pill, and nothing else: `/statutes` has no create
+          action to place anywhere — browsing a library is not one obvious
+          thing to do. */}
       {searchAtTop ? null : (
         <ScreenDock>
           <ScreenDockSearch>{searchField}</ScreenDockSearch>

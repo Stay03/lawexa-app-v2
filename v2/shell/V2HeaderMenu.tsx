@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { FlaskConical, LogOut, Moon, MoreVertical, Sun, SunMoon } from 'lucide-react';
+import { LogOut, Moon, MoreVertical, Settings, Sun, SunMoon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { canAccessV2Preview } from '@/lib/utils/v2-access';
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
-import { useV2Session } from '@/v2/runtime/session-context';
 import { useMounted } from './use-mounted';
 import { useScreenActions } from './screen-context';
 
@@ -38,16 +36,22 @@ import { useScreenActions } from './screen-context';
  * — no mismatch, no lint violation. The trigger glyph is theme-neutral, so the
  * bar itself never flashes.
  *
- * DEVELOPER ROW (role-gated). v2 has no Settings surface of its own — `/settings`
- * is not in `routes.manifest.ts` and the nav config has no entry — so the
- * developer flags (the v2-preview cookie, the streaming style) were unreachable
- * from inside v2. This row is the one path to them. It is gated by
- * `canAccessV2Preview` on the SERVER-VERIFIED role from `useV2Session`, exactly
- * like the v1 nav link and the `/settings/developer` page's own fallback — since
- * Aug 3, 2026 that audience is every registered account, so only guests/bots
- * miss the row. `/settings/developer` still lives in v1, so this is a genuine
- * cross-experience link — a real `<Link>`/anchor, so it is middle-clickable and
- * copyable rather than a JS-only jump.
+ * SETTINGS ROW. This menu is the ONE door to v2's settings home, which is why
+ * `/settings` is a PUSHED screen and not a top-level one — see
+ * `v2/shell/pushed-route.ts`.
+ *
+ * It replaces the role-gated DEVELOPER row that used to sit here. That row
+ * existed for exactly one reason, stated in this docblock until 16 August 2026:
+ * "v2 has no Settings surface of its own — `/settings` is not in
+ * `routes.manifest.ts` and the nav config has no entry — so the developer flags
+ * were unreachable from inside v2". v2 has one now, Developer is a row on it,
+ * and a shortcut that duplicates a row one tap away is the crowding this bar is
+ * kept clear of (owner #28). Nobody loses the way out of the preview either:
+ * "Switch to classic Lawexa" is still one press, below.
+ *
+ * The row is NOT gated. A guest opening it meets a screen that offers them the
+ * two doors into an account and the two device preferences that work without
+ * one, which is a true answer; hiding settings from them would not be.
  *
  * ── THE SCREEN'S OWN ROWS COME FIRST (phase 7) ─────────────────────────────
  * A screen used to grow its own kebab in the page body under a bar that already
@@ -72,10 +76,8 @@ export function V2HeaderMenu({
   className?: string;
 } = {}) {
   const mounted = useMounted();
-  const { role } = useV2Session();
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
-  const showDeveloper = canAccessV2Preview(role);
   const screenActions = useScreenActions(usePathname() ?? '');
 
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
@@ -115,6 +117,13 @@ export function V2HeaderMenu({
           </DropdownMenuGroup>
         ) : null}
 
+        <DropdownMenuItem asChild className="min-h-11 md:min-h-8">
+          <Link href="/settings">
+            <Settings className="text-muted-foreground" />
+            <span>Settings</span>
+          </Link>
+        </DropdownMenuItem>
+
         <DropdownMenuItem
           // 44px touch rows on mobile (a11y floor); default density on desktop.
           className="min-h-11 md:min-h-8"
@@ -138,18 +147,6 @@ export function V2HeaderMenu({
             </span>
           ) : null}
         </DropdownMenuItem>
-
-        {showDeveloper ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild className="min-h-11 md:min-h-8">
-              <Link href="/settings/developer">
-                <FlaskConical className="text-muted-foreground" />
-                <span>Developer</span>
-              </Link>
-            </DropdownMenuItem>
-          </>
-        ) : null}
 
         <DropdownMenuSeparator />
 

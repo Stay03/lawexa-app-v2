@@ -23,6 +23,7 @@ import { CountBadge, FOCUS_RING, UnreadDot } from '@/v2/shell/designs/modules';
 import { channelsQueries } from '../queries';
 import {
   channelDisplayName,
+  followerLabel,
   threadUnreadState,
   type ThreadUnreadState,
 } from '../thread-model';
@@ -285,16 +286,6 @@ export function ThreadsSheet({
       </SheetContent>
     </Sheet>
   );
-}
-
-/**
- * How many people have spoken in a thread — which is what following IS here,
- * so the count and the word agree. `0` is a real value and reads as one: a
- * branch nobody has answered yet has no followers, not "0 following".
- */
-function followerLabel(count: number): string {
-  if (count === 0) return 'Nobody following yet';
-  return `${count} following`;
 }
 
 /**

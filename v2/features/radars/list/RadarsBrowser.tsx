@@ -1,14 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import type { RadarListItem, RadarStatus } from '@/types/radar';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
-import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
-import { ScreenDock, ScreenFab } from '@/v2/shell/ScreenDock';
+import { CREATE_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
@@ -96,7 +99,7 @@ export function RadarsBrowser() {
 
   if (!signedIn) {
     return (
-      <div className={LIST_COLUMN_DOCKED}>
+      <div className={LIST_COLUMN}>
         <ScreenTitle />
         <RadarsSignedOutState />
       </div>
@@ -104,7 +107,7 @@ export function RadarsBrowser() {
   }
   if (!canUseRadar) {
     return (
-      <div className={LIST_COLUMN_DOCKED}>
+      <div className={LIST_COLUMN}>
         <ScreenTitle />
         <RadarsGuestState />
       </div>
@@ -116,12 +119,15 @@ export function RadarsBrowser() {
   const showEmpty = !showSkeleton && !showError && radars.length === 0;
 
   return (
-    <div className={LIST_COLUMN_DOCKED}>
+    <div className={LIST_COLUMN}>
       <ScreenTitle />
 
-      {/* The status strip is alone on its row now — "New radar" has moved to
-          the floating action, where it keeps its word and reaches the thumb. */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      {/* The status strip and the one action this screen is for, on one row.
+          "New radar" spent a day as a floating button at the bottom of the
+          screen and the owner turned it down ("Remove the floating button from
+          the bottom. It looks very messy"), so it is back where it was, at the
+          end of its own row, on the shared `CREATE_PILL`. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <RadarTabs
           tabs={STATUS_TABS}
           value={status}
@@ -129,6 +135,10 @@ export function RadarsBrowser() {
           ariaLabel="Filter radars by status"
           panelId={PANEL_ID}
         />
+        <Link href="/radars/new" className={cn(CREATE_PILL, FOCUS_RING)}>
+          <Plus aria-hidden className="size-4" />
+          New radar
+        </Link>
       </div>
 
       <div
@@ -171,12 +181,6 @@ export function RadarsBrowser() {
           </>
         )}
       </div>
-
-      {/* The one thing this screen is for. `/radars` has no search box, so the
-          dock carries the action alone. */}
-      <ScreenDock>
-        <ScreenFab href="/radars/new" label="New radar" />
-      </ScreenDock>
     </div>
   );
 }

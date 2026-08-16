@@ -12,6 +12,7 @@ import type {
   ChannelListParams,
   MemberListParams,
   MessageListParams,
+  ThreadIndexParams,
 } from '@/types/collab';
 import { extractApiError } from '@/lib/utils/api-error';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
@@ -25,13 +26,27 @@ import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
  * `api-digest.md` §C (2026-08-04).
  *
  * KEY GEOGRAPHY, LOAD-BEARING FOR THE SPINE'S WRITERS (`./cache.ts`):
- *  - every CHANNEL-ROW list (cross-space `mine`, per-space `bySpace`) lives
- *    under the ONE `lists()` prefix, so a `.channel.unread` writer reaches all
- *    of them in a single fan-out;
+ *  - every CHANNEL-ROW list (cross-space `mine` + `myThreads`, per-space
+ *    `bySpace` + `threadsBySpace`) lives under the ONE `lists()` prefix, so a
+ *    `.channel.unread` writer reaches all of them in a single fan-out;
  *  - `detailsOf(uuid)` / `membersOf(uuid)` / `messagesOf(uuid)` are the
  *    per-channel prefixes writers and invalidations target.
  * The per-space channel list therefore lives HERE, not in the spaces factory
- * (v1 keyed it under spaces): the row type owns the key family.
+ * (v1 keyed it under spaces): the row type owns the key family. The two THREAD
+ * indexes (2026-08-16) follow the same rule for the same reason - a thread IS a
+ * channel on the wire, so its rows want the channel writers.
+ *
+ * ── EVERY ENTRY UNDER `lists()` MUST BE A FLAT `ChannelListResponse` ───────
+ * Not a style rule: it is what the writers can parse. `applyChannelCounts` and
+ * `applyChannelNotifyLevel` both run `setQueriesData<ChannelListResponse>` over
+ * EVERY cached entry beneath this prefix and reach straight into `data.data`.
+ * Hand either of them an `infiniteQueryOptions` entry and that is `undefined`,
+ * so the fan-out throws on the next unread event anywhere in the app.
+ *
+ * That, and not the `topLevel()` filter, is the real reason the per-channel
+ * `threads` leaf at the bottom of this file stays out of `lists()`: it is
+ * page-infinite. The two indexes below are flat, exactly like the channel
+ * listings they mirror, so they are safe under it.
  *
  * `enabled` is a call-site concern, gated on the collab access state
  * (`v2/features/collab/model.ts`) — never baked into the leaves.
@@ -110,6 +125,73 @@ export const channelsQueries = {
         { viewerId },
       ] as const,
       queryFn: () => spacesApi.getChannels(spaceUuid, params),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
+  /* ── The two THREAD indexes (live 2026-08-16) ──────────────────────────────
+     `GET /spaces/{uuid}/threads` and `GET /threads`, the thread twins of the
+     two listings above, returning the SAME `ChannelResource` rows. They are
+     flat and viewer-partitioned exactly like their twins, and they sit under
+     `lists()` for the reason spelled out in the key-geography note: that prefix
+     is the ONE fan-out `applyChannelCounts` and `applyChannelNotifyLevel` walk,
+     so a mention landing in a thread moves that thread's row live instead of
+     leaving it stale under a space badge that already counted it - the exact
+     mismatch these routes were asked for. `useCachedChannelIdentity` reads the
+     same prefix and is now thread-aware for the same reason.
+
+     NOT to be confused with `threadsOf`/`threads` at the bottom of this file:
+     that is ONE CHANNEL's threads, page-infinite, and it must stay out of
+     `lists()` because the writers there cannot parse an infinite entry.       */
+
+  /**
+   * One space's threads (`GET /spaces/{uuid}/threads`) - what the lobby's
+   * "Active here" digest merges with the channel rows so the space's mention
+   * badge has rows to land on. Newest activity first, a brand-new silent thread
+   * at the top.
+   *
+   * NOT read by the rail or the drawer, and that is not an omission: threads
+   * have no rail row by design (`ThreadsSheet` is the channel-level surface),
+   * which is why this is mounted by the lobby screen rather than by
+   * `CollabFrame` beside `bySpace`: a channel route pays nothing for it.
+   */
+  threadsBySpace: ({
+    spaceUuid,
+    viewerId,
+    ...params
+  }: ThreadIndexParams & BySpaceOptions) =>
+    queryOptions({
+      queryKey: [
+        ...channelsQueries.lists(),
+        'space-threads',
+        spaceUuid,
+        params,
+        { viewerId },
+      ] as const,
+      queryFn: () => spacesApi.getThreads(spaceUuid, params),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
+  /**
+   * The caller's threads across every space (`GET /threads`) - the twin of
+   * `mine`, for the "My channels" index that today shows only top-level rooms.
+   *
+   * NO SCREEN READS THIS YET, deliberately. The two routes shipped as a pair and
+   * the pair is keyed as one, so the cross-space half cannot later be filed
+   * somewhere the writers do not reach; wiring the screen is its own change.
+   */
+  myThreads: ({ viewerId, ...params }: ThreadIndexParams & ViewerScoped) =>
+    queryOptions({
+      queryKey: [
+        ...channelsQueries.lists(),
+        'my-threads',
+        params,
+        { viewerId },
+      ] as const,
+      queryFn: () => channelsApi.getMyThreads(params),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
       refetchOnMount: REFETCH_ON_VISIT,
@@ -343,10 +425,23 @@ export const channelsQueries = {
 
   /* ── The channel's own threads (Threads Phase 4) ───────────────────────────
      A list of CHANNELS, not of messages, and deliberately NOT under the
-     `lists()` prefix that `mine`/`bySpace` share: those are the surfaces the
-     `.channel.unread` writers fan over, and a thread is excluded from every one
-     of them server-side (`topLevel()`). Filing thread rows there would hand
-     those writers rows that the rail and the drawer must never show. */
+     `lists()` prefix, BECAUSE IT IS PAGE-INFINITE, which is a shape the
+     writers over that prefix cannot read (`data.data` is `undefined` on an
+     `InfiniteData` entry; see the key-geography note at the top of this file).
+
+     THE REASON RECORDED HERE UNTIL 2026-08-16 WAS THE WRONG ONE. It said filing
+     thread rows under `lists()` "would hand those writers rows that the rail and
+     the drawer must never show". It would not: those writers are uuid-matched
+     assignments onto rows that are already cached, and the rail and the drawer
+     read the `bySpace` ENTRY, not the prefix, and a sibling entry under the same
+     prefix puts nothing in their list. `threadsBySpace` above is exactly that
+     sibling and it does no such harm. The shape constraint is the real one, and
+     it is the one that would have crashed.
+
+     The consequence, stated rather than hidden: this sheet's rows do NOT get
+     live count writes, so a thread open in the sheet and the same thread in the
+     space digest can disagree until the sheet refetches. That is unchanged
+     behaviour, not a regression, and the sheet's `staleTime` is what covers it. */
 
   /** Invalidation handle for one channel's threads list (both filters). */
   threadsOf: (channelUuid: string) =>

@@ -1,28 +1,28 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import Link from 'next/link';
-import { Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /**
  * ScreenDock — the floating layer at the bottom of a top-level screen: the
- * search pill, the one floating action, and the dissolve the content passes
- * into behind both.
+ * search pill, and the dissolve the content passes into behind it.
  *
  * ── WHY `sticky`, NOT `fixed`, AND NOT THE SHELL'S DOCK ROW ────────────────
  * `position: fixed` is forbidden in this shell and `shell.css` carries the
  * reason: fixed elements break under the iOS keyboard. The shell's dock ROW
  * (grid-row 3) is the sanctioned alternative and is wrong here for a different
- * reason — a row RESERVES its height, so the list would stop above the pill
- * instead of running under it, and the owner has already turned down that
- * look once ("an opaque band above/below the pill", see `Dock.tsx`).
+ * reason — a row RESERVES its height OUTSIDE the scroller, so the list would be
+ * cut off above the pill and nothing could ever pass behind it, and the owner
+ * has already turned down that look once ("an opaque band above/below the
+ * pill", see `Dock.tsx`).
  *
  * So this is `sticky bottom-0` as the last child of a `min-h-full flex-col`
- * column, which is the exact mechanism the home composer and the case ask-dock
- * already run on. It buys three things at once:
+ * column, which is the exact mechanism the conversation composer already runs
+ * on — that one is an ABSOLUTE layer over its own transcript, which is only
+ * possible because a conversation owns a non-scrolling wrapper; a list screen's
+ * only scroller is the shell's, so sticky is the same idea expressed inside it.
+ * It buys three things at once:
  *
  *  - it floats OVER the list, with rows visibly scrolling behind it;
  *  - it rides the keyboard for free — the shell is `100dvh − keyboard-inset`,
@@ -31,20 +31,55 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  *    into a shell-owned layer would have been tidier to read and would have
  *    painted the pill one commit late on every arrival.
  *
- * Because it is the last element in flow, scrolling to the very bottom settles
- * it into place at the end of the list — so the last row is never trapped under
- * it and no bottom clearance has to be reserved anywhere.
+ * ── WHAT MAKES IT READ AS FLOATING AND NOT AS FURNITURE ────────────────────
+ * The owner filmed the first version on his phone and called it "a messy
+ * design… not looking nice", against the ChatGPT recording he had sent: ours
+ * was a near full-width plate, square to the screen edges, sitting flat on the
+ * bottom, with the rows erased by an opaque band before they reached it. Three
+ * numbers here answer that, and all three are geometry rather than decoration:
+ *
+ *  - THE PILL IS NARROWER THAN THE ROWS. `px-8` against the rows' `px-4` insets
+ *    it by a further 16px on each side at every phone width, and
+ *    `ScreenDockSearch` caps it at `max-w-md` so it never stretches to the full
+ *    reading measure on a tablet or a desktop. A plate as wide as the content
+ *    is a bar; a plate visibly narrower than the content is an object lying on
+ *    top of it.
+ *  - IT DOES NOT TOUCH THE BOTTOM EDGE. `.v2-screen-dock` in `shell.css` holds
+ *    it 1.25rem clear (plus the home-indicator inset), so there is background
+ *    on all four sides of it. Something bolted to an edge is chrome.
+ *  - THE DISSOLVE IS LONGER THAN THE GAP IT LIVES IN. `pt-10` is the only
+ *    reason the fade has any room at all: the dock's own box IS the clearance
+ *    the list keeps at the end of its travel, so the top padding and the length
+ *    of the dissolve are the same 40px. Below that it is opaque, level with and
+ *    under the pill, so nothing is ever half-legible beside a control — the
+ *    rule the header fade is tuned to as well.
+ *
+ * ── WHERE THE ROWS ACTUALLY GO ─────────────────────────────────────────────
+ * While the reader is scrolling, they pass BEHIND the pill: sticky pins the
+ * dock to the bottom of the scrollport for as long as the list has more to
+ * give, and rows dissolve into the gradient as they arrive under it. At the END
+ * of the list they stop above it, and they must: this element is the last child
+ * in the flow, so the scroll region finishes where it finishes, and the last
+ * row has to be readable when the reader gets to it. The fade is exactly as
+ * tall as that resting clearance (`inset: 0` on the pseudo-element in
+ * `shell.css`), which is what keeps the final row crisp instead of veiled — a
+ * taller fade would look better mid-scroll and wash the one row the reader
+ * scrolled all that way to read.
  *
  * ── THE FADE IS PART OF THE DOCK, NOT PART OF THE SCROLLER ─────────────────
  * The top of the screen dissolves under the bar (shell.css); the bottom
  * dissolves into this. It is the same gradient argument and the same answer: a
- * mask on the scroll region would have faded out the pill and the action too,
- * which are precisely the things the owner wants sitting ABOVE the fade.
+ * mask on the scroll region would have faded out the pill too, which is
+ * precisely the thing the owner wants sitting ABOVE the fade. It is drawn as
+ * `.v2-screen-dock::before` rather than as a child div because its stops are
+ * measured from `env(safe-area-inset-bottom)`, and four `calc()` gradient stops
+ * are a paragraph of unreadable arbitrary values as utility classes — the same
+ * reason the padding below them already lives in CSS.
  *
  * ── NOTHING HERE STEALS A TAP ──────────────────────────────────────────────
  * The wrapper is `pointer-events-none` so the strip of empty space beside the
- * action never swallows a press meant for a row behind it; each control turns
- * pointer events back on for itself.
+ * pill never swallows a press meant for a row behind it; the pill turns pointer
+ * events back on for itself.
  *
  * ── THE FILTER PILLS DID NOT COME WITH THE SEARCH BOX ──────────────────────
  * `/cases`, `/statutes` and `/notes` each spent about 192px on three stacked
@@ -65,6 +100,13 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * The saving the owner asked for still lands: the top of these screens went
  * from three rows to a title and one pill row, and the bar's own 56px stopped
  * being dead space because the list now scrolls through it.
+ *
+ * ── THERE IS NO FLOATING ACTION IN HERE ANY MORE ───────────────────────────
+ * A `ScreenFab` used to ride above the pill on `/notes`, `/radars` and
+ * `/spaces`. The owner turned it down on sight ("Remove the floating button
+ * from the bottom. It looks very messy"), and each screen's create action went
+ * back into its filter row on the shared `CREATE_PILL`. Nothing floats at the
+ * bottom of a v2 screen except the one thing the reader types into.
  */
 export function ScreenDock({
   children,
@@ -83,91 +125,43 @@ export function ScreenDock({
         // block and silently kills `position: sticky` (home-frame.ts).
         //
         // `-mb-16` cancels the column's own `pb-16` for this element alone, so
-        // the dock rests ON the bottom edge while a screen that renders no dock
-        // (search switched to the top) keeps that padding as its list's bottom
-        // breathing room. See `LIST_COLUMN_DOCKED`.
-        'v2-screen-dock pointer-events-none sticky bottom-0 z-20 -mx-4 -mb-16 mt-auto flex flex-col items-end gap-2 px-4 pt-8',
+        // the dock's box rests ON the bottom edge while a screen that renders
+        // no dock (search switched to the top) keeps that padding as its list's
+        // bottom breathing room. See `LIST_COLUMN_DOCKED`.
+        //
+        // `-mx-4 px-8`: the bleed puts the fade's edges on the screen's edges,
+        // the padding puts the PILL 32px inside them — a full 16px narrower per
+        // side than the rows it floats over.
+        'v2-screen-dock pointer-events-none sticky bottom-0 z-20 -mx-4 -mb-16 mt-auto px-8 pt-10',
         className,
       )}
     >
-      {/* The dissolve. `-z-10` inside this positioned element, so the content
-          scrolling up meets it before it meets the controls. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background from-40% via-background/85 to-transparent"
-      />
       {children}
     </div>
   );
 }
 
 /**
- * ScreenFab — the floating action, bottom right, with a WORD on it.
- *
- * It replaces the bottom bar the owner turned down, and it exists only where a
- * screen has one obvious main action. He named three and only three: Notes gets
- * New note, Radar gets New radar, Spaces gets New space. Cases, statutes,
- * bookmarks and quiz get none, and a screen with no single obvious action must
- * not be given one to keep the set tidy.
- *
- * THE WORD IS NOT DECORATION. A bare `+` circle is the thing that has to be
- * learned; the label is what makes the action legible on first sight, and it is
- * also the accessible name, so there is no `aria-label` here to fall out of
- * step with what is drawn.
- *
- * ── TWO SHAPES, ONE COMPONENT ──────────────────────────────────────────────
- * Some of these actions are a place (`/notes/create`, `/radars/new`) and some
- * are a dialog the screen opens itself (Spaces). A place stays a real `<Link>`
- * — prefetchable, middle-clickable, previewable on a long press — and a dialog
- * is a `<button>`, because a link that goes nowhere is a lie to everyone who
- * inspects where it points. The `href`/`onClick` union is what keeps both
- * honest instead of forcing one into the other's clothes.
- */
-type ScreenFabAction =
-  | { href: string; onClick?: never }
-  | { onClick: () => void; href?: never };
-
-export function ScreenFab({
-  label,
-  className,
-  ...action
-}: ScreenFabAction & { label: string; className?: string }) {
-  const classes = cn(
-    'v2-interactive pointer-events-auto inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-full bg-primary pl-4 pr-5 text-sm font-medium text-primary-foreground shadow-lg transition-colors hover:bg-primary/90',
-    FOCUS_RING,
-    className,
-  );
-
-  const content = (
-    <>
-      <Plus aria-hidden className="size-4" />
-      {label}
-    </>
-  );
-
-  return action.href !== undefined ? (
-    <Link href={action.href} className={classes}>
-      {content}
-    </Link>
-  ) : (
-    <button type="button" onClick={action.onClick} className={classes}>
-      {content}
-    </button>
-  );
-}
-
-/**
  * The dock's search slot — the pill the search field sits in.
  *
- * `pointer-events-auto` and full width, so the field spans the reading column
- * the way the list rows do. The rounded, shadowed plate is what makes it read
- * as floating over the rows rather than as a row of its own; `SearchField`
- * itself is unchanged and unaware of where it is being rendered, which is what
- * lets the same control serve both positions of the developer switch.
+ * `pointer-events-auto`, and a width cap of its own: `max-w-md` is what stops
+ * the field spanning the whole `max-w-3xl` reading column on a tablet or a
+ * desktop, where a full-measure plate at the bottom of the page reads as a
+ * toolbar rather than as something floating. On a phone the cap is never
+ * reached and the dock's `px-8` does the insetting instead, so the pill is
+ * narrower than the rows at every width for one reason or the other.
+ *
+ * The plate is opaque and shadowed on purpose. It is what hides the rows
+ * travelling behind it — deliberately NOT a translucent, blurred glass pill:
+ * `backdrop-filter` over the app's one scroll container re-composites on every
+ * scrolled frame, which is the cost `shell.css` refuses for the header fade and
+ * refuses again here. `SearchField` itself is unchanged and unaware of where it
+ * is being rendered, which is what lets the same control serve both positions
+ * of the developer switch.
  */
 export function ScreenDockSearch({ children }: { children: ReactNode }) {
   return (
-    <div className="pointer-events-auto w-full rounded-4xl bg-background shadow-lg shadow-black/10 dark:shadow-black/40">
+    <div className="pointer-events-auto mx-auto w-full max-w-md rounded-4xl bg-background shadow-lg shadow-black/10 dark:shadow-black/40">
       {children}
     </div>
   );
