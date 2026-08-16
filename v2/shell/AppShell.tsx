@@ -33,10 +33,11 @@ import { V2_SHELL_CONTENT_ID } from './shell-content';
  *  - Slots are optional: each element carries an explicit `grid-row`, so an
  *    omitted header or an empty dock collapses its row without shifting the others.
  *  - On a TOP-LEVEL screen the header ROW collapses to zero and the bar paints
- *    OVER the content region, which is how content scrolls under it. The bar is
- *    still a grid item and still never `position: fixed` — see the see-through
- *    block in `shell.css` for the whole mechanism, the notch decision, and why
- *    the dissolve is a gradient rather than a mask on the scroller.
+ *    OVER the content region, which is how content scrolls under it. Nothing is
+ *    painted behind the bar there — the words pass BEHIND its round buttons and
+ *    out the other side. The bar is still a grid item and still never
+ *    `position: fixed` — see the see-through block in `shell.css` for the whole
+ *    mechanism, the owner's decision, and what the notch strip does now.
  *
  * Visuals are deliberately neutral (existing tokens) — phase-2 owns the real
  * header/dock chrome; this WP ships only the mechanics any nav can slot into.
@@ -61,16 +62,12 @@ export function AppShell({ children, header, dock }: AppShellProps) {
         // itself for the notch and then shows nothing is a dead strip above the
         // screen, and on a phone inside a channel this row shows nothing at all
         // (the screen owns the bar there).
-        <header className="v2-shell__header">
-          {/* The see-through bar's dissolve — always in the tree, painted only
-              on a top-level screen below `md:` (shell.css carries the reasoning,
-              including why this is a gradient and not a mask on the scroller).
-              It sits INSIDE the bar so the bar is its containing block and its
-              own safe-area padding measures it; `aria-hidden` because it is a
-              colour, not content. */}
-          <div aria-hidden className="v2-shell__header-fade" />
-          {header}
-        </header>
+        //
+        // The row has NO child but the bar. On a top-level screen it paints no
+        // plate, no rule line and no dissolve — a gradient child used to live
+        // here and the owner took it away. See the see-through block in
+        // `shell.css` for his words and for what the notch strip does now.
+        <header className="v2-shell__header">{header}</header>
       ) : null}
       {/* The id lets full-page surfaces root IntersectionObservers against the
           REAL scroll container (see use-shell-scroll-root.ts) — a viewport root

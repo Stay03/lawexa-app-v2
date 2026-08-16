@@ -31,7 +31,8 @@ import { isTopLevelRoute } from './top-level-route';
 import { useScreenContext } from './screen-context';
 
 /**
- * THE SEE-THROUGH BAR'S CONTROLS, on a top-level screen below `md:`.
+ * THE SEE-THROUGH BAR'S CONTROLS, on a top-level screen below `md:` — a SOLID
+ * disc each, and the only thing the bar paints.
  *
  * With nothing painted behind the bar (see the see-through block in
  * `shell.css`), a `ghost` control is a bare glyph floating over whatever text
@@ -40,34 +41,36 @@ import { useScreenContext } from './screen-context';
  * the controls and he disliked it; ChatGPT's controls sit in solid filled
  * circles, and that is what this is.
  *
- * Below `md:` only, because that is the only place the bar goes see-through.
- * At `md:` and up the bar keeps its plate and its controls keep the ghost
+ * Below `md:` only, because that is the only place the bar goes see-through. At
+ * `md:` and up the bar keeps its plate and its controls keep the ghost
  * treatment they have always had.
+ *
+ * ── THE OWNER PICKED THIS, TWICE, AND A ROUND TALKED ITSELF OUT OF IT ──────
+ * He chose "option 3" off a page of three working mock-ups: solid buttons,
+ * nothing behind them, and the words travelling through the gap between them as
+ * they scroll. He then said "option 3 but refined", "refined" was read as the
+ * edge fade in his ChatGPT recordings, and the discs went translucent AND the
+ * fade got stronger — two steps in the direction he had already ruled out.
+ *
+ * His correction, 16 August: "I like the buttons as they are, but you remember
+ * option 3 in your artifact and how there's nothing at the header just the
+ * buttons? That's what I want."
+ *
+ * THE MOCK-UP SETTLES THE AMBIGUITY IN "AS THEY ARE". Read alone, that clause
+ * could mean the glass discs he was looking at when he typed it. It does not:
+ * option 3 in the artifact is the only one of the three whose buttons have a
+ * ground at all (`.btn.solid { background: var(--chip) }` — flat, opaque, no
+ * blur, no ring, the other two are bare glyphs), and he named option 3 in the
+ * same sentence. So: opaque disc, no ring, no blur, and nothing behind the bar.
+ *
+ * WHAT THIS COSTS, ACCEPTED WITH HIS EYES OPEN: a long title now runs behind a
+ * button and out the other side rather than dissolving. That is what option 3
+ * IS, and it is drawn that way in the mock-up he chose. If it grates in use the
+ * answer is option 1 (the bar gains a background only once scrolled), not
+ * quietly reintroducing a haze he has now rejected twice.
  */
-/**
- * The plate behind a control on a see-through bar.
- *
- * ── IT IS GLASS, NOT A CHIP (owner, 16 August 2026) ────────────────────────
- * It was `bg-secondary`, an opaque grey disc. Filmed on his phone, the four
- * controls read as "a row of blobs", which is a bar whether or not there is a
- * line under it: "the header still looks like it's there, it's not clear or
- * transparent."
- *
- * An opaque plate is the wrong instrument. The plate exists to keep a glyph
- * legible over whatever is scrolling behind it, and translucency plus a blur
- * does that while still showing the page moving underneath, which is the thing
- * that makes it read as floating ON the content rather than as chrome above it.
- *
- * `supports-[backdrop-filter]` because a browser without it would otherwise get
- * a 60% wash with nothing behind it and no legibility guarantee; there it falls
- * back to the opaque token, which is the safe direction to fail in.
- */
-const OPEN_BAR_CONTROL = [
-  'max-md:bg-background/85 max-md:text-foreground',
-  'max-md:supports-[backdrop-filter]:bg-background/55',
-  'max-md:supports-[backdrop-filter]:backdrop-blur-md',
-  'max-md:ring-1 max-md:ring-foreground/5',
-].join(' ');
+const OPEN_BAR_CONTROL =
+  'max-md:bg-secondary max-md:text-foreground max-md:shadow-sm';
 
 /**
  * V2Header — the top bar, deliberately UNCROWDED (a binding owner decision).
@@ -143,8 +146,9 @@ const OPEN_BAR_CONTROL = [
  * to be: below `md:` nothing is painted behind it, the content scrolls
  * underneath, and its controls sit on the page as solid round buttons
  * ({@link OPEN_BAR_CONTROL}). The structural half — the collapsed header row,
- * the content's resting padding, the dissolve, and what now fills the notch —
- * is in `shell.css`; which screens those are is `top-level-route.ts`.
+ * the content's resting padding, and what the notch strip does with nothing
+ * painted in it — is in `shell.css`; which screens those are is
+ * `top-level-route.ts`.
  *
  * Three things follow here:
  *

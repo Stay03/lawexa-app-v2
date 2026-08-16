@@ -51,8 +51,7 @@ import { cn } from '@/lib/utils';
  *    reason the fade has any room at all: the dock's own box IS the clearance
  *    the list keeps at the end of its travel, so the top padding and the length
  *    of the dissolve are the same 40px. Below that it is opaque, level with and
- *    under the pill, so nothing is ever half-legible beside a control — the
- *    rule the header fade is tuned to as well.
+ *    under the pill, so nothing is ever half-legible beside a control.
  *
  * ── WHERE THE ROWS ACTUALLY GO ─────────────────────────────────────────────
  * While the reader is scrolling, they pass BEHIND the pill: sticky pins the
@@ -67,10 +66,12 @@ import { cn } from '@/lib/utils';
  * scrolled all that way to read.
  *
  * ── THE FADE IS PART OF THE DOCK, NOT PART OF THE SCROLLER ─────────────────
- * The top of the screen dissolves under the bar (shell.css); the bottom
- * dissolves into this. It is the same gradient argument and the same answer: a
- * mask on the scroll region would have faded out the pill too, which is
- * precisely the thing the owner wants sitting ABOVE the fade. It is drawn as
+ * This is the app's only dissolve: the TOP of a top-level screen has none, on
+ * the owner's instruction, and its words simply pass behind the bar's round
+ * buttons (see the see-through block in `shell.css`). Here it stays, and it is
+ * a gradient rather than a mask because a mask on the scroll region would have
+ * faded out the pill too, which is precisely the thing the owner wants sitting
+ * ABOVE the fade — `shell.css` carries that argument in full. It is drawn as
  * `.v2-screen-dock::before` rather than as a child div because its stops are
  * measured from `env(safe-area-inset-bottom)`, and four `calc()` gradient stops
  * are a paragraph of unreadable arbitrary values as utility classes — the same
@@ -154,8 +155,8 @@ export function ScreenDock({
  * The plate is opaque and shadowed on purpose. It is what hides the rows
  * travelling behind it — deliberately NOT a translucent, blurred glass pill:
  * `backdrop-filter` over the app's one scroll container re-composites on every
- * scrolled frame, which is the cost `shell.css` refuses for the header fade and
- * refuses again here. `SearchField` itself is unchanged and unaware of where it
+ * scrolled frame, which is a cost `shell.css` refuses for this dissolve and the
+ * bar refuses too. `SearchField` itself is unchanged and unaware of where it
  * is being rendered, which is what lets the same control serve both positions
  * of the developer switch.
  */

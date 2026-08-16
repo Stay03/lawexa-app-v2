@@ -45,10 +45,14 @@ html.v2-document-lock body {
   height: calc(100dvh - var(--keyboard-inset, 0px));
   overflow: hidden;
 
-  /* The bar's height, in ONE place, because three rules need the same number:
-     the content region's resting top padding on a see-through screen, the
-     dissolve's reach, and the header row's collapse. 3.5rem is `h-14` on the
-     bar element in `V2Header`; if that changes, this changes with it. */
+  /* The bar's height, named once. It is the content region's resting top
+     padding on a see-through screen: the page starts BELOW the buttons and only
+     travels under them when the reader pushes it there. It used to feed the
+     header dissolve's reach as well, and that gradient is gone (see the
+     see-through block below), so it has exactly one reader now — but it stays a
+     variable, because the number is a fact about the BAR rather than about
+     padding. 3.5rem is `h-14` on the bar element in `V2Header`; if that changes,
+     this changes with it. */
   --v2-bar-h: calc(env(safe-area-inset-top, 0px) + 3.5rem);
 }
 
@@ -70,12 +74,18 @@ html.v2-document-lock body {
    the notch is filled by the bar rather than showing through — correct mobile
    behaviour. Neutral token; phase-2 restyles the real header chrome.
 
-   `position: relative` is unconditional and costs nothing: it makes the bar the
-   containing block for the see-through fade below, which is a child of this
-   element on every route and paints on none of them until the modifier is on. */
+   THERE IS NO `position` HERE, AND THAT IS DELIBERATE. It carried
+   `position: relative` for one reason: to be the containing block for the
+   see-through bar's fade, which was a child of this element. The fade is gone
+   (see the see-through block below) and nothing else in the bar positions
+   against it — the bell's unread badge hangs off the bell BUTTON's own
+   `relative`. The `z-index: 30` the see-through modifier adds does not need it
+   either: z-index applies to a GRID ITEM even where its position is static, and
+   that was measured rather than assumed — with `position: static` forced on,
+   the bar still paints over the content region's descendants at the button row.
+   So the declaration left with the element that justified it. */
 .v2-shell__header {
   grid-row: 1;
-  position: relative;
   background: var(--background);
 }
 
@@ -152,40 +162,38 @@ html.v2-document-lock body {
    page's big title sits below the buttons and only travels under them when the
    reader pushes it there.
 
-   ── WHAT FILLS THE NOTCH NOW ───────────────────────────────────────────────
-   The bar used to be painted solid for exactly one reason: `viewport-fit=cover`
-   lets content run under the notch, and something has to fill that strip. Going
-   transparent hands that job to the FADE, which is the better owner of it — the
-   fade's first stop is opaque `--background` and it is held opaque past the
-   whole safe-area inset, so the strip is filled exactly as before and the
-   content has already dissolved to nothing before it reaches the notch. The
-   `theme-color` metas in the v2 layout already name the same two colours, so
-   the browser's own chrome still matches.
+   ── NOTHING IS PAINTED HERE, INCLUDING IN THE NOTCH STRIP ──────────────────
+   There was a dissolve under this bar for two rounds — a gradient holding
+   `--background` opaque past the buttons, so words melted rather than went
+   behind them. It is gone, and the owner removed it himself: he picked option 3
+   off a page of three working mock-ups (solid buttons, nothing behind them,
+   words passing through the gap), an earlier round read "option 3 but refined"
+   as the ChatGPT edge fade and built the haze anyway, and his correction was
+   flat — "you remember option 3 in your artifact and how there's nothing at the
+   header just the buttons? That's what I want."
 
-   ── WHY A GRADIENT AND NOT `mask-image` ON THE SCROLLER ────────────────────
-   A mask is the tidier idea and it was rejected on two grounds, one of them
-   fatal:
+   So the words are OCCLUDED by the round controls and legible either side of
+   them. That is not a defect to soften; it is what option 3 is, and it is drawn
+   that way in the mock-up he chose.
 
-    1. IT WOULD FADE THE FLOATING CONTROL TOO. A mask applies to the masked
-       element and everything inside it, and the bottom search pill is a
-       `position: sticky` child of the scroll region (`ScreenDock`) — the only
-       place it can be, since `fixed` is banned and a portal would paint it a
-       frame late. A bottom mask would dissolve the very control that is
-       supposed to sit ON TOP of the fade.
-    2. IT WOULD PUT A MASKED COMPOSITING LAYER ON THE APP'S ONE SCROLL
-       CONTAINER. `.v2-shell__content` is the single scroller for every screen,
-       and a mask on it is re-composited on every scroll frame. Phase 4 of this
-       overhaul was a scrolling defect a real reader reported; this is not the
-       element to spend frames on for an effect that is reproducible without
-       them.
+   WHAT IS IN THE NOTCH STRIP NOW. `viewport-fit=cover` (the v2 layout's
+   viewport export) lets content run under the notch, and the bar used to be
+   painted solid to fill that strip. At REST it still looks the same: nothing is
+   up there, and the page's own `--background` — painted by the v2 layout's root,
+   which neither `.v2-shell` nor the content region paints over — shows through,
+   while `--v2-bar-h` keeps the page's first line below the buttons. ONCE
+   SCROLLED the words travel up through the strip and pass under the phone's
+   status bar, which is the same occlusion the buttons cause, against the clock
+   instead of against a control.
 
-   A gradient is not an approximation here, it is arithmetic: masking content to
-   alpha `m` over an opaque backdrop and compositing that same backdrop at
-   `1 − m` over the content give identical pixels. The backdrop IS knowable and
-   uniform — the v2 layout's root paints `--background` and neither `.v2-shell`
-   nor the content region paints over it — so the two are the same picture, and
-   the gradient costs one static, non-scrolling paint instead of a per-frame
-   one.
+   THAT LAST PART IS UNFILMED AND THE OWNER HAS NOT SEEN IT. Chromium reports a
+   zero safe-area inset on every device it emulates, so the notched case cannot
+   be reproduced in the harness, and the mock-up he chose from had no notch
+   either. If it reads badly on his phone the agreed next step is option 1 — the
+   bar gains a background only once scrolled — never a haze reintroduced under
+   another name. The `theme-color` metas in the v2 layout still tint the
+   browser's own chrome to match the theme; they were never what filled this
+   strip.
 
    ── BELOW `md:` ONLY, AND THAT IS A DECISION ───────────────────────────────
    The rule came from phone recordings and the 192px of stacked chrome it is
@@ -216,60 +224,6 @@ html.v2-document-lock body {
   html.v2-document-lock .v2-shell--open .v2-shell__content {
     padding-top: var(--v2-bar-h);
   }
-
-  /* The dissolve. A child of the bar, so it needs no grid placement of its
-     own; `z-index: -1` puts it behind the bar's controls but still inside the
-     bar's stacking context, therefore still above the content region.
-
-     It reaches `0.75rem` BELOW the bar so the last of the fade lands clear of
-     the buttons rather than exactly on their edge, and the first stop is held
-     opaque past the safe-area inset so the notch strip is solid colour.
-
-     THE OPAQUE STOP IS 2.5rem PAST THE INSET, NOT 1.25rem, AND THAT WAS
-     MEASURED. The buttons sit between `0.75rem` and `2.75rem` below the inset,
-     so an opaque stop at `1.25rem` left the whole button row inside the FADING
-     part of the gradient. Filmed at 390px on a device reporting no safe-area
-     inset (every Android without a notch, and every desktop window), a case
-     title scrolling past was still legible through the gap between the crest
-     and the bell. It read as text colliding with the controls, which is the
-     exact fault the owner disliked in Claude's app and the reason he chose
-     ChatGPT's treatment instead.
-
-     Expressing it against the inset is still right: on a notched phone the bar
-     shifts down by the inset and the buttons shift with it, so the same
-     constant covers them in both cases. It was only ever too small. */
-  html.v2-document-lock .v2-shell--open .v2-shell__header-fade {
-    display: block;
-    position: absolute;
-    /* Reaches well BELOW the bar so the tail has room to finish. At `-0.75rem`
-       the gradient hit full transparency a few pixels under the buttons, which
-       left a band of half-dead text sitting right beneath them. The owner
-       filmed it and called the header "not clear or transparent": the smear was
-       what read as chrome, not the buttons. A fade needs distance to disappear
-       in. */
-    inset: 0 0 -2.75rem 0;
-    z-index: -1;
-    pointer-events: none;
-    /* Opaque past the buttons (they end 2.75rem below the inset), THEN a long
-       soft tail. Nothing may be legible anywhere near a control: in the app the
-       owner is copying, words are gone before they reach the chrome, not
-       dimmed under it. */
-    background: linear-gradient(
-      to bottom,
-      var(--background) 0,
-      var(--background) calc(env(safe-area-inset-top, 0px) + 2.75rem),
-      color-mix(in oklab, var(--background) 82%, transparent)
-        calc(env(safe-area-inset-top, 0px) + 4rem),
-      transparent 100%
-    );
-  }
-}
-
-/* Inert on every other route and at every other width — the element is always
-   in the tree (it is shell structure, not conditional markup) and paints only
-   when the block above turns it on. */
-.v2-shell__header-fade {
-  display: none;
 }
 
 /* -----------------------------------------------------------------------------
@@ -292,10 +246,33 @@ html.v2-document-lock body {
   padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
 }
 
-/* The dissolve the list passes into behind the pill — the bottom twin of the
-   header fade above, and the same arithmetic: compositing the known, uniform
-   `--background` over the content at `1 − m` gives the pixels a mask at alpha
-   `m` would, for one static paint instead of a per-frame one.
+/* The dissolve the list passes into behind the pill. It is the app's ONLY
+   dissolve now — the header had a matching one and the owner took it away (see
+   the see-through block above) — so the reasoning it used to share lives here.
+
+   ── WHY A GRADIENT AND NOT `mask-image` ON THE SCROLLER ────────────────────
+   A mask is the tidier idea and it was rejected on two grounds, one of them
+   fatal:
+
+    1. IT WOULD FADE THE FLOATING CONTROL TOO. A mask applies to the masked
+       element and everything inside it, and the search pill is a
+       `position: sticky` child of the scroll region (`ScreenDock`) — the only
+       place it can be, since `fixed` is banned and a portal would paint it a
+       frame late. The mask would dissolve the very control that is supposed to
+       sit ON TOP of the fade.
+    2. IT WOULD PUT A MASKED COMPOSITING LAYER ON THE APP'S ONE SCROLL
+       CONTAINER. `.v2-shell__content` is the single scroller for every screen,
+       and a mask on it is re-composited on every scroll frame. Phase 4 of this
+       overhaul was a scrolling defect a real reader reported; this is not the
+       element to spend frames on for an effect that is reproducible without
+       them.
+
+   A gradient is not an approximation here, it is arithmetic: masking content to
+   alpha `m` over an opaque backdrop and compositing that same backdrop at
+   `1 − m` over the content give identical pixels. The backdrop IS knowable and
+   uniform — the v2 layout's root paints `--background` and neither `.v2-shell`
+   nor the content region paints over it — so the two are the same picture, and
+   the gradient costs one static, non-scrolling paint instead of a per-frame one.
 
    `z-index: -1` puts it behind the pill but INSIDE the dock's stacking context
    (`z-20` on a positioned element makes one), so it still paints over the rows
@@ -308,12 +285,11 @@ html.v2-document-lock body {
    THE STOPS ARE MEASURED FROM THE PILL, NOT SPACED EVENLY. The plate occupies
    `inset + 1.25rem` to `inset + 4rem` (it is `h-11`), so the gradient is held
    fully opaque to `inset + 4rem`: level with the pill and below it nothing may
-   be even half-legible, exactly as the header fade is held opaque past the
-   round buttons. Above that line the whole 2.5rem of `pt-10` is spent on the
-   tail, and the three stops in it follow a smoothstep rather than a straight
-   line — a linear ramp over so short a distance reads as an edge moving up the
-   screen, which is what made the first version look like a band with rows
-   disappearing into it rather than like content dissolving. */
+   be even half-legible. Above that line the whole 2.5rem of `pt-10` is spent
+   on the tail, and the three stops in it follow a smoothstep rather than a
+   straight line — a linear ramp over so short a distance reads as an edge
+   moving up the screen, which is what made the first version look like a band
+   with rows disappearing into it rather than like content dissolving. */
 .v2-screen-dock::before {
   content: '';
   position: absolute;
