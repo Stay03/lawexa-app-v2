@@ -33,11 +33,12 @@ import { V2_SHELL_CONTENT_ID } from './shell-content';
  *  - Slots are optional: each element carries an explicit `grid-row`, so an
  *    omitted header or an empty dock collapses its row without shifting the others.
  *  - On a TOP-LEVEL screen the header ROW collapses to zero and the bar paints
- *    OVER the content region, which is how content scrolls under it. Nothing is
- *    painted behind the bar there — the words pass BEHIND its round buttons and
- *    out the other side. The bar is still a grid item and still never
- *    `position: fixed` — see the see-through block in `shell.css` for the whole
- *    mechanism, the owner's decision, and what the notch strip does now.
+ *    OVER the content region, which is how content scrolls under it. The words
+ *    pass BEHIND its round buttons and out the other side, going soft as they
+ *    cross a strip of frosted glass and staying readable through it. The bar is
+ *    still a grid item and still never `position: fixed` — see the see-through
+ *    block in `shell.css` for the whole mechanism, the owner's three rounds on
+ *    it, and what the blur costs.
  *
  * Visuals are deliberately neutral (existing tokens) — phase-2 owns the real
  * header/dock chrome; this WP ships only the mechanics any nav can slot into.
@@ -64,9 +65,10 @@ export function AppShell({ children, header, dock }: AppShellProps) {
         // (the screen owns the bar there).
         //
         // The row has NO child but the bar. On a top-level screen it paints no
-        // plate, no rule line and no dissolve — a gradient child used to live
-        // here and the owner took it away. See the see-through block in
-        // `shell.css` for his words and for what the notch strip does now.
+        // plate and no rule line, and the glass strip that frosts what scrolls
+        // under it is a `::before` on this element rather than a child, so
+        // nothing conditional lives in this markup. See the see-through block
+        // in `shell.css`.
         <header className="v2-shell__header">{header}</header>
       ) : null}
       {/* The id lets full-page surfaces root IntersectionObservers against the

@@ -75,15 +75,16 @@ html.v2-document-lock body {
    behaviour. Neutral token; phase-2 restyles the real header chrome.
 
    THERE IS NO `position` HERE, AND THAT IS DELIBERATE. It carried
-   `position: relative` for one reason: to be the containing block for the
-   see-through bar's fade, which was a child of this element. The fade is gone
-   (see the see-through block below) and nothing else in the bar positions
-   against it — the bell's unread badge hangs off the bell BUTTON's own
-   `relative`. The `z-index: 30` the see-through modifier adds does not need it
-   either: z-index applies to a GRID ITEM even where its position is static, and
-   that was measured rather than assumed — with `position: static` forced on,
-   the bar still paints over the content region's descendants at the button row.
-   So the declaration left with the element that justified it. */
+   `position: relative` unconditionally, to be the containing block for the
+   see-through bar's dissolve. That dissolve is gone (see the see-through block
+   below) and its replacement, the glass strip, is scoped to the one modifier
+   that shows it, so the declaration moved down there with it. Nothing else in
+   the bar positions against this element: the bell's unread badge hangs off the
+   bell BUTTON's own `relative`. The `z-index: 30` the see-through modifier adds
+   does not need it either: z-index applies to a GRID ITEM even where its
+   position is static, and that was measured rather than assumed, with
+   `position: static` forced on the bar still painting over the content region's
+   descendants at the button row. */
 .v2-shell__header {
   grid-row: 1;
   background: var(--background);
@@ -162,38 +163,87 @@ html.v2-document-lock body {
    page's big title sits below the buttons and only travels under them when the
    reader pushes it there.
 
-   ── NOTHING IS PAINTED HERE, INCLUDING IN THE NOTCH STRIP ──────────────────
-   There was a dissolve under this bar for two rounds — a gradient holding
-   `--background` opaque past the buttons, so words melted rather than went
-   behind them. It is gone, and the owner removed it himself: he picked option 3
-   off a page of three working mock-ups (solid buttons, nothing behind them,
-   words passing through the gap), an earlier round read "option 3 but refined"
-   as the ChatGPT edge fade and built the haze anyway, and his correction was
-   flat — "you remember option 3 in your artifact and how there's nothing at the
-   header just the buttons? That's what I want."
+   ── THE ONE THING PAINTED HERE IS A STRIP OF FROSTED GLASS ─────────────────
+   Three rounds arrived at this. For two of them the bar carried a DISSOLVE: a
+   gradient holding `--background` opaque past the buttons, so words melted away
+   before they reached them. The owner threw that out twice, the second time in
+   his own words ("you remember option 3 in your artifact and how there's
+   nothing at the header just the buttons? That's what I want"), and it went:
+   element, gradient and stub rule.
 
-   So the words are OCCLUDED by the round controls and legible either side of
-   them. That is not a defect to soften; it is what option 3 is, and it is drawn
-   that way in the mock-up he chose.
+   Then he saw option 3 live and asked for the last step: "Good, it's not
+   complete see through, close to what I want. Now I just need some little blur
+   on that top header side, enough blur that the text is still readable."
 
-   WHAT IS IN THE NOTCH STRIP NOW. `viewport-fit=cover` (the v2 layout's
-   viewport export) lets content run under the notch, and the bar used to be
-   painted solid to fill that strip. At REST it still looks the same: nothing is
-   up there, and the page's own `--background` — painted by the v2 layout's root,
-   which neither `.v2-shell` nor the content region paints over — shows through,
-   while `--v2-bar-h` keeps the page's first line below the buttons. ONCE
-   SCROLLED the words travel up through the strip and pass under the phone's
-   status bar, which is the same occlusion the buttons cause, against the clock
-   instead of against a control.
+   THE INSTRUMENT IS BLUR, NOT OPACITY, and that distinction is the whole brief.
+   A wash HIDES the words, which is the thing he has now rejected twice. A blur
+   keeps every word on the screen and softens it as it passes: he can still tell
+   what a case is called through the strip, and the strip still reads as glass
+   rather than as a hole. So the rule below is a `backdrop-filter` first and the
+   tint is a small correction on top of it, not the other way round.
 
-   THAT LAST PART IS UNFILMED AND THE OWNER HAS NOT SEEN IT. Chromium reports a
-   zero safe-area inset on every device it emulates, so the notched case cannot
-   be reproduced in the harness, and the mock-up he chose from had no notch
-   either. If it reads badly on his phone the agreed next step is option 1 — the
-   bar gains a background only once scrolled — never a haze reintroduced under
-   another name. The `theme-color` metas in the v2 layout still tint the
-   browser's own chrome to match the theme; they were never what filled this
-   strip.
+   THE THREE NUMBERS, AND WHY THEY ARE THOSE NUMBERS.
+
+    - `blur(1.5px)`. HIS SENTENCE MAKES READABILITY THE TEST, so the radius was
+      judged against the SMALLEST thing that crosses the bar, not the biggest. A
+      `/cases` row carries a 15px medium-weight title, a 14px grey snippet under
+      it and a 12px court line above it; the page's `h1` is 28px and survives
+      anything. Filmed at 390px at 1, 1.5, 2, 3 and 4px against a real list: 3px
+      and 4px close the counters of `e` and `a` and the 14px line becomes a
+      smear; at 2px that line is guessed at rather than read; 1px is barely
+      distinguishable from no strip at all. 1.5px is the largest radius at which
+      the 14px line is still READ, and the strip is plainly frosted at it. The
+      value is a CSS px, so it scales with the reader's zoom exactly as the text
+      under it does.
+    - A `--background` TINT AT 12%. The colour is the page's own ground, which
+      means it is INVISIBLE at rest: mixing `--background` over `--background`
+      is a no-op, so an unscrolled screen looks exactly as it did before this
+      rule existed, in both themes. It only shows once words are under it, where
+      it gives the glass a body the blur alone does not. The same films at 0%,
+      12% and 20% put its effect on legibility below the radius's by a wide
+      margin, which is the licence to have it at all; 12% is a seventh of the
+      82% the rejected dissolve merely OPENED at.
+    - A 12px MASK TAIL. The strip stops blurring 12px below the bar rather than
+      on a line, because a hard edge cuts a word in half across its x-height and
+      reads as a rendering fault on a phone. THE MASK FADES THE BLUR, NOT THE
+      CONTENT: where its alpha is 0.5 the reader sees a half-and-half composite
+      of the blurred and the unblurred backdrop, so nothing under the strip is
+      ever less than fully present. That is the opposite of the dissolve, which
+      took the words away.
+
+   IT COSTS ONE COMPOSITED LAYER AND THE COST WAS MEASURED, NOT ASSUMED. A
+   `backdrop-filter` over the app's one scroll container re-composites on every
+   scrolled frame, which is the cost the dock's fade below refuses by being a
+   gradient. It is spent HERE and only here, over a 56px strip. Three 5s
+   rAF-driven scrolls of a loaded `/cases` at 390px under 6x CPU throttling,
+   with the arms interleaved so machine drift cannot read as an effect:
+
+       strip off   mean 16.87ms/frame (16.72, 16.78, 17.12)   1.2% over 20ms
+       strip on    mean 16.80ms/frame (16.67, 16.67, 17.06)   0.8% over 20ms
+       control     mean 18.16ms/frame (17.24, 17.73, 19.52)   8.2% over 20ms
+
+   The control is the same rule at `blur(24px)` over a strip four times as tall,
+   and it is there to prove the harness can SEE a compositing cost before the
+   first two lines are believed. The shipped strip is inside the unblurred arm's
+   own run-to-run spread. (At 12x the whole page is frame-starved and the spread
+   swallows the control too, so that depth measures nothing and is not quoted.)
+   If a real reader ever reports scroll judder on a top-level screen, this rule
+   is the first thing to take out.
+
+   IT COVERS THE NOTCH STRIP TOO. `viewport-fit=cover` (the v2 layout's viewport
+   export) lets content run under the notch, and `inset: 0` puts the glass over
+   the whole header box, safe-area padding included. So a word travelling up
+   past the buttons is already soft by the time it reaches the phone's clock,
+   which is a better answer for that band than the nothing it had before. At
+   rest the strip is still invisible there for the reason the tint is: the
+   page's own `--background`, painted by the v2 layout's root, is all that is
+   up there and `--v2-bar-h` keeps the page's first line below the buttons.
+
+   THE NOTCHED CASE IS STILL UNFILMED. Chromium reports a zero safe-area inset
+   on every device it emulates, so the harness cannot reproduce a notch and the
+   `env()` terms below are read as 0 in every shot. They are expressed against
+   the inset anyway, because the bar shifts down by it on a real phone and the
+   strip has to shift with it.
 
    ── BELOW `md:` ONLY, AND THAT IS A DECISION ───────────────────────────────
    The rule came from phone recordings and the 192px of stacked chrome it is
@@ -219,10 +269,66 @@ html.v2-document-lock body {
     align-self: start;
     z-index: 30;
     background: none;
+    /* Containing block for the glass strip below, and nothing else. It is set
+       HERE rather than on the base rule because the strip exists only on a
+       see-through bar; on every other route the element keeps the static
+       position `4436dee` left it with. */
+    position: relative;
   }
 
   html.v2-document-lock .v2-shell--open .v2-shell__content {
     padding-top: var(--v2-bar-h);
+  }
+
+  /* THE GLASS. A pseudo-element rather than a child div, for the reason the
+     dock's fade is one: its geometry is `calc()` against `env()`, which is a
+     paragraph of unreadable arbitrary values as utility classes, and it is a
+     colour rather than content so nothing in the markup should have to carry
+     it.
+
+     `z-index: -1` is load-bearing twice over. It puts the strip behind the
+     bar's own controls, so the solid discs stay solid and unblurred, while
+     keeping it INSIDE the header's stacking context (`z-index: 30` on a grid
+     item makes one) and therefore above the content region. It also has to be
+     negative rather than 0: a positioned descendant at `z-index: 0` paints
+     ABOVE its parent's in-flow content, which would frost the buttons.
+
+     `inset: 0 0 -0.75rem 0` reaches 12px past the bar so the mask tail has
+     somewhere to finish. The blur is held at full strength to 3.25rem below
+     the safe-area inset, which clears the 44px discs (they end at 3.125rem),
+     then eases out over the remaining 12px.
+
+     `pointer-events: none` because it is over the content region and a finger
+     must reach the rows underneath. It changes no layout: it is out of flow,
+     and the header's own box is unchanged.
+
+     The whole rule is behind `@supports`, because without `backdrop-filter`
+     the tint would be a bare wash over moving text with no blur to justify it,
+     which is precisely the treatment the owner rejected. There it paints
+     nothing at all and the bar is exactly what it was before this rule. */
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    html.v2-document-lock .v2-shell--open .v2-shell__header::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 -0.75rem 0;
+      z-index: -1;
+      pointer-events: none;
+      -webkit-backdrop-filter: blur(1.5px);
+      backdrop-filter: blur(1.5px);
+      background: color-mix(in oklab, var(--background) 12%, transparent);
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        #000 0,
+        #000 calc(env(safe-area-inset-top, 0px) + 3.25rem),
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        #000 0,
+        #000 calc(env(safe-area-inset-top, 0px) + 3.25rem),
+        transparent 100%
+      );
+    }
   }
 }
 
@@ -247,8 +353,9 @@ html.v2-document-lock body {
 }
 
 /* The dissolve the list passes into behind the pill. It is the app's ONLY
-   dissolve now — the header had a matching one and the owner took it away (see
-   the see-through block above) — so the reasoning it used to share lives here.
+   dissolve now: the header had a matching one, the owner took it away, and what
+   stands there instead is a blur that keeps the words (see the see-through
+   block above). So the reasoning the two used to share lives here.
 
    ── WHY A GRADIENT AND NOT `mask-image` ON THE SCROLLER ────────────────────
    A mask is the tidier idea and it was rejected on two grounds, one of them

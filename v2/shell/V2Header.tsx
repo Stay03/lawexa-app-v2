@@ -32,11 +32,12 @@ import { useScreenContext } from './screen-context';
 
 /**
  * THE SEE-THROUGH BAR'S CONTROLS, on a top-level screen below `md:` — a SOLID
- * disc each, and the only thing the bar paints.
+ * disc each, and the only thing the bar paints in its own right.
  *
- * With nothing painted behind the bar (see the see-through block in
- * `shell.css`), a `ghost` control is a bare glyph floating over whatever text
- * happens to be sliding past it. The owner watched both phone apps do this and
+ * With no plate behind the bar (the only thing behind it is a strip of frosted
+ * glass, which softens what scrolls past without hiding it: see the see-through
+ * block in `shell.css`), a `ghost` control is a bare glyph floating over
+ * whatever text happens to be sliding past it. The owner watched both apps and
  * was explicit about which one is right: Claude's bare glyphs let text crowd
  * the controls and he disliked it; ChatGPT's controls sit in solid filled
  * circles, and that is what this is.
@@ -65,9 +66,16 @@ import { useScreenContext } from './screen-context';
  *
  * WHAT THIS COSTS, ACCEPTED WITH HIS EYES OPEN: a long title now runs behind a
  * button and out the other side rather than dissolving. That is what option 3
- * IS, and it is drawn that way in the mock-up he chose. If it grates in use the
- * answer is option 1 (the bar gains a background only once scrolled), not
- * quietly reintroducing a haze he has now rejected twice.
+ * IS, and it is drawn that way in the mock-up he chose.
+ *
+ * ── AND THEN HE ASKED FOR THE GLASS ───────────────────────────────────────
+ * Seeing it live: "Good, it's not complete see through, close to what I want.
+ * Now I just need some little blur on that top header side, enough blur that
+ * the text is still readable." So a `backdrop-filter` strip went in BEHIND
+ * these discs, which are unchanged and stay unchanged: he said he likes the
+ * buttons as they are, and the strip sits at `z-index: -1` precisely so it
+ * frosts the page and never them. It is a blur, not the haze he rejected
+ * twice: every word stays on the screen and stays legible through it.
  */
 const OPEN_BAR_CONTROL =
   'max-md:bg-secondary max-md:text-foreground max-md:shadow-sm';
@@ -143,12 +151,11 @@ const OPEN_BAR_CONTROL =
  * ── AND ON A TOP-LEVEL SCREEN THE BAR STOPS BEING A BAR (phase 10) ─────────
  * The other half of that rule, from the same recordings. A screen you did NOT
  * push into carries no title in the bar, so there is nothing left for the bar
- * to be: below `md:` nothing is painted behind it, the content scrolls
- * underneath, and its controls sit on the page as solid round buttons
- * ({@link OPEN_BAR_CONTROL}). The structural half — the collapsed header row,
- * the content's resting padding, and what the notch strip does with nothing
- * painted in it — is in `shell.css`; which screens those are is
- * `top-level-route.ts`.
+ * to be: below `md:` there is no plate behind it, the content scrolls
+ * underneath through a strip of frosted glass, and its controls sit on the page
+ * as solid round buttons ({@link OPEN_BAR_CONTROL}). The structural half — the
+ * collapsed header row, the content's resting padding, the glass and what it
+ * costs — is in `shell.css`; which screens those are is `top-level-route.ts`.
  *
  * Three things follow here:
  *

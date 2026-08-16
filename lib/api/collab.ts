@@ -276,9 +276,10 @@ export const channelsApi = {
    * is a channel row. Nothing about this list is per-space, so there is no space
    * uuid to bind it under.
    *
-   * NOT YET READ BY ANY SCREEN. Wired as the pair of `spacesApi.getThreads`
-   * because the two routes shipped together and keying only half a pair is how
-   * the other half gets keyed wrong later; "My channels" is a separate change.
+   * READ BY THE "My channels" INDEX since 2026-08-16, through
+   * `channelsQueries.myThreads`, and merged with {@link getMine}'s rows into one
+   * list ranked newest first. Same page default (20) as its twin, so the merged
+   * list is cut off at one depth rather than two.
    */
   getMyThreads: async (
     params: ThreadIndexParams = {}

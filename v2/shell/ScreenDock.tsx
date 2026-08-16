@@ -67,8 +67,9 @@ import { cn } from '@/lib/utils';
  *
  * ── THE FADE IS PART OF THE DOCK, NOT PART OF THE SCROLLER ─────────────────
  * This is the app's only dissolve: the TOP of a top-level screen has none, on
- * the owner's instruction, and its words simply pass behind the bar's round
- * buttons (see the see-through block in `shell.css`). Here it stays, and it is
+ * the owner's instruction, and its words pass behind the bar's round buttons,
+ * frosted by a blur that keeps them readable rather than taken away (see the
+ * see-through block in `shell.css`). Here the dissolve stays, and it is
  * a gradient rather than a mask because a mask on the scroll region would have
  * faded out the pill too, which is precisely the thing the owner wants sitting
  * ABOVE the fade — `shell.css` carries that argument in full. It is drawn as
@@ -155,8 +156,11 @@ export function ScreenDock({
  * The plate is opaque and shadowed on purpose. It is what hides the rows
  * travelling behind it — deliberately NOT a translucent, blurred glass pill:
  * `backdrop-filter` over the app's one scroll container re-composites on every
- * scrolled frame, which is a cost `shell.css` refuses for this dissolve and the
- * bar refuses too. `SearchField` itself is unchanged and unaware of where it
+ * scrolled frame, and the app spends that cost in exactly ONE place, the top
+ * bar's glass strip, because the owner asked for it there by name and it was
+ * measured before it shipped (`shell.css`). A second layer of it here would be
+ * a cost nobody asked for, over a plate whose whole job is to be opaque.
+ * `SearchField` itself is unchanged and unaware of where it
  * is being rendered, which is what lets the same control serve both positions
  * of the developer switch.
  */
