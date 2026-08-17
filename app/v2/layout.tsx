@@ -14,6 +14,7 @@ import { V2Drawer } from '@/v2/shell/V2Drawer';
 import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
+import { SystemBarColour } from '@/v2/shell/SystemBarColour';
 import { TouchPress } from '@/v2/shell/touch-press';
 import { RouteTrail } from '@/v2/shell/route-trail';
 import { RouteMotion } from '@/v2/shell/route-motion';
@@ -73,7 +74,10 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#C9A227' },
+    /* WHITE, not the brand gold. The page is white; gold drew a stripe across
+       the top of it, which is the band the owner photographed on 17 August
+       2026 beside a native app that has none. */
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
   ],
 };
@@ -153,6 +157,10 @@ export default async function V2Layout({
           on soft-nav away) — the document-scroll lock must follow the shell's
           lifecycle because React never unloads the stylesheet. */}
       <DocumentLock />
+      {/* Keeps the phone's status bar the colour of the page under it, and in
+          step with OUR theme switch rather than the phone's. The static
+          `themeColor` below answers the first paint; this corrects it. */}
+      <SystemBarColour />
       {/* Marks the closest tappable ancestor of a finger with `data-pressed`,
           which is the only thing that makes 633 of the app's 729 tappable sites
           answer a touch at all (see the module for the count and the platform
