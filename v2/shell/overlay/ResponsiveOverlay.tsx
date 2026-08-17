@@ -143,6 +143,7 @@ export function ResponsiveOverlay({
   footer,
   className,
   size = 'fill',
+  guardUnsaved = false,
   children,
 }: {
   open: boolean;
@@ -172,6 +173,19 @@ export function ResponsiveOverlay({
    * always sized to its content.
    */
   size?: 'fill' | 'content';
+  /**
+   * Refuse to close on a tap OUTSIDE, because there is unsaved typing in here.
+   *
+   * @arthur, 17 August 2026: "clicking outside the text box exits the entry
+   * immediately making me lose what I typed in it". A phone panel is a small
+   * target on a big screen, so the area that silently throws work away is far
+   * larger than the area that keeps it. Nobody taps beside a box on purpose.
+   *
+   * Escape and the Cancel button still close it. Those are deliberate — a
+   * reader who presses either has SAID they are abandoning the edit. A stray
+   * thumb has not.
+   */
+  guardUnsaved?: boolean;
   children: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -221,6 +235,14 @@ export function ResponsiveOverlay({
              exactly what removes the attribute. So when there IS a description
              nothing may be passed at all, or the linkage Radix just made would
              be undone by the act of silencing a warning that was not firing. */
+          /* Only the OUTSIDE tap is refused, and only while there is something
+             to lose. Escape stays live: it is a decision, not a slip. */
+          onPointerDownOutside={
+            guardUnsaved ? (event) => event.preventDefault() : undefined
+          }
+          onInteractOutside={
+            guardUnsaved ? (event) => event.preventDefault() : undefined
+          }
           {...(description ? {} : { 'aria-describedby': undefined })}
         >
           {/* ── THE BAR, WHICH IS ALSO THE TITLE BLOCK ────────────────────

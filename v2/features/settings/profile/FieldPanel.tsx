@@ -203,6 +203,9 @@ export function FieldPanel({
          17 August 2026, and he was right: the confirm ended up a screen away
          from the box it confirms. */
       size="content"
+      /* While the box holds something different from the row, a tap beside the
+         panel must not throw it away. Cancel and Escape still do. */
+      guardUnsaved={changed}
       title={spec?.label ?? ''}
       /**
        * DONE SITS BESIDE CANCEL, IN THE BAR, NOT AT THE FOOT OF THE SHEET.
