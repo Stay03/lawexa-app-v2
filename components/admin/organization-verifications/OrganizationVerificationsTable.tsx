@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Building2, FileText, FileWarning } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -84,7 +85,15 @@ export function OrganizationVerificationsTable({
           {items.map((org) => (
             <TableRow key={org.uuid}>
               <TableCell>
-                <div className="font-medium">{org.name}</div>
+                {/* The NAME is the way in, not a separate "view" column: the
+                    thing a reader wants to open is the company, so that is what
+                    they click. */}
+                <Link
+                  href={`/admin/organization-verifications/${org.uuid}`}
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  {org.name}
+                </Link>
                 <div className="text-sm text-muted-foreground">
                   {org.type_label}
                   {org.active_members_count != null

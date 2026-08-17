@@ -501,6 +501,46 @@ export const organizationsApi = {
   },
 
   /**
+   * Approve an application. Admin only, and it takes NO BODY — approving is not
+   * a form, it is a decision.
+   *
+   * The server refuses it twice over: if the company is already verified, and if
+   * there is no application to approve. So the screen does not have to guard
+   * against a stale queue row; the refusal is authoritative.
+   */
+  verify: async (uuid: string): Promise<OrganizationResponse> => {
+    const response = await apiClient.post<OrganizationResponse>(
+      `/organizations/${uuid}/verify`,
+      {}
+    );
+    return response.data;
+  },
+
+  /**
+   * Refuse an application, WITH A REASON — required, free text, up to 1000
+   * characters, and sent to the company in an email. There is no fixed list of
+   * reasons; a list would be a change on the server, not a setting here.
+   *
+   * ── IT RECORDS RATHER THAN ERASES, SINCE 17 AUGUST 2026 ───────────────────
+   * Rejecting used to delete the document and wipe the number, so a mistake was
+   * unrecoverable and the company had to start from nothing. It now keeps what
+   * they sent, records who decided and why, drops the row out of the queue, and
+   * lets them apply again — which clears the rejection and puts them back.
+   *
+   * That change is the reason this button is safe to put in front of somebody.
+   */
+  rejectVerification: async (
+    uuid: string,
+    reason: string
+  ): Promise<OrganizationResponse> => {
+    const response = await apiClient.post<OrganizationResponse>(
+      `/organizations/${uuid}/reject-verification`,
+      { reason }
+    );
+    return response.data;
+  },
+
+  /**
    * The review queue: organizations that have APPLIED for verification and not
    * yet been answered. Admin only — the rows carry the applicant's document and
    * number, which nobody else is shown.
