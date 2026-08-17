@@ -17,7 +17,11 @@ import type { Organization, OrganizationType } from '@/types/collab';
  *  - `under-review` — documents submitted, no decision yet;
  *  - `unverified`   — the invitation to submit (the only state with an action).
  */
-export type VerificationState = 'verified' | 'under-review' | 'unverified';
+export type VerificationState =
+  | 'verified'
+  | 'under-review'
+  | 'refused'
+  | 'unverified';
 
 /**
  * Derive the state. ORDER MATTERS: `is_verified` wins, because a re-submission
@@ -47,12 +51,35 @@ export type VerificationState = 'verified' | 'under-review' | 'unverified';
  * first render after a submit and the payload becomes authoritative across
  * reloads and devices — no other code changes.
  */
+/**
+ * ── A REFUSAL IS NOT "STILL UNDER REVIEW" ──────────────────────────────────
+ * @arthur, 17 August 2026: "the organization's verification profile in their
+ * settings still shows verification under review despite me refusing it in
+ * admin. Does it not update immediately so that they can reupload".
+ *
+ * It did not, and the reason is a good change made the same morning. Refusing
+ * used to DESTROY the application; it now records the decision and KEEPS the
+ * original request date, so a refused organization still carries a
+ * `verification_requested_at`. This function only knew two things about that
+ * field — set or not — so a refusal read as "waiting", for ever, with no way
+ * back to the upload form.
+ *
+ * So the order is: what they just did, then what the server decided, then what
+ * they asked for.
+ *
+ * `locallySubmitted` comes FIRST among the server states, because somebody who
+ * has just re-applied after a refusal must see "under review" and not the
+ * refusal they have already answered. The server clears the rejection when they
+ * re-apply; this covers the seconds before the next payload arrives.
+ */
 export function verificationState(
   organization: Organization,
   locallySubmitted = false,
 ): VerificationState {
   if (organization.is_verified) return 'verified';
-  if (organization.verification_requested_at || locallySubmitted) return 'under-review';
+  if (locallySubmitted) return 'under-review';
+  if (organization.verification_rejected_at) return 'refused';
+  if (organization.verification_requested_at) return 'under-review';
   return 'unverified';
 }
 

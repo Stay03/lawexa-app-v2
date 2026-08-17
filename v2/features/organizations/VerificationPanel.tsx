@@ -1,6 +1,6 @@
 'use client';
 
-import { BadgeCheck, Clock, ShieldCheck } from 'lucide-react';
+import { BadgeCheck, Clock, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -119,6 +119,62 @@ export function VerificationPanel({
               : "A reviewer is checking your documents. The badge appears here when it's approved — nothing else is needed from you."}
           </p>
         </div>
+      </section>
+    );
+  }
+
+  /**
+   * ── REFUSED: SAY SO, SAY WHY, AND LET THEM TRY AGAIN ──────────────────────
+   * @arthur refused a real application on 17 August 2026 and the company's own
+   * screen still said "under review". They had no way to know, and no way back
+   * to the upload form.
+   *
+   * The reason is shown because the reviewer wrote it FOR them — it is already
+   * in the email they were sent, and a screen that hides what the email says
+   * makes the person go and find the email. The submit control is the same one
+   * as "Get verified": re-applying is the same act, and the server treats it as
+   * one, clearing the refusal and putting them back in the queue.
+   */
+  if (state === 'refused') {
+    const refusedAgo = agoPhrase(organization.verification_rejected_at, now);
+    return (
+      <section
+        className={cn(
+          'flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-start sm:justify-between',
+          PANEL_ENTER,
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <ShieldAlert
+            aria-hidden
+            className="mt-0.5 size-5 shrink-0 text-destructive"
+          />
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">
+              Verification was not approved
+            </h2>
+            {organization.verification_rejection_reason ? (
+              <p className="mt-0.5 text-sm text-foreground">
+                &ldquo;{organization.verification_rejection_reason}&rdquo;
+              </p>
+            ) : null}
+            <p className="mt-1 text-sm text-muted-foreground">
+              {refusedAgo ? `Reviewed ${refusedAgo}. ` : ''}
+              {canManage
+                ? 'Fix what is described above and send it again.'
+                : 'An owner or admin can send it again.'}
+            </p>
+          </div>
+        </div>
+        {canManage ? (
+          <Button
+            size="sm"
+            onClick={onRequest}
+            className="v2-interactive shrink-0"
+          >
+            Send again
+          </Button>
+        ) : null}
       </section>
     );
   }
