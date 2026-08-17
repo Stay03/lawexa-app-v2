@@ -85,11 +85,11 @@ export function RequestVerificationDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="bn-number">Business (BN) number</Label>
+            <Label htmlFor="bn-number">BN or RC number</Label>
             <Input
               id="bn-number"
               maxLength={50}
-              placeholder="e.g. BN1234567"
+              placeholder="e.g. RC 1716380 or BN1234567"
               value={bnNumber}
               onChange={(event) => setBnNumber(event.target.value)}
             />

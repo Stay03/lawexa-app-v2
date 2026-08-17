@@ -18,8 +18,19 @@ import {
 import { useRequestVerification } from './mutations';
 
 /**
- * RequestVerificationDialog — BN number + CAC document, the multipart request
- * that moves an organization into review (study A8: KEEP).
+ * RequestVerificationDialog — the registration number + CAC document, the
+ * multipart request that moves an organization into review (study A8: KEEP).
+ *
+ * ── THE LABEL IS NOT THE FIELD NAME, DELIBERATELY ──────────────────────────
+ * The field is `bn_number` and the label says "BN or RC number", because those
+ * are different questions. @arthur, 17 August 2026: "please note its BN number
+ * or RC Number". It was not a wording preference — the only real applicant we
+ * had put "RC 1716380" into a box our own form called Business Number, so the
+ * form was already wrong for 100% of the companies that had used it.
+ *
+ * Renaming the stored field would be a migration for no gain: the server, the
+ * reports and the admin screen all agree on `bn_number` today. What a person
+ * reads is what had to change.
  *
  * CLIENT-SIDE VALIDATION IS A COURTESY, NOT A GATE. The type and size checks
  * run before the upload so a wrong file is answered instantly instead of after
@@ -103,7 +114,7 @@ export function RequestVerificationDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`Verify ${organizationName}`}
-      description="Send your business number and CAC document. A reviewer checks them and the badge appears on your organization when it’s approved."
+      description="Send your registration number and CAC document. A reviewer checks them and the badge appears on your organization when it’s approved."
       footer={
         <>
           <Button
@@ -122,12 +133,12 @@ export function RequestVerificationDialog({
     >
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="bn-number">Business (BN) number</Label>
+          <Label htmlFor="bn-number">BN or RC number</Label>
           <Input
             id="bn-number"
             maxLength={BN_NUMBER_MAX}
             autoComplete="off"
-            placeholder="e.g. BN1234567"
+            placeholder="e.g. RC 1716380 or BN1234567"
             value={bnNumber}
             onChange={(event) => setBnNumber(event.target.value)}
           />
