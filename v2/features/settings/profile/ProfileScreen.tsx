@@ -22,6 +22,7 @@ import { PROFESSION_OPTIONS, getLevelOptions } from '@/types/onboarding';
 import type { User, UserType } from '@/types/auth';
 import type { StudentEducationLevel } from '@/types/onboarding';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
   SettingsChoiceGroup,
   SettingsFormGroup,
@@ -179,14 +180,18 @@ function ProfileColumn({ children }: { children: React.ReactNode }) {
 /**
  * The three kinds of person this product knows about.
  *
- * ── THE OWNER WANTS THIS CHANGEABLE, AND TODAY IT IS NOT ───────────────────
- * The control is live, the diff carries `user_type`, and the save goes out.
- * What comes back is a refusal: onboarding owns the only endpoints that write
- * an account type, and they decline once onboarding is finished. That is a
- * backend ask, raised separately, and NOT something to paper over here. The
- * control is not disabled and there is no "this cannot be changed" notice: the
- * owner has rejected that framing, and a control greyed out today would have to
- * be found and un-greyed the day the endpoint lands.
+ * ── IT IS CHANGEABLE NOW, AND THIS PARAGRAPH USED TO SAY OTHERWISE ─────────
+ * It said the save came back refused, because onboarding owned the only
+ * endpoints that wrote an account type and declined once onboarding was over.
+ * That was true when it was written and stopped being true on 17 August 2026,
+ * when the endpoint shipped. Measured end to end rather than assumed: an
+ * account holding no type was sent exactly what this form's diff sends, the
+ * request returned 200, and the value read back.
+ *
+ * The control was never disabled and there is still no "this cannot be changed"
+ * notice — the owner rejected that framing, and a control greyed out for a
+ * limitation would have had to be found and un-greyed the day it lifted, which
+ * is today.
  */
 const ACCOUNT_TYPES: readonly SettingsChoice<UserType>[] = [
   {
@@ -256,19 +261,71 @@ function ProfileForm({ user }: { user: User }) {
     profileFormValuesFromUser(user),
   );
   const [errors, setErrors] = useState<ProfileFieldErrors>({});
-  const [picker, setPicker] = useState<'country' | 'expertise' | null>(null);
   /**
-   * Which field the one panel is holding, and whether it is showing.
+   * The three panels on this screen live in the URL, so the device Back button
+   * and the edge swipe close them.
    *
-   * The two are separate on purpose. `ResponsiveOverlay` stays mounted while it
-   * plays its exit, so a field name cleared on close would empty the panel's
-   * title and its control for the length of the animation. The name is
-   * therefore kept and only the flag moves.
+   * ── WHY THIS SCREEN WAS THE EXCEPTION ──────────────────────────────────────
+   * `useUrlOverlay` is the one way a v2 overlay does this, built on the owner's
+   * own instruction of 4 August 2026 ("all the modals and sidebar should be
+   * like that"), and seventeen files across channels, spaces and organizations
+   * already use it. These three did not: they held `useState`, so Back left the
+   * page instead of closing the panel. The owner found it by swiping, 17 August
+   * 2026 — "seems these panels don't have URLs or something?" — which is
+   * exactly what it was.
+   *
+   * Worse, `FieldPanel` CLAIMED in its own notes that Back already worked. That
+   * sentence is true of `ResponsiveOverlay`'s other callers, each of which does
+   * this binding; it was never true of the component, which does no history
+   * work by design. The promise was inherited, not implemented.
+   *
+   * TWO PARAMS, NOT ONE, because a panel can never be open at the same time as
+   * another here but they are different families: `?field=` names which of the
+   * sixteen typed rows is being edited, `?panel=` names which chooser is up.
+   * One param holds one value, and the hook's own rule is that exactly one
+   * component owns each.
    */
-  const [editing, setEditing] = useState<{
-    field: ProfileTextFieldName;
-    open: boolean;
-  } | null>(null);
+  const fieldPanel = useUrlOverlay('field');
+  const chooser = useUrlOverlay('panel');
+
+  /**
+   * A URL is typed by people and restored by browsers, so neither param is
+   * trusted. `?field=nonsense` must read as closed rather than open a panel
+   * with no title and no control. (`canOpen` cannot do this: it refuses only
+   * the keys explicitly set to `false`, so it is a blocklist, not a list of
+   * what is allowed.)
+   */
+  const urlField = fieldPanel.value;
+  const editingField =
+    urlField && urlField in PROFILE_TEXT_FIELDS
+      ? (urlField as ProfileTextFieldName)
+      : null;
+  const openChooser =
+    chooser.value === 'country' || chooser.value === 'expertise'
+      ? chooser.value
+      : null;
+
+  /**
+   * The name survives the closing animation. `ResponsiveOverlay` stays mounted
+   * while it plays its exit, and the param is already `null` by then, so a
+   * panel reading only the live value would spend its exit blank.
+   *
+   * STATE SET IN THE EVENT, NOT A REF. A ref would do the job, but reading one
+   * during render is banned here for the same reason writing one is — the house
+   * rule is that render reads nothing that can change behind it — and `react-
+   * hooks/refs` enforces it. Setting this in the tap handler costs one render
+   * that was already happening, because opening the panel re-renders anyway.
+   *
+   * The one path that never runs the handler is a restored or typed URL, and it
+   * arrives with the param already set, so the live value answers and this is
+   * not consulted.
+   */
+  const [lastField, setLastField] = useState<ProfileTextFieldName | null>(null);
+  const openField = (field: ProfileTextFieldName) => {
+    setLastField(field);
+    fieldPanel.show(field);
+  };
+  const heldField = editingField ?? lastField;
 
   const visibility = useMemo(() => visibilityFor(values), [values]);
 
@@ -277,7 +334,7 @@ function ProfileForm({ user }: { user: User }) {
   // static tier then keeps it for the rest of the session.
   const countriesQuery = useQuery({
     ...profileQueries.countries(),
-    enabled: picker === 'country',
+    enabled: openChooser === 'country',
   });
   // Expertise is the other way round: the row shows the NAMES behind a list of
   // ids, so it has to be read as soon as the row is on screen.
@@ -382,7 +439,7 @@ function ProfileForm({ user }: { user: User }) {
         label={spec.label}
         value={held ? `${spec.prefix ?? ''}${held}` : null}
         placeholder="Not set"
-        onOpen={() => setEditing({ field, open: true })}
+        onOpen={() => openField(field)}
         error={errors[field]}
       />
     );
@@ -560,7 +617,7 @@ function ProfileForm({ user }: { user: User }) {
                 label="Areas of expertise"
                 value={expertiseValue}
                 placeholder="None chosen"
-                onOpen={() => setPicker('expertise')}
+                onOpen={() => chooser.show('expertise')}
                 error={errors.areas_of_expertise}
               />
             ) : null}
@@ -573,7 +630,7 @@ function ProfileForm({ user }: { user: User }) {
             label="Country"
             value={values.country || null}
             placeholder="Not set"
-            onOpen={() => setPicker('country')}
+            onOpen={() => chooser.show('country')}
             error={errors.country}
           />
           {textRow('state')}
@@ -646,24 +703,21 @@ function ProfileForm({ user }: { user: User }) {
           pickers under it, because an overlay unmounted while closed cannot
           play its exit. */}
       <FieldPanel
-        open={editing?.open ?? false}
-        onOpenChange={(open) =>
-          setEditing((current) => (current ? { ...current, open } : null))
-        }
-        spec={editing ? PROFILE_TEXT_FIELDS[editing.field] : null}
-        value={editing ? values[editing.field] : ''}
-        error={editing ? errors[editing.field] : undefined}
+        open={editingField !== null}
+        onOpenChange={fieldPanel.setOpen}
+        spec={heldField ? PROFILE_TEXT_FIELDS[heldField] : null}
+        value={heldField ? values[heldField] : ''}
+        error={heldField ? errors[heldField] : undefined}
         validate={(candidate) =>
-          editing ? validateField(editing.field, candidate) : undefined
+          heldField ? validateField(heldField, candidate) : undefined
         }
         onCommit={(next) => {
-          if (editing) set(editing.field, next);
+          if (heldField) set(heldField, next);
         }}
       />
 
       <OptionPicker
-        open={picker === 'country'}
-        onOpenChange={(open) => setPicker(open ? 'country' : null)}
+        {...chooser.bind('country')}
         title="Country"
         description="Where you are based. It also decides how study levels are named."
         searchLabel="Search countries"
@@ -677,8 +731,7 @@ function ProfileForm({ user }: { user: User }) {
       />
 
       <OptionPicker
-        open={picker === 'expertise'}
-        onOpenChange={(open) => setPicker(open ? 'expertise' : null)}
+        {...chooser.bind('expertise')}
         title="Areas of expertise"
         description="The areas of law you work in. Choose as many as apply."
         searchLabel="Search areas of expertise"
