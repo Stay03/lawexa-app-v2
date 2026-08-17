@@ -598,6 +598,44 @@ function ProfileForm({ user }: { user: User }) {
           />
         ) : null}
 
+        {/* ── THE ANSWER FOLLOWS THE QUESTION ───────────────────────────────
+            This group used to sit below "Where you are", second from last.
+            Choosing "University" above therefore raised a question whose answer
+            — WHICH university, and at what level — was 1472px down a 1984px
+            page, with two unrelated sections in between. The owner hit it on 17
+            August 2026: "what about university, I can set it. How should it
+            work?"
+
+            Nobody noticed because the group only appears for some people, so on
+            most accounts the gap does not exist to be seen.
+
+            It is placed by WHEN IT APPEARS, not by topic: directly under the
+            choice that reveals it. A lawyer has no "Where you study" block at
+            all, so for them it follows the account type just as closely. */}
+        {visibility.showEducationSection ? (
+          <SettingsFormGroup id="education" label="Education and credentials">
+            {visibility.showUniversity ? textRow('university') : null}
+            {visibility.showLevel ? (
+              <SettingsSelectField
+                icon={GraduationCap}
+                label="Level"
+                value={values.level}
+                onChange={(value) => set('level', value)}
+                options={levelOptions}
+                placeholder="Not set"
+                error={errors.level}
+              />
+            ) : null}
+            {visibility.showLawSchool ? textRow('law_school') : null}
+            {visibility.showCallToBarYear ? textRow('call_to_bar_year') : null}
+            {visibility.showCallNumber ? textRow('call_number') : null}
+            {visibility.showOtherCertifications
+              ? textRow('other_certifications')
+              : null}
+            {visibility.showWorkExperience ? textRow('work_experience') : null}
+          </SettingsFormGroup>
+        ) : null}
+
         {visibility.showProfession || visibility.showAreasOfExpertise ? (
           <SettingsFormGroup id="work" label="Your work">
             {visibility.showProfession ? (
@@ -638,29 +676,6 @@ function ProfileForm({ user }: { user: User }) {
           {textRow('address')}
         </SettingsFormGroup>
 
-        {visibility.showEducationSection ? (
-          <SettingsFormGroup id="education" label="Education and credentials">
-            {visibility.showUniversity ? textRow('university') : null}
-            {visibility.showLevel ? (
-              <SettingsSelectField
-                icon={GraduationCap}
-                label="Level"
-                value={values.level}
-                onChange={(value) => set('level', value)}
-                options={levelOptions}
-                placeholder="Not set"
-                error={errors.level}
-              />
-            ) : null}
-            {visibility.showLawSchool ? textRow('law_school') : null}
-            {visibility.showCallToBarYear ? textRow('call_to_bar_year') : null}
-            {visibility.showCallNumber ? textRow('call_number') : null}
-            {visibility.showOtherCertifications
-              ? textRow('other_certifications')
-              : null}
-            {visibility.showWorkExperience ? textRow('work_experience') : null}
-          </SettingsFormGroup>
-        ) : null}
 
         <SettingsFormGroup id="links" label="Links">
           {textRow('linkedin_url')}
