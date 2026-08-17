@@ -147,10 +147,31 @@ export interface Organization {
   logo_url: string | null;
   is_verified: boolean;
   verified_at: string | null;
-  /** Admin-only: present (often null) for platform admins, omitted otherwise. */
+  /**
+   * Admin-only: present (often null) for platform admins, omitted otherwise.
+   *
+   * READ FROM THE LIVE PAYLOAD, 17 August 2026, not from a doc. The three
+   * fields below `cac_document_url` were being returned and were not typed, so
+   * nothing could render a rejection reason or say when one happened.
+   *
+   * `cac_document_url` IS ALWAYS NULL IN PRACTICE. The real file is
+   * `cac_document`, and its `download_url` is the route to use. Do not reach
+   * for the `_url` field because its name reads better — it has never carried
+   * a value for a real application.
+   */
   bn_number?: string | null;
   cac_document_url?: string | null;
+  /** The certificate itself. Absent until somebody applies. */
+  cac_document?: {
+    id: number;
+    original_name: string;
+    mime_type: string;
+    size: number;
+    download_url: string;
+  } | null;
   verification_requested_at?: string | null;
+  verification_rejected_at?: string | null;
+  verification_rejection_reason?: string | null;
   creator: SlimUser;
   /** Roster + count only for active members / platform admins. */
   members?: Member[];

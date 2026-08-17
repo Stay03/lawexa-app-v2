@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Fingerprint,
   Activity,
+  Building2,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -34,6 +35,9 @@ const userNavItems = [
   { title: 'Activity Feed', url: '/admin/activity-feed', icon: Activity },
   { title: 'Device Intelligence', url: '/admin/device-intelligence', icon: Fingerprint },
   { title: 'Lawyer Verifications', url: '/admin/lawyer-verifications', icon: ShieldCheck },
+  // Companies applying to be verified, which until 17 August 2026 had no screen
+  // at all: the approve and reject endpoints existed and nothing called them.
+  { title: 'Organization Verifications', url: '/admin/organization-verifications', icon: Building2 },
 ];
 
 export function AdminNavUsersSection() {
@@ -44,7 +48,8 @@ export function AdminNavUsersSection() {
     pathname.startsWith('/admin/users') ||
     pathname.startsWith('/admin/activity-feed') ||
     pathname.startsWith('/admin/device-intelligence') ||
-    pathname.startsWith('/admin/lawyer-verifications');
+    pathname.startsWith('/admin/lawyer-verifications') ||
+    pathname.startsWith('/admin/organization-verifications');
 
   return (
     <SidebarGroup>

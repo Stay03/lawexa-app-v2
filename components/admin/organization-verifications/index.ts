@@ -1,0 +1,1 @@
+export { OrganizationVerificationsTable } from './OrganizationVerificationsTable';

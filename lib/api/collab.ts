@@ -35,6 +35,7 @@ import type {
   InviteMemberPayload,
   InvitePreviewResponse,
   JoinRequestListResponse,
+  LengthAwareResponse,
   MarkReadResponse,
   MemberListParams,
   MemberResponse,
@@ -43,6 +44,7 @@ import type {
   MessageRepliesResponse,
   MessageResponse,
   MyOrganizationResponse,
+  Organization,
   NotifyLevelPayload,
   OrganizationInvitationListResponse,
   OrganizationMemberListResponse,
@@ -494,6 +496,31 @@ export const organizationsApi = {
   getByUuid: async (uuid: string): Promise<OrganizationResponse> => {
     const response = await apiClient.get<OrganizationResponse>(
       `/organizations/${uuid}`
+    );
+    return response.data;
+  },
+
+  /**
+   * The review queue: organizations that have APPLIED for verification and not
+   * yet been answered. Admin only — the rows carry the applicant's document and
+   * number, which nobody else is shown.
+   *
+   * ── THE PARAMETER NAME IS LOAD-BEARING, AND A WRONG ONE IS SILENT ─────────
+   * It is `awaiting_verification`. Measured against production on 17 August
+   * 2026: that returns the one company actually waiting. `pending_verification`
+   * (my first guess), `pending_verification=true` and `verification=pending`
+   * ALL return 200 with EVERY organization, including four that never applied.
+   *
+   * An ignored filter does not look like a bug, it looks like a queue. Getting
+   * this name wrong would have put an Approve button beside four companies who
+   * asked for nothing. So it is written once, here, and no caller composes it.
+   */
+  listAwaitingVerification: async (
+    params: { page?: number; per_page?: number } = {}
+  ): Promise<LengthAwareResponse<Organization>> => {
+    const response = await apiClient.get<LengthAwareResponse<Organization>>(
+      '/organizations',
+      { params: { ...params, awaiting_verification: 1 } }
     );
     return response.data;
   },
