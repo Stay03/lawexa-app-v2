@@ -66,12 +66,19 @@ export interface BarTuning {
  */
 export const BAR_DEFAULTS: Readonly<Record<BarTreatment, BarTuning>> = {
   blur: { treatment: 'blur', blur: 1.5, tint: 12 },
-  fade: { treatment: 'fade', blur: 0, tint: 22 },
+  fade: { treatment: 'fade', blur: 0, tint: 75 },
   none: { treatment: 'none', blur: 0, tint: 0 },
 };
 
-/** The treatment that ships when nobody has chosen. */
-export const SHIPPED_TREATMENT: BarTreatment = 'blur';
+/**
+ * The treatment that ships when nobody has chosen.
+ *
+ * THE OWNER CHOSE, 17 August 2026: "Fade 75% is perfect". He picked it on his
+ * own phone, with the switch below, minutes after it existed — which is the
+ * whole reason the switch was built and the reason the question had stayed open
+ * for two days before it.
+ */
+export const SHIPPED_TREATMENT: BarTreatment = 'fade';
 
 const SHIPPED: BarTuning = BAR_DEFAULTS[SHIPPED_TREATMENT];
 

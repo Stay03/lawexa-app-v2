@@ -443,13 +443,15 @@ html.v2-document-lock body {
     z-index: -1;
     pointer-events: none;
     /* Same naming as the blur above, and the same rule: the fallback is the
-       shipped value. The fade is denser than the blur because it has no
-       backdrop-filter doing half the work. */
+       shipped value. 75% is the owner's own number, chosen on his phone with
+       the developer-settings switch on 17 August 2026 — "Fade 75% is perfect".
+       It is dense because there is no backdrop-filter here doing half the work,
+       and because a bar you can read through beats a bar you can see through. */
     background: linear-gradient(
       to bottom,
-      color-mix(in oklab, var(--background) var(--v2-bar-tint, 22%), transparent)
+      color-mix(in oklab, var(--background) var(--v2-bar-tint, 75%), transparent)
         0,
-      color-mix(in oklab, var(--background) var(--v2-bar-tint, 22%), transparent)
+      color-mix(in oklab, var(--background) var(--v2-bar-tint, 75%), transparent)
         calc(env(safe-area-inset-top, 0px) + 3.25rem),
       transparent 100%
     );

@@ -232,35 +232,105 @@ export function ResponsiveOverlay({
               and becomes the title block the card has always had, with the
               close X in the corner. Same DOM, so the `DialogTitle` is rendered
               ONCE — two of them would share one Radix-provided id. */}
+          {/* ── THE HANDLE, ON THE SHEET ONLY ────────────────────────────
+              A bottom sheet is dragged down to dismiss, and the handle is the
+              only thing that says so. The owner asked for it, then asked for it
+              to be nicer: it is wider and softer than the first pass, and it
+              owns the space above the title rather than crowding it. A full
+              screen has nothing to drag, so it does not get one. */}
+          {size === 'content' ? (
+            <div
+              aria-hidden
+              className="mx-auto mt-2.5 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-foreground/15 md:hidden"
+            />
+          ) : null}
+
           {/* The notch padding belongs to the FULL-SCREEN shape, which starts
               under the status bar. A sheet on the bottom edge has nothing above
-              it, so the same padding there is just a gap. */}
+              it, so the same padding there is just a gap.
+
+              THE RULE UNDER THE TITLE IS FULL-SCREEN ONLY. On a sheet 200px
+              tall, a line under the title and another above the button chop it
+              into three bands — the owner's "too boring and basic". Space does
+              the separating there instead. */}
           <header
             className={cn(
-              'shrink-0 border-b bg-background md:border-b-0 md:pt-6 md:pb-4',
-              size === 'fill' && 'pt-[env(safe-area-inset-top,0px)]',
+              'shrink-0 bg-background md:border-b-0 md:pt-6 md:pb-4',
+              size === 'fill'
+                ? 'border-b pt-[env(safe-area-inset-top,0px)]'
+                : 'md:border-b-0',
             )}
           >
-            <div className="flex h-14 items-center gap-2 px-2 md:h-auto md:px-6 md:pr-12">
+            {/* ── THE SHEET CENTRES ITS TITLE, AND THAT IS NOT DECORATION ──
+                With Cancel on the left and the title beside it, the two read as
+                one phrase: "Cancel Full name". The shell's own bar solved this
+                long ago with a three-column grid whose middle column is the
+                title, so the same idiom is used here rather than a new one.
+                A full screen keeps the flex row: its title follows a chevron,
+                which nobody reads as a sentence. */}
+            <div
+              className={cn(
+                'items-center gap-2 md:flex md:h-auto md:px-6 md:pr-12',
+                size === 'fill'
+                  ? 'flex h-14 px-2'
+                  : 'grid h-11 grid-cols-[1fr_auto_1fr] px-4',
+              )}
+            >
+              {/* ── THE WAY OUT SAYS WHAT IT DOES ──────────────────────────
+                  A full screen keeps its chevron: you came from somewhere and
+                  you are going back there.
+
+                  A SHEET GETS THE WORD "CANCEL" INSTEAD, and that is not a
+                  style choice. Done is the only labelled control on this
+                  surface and it KEEPS what you typed; every way to discard —
+                  tapping outside, swiping down, hardware Back — is invisible.
+                  Somebody who has typed something they did not mean had no
+                  button that said so. An arrow would not have said it either:
+                  an arrow means the previous screen, not "throw this away". */}
               <DialogClose asChild>
-                <button
-                  type="button"
-                  aria-label="Close"
-                  className={cn(
-                    'v2-interactive -ml-1 flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground md:hidden',
-                    FOCUS_RING,
-                  )}
-                >
-                  <ChevronLeft aria-hidden className="size-5" />
-                </button>
+                {size === 'fill' ? (
+                  <button
+                    type="button"
+                    aria-label="Close"
+                    className={cn(
+                      'v2-interactive -ml-1 flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground md:hidden',
+                      FOCUS_RING,
+                    )}
+                  >
+                    <ChevronLeft aria-hidden className="size-5" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={cn(
+                      'v2-interactive -ml-2 shrink-0 rounded-full px-2 py-1 text-sm text-muted-foreground md:hidden',
+                      FOCUS_RING,
+                    )}
+                  >
+                    Cancel
+                  </button>
+                )}
               </DialogClose>
 
-              <DialogTitle className="min-w-0 flex-1 truncate text-base leading-none font-medium md:whitespace-normal">
+              <DialogTitle
+                className={cn(
+                  'min-w-0 truncate text-base leading-none font-medium md:flex-1 md:text-left md:whitespace-normal',
+                  size === 'fill' ? 'flex-1' : 'text-center',
+                )}
+              >
                 {title}
               </DialogTitle>
 
+              {/* The trailing cell. It holds the optional action, and on the
+                  sheet it is rendered EMPTY rather than omitted, because the
+                  centred title above is centred by the grid having three
+                  columns — drop this and the title shifts off centre. */}
               {action ? (
-                <div className="shrink-0 md:hidden">{action}</div>
+                <div className="shrink-0 justify-self-end md:hidden">
+                  {action}
+                </div>
+              ) : size === 'content' ? (
+                <div aria-hidden className="md:hidden" />
               ) : null}
             </div>
 
@@ -284,7 +354,12 @@ export function ResponsiveOverlay({
                LAST child on top, so callers pass Cancel then the primary action
                and get the right order on both shapes — the same contract
                `DialogFooter` already has. */
-            <footer className="flex shrink-0 flex-col-reverse gap-2 border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex-row md:justify-end md:px-6 md:py-4 md:pb-4">
+            <footer
+              className={cn(
+                'flex shrink-0 flex-col-reverse gap-2 bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex-row md:justify-end md:border-t-0 md:px-6 md:py-4 md:pb-4',
+                size === 'fill' && 'border-t',
+              )}
+            >
               {footer}
             </footer>
           ) : null}
