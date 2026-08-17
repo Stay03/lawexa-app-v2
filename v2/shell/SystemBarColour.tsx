@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useTheme } from 'next-themes';
 
 /**
  * Paints the phone's own status bar the same colour as the app underneath it.
@@ -36,32 +35,60 @@ import { useTheme } from 'next-themes';
  * reaches the bottom edge.
  */
 export function SystemBarColour() {
-  const { resolvedTheme } = useTheme();
-
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
-    /* The colour the app is ACTUALLY painting, read from the page rather than
-       restated here. A second copy of the background colour is a second thing
-       to forget when the palette moves. */
-    const painted = getComputedStyle(document.body).backgroundColor;
-    if (!painted || painted === 'rgba(0, 0, 0, 0)') return;
+    const root = document.documentElement;
 
-    /* The media-scoped tags from `viewport.themeColor` cannot be corrected —
-       they answer to the phone, not to us — so they are left alone and one
-       unscoped tag is kept alongside them. An unscoped `theme-color` wins over
-       a media-scoped one that does not match, and loses to one that does, which
-       is why this must be the only unscoped tag on the page. */
-    let tag = document.querySelector<HTMLMetaElement>(
-      'meta[name="theme-color"]:not([media])',
-    );
-    if (!tag) {
-      tag = document.createElement('meta');
-      tag.name = 'theme-color';
-      document.head.appendChild(tag);
-    }
-    tag.content = painted;
-  }, [resolvedTheme]);
+    const paint = () => {
+      /* The colour the app is ACTUALLY painting, read from the page rather than
+         restated here. A second copy of the background is a second thing to
+         forget when the palette moves. */
+      const painted = getComputedStyle(document.body).backgroundColor;
+      if (!painted || painted === 'rgba(0, 0, 0, 0)') return;
+
+      /* The media-scoped tags from `viewport.themeColor` cannot be corrected —
+         they answer to the phone, not to us — so they are left alone and one
+         unscoped tag is kept alongside them. An unscoped `theme-color` wins
+         over a media-scoped one that does not match, which is why this must be
+         the only unscoped tag on the page. */
+      let tag = document.querySelector<HTMLMetaElement>(
+        'meta[name="theme-color"]:not([media])',
+      );
+      if (!tag) {
+        tag = document.createElement('meta');
+        tag.name = 'theme-color';
+        document.head.appendChild(tag);
+      }
+      tag.content = painted;
+    };
+
+    /**
+     * ── WATCHING THE CLASS, NOT THE HOOK ───────────────────────────────────
+     * The first version ran off `resolvedTheme` and was ONE STEP BEHIND. The
+     * owner caught it within the hour: "when I switch to dark mode the page
+     * changes immediately but the top bar still remains white, when I change it
+     * to white again the page changes to white but this time the bar shows
+     * black."
+     *
+     * His second message is what identified it: "if I close the app and start
+     * it again it starts with the proper combination". Correct on a fresh load,
+     * wrong only on a switch, is the signature of reading too early rather than
+     * reading the wrong thing. `next-themes` writes the class in its own
+     * effect, and nothing orders that against mine — so on a switch I measured
+     * the page before it had changed, and painted the bar the colour it was
+     * leaving.
+     *
+     * So this no longer asks React when the theme changed. It watches the
+     * element that actually carries the theme and paints when THAT changes,
+     * whatever order the effects run in.
+     */
+    const observer = new MutationObserver(paint);
+    observer.observe(root, { attributes: true, attributeFilter: ['class', 'style'] });
+    paint();
+
+    return () => observer.disconnect();
+  }, []);
 
   return null;
 }
