@@ -329,9 +329,17 @@ html.v2-document-lock body {
       inset: 0 0 -0.75rem 0;
       z-index: -1;
       pointer-events: none;
-      -webkit-backdrop-filter: blur(1.5px);
-      backdrop-filter: blur(1.5px);
-      background: color-mix(in oklab, var(--background) 12%, transparent);
+      /* The three numbers a reader can feel are named, so the developer
+         settings panel can drive them live without a deploy. The fallbacks ARE
+         the shipped values: with nothing set, this rule is byte-identical to
+         what it was before the knobs existed. */
+      -webkit-backdrop-filter: blur(var(--v2-bar-blur, 1.5px));
+      backdrop-filter: blur(var(--v2-bar-blur, 1.5px));
+      background: color-mix(
+        in oklab,
+        var(--background) var(--v2-bar-tint, 12%),
+        transparent
+      );
       -webkit-mask-image: linear-gradient(
         to bottom,
         #000 0,
@@ -434,10 +442,14 @@ html.v2-document-lock body {
     inset: 0 0 -0.75rem 0;
     z-index: -1;
     pointer-events: none;
+    /* Same naming as the blur above, and the same rule: the fallback is the
+       shipped value. The fade is denser than the blur because it has no
+       backdrop-filter doing half the work. */
     background: linear-gradient(
       to bottom,
-      color-mix(in oklab, var(--background) 22%, transparent) 0,
-      color-mix(in oklab, var(--background) 22%, transparent)
+      color-mix(in oklab, var(--background) var(--v2-bar-tint, 22%), transparent)
+        0,
+      color-mix(in oklab, var(--background) var(--v2-bar-tint, 22%), transparent)
         calc(env(safe-area-inset-top, 0px) + 3.25rem),
       transparent 100%
     );

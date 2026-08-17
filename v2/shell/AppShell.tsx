@@ -1,26 +1,22 @@
 import type { ReactNode } from 'react';
 import { ShellFrame } from './ShellFrame';
+import { TunedHeader } from './TunedHeader';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
 
-/**
- * WHAT THE SEE-THROUGH BAR PAINTS BEHIND ITSELF. Change this one word.
+/*
+ * WHAT THE SEE-THROUGH BAR PAINTS BEHIND ITSELF used to be a constant here.
  *
- * `blur` is a strip of frosted glass; `fade` is a light wash of the page's own
- * ground. Both are written in the see-through block of `shell.css`, share a box
- * and differ only in the instrument, and the value lands on the header as
- * `data-v2-bar-treatment` — so the CSS selects on it and nothing here branches.
+ * It is now `v2/shell/bar-tuning.ts`, because a constant could only be changed
+ * by a deploy and the owner spent two days unable to decide between the blur
+ * and the fade without seeing them on his own phone. He asked for the switch on
+ * 17 August 2026, along with "opacity level, blur level and other things you
+ * recommend".
  *
- * `blur` SHIPS, and changing that is the owner's call, not a build's. He asked
- * for the blur by name, then said "maybe a fade seems better, the blur feels
- * weird", and both were filmed side by side for him to choose from. Until he
- * answers, the thing he has actually seen live stays live.
- *
- * If he picks the fade this constant is the whole change. If he keeps the blur,
- * the fade rule and this switch come out together — a treatment nobody selects
- * is dead code, and the union type is what makes deleting it a compile error
- * rather than a silent orphan.
+ * The shipped answer has not changed: `blur`, at the same radius and the same
+ * tint, is what every account renders until somebody moves a slider in
+ * developer settings. See `bar-tuning.ts` for why that store exists and why it
+ * is expected to be deleted, with the losing treatment, once he decides.
  */
-const BAR_TREATMENT: 'blur' | 'fade' = 'blur';
 
 /**
  * AppShell — the v2 non-scrolling shell frame (Phase 1, WP6).
@@ -55,7 +51,7 @@ const BAR_TREATMENT: 'blur' | 'fade' = 'blur';
  *  - On a TOP-LEVEL screen the header ROW collapses to zero and the bar paints
  *    OVER the content region, which is how content scrolls under it. The words
  *    pass BEHIND its round buttons and out the other side, treated as they
- *    cross a strip and staying readable through it ({@link BAR_TREATMENT}). The
+ *    cross a strip and staying readable through it (see `bar-tuning.ts`). The
  *    bar is still a grid item and still never `position: fixed` — see the
  *    see-through block in `shell.css` for the whole mechanism, the owner's
  *    rounds on it, and what each treatment costs.
@@ -86,13 +82,16 @@ export function AppShell({ children, header, dock }: AppShellProps) {
         //
         // The row has NO child but the bar. On a top-level screen it paints no
         // plate and no rule line, and the strip that treats what scrolls under
-        // it is a `::before` on this element rather than a child. The attribute
-        // is a constant, not state: the same string on every route and every
-        // width, read only by the see-through block in `shell.css`, so there is
-        // still nothing conditional in this markup.
-        <header className="v2-shell__header" data-v2-bar-treatment={BAR_TREATMENT}>
-          {header}
-        </header>
+        // it is a `::before` on `TunedHeader`'s element rather than a child.
+        //
+        // THE ELEMENT MOVED TO ITS OWN CLIENT FILE and the treatment is no
+        // longer a constant here: on 17 August 2026 the owner asked to switch
+        // between the blur and the fade from developer settings, on his own
+        // phone, because two days of deciding by deploy had not decided it.
+        // `TunedHeader` reads that preference and answers with the shipped
+        // default until somebody sets one, so this markup is still
+        // unconditional and this file is still a server component.
+        <TunedHeader>{header}</TunedHeader>
       ) : null}
       {/* The id lets full-page surfaces root IntersectionObservers against the
           REAL scroll container (see use-shell-scroll-root.ts) — a viewport root

@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { V2_COOKIE_CLEAR, V2_COOKIE_SET, hasV2Cookie } from '@/v2/cookie';
 import { readStreamStyle, setStreamStyle } from '@/v2/stream-style';
 import { readSearchPosition, setSearchPosition } from '@/v2/search-position';
+import { BarTuningControls } from './BarTuningControls';
 
 export function DeveloperSettings() {
   // Lazy initializer reads the cookie once, on mount — never in an effect
@@ -121,6 +122,12 @@ export function DeveloperSettings() {
             checked={topSearch}
             onCheckedChange={handleSearchPosition}
           />
+        </div>
+        {/* Its own block rather than a fourth switch row: this one is three
+            controls that belong together, and it is expected to be deleted in
+            one piece once the owner has chosen a treatment. */}
+        <div className="border-t pt-6">
+          <BarTuningControls />
         </div>
       </CardContent>
     </Card>

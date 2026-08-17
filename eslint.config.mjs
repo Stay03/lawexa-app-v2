@@ -113,6 +113,12 @@ const eslintConfig = defineConfig([
               // preference surfaces in DeveloperSettings) and
               // `@/v2/routes.manifest` (proxy).
               //
+              // `bar-tuning.ts` earns its place on the same terms, and is the
+              // most temporary of them: it exists so the owner can choose the
+              // top bar's treatment on his own phone (17 August 2026), and it
+              // is expected to be deleted with the losing treatment once he
+              // has. It imports `useSyncExternalStore` and nothing else.
+              //
               // `search-position.ts` earns its place on the same terms as
               // `stream-style.ts`: it imports `useSyncExternalStore` from React
               // and nothing else at all — no v2 type, no v2 runtime, no
@@ -123,9 +129,10 @@ const eslintConfig = defineConfig([
                 "routes.manifest.ts",
                 "stream-style.ts",
                 "search-position.ts",
+                "bar-tuning.ts",
               ],
               message:
-                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style, @/v2/search-position and @/v2/routes.manifest are sanctioned crossings).",
+                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style, @/v2/search-position, @/v2/bar-tuning and @/v2/routes.manifest are sanctioned crossings).",
             },
           ],
         },
