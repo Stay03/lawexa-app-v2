@@ -52,7 +52,7 @@ import {
   type ProfileFormValues,
 } from './form-model';
 import { useSaveProfile } from './mutations';
-import { profileQueries } from './queries';
+import { profileQueries, universityQueries } from './queries';
 import {
   ProfileErrorState,
   ProfileFallback,
@@ -301,9 +301,27 @@ function ProfileForm({ user }: { user: User }) {
       ? (urlField as ProfileTextFieldName)
       : null;
   const openChooser =
-    chooser.value === 'country' || chooser.value === 'expertise'
+    chooser.value === 'country' ||
+    chooser.value === 'expertise' ||
+    chooser.value === 'university'
       ? chooser.value
       : null;
+
+  /**
+   * The university list, which is the SERVER'S list rather than ours.
+   *
+   * The owner, 17 August 2026: "for the university there should be a list like
+   * in the onboarding there no list in the setting". He is right and it was a
+   * real gap: onboarding offers the institutions we know about, and settings
+   * asked the same person to type the name again from memory, into a box that
+   * would happily accept a typo.
+   *
+   * TWO SOURCES, exactly as onboarding uses them. Nothing typed shows the
+   * universities in the reader's own country, because that is almost always the
+   * answer. Two characters or more searches every country, because students
+   * abroad exist and a country list would strand them.
+   */
+  const [universitySearch, setUniversitySearch] = useState('');
 
   /**
    * The name survives the closing animation. `ResponsiveOverlay` stays mounted
@@ -334,7 +352,7 @@ function ProfileForm({ user }: { user: User }) {
   // static tier then keeps it for the rest of the session.
   const countriesQuery = useQuery({
     ...profileQueries.countries(),
-    enabled: openChooser === 'country',
+    enabled: openChooser === 'country' || openChooser === 'university',
   });
   // Expertise is the other way round: the row shows the NAMES behind a list of
   // ids, so it has to be read as soon as the row is on screen.
@@ -348,6 +366,62 @@ function ProfileForm({ user }: { user: User }) {
     [values, original],
   );
   const dirty = hasChanges(payload);
+
+  /**
+   * The reader's country CODE, which the profile does not store.
+   *
+   * It stores the country's NAME, because that is what every existing account
+   * holds and what the study-level names key off. The university list is asked
+   * for by code, so the two are joined here through the country list that is
+   * already being fetched — rather than storing a second field, or asking the
+   * server for a name it does not index on.
+   */
+  const countryCode = useMemo(() => {
+    if (!values.country) return undefined;
+    return (countriesQuery.data ?? []).find(
+      (country) => country.name === values.country,
+    )?.code;
+  }, [countriesQuery.data, values.country]);
+
+  const countryUniversities = useQuery(
+    universityQueries.byCountry(
+      openChooser === 'university' ? countryCode : undefined,
+    ),
+  );
+  const universityMatches = useQuery(
+    universityQueries.search(
+      openChooser === 'university' ? universitySearch : '',
+    ),
+  );
+
+  /**
+   * Two characters is the server's own threshold for searching, so below it the
+   * country list stays: a reader who has typed one letter should not watch the
+   * list they were reading empty itself.
+   */
+  const universityOptions = useMemo(() => {
+    const searching = universitySearch.trim().length >= 2;
+    const rows = searching
+      ? (universityMatches.data?.data ?? [])
+      : (countryUniversities.data?.data ?? []);
+    return rows.map((row) => ({ id: row.name, label: row.name }));
+  }, [universitySearch, universityMatches.data, countryUniversities.data]);
+
+  /**
+   * `isFetching`, NOT `isPending`. A DISABLED query in TanStack v5 reports
+   * `isPending: true` for ever — it has no data and never will until it is
+   * enabled — so a picker asking `isPending` would show its skeletons
+   * permanently to anyone with no country set, and to everyone if the country
+   * service is unreachable. That is the endless skeleton, which is the exact
+   * complaint this screen has been fixing all week.
+   *
+   * `isFetching` is false while disabled and true only while a request is
+   * actually in flight, which is the question being asked.
+   */
+  const universitiesLoading =
+    universitySearch.trim().length >= 2
+      ? universityMatches.isFetching
+      : countryUniversities.isFetching;
 
   const countryOptions = useMemo(
     () =>
@@ -614,7 +688,21 @@ function ProfileForm({ user }: { user: User }) {
             all, so for them it follows the account type just as closely. */}
         {visibility.showEducationSection ? (
           <SettingsFormGroup id="education" label="Education and credentials">
-            {visibility.showUniversity ? textRow('university') : null}
+            {/* A LIST, NOT A BOX. The owner, 17 August 2026: "for the
+                university there should be a list like in the onboarding there
+                no list in the setting". Onboarding offers the institutions we
+                know; settings was asking the same person to retype the name
+                from memory into a field that accepts any spelling of it. */}
+            {visibility.showUniversity ? (
+              <SettingsPickerField
+                icon={School}
+                label="University"
+                value={values.university || null}
+                placeholder="Not set"
+                onOpen={() => chooser.show('university')}
+                error={errors.university}
+              />
+            ) : null}
             {visibility.showLevel ? (
               <SettingsSelectField
                 icon={GraduationCap}
@@ -743,6 +831,36 @@ function ProfileForm({ user }: { user: User }) {
         emptyMessage="No country matches that."
         onChange={(ids) => set('country', ids[0] ?? '')}
         onClear={() => set('country', '')}
+      />
+
+      <OptionPicker
+        {...chooser.bind('university')}
+        title="University"
+        description="Where you study. Search if it is not in the list below."
+        searchLabel="Search universities"
+        searchPlaceholder="Search universities"
+        options={universityOptions}
+        isLoading={universitiesLoading}
+        selected={values.university ? [values.university] : []}
+        /* THE EMPTY MESSAGE HAS TO SAY WHICH EMPTY IT IS. "No university
+           matches that" is only true after a search. Said to somebody who has
+           typed nothing — which is everybody whose country we do not know, and
+           everybody who has not set one — it reports a failed search that never
+           happened and reads as "we have no universities". */
+        emptyMessage={
+          universitySearch.trim().length >= 2
+            ? 'No university matches that.'
+            : countryCode
+              ? 'No universities listed for your country yet. Search for yours.'
+              : 'Search for your university by name.'
+        }
+        /* The server does the filtering; see OptionPicker's note. */
+        onSearchChange={setUniversitySearch}
+        /* And a reader whose university we have never heard of must still be
+           able to say where they study. */
+        allowCustomValue
+        onChange={(ids) => set('university', ids[0] ?? '')}
+        onClear={() => set('university', '')}
       />
 
       <OptionPicker

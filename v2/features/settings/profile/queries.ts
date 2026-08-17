@@ -2,6 +2,7 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { authApi } from '@/lib/api/auth';
 import { expertiseApi } from '@/lib/api/expertise';
+import { universityApi } from '@/lib/api/universities';
 import { STALE_TIMES } from '@/v2/runtime/query';
 
 /** One country, as the two rows of this form need it. */
@@ -90,5 +91,51 @@ export const profileQueries = {
       queryKey: [...profileQueries.all, 'expertise'] as const,
       queryFn: () => expertiseApi.getAll({ per_page: 100 }),
       staleTime: STALE_TIMES.static,
+    }),
+};
+
+/**
+ * The universities we know about, for the picker on this screen.
+ *
+ * ── WHY THESE ARE RESTATED HERE ────────────────────────────────────────────
+ * v1 already has `useUniversities.ts`, and v2 is barred from importing v1 HOOKS
+ * (`import/no-restricted-paths`) for the same reason `profileQueries.countries`
+ * restates its fetcher: a v1 hook drags v1's query policy and key into the v2
+ * bundle. The API module underneath is shared and imported directly, so only
+ * the query options are written again — no second copy of the request.
+ *
+ * ── TWO LISTS, BECAUSE ONE WOULD BE WRONG FOR SOMEBODY ─────────────────────
+ * Nothing typed shows the institutions in the reader's own country, which is
+ * almost always the answer and is one short list. Two characters or more asks
+ * every country, because a student studying abroad is not an edge case worth
+ * stranding.
+ *
+ * Both are `reference`: a list of universities does not change while somebody
+ * is looking at it, and the pair is opened and closed repeatedly while a person
+ * makes up their mind.
+ */
+export const universityQueries = {
+  byCountry: (countryCode: string | undefined) =>
+    queryOptions({
+      queryKey: ['v2', 'universities', 'country', countryCode ?? null],
+      queryFn: () =>
+        universityApi.getAll({
+          country_code: countryCode,
+          per_page: 100,
+          sort: 'name',
+          order: 'asc',
+        }),
+      enabled: Boolean(countryCode),
+      staleTime: STALE_TIMES.reference,
+    }),
+
+  /** Below two characters this never runs: the server's own threshold, and the
+   *  country list stays on screen rather than emptying itself for one letter. */
+  search: (term: string) =>
+    queryOptions({
+      queryKey: ['v2', 'universities', 'search', term],
+      queryFn: () => universityApi.search(term),
+      enabled: term.trim().length >= 2,
+      staleTime: STALE_TIMES.reference,
     }),
 };

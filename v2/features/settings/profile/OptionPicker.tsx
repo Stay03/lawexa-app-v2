@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, Search } from 'lucide-react';
+import { Check, Plus, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +50,8 @@ export function OptionPicker({
   emptyMessage,
   onChange,
   onClear,
+  onSearchChange,
+  allowCustomValue = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,6 +69,28 @@ export function OptionPicker({
   onChange: (ids: string[]) => void;
   /** Offered as a footer control when something is chosen. Single mode only. */
   onClear?: () => void;
+  /**
+   * The list is filtered BY THE SERVER, so what arrives in `options` is already
+   * the answer and must not be filtered again here.
+   *
+   * A country list is 250 rows and lives in memory, so it filters itself. A
+   * list of the world's universities does not: the caller asks the server as
+   * the reader types. Without this the picker would narrow the server's answer
+   * a second time against the same word, which is harmless until the server
+   * matches on something the label does not show — an abbreviation, an old name
+   * — and the row it found is then hidden by us.
+   */
+  onSearchChange?: (query: string) => void;
+  /**
+   * Offer whatever was typed as a choice of its own.
+   *
+   * For lists that cannot be complete. A reader whose university is missing
+   * from ours must still be able to say where they study, and the alternative
+   * is telling them their own institution does not exist. Onboarding already
+   * has this escape; a settings screen that lacked it would be a downgrade for
+   * the same person.
+   */
+  allowCustomValue?: boolean;
 }) {
   const [search, setSearch] = useState('');
 
@@ -74,18 +98,37 @@ export function OptionPicker({
   // alternative is a list that reopens still filtered by a word the reader
   // typed some time ago and has no reason to remember.
   const handleOpenChange = (next: boolean) => {
-    if (!next) setSearch('');
+    if (!next) {
+      setSearch('');
+      onSearchChange?.('');
+    }
     onOpenChange(next);
   };
 
-  const needle = search.trim().toLowerCase();
+  const handleSearch = (next: string) => {
+    setSearch(next);
+    onSearchChange?.(next);
+  };
+
+  const typed = search.trim();
+  const needle = typed.toLowerCase();
   const filtered = useMemo(
     () =>
-      needle
+      // Server-filtered lists arrive as the answer; see `onSearchChange`.
+      needle && !onSearchChange
         ? options.filter((option) => option.label.toLowerCase().includes(needle))
         : options,
-    [options, needle],
+    [options, needle, onSearchChange],
   );
+
+  /** Only when what they typed is not already on the list, so the escape never
+   *  sits above the very row it duplicates. */
+  const custom =
+    allowCustomValue &&
+    typed.length > 0 &&
+    !filtered.some((option) => option.label.toLowerCase() === needle)
+      ? typed
+      : null;
 
   const chosen = new Set(selected);
 
@@ -138,7 +181,7 @@ export function OptionPicker({
           />
           <Input
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => handleSearch(event.target.value)}
             aria-label={searchLabel}
             placeholder={searchPlaceholder}
             autoComplete="off"
@@ -157,12 +200,34 @@ export function OptionPicker({
               />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && !custom ? (
           <p className="px-1 py-8 text-center text-sm text-muted-foreground">
             {emptyMessage}
           </p>
         ) : (
           <ul className="flex flex-col">
+            {/* ABOVE the results, not below them. Somebody types their own
+                institution precisely because ours does not have it, so the
+                answer they want must not be at the bottom of a list of
+                near-misses they have to scroll past first. */}
+            {custom ? (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => handlePick(custom)}
+                  className={cn(
+                    'v2-interactive flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm',
+                    'transition-colors duration-150 hover:bg-secondary motion-reduce:transition-none',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  )}
+                >
+                  <Plus aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">
+                    Use &ldquo;{custom}&rdquo;
+                  </span>
+                </button>
+              </li>
+            ) : null}
             {filtered.map((option) => {
               const isChosen = chosen.has(option.id);
               return (
