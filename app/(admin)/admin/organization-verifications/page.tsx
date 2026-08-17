@@ -2,7 +2,6 @@
 
 import { Suspense, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle } from 'lucide-react';
 
 import { AdminPagination } from '@/components/admin';
 import { OrganizationVerificationsTable } from '@/components/admin/organization-verifications';
@@ -23,15 +22,15 @@ import { useAdminOrganizationVerifications } from '@/lib/hooks/useAdminOrganizat
  * the app called either, so the only route to a decision was asking a person
  * with database access to press it for him.
  *
- * ── THIS SCREEN LISTS. IT DOES NOT YET JUDGE ───────────────────────────────
- * Reviewing means reading the certificate, and on 17 August 2026 the
- * certificates turned out to be gone — written to a folder every deploy
- * deletes, for as long as the feature has existed. A review screen offering
- * "open document" today would 404 on every row.
+ * ── IT LISTS; THE ROW OPENS THE ONE THAT JUDGES ────────────────────────────
+ * Who applied, what number they gave, how long they have waited, and what they
+ * sent. Tapping the company opens the screen the decision is made on.
  *
- * So the queue ships first and alone. It is the half that is true: who applied,
- * what number they gave, how long they have waited, and what they sent. The
- * judging half follows the storage fix rather than racing it.
+ * It shipped BEFORE that screen could open a certificate, because on 17 August
+ * 2026 every certificate we had turned out to be gone — written to a folder
+ * every deploy deletes. The storage fix landed the same evening and new
+ * uploads survive; the older ones do not, and the review screen says so per
+ * company rather than this list warning about all of them.
  */
 function OrganizationVerificationsContent() {
   const router = useRouter();
@@ -79,25 +78,6 @@ function OrganizationVerificationsContent() {
           Companies that have applied and not yet been answered, longest wait
           first.
         </p>
-      </div>
-
-      {/* Stated on the screen rather than only in a channel, because the person
-          using it will otherwise conclude the feature is broken. It comes out
-          the moment the storage fix lands. */}
-      <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-900/20">
-        <AlertTriangle
-          aria-hidden
-          className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
-        />
-        <div className="space-y-1">
-          <p className="font-medium">Documents cannot be opened yet</p>
-          <p className="text-muted-foreground">
-            Certificates uploaded before today were stored on a server that is
-            rebuilt on every deploy, so the files are gone even though the
-            records remain. Approving is on hold until storage is fixed and the
-            companies below have sent their certificate again.
-          </p>
-        </div>
       </div>
 
       <Card>

@@ -14,7 +14,10 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { RejectOrganizationDialog } from '@/components/admin/organization-verifications';
+import {
+  OpenCertificateButton,
+  RejectOrganizationDialog,
+} from '@/components/admin/organization-verifications';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,17 +46,22 @@ import {
  * Nothing else. A member roster and an activity history belong on the
  * organization's own screen; here they would be things to read past.
  *
- * ── THE DOCUMENT IS NAMED BUT NOT YET OPENED ───────────────────────────────
- * Deliberate, and it is not caution for its own sake. Every verification
- * certificate ever uploaded was written to a folder our deploys delete, found
- * on 17 August 2026. The fix is pushed but not confirmed deployed, and
- * @backendclaude warned that the download route CHANGES SHAPE when it lands: it
- * streams the file today and will return a signed link afterwards. A button
- * built against today works for an hour and then breaks with nothing in this
- * file changing.
+ * ── THE CERTIFICATE OPENS, AND IT WAITED FOR A REASON ──────────────────────
+ * This screen shipped without an open button. Every certificate ever uploaded
+ * had been written to a folder our deploys delete, found on 17 August 2026, and
+ * @backendclaude warned that the download route would CHANGE SHAPE when his fix
+ * landed — streaming the file before, returning a signed link after. A button
+ * built against the old shape would have worked for an hour and then broken
+ * with nothing in this file changing.
  *
- * So the certificate's real name, type and size are shown — those are true and
- * useful — and opening it arrives when he confirms, not when he pushes.
+ * So it waited on him CONFIRMING the deploy — he uploaded a document, opened it
+ * and compared the bytes — rather than on the commit landing. `pushed` and
+ * `working` were different things all that afternoon.
+ *
+ * Documents from BEFORE the fix are still gone, including the only application
+ * in the queue today. That is said by the button when it happens rather than by
+ * a warning over every company, which would now be false for the ones that
+ * work. See `OpenCertificateButton`.
  */
 export default function OrganizationVerificationPage({
   params,
@@ -167,6 +175,12 @@ export default function OrganizationVerificationPage({
                       {org.cac_document.mime_type} ·{' '}
                       {Math.round(org.cac_document.size / 1024)} KB
                     </div>
+                    <div className="pt-2">
+                      <OpenCertificateButton
+                        fileId={org.cac_document.id}
+                        fileName={org.cac_document.original_name}
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -177,21 +191,27 @@ export default function OrganizationVerificationPage({
         </Card>
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-900/20">
-        <AlertTriangle
-          aria-hidden
-          className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
-        />
-        <div className="space-y-1">
-          <p className="font-medium">You cannot open the certificate yet</p>
-          <p className="text-muted-foreground">
-            Documents uploaded before the storage fix are gone — they were
-            written to a server rebuilt on every deploy. Do not approve on the
-            strength of a filename; ask the company to send it again once
-            opening works.
-          </p>
+      {/* The blanket "you cannot open anything" notice is gone: the storage fix
+          is live and verified, so new certificates open. What remains true is
+          narrower and is said by the button itself when it happens — a document
+          uploaded before the fix no longer exists. A warning that fires for
+          every company would now be lying to the reviewer about the ones that
+          work. */}
+      {applied && !org.cac_document ? (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-900/20">
+          <AlertTriangle
+            aria-hidden
+            className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+          />
+          <div className="space-y-1">
+            <p className="font-medium">They applied without a certificate</p>
+            <p className="text-muted-foreground">
+              There is nothing attached to this application, so there is nothing
+              to check it against.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {decided === 'waiting' ? (
         <div className="flex flex-wrap gap-3">
