@@ -204,8 +204,29 @@ export function FieldPanel({
          from the box it confirms. */
       size="content"
       title={spec?.label ?? ''}
-      footer={
-        <Button type="button" onClick={handleDone} disabled={!changed}>
+      /**
+       * DONE SITS BESIDE CANCEL, IN THE BAR, NOT AT THE FOOT OF THE SHEET.
+       *
+       * It was a full-width button at the bottom, with Cancel at the top left,
+       * and the owner called the result messy on 17 August 2026. He was right
+       * and the convention says why: a confirm belongs at the TOP RIGHT, and a
+       * cancel sits at the top right too UNLESS it is paired with one — at
+       * which point it moves to the top left. Paired. Two exits at opposite
+       * ends of a 200px sheet is the arrangement neither platform uses.
+       *
+       * `ResponsiveOverlay` already had the slot for this and its own note
+       * says so: "one control on the trailing edge of the phone bar — a Save,
+       * usually". The first version simply did not use it.
+       */
+      action={
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={handleDone}
+          disabled={!changed}
+          className="font-semibold"
+        >
           Done
         </Button>
       }
