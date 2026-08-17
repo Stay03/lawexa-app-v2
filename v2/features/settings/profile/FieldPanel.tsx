@@ -24,11 +24,25 @@ import type { ProfileTextFieldSpec } from './text-fields';
  * context.
  *
  * So the row states the value and this states the question. `ResponsiveOverlay`
- * gives the shape for nothing: a full screen on a phone, the familiar centred
- * card from `md:`, hardware Back and the edge swipe already closing it, and a
- * footer that rides above the on-screen keyboard on both platforms. It is the
- * same element the country and expertise pickers on this screen already open,
- * so a typed field and a chosen one now arrive the same way.
+ * gives the shape for nothing: a bottom sheet sized to this one control on a
+ * phone (`size="content"`), the familiar centred card from `md:`, and a footer
+ * that rides above the on-screen keyboard on both platforms. It is the same
+ * element the country and expertise pickers on this screen already open, so a
+ * typed field and a chosen one now arrive the same way.
+ *
+ * ── WHAT THIS PARAGRAPH USED TO CLAIM, AND DID NOT DO ──────────────────────
+ * It said "hardware Back and the edge swipe already closing it". THAT WAS NOT
+ * TRUE and nothing here ever implemented it. The owner found it on 17 August
+ * 2026 by swiping back with a panel open and leaving the page instead: "seems
+ * these panels don't have URLs or something?" — which is exactly right, there
+ * is no history entry behind any of these overlays. Escape closes them, the
+ * chevron closes them, tapping outside closes them; the device Back button
+ * navigates the app.
+ *
+ * Left written down rather than quietly deleted, because a comment asserting a
+ * behaviour nobody built is worse than no comment: it is the reason this went
+ * unnoticed until a person swiped. Wiring Back to these surfaces is a change to
+ * navigation for every overlay, not to this file, and is not smuggled in here.
  *
  * ── ITS BUTTON SAYS "DONE", AND THAT IS THE WHOLE POINT ────────────────────
  * Nothing here writes to the server. The panel hands its value back to the
@@ -184,6 +198,11 @@ export function FieldPanel({
     <ResponsiveOverlay
       open={open}
       onOpenChange={handleOpenChange}
+      /* One control, so the sheet is as tall as one control. A whole screen for
+         a single line was the owner's "wasted space and unaesthetic design" on
+         17 August 2026, and he was right: the confirm ended up a screen away
+         from the box it confirms. */
+      size="content"
       title={spec?.label ?? ''}
       footer={
         <Button type="button" onClick={handleDone} disabled={!changed}>

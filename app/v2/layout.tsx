@@ -257,7 +257,38 @@ export default async function V2Layout({
             <DockProvider>
               <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
                 <V2Sidebar user={user} />
-                <SidebarInset className="min-h-0 overflow-hidden">
+                {/* ── `clip`, NOT `hidden`, AND THE DIFFERENCE IS THE BUG ────
+                    `overflow: hidden` makes a box unscrollable BY THE READER
+                    and leaves it a scroll container: it still has scrollable
+                    overflow, and the browser may still scroll it to reveal a
+                    focused descendant. `overflow: clip` does not create a
+                    scroll container at all, so there is nothing to scroll.
+
+                    This box never scrolls by design — the shell inside it owns
+                    scrolling — so it was `hidden`, and that was enough until
+                    something inside it took focus. The owner photographed the
+                    result on Android, 17 August 2026: tap an account-type row,
+                    and the whole app sits shifted up by a few hundred pixels
+                    with its header off the top of the screen and a black band
+                    at the bottom. Nothing puts it back, because the reader
+                    cannot scroll a box that is `hidden` either. Only a reload
+                    clears it.
+
+                    Measured both ways on the real build, tapping the same row:
+                      hidden → shell top -28px, band 28px, main.scrollTop 28
+                      clip   → shell top 0,    band 0,    main.scrollTop 0
+
+                    NOTE the box still reports 129px of scrollable overflow in
+                    both cases; `clip` does not remove the overflow, it removes
+                    the ABILITY TO SCROLL IT, which is the part that hurt. What
+                    creates those 129px is not known — no descendant accounts
+                    for it, verified by hiding every one of them in turn — and
+                    it is worth finding, but it is not what displaced the app.
+
+                    `use-keyboard-inset.ts` already carries the same lesson for
+                    the document and iOS. This is that lesson again, one box in,
+                    on a platform with no keyboard involved. */}
+                <SidebarInset className="min-h-0 overflow-clip">
                   {/* Non-scrolling shell: header / scrollable content / dock. DockHost
                       owns the dock slot: it renders an SSR height reservation on
                       conversation routes (so the floating composer never causes CLS) and

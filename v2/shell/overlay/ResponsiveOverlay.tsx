@@ -90,13 +90,42 @@ const SURFACE_PHONE =
   'fixed left-0 right-0 top-0 z-50 flex h-[calc(100dvh-var(--keyboard-inset,0px))] flex-col bg-background text-sm outline-none';
 
 /**
+ * Phone, sized to what is IN it: a sheet on the bottom edge rather than a whole
+ * screen.
+ *
+ * ── WHY THERE ARE TWO PHONE SHAPES ─────────────────────────────────────────
+ * The owner, 17 August 2026, on a panel holding one username: "is this not
+ * wasted space and unaesthetic design?" He was right. A full screen is the
+ * correct answer for a list of 250 countries, and the wrong one for a single
+ * line of text — it leaves most of the screen empty with the confirm button
+ * stranded a long way from the field it belongs to.
+ *
+ * So the shape follows the content instead of being fixed. `fill` stays the
+ * default because it is what a long list needs and what every existing caller
+ * already expects.
+ *
+ * THE BOTTOM EDGE IS THE KEYBOARD'S, NOT THE VIEWPORT'S. `bottom` is the
+ * keyboard inset rather than 0, for the same reason the shell subtracts it: an
+ * engine that OVERLAYS the keyboard leaves the visual viewport short while
+ * `100dvh` stays full, and a sheet pinned to a literal 0 would sit behind the
+ * keys — which is precisely the sheet a reader is trying to type into. On an
+ * engine that resizes instead, the inset is 0 and this reads as `bottom-0`.
+ *
+ * The cap keeps a long-but-not-endless body honest: at `max-h` the header and
+ * footer stay put and the middle scrolls, because they are `shrink-0` around a
+ * `min-h-0 flex-1` region that was already built to do exactly that.
+ */
+const SURFACE_PHONE_CONTENT =
+  'fixed left-0 right-0 bottom-[var(--keyboard-inset,0px)] z-50 flex max-h-[calc(100dvh-var(--keyboard-inset,0px)-2rem)] flex-col overflow-hidden rounded-t-3xl bg-background text-sm outline-none';
+
+/**
  * Desktop: the centred card, geometry matched to `DialogContent` so a converted
  * dialog looks the same as it did on the surface nobody is watching. The
  * default width is `md:max-w-lg`; a caller that needs another passes it and
  * tailwind-merge replaces this one.
  */
 const SURFACE_DESKTOP =
-  'md:left-1/2 md:right-auto md:top-[calc(50%-var(--keyboard-inset,0px)/2)] md:h-auto md:max-h-[calc(100dvh-4rem-var(--keyboard-inset,0px))] md:w-full md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:overflow-hidden md:rounded-4xl md:shadow-lg md:ring-1 md:ring-foreground/5';
+  'md:left-1/2 md:right-auto md:bottom-auto md:top-[calc(50%-var(--keyboard-inset,0px)/2)] md:h-auto md:max-h-[calc(100dvh-4rem-var(--keyboard-inset,0px))] md:w-full md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:overflow-hidden md:rounded-4xl md:shadow-lg md:ring-1 md:ring-foreground/5';
 
 /**
  * Phone rises from the bottom edge; desktop keeps the card's zoom. The `md:`
@@ -113,6 +142,7 @@ export function ResponsiveOverlay({
   action,
   footer,
   className,
+  size = 'fill',
   children,
 }: {
   open: boolean;
@@ -132,8 +162,16 @@ export function ResponsiveOverlay({
   /** The button row. Full-width stacked on a phone, right-aligned on a desktop.
    *  Omitted entirely rather than rendered empty when there is nothing in it. */
   footer?: ReactNode;
-  /** Desktop width, and nothing else — the phone shape is always full screen. */
+  /** Desktop width, and nothing else — the phone shape comes from `size`. */
   className?: string;
+  /**
+   * How tall the PHONE shape is. `fill` is a whole screen, which is what a long
+   * list wants and what every caller before 17 August 2026 assumed. `content`
+   * is a sheet on the bottom edge, as tall as what is inside it, for a surface
+   * holding one control. The desktop card is unaffected either way — it has
+   * always sized to its content.
+   */
+  size?: 'fill' | 'content';
   children: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -144,7 +182,12 @@ export function ResponsiveOverlay({
         <DialogOverlay />
         <DialogSurface
           ref={surfaceRef}
-          className={cn(SURFACE_PHONE, SURFACE_DESKTOP, SURFACE_MOTION, className)}
+          className={cn(
+            size === 'content' ? SURFACE_PHONE_CONTENT : SURFACE_PHONE,
+            SURFACE_DESKTOP,
+            SURFACE_MOTION,
+            className,
+          )}
           /* ── A FORM SCREEN OPENS WITH NOTHING FOCUSED ──────────────────
              Radix focuses the first focusable element on open. In a card that
              is the first field, which is what a desktop wants. In this shape
@@ -189,7 +232,15 @@ export function ResponsiveOverlay({
               and becomes the title block the card has always had, with the
               close X in the corner. Same DOM, so the `DialogTitle` is rendered
               ONCE — two of them would share one Radix-provided id. */}
-          <header className="shrink-0 border-b bg-background pt-[env(safe-area-inset-top,0px)] md:border-b-0 md:pt-6 md:pb-4">
+          {/* The notch padding belongs to the FULL-SCREEN shape, which starts
+              under the status bar. A sheet on the bottom edge has nothing above
+              it, so the same padding there is just a gap. */}
+          <header
+            className={cn(
+              'shrink-0 border-b bg-background md:border-b-0 md:pt-6 md:pb-4',
+              size === 'fill' && 'pt-[env(safe-area-inset-top,0px)]',
+            )}
+          >
             <div className="flex h-14 items-center gap-2 px-2 md:h-auto md:px-6 md:pr-12">
               <DialogClose asChild>
                 <button
