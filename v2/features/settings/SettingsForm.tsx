@@ -78,6 +78,29 @@ const BARE_CONTROL =
   'w-full min-w-0 min-h-6 border-0 bg-transparent p-0 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed disabled:opacity-60';
 
 /**
+ * How a settings group ARRIVES, stated once for every group.
+ *
+ * ── THE OWNER, 17 AUGUST 2026 ──────────────────────────────────────────────
+ * "when tapping on student and all that and the new options show on the page
+ * there is no animation or motion. Feels jumpy." He is right, and it is the
+ * standing rule for v2 rather than a preference: nothing appears or disappears
+ * abruptly.
+ *
+ * Which groups a person sees depends on the account type they just chose, so
+ * choosing one makes whole blocks appear under their finger. Instantly, they
+ * read as a layout glitch rather than an answer to what was tapped.
+ *
+ * It is on the PRIMITIVE, not on the three conditional blocks in
+ * `ProfileScreen`, because it is a fact about how a settings group appears and
+ * would otherwise have to be remembered every time somebody adds a fourth.
+ *
+ * `motion-safe:` throughout, so a reader who has asked their phone for less
+ * motion gets none of it.
+ */
+const GROUP_ENTER =
+  'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-200';
+
+/**
  * A block of form rows, under its own visible heading.
  *
  * The heading is a real `h2`, tied to the block with `aria-labelledby`, so
@@ -99,7 +122,7 @@ export function SettingsFormGroup({
 }) {
   const headingId = `settings-form-${id}`;
   return (
-    <section aria-labelledby={headingId}>
+    <section aria-labelledby={headingId} className={GROUP_ENTER}>
       <h2
         id={headingId}
         className="px-1 text-[13px] leading-snug font-medium text-muted-foreground"
@@ -492,7 +515,7 @@ export function SettingsChoiceGroup<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <fieldset>
+    <fieldset className={GROUP_ENTER}>
       <legend className="px-1 text-[13px] leading-snug font-medium text-muted-foreground">
         {legend}
       </legend>

@@ -302,8 +302,20 @@ export function ResponsiveOverlay({
                 ) : (
                   <button
                     type="button"
+                    /* `justify-self-start` IS THE WHOLE FIX. The row is a
+                       three-column grid so the title can be centred, which
+                       makes this button's cell a full `1fr` wide — and a
+                       button centres its own text, so "Cancel" floated in the
+                       middle of that empty column instead of sitting at the
+                       edge. Photographed by the owner, 17 August 2026: "is
+                       there where you put the cancel button??"
+
+                       I had filmed this sheet BEFORE the title was centred and
+                       only measured it afterwards. The measurements all passed
+                       — the button was present, enabled and correctly wired.
+                       None of them could see where it was. */
                     className={cn(
-                      'v2-interactive -ml-2 shrink-0 rounded-full px-2 py-1 text-sm text-muted-foreground md:hidden',
+                      'v2-interactive -ml-2 shrink-0 justify-self-start rounded-full px-2 py-1 text-sm text-muted-foreground md:hidden',
                       FOCUS_RING,
                     )}
                   >
