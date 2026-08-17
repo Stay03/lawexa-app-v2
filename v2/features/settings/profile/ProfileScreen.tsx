@@ -203,7 +203,10 @@ const ACCOUNT_TYPES: readonly SettingsChoice<UserType>[] = [
   },
   {
     value: 'other',
-    label: 'Something else',
+    /* NOT "Something else". @arthur, 17 August 2026: it "may appear dismissive
+       to people". It is the third of three, so whatever it says is what a
+       reader who is not a lawyer or a student reads about themselves. */
+    label: 'Other roles',
     description: 'Business owner, researcher, journalist, or other',
     icon: Briefcase,
   },
