@@ -116,9 +116,16 @@ export function SettingsFormGroup({
   );
 }
 
-/** The message under a control: the error when there is one, otherwise the
- *  hint. Never both, because the error is what the reader has to act on. */
-function FieldMessage({
+/**
+ * The message under a control: the error when there is one, otherwise the
+ * hint. Never both, because the error is what the reader has to act on.
+ *
+ * Exported for the panel that edits a row's value (`profile/FieldPanel.tsx`),
+ * which has to say the same thing in the same words a moment after the row
+ * said it. Two spellings of one message is how a screen ends up telling
+ * somebody their address is wrong in two different sentences.
+ */
+export function FieldMessage({
   errorId,
   hintId,
   error,
@@ -149,7 +156,7 @@ function FieldMessage({
 }
 
 /** The id a control should point `aria-describedby` at, or nothing. */
-function describedBy(
+export function describedBy(
   errorId: string,
   hintId: string,
   error?: string,
@@ -243,60 +250,10 @@ export function SettingsTextField({
   );
 }
 
-/** A typed field that runs to several lines. Never auto-growing: a settings
- *  block that changes height as somebody types is a block that moves the rows
- *  under their own finger. */
-export function SettingsTextAreaField({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-  error,
-  hint,
-  rows = 3,
-  placeholder,
-  maxLength,
-}: FieldBase & {
-  value: string;
-  onChange: (value: string) => void;
-  rows?: number;
-  placeholder?: string;
-  maxLength?: number;
-}) {
-  const uid = useId();
-  const errorId = `${uid}-error`;
-  const hintId = `${uid}-hint`;
-
-  return (
-    <li>
-      <div className={FIELD_ROW}>
-        <Icon aria-hidden className={FIELD_ICON} />
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <label htmlFor={uid} className={FIELD_LABEL}>
-            {label}
-          </label>
-          <textarea
-            id={uid}
-            rows={rows}
-            value={value}
-            placeholder={placeholder}
-            maxLength={maxLength}
-            onChange={(event) => onChange(event.target.value)}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={describedBy(errorId, hintId, error, hint)}
-            className={cn(BARE_CONTROL, 'resize-none')}
-          />
-          <FieldMessage
-            errorId={errorId}
-            hintId={hintId}
-            error={error}
-            hint={hint}
-          />
-        </div>
-      </div>
-    </li>
-  );
-}
+/* A multi-line field once lived here, typed into on the page. It has no
+   callers: since the panel arrived, a bio and a work history are edited in a
+   full-screen textarea with room to read them, not in three cramped lines
+   inside a settings row. See `profile/FieldPanel.tsx`. */
 
 /**
  * A field with a short, fixed set of answers. The trigger is stripped back to
@@ -366,14 +323,29 @@ export function SettingsSelectField({
 }
 
 /**
- * A row that OPENS something: a list too long to sit in a select, or a choice
- * that is really several choices (the countries of the world, the areas of law
- * this person practises).
+ * A row that states what it holds and OPENS somewhere to change it: a list too
+ * long to sit in a select (the countries of the world), a choice that is really
+ * several choices (the areas of law this person practises), and, since the
+ * owner asked for it on 16 August 2026, EVERY TYPED FIELD as well. A phone
+ * edits one thing at a time in a panel over the list rather than putting a
+ * caret in the middle of it, so a text field's row is a fact plus a way in,
+ * which is exactly this shape. The panel itself is
+ * `profile/FieldPanel.tsx`.
  *
  * IT IS THE ONE ROW SHAPE THAT CARRIES A CHEVRON, and that is deliberate. The
  * index has none because a glyph repeated on every row of a list of links says
- * nothing. Here it says something real: among a screen of rows you type into,
- * these are the ones you tap.
+ * nothing. Here it says something real: this row goes somewhere.
+ *
+ * THE BUTTON MARKS ITSELF WHEN IT IS CARRYING A REFUSAL, because that is what
+ * the screen looks for when a save comes back refused: `focusFirstInvalid`
+ * queries for it, and without the mark a 422 against a field behind a panel
+ * would draw its message and move focus nowhere.
+ *
+ * The mark is `data-invalid` rather than `aria-invalid`. A button has no
+ * validity to announce in the accessibility tree, which is why `aria-invalid`
+ * is not supported on the role and why jsx-a11y refuses it. What a reader is
+ * told comes from the message below, which carries `role="alert"` and is named
+ * by `aria-describedby`. This attribute is only how the form finds the row.
  *
  * The message sits OUTSIDE the button, indented to the value's gutter. A button
  * may only contain phrasing content, so a paragraph inside one is invalid HTML,
@@ -406,6 +378,7 @@ export function SettingsPickerField({
         type="button"
         onClick={onOpen}
         disabled={disabled}
+        data-invalid={error ? true : undefined}
         aria-describedby={describedBy(errorId, hintId, error, hint)}
         className={cn(
           'v2-interactive flex min-h-14 w-full items-start gap-3.5 px-4 py-2.5 text-left',
@@ -470,6 +443,37 @@ export interface SettingsChoice<T extends string> {
  * its group name announced, all from the browser, where a set of buttons
  * wearing `role="radio"` would need every one of those written by hand and
  * would be subtly wrong until it was.
+ *
+ * ── THE CHOSEN ROW IS TINTED AND FILLED, NOT MERELY TICKED ─────────────────
+ * Filmed on the owner's phone, 16 August 2026: his account type is `other` and
+ * none of the three rows looked chosen. The state WAS computed and was too
+ * quiet to be one. A 3% wash of the foreground colour over an already-tinted
+ * block sits below what a phone screen resolves in daylight, which left the
+ * whole answer resting on a 16px tick at the far right edge, and a tick that is
+ * simply absent everywhere else says "none of these" as readily as it says
+ * "that one".
+ *
+ * Three things say it now:
+ *
+ *  1. `bg-primary/10` on the row, which is the same tint the sidebar and the
+ *     drawer already use for the page you are on. It is the app's existing word
+ *     for "this one", not a fourth idea invented for one screen.
+ *  2. EVERY row carries an indicator, and the chosen one is FILLED. An empty
+ *     ring beside each answer is what a radio group has always looked like, and
+ *     it is what makes the group readable at a glance: one of these is solid.
+ *     A mark that only exists on the answer cannot be told apart from a screen
+ *     that has not loaded its answer yet, which is exactly what was filmed.
+ *  3. The icon takes the primary colour.
+ *
+ * THE LABEL IS NOT RECOLOURED. `text-primary` on a tinted row is how the
+ * sidebar marks its nav items, and it would have been the obvious fourth mark,
+ * but this primary is a mid amber: against the tinted row it measures near
+ * 4.2:1 in the light theme, under the 4.5:1 a 15px line has to clear. Selection
+ * is not worth reading the answer less clearly, and the fill above carries it
+ * as a graphical mark, where the 3:1 bar applies and is met.
+ *
+ * The hover wash moves onto the UNCHOSEN rows only. Painted over a chosen row
+ * it lightened exactly the tint that says it is chosen.
  */
 export function SettingsChoiceGroup<T extends string>({
   name,
@@ -505,9 +509,9 @@ export function SettingsChoiceGroup<T extends string>({
               key={option.value}
               className={cn(
                 'v2-interactive flex min-h-14 cursor-pointer items-start gap-3.5 px-4 py-2.5',
-                'transition-colors duration-150 hover:bg-foreground/[0.04] motion-reduce:transition-none',
+                'transition-colors duration-150 motion-reduce:transition-none',
                 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-inset',
-                selected && 'bg-foreground/[0.03]',
+                selected ? 'bg-primary/10' : 'hover:bg-foreground/[0.04]',
               )}
             >
               <input
@@ -535,13 +539,24 @@ export function SettingsChoiceGroup<T extends string>({
                   </span>
                 ) : null}
               </span>
-              <Check
+              {/* The tick is always in the DOM, so choosing does not change the
+                  row's shape under the finger that chose it. Only the colours
+                  move, and they move over 150ms. */}
+              <span
                 aria-hidden
                 className={cn(
-                  'mt-0.5 size-4 shrink-0 text-primary transition-opacity duration-150 motion-reduce:transition-none',
-                  selected ? 'opacity-100' : 'opacity-0',
+                  'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 motion-reduce:transition-none',
+                  selected
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : // NOT `border-border`. That token is 4.5% of lightness
+                      // away from the block it sits on, which is right for a
+                      // hairline between rows and leaves an empty circle
+                      // invisible. This is the same ring in both themes.
+                      'border-foreground/25 text-transparent',
                 )}
-              />
+              >
+                <Check aria-hidden className="size-3.5" strokeWidth={3} />
+              </span>
             </label>
           );
         })}

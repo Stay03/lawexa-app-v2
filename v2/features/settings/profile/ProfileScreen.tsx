@@ -3,29 +3,15 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AtSign,
-  Award,
   Briefcase,
-  Building,
   Building2,
   Cake,
-  CalendarDays,
   GraduationCap,
   Globe,
-  House,
-  IdCard,
-  Landmark,
-  Linkedin,
-  Facebook,
-  Link2,
   Loader2,
-  MapPin,
-  NotebookPen,
   Scale,
   School,
   Tags,
-  Twitter,
-  UserPen,
   VenusAndMars,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -41,19 +27,21 @@ import {
   SettingsFormGroup,
   SettingsPickerField,
   SettingsSelectField,
-  SettingsTextAreaField,
   SettingsTextField,
   type SettingsChoice,
 } from '../SettingsForm';
 import { SETTINGS_COLUMN } from '../SettingsList';
+import { FieldPanel } from './FieldPanel';
 import { OptionPicker } from './OptionPicker';
 import { ProfileHero } from './ProfileHero';
 import {
-  PROFILE_LIMITS,
+  PROFILE_TEXT_FIELDS,
+  type ProfileTextFieldName,
+} from './text-fields';
+import {
   buildProfilePayload,
   hasChanges,
   mapServerErrors,
-  normaliseUsername,
   profileFormValuesFromUser,
   settleProfileValues,
   validateProfileForm,
@@ -95,11 +83,24 @@ import {
  * that owns it (`lib/utils/profile-field-config.ts`) is imported by the form
  * model, so the two apps cannot disagree about what applies to whom.
  *
+ * ── YOU DO NOT TYPE ON THIS SCREEN ─────────────────────────────────────────
+ * Every typed field is a ROW showing what it holds, and tapping one opens a
+ * panel holding that field alone (`FieldPanel.tsx`, which carries the owner's
+ * words and the reasoning). What stayed inline, and why, is written at
+ * `textRow` below.
+ *
  * ── SAVING ─────────────────────────────────────────────────────────────────
  * The payload is a DIFF, so pressing Save writes exactly what changed and the
  * confirm is disabled until something has. A 422 lands on its own field in the
  * server's own words; anything the server said that matched no field is shown
  * in-page beside the button it blocked, never as a toast.
+ *
+ * A panel does not save. It hands its value back to this form and closes, the
+ * row redraws, and the sticky bar becomes the one thing that writes: one
+ * definition of saved, one diff, one place a refusal comes back to. The panel's
+ * own confirm is therefore "Done", and it is disabled until the box holds
+ * something different from the row, exactly as Save is disabled until the
+ * record would change.
  */
 export function ProfileScreen() {
   const { signedIn, role } = useV2Session();
@@ -175,6 +176,18 @@ function ProfileColumn({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The three kinds of person this product knows about.
+ *
+ * ── THE OWNER WANTS THIS CHANGEABLE, AND TODAY IT IS NOT ───────────────────
+ * The control is live, the diff carries `user_type`, and the save goes out.
+ * What comes back is a refusal: onboarding owns the only endpoints that write
+ * an account type, and they decline once onboarding is finished. That is a
+ * backend ask, raised separately, and NOT something to paper over here. The
+ * control is not disabled and there is no "this cannot be changed" notice: the
+ * owner has rejected that framing, and a control greyed out today would have to
+ * be found and un-greyed the day the endpoint lands.
+ */
 const ACCOUNT_TYPES: readonly SettingsChoice<UserType>[] = [
   {
     value: 'lawyer',
@@ -241,6 +254,18 @@ function ProfileForm({ user }: { user: User }) {
   );
   const [errors, setErrors] = useState<ProfileFieldErrors>({});
   const [picker, setPicker] = useState<'country' | 'expertise' | null>(null);
+  /**
+   * Which field the one panel is holding, and whether it is showing.
+   *
+   * The two are separate on purpose. `ResponsiveOverlay` stays mounted while it
+   * plays its exit, so a field name cleared on close would empty the panel's
+   * title and its control for the length of the animation. The name is
+   * therefore kept and only the flag moves.
+   */
+  const [editing, setEditing] = useState<{
+    field: ProfileTextFieldName;
+    open: boolean;
+  } | null>(null);
 
   const visibility = useMemo(() => visibilityFor(values), [values]);
 
@@ -322,12 +347,77 @@ function ProfileForm({ user }: { user: User }) {
     }));
   };
 
-  /** Move focus to the first control the form is refusing, once the error
-   *  state has committed. Scoped to THIS form. */
+  /**
+   * ONE TYPED FIELD, AS A ROW: the icon, the label, what it holds, and a way
+   * in. Everything about how the field is presented comes from one table
+   * (`text-fields.ts`), so this row and the panel behind it cannot disagree.
+   *
+   * ── WHAT DID NOT BECOME A PANEL, AND WHY ───────────────────────────────
+   * Gender, profession and level are `select`s, and the date of birth is a date
+   * input. Each of those already opens the platform's own thing on a tap: a
+   * wheel, a list, a calendar, drawn by the phone and sized by the phone. A
+   * panel around one of them would be a screen you open to open a second thing,
+   * which is two layers of chrome for one choice and slower than what the
+   * platform already does well.
+   *
+   * The country and the areas of expertise were panels before this change and
+   * stay as they are: too many answers for a select, and one of them holds
+   * several at once (`OptionPicker.tsx`).
+   *
+   * The account type and where you study are radio groups. Their whole point is
+   * that you SEE the alternatives beside each other with a sentence on each,
+   * and hiding three visible options behind a tap would take away the only
+   * thing that makes them readable.
+   */
+  const textRow = (field: ProfileTextFieldName) => {
+    const spec = PROFILE_TEXT_FIELDS[field];
+    const held = values[field];
+    return (
+      <SettingsPickerField
+        key={field}
+        icon={spec.icon}
+        label={spec.label}
+        value={held ? `${spec.prefix ?? ''}${held}` : null}
+        placeholder="Not set"
+        onOpen={() => setEditing({ field, open: true })}
+        error={errors[field]}
+      />
+    );
+  };
+
+  /**
+   * The form's own rules, asked about ONE candidate value. The panel calls it
+   * before it hands anything back, so a mistake is answered where it was made
+   * rather than at the foot of a screen the reader has to return to. It is the
+   * same function the submit runs, given the values as they would be, so the
+   * two can never disagree about what is acceptable.
+   */
+  const validateField = (
+    field: ProfileTextFieldName,
+    candidate: string,
+  ): string | undefined => {
+    const next: ProfileFormValues = { ...values };
+    next[field] = candidate;
+    return validateProfileForm(next, visibilityFor(next)).fields[field];
+  };
+
+  /**
+   * Move focus to the first control the form is refusing, once the error state
+   * has committed. Scoped to THIS form.
+   *
+   * Two marks, because there are two kinds of control on this screen and the
+   * accessibility rules differ: a control that holds a value says
+   * `aria-invalid`, and a row that only OPENS one cannot, since a button has no
+   * validity to announce. The row marks itself with `data-invalid` instead and
+   * this query accepts either, so a refusal against a field behind a panel
+   * still moves the reader to the row that carries it.
+   */
   const focusFirstInvalid = () => {
     requestAnimationFrame(() => {
       formRef.current
-        ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+        ?.querySelector<HTMLElement>(
+          '[aria-invalid="true"],[data-invalid="true"]',
+        )
         ?.focus();
     });
   };
@@ -403,43 +493,9 @@ function ProfileForm({ user }: { user: User }) {
 
       <div className="flex flex-col gap-5">
         <SettingsFormGroup id="you" label="You">
-          <SettingsTextField
-            icon={UserPen}
-            label="Full name"
-            value={values.name}
-            onChange={(value) => set('name', value)}
-            error={errors.name}
-            placeholder="Your full name"
-            maxLength={PROFILE_LIMITS.name}
-            autoComplete="name"
-          />
-          <SettingsTextField
-            icon={AtSign}
-            label="Username"
-            value={values.username}
-            onChange={(value) => set('username', normaliseUsername(value))}
-            error={errors.username}
-            hint={
-              original.username
-                ? 'People type this to tag you in channels.'
-                : 'Pick one so people can tag you in channels. It cannot be removed later.'
-            }
-            prefix="@"
-            placeholder="yourhandle"
-            maxLength={PROFILE_LIMITS.usernameMax}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <SettingsTextAreaField
-            icon={NotebookPen}
-            label="Bio"
-            value={values.bio}
-            onChange={(value) => set('bio', value)}
-            error={errors.bio}
-            placeholder="A line or two about yourself"
-            maxLength={PROFILE_LIMITS.bio}
-            rows={3}
-          />
+          {textRow('name')}
+          {textRow('username')}
+          {textRow('bio')}
           <SettingsSelectField
             icon={VenusAndMars}
             label="Gender"
@@ -449,6 +505,9 @@ function ProfileForm({ user }: { user: User }) {
             placeholder="Not set"
             error={errors.gender}
           />
+          {/* The one control still typed into on the page, and only in the
+              sense that a date input is typed into: on a phone it opens the
+              platform's calendar, which is a better answer than any panel. */}
           <SettingsTextField
             icon={Cake}
             label="Date of birth"
@@ -514,50 +573,14 @@ function ProfileForm({ user }: { user: User }) {
             onOpen={() => setPicker('country')}
             error={errors.country}
           />
-          <SettingsTextField
-            icon={MapPin}
-            label="State or region"
-            value={values.state}
-            onChange={(value) => set('state', value)}
-            error={errors.state}
-            placeholder="Not set"
-            maxLength={PROFILE_LIMITS.state}
-            autoComplete="address-level1"
-          />
-          <SettingsTextField
-            icon={Building}
-            label="City"
-            value={values.city}
-            onChange={(value) => set('city', value)}
-            error={errors.city}
-            placeholder="Not set"
-            maxLength={PROFILE_LIMITS.city}
-            autoComplete="address-level2"
-          />
-          <SettingsTextField
-            icon={House}
-            label="Address"
-            value={values.address}
-            onChange={(value) => set('address', value)}
-            error={errors.address}
-            placeholder="Not set"
-            maxLength={PROFILE_LIMITS.address}
-            autoComplete="street-address"
-          />
+          {textRow('state')}
+          {textRow('city')}
+          {textRow('address')}
         </SettingsFormGroup>
 
         {visibility.showEducationSection ? (
           <SettingsFormGroup id="education" label="Education and credentials">
-            {visibility.showUniversity ? (
-              <SettingsTextField
-                icon={School}
-                label="University"
-                value={values.university}
-                onChange={(value) => set('university', value)}
-                error={errors.university}
-                placeholder="Not set"
-              />
-            ) : null}
+            {visibility.showUniversity ? textRow('university') : null}
             {visibility.showLevel ? (
               <SettingsSelectField
                 icon={GraduationCap}
@@ -569,112 +592,21 @@ function ProfileForm({ user }: { user: User }) {
                 error={errors.level}
               />
             ) : null}
-            {visibility.showLawSchool ? (
-              <SettingsTextField
-                icon={Landmark}
-                label="Law school"
-                value={values.law_school}
-                onChange={(value) => set('law_school', value)}
-                error={errors.law_school}
-                placeholder="Not set"
-              />
-            ) : null}
-            {visibility.showCallToBarYear ? (
-              <SettingsTextField
-                icon={CalendarDays}
-                label="Year of call"
-                value={values.call_to_bar_year}
-                onChange={(value) => set('call_to_bar_year', value)}
-                error={errors.call_to_bar_year}
-                placeholder="e.g. 2020"
-                inputMode="numeric"
-                maxLength={4}
-              />
-            ) : null}
-            {visibility.showCallNumber ? (
-              <SettingsTextField
-                icon={IdCard}
-                label="Call number"
-                value={values.call_number}
-                onChange={(value) => set('call_number', value)}
-                error={errors.call_number}
-                placeholder="Not set"
-              />
-            ) : null}
-            {visibility.showOtherCertifications ? (
-              <SettingsTextAreaField
-                icon={Award}
-                label="Other certifications"
-                value={values.other_certifications}
-                onChange={(value) => set('other_certifications', value)}
-                error={errors.other_certifications}
-                placeholder="Anything else you are certified in"
-                rows={3}
-              />
-            ) : null}
-            {visibility.showWorkExperience ? (
-              <SettingsTextAreaField
-                icon={Briefcase}
-                label="Work experience"
-                value={values.work_experience}
-                onChange={(value) => set('work_experience', value)}
-                error={errors.work_experience}
-                placeholder="Where you have practised, and for how long"
-                rows={4}
-              />
-            ) : null}
+            {visibility.showLawSchool ? textRow('law_school') : null}
+            {visibility.showCallToBarYear ? textRow('call_to_bar_year') : null}
+            {visibility.showCallNumber ? textRow('call_number') : null}
+            {visibility.showOtherCertifications
+              ? textRow('other_certifications')
+              : null}
+            {visibility.showWorkExperience ? textRow('work_experience') : null}
           </SettingsFormGroup>
         ) : null}
 
         <SettingsFormGroup id="links" label="Links">
-          <SettingsTextField
-            icon={Linkedin}
-            label="LinkedIn"
-            type="url"
-            inputMode="url"
-            value={values.linkedin_url}
-            onChange={(value) => set('linkedin_url', value)}
-            error={errors.linkedin_url}
-            placeholder="https://linkedin.com/in/..."
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <SettingsTextField
-            icon={Link2}
-            label="Website"
-            type="url"
-            inputMode="url"
-            value={values.website_url}
-            onChange={(value) => set('website_url', value)}
-            error={errors.website_url}
-            placeholder="https://yoursite.com"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <SettingsTextField
-            icon={Twitter}
-            label="X"
-            type="url"
-            inputMode="url"
-            value={values.twitter_url}
-            onChange={(value) => set('twitter_url', value)}
-            error={errors.twitter_url}
-            placeholder="https://x.com/..."
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <SettingsTextField
-            icon={Facebook}
-            label="Facebook"
-            type="url"
-            inputMode="url"
-            value={values.facebook_url}
-            onChange={(value) => set('facebook_url', value)}
-            error={errors.facebook_url}
-            placeholder="https://facebook.com/..."
-            autoComplete="off"
-            spellCheck={false}
-          />
+          {textRow('linkedin_url')}
+          {textRow('website_url')}
+          {textRow('twitter_url')}
+          {textRow('facebook_url')}
         </SettingsFormGroup>
       </div>
 
@@ -706,6 +638,25 @@ function ProfileForm({ user }: { user: User }) {
           </Button>
         </div>
       </div>
+
+      {/* ONE panel for sixteen rows. It is always rendered, like the two
+          pickers under it, because an overlay unmounted while closed cannot
+          play its exit. */}
+      <FieldPanel
+        open={editing?.open ?? false}
+        onOpenChange={(open) =>
+          setEditing((current) => (current ? { ...current, open } : null))
+        }
+        spec={editing ? PROFILE_TEXT_FIELDS[editing.field] : null}
+        value={editing ? values[editing.field] : ''}
+        error={editing ? errors[editing.field] : undefined}
+        validate={(candidate) =>
+          editing ? validateField(editing.field, candidate) : undefined
+        }
+        onCommit={(next) => {
+          if (editing) set(editing.field, next);
+        }}
+      />
 
       <OptionPicker
         open={picker === 'country'}
