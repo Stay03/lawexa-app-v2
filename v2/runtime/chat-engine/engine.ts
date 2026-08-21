@@ -123,10 +123,24 @@ const SSE_MAX_RECONNECTS = 3;
 const SSE_RECONNECT_DELAY_MS = 1_000;
 
 // Heartbeat-only stale detection: heartbeats prove the socket is alive but carry
-// no data. After this many consecutive heartbeats with zero data events (≈60s at
-// 5s heartbeats) we check conversation status via API — covers the case where
-// another tab already consumed the terminal completed/end events.
-const HEARTBEAT_ONLY_THRESHOLD = 12;
+// no data. After this long with heartbeats arriving and zero data events we check
+// conversation status via API — covers the case where another tab already consumed
+// the terminal completed/end events, and the case where the AI service died and
+// the connection was never told.
+//
+// A DURATION, NOT A COUNT OF HEARTBEATS, and that is the whole point (21 Aug 2026).
+// This was `HEARTBEAT_ONLY_THRESHOLD = 12`, on the assumption — written in a comment
+// and never checked — that heartbeats arrive every 5s, making 12 of them a minute.
+// The backend author confirmed the interval IS 5s but that the number is a FLOOR,
+// not a promise: it is how long the server waits for the next piece before sending a
+// heartbeat instead, so it stretches whenever the server is busy. Which is exactly
+// when answers are slowest and this check matters most. A count of 12 therefore
+// silently became five minutes under load — landing at the same moment the stream
+// was going to give up anyway, so it would look like it worked and do nothing.
+//
+// Measuring elapsed time since the last DATA event removes the dependency on a
+// cadence we do not own.
+const DATA_SILENCE_MS = 60_000;
 
 // Default token-flush cadence (foundation-standards §5: 50–80ms).
 const DEFAULT_FLUSH_INTERVAL_MS = 60;
@@ -398,7 +412,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   let turnsAwaitingIds = 0;
   let executionId: string | null = null;
   let reconnectCount = 0;
-  let consecutiveHeartbeats = 0;
+  /** When the last DATA (non-heartbeat) event arrived. 0 = no stream open. */
+  let lastDataEventTime = 0;
   let staleCheckInFlight = false;
   let dedupKeys = new Set<number>();
   // v2_stream token-streaming placeholder tracking (per v1):
@@ -738,9 +753,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: null }));
         }
       }
-      consecutiveHeartbeats = 0;
+      lastDataEventTime = Date.now();
     } catch {
-      consecutiveHeartbeats = 0;
+      lastDataEventTime = Date.now();
     } finally {
       staleCheckInFlight = false;
     }
@@ -1065,8 +1080,14 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // Snapshot the dedup set built from history — skip SSE events already rendered.
     const dedup = dedupKeys;
-    const resetHeartbeat = () => {
-      consecutiveHeartbeats = 0;
+    /* Seeded AT CONNECT, not left at 0 until the first data event. A stream that
+       opens, heartbeats, and never carries a single data event is precisely the
+       "the service died and nobody told the connection" case; leaving this unset
+       until the first delta would mean that case never triggered the check at all.
+       The old counter started from zero on connect and had this for free. */
+    lastDataEventTime = Date.now();
+    const markDataEvent = () => {
+      lastDataEventTime = Date.now();
     };
 
     // connected — on reconnect the backend may replay `accumulated_text` so the
@@ -1074,7 +1095,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     es.addEventListener('connected', (e) => {
       lastEventTime = Date.now();
       reconnectCount = 0; // reset on successful connection
-      resetHeartbeat();
+      markDataEvent();
       const data = parseEvent<ConnectedEvent>((e as MessageEvent).data);
       if (data?.accumulated_text) {
         const iteration = currentIteration ?? 0;
@@ -1089,14 +1110,14 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     es.addEventListener('iteration', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const event = parseEvent<IterationEvent>((e as MessageEvent).data);
       if (event) handlers.onIteration?.(event);
     });
 
     es.addEventListener('handover_started', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const event = parseEvent<HandoverStartedEvent>((e as MessageEvent).data);
       if (!event) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
@@ -1105,7 +1126,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     es.addEventListener('handover_complete', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const event = parseEvent<HandoverCompleteEvent>((e as MessageEvent).data);
       if (!event) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
@@ -1117,7 +1138,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // calls are skipped (not user-visible).
     es.addEventListener('tool_calling', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const event = parseEvent<ToolCallingEvent>((e as MessageEvent).data);
       if (!event) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
@@ -1133,7 +1154,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // tool_complete — consume the first pending id for this tool name (FIFO).
     es.addEventListener('tool_complete', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const event = parseEvent<ToolCompleteEvent>((e as MessageEvent).data);
       if (!event) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
@@ -1154,7 +1175,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // placeholder's live store). Both buffer + flush; no per-token setState.
     es.addEventListener('text_delta', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const event = parseEvent<TextDeltaEvent>((e as MessageEvent).data);
       if (!event) return;
       if (event.agent_slug) {
@@ -1170,7 +1191,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // keep content visible; `completed` will replace it with authoritative text.
     es.addEventListener('text_done', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const event = parseEvent<TextDoneEvent>((e as MessageEvent).data);
       if (!event) return;
       if (event.agent_slug) return; // only stop the orchestrator cursor here
@@ -1207,7 +1228,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // Carries the narration-vs-final heuristic (see below).
     es.addEventListener('text_reset', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const event = parseEvent<TextResetEvent>((e as MessageEvent).data);
       if (!event) return;
 
@@ -1265,8 +1286,14 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // the terminal events).
     es.addEventListener('heartbeat', () => {
       lastEventTime = Date.now();
-      consecutiveHeartbeats += 1;
-      if (consecutiveHeartbeats >= HEARTBEAT_ONLY_THRESHOLD) void checkStaleStream();
+      /* Heartbeats keep `lastEventTime` fresh, so the 60s silence watchdog above
+         can never fire while they flow — this is the only thing that catches a
+         connection that is alive and carrying nothing. Measured against the last
+         DATA event, so a server that slows its heartbeats down cannot slow this
+         down with it. See DATA_SILENCE_MS. */
+      if (lastDataEventTime && Date.now() - lastDataEventTime > DATA_SILENCE_MS) {
+        void checkStaleStream();
+      }
     });
 
     // thinking — the model is actively reasoning. Reset the stale-detection
@@ -1277,7 +1304,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // firming up — whichever text field is present is captured; none ⇒ no-op.
     es.addEventListener('thinking', (e) => {
       lastEventTime = Date.now();
-      resetHeartbeat();
+      markDataEvent();
       const data = parseEvent<{
         iteration?: number;
         delta?: string;
@@ -1722,7 +1749,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     reasoningSmoother.clear();
     executionId = null;
     reconnectCount = 0;
-    consecutiveHeartbeats = 0;
+    lastDataEventTime = 0;
     dedupKeys = new Set();
     // Clear text accumulators on FULL disconnect (but never on SSE reconnect — the
     // placeholder must persist so `completed` can replace it).
