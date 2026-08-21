@@ -76,6 +76,8 @@ export const MyThreadRow = memo(function MyThreadRow({
   thread,
   now,
   index,
+  className,
+  nested = false,
 }: {
   thread: Channel;
   /** Frozen clock — threaded from the screen's lazy `useState` so no
@@ -83,6 +85,26 @@ export const MyThreadRow = memo(function MyThreadRow({
   now: number;
   /** Position across ALL sections — drives the entrance stagger. */
   index: number;
+  /**
+   * Extra classes on the row element. The grouped list uses this to indent a
+   * thread under its channel heading.
+   */
+  className?: string;
+  /**
+   * Drawn UNDERNEATH its channel's heading, rather than as a row in its own
+   * right.
+   *
+   * WHAT THIS TURNS OFF, AND WHY IT IS NOT COSMETIC. A standalone thread row
+   * has to say where it came from — the space it lives in, its crest, and
+   * "Thread in Product Development" — because nothing else on screen does.
+   * Under a heading, all three are the heading, one line above and repeated for
+   * every sibling. Left in, they cost the width the TITLE needs: measured on a
+   * 390px phone, "Channel/Thread visua..." truncated at 20 characters while the
+   * line below it spent the rest of the row saying "Thread in Product Dev...".
+   * The reader loses the one thing that tells the rows apart to read the one
+   * thing they all share.
+   */
+  nested?: boolean;
 }) {
   const { mentions, muted } = channelUnreadGrammar(thread);
   const state = threadUnreadState(thread);
@@ -98,7 +120,10 @@ export const MyThreadRow = memo(function MyThreadRow({
 
   return (
     <li
-      className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:fill-mode-both motion-safe:duration-200"
+      className={cn(
+        'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:fill-mode-both motion-safe:duration-200',
+        className,
+      )}
       style={{ animationDelay: `${Math.min(index, 6) * 20}ms` }}
     >
       <Link
@@ -115,13 +140,15 @@ export const MyThreadRow = memo(function MyThreadRow({
             inside a `<span>` is invalid. An `<a>` accepts flow content, so the
             whole-row link still nests correctly. */}
         <div className={cn('flex min-w-0 flex-1 items-start gap-3', dim)}>
-          <SpaceCrest
-            uuid={thread.space.uuid}
-            name={thread.space.name}
-            type={thread.space.type}
-            size="md"
-            className="mt-0.5"
-          />
+          {nested ? null : (
+            <SpaceCrest
+              uuid={thread.space.uuid}
+              name={thread.space.name}
+              type={thread.space.type}
+              size="md"
+              className="mt-0.5"
+            />
+          )}
 
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
@@ -160,11 +187,15 @@ export const MyThreadRow = memo(function MyThreadRow({
 
             <MetaLine
               className="mt-1"
-              lead={[
-                thread.space.name,
-                provenance,
-                thread.last_message_at === null ? 'No messages yet' : null,
-              ]}
+              lead={
+                nested
+                  ? [thread.last_message_at === null ? 'No messages yet' : null]
+                  : [
+                      thread.space.name,
+                      provenance,
+                      thread.last_message_at === null ? 'No messages yet' : null,
+                    ]
+              }
             />
           </div>
         </div>

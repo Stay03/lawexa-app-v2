@@ -52,6 +52,7 @@ export const MyChannelRow = memo(function MyChannelRow({
   channel,
   now,
   index,
+  activityAt,
 }: {
   channel: Channel;
   /** Frozen clock — threaded from the screen's lazy `useState` so no
@@ -59,6 +60,21 @@ export const MyChannelRow = memo(function MyChannelRow({
   now: number;
   /** Position across ALL sections — drives the entrance stagger. */
   index: number;
+  /**
+   * The stamp the row should AGE ITSELF ON, when it is not the channel's own
+   * last message.
+   *
+   * WHY IT EXISTS (filmed, 21 August 2026). In the grouped list a channel is
+   * RANKED on the newest thing inside it, its own messages or any of its
+   * threads — otherwise the busiest room in the app sinks, because posting in a
+   * thread never touches its channel's clock. But the row went on printing the
+   * channel's own age, so Product Development sat under the heading TODAY,
+   * above threads marked "4m", and said "2d". Ranked on one clock and labelled
+   * with another is a row arguing with the screen around it.
+   *
+   * Omitted everywhere else, so a channel drawn on its own is unchanged.
+   */
+  activityAt?: string | null;
 }) {
   const { unread, mentions, muted } = channelUnreadGrammar(channel);
   // MISSED BY THE FIRST SWEEP, reported by @arthur: a hidden channel drew the
@@ -66,7 +82,7 @@ export const MyChannelRow = memo(function MyChannelRow({
   // grep as if it were the whole list.
   const visibilityFace = channelVisibilityFace(channel.visibility);
   const Glyph = visibilityFace.icon;
-  const age = formatRelativeTime(channel.last_message_at, now);
+  const age = formatRelativeTime(activityAt ?? channel.last_message_at, now);
   const preview = channel.last_message;
   const dim = muted
     ? 'opacity-60 transition-opacity duration-150 group-hover:opacity-100 motion-reduce:transition-none'

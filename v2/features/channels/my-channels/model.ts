@@ -1,5 +1,5 @@
 import type { Channel } from '@/types/collab';
-import { channelUnreadGrammar, compareRoomRecency } from '../model';
+import { channelUnreadGrammar, compareRoomRecency, roomActivityAt } from '../model';
 import { channelDisplayName } from '../thread-model';
 
 /**
@@ -127,4 +127,173 @@ export function mergeMyRooms(
   threads: readonly Channel[],
 ): Channel[] {
   return [...channels, ...threads].sort(compareRoomRecency);
+}
+
+/* ── Grouped view: a channel, and its threads underneath it ────────────────── */
+
+/** How many threads are drawn under a heading before the rest collapse. */
+export const THREADS_PER_CHANNEL = 3;
+
+/**
+ * One heading and the threads under it.
+ */
+export interface MyChannelGroup {
+  /** The heading itself. */
+  channel: Channel;
+  /** Its threads, newest first, capped at {@link THREADS_PER_CHANNEL}. */
+  threads: Channel[];
+  /**
+   * The rest of the threads we hold for it, newest first — what "See more"
+   * reveals. Held rather than discarded so pressing the button costs nothing
+   * and shows no skeleton: these rows are already in memory.
+   */
+  rest: Channel[];
+  /**
+   * Threads we HOLD for this channel and are not drawing. NOT the true
+   * remainder: the screen only ever holds the newest page of threads, so a
+   * channel can have more that never arrived. `0` therefore means "nothing
+   * more that we know of", never "nothing more". The button says "See more"
+   * rather than a number until the server sends a real count per channel.
+   */
+  hiddenHeld: number;
+  /** The clock this heading is ranked on. See {@link groupMyRooms}. */
+  activityAt: string;
+}
+
+/**
+ * The two halves of `/channels` as CHANNELS WITH THEIR THREADS UNDER THEM.
+ *
+ * ── WHY (the owner, 20 August 2026) ────────────────────────────────────────
+ * "I want the threads to be under the channel for every channel. If the channel
+ * has too many threads then there should be see more. The point is that
+ * visually if I see that a thread is under a channel I understand the hierarchy
+ * but still the most recent shows top."
+ *
+ * {@link mergeMyRooms} puts both kinds in one flat ranked list, where a thread
+ * and a channel sit as equals and the only clue a thread belongs to Product
+ * Development is a line of grey text under its name. You have to READ to work
+ * out the shape. This states it instead.
+ *
+ * ── THE HEADING IS RANKED ON THE NEWEST THING INSIDE IT ────────────────────
+ * And this is the whole screen, not a detail. A channel's own
+ * `last_message_at` moves only when somebody posts IN THE CHANNEL — posting in
+ * one of its threads never touches it (measured, and confirmed by the backend
+ * author, 20 August 2026). So ranking headings on the channel's own clock sinks
+ * the busiest room in the app: Product Development's own last message can be
+ * hours older than the thread that moved a minute ago.
+ *
+ * The owner's rule was "the most recent shows top". Ranking on the channel
+ * alone breaks that rule while looking like it obeys it, which is the worst of
+ * both. So a heading is ranked on the newest of itself and everything under it.
+ *
+ * ── A THREAD ALWAYS GETS A HEADING ─────────────────────────────────────────
+ * If a thread's parent is somehow not in the channel list, the thread is NOT
+ * dropped: a stand-in heading is built from the parent name and uuid the thread
+ * already carries. On this screen that should not happen — the list is filtered
+ * to rooms you belong to, and access to a thread rides on its parent. But
+ * "should not happen" is not "cannot": the backend author first stated a thread
+ * always sits in a channel you are in, checked it properly, and corrected
+ * himself — SEEING a thread only requires the parent to be VISIBLE, not joined,
+ * so a reader can be in a thread whose channel they never joined. Dropping a
+ * row in that case would hide a conversation rather than mis-file it.
+ *
+ * ── ORDER WITHIN A HEADING IS THE SAME RULE, DELIBERATELY ──────────────────
+ * Newest first, no special treatment for a thread that mentions you. The owner
+ * was asked whether mentions should be pulled into the visible three so one can
+ * never hide behind the button, and has not answered; his stated rule is strict
+ * recency, so that is what this does. If that changes it is a comparator, not a
+ * rebuild.
+ */
+export function groupMyRooms(
+  channels: readonly Channel[],
+  threads: readonly Channel[],
+): MyChannelGroup[] {
+  const byParent = new Map<string, Channel[]>();
+  const orphans: Channel[] = [];
+
+  for (const thread of threads) {
+    const parent = thread.parent_channel_uuid;
+    if (!parent) {
+      orphans.push(thread);
+      continue;
+    }
+    const bucket = byParent.get(parent);
+    if (bucket) bucket.push(thread);
+    else byParent.set(parent, [thread]);
+  }
+
+  const groups: MyChannelGroup[] = [];
+  const seenParents = new Set<string>();
+
+  for (const channel of channels) {
+    seenParents.add(channel.uuid);
+    groups.push(buildGroup(channel, byParent.get(channel.uuid) ?? []));
+  }
+
+  /* Threads whose parent never appeared in the channel list. Grouped by that
+     parent so two tangents of the same absent channel share one heading rather
+     than each growing their own. */
+  for (const [parentUuid, bucket] of byParent) {
+    if (seenParents.has(parentUuid)) continue;
+    groups.push(buildGroup(standInChannel(bucket[0], parentUuid), bucket));
+  }
+
+  /* A thread carrying no parent at all cannot be filed under anything, so it
+     stands alone rather than vanishing. */
+  for (const thread of orphans) {
+    groups.push({
+      channel: thread,
+      threads: [],
+      rest: [],
+      hiddenHeld: 0,
+      activityAt: roomActivityAt(thread),
+    });
+  }
+
+  return groups.sort(
+    (left, right) =>
+      Date.parse(right.activityAt) - Date.parse(left.activityAt) ||
+      channelDisplayName(left.channel).localeCompare(channelDisplayName(right.channel)),
+  );
+}
+
+function buildGroup(channel: Channel, bucket: readonly Channel[]): MyChannelGroup {
+  const ordered = [...bucket].sort(compareRoomRecency);
+  const newest = ordered.reduce(
+    (latest, thread) => {
+      const at = roomActivityAt(thread);
+      return Date.parse(at) > Date.parse(latest) ? at : latest;
+    },
+    roomActivityAt(channel),
+  );
+  return {
+    channel,
+    threads: ordered.slice(0, THREADS_PER_CHANNEL),
+    rest: ordered.slice(THREADS_PER_CHANNEL),
+    hiddenHeld: Math.max(0, ordered.length - THREADS_PER_CHANNEL),
+    activityAt: newest,
+  };
+}
+
+/**
+ * A heading for a channel we were never handed, built from what its thread
+ * already carries. Everything a heading needs is on the thread: the parent's
+ * name, its uuid, and the space it lives in.
+ *
+ * The counts are ZEROED rather than copied. A thread's unread belongs to the
+ * thread and is drawn on the thread's own row; letting it ride up would count
+ * the same messages twice on one screen.
+ */
+function standInChannel(thread: Channel, parentUuid: string): Channel {
+  return {
+    ...thread,
+    uuid: parentUuid,
+    name: thread.parent_channel_name ?? 'Channel',
+    is_thread: false,
+    parent_channel_uuid: null,
+    parent_channel_name: null,
+    title: null,
+    unread_count: 0,
+    mention_count: 0,
+  };
 }

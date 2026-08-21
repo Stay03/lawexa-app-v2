@@ -16,7 +16,6 @@ import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
 import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { SearchField, SearchFieldShape } from '@/v2/shell/SearchField';
 import { TabRow } from '@/v2/shell/TabRow';
-import { roomActivityAt } from '../model';
 import { channelsQueries } from '../queries';
 import { groupByRecency } from '../recency';
 import {
@@ -24,12 +23,11 @@ import {
   NO_MY_THREADS,
   matchesChannelSearch,
   matchesLens,
-  mergeMyRooms,
+  groupMyRooms,
   parseMyChannelsLens,
   type MyChannelsLens,
 } from './model';
-import { MyChannelRow } from './MyChannelRow';
-import { MyThreadRow } from './MyThreadRow';
+import { MyChannelGroupRows } from './MyChannelGroupRows';
 import {
   MyChannelsEmptyState,
   MyChannelsErrorState,
@@ -151,23 +149,42 @@ export function MyChannelsScreen() {
      every render and re-rank the whole list for nothing. */
   const threads = threadsQuery.data?.data ?? NO_MY_THREADS;
 
-  const rooms = useMemo(() => mergeMyRooms(channels, threads), [channels, threads]);
-
-  const visible = useMemo(
+  /* FILTERED IN TWO HALVES, THEN GROUPED — not merged, filtered and regrouped.
+     A lens or a search term has to narrow channels and threads separately,
+     because the two are no longer peers: a thread that matches while its
+     channel does not still needs somewhere to sit. `groupMyRooms` builds it a
+     heading from the parent name the thread already carries, so searching
+     "websocket" shows the matching thread under a Product Development heading
+     rather than losing it or promoting it to a top-level row. */
+  const visibleChannels = useMemo(
     () =>
-      rooms.filter(
+      channels.filter(
         (room) => matchesLens(room, lens) && matchesChannelSearch(room, committedSearch),
       ),
-    [rooms, lens, committedSearch],
+    [channels, lens, committedSearch],
   );
 
-  /* Grouped on the SAME clock the merge ranked by, never on `last_message_at`
-     alone: a thread nobody has answered yet has a null stamp, and reading that
-     directly would date every newborn thread as "Earlier" while the row above it
-     said it was the newest thing here. */
+  const visibleThreads = useMemo(
+    () =>
+      threads.filter(
+        (room) => matchesLens(room, lens) && matchesChannelSearch(room, committedSearch),
+      ),
+    [threads, lens, committedSearch],
+  );
+
+  const groups = useMemo(
+    () => groupMyRooms(visibleChannels, visibleThreads),
+    [visibleChannels, visibleThreads],
+  );
+
+  /* The date headings survive the regrouping and now bucket HEADINGS rather
+     than rows, on the group's own clock — the newest of a channel and anything
+     under it. Bucketing on the channel's own `last_message_at` would file
+     Product Development under "Earlier" while the thread drawn inside it moved
+     a minute ago, which is the same lie the ranking fix exists to stop. */
   const sections = useMemo(
-    () => groupByRecency(visible, now, roomActivityAt),
-    [visible, now],
+    () => groupByRecency(groups, now, (group) => group.activityAt),
+    [groups, now],
   );
 
   const setLens = useCallback((next: MyChannelsLens) => {
@@ -220,7 +237,7 @@ export function MyChannelsScreen() {
   const showError = (query.isError || threadsQuery.isError) && nothingKnown;
   const showEmpty = !showSkeleton && !showError && nothingKnown;
   const showNoMatch =
-    !showSkeleton && !showError && !showEmpty && visible.length === 0;
+    !showSkeleton && !showError && !showEmpty && groups.length === 0;
 
   // SHOWN AT EVERY WIDTH. The brief asked for this field at `sm:`+, and that
   // was wrong for this surface specifically: `/channels` is the natural MOBILE
@@ -316,23 +333,14 @@ export function MyChannelsScreen() {
                     {section.label}
                   </h2>
                   <ul className="flex flex-col divide-y divide-border/60">
-                    {section.rows.map((room, index) =>
-                      room.is_thread ? (
-                        <MyThreadRow
-                          key={room.uuid}
-                          thread={room}
-                          now={now}
-                          index={offset + index}
-                        />
-                      ) : (
-                        <MyChannelRow
-                          key={room.uuid}
-                          channel={room}
-                          now={now}
-                          index={offset + index}
-                        />
-                      ),
-                    )}
+                    {section.rows.map((group, index) => (
+                      <MyChannelGroupRows
+                        key={group.channel.uuid}
+                        group={group}
+                        now={now}
+                        index={offset + index}
+                      />
+                    ))}
                   </ul>
                 </section>
               );
