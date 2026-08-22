@@ -205,6 +205,7 @@ function PageContent() {
 
           <CaseMaintenancePreviewTable
             rows={rows}
+            type={type}
             isLoading={preview.isPending}
             selected={selected}
             onToggle={toggle}

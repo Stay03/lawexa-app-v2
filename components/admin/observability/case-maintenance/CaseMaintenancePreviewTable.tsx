@@ -4,13 +4,29 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { ObservabilityTable } from '../index';
 import { MATCH_METHOD_LABEL } from './status';
-import type { CaseMaintenancePreviewRow } from '@/types/admin-case-maintenance-runs';
+import {
+  cleanupDiffEntries,
+  isCleanupPreviewRow,
+  type CaseMaintenancePreviewRow,
+  type CaseMaintenanceRunType,
+  type CleanupPreviewRow,
+} from '@/types/admin-case-maintenance-runs';
 
 const COLUMNS = [
   { key: 'tick', label: <span className="sr-only">Choose</span>, className: 'w-[1%]' },
   { key: 'case', label: 'Case', className: 'w-[55%]' },
   { key: 'method', label: 'How it would be matched' },
 ];
+
+/* The last column answers a different question per job, so it is LABELLED per
+   job. A cleanup matches nothing — it rewrites our own formatting — and a
+   header reading "How it would be matched" over a column saying "title,
+   citation, slug" asks the reader to reconcile two things that do not go
+   together. */
+const COLUMN_LABEL: Record<CaseMaintenanceRunType, string> = {
+  nwlr_refresh: 'How it would be matched',
+  editorial_cleanup: 'What would change',
+};
 
 /**
  * The cases that qualify, with the tick boxes that choose them.
@@ -30,12 +46,14 @@ const COLUMNS = [
  */
 export function CaseMaintenancePreviewTable({
   rows,
+  type,
   isLoading,
   selected,
   onToggle,
   onToggleAll,
 }: {
   rows: CaseMaintenancePreviewRow[];
+  type: CaseMaintenanceRunType;
   isLoading: boolean;
   selected: ReadonlySet<number>;
   onToggle: (id: number) => void;
@@ -63,7 +81,8 @@ export function CaseMaintenancePreviewTable({
             />
           ),
         },
-        ...COLUMNS.slice(1),
+        COLUMNS[1],
+        { ...COLUMNS[2], label: COLUMN_LABEL[type] },
       ]}
       isLoading={isLoading}
       isEmpty={rows.length === 0}
@@ -93,27 +112,78 @@ export function CaseMaintenancePreviewTable({
                 </div>
               ) : null}
             </TableCell>
-            <TableCell className="text-sm text-muted-foreground">
-              {row.bucket ? MATCH_METHOD_LABEL[row.bucket] : '—'}
-              {/* The part and page the server parsed out of the citation. "Part
-                  613, no page" explains why a case needs a search in a way the
-                  phrase "part only" never will.
-                  
-                  `typeof === 'number'`, NOT `!== null`. On a cleanup preview
-                  these fields are ABSENT rather than null, and `undefined !==
-                  null` is true — so the first version printed "Part , page
-                  undefined" on all 11,612 cleanup rows. Caught only by pointing
-                  at production; every fixture I had written used null. */}
-              {typeof row.part === 'number' ? (
-                <div className="text-xs">
-                  Part {row.part}
-                  {typeof row.page === 'number' ? `, page ${row.page}` : ', no page'}
-                </div>
-              ) : null}
+            <TableCell className="max-w-0 text-sm text-muted-foreground">
+              {isCleanupPreviewRow(row) ? (
+                <CleanupOutcome row={row} />
+              ) : (
+                <>
+                  {row.bucket ? MATCH_METHOD_LABEL[row.bucket] : '—'}
+                  {/* The part and page the server parsed out of the citation.
+                      "Part 613, no page" says why a case needs a search in a
+                      way the phrase "part only" never will. */}
+                  {typeof row.part === 'number' ? (
+                    <div className="text-xs">
+                      Part {row.part}
+                      {typeof row.page === 'number' ? `, page ${row.page}` : ', no page'}
+                    </div>
+                  ) : null}
+                </>
+              )}
             </TableCell>
           </TableRow>
         );
       })}
     </ObservabilityTable>
+  );
+}
+
+/**
+ * What a cleanup would do to one case.
+ *
+ * ── MOST CASES ARE ALREADY FINE, AND THE ROW SHOULD SAY SO ────────────────
+ * 6,544 of 11,612 would not be touched. A row that says nothing leaves the
+ * reader to guess whether it is unchanged or whether we failed to work it out.
+ *
+ * ── AND WHERE IT WOULD CHANGE, IT SHOWS THE CHANGE ────────────────────────
+ * The preview carries the actual before and after per field, which is the
+ * difference between asking somebody to approve "a cleanup" and asking them to
+ * approve a rewrite they can see. The fields are named on the row and the
+ * first rewrite is shown under them; the rest are reachable in the title,
+ * because five stacked diffs per row over 11,612 rows is not a table anybody
+ * can read.
+ */
+function CleanupOutcome({ row }: { row: CleanupPreviewRow }) {
+  const entries = cleanupDiffEntries(row);
+
+  if (row.held_back) {
+    return (
+      <div className="text-amber-700 dark:text-amber-400">
+        Held back
+        <div className="truncate text-xs" title={row.held_back}>
+          {row.held_back}
+        </div>
+      </div>
+    );
+  }
+
+  if (!row.would_change) return <span>No change</span>;
+
+  const [firstField, firstDiff] = entries[0] ?? [];
+  return (
+    <div className="space-y-0.5">
+      <div className="truncate font-medium text-foreground">
+        {row.flags.join(', ') || 'Would change'}
+      </div>
+      {firstField && firstDiff ? (
+        <div
+          className="truncate text-xs"
+          title={entries
+            .map(([field, d]) => [field, d.from ?? '—', d.to ?? '—'].join(' | '))
+            .join(' · ')}
+        >
+          {firstDiff.to ?? '—'}
+        </div>
+      ) : null}
+    </div>
   );
 }

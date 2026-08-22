@@ -222,26 +222,63 @@ export function isNwlrPreviewSummary(
 /**
  * One candidate row in the preview: what you tick.
  *
- * SHAPED AS THE LIVE ENDPOINT ACTUALLY ANSWERS, which is not how the written
- * contract described it. The case is NESTED rather than flattened onto the row,
- * the group is called `bucket` and not `match_method`, and the row carries the
- * part and page it parsed out of the citation — which are worth showing,
- * because "Part 613, no page" explains why a case needs a search far better
- * than the phrase "part only" does.
+ * ── THE TWO JOBS RETURN DIFFERENT ROWS ────────────────────────────────────
+ * Not a variation on one shape — two shapes, sharing only `case`. The written
+ * contract described the NWLR one and never mentioned that a cleanup answers
+ * with something else, which is how a `part` field that never exists on a
+ * cleanup came to be read on every cleanup row.
+ *
+ * A union rather than one type with everything optional, so a screen cannot
+ * reach for `part` on a cleanup row without narrowing first.
  */
-export interface CaseMaintenancePreviewRow {
+export interface NwlrPreviewRow {
   case: CaseMaintenanceItemCase;
   /** Which group it falls into for THIS run — not derivable on our side. */
   bucket: CaseMatchMethod | null;
+  /** Parsed out of the citation. Present on this shape only. */
+  part: number | null;
+  page: number | null;
+  provider_case_id: string | null;
+}
+
+/** One field the cleanup would rewrite, before and after. */
+export interface CleanupFieldDiff {
+  from: string | null;
+  to: string | null;
+}
+
+export interface CleanupPreviewRow {
+  case: CaseMaintenanceItemCase;
+  /** Whether this run would touch the case at all. Most of the corpus: false. */
+  would_change: boolean;
+  /** Set when something stopped it being changed. */
+  held_back: string | null;
+  /** Which fields would be rewritten, e.g. title, citation, slug. */
+  flags: string[];
   /**
-   * Parsed out of the citation, and ABSENT — not null — on a cleanup preview.
-   * Optional here because that is what the wire does; a `| null` type let a
-   * `!== null` guard through and printed "Part , page undefined" on every
-   * cleanup row.
+   * The rewrite itself, per field.
+   *
+   * ARRIVES AS `[]` WHEN EMPTY, not as `{}`. An empty PHP associative array
+   * serialises to a JSON array, so anything reading this must tolerate both
+   * or it will read keys off an array and find none.
    */
-  part?: number | null;
-  page?: number | null;
-  provider_case_id?: string | null;
+  diff: Record<string, CleanupFieldDiff> | never[];
+}
+
+export type CaseMaintenancePreviewRow = NwlrPreviewRow | CleanupPreviewRow;
+
+/** Narrowing helper — the two row shapes share only `case`. */
+export function isCleanupPreviewRow(
+  row: CaseMaintenancePreviewRow,
+): row is CleanupPreviewRow {
+  return 'would_change' in row;
+}
+
+/** The diff as entries, tolerating the empty-array form. */
+export function cleanupDiffEntries(
+  row: CleanupPreviewRow,
+): [string, CleanupFieldDiff][] {
+  return Array.isArray(row.diff) ? [] : Object.entries(row.diff);
 }
 
 export interface CaseMaintenanceStartPayload {
