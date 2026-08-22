@@ -63,16 +63,30 @@ function PageContent() {
   /** True when the reader means "everything that matches", not "these rows". */
   const [wholeSelection, setWholeSelection] = useState(false);
 
+  /* `mode` is required by the endpoint and is not optional sugar: a body
+     without it is refused outright. `nwlr` for the refresh, `all` for the
+     cleanup — those are what the server accepts for "everything that
+     qualifies" in each case. */
   const previewParams = useMemo(
-    () => ({ type, selection: {}, page, per_page: 15 }),
+    () => ({
+      type,
+      selection: (type === 'nwlr_refresh'
+        ? { mode: 'nwlr' as const }
+        : { mode: 'all' as const }),
+      page,
+      per_page: 15,
+    }),
     [type, page],
   );
   const preview = useCaseMaintenancePreview(previewParams);
   const runs = useCaseMaintenanceRuns({ page: 1, per_page: 15 });
   const start = useStartCaseMaintenanceRun();
 
-  const summary = preview.data?.summary;
-  const rows = useMemo(() => preview.data?.data ?? [], [preview.data]);
+  /* Everything preview answers with is nested under `data`, unlike the run
+     list beside it. Measured, not assumed. */
+  const payload = preview.data?.data;
+  const summary = payload?.summary;
+  const rows = useMemo(() => payload?.data ?? [], [payload]);
 
   /* Changing the kind of run throws the ticks away. Keeping them would let
      somebody tick cases under one job and start a different one with them. */
@@ -113,7 +127,11 @@ function PageContent() {
     start.mutate(
       {
         type,
-        selection: wholeSelection ? {} : { case_ids: [...selected] },
+        selection: wholeSelection
+          ? type === 'nwlr_refresh'
+            ? { mode: 'nwlr' as const }
+            : { mode: 'all' as const }
+          : { mode: 'ids' as const, case_ids: [...selected] },
       },
       {
         onSuccess: () => {
@@ -196,9 +214,9 @@ function PageContent() {
             onToggleAll={toggleAll}
           />
 
-          {preview.data?.pagination && preview.data.pagination.total > 0 ? (
+          {payload?.pagination && payload.pagination.total > 0 ? (
             <AdminPagination
-              pagination={preview.data.pagination}
+              pagination={payload.pagination}
               onPageChange={setPage}
               itemLabel="cases"
             />

@@ -8,7 +8,7 @@ import type { CaseMaintenancePreviewRow } from '@/types/admin-case-maintenance-r
 
 const COLUMNS = [
   { key: 'tick', label: <span className="sr-only">Choose</span>, className: 'w-[1%]' },
-  { key: 'case', label: 'Case' },
+  { key: 'case', label: 'Case', className: 'w-[55%]' },
   { key: 'method', label: 'How it would be matched' },
 ];
 
@@ -41,7 +41,7 @@ export function CaseMaintenancePreviewTable({
   onToggle: (id: number) => void;
   onToggleAll: (ids: number[], select: boolean) => void;
 }) {
-  const pageIds = rows.map((row) => row.id);
+  const pageIds = rows.map((row) => row.case.id);
   const allOnPage = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
   const someOnPage = pageIds.some((id) => selected.has(id));
 
@@ -70,24 +70,40 @@ export function CaseMaintenancePreviewTable({
       emptyText="No cases match that selection"
     >
       {rows.map((row) => {
-        const ticked = selected.has(row.id);
+        const ticked = selected.has(row.case.id);
         return (
-          <TableRow key={row.id} data-state={ticked ? 'selected' : undefined}>
+          <TableRow key={row.case.id} data-state={ticked ? 'selected' : undefined}>
             <TableCell>
               <Checkbox
                 checked={ticked}
-                onCheckedChange={() => onToggle(row.id)}
-                aria-label={`Include ${row.title}`}
+                onCheckedChange={() => onToggle(row.case.id)}
+                aria-label={`Include ${row.case.title}`}
               />
             </TableCell>
-            <TableCell className="max-w-[26rem]">
-              <div className="font-medium">{row.title}</div>
-              {row.citation ? (
-                <div className="text-xs text-muted-foreground">{row.citation}</div>
+            {/* max-w-0 with the declared column width, for the reason the items
+                table records: without it the cell grows to the title and pushes
+                the rest of the row out of view. */}
+            <TableCell className="max-w-0">
+              <div className="truncate font-medium" title={row.case.title}>
+                {row.case.title}
+              </div>
+              {row.case.citation ? (
+                <div className="truncate text-xs text-muted-foreground">
+                  {row.case.citation}
+                </div>
               ) : null}
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
-              {row.match_method ? MATCH_METHOD_LABEL[row.match_method] : '—'}
+              {row.bucket ? MATCH_METHOD_LABEL[row.bucket] : '—'}
+              {/* The part and page the server parsed out of the citation. "Part
+                  613, no page" explains why a case needs a search in a way the
+                  phrase "part only" never will. */}
+              {row.part !== null ? (
+                <div className="text-xs">
+                  Part {row.part}
+                  {row.page !== null ? `, page ${row.page}` : ', no page'}
+                </div>
+              ) : null}
             </TableCell>
           </TableRow>
         );

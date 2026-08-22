@@ -164,13 +164,25 @@ export interface CaseMaintenanceItem {
 /* ── Choosing what to run ──────────────────────────────────────────────────── */
 
 /**
- * What a run is over: the same filter the review screen already sends, or an
- * explicit list of cases the reader ticked.
+ * How the cases for a run are chosen.
+ *
+ * ── `mode` IS REQUIRED, AND IT WAS NOT IN THE WRITTEN CONTRACT ────────────
+ * Measured against the live endpoint on 22 August: a body without it is
+ * refused with 422 `selection.mode field is required`, and the accepted values
+ * are exactly `nwlr`, `all` and `ids`. The shape agreed in the channel had
+ * only `filter` and `case_ids`, so every call built from it fails.
+ *
+ * Kept as a discriminated union rather than three optional fields, because
+ * "mode: ids with no case_ids" is its own 422 and the type should make that
+ * unrepresentable rather than leave it to be discovered at runtime.
  */
-export interface CaseMaintenanceSelection {
-  filter?: Record<string, unknown>;
-  case_ids?: number[];
-}
+export type CaseMaintenanceSelection =
+  /** Every case that qualifies for an NWLR refresh. */
+  | { mode: 'nwlr' }
+  /** Every case in scope for the chosen job. */
+  | { mode: 'all' }
+  /** Exactly these cases — what the tick boxes produce. */
+  | { mode: 'ids'; case_ids: number[] };
 
 export interface CaseMaintenancePreviewParams {
   type: CaseMaintenanceRunType;
@@ -207,16 +219,23 @@ export function isNwlrPreviewSummary(
   return 'exact_key' in summary;
 }
 
-/** One candidate row in the preview: what you tick. */
+/**
+ * One candidate row in the preview: what you tick.
+ *
+ * SHAPED AS THE LIVE ENDPOINT ACTUALLY ANSWERS, which is not how the written
+ * contract described it. The case is NESTED rather than flattened onto the row,
+ * the group is called `bucket` and not `match_method`, and the row carries the
+ * part and page it parsed out of the citation — which are worth showing,
+ * because "Part 613, no page" explains why a case needs a search far better
+ * than the phrase "part only" does.
+ */
 export interface CaseMaintenancePreviewRow {
-  id: number;
-  title: string;
-  citation: string | null;
-  slug: string;
+  case: CaseMaintenanceItemCase;
   /** Which group it falls into for THIS run — not derivable on our side. */
-  match_method: CaseMatchMethod | null;
-  /** What the review screen already says is wrong with it. */
-  problems?: { key: string; label: string }[];
+  bucket: CaseMatchMethod | null;
+  part: number | null;
+  page: number | null;
+  provider_case_id: string | null;
 }
 
 export interface CaseMaintenanceStartPayload {

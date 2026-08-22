@@ -17,11 +17,22 @@ import type {
   CaseMaintenanceStartPayload,
 } from '@/types/admin-case-maintenance-runs';
 
-/** What `preview` answers with: counts over the whole selection, plus a page. */
-export interface CaseMaintenancePreviewResponse
-  extends PaginatedResponse<CaseMaintenancePreviewRow> {
+/**
+ * What `preview` answers with: counts over the whole selection, plus a page.
+ *
+ * NESTED UNDER `data`, unlike every other call here. Measured on the live
+ * endpoint — the summary, the rows and the paging all sit inside `data` rather
+ * than beside it, while `GET /` uses the ordinary envelope. Written as it is
+ * rather than as the contract described it.
+ */
+export interface CaseMaintenancePreviewPayload {
   summary: CaseMaintenancePreviewSummary;
+  data: CaseMaintenancePreviewRow[];
+  pagination: PaginatedResponse<CaseMaintenancePreviewRow>['pagination'];
 }
+
+export type CaseMaintenancePreviewResponse =
+  ApiResponse<CaseMaintenancePreviewPayload>;
 
 /**
  * What would run, and what it would cost — WITHOUT touching anything.
