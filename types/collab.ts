@@ -380,6 +380,36 @@ export interface Channel {
    *  members still receive it (mute kills the unread rollup, never a direct
    *  mention badge). */
   mention_count?: number;
+  /**
+   * How many threads in this channel the CALLER IS IN, and the unread and
+   * mention totals across exactly those threads (backend `ac5b596`, live on
+   * production 2026-08-22T01:20Z). Members-only, gated like `unread_count`.
+   *
+   * ── WHY THEY EXIST ─────────────────────────────────────────────────────
+   * The grouped "My channels" list draws three threads under a channel and
+   * collapses the rest. Without these, the button could only say "See more":
+   * the screen holds one page of threads, so the number it is NOT drawing is
+   * not the number that exist. Measured the day they landed — `general`
+   * reports 5 while that page held 4.
+   *
+   * More importantly the collapse would HIDE MENTIONS. A message addressed to
+   * you could sit behind a button that said nothing about it.
+   *
+   * ── THEY COUNT THE SAME THREADS THE BUTTON OPENS ───────────────────────
+   * Threads you are IN — not every thread in the channel — deliberately, so
+   * the number and the list it opens describe one population. The backend's
+   * first cut ordered channels using every thread while counting only joined
+   * ones, which made a channel climb the list on a thread you are not in and
+   * then open empty; that is fixed, and there is a test that fails if the two
+   * rules drift apart. Verified here against the live list on both my
+   * channels: 16/16 threads, 851/851 unread, 127/127 mentions.
+   *
+   * Muted threads are INCLUDED, matching the list, because a muted row is
+   * drawn dimmed with its mention badge at full strength rather than hidden.
+   */
+  my_threads_count?: number;
+  my_threads_unread_count?: number;
+  my_threads_mention_count?: number;
   active_members_count: number;
   last_message_at: string | null;
   /**

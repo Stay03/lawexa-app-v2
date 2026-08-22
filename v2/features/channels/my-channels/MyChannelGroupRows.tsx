@@ -1,10 +1,11 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { CountBadge, FOCUS_RING, UnreadDot } from '@/v2/shell/designs/modules';
 import { MyChannelRow } from './MyChannelRow';
 import { MyThreadRow } from './MyThreadRow';
 import type { MyChannelGroup } from './model';
@@ -38,24 +39,32 @@ import type { MyChannelGroup } from './model';
  * One border on the block, not one per row, so it cannot break into dashes
  * between rows of different heights.
  *
- * ── "SEE MORE" AND WHY IT DOES NOT SAY A NUMBER YET ────────────────────────
- * The button reveals the threads this screen ALREADY HOLDS and is not drawing.
- * It deliberately does not claim a count. The screen holds only the newest page
- * of threads, so the number it is not drawing is not the number that exist — a
- * channel can have forty and have sent us three.
+ * ── THE BUTTON SAYS WHAT IS BEHIND IT, INCLUDING WHO WANTS YOU ────────────
+ * "4 more", and if any of those four are unread it carries the dot, and if any
+ * of them name you it carries the count. That last part is the reason the whole
+ * thing was asked for: collapsing threads without it would hide a message
+ * addressed to the reader behind a button that said nothing about it, which is
+ * strictly worse than the flat list this replaces.
  *
- * @backendclaude is adding a real per-channel count (threads you are in, unread
- * among them, mentions among them). When it lands this becomes "4 more" and
- * carries the unread dot and the mention badge, which is the part that matters:
- * without them, collapsing threads would hide a message addressed to you behind
- * a button that says nothing. Until then a silent "See more" is the honest
- * version — a number we cannot stand behind is worse than no number.
+ * The numbers come from the SERVER (`my_threads_count` and its two siblings,
+ * live 2026-08-22), never from counting the rows we hold. This screen holds one
+ * page of the newest threads across every channel, so what it holds for any one
+ * channel can be short of the truth — measured the day the fields landed,
+ * `general` reported 5 while this screen held 4. Counting locally would quietly
+ * under-report, and the thing under-reported would be a mention.
  *
- * ── IT EXPANDS IN PLACE ────────────────────────────────────────────────────
- * Pressing it shows the rest of what we hold, right there, rather than
- * navigating away. A reader triaging their channels is mid-scan; sending them
- * to another screen for two more rows loses their place for information that
- * was already in memory.
+ * A payload without those fields draws the old silent "See more" rather than a
+ * guess.
+ *
+ * ── IT EXPANDS IN PLACE, THEN IT HANDS OVER ────────────────────────────────
+ * Pressing it shows the rest of what we HOLD, right there. A reader triaging
+ * their channels is mid-scan, and sending them to another screen for two rows
+ * that were already in memory loses their place for nothing.
+ *
+ * But when everything held is on screen and the server still says there are
+ * more, there is nothing left to expand — so the control stops being a button
+ * and becomes a link into the channel's own thread list, which can page through
+ * all of them. A button that silently does nothing is the outcome to avoid.
  */
 export const MyChannelGroupRows = memo(function MyChannelGroupRows({
   group,
@@ -70,7 +79,31 @@ export const MyChannelGroupRows = memo(function MyChannelGroupRows({
 }) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? [...group.threads, ...group.rest] : group.threads;
-  const hidden = expanded ? 0 : group.rest.length;
+
+  /* What is genuinely still hidden: the server's total minus what is drawn.
+     Falls back to the rows we hold when the server sent no total, so an older
+     payload still gets a working control rather than none. */
+  const remaining =
+    group.total === null
+      ? expanded
+        ? 0
+        : group.rest.length
+      : Math.max(0, group.total - shown.length);
+
+  /* More exist than we were sent, so expanding cannot reach them. */
+  const beyondWhatWeHold = expanded || remaining > group.rest.length;
+  const unreadHidden = (group.hiddenUnread ?? 0) > 0;
+  const mentionsHidden = group.hiddenMentions ?? 0;
+
+  const label = (
+    <MoreLabel
+      remaining={remaining}
+      known={group.total !== null}
+      unread={unreadHidden}
+      mentions={mentionsHidden}
+      channel={group.channel.name}
+    />
+  );
 
   return (
     <>
@@ -81,7 +114,7 @@ export const MyChannelGroupRows = memo(function MyChannelGroupRows({
         activityAt={group.activityAt}
       />
 
-      {shown.length > 0 || hidden > 0 ? (
+      {shown.length > 0 || remaining > 0 ? (
         <li className="pb-1">
           <div className="ml-5 border-l border-border/70 pl-2">
             <ul className="flex flex-col divide-y divide-border/40">
@@ -96,22 +129,25 @@ export const MyChannelGroupRows = memo(function MyChannelGroupRows({
               ))}
             </ul>
 
-            {hidden > 0 ? (
-              <button
-                type="button"
-                onClick={() => setExpanded(true)}
-                className={cn(
-                  'flex w-full items-center gap-1.5 rounded-lg px-2 py-2',
-                  'text-left text-xs font-medium text-muted-foreground',
-                  'transition-colors duration-150 hover:bg-secondary/50 hover:text-foreground',
-                  'motion-reduce:transition-none v2-interactive',
-                  FOCUS_RING,
-                )}
-              >
-                <ChevronDown aria-hidden className="h-3.5 w-3.5" />
-                {/* No count. See the note above — we cannot stand behind one yet. */}
-                See more
-              </button>
+            {remaining > 0 ? (
+              beyondWhatWeHold ? (
+                <Link
+                  href={`/channels/${group.channel.uuid}?panel=threads&mine=1`}
+                  className={MORE_CLASS}
+                >
+                  <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                  {label}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setExpanded(true)}
+                  className={MORE_CLASS}
+                >
+                  <ChevronDown aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                  {label}
+                </button>
+              )
             ) : null}
           </div>
         </li>
@@ -119,3 +155,57 @@ export const MyChannelGroupRows = memo(function MyChannelGroupRows({
     </>
   );
 });
+
+const MORE_CLASS = cn(
+  'flex w-full items-center gap-1.5 rounded-lg px-2 py-2',
+  'text-left text-xs font-medium text-muted-foreground',
+  'transition-colors duration-150 hover:bg-secondary/50 hover:text-foreground',
+  'motion-reduce:transition-none v2-interactive',
+  FOCUS_RING,
+);
+
+/**
+ * What the control says, and the two marks it can carry.
+ *
+ * The dot and the badge are the ones a row already uses, so a reader who has
+ * learnt "gold dot means unread, gold number means somebody said my name" needs
+ * to learn nothing new to read a collapsed group.
+ *
+ * The spoken sentence names the CHANNEL. "4 more", read out of context by a
+ * screen reader, says nothing about which group the reader is standing in.
+ */
+function MoreLabel({
+  remaining,
+  known,
+  unread,
+  mentions,
+  channel,
+}: {
+  remaining: number;
+  known: boolean;
+  unread: boolean;
+  mentions: number;
+  channel: string;
+}) {
+  const spokenCount = known
+    ? `${remaining} more ${remaining === 1 ? 'thread' : 'threads'} in ${channel}`
+    : `More threads in ${channel}`;
+  const spokenSignal =
+    mentions > 0 ? `, ${mentions} mentioning you` : unread ? ', some unread' : '';
+
+  return (
+    <>
+      <span aria-hidden className="flex-1">
+        {known ? `${remaining} more` : 'See more'}
+      </span>
+      <span className="sr-only">{spokenCount + spokenSignal}</span>
+      {mentions > 0 ? (
+        /* Label emptied: the sentence above already says it, and CountBadge's
+           own label would repeat the number a second time to a screen reader. */
+        <CountBadge count={mentions} label="" />
+      ) : unread ? (
+        <UnreadDot />
+      ) : null}
+    </>
+  );
+}

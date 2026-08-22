@@ -149,13 +149,31 @@ export interface MyChannelGroup {
    */
   rest: Channel[];
   /**
-   * Threads we HOLD for this channel and are not drawing. NOT the true
-   * remainder: the screen only ever holds the newest page of threads, so a
-   * channel can have more that never arrived. `0` therefore means "nothing
-   * more that we know of", never "nothing more". The button says "See more"
-   * rather than a number until the server sends a real count per channel.
+   * Threads we HOLD for this channel and are not drawing. Not the true
+   * remainder — see {@link total}.
    */
   hiddenHeld: number;
+  /**
+   * How many threads in this channel the reader is in, ACCORDING TO THE
+   * SERVER, or `null` from a payload that predates the field.
+   *
+   * This is the number the button can stand behind. What the screen holds is
+   * one page of the newest threads across every channel, so `hiddenHeld` can
+   * be smaller than the truth: measured the day the field landed, `general`
+   * reported 5 threads while this screen held 4 of them.
+   */
+  total: number | null;
+  /**
+   * Unread messages and mentions sitting in the threads NOT currently drawn —
+   * the server's totals for this channel minus what is on screen.
+   *
+   * This is the whole reason the counts were asked for. Collapsing threads
+   * behind a button would otherwise hide a message that names you, with
+   * nothing on the button to say so. `null` when the server did not send the
+   * totals, which draws no dot rather than a wrong one.
+   */
+  hiddenUnread: number | null;
+  hiddenMentions: number | null;
   /** The clock this heading is ranked on. See {@link groupMyRooms}. */
   activityAt: string;
 }
@@ -246,6 +264,9 @@ export function groupMyRooms(
       threads: [],
       rest: [],
       hiddenHeld: 0,
+      total: null,
+      hiddenUnread: null,
+      hiddenMentions: null,
       activityAt: roomActivityAt(thread),
     });
   }
@@ -266,11 +287,32 @@ function buildGroup(channel: Channel, bucket: readonly Channel[]): MyChannelGrou
     },
     roomActivityAt(channel),
   );
+  const shown = ordered.slice(0, THREADS_PER_CHANNEL);
+
+  /* SUBTRACTED FROM THE SERVER'S TOTAL, not summed over the rows we are not
+     drawing. Those are two different numbers: the rows we hold are one page,
+     so summing them would under-report a channel whose older threads never
+     arrived — and under-reporting is the failure that matters, because the
+     thing being under-reported is a message addressed to the reader.
+     Clamped at 0: a total that briefly lags a live unread write should draw
+     no badge, never a negative one. */
+  const sum = (rows: readonly Channel[], field: 'unread_count' | 'mention_count') =>
+    rows.reduce((n, row) => n + (row[field] ?? 0), 0);
+
+  const total = channel.my_threads_count ?? null;
+  const unreadTotal = channel.my_threads_unread_count ?? null;
+  const mentionTotal = channel.my_threads_mention_count ?? null;
+
   return {
     channel,
-    threads: ordered.slice(0, THREADS_PER_CHANNEL),
+    threads: shown,
     rest: ordered.slice(THREADS_PER_CHANNEL),
     hiddenHeld: Math.max(0, ordered.length - THREADS_PER_CHANNEL),
+    total,
+    hiddenUnread:
+      unreadTotal === null ? null : Math.max(0, unreadTotal - sum(shown, 'unread_count')),
+    hiddenMentions:
+      mentionTotal === null ? null : Math.max(0, mentionTotal - sum(shown, 'mention_count')),
     activityAt: newest,
   };
 }
