@@ -233,9 +233,15 @@ export interface CaseMaintenancePreviewRow {
   case: CaseMaintenanceItemCase;
   /** Which group it falls into for THIS run — not derivable on our side. */
   bucket: CaseMatchMethod | null;
-  part: number | null;
-  page: number | null;
-  provider_case_id: string | null;
+  /**
+   * Parsed out of the citation, and ABSENT — not null — on a cleanup preview.
+   * Optional here because that is what the wire does; a `| null` type let a
+   * `!== null` guard through and printed "Part , page undefined" on every
+   * cleanup row.
+   */
+  part?: number | null;
+  page?: number | null;
+  provider_case_id?: string | null;
 }
 
 export interface CaseMaintenanceStartPayload {

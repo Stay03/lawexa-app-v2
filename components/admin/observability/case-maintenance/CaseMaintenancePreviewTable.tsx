@@ -97,11 +97,17 @@ export function CaseMaintenancePreviewTable({
               {row.bucket ? MATCH_METHOD_LABEL[row.bucket] : '—'}
               {/* The part and page the server parsed out of the citation. "Part
                   613, no page" explains why a case needs a search in a way the
-                  phrase "part only" never will. */}
-              {row.part !== null ? (
+                  phrase "part only" never will.
+                  
+                  `typeof === 'number'`, NOT `!== null`. On a cleanup preview
+                  these fields are ABSENT rather than null, and `undefined !==
+                  null` is true — so the first version printed "Part , page
+                  undefined" on all 11,612 cleanup rows. Caught only by pointing
+                  at production; every fixture I had written used null. */}
+              {typeof row.part === 'number' ? (
                 <div className="text-xs">
                   Part {row.part}
-                  {row.page !== null ? `, page ${row.page}` : ', no page'}
+                  {typeof row.page === 'number' ? `, page ${row.page}` : ', no page'}
                 </div>
               ) : null}
             </TableCell>

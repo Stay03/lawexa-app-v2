@@ -82,11 +82,8 @@ function PageContent() {
   const runs = useCaseMaintenanceRuns({ page: 1, per_page: 15 });
   const start = useStartCaseMaintenanceRun();
 
-  /* Everything preview answers with is nested under `data`, unlike the run
-     list beside it. Measured, not assumed. */
-  const payload = preview.data?.data;
-  const summary = payload?.summary;
-  const rows = useMemo(() => payload?.data ?? [], [payload]);
+  const summary = preview.data?.summary;
+  const rows = useMemo(() => preview.data?.data ?? [], [preview.data]);
 
   /* Changing the kind of run throws the ticks away. Keeping them would let
      somebody tick cases under one job and start a different one with them. */
@@ -214,9 +211,9 @@ function PageContent() {
             onToggleAll={toggleAll}
           />
 
-          {payload?.pagination && payload.pagination.total > 0 ? (
+          {preview.data?.pagination && preview.data.pagination.total > 0 ? (
             <AdminPagination
-              pagination={payload.pagination}
+              pagination={preview.data.pagination}
               onPageChange={setPage}
               itemLabel="cases"
             />

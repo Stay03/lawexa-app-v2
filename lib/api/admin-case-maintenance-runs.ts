@@ -18,21 +18,27 @@ import type {
 } from '@/types/admin-case-maintenance-runs';
 
 /**
- * What `preview` answers with: counts over the whole selection, plus a page.
+ * What `preview` answers with: the ordinary list envelope, plus the counts.
  *
- * NESTED UNDER `data`, unlike every other call here. Measured on the live
- * endpoint — the summary, the rows and the paging all sit inside `data` rather
- * than beside it, while `GET /` uses the ordinary envelope. Written as it is
- * rather than as the contract described it.
+ * ── IT ANSWERS LIKE EVERY OTHER LIST, AND THAT WAS WORTH ONE MORE PASS ────
+ * It briefly did not. The first build nested everything a level deeper, so the
+ * rows were reached at `data.data` while every other list in admin puts them at
+ * `data`. Measured, reported, and changed on the backend the same afternoon
+ * rather than left.
+ *
+ * The reason it was worth changing for the sake of ten minutes here: the next
+ * person building an admin list copies one that exists. If this were the odd
+ * one, the mistake it teaches is reading `data.data` on a list that has no such
+ * thing — which yields `undefined`, draws an empty table, and raises no error
+ * at all.
+ *
+ * The summary sits BESIDE the rows, which is the pattern the trending endpoint
+ * already used for exactly this case: a list that needs extra numbers with it.
  */
-export interface CaseMaintenancePreviewPayload {
+export interface CaseMaintenancePreviewResponse
+  extends PaginatedResponse<CaseMaintenancePreviewRow> {
   summary: CaseMaintenancePreviewSummary;
-  data: CaseMaintenancePreviewRow[];
-  pagination: PaginatedResponse<CaseMaintenancePreviewRow>['pagination'];
 }
-
-export type CaseMaintenancePreviewResponse =
-  ApiResponse<CaseMaintenancePreviewPayload>;
 
 /**
  * What would run, and what it would cost — WITHOUT touching anything.
