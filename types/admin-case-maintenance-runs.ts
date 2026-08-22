@@ -194,7 +194,40 @@ export interface CaseMaintenanceItemDetail {
   case_slug?: string | null;
   /** How the end of the judgment text was found. */
   boundary_confidence?: string | null;
-  reference?: string | null;
+  reference?: CaseMaintenanceReference | null;
+}
+
+/**
+ * What we managed to read out of OUR OWN citation before going to the provider.
+ *
+ * ── IT SEPARATES THE TWO WAYS A CASE GOES UNMATCHED ───────────────────────
+ * The error line alone cannot tell them apart, and they need opposite fixes:
+ *
+ *  - `part: null` with `mentions_nwlr: true` — the citation names NWLR but
+ *    carries no part or page. Nothing was ever asked of the provider; the
+ *    reference is somewhere we did not look, usually the title.
+ *  - a part and page, with a 404 beside it — we asked, and the provider had
+ *    nothing there. Either their library lacks it or our part number is wrong.
+ */
+export interface CaseMaintenanceReference {
+  key?: string | null;
+  part?: number | null;
+  page?: number | null;
+  /** True when the citation mentions NWLR at all, parseable or not. */
+  mentions_nwlr?: boolean;
+}
+
+/**
+ * The detail of an item, or nothing — with `[]` treated as nothing.
+ *
+ * Two of the four items in the owner's run carried `detail: []`. See the field
+ * itself for why an empty record arrives as a list.
+ */
+export function caseMaintenanceDetail(
+  detail: CaseMaintenanceItemDetail | unknown[] | null,
+): CaseMaintenanceItemDetail | null {
+  if (!detail || Array.isArray(detail)) return null;
+  return detail;
 }
 
 export interface CaseMaintenanceItem {
@@ -204,8 +237,15 @@ export interface CaseMaintenanceItem {
   match_method: CaseMatchMethod | null;
   /** What it matched to at the provider, when it matched. */
   provider_case_id: string | null;
-  /** See {@link CaseMaintenanceItemDetail} — an object, never a string. */
-  detail: CaseMaintenanceItemDetail | null;
+  /**
+   * See {@link CaseMaintenanceItemDetail} — an object, never a string.
+   *
+   * AN EMPTY ONE ARRIVES AS `[]`, NOT `{}`, because PHP serialises an empty
+   * associative array as a JSON list. A `!detail` guard passes it straight
+   * through — `[]` is truthy — and every field then reads `undefined`. Read it
+   * through {@link caseMaintenanceDetail}, never directly.
+   */
+  detail: CaseMaintenanceItemDetail | unknown[] | null;
   error: string | null;
   status_code: number | null;
   started_at: string | null;

@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { ObservabilityTable, ErrorCell, StatusBadge } from '../index';
 import { itemStatusMeta, matchMethodLabel } from './status';
-import type {
-  CaseMaintenanceItem,
-  CaseMaintenanceItemDetail,
+import {
+  caseMaintenanceDetail,
+  type CaseMaintenanceItem,
+  type CaseMaintenanceItemDetail,
+  type CaseMaintenanceReference,
 } from '@/types/admin-case-maintenance-runs';
 
 /* FOUR COLUMNS, NOT FIVE, AND THE WIDTHS ARE DECLARED.
@@ -98,25 +100,13 @@ export function CaseMaintenanceItemsTable({
             </TableCell>
 
             <TableCell className="max-w-0 text-sm">
-              {item.error ? (
-                <div className="space-y-0.5">
-                  <ErrorCell error={item.error} />
-                  {/* The shared cell carries the message only. The status code
-                      is sent on every failure precisely so a person can tell a
-                      provider outage from a case we simply could not find, so
-                      it is drawn rather than dropped. */}
-                  {item.status_code !== null ? (
-                    <span className="block text-xs text-muted-foreground">
-                      HTTP {item.status_code}
-                    </span>
-                  ) : null}
-                </div>
-              ) : (
-                /* The evidence a person judges the match on, and the judgment
-                   is permanent — so it is drawn as readable words rather than
-                   dumped as a value. See `ItemDetail`. */
-                <ItemDetail detail={item.detail} />
-              )}
+              {/* The error and the evidence are drawn TOGETHER, not as
+                  alternatives — see `ItemDetail`. */}
+              <ItemDetail
+                detail={caseMaintenanceDetail(item.detail)}
+                error={item.error}
+                statusCode={item.status_code}
+              />
             </TableCell>
 
             <TableCell>
@@ -157,23 +147,39 @@ export function CaseMaintenanceItemsTable({
  *
  * ── IT IS AN OBJECT, AND RENDERING IT DIRECTLY WHITE-SCREENED THE PAGE ────
  * `detail` was documented as free text and is not: it carries `changed`, an
- * `evidence` record, `case_slug` and `boundary_confidence`. Printed straight
- * into the row, React threw error #31 and the owner lost the whole run page
- * mid-run. So nothing here renders an unknown value directly.
+ * `evidence` record, a `reference`, `case_slug` and `boundary_confidence`.
+ * Printed straight into the row, React threw error #31 and the owner lost the
+ * whole run page mid-run. So nothing here renders an unknown value directly.
  *
- * ── WHAT IS WORTH SHOWING, AND WHY THESE THREE ────────────────────────────
- * The evidence answers the only question that matters on a conflict: WHICH
- * parts agreed. A case whose citation matched but whose titles did not is
- * precisely the one a person should rule on — "Abacha v Fawehinmi" against
- * "Abacha v. Fawehinmi" is the same case; a different name entirely is not.
- * So the three comparisons are named plainly, and the two titles are put side
- * by side underneath, because that is the comparison being made.
+ * ── THE ERROR AND THE EVIDENCE ARE NOT ALTERNATIVES ───────────────────────
+ * This cell used to show one OR the other, and a refused row is exactly the
+ * row that has both. Every conflict in the owner's runs reads "the fetched
+ * document does not agree" while its own evidence says the citation matched
+ * and the keys are identical — the disagreement is `v` against `v.` and a year
+ * taken from the wrong line. Showing only the sentence hides the one thing
+ * that would tell him the refusal is wrong.
+ *
+ * ── AND WHEN THERE IS NO EVIDENCE, THERE IS STILL A REASON ────────────────
+ * A case that never reached the provider carries a `reference` instead: what
+ * we read out of our own citation. "The citation names NWLR but carries no
+ * part or page" and "we asked for Part 60, page 196 and got a 404" are
+ * different problems with different owners, and the error sentence alone does
+ * not separate them.
  */
-function ItemDetail({ detail }: { detail: CaseMaintenanceItemDetail | null }) {
-  if (!detail) return <span className="text-muted-foreground">—</span>;
+function ItemDetail({
+  detail,
+  error,
+  statusCode,
+}: {
+  detail: CaseMaintenanceItemDetail | null;
+  error: string | null;
+  statusCode: number | null;
+}) {
+  const evidence = detail?.evidence;
+  const reference = detail?.reference;
 
-  const e = detail.evidence;
-  if (!e) {
+  if (!error && !evidence) {
+    if (!detail) return <span className="text-muted-foreground">—</span>;
     return (
       <span className="text-muted-foreground">
         {detail.changed ? 'Replaced from NWLR' : 'Nothing changed'}
@@ -181,18 +187,43 @@ function ItemDetail({ detail }: { detail: CaseMaintenanceItemDetail | null }) {
     );
   }
 
+  return (
+    <div className="space-y-0.5">
+      {error ? <ErrorCell error={error} /> : null}
+      {/* The status code is sent on every failure precisely so a person can
+          tell a provider outage from a case we simply could not find. */}
+      {statusCode !== null ? (
+        <span className="block text-xs text-muted-foreground">HTTP {statusCode}</span>
+      ) : null}
+      {evidence ? <Comparison evidence={evidence} /> : null}
+      {!evidence && reference ? <ReferenceLine reference={reference} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Which parts of our record and the fetched document agreed.
+ *
+ * That is the only question that matters on a conflict. A case whose citation
+ * matched but whose titles did not is precisely the one a person should rule
+ * on — "Abacha v Fawehinmi" against "Abacha v. Fawehinmi" is the same case; a
+ * different name entirely is not. So the three comparisons are named plainly,
+ * and the two titles are put side by side underneath, because that is the
+ * comparison being made.
+ */
+function Comparison({ evidence }: { evidence: NonNullable<CaseMaintenanceItemDetail['evidence']> }) {
   const agreed: string[] = [];
   const differed: string[] = [];
   const note = (label: string, ok: boolean | undefined) => {
     if (ok === true) agreed.push(label);
     else if (ok === false) differed.push(label);
   };
-  note('citation', e.citation_match);
-  note('year', e.year_match);
-  note('title', e.title_match);
+  note('citation', evidence.citation_match);
+  note('year', evidence.year_match);
+  note('title', evidence.title_match);
 
   return (
-    <div className="space-y-0.5">
+    <>
       <div className="truncate">
         {agreed.length > 0 ? (
           <span className="text-emerald-700 dark:text-emerald-400">
@@ -207,14 +238,33 @@ function ItemDetail({ detail }: { detail: CaseMaintenanceItemDetail | null }) {
         ) : null}
       </div>
       {/* The two titles, which is the comparison a person is actually making. */}
-      {e.document_title ? (
+      {evidence.document_title ? (
         <div
           className="truncate text-xs text-muted-foreground"
-          title={`Ours: ${e.our_title ?? '—'} | Theirs: ${e.document_title}`}
+          title={`Ours: ${evidence.our_title ?? '—'} | Theirs: ${evidence.document_title}`}
         >
-          Theirs: {e.document_title}
+          Theirs: {evidence.document_title}
         </div>
       ) : null}
-    </div>
+    </>
+  );
+}
+
+/** What we read out of our own citation, for a case that never got matched. */
+function ReferenceLine({ reference }: { reference: CaseMaintenanceReference }) {
+  if (typeof reference.part === 'number') {
+    return (
+      <span className="block text-xs text-muted-foreground">
+        Asked for Part {reference.part}
+        {typeof reference.page === 'number' ? `, page ${reference.page}` : ', no page'}
+      </span>
+    );
+  }
+  return (
+    <span className="block text-xs text-muted-foreground">
+      {reference.mentions_nwlr
+        ? 'The citation names NWLR but carries no part or page'
+        : 'No NWLR citation to look up'}
+    </span>
   );
 }
