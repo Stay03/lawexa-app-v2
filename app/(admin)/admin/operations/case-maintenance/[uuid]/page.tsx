@@ -194,7 +194,7 @@ export default function CaseMaintenanceRunPage({
             <AdminPagination
               pagination={itemsQuery.data.pagination}
               onPageChange={setPage}
-              itemLabel="case"
+              itemLabel="cases"
             />
           ) : null}
         </CardContent>

@@ -200,7 +200,7 @@ function PageContent() {
             <AdminPagination
               pagination={preview.data.pagination}
               onPageChange={setPage}
-              itemLabel="case"
+              itemLabel="cases"
             />
           ) : null}
 

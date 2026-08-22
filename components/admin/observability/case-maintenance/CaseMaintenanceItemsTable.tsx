@@ -9,12 +9,20 @@ import { ObservabilityTable, ErrorCell, StatusBadge } from '../index';
 import { MATCH_METHOD_LABEL, itemStatusMeta } from './status';
 import type { CaseMaintenanceItem } from '@/types/admin-case-maintenance-runs';
 
+/* FOUR COLUMNS, NOT FIVE, AND THE WIDTHS ARE DECLARED.
+   Filmed at 1280 with real-length case titles, the five-column version pushed
+   the actions column off the side of the table: both decision buttons were in
+   the DOM — which is all an assertion for them proves — and neither could be
+   seen or pressed. The long titles also ran under the status badge.
+   "Matched by" was the column to lose: for a row awaiting a decision it always
+   reads "Matched by title only", which is the only reason such a row exists,
+   so it was spending a column to repeat the status. It moves under the title
+   for the rows where it varies. */
 const COLUMNS = [
-  { key: 'case', label: 'Case' },
-  { key: 'status', label: 'Status' },
-  { key: 'method', label: 'Matched by' },
+  { key: 'case', label: 'Case', className: 'w-[38%]' },
+  { key: 'status', label: 'Status', className: 'w-[14%]' },
   { key: 'detail', label: 'What happened', className: 'w-[30%]' },
-  { key: 'act', label: '', className: 'w-[1%]' },
+  { key: 'act', label: <span className="sr-only">Decide</span>, className: 'w-[18%] text-right' },
 ];
 
 /**
@@ -62,29 +70,31 @@ export function CaseMaintenanceItemsTable({
         const busy = decidingId === item.id;
         return (
           <TableRow key={item.id}>
-            <TableCell className="max-w-[22rem]">
+            {/* `max-w-0` with a declared column width is what actually makes a
+                table cell truncate: without it the cell grows to its content and
+                pushes everything after it out of view. */}
+            <TableCell className="max-w-0">
               <Link
                 href={`/cases/${item.case.slug}`}
                 target="_blank"
                 rel="noreferrer"
-                className="font-medium underline-offset-4 hover:underline"
+                title={item.case.title}
+                className="block truncate font-medium underline-offset-4 hover:underline"
               >
                 {item.case.title}
               </Link>
-              {item.case.citation ? (
-                <div className="text-xs text-muted-foreground">{item.case.citation}</div>
-              ) : null}
+              <div className="truncate text-xs text-muted-foreground">
+                {[item.case.citation, item.match_method ? MATCH_METHOD_LABEL[item.match_method] : null]
+                  .filter(Boolean)
+                  .join(' · ') || '—'}
+              </div>
             </TableCell>
 
             <TableCell>
               <StatusBadge meta={itemStatusMeta(item.status)} />
             </TableCell>
 
-            <TableCell className="text-sm text-muted-foreground">
-              {item.match_method ? MATCH_METHOD_LABEL[item.match_method] : '—'}
-            </TableCell>
-
-            <TableCell className="text-sm">
+            <TableCell className="max-w-0 text-sm">
               {item.error ? (
                 <div className="space-y-0.5">
                   <ErrorCell error={item.error} />
@@ -99,7 +109,15 @@ export function CaseMaintenanceItemsTable({
                   ) : null}
                 </div>
               ) : (
-                <span className="text-muted-foreground">{item.detail ?? '—'}</span>
+                /* WRAPPED TO TWO LINES, NOT TRUNCATED TO ONE. This is the
+                   evidence a person judges the match on, and the judgment is
+                   permanent. Truncating it to "NWLR offers \"Savannah Bank v..."
+                   makes hovering a precondition for deciding safely, which is
+                   how a screen ends up collecting rubber stamps. Two lines fits
+                   the candidate title and citation, which is the whole of it. */
+                <span className="line-clamp-2 text-muted-foreground">
+                  {item.detail ?? '—'}
+                </span>
               )}
             </TableCell>
 
