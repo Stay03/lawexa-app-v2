@@ -17,6 +17,12 @@ import { useStatuteImportSummary } from '@/lib/hooks/useAdminStatuteImports';
 import { failureRate } from '@/types/admin-radar-scans';
 
 const SIBLING_LINKS = [
+  /* Listed here rather than as a health card above, deliberately: the cards
+     are driven by a summary endpoint that says how a job type is doing, and
+     case maintenance has no such endpoint. A card showing nothing would look
+     like a job type with no activity rather than one that cannot be summarised
+     yet. */
+  { title: 'Case Maintenance', href: '/admin/operations/case-maintenance' },
   { title: 'Case Enrichment', href: '/admin/cases/enrichments' },
   { title: 'Principle Review', href: '/admin/cases/principle-review' },
   { title: 'Quiz Generation', href: '/admin/quiz/generation' },
