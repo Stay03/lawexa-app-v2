@@ -90,13 +90,21 @@ export const CLEANUP_ONLY_EXCLUDED_ITEM_STATUSES: CaseMaintenanceItemStatus[] = 
   'no_match',
 ];
 
-/** How a case was tied to a document at the provider. */
-export type CaseMatchMethod =
-  | 'exact_key'
-  | 'part_only'
-  | 'title_only'
-  | 'already_refreshed'
-  | 'no_reference';
+/**
+ * How a case was tied to a document at the provider.
+ *
+ * TWO VOCABULARIES, and they are not the same one. The PREVIEW groups a case
+ * into a bucket before anything runs — `exact_key`, `part_only`, `title_only`
+ * and so on. A finished ITEM reports how it was matched in the end, and uses
+ * different words: `citation_key` is what a completed item carries where the
+ * preview said `exact_key`.
+ *
+ * Kept as one open-ended lookup rather than a closed union, because a label
+ * this screen has never seen must degrade to showing the raw value rather than
+ * rendering nothing. The first version was a closed union and a real
+ * `citation_key` fell straight through it into a blank cell.
+ */
+export type CaseMatchMethod = string;
 
 /**
  * How many items are in each state.
@@ -146,6 +154,49 @@ export interface CaseMaintenanceItemCase {
   slug: string;
 }
 
+/**
+ * Why the server reached the conclusion it did, field by field.
+ *
+ * This is what makes a decision judgeable rather than a guess: our title and
+ * year against the document's, and whether each agreed. A person looking at a
+ * conflict can see that the citation matched and the titles did not, which is
+ * exactly the case where a human should be the one to say yes.
+ */
+export interface CaseMaintenanceEvidence {
+  our_key?: string | null;
+  our_year?: number | null;
+  our_title?: string | null;
+  year_match?: boolean;
+  title_match?: boolean;
+  citation_match?: boolean;
+  document_year?: number | null;
+  document_title?: string | null;
+  document_stated_key?: string | null;
+  document_stated_citation?: string | null;
+}
+
+/**
+ * What happened to one case.
+ *
+ * ── THIS IS AN OBJECT, NOT A STRING, AND THAT CRASHED THE SCREEN ──────────
+ * The contract called it "free text about what happened". It is not: it is a
+ * structured record carrying `changed`, `evidence`, `case_slug` and
+ * `boundary_confidence`. Typed as a string and rendered directly, React threw
+ * error #31 — objects are not valid as a child — and the run page went white
+ * for the owner while he was watching his first real run.
+ *
+ * Typed from a live payload this time, not from a description of one.
+ */
+export interface CaseMaintenanceItemDetail {
+  /** Whether this case was actually altered, as opposed to merely handled. */
+  changed?: boolean;
+  evidence?: CaseMaintenanceEvidence;
+  case_slug?: string | null;
+  /** How the end of the judgment text was found. */
+  boundary_confidence?: string | null;
+  reference?: string | null;
+}
+
 export interface CaseMaintenanceItem {
   id: number;
   case: CaseMaintenanceItemCase;
@@ -153,8 +204,8 @@ export interface CaseMaintenanceItem {
   match_method: CaseMatchMethod | null;
   /** What it matched to at the provider, when it matched. */
   provider_case_id: string | null;
-  /** Free text about what happened — the candidate on a confirmation, usually. */
-  detail: string | null;
+  /** See {@link CaseMaintenanceItemDetail} — an object, never a string. */
+  detail: CaseMaintenanceItemDetail | null;
   error: string | null;
   status_code: number | null;
   started_at: string | null;

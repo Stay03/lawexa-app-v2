@@ -6,8 +6,11 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { ObservabilityTable, ErrorCell, StatusBadge } from '../index';
-import { MATCH_METHOD_LABEL, itemStatusMeta } from './status';
-import type { CaseMaintenanceItem } from '@/types/admin-case-maintenance-runs';
+import { itemStatusMeta, matchMethodLabel } from './status';
+import type {
+  CaseMaintenanceItem,
+  CaseMaintenanceItemDetail,
+} from '@/types/admin-case-maintenance-runs';
 
 /* FOUR COLUMNS, NOT FIVE, AND THE WIDTHS ARE DECLARED.
    Filmed at 1280 with real-length case titles, the five-column version pushed
@@ -84,7 +87,7 @@ export function CaseMaintenanceItemsTable({
                 {item.case.title}
               </Link>
               <div className="truncate text-xs text-muted-foreground">
-                {[item.case.citation, item.match_method ? MATCH_METHOD_LABEL[item.match_method] : null]
+                {[item.case.citation, item.match_method ? matchMethodLabel(item.match_method) : null]
                   .filter(Boolean)
                   .join(' · ') || '—'}
               </div>
@@ -109,15 +112,10 @@ export function CaseMaintenanceItemsTable({
                   ) : null}
                 </div>
               ) : (
-                /* WRAPPED TO TWO LINES, NOT TRUNCATED TO ONE. This is the
-                   evidence a person judges the match on, and the judgment is
-                   permanent. Truncating it to "NWLR offers \"Savannah Bank v..."
-                   makes hovering a precondition for deciding safely, which is
-                   how a screen ends up collecting rubber stamps. Two lines fits
-                   the candidate title and citation, which is the whole of it. */
-                <span className="line-clamp-2 text-muted-foreground">
-                  {item.detail ?? '—'}
-                </span>
+                /* The evidence a person judges the match on, and the judgment
+                   is permanent — so it is drawn as readable words rather than
+                   dumped as a value. See `ItemDetail`. */
+                <ItemDetail detail={item.detail} />
               )}
             </TableCell>
 
@@ -151,5 +149,72 @@ export function CaseMaintenanceItemsTable({
         );
       })}
     </ObservabilityTable>
+  );
+}
+
+/**
+ * What the server found, in words a person can judge.
+ *
+ * ── IT IS AN OBJECT, AND RENDERING IT DIRECTLY WHITE-SCREENED THE PAGE ────
+ * `detail` was documented as free text and is not: it carries `changed`, an
+ * `evidence` record, `case_slug` and `boundary_confidence`. Printed straight
+ * into the row, React threw error #31 and the owner lost the whole run page
+ * mid-run. So nothing here renders an unknown value directly.
+ *
+ * ── WHAT IS WORTH SHOWING, AND WHY THESE THREE ────────────────────────────
+ * The evidence answers the only question that matters on a conflict: WHICH
+ * parts agreed. A case whose citation matched but whose titles did not is
+ * precisely the one a person should rule on — "Abacha v Fawehinmi" against
+ * "Abacha v. Fawehinmi" is the same case; a different name entirely is not.
+ * So the three comparisons are named plainly, and the two titles are put side
+ * by side underneath, because that is the comparison being made.
+ */
+function ItemDetail({ detail }: { detail: CaseMaintenanceItemDetail | null }) {
+  if (!detail) return <span className="text-muted-foreground">—</span>;
+
+  const e = detail.evidence;
+  if (!e) {
+    return (
+      <span className="text-muted-foreground">
+        {detail.changed ? 'Replaced from NWLR' : 'Nothing changed'}
+      </span>
+    );
+  }
+
+  const agreed: string[] = [];
+  const differed: string[] = [];
+  const note = (label: string, ok: boolean | undefined) => {
+    if (ok === true) agreed.push(label);
+    else if (ok === false) differed.push(label);
+  };
+  note('citation', e.citation_match);
+  note('year', e.year_match);
+  note('title', e.title_match);
+
+  return (
+    <div className="space-y-0.5">
+      <div className="truncate">
+        {agreed.length > 0 ? (
+          <span className="text-emerald-700 dark:text-emerald-400">
+            {agreed.join(' and ')} agree
+          </span>
+        ) : null}
+        {agreed.length > 0 && differed.length > 0 ? ', ' : null}
+        {differed.length > 0 ? (
+          <span className="text-amber-700 dark:text-amber-400">
+            {differed.join(' and ')} differ
+          </span>
+        ) : null}
+      </div>
+      {/* The two titles, which is the comparison a person is actually making. */}
+      {e.document_title ? (
+        <div
+          className="truncate text-xs text-muted-foreground"
+          title={`Ours: ${e.our_title ?? '—'} | Theirs: ${e.document_title}`}
+        >
+          Theirs: {e.document_title}
+        </div>
+      ) : null}
+    </div>
   );
 }

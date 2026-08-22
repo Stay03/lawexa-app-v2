@@ -6,6 +6,7 @@ export {
   runStatusMeta,
   itemStatusMeta,
   MATCH_METHOD_LABEL,
+  matchMethodLabel,
   RUN_TYPE_LABEL,
   RUN_TYPE_DESCRIPTION,
 } from './status';

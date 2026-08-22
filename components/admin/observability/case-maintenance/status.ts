@@ -3,7 +3,6 @@ import type {
   CaseMaintenanceItemStatus,
   CaseMaintenanceRunStatus,
   CaseMaintenanceRunType,
-  CaseMatchMethod,
 } from '@/types/admin-case-maintenance-runs';
 
 /**
@@ -40,14 +39,39 @@ export const itemStatusMeta = makeStatusMeta<CaseMaintenanceItemStatus>({
   no_match: { label: 'Not found', tone: 'warning' },
 });
 
-/** Plain words for how a case was tied to a document at the provider. */
-export const MATCH_METHOD_LABEL: Record<CaseMatchMethod, string> = {
+/**
+ * Plain words for how a case was tied to a document at the provider.
+ *
+ * TWO VOCABULARIES LIVE HERE. The preview groups a case before anything runs
+ * (`exact_key`); a finished item says how it was matched in the end and uses a
+ * different word for the same thing (`citation_key`). Both are listed rather
+ * than one being treated as a typo for the other.
+ */
+const MATCH_METHOD_LABELS: Record<string, string> = {
+  // Preview buckets.
   exact_key: 'Matched by citation',
   part_only: 'Part known, page missing',
   title_only: 'Matched by title only',
   already_refreshed: 'Already refreshed',
   no_reference: 'Nothing to match on',
+  // What a finished item reports.
+  citation_key: 'Matched by citation',
+  title_search: 'Matched by title search',
 };
+
+/**
+ * NEVER RETURNS NOTHING. A value this screen has not met before is shown as
+ * itself rather than as a blank cell — a real `citation_key` fell through the
+ * closed version of this map and left the column empty, which reads as "we do
+ * not know" when the truth was "we were not told".
+ */
+export function matchMethodLabel(method: string | null | undefined): string {
+  if (!method) return '—';
+  return MATCH_METHOD_LABELS[method] ?? method.replace(/_/g, ' ');
+}
+
+/** @deprecated Use {@link matchMethodLabel} — a bare lookup can return nothing. */
+export const MATCH_METHOD_LABEL = MATCH_METHOD_LABELS;
 
 export const RUN_TYPE_LABEL: Record<CaseMaintenanceRunType, string> = {
   nwlr_refresh: 'Refresh from NWLR',

@@ -3,7 +3,7 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { ObservabilityTable } from '../index';
-import { MATCH_METHOD_LABEL } from './status';
+import { matchMethodLabel } from './status';
 import {
   cleanupDiffEntries,
   isCleanupPreviewRow,
@@ -117,7 +117,7 @@ export function CaseMaintenancePreviewTable({
                 <CleanupOutcome row={row} />
               ) : (
                 <>
-                  {row.bucket ? MATCH_METHOD_LABEL[row.bucket] : '—'}
+                  {matchMethodLabel(row.bucket)}
                   {/* The part and page the server parsed out of the citation.
                       "Part 613, no page" says why a case needs a search in a
                       way the phrase "part only" never will. */}
