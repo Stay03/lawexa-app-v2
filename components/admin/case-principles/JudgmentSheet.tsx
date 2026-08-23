@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useCallback, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -15,13 +16,19 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCase } from '@/lib/hooks/useAdminCases';
 import { caseTextParagraphs } from '@/lib/utils/case-text';
+import { indexRendered, locateAllQuotes } from '@/lib/utils/quote-locator';
 import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import type { PrincipleCaseRef } from '@/types/admin-case-principles';
+
+/** Named so the paint rule in globals.css can find it. */
+const HIGHLIGHT_NAME = 'judgment-passage';
 
 interface JudgmentSheetProps {
   caseRef: PrincipleCaseRef | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** The principle to find and scroll to. The reviewer's own row. */
+  highlight?: string | null;
 }
 
 /**
@@ -43,7 +50,12 @@ interface JudgmentSheetProps {
  * rather than an empty panel. But the heading now tells the truth about which
  * of the two is on screen.
  */
-export function JudgmentSheet({ caseRef, open, onOpenChange }: JudgmentSheetProps) {
+export function JudgmentSheet({
+  caseRef,
+  open,
+  onOpenChange,
+  highlight,
+}: JudgmentSheetProps) {
   const { data, isLoading } = useCase(caseRef?.slug, {
     enabled: open,
     includeFullReport: true,
@@ -55,6 +67,53 @@ export function JudgmentSheet({ caseRef, open, onOpenChange }: JudgmentSheetProp
      boundary forbids this v1 screen importing the v2 renderer and the two must
      not drift — v1 already had three renderers for this one field. */
   const paragraphs = judgmentText ? caseTextParagraphs(judgmentText) : [];
+
+  const [found, setFound] = useState<'pending' | 'hit' | 'many' | 'miss'>('pending');
+
+  /**
+   * Find the reviewer's principle in the judgment, scroll to it, paint it.
+   *
+   * ── A CALLBACK REF, NOT AN EFFECT ─────────────────────────────────────
+   * The work needs the rendered DOM, so it cannot happen during render, and
+   * setting state from inside an effect is banned in this codebase. A ref
+   * callback fires exactly when the node attaches — which is the moment the
+   * paragraphs exist — and is the sanctioned place to read the DOM and record
+   * what was found. React 19 runs the returned function on detach, so the
+   * highlight is cleaned up when the sheet closes.
+   *
+   * Re-runs when the principle changes, because the callback's identity does.
+   *
+   * ── WHY CSS.highlights AND NOT <mark> ─────────────────────────────────
+   * It is a PAINT-ONLY overlay: no elements, no attributes, nothing for React
+   * to reconcile. Wrapping the match would mutate a DOM React owns, and writing
+   * markers into the judgment is forbidden anyway — the same text feeds the
+   * search index and the AI's view of the case.
+   */
+  const attachBody = useCallback(
+    (container: HTMLDivElement | null) => {
+      if (!container || !highlight) return;
+      const registry = typeof CSS !== 'undefined' ? CSS.highlights : undefined;
+      const ranges = locateAllQuotes(indexRendered(container), highlight);
+      if (ranges.length === 0) {
+        setFound('miss');
+        return;
+      }
+      setFound(ranges.length > 1 ? 'many' : 'hit');
+      registry?.set(HIGHLIGHT_NAME, new Highlight(...ranges));
+      /* Centring sidesteps the sticky header: a Range carries no scroll-margin,
+         so `block: 'start'` would tuck the passage under the heading. */
+      ranges[0].startContainer.parentElement?.scrollIntoView({
+        block: 'center',
+        behavior: 'smooth',
+      });
+      // Braces matter: `delete` returns a boolean and a ref cleanup must return
+      // nothing.
+      return () => {
+        registry?.delete(HIGHLIGHT_NAME);
+      };
+    },
+    [highlight],
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -71,11 +130,22 @@ export function JudgmentSheet({ caseRef, open, onOpenChange }: JudgmentSheetProp
           </SheetTitle>
           {/* Says which document is actually on screen. The judgment and the
               summary are different things and a reviewer has to know which one
-              they are reading a principle against. */}
+              they are reading a principle against.
+              It also reports whether the principle was FOUND in that document.
+              A principle that cannot be located is itself worth knowing at the
+              moment of approving it, and silently scrolling nowhere would read
+              as the feature being broken. */}
           <SheetDescription>
             {[
               [caseRef?.court, caseRef?.country].filter(Boolean).join(' · '),
               isLoading ? null : fullReport ? 'Full judgment' : 'Summary only — no judgment on file',
+              highlight && !isLoading
+                ? found === 'miss'
+                  ? 'This principle is not word for word in the text'
+                  : found === 'many'
+                    ? 'Appears more than once — showing the first'
+                    : null
+                : null,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -98,7 +168,7 @@ export function JudgmentSheet({ caseRef, open, onOpenChange }: JudgmentSheetProp
                raw tags beginning `<p style="line-height: 150%;">`. It read
                cleanly for as long as this sheet was fetching the case SUMMARY,
                which is plain prose — a data bug hiding a rendering one. */
-            <div className="space-y-3 text-sm leading-relaxed">
+            <div ref={attachBody} className="space-y-3 text-sm leading-relaxed">
               {paragraphs.map((paragraph, index) => (
                 <p key={index} className="whitespace-pre-line">
                   {paragraph}

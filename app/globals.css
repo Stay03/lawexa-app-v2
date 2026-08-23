@@ -1638,3 +1638,13 @@
   border-radius: 0.5rem;
 }
 
+/* The passage a reviewer is checking a principle against.
+   ::highlight takes only a few properties — background, colour, text-decoration
+   and shadow — so this is deliberately a wash of colour rather than a box.
+   Painted via CSS.highlights, which adds no elements to the judgment: nothing
+   may be written into full_report, because the same text feeds the search index
+   and the AI's view of the case. */
+::highlight(judgment-passage) {
+  background-color: color-mix(in oklab, var(--primary) 26%, transparent);
+  color: var(--foreground);
+}

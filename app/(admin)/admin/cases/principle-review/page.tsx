@@ -523,10 +523,15 @@ function PrincipleReviewPageContent() {
         onOpenChange={setRejectOpen}
         onConfirm={confirmReject}
       />
+      {/* The judgment opens at the row the reviewer is on, not at the top. The
+          keyboard cursor already tracks that row, so pressing Judgment answers
+          "show me THIS one in the report" rather than handing over 235,000
+          characters and leaving them to search. */}
       <JudgmentSheet
         caseRef={activeCaseRef}
         open={judgmentOpen}
         onOpenChange={setJudgmentOpen}
+        highlight={rows[focusedIndex]?.principle ?? null}
       />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
