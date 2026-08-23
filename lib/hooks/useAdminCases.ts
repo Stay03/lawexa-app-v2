@@ -69,10 +69,14 @@ export const adminCasesKeys = {
 /**
  * Get paginated list of cases with filters
  */
-export function useCases(params: AdminCasesParams = {}) {
+export function useCases(
+  params: AdminCasesParams = {},
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: adminCasesKeys.list(params),
     queryFn: () => adminCasesApi.getCases(params),
+    enabled: options?.enabled !== false,
     staleTime: 60 * 1000, // 1 minute
   });
 }

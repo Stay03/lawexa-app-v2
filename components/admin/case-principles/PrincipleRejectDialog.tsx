@@ -1,7 +1,5 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -12,32 +10,31 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { useRejectCasePrinciple } from '@/lib/hooks/useAdminCasePrinciples';
-import { extractApiError } from '@/lib/utils/api-error';
 import type { CasePrincipleReviewItem } from '@/types/admin-case-principles';
 
 interface PrincipleRejectDialogProps {
   principle: CasePrincipleReviewItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onConfirm: (principle: CasePrincipleReviewItem) => void;
 }
 
+/**
+ * Confirm only — no request happens here. Rejection hard-deletes with no
+ * archive, so the page holds the actual call for a few seconds behind an Undo
+ * toast after this confirm: the one undo that can exist for a hard delete is
+ * the one before the request leaves.
+ */
 export function PrincipleRejectDialog({
   principle,
   open,
   onOpenChange,
+  onConfirm,
 }: PrincipleRejectDialogProps) {
-  const rejectMutation = useRejectCasePrinciple();
-
-  const handleReject = () => {
+  const handleConfirm = () => {
     if (!principle) return;
-    rejectMutation.mutate(principle.id, {
-      onSuccess: () => {
-        toast.success('Principle rejected and removed');
-        onOpenChange(false);
-      },
-      onError: (error) => toast.error(extractApiError(error).message),
-    });
+    onConfirm(principle);
+    onOpenChange(false);
   };
 
   return (
@@ -46,25 +43,19 @@ export function PrincipleRejectDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Reject this principle?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes the extraction. The case keeps its other
-            principles. This can&apos;t be undone.
+            This permanently deletes the extraction — there is no archive. The
+            case keeps its other principles. You get a few seconds to undo
+            before anything is sent.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {principle && (
-          <p className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground line-clamp-4">
+          <p className="line-clamp-4 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
             {principle.principle}
           </p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={rejectMutation.isPending}>
-            Cancel
-          </AlertDialogCancel>
-          <Button
-            variant="destructive"
-            onClick={handleReject}
-            disabled={rejectMutation.isPending}
-          >
-            {rejectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <Button variant="destructive" onClick={handleConfirm}>
             Reject
           </Button>
         </AlertDialogFooter>

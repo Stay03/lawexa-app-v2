@@ -37,6 +37,12 @@ interface PrincipleEditDialogProps {
   principle: CasePrincipleReviewItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Fires with the server's updated row. The page needs it because a
+   * save-and-approve is already committed server-side, so the session overlay
+   * and the rail counts must mark the row done without any refetch.
+   */
+  onSaved?: (item: CasePrincipleReviewItem, approved: boolean) => void;
 }
 
 const TYPE_NONE = 'none';
@@ -46,9 +52,11 @@ const LAW_TYPES: PrincipleLawType[] = ['procedural', 'substantive'];
 function EditForm({
   principle,
   onClose,
+  onSaved,
 }: {
   principle: CasePrincipleReviewItem;
   onClose: () => void;
+  onSaved?: (item: CasePrincipleReviewItem, approved: boolean) => void;
 }) {
   const [text, setText] = useState(principle.principle);
   const [type, setType] = useState<PrincipleType | typeof TYPE_NONE>(
@@ -75,8 +83,9 @@ function EditForm({
     updateMutation.mutate(
       { id: principle.id, data: buildPayload(approve) },
       {
-        onSuccess: () => {
+        onSuccess: (response) => {
           toast.success(approve ? 'Principle approved' : 'Changes saved');
+          onSaved?.(response.data, approve);
           onClose();
         },
         onError: (error) => toast.error(extractApiError(error).message),
@@ -168,6 +177,7 @@ export function PrincipleEditDialog({
   principle,
   open,
   onOpenChange,
+  onSaved,
 }: PrincipleEditDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -183,6 +193,7 @@ export function PrincipleEditDialog({
             key={principle.id}
             principle={principle}
             onClose={() => onOpenChange(false)}
+            onSaved={onSaved}
           />
         )}
       </DialogContent>
