@@ -84,10 +84,28 @@ export function useCases(
 /**
  * Get single case by slug
  */
-export function useCase(slug: string | undefined, options?: { enabled?: boolean }) {
+/**
+ * One case.
+ *
+ * `includeFullReport` is OPT-IN, and the flag is part of the cache key.
+ *
+ * The judgment is large — 235KB on Savannah Bank v Pan Atlantic — so the two
+ * callers that only want case metadata must not pay for it. And the flag has to
+ * key the cache separately or a screen asking for the judgment is handed the
+ * thin payload a metadata screen fetched first, which is exactly how the
+ * admin Judgment sheet came to show a summary under the heading "Full
+ * judgment text" without anyone noticing.
+ */
+export function useCase(
+  slug: string | undefined,
+  options?: { enabled?: boolean; includeFullReport?: boolean }
+) {
+  const includeFullReport = options?.includeFullReport === true;
   return useQuery({
-    queryKey: slug ? adminCasesKeys.detail(slug) : (['admin', 'cases', 'detail', 'undefined'] as const),
-    queryFn: () => adminCasesApi.getCase(slug!),
+    queryKey: slug
+      ? ([...adminCasesKeys.detail(slug), { full: includeFullReport }] as const)
+      : (['admin', 'cases', 'detail', 'undefined'] as const),
+    queryFn: () => adminCasesApi.getCase(slug!, { includeFullReport }),
     enabled: !!slug && (options?.enabled !== false),
     staleTime: 60 * 1000, // 1 minute
   });

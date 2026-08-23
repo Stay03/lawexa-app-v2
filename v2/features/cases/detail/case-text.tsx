@@ -43,50 +43,12 @@ import { extractAuthorityRefs } from './authorities';
  * the same click-runs-a-search semantics as an unlinked authority row.
  */
 
-/** Paragraph openers that mark a section of a judgment summary. */
-const HEADING = /^(Held|Facts|Issue|Issues|Decision|Ratio|Obiter|Judgment|Appeal|Background|Analysis|Conclusion|Dissent|Concurrence|Per\s+[\w'-]+(?:\s+[A-Z][\w.'-]*)*)\s*:\s*/;
-
-/** Tags whose presence means the value is legacy markup rather than plain text. */
-const LOOKS_LIKE_HTML = /<\/?(?:p|br|div|strong|em|b|i|ul|ol|li|h[1-6]|span)\b[^>]*>/i;
-
-const ENTITIES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&apos;': "'",
-  '&nbsp;': ' ',
-};
-
-/**
- * Reduce legacy markup to the text it was wrapping. Block boundaries become
- * blank lines so the paragraph split below still finds the author's structure.
- */
-function htmlToPlainText(value: string): string {
-  return value
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(?:p|div|li|h[1-6])>/gi, '\n\n')
-    .replace(/<li\b[^>]*>/gi, '• ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&[a-z#0-9]+;/gi, (entity) => ENTITIES[entity.toLowerCase()] ?? entity)
-    .replace(/\n{3,}/g, '\n\n');
-}
-
-/**
- * Split into paragraphs on blank lines, dropping empties — exported because
- * the flat `principles` fallback needs the SAME split to decide whether the
- * field holds one passage or a paragraph-per-principle list (measured on live
- * data: Mustapha v Abubakar's flat field is five blank-line paragraphs, one
- * principle each). Legacy HTML degrades before splitting, same as rendering.
- */
-export function caseTextParagraphs(value: string): string[] {
-  const source = LOOKS_LIKE_HTML.test(value) ? htmlToPlainText(value) : value;
-  return source
-    .split(/\r?\n\s*\r?\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-}
+/* The conversion from stored markup to paragraphs of plain text now lives in
+   `@/lib/utils/case-text`, because the admin principle-review screen needs the
+   same function and the lint boundary forbids v1 importing v2. Re-exported here
+   so this module stays the one place v2 asks for case text. */
+export { caseTextParagraphs } from '@/lib/utils/case-text';
+import { CASE_HEADING as HEADING, caseTextParagraphs } from '@/lib/utils/case-text';
 
 /**
  * A passage with its inline authorities linked. The link keeps the serif's

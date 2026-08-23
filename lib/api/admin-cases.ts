@@ -45,9 +45,13 @@ async function getCases(
 /**
  * Get single case by slug with all relationships
  */
-async function getCase(slug: string): Promise<ApiResponse<CaseDetail>> {
+async function getCase(
+  slug: string,
+  options?: { includeFullReport?: boolean }
+): Promise<ApiResponse<CaseDetail>> {
   const response = await apiClient.get<ApiResponse<CaseDetail>>(
-    `/cases/${slug}`
+    `/cases/${slug}`,
+    options?.includeFullReport ? { params: { include_full_report: true } } : undefined
   );
   return response.data;
 }

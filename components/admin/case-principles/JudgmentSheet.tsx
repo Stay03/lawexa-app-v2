@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCase } from '@/lib/hooks/useAdminCases';
+import { caseTextParagraphs } from '@/lib/utils/case-text';
 import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import type { PrincipleCaseRef } from '@/types/admin-case-principles';
 
@@ -27,12 +28,33 @@ interface JudgmentSheetProps {
  * The judgment beside the queue, so checking a principle against its source
  * does not cost the reviewer their place. Fetched lazily on open — full
  * reports run to hundreds of kilobytes and most rows never need one.
+ *
+ * ── IT HAD NEVER ONCE SHOWN A JUDGMENT ────────────────────────────────────
+ * `GET /cases/{slug}` returns `full_report` ONLY when asked with
+ * `include_full_report`. This sheet did not ask, so `full_report` was always
+ * absent, the fallback below took `body` — the case SUMMARY — and the panel
+ * displayed it under the heading "Full judgment text".
+ *
+ * It went unnoticed because `body` is prose and renders perfectly well. The
+ * reviewer's whole job is judging a principle against the judgment it came
+ * from, and the screen was quietly showing them a different document.
+ *
+ * The fallback stays: a case with no judgment on file should show its summary
+ * rather than an empty panel. But the heading now tells the truth about which
+ * of the two is on screen.
  */
 export function JudgmentSheet({ caseRef, open, onOpenChange }: JudgmentSheetProps) {
-  const { data, isLoading } = useCase(caseRef?.slug, { enabled: open });
+  const { data, isLoading } = useCase(caseRef?.slug, {
+    enabled: open,
+    includeFullReport: true,
+  });
   const caseDetail = data?.data;
-  const judgmentText =
-    caseDetail?.full_report?.full_text ?? caseDetail?.body ?? null;
+  const fullReport = caseDetail?.full_report?.full_text ?? null;
+  const judgmentText = fullReport ?? caseDetail?.body ?? null;
+  /* Shared with the public case reader through `lib/utils`, because the lint
+     boundary forbids this v1 screen importing the v2 renderer and the two must
+     not drift — v1 already had three renderers for this one field. */
+  const paragraphs = judgmentText ? caseTextParagraphs(judgmentText) : [];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -47,9 +69,16 @@ export function JudgmentSheet({ caseRef, open, onOpenChange }: JudgmentSheetProp
           <SheetTitle className="leading-snug">
             {caseRef ? getCaseDisplayTitle(caseRef) : 'Judgment'}
           </SheetTitle>
+          {/* Says which document is actually on screen. The judgment and the
+              summary are different things and a reviewer has to know which one
+              they are reading a principle against. */}
           <SheetDescription>
-            {[caseRef?.court, caseRef?.country].filter(Boolean).join(' · ') ||
-              'Full judgment text'}
+            {[
+              [caseRef?.court, caseRef?.country].filter(Boolean).join(' · '),
+              isLoading ? null : fullReport ? 'Full judgment' : 'Summary only — no judgment on file',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </SheetDescription>
         </SheetHeader>
 
@@ -63,10 +92,19 @@ export function JudgmentSheet({ caseRef, open, onOpenChange }: JudgmentSheetProp
                 />
               ))}
             </div>
-          ) : judgmentText ? (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {judgmentText}
-            </p>
+          ) : paragraphs.length > 0 ? (
+            /* Paragraphs, not the stored value. A judgment is stored as markup,
+               so printing it straight into one element showed the reviewer 6,145
+               raw tags beginning `<p style="line-height: 150%;">`. It read
+               cleanly for as long as this sheet was fetching the case SUMMARY,
+               which is plain prose — a data bug hiding a rendering one. */
+            <div className="space-y-3 text-sm leading-relaxed">
+              {paragraphs.map((paragraph, index) => (
+                <p key={index} className="whitespace-pre-line">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">
               No judgment text is on file for this case.
