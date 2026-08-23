@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
-import { extractViewLimitError } from '@/lib/utils/api-error';
+import { extractViewLimitError, isNotFoundError } from '@/lib/utils/api-error';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { casesQueries } from '../queries';
 import { formatCaseName } from '../case-name';
@@ -59,10 +59,15 @@ export function CaseReportScreen({ slug }: { slug: string }) {
 
   if (query.isError) {
     const limit = extractViewLimitError(query.error);
+    // A case that is not there is not a failed request. Same screen for both
+    // told readers to retry something that will never succeed.
+    const missing = isNotFoundError(query.error);
     return (
       <div className={CASE_COLUMN}>
         {limit ? (
           <CaseHardLimitState limit={limit} />
+        ) : missing ? (
+          <CaseNotFoundState />
         ) : (
           <CaseErrorState onRetry={() => void query.refetch()} />
         )}

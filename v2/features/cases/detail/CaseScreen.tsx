@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
-import { extractViewLimitError } from '@/lib/utils/api-error';
+import { extractViewLimitError, isNotFoundError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import {
   quietPushUrlParams,
@@ -186,10 +186,15 @@ function CaseBody({ slug }: { slug: string }) {
     // A 429 is not a failure to load — it is the plan's monthly allowance, and it
     // deserves its own screen with the numbers and the reset date on it.
     const limit = extractViewLimitError(query.error);
+    // A case that is not there is not a failed request. Same screen for both
+    // told readers to retry something that will never succeed.
+    const missing = isNotFoundError(query.error);
     return (
       <div className={CASE_COLUMN}>
         {limit ? (
           <CaseHardLimitState limit={limit} />
+        ) : missing ? (
+          <CaseNotFoundState />
         ) : (
           <CaseErrorState onRetry={() => void query.refetch()} />
         )}

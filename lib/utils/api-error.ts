@@ -31,6 +31,22 @@ export function extractApiError(error: unknown): ApiError {
 /**
  * Extract structured view-limit error from a 429 response.
  */
+/**
+ * Is this "the thing is not there" rather than "the request failed"?
+ *
+ * ── THEY NEED OPPOSITE MESSAGES AND WE WERE GIVING ONE ────────────────────
+ * A case page that 404s showed "Something went wrong while loading the case.
+ * Please try again." with a Try again button. That reads as a passing fault and
+ * invites a reader to retry, forever, something that will never work.
+ *
+ * It matters more once cases can be merged: an old link is exactly the case
+ * that 404s, and telling that reader to try again is the least useful thing the
+ * screen could say.
+ */
+export function isNotFoundError(error: unknown): boolean {
+  return error instanceof AxiosError && error.response?.status === 404;
+}
+
 export function extractViewLimitError(error: unknown): CaseViewLimitError | null {
   if (error instanceof AxiosError && error.response?.status === 429) {
     const errors = error.response.data?.errors;

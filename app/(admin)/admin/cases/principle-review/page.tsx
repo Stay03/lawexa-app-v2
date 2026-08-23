@@ -29,7 +29,7 @@ import {
   useReviewQueue,
 } from '@/lib/hooks/useAdminCasePrinciples';
 import { useHeldCommits } from '@/lib/hooks/useHeldCommits';
-import { extractApiError } from '@/lib/utils/api-error';
+import { extractApiError, isNotFoundError } from '@/lib/utils/api-error';
 import type { CasePrincipleReviewItem } from '@/types/admin-case-principles';
 
 /** The bulk-approve endpoint accepts at most 100 ids per call. */
@@ -493,6 +493,7 @@ function PrincipleReviewPageContent() {
             data={caseSetData}
             isLoading={caseSetQuery.isLoading}
             isError={caseSetQuery.isError}
+            isMissing={isNotFoundError(caseSetQuery.error)}
             onRetry={() => caseSetQuery.refetch()}
             session={session}
             focusedIndex={focusedIndex}

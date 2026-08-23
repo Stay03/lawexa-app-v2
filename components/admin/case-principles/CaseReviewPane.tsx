@@ -26,6 +26,8 @@ interface CaseReviewPaneProps {
   data: CaseReviewSet | undefined;
   isLoading: boolean;
   isError: boolean;
+  /** The case itself is gone, as opposed to the request having failed. */
+  isMissing: boolean;
   onRetry: () => void;
   session: ReviewSession;
   focusedIndex: number;
@@ -75,6 +77,7 @@ export function CaseReviewPane({
   data,
   isLoading,
   isError,
+  isMissing,
   onRetry,
   session,
   focusedIndex,
@@ -102,6 +105,23 @@ export function CaseReviewPane({
   }
 
   if (isLoading) return <PaneSkeleton />;
+
+  /* A case that is not there and a request that failed need opposite messages.
+     Offering "Try again" for an address that will never resolve invites someone
+     to retry forever — and after a merge, an old bookmarked case id is exactly
+     the one that 404s. */
+  if (isMissing) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl border bg-card px-6 py-16 text-center">
+        <FolderSearch className="size-8 text-muted-foreground" />
+        <p className="text-sm font-medium">That case is no longer here</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          It may have been removed or merged into another case. Pick one from the
+          list to carry on reviewing.
+        </p>
+      </div>
+    );
+  }
 
   if (isError || !data) {
     return (
