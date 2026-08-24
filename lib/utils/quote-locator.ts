@@ -170,6 +170,32 @@ export function indexRendered(root: Node): RenderedIndex {
   };
 }
 
+/**
+ * Is this hit a whole-word match, rather than a run that happens to sit inside
+ * longer words at either end?
+ *
+ * ── A SUBSTRING SEARCH FINDS PASSAGES THE JUDGMENT NEVER WROTE ────────────
+ * `indexOf` matched "act confers the right to" inside "enact confers the right
+ * to". The Range then began part-way through "enact", so the reviewer would
+ * have been shown a highlight starting mid-word — and, where a sub-word run
+ * occurred somewhere else entirely, a passage from the wrong part of the
+ * judgment while the row claimed a perfect match.
+ *
+ * @backendclaude hit the same flaw in the scorer and found it by chasing a
+ * principle that scored 100 and produced no quote at all.
+ *
+ * Checked rather than padded: padding the projection would shift every offset
+ * and break the map back to the DOM, which is the one property this file
+ * exists to preserve. The projection collapses whitespace to single spaces, so
+ * a boundary is simply a space or an end.
+ */
+function isWordAligned(text: string, at: number, length: number): boolean {
+  const before = at === 0 || text[at - 1] === ' ';
+  const end = at + length;
+  const after = end === text.length || text[end] === ' ';
+  return before && after;
+}
+
 function rangeAt(index: RenderedIndex, at: number, length: number): Range {
   const last = at + length - 1;
   const range = document.createRange();
@@ -187,9 +213,14 @@ function rangeAt(index: RenderedIndex, at: number, length: number): Range {
 export function locateQuote(index: RenderedIndex, quote: string): Range | null {
   const needle = normalizeForMatch(quote);
   if (!needle) return null;
-  const at = index.text.indexOf(needle);
-  if (at === -1) return null;
-  return rangeAt(index, at, needle.length);
+  let at = index.text.indexOf(needle);
+  while (at !== -1) {
+    if (isWordAligned(index.text, at, needle.length)) {
+      return rangeAt(index, at, needle.length);
+    }
+    at = index.text.indexOf(needle, at + 1);
+  }
+  return null;
 }
 
 /**
@@ -205,7 +236,9 @@ export function locateAllQuotes(index: RenderedIndex, quote: string, cap = 8): R
   const found: Range[] = [];
   let at = index.text.indexOf(needle);
   while (at !== -1 && found.length < cap) {
-    found.push(rangeAt(index, at, needle.length));
+    if (isWordAligned(index.text, at, needle.length)) {
+      found.push(rangeAt(index, at, needle.length));
+    }
     at = index.text.indexOf(needle, at + 1);
   }
   return found;
