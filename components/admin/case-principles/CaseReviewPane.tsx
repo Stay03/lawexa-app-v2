@@ -108,16 +108,21 @@ export function CaseReviewPane({
 
   /* A case that is not there and a request that failed need opposite messages.
      Offering "Try again" for an address that will never resolve invites someone
-     to retry forever — and after a merge, an old bookmarked case id is exactly
-     the one that 404s. */
+     to retry forever.
+
+     The wording says REMOVED and not "removed or merged". Lawexa merges nothing
+     today: the merge is designed, unbuilt, and waiting on two answers from the
+     owner. Copy that names a behaviour we do not have tells a reader the product
+     does something it cannot. When the merge ships, this line earns the second
+     half — not before. */
   if (isMissing) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border bg-card px-6 py-16 text-center">
         <FolderSearch className="size-8 text-muted-foreground" />
         <p className="text-sm font-medium">That case is no longer here</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          It may have been removed or merged into another case. Pick one from the
-          list to carry on reviewing.
+          It looks like it was removed. Pick one from the list to carry on
+          reviewing.
         </p>
       </div>
     );
