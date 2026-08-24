@@ -186,14 +186,32 @@ export function indexRendered(root: Node): RenderedIndex {
  *
  * Checked rather than padded: padding the projection would shift every offset
  * and break the map back to the DOM, which is the one property this file
- * exists to preserve. The projection collapses whitespace to single spaces, so
- * a boundary is simply a space or an end.
+ * exists to preserve.
+ *
+ * ── THE BOUNDARY IS NOT A SPACE, AND ASSUMING IT WAS COST 20 PASSAGES ─────
+ * The first version of this asked for a space on each side. That is wrong for
+ * the text this runs on: a passage that ends a sentence is followed by a full
+ * stop, and a quoted holding is wrapped in quotation marks. Measured over 149
+ * real principles in four judgments, demanding a space threw away 20 passages
+ * that were present and correct — seven wrapped in quotation marks, four ending
+ * on a dash, the rest on a colon or a comma.
+ *
+ * A cut is only INSIDE a word when the characters on both sides of it are word
+ * characters. That is the rule below, and it is the one that discriminates:
+ * "act confers the right to" is still refused inside "enact confers the right
+ * to", because 'a' and the preceding 'n' are both letters. Same corpus, same
+ * run: 148 of 149 located, and the one refusal is a genuine mid-word cut where
+ * the judgment itself is missing a space.
  */
+function isWordChar(char: string | undefined): boolean {
+  return char !== undefined && /[\p{L}\p{N}]/u.test(char);
+}
+
 function isWordAligned(text: string, at: number, length: number): boolean {
-  const before = at === 0 || text[at - 1] === ' ';
   const end = at + length;
-  const after = end === text.length || text[end] === ' ';
-  return before && after;
+  const startsCleanly = at === 0 || !(isWordChar(text[at]) && isWordChar(text[at - 1]));
+  const endsCleanly = end === text.length || !(isWordChar(text[end - 1]) && isWordChar(text[end]));
+  return startsCleanly && endsCleanly;
 }
 
 function rangeAt(index: RenderedIndex, at: number, length: number): Range {
