@@ -533,6 +533,7 @@ function PrincipleReviewPageContent() {
         open={judgmentOpen}
         onOpenChange={setJudgmentOpen}
         highlight={rows[focusedIndex]?.principle ?? null}
+        quote={rows[focusedIndex]?.verbatim_quote ?? null}
       />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>

@@ -31,9 +31,62 @@ interface PrincipleRowProps {
  * obiter or untyped are the ones most likely to be mislabelled, so those two
  * states get the visual weight instead of drowning in 1,600 "Ratio" badges.
  */
+/**
+ * How much of this principle is word for word in its judgment.
+ *
+ * ── THE COMMON CASE IS QUIET, THE EXCEPTION CARRIES THE WEIGHT ────────────
+ * Same grammar as the type badge above, and for the same reason. Measured
+ * across ~400 principles by the backend and 149 by this side: nothing scores
+ * below 80 and almost everything scores 100. A column shouting "100" on every
+ * row teaches a reviewer nothing and trains them to stop looking at it, which
+ * is exactly what must not happen to a check whose whole job is to be noticed
+ * on the day it finally fires.
+ *
+ * So 100 is rendered small and muted — present, honest, ignorable — and only a
+ * score below it is given colour.
+ *
+ * ── NOT MEASURED IS NOT ZERO ──────────────────────────────────────────────
+ * `null` means nobody has scored it yet, either because the scoring command
+ * has not run or because the case carries no judgment text at all. Those
+ * principles re-enter the pool on their own the day a report arrives. Showing
+ * them as 0, or hiding them, would both be lies.
+ */
+function VerbatimScore({ score }: { score: number | null }) {
+  if (score === null) {
+    return (
+      <span className="text-xs text-muted-foreground/70" title="No judgment text to check against yet">
+        Not checked
+      </span>
+    );
+  }
+  if (score === 100) {
+    return (
+      <span className="tabular-nums text-xs text-muted-foreground/70" title="Word for word in the judgment">
+        100
+      </span>
+    );
+  }
+  const severe = score < 50;
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        'tabular-nums font-medium',
+        severe
+          ? 'border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400'
+          : 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+      )}
+      title={`${score}% of this principle is word for word in the judgment`}
+    >
+      {score}
+    </Badge>
+  );
+}
+
 function PrincipleMeta({ item }: { item: CasePrincipleReviewItem }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
+      <VerbatimScore score={item.verbatim_score} />
       {item.tag && (
         <Badge variant="secondary" className="font-normal">
           {item.tag}

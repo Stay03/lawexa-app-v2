@@ -29,6 +29,15 @@ interface JudgmentSheetProps {
   onOpenChange: (open: boolean) => void;
   /** The principle to find and scroll to. The reviewer's own row. */
   highlight?: string | null;
+  /**
+   * The passage the backend lifted from this judgment, when it has one.
+   *
+   * Preferred over `highlight` because it is CUT FROM the report rather than
+   * written about it, so it is present in the rendered text by construction.
+   * A principle is often a summary and legitimately absent — searching it made
+   * the panel report "not word for word" on rows where nothing was wrong.
+   */
+  quote?: string | null;
 }
 
 /**
@@ -55,6 +64,7 @@ export function JudgmentSheet({
   open,
   onOpenChange,
   highlight,
+  quote,
 }: JudgmentSheetProps) {
   const { data, isLoading } = useCase(caseRef?.slug, {
     enabled: open,
@@ -89,11 +99,18 @@ export function JudgmentSheet({
    * markers into the judgment is forbidden anyway — the same text feeds the
    * search index and the AI's view of the case.
    */
+  /* The stored passage when there is one, the principle's own words otherwise.
+     Which of the two was searched changes what a miss MEANS, so it is carried
+     rather than inferred: a principle that is not verbatim is ordinary, a
+     stored passage that is missing from its own judgment is a real fault. */
+  const needle = quote ?? highlight ?? null;
+  const searchedStoredQuote = Boolean(quote);
+
   const attachBody = useCallback(
     (container: HTMLDivElement | null) => {
-      if (!container || !highlight) return;
+      if (!container || !needle) return;
       const registry = typeof CSS !== 'undefined' ? CSS.highlights : undefined;
-      const ranges = locateAllQuotes(indexRendered(container), highlight);
+      const ranges = locateAllQuotes(indexRendered(container), needle);
       if (ranges.length === 0) {
         setFound('miss');
         return;
@@ -112,7 +129,7 @@ export function JudgmentSheet({
         registry?.delete(HIGHLIGHT_NAME);
       };
     },
-    [highlight],
+    [needle],
   );
 
   return (
@@ -139,9 +156,16 @@ export function JudgmentSheet({
             {[
               [caseRef?.court, caseRef?.country].filter(Boolean).join(' · '),
               isLoading ? null : fullReport ? 'Full judgment' : 'Summary only — no judgment on file',
-              highlight && !isLoading
+              /* A miss means two different things and the reviewer needs the
+                 right one. Missing the PRINCIPLE is ordinary — most are
+                 summaries of a holding rather than quotations of it. Missing
+                 the STORED PASSAGE is a fault worth reporting, because that
+                 text was cut out of this very judgment and should be in it. */
+              needle && !isLoading
                 ? found === 'miss'
-                  ? 'This principle is not word for word in the text'
+                  ? searchedStoredQuote
+                    ? 'The stored passage is not in this text'
+                    : 'This principle is not word for word in the text'
                   : found === 'many'
                     ? 'Appears more than once — showing the first'
                     : null
