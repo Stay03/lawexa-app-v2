@@ -665,10 +665,27 @@ function getTierKey(plan: IPlan): string {
  * label alone and TIER_ORDER stops recognising the key, every foreign tier
  * scores -1, and four correctly grouped cards appear in arbitrary order.
  */
+/**
+ * Words that say WHO a plan is for or WHAT IT IS PRICED IN — never which tier
+ * it is. Both kinds reach us inside the slug because a plan's slug is built
+ * from the name a human typed into the payment provider.
+ *
+ * `international` was the first. `usd` and `ngn` are here before they arrive:
+ * the dollar plans are being created as this ships, and the natural name for
+ * one is "Basic Monthly USD". Left alone, that produces a card labelled
+ * "Basic Usd" sitting in an arbitrary position, because TIER_ORDER cannot
+ * match `basic-usd` and scores it -1 along with every other foreign tier.
+ *
+ * The point is that naming is the payment side's decision and rendering is
+ * ours. Neither should constrain the other, so this strips the marker rather
+ * than asking anyone to avoid the obvious word.
+ */
+const TIER_KEY_MARKERS = new Set(['international', 'global', 'usd', 'ngn']);
+
 function baseTierKey(tierKey: string): string {
   const stripped = tierKey
     .split('-')
-    .filter((part) => part.toLowerCase() !== 'international')
+    .filter((part) => !TIER_KEY_MARKERS.has(part.toLowerCase()))
     .join('-');
   return stripped || tierKey;
 }
