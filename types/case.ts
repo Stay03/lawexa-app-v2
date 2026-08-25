@@ -118,6 +118,56 @@ export interface ReportPrinciple {
   law_type: string[] | null;
   reviewed: boolean;
   order: number;
+
+  /**
+   * The judgment's own words behind this principle — the passage the extractor
+   * cut it from, with a little of the sentence around it.
+   *
+   * ── WHY A READER GETS THIS AND NOT THE JUDGMENT ───────────────────────────
+   * A principle is OUR sentence about what the court held. This is the COURT'S
+   * sentence. Showing it is the difference between being told what a case says
+   * and reading it, and for a reader who is not paying it is the only judgment
+   * text on the page.
+   *
+   * The server truncates it for readers without a subscription and caps how
+   * many principles carry one, so the page can never add up to the judgment.
+   * The owner agreed the number knowingly: about 3,000 characters per case,
+   * roughly 500 words, near enough one percent of a typical judgment.
+   *
+   * `null` when this principle has no measured passage — most often because it
+   * is shorter than the six-word run the matcher works in.
+   */
+  verbatim_window?: string | null;
+
+  /**
+   * The exact span the principle was matched against, raw from the judgment.
+   *
+   * Shorter than the window: this is the match itself, with nothing either
+   * side. It is what a highlight paints.
+   *
+   * ── THE RULE THAT KEEPS IT SAFE, AND IT IS NOT OBVIOUS ────────────────────
+   * Its words are by construction the longest run of THIS PRINCIPLE found in
+   * the judgment, so every word in it is already in the principle above it.
+   * That is the whole reason it can be shown to a reader who is not paying.
+   * It follows that the quote MAY ONLY EVER BE RENDERED ALONGSIDE THE FULL
+   * PRINCIPLE IT WAS CUT FOR. Show it on its own — in a teaser, a summary
+   * list, or beside a truncated principle — and it stops being bounded by
+   * anything and becomes raw judgment text.
+   */
+  verbatim_quote?: string | null;
+
+  /**
+   * The same span under the shared normalisation, for locating it in rendered
+   * text without the browser re-deriving the string and drifting.
+   *
+   * It KEEPS punctuation on purpose. A word-boundary test that demands a space
+   * on each side will reject every passage wrapped in quotation marks or ending
+   * on a full stop — measured at 20 of 149 before it was fixed. Use
+   * `isWordAligned` in lib/utils/quote-locator.ts, which asks the right
+   * question: a cut is inside a word only when the characters on both sides of
+   * it are word characters.
+   */
+  verbatim_quote_key?: string | null;
 }
 
 // One statute this judgment cited (statutes_cited[]). When `statute_id` is set

@@ -572,11 +572,59 @@ function StructuredPrinciples({
             <div className="doc-prose">
               <CaseText value={principle.principle} />
             </div>
+            {/* Directly beneath the FULL principle, never anywhere else — see
+                the rule in JudgmentPassage. Absent on most rows: a principle
+                shorter than the matcher's six-word run has no passage, and the
+                server sends none beyond a reader's allowance. */}
+            {principle.verbatim_window ? (
+              <JudgmentPassage text={principle.verbatim_window} />
+            ) : null}
             <PrincipleCaption principle={principle} showLawType={!showTabs} />
           </NumberedPrinciple>
         )}
       />
     </section>
+  );
+}
+
+/**
+ * The judgment's own words, under the principle drawn from them.
+ *
+ * ── WHY THIS EARNS ITS SPACE ──────────────────────────────────────────────
+ * Everything else in this section is OUR sentence about what the court held.
+ * This is the COURT'S sentence. For a reader without a subscription it is the
+ * only judgment text on the page, and it is the difference between being told
+ * what a case says and reading it.
+ *
+ * ── WHY IT IS QUIETER THAN THE PRINCIPLE ABOVE IT ─────────────────────────
+ * The principle is what the reader came for and what the eye should land on.
+ * This is where it came from. So it sits indented behind a rule, in the
+ * serif the document uses for quoted matter, at the weight of a source note —
+ * present for anyone who wants to check, never competing for the read.
+ *
+ * ── THE RULE THIS COMPONENT ENFORCES ──────────────────────────────────────
+ * It renders ONLY inside a principle entry, directly beneath the full
+ * principle text. That is not a layout preference. The passage is safe to
+ * show because its words are a run of the principle above it, so the two must
+ * travel together — a passage shown beside a truncated principle, or in a
+ * list of its own, stops being bounded by anything.
+ *
+ * The server decides how much arrives and for whom: it truncates the passage
+ * for readers without a subscription and caps how many principles carry one.
+ * Nothing here needs to gate anything, and nothing here should try.
+ */
+function JudgmentPassage({ text }: { text: string }) {
+  const value = text.trim();
+  if (!value) return null;
+  return (
+    <figure className="mt-2.5 border-l-2 border-primary/25 pl-3.5">
+      <figcaption className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+        From the judgment
+      </figcaption>
+      <blockquote className="doc-prose text-[0.9375rem] leading-relaxed text-muted-foreground">
+        <CaseText value={value} />
+      </blockquote>
+    </figure>
   );
 }
 
