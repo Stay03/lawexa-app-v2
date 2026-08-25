@@ -296,6 +296,10 @@ function TieChoice({
   );
   if (qualified.length === 0) return null;
 
+  const reasons = (search?.reasons ?? []).filter(
+    (reason): reason is string => typeof reason === 'string' && reason.length > 0,
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -305,9 +309,27 @@ function TieChoice({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-w-[420px]">
+        {/* THE REASON IS NOT ALWAYS A TIE, AND SAYING IT IS MISLEADS THE ONE
+            PERSON WHO CAN STILL CATCH IT. This said "Both matched equally" on
+            every row. Measured against the live queue, the ONLY row offering a
+            choice was not a tie at all: one candidate at 100, withheld because
+            a Part signal on it contradicted the Part we parsed and no year
+            agreed. Every true tie there scored below the bar and correctly
+            offered nothing. So the old copy reassured a reviewer on precisely
+            the row the backend had flagged as suspicious. The label now
+            follows the count, and the server's own reasons are shown, because
+            a reviewer overriding a refusal has to see what they are
+            overriding. */}
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Both matched equally. Pick the right case.
+          {qualified.length > 1
+            ? 'These matched equally. Pick the right case.'
+            : 'This was not used automatically. Read why before you use it.'}
         </DropdownMenuLabel>
+        {reasons.length > 0 ? (
+          <p className="px-2 pb-1.5 text-[11px] leading-snug text-amber-600 dark:text-amber-500">
+            {reasons.join('. ')}
+          </p>
+        ) : null}
         {qualified.slice(0, 5).map((candidate) => (
           <DropdownMenuItem
             key={candidate.provider_case_id}
