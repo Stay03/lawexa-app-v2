@@ -3,6 +3,7 @@
 import { use, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { AdminPagination } from '@/components/admin';
 import { EnumFilterSelect, StatusBadge } from '@/components/admin/observability';
@@ -98,9 +99,32 @@ export default function CaseMaintenanceRunPage({
     setPage(1);
   }, []);
 
+  /**
+   * A decision that fails must SAY SO.
+   *
+   * This fired and forgot. When the server refused — "the item has no stored
+   * candidate", which is what an item with nothing behind it answers — the row
+   * did not move and the screen said nothing at all. From the reviewer's side
+   * that is a button that does not work, and the owner reported it in exactly
+   * those words: "i click on them and nothing happens".
+   *
+   * A write that can be refused needs its refusal on screen. Same toast the
+   * rest of admin uses, so the failure looks like every other failure here.
+   */
   const onDecide = useCallback(
     (itemId: number, decision: 'confirm' | 'reject') => {
-      decide.mutate({ itemId, decision });
+      decide.mutate(
+        { itemId, decision },
+        {
+          onSuccess: () =>
+            toast.success(
+              decision === 'confirm'
+                ? 'Accepted — the judgment is queued to be written'
+                : 'Cleared',
+            ),
+          onError: (error) => toast.error(extractApiError(error).message),
+        },
+      );
     },
     [decide],
   );

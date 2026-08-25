@@ -112,6 +112,19 @@ export function CaseMaintenanceItemsTable({
             <TableCell>
               {awaiting && onDecide ? (
                 <div className="flex items-center justify-end gap-2">
+                  {/* NOTHING WAS FOUND, SO THERE IS NOTHING TO ACCEPT.
+                      A name search that matched no document parks the item all
+                      the same — somebody still has to clear it — but there is
+                      no candidate behind it. Offering "Yes, use it" here asks a
+                      reviewer to accept a thing that does not exist: the server
+                      refuses with "the item has no stored candidate", the row
+                      does not move, and the screen looks broken. The owner hit
+                      exactly this and asked, reasonably, "use what?". */}
+                  {item.provider_case_id === null ? (
+                    <span className="mr-1 text-xs text-muted-foreground">
+                      Nothing found to use
+                    </span>
+                  ) : null}
                   {/* Safe first, and plain. Refusing writes nothing. */}
                   <Button
                     size="sm"
@@ -119,19 +132,22 @@ export function CaseMaintenanceItemsTable({
                     disabled={busy}
                     onClick={() => onDecide(item.id, 'reject')}
                   >
-                    Not this one
+                    {item.provider_case_id === null ? 'Clear it' : 'Not this one'}
                   </Button>
-                  {/* The one that writes a judgment into a case. */}
-                  <Button
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => onDecide(item.id, 'confirm')}
-                  >
-                    {busy ? (
-                      <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
-                    ) : null}
-                    Yes, use it
-                  </Button>
+                  {/* The one that writes a judgment into a case. Only offered
+                      when there IS a judgment to write. */}
+                  {item.provider_case_id !== null ? (
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => onDecide(item.id, 'confirm')}
+                    >
+                      {busy ? (
+                        <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      Yes, use it
+                    </Button>
+                  ) : null}
                 </div>
               ) : null}
             </TableCell>
