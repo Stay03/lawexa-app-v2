@@ -656,38 +656,57 @@ function getTierKey(plan: IPlan): string {
 }
 
 /**
- * The tier a key refers to, with the audience taken off.
+ * The tier a key refers to, or null when we do not recognise it.
  *
- * "International" says who a plan is FOR, not what it is. A visitor abroad is
- * shown only international plans, so the word distinguishes nothing on their
- * screen. It must come off in ONE place, because two things depend on it: the
- * label a card shows, and where that card sits in the row. Strip it for the
- * label alone and TIER_ORDER stops recognising the key, every foreign tier
- * scores -1, and four correctly grouped cards appear in arbitrary order.
+ * ── WHY THIS IS A LIST OF TIERS AND NOT A LIST OF SUFFIXES ────────────────
+ * A plan's slug is built from a name a human typed into the payment provider,
+ * so it carries words about WHO the plan is for and WHAT IT IS PRICED IN.
+ * `basic-monthly-international` and `basic-monthly-usd` are both the Basic
+ * tier; `international` and `usd` are noise.
+ *
+ * This was first solved by stripping `international`, and four hours later the
+ * dollar plans arrived and `basic-usd` broke it exactly the same way. A list of
+ * suffixes only ever knows the ones that have already hurt us, and the next one
+ * — a region, a promotion, a currency nobody has thought of — silently scores
+ * -1 and drops the card into an arbitrary position.
+ *
+ * So the test is inverted. We match against the four tiers we actually sell,
+ * which is a closed set we control, instead of guessing at an open set of words
+ * other people invent. Any suffix at all now survives.
+ *
+ * Anchored on a segment boundary so a tier name cannot match inside a longer
+ * word — `pro` must not claim `professional-monthly`.
  */
-/**
- * Words that say WHO a plan is for or WHAT IT IS PRICED IN — never which tier
- * it is. Both kinds reach us inside the slug because a plan's slug is built
- * from the name a human typed into the payment provider.
- *
- * `international` was the first. `usd` and `ngn` are here before they arrive:
- * the dollar plans are being created as this ships, and the natural name for
- * one is "Basic Monthly USD". Left alone, that produces a card labelled
- * "Basic Usd" sitting in an arbitrary position, because TIER_ORDER cannot
- * match `basic-usd` and scores it -1 along with every other foreign tier.
- *
- * The point is that naming is the payment side's decision and rendering is
- * ours. Neither should constrain the other, so this strips the marker rather
- * than asking anyone to avoid the obvious word.
- */
-const TIER_KEY_MARKERS = new Set(['international', 'global', 'usd', 'ngn']);
+function resolveTier(tierKey: string): string | null {
+  const key = tierKey.toLowerCase();
+  return TIER_ORDER.find((tier) => key === tier || key.startsWith(`${tier}-`)) ?? null;
+}
 
+/**
+ * Where a card sits in the row.
+ *
+ * Returns a number that sorts UNKNOWN TIERS LAST rather than first. `indexOf`
+ * returned -1, which sorts an unrecognised tier to the front — so the failure
+ * mode was the cheapest plan vanishing under a mystery card, which reads as a
+ * layout bug rather than a naming one and is why this took two goes to find.
+ */
+function tierRank(tierKey: string): number {
+  const tier = resolveTier(tierKey);
+  if (tier) return TIER_ORDER.indexOf(tier);
+  if (process.env.NODE_ENV !== 'production') {
+    // Loud in development, harmless in production. A tier we cannot place is a
+    // naming change we have not been told about, and it should not be silent.
+    console.warn(
+      `[pricing] unrecognised tier key "${tierKey}" — it will sort last. ` +
+        `Add it to TIER_ORDER if it is a real tier.`,
+    );
+  }
+  return TIER_ORDER.length;
+}
+
+/** The tier a key refers to, with any audience or currency marker taken off. */
 function baseTierKey(tierKey: string): string {
-  const stripped = tierKey
-    .split('-')
-    .filter((part) => !TIER_KEY_MARKERS.has(part.toLowerCase()))
-    .join('-');
-  return stripped || tierKey;
+  return resolveTier(tierKey) ?? tierKey;
 }
 
 /** Convert a tier key to a display name. */
@@ -722,8 +741,8 @@ function groupPlansByTier(plans: IPlan[]): ITierGroup[] {
   return Array.from(tierMap.values()).sort((a, b) => {
     /* Ordered on the BASE key, so an international tier sits where its local
        twin would. Ordering on the raw key scores every foreign tier -1. */
-    const ai = TIER_ORDER.indexOf(baseTierKey(a.tierKey));
-    const bi = TIER_ORDER.indexOf(baseTierKey(b.tierKey));
+    const ai = tierRank(a.tierKey);
+    const bi = tierRank(b.tierKey);
     return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
   });
 }
