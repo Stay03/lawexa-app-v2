@@ -99,10 +99,30 @@ function PricingPage() {
   const allPlans = plansQuery.data?.data ?? [];
   const currentData = currentQuery.data?.data ?? null;
 
+  /* WHICH CURRENCIES ARE ACTUALLY ON SALE, from what the server sent us.
+     The server now decides which plans a visitor sees, and the international
+     ones are priced in naira — so a visitor abroad can be sent nine plans and
+     not one of them in dollars. Meanwhile geo suggests USD for that same
+     visitor, the filter below removes every plan, and the page shows nothing
+     to buy. Measured live: 9 plans served, 0 in USD, currency defaulted to USD.
+     Derived, never hardcoded, so this holds whatever the server decides next. */
+  const sellable = useMemo(() => allPlans.filter((p) => !p.is_free), [allPlans]);
+  const availableCurrencies = useMemo(
+    () => [...new Set(sellable.map((p) => p.currency))],
+    [sellable],
+  );
+  /* If the chosen currency has nothing behind it, show one that does rather
+     than an empty page. Derived, not stored: the reader's own preference is
+     left untouched, so it takes effect again the day that currency returns. */
+  const effectiveCurrency =
+    availableCurrencies.length > 0 && !availableCurrencies.includes(currency)
+      ? availableCurrencies[0]
+      : currency;
+
   // Filter plans to the active currency
   const plans = useMemo(
-    () => allPlans.filter((p) => p.is_free || p.currency === currency),
-    [allPlans, currency]
+    () => allPlans.filter((p) => p.is_free || p.currency === effectiveCurrency),
+    [allPlans, effectiveCurrency]
   );
 
   // Trial eligibility — only meaningful for NGN (Paystack); USD trials deferred.
@@ -239,7 +259,8 @@ function PricingPage() {
         </Tabs>
         {activeTab !== 'enterprise' && (
           <CurrencyPicker
-            currency={currency}
+            currency={effectiveCurrency}
+            available={availableCurrencies}
             isDetecting={isDetecting}
             manualOverride={manualOverride}
           />

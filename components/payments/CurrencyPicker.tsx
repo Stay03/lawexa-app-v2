@@ -33,6 +33,18 @@ const CURRENCY_ORDER: TCurrency[] = ['NGN', 'USD'];
 
 interface ICurrencyPickerProps {
   currency: TCurrency;
+  /**
+   * The currencies actually on sale, from the plans the server sent US.
+   *
+   * Not decoration. The server decides which plans a visitor may see, and
+   * since the international plans are priced in naira there may be no dollar
+   * plan on offer at all. Listing a currency with nothing behind it hands the
+   * reader an empty pricing page — which is exactly what happened the night
+   * the dollar plans were switched off.
+   *
+   * Omitted means show everything, for callers that have no plan list.
+   */
+  available?: TCurrency[];
   /** True when geo detection is still resolving and no preference is stored yet. */
   isDetecting?: boolean;
   /** True when the active currency was chosen by the user, not auto-detected. */
@@ -50,10 +62,20 @@ interface ICurrencyPickerProps {
  * `useUserCurrencyStore` and survives reloads.
  */
 function CurrencyPicker(props: ICurrencyPickerProps) {
-  const { currency, isDetecting = false, manualOverride = false, className } = props;
+  const { currency, available, isDetecting = false, manualOverride = false, className } = props;
   const setManual = useUserCurrencyStore((s) => s.setManual);
 
   const active = CURRENCY_LABELS[currency];
+
+  /* Only currencies with something to buy. A caller that passes no list gets
+     the full set, which is the old behaviour. A list that somehow excludes
+     everything falls back to the full set too — an empty dropdown is worse
+     than a wrong one. */
+  const offered =
+    available && available.length > 0
+      ? CURRENCY_ORDER.filter((code) => available.includes(code))
+      : CURRENCY_ORDER;
+  const codes = offered.length > 0 ? offered : CURRENCY_ORDER;
 
   return (
     <DropdownMenu>
@@ -81,7 +103,7 @@ function CurrencyPicker(props: ICurrencyPickerProps) {
           value={currency}
           onValueChange={(value) => setManual(value as TCurrency)}
         >
-          {CURRENCY_ORDER.map((code) => {
+          {codes.map((code) => {
             const item = CURRENCY_LABELS[code];
             return (
               <DropdownMenuRadioItem key={code} value={code} className="gap-3 py-2.5">
