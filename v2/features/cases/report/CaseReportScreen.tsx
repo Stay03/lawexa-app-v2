@@ -1,7 +1,11 @@
 'use client';
 
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+
+import { indexRendered, locateAllQuotes } from '@/lib/utils/quote-locator';
 
 import { cn } from '@/lib/utils';
 import { extractViewLimitError, isNotFoundError } from '@/lib/utils/api-error';
@@ -33,10 +37,79 @@ import '../detail/case-document.css';
  * that had already drifted — the report's recognised more heading words than the
  * summary's, so the same paragraph rendered differently on the two pages.
  */
+/** The highlight the case page's "Read it in the judgment" link lands on. */
+const HIGHLIGHT_NAME = 'judgment-passage';
+
 export function CaseReportScreen({ slug }: { slug: string }) {
   const query = useQuery(casesQueries.report(slug));
   const detail = query.data?.data ?? null;
   const report = detail?.full_report ?? null;
+
+  /**
+   * Arriving from a principle: open the judgment AT that passage.
+   *
+   * ── WHY A PRINCIPLE ID AND NOT THE TEXT ───────────────────────────────
+   * The link carries `?p=<id>` and the span is looked up here. Putting the
+   * passage in the URL would make a shareable link hundreds of characters of
+   * judgment long, and it would let anyone highlight any text they liked on
+   * our page by editing the address.
+   *
+   * ── WHY THE STORED SPAN AND NOT THE PRINCIPLE'S OWN WORDS ─────────────
+   * The span was cut out of this very judgment, so it is present by
+   * construction. A principle is usually a summary of a holding and often
+   * genuinely absent — searching for it is what made the admin panel report
+   * "not word for word" on rows where nothing was wrong.
+   */
+  const params = useSearchParams();
+  const target = params.get('p');
+  /* THE KEY, NOT THE RAW QUOTE. The key is the span already through the shared
+     normalisation, which is exactly what the matcher ran on. The raw quote is
+     lifted straight out of stored markup and can still carry undecoded
+     entities — one case in the corpus holds 62 occurrences of `&#039;` — and
+     this side does NOT decode entities, because it assumes the browser already
+     did when it built the text nodes. Feeding it raw would silently fail to
+     match on exactly those cases. Falling back to the raw span is better than
+     no highlight at all when a key is missing. */
+  const found = target
+    ? (detail?.report_principles ?? []).find(
+        (principle) => String(principle.id) === target,
+      )
+    : undefined;
+  const quote = found?.verbatim_quote_key ?? found?.verbatim_quote ?? null;
+  const [located, setLocated] = useState<'idle' | 'hit' | 'miss'>('idle');
+
+  /**
+   * A callback ref, because the work needs the rendered DOM and setting state
+   * from an effect is banned here. React 19 runs the returned function on
+   * detach, so the highlight is cleaned up when the reader leaves.
+   *
+   * `CSS.highlights` paints without touching the DOM — no elements, no
+   * attributes, nothing for React to reconcile, and nothing written into
+   * judgment text that also feeds the search index.
+   */
+  const attachReport = useCallback(
+    (container: HTMLDivElement | null) => {
+      if (!container || !quote) return;
+      const registry = typeof CSS !== 'undefined' ? CSS.highlights : undefined;
+      const ranges = locateAllQuotes(indexRendered(container), quote);
+      if (ranges.length === 0) {
+        setLocated('miss');
+        return;
+      }
+      setLocated('hit');
+      registry?.set(HIGHLIGHT_NAME, new Highlight(...ranges));
+      /* Centred, not `start`: a Range carries no scroll-margin, so the passage
+         would otherwise sit under the sticky bar. */
+      ranges[0].startContainer.parentElement?.scrollIntoView({
+        block: 'center',
+        behavior: 'smooth',
+      });
+      return () => {
+        registry?.delete(HIGHLIGHT_NAME);
+      };
+    },
+    [quote],
+  );
   const rawTitle = detail ? detail.display_title || detail.title : null;
   const title = rawTitle ? formatCaseName(rawTitle) : null;
 
@@ -120,9 +193,19 @@ export function CaseReportScreen({ slug }: { slug: string }) {
           </header>
 
           {report?.full_text?.trim() ? (
-            <div className="doc-prose">
-              <CaseText value={report.full_text} />
-            </div>
+            <>
+              {/* Arrived from a principle whose passage is not in this text.
+                  Silence would read as a broken link, so it says so once and
+                  the judgment is still there to read. */}
+              {quote && located === 'miss' ? (
+                <p className="mb-3 text-sm text-muted-foreground">
+                  That passage could not be found in this text.
+                </p>
+              ) : null}
+              <div ref={attachReport} className="doc-prose">
+                <CaseText value={report.full_text} />
+              </div>
+            </>
           ) : (
             // Reachable by URL even when no report exists (the case page only
             // links here when `has_full_report` is true), so it needs a real

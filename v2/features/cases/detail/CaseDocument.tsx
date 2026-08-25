@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { formatTreatment, relatedToDisplay } from '@/lib/utils/related-cases';
@@ -268,6 +268,11 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
         <StructuredPrinciples
           principles={principles}
           overview={detail.principles?.trim() || null}
+          reportHref={
+            detail.has_full_report === true && !isLimited
+              ? `/cases/${detail.slug}/report`
+              : null
+          }
         />
       ) : detail.principles?.trim() ? (
         <FlatPrinciples text={detail.principles} />
@@ -503,9 +508,12 @@ function AboutRow({ term, children }: { term: string; children: React.ReactNode 
 function StructuredPrinciples({
   principles,
   overview,
+  reportHref,
 }: {
   principles: ReportPrinciple[];
   overview: string | null;
+  /** `/cases/{slug}/report`, or null when this case has no full judgment. */
+  reportHref: string | null;
 }) {
   // The law-type filter exists only when the case actually spans more than
   // one classification — a tab row with one real option is furniture. With
@@ -577,7 +585,19 @@ function StructuredPrinciples({
                 shorter than the matcher's six-word run has no passage, and the
                 server sends none beyond a reader's allowance. */}
             {principle.verbatim_window ? (
-              <JudgmentPassage text={principle.verbatim_window} />
+              <JudgmentPassage
+                text={principle.verbatim_window}
+                /* Only when the judgment exists AND we hold the exact span to
+                   find it by. Without the span the report page has nothing to
+                   scroll to, and a link that lands at the top of a judgment is
+                   worse than no link. */
+                href={
+                  reportHref &&
+                  (principle.verbatim_quote_key || principle.verbatim_quote)
+                    ? `${reportHref}?p=${principle.id}`
+                    : null
+                }
+              />
             ) : null}
             <PrincipleCaption principle={principle} showLawType={!showTabs} />
           </NumberedPrinciple>
@@ -613,17 +633,46 @@ function StructuredPrinciples({
  * for readers without a subscription and caps how many principles carry one.
  * Nothing here needs to gate anything, and nothing here should try.
  */
-function JudgmentPassage({ text }: { text: string }) {
+function JudgmentPassage({
+  text,
+  href,
+}: {
+  text: string;
+  /** The judgment, opened at this passage. Absent when there is no full text. */
+  href: string | null;
+}) {
   const value = text.trim();
   if (!value) return null;
   return (
-    <figure className="mt-2.5 border-l-2 border-primary/25 pl-3.5">
+    /* col-start-2 IS LOAD-BEARING. NumberedPrinciple is a two-column grid —
+       a 2.5rem gutter for the hanging numeral, then the text column — and its
+       children are grid ITEMS, not wrapped in one. Without this the figure
+       auto-places into the numeral gutter: measured on production at 40px wide
+       and 3,418px tall, one passage running the height of a page. The caption
+       below carries the same class for the same reason. */
+    <figure className="col-start-2 mt-2.5 border-l-2 border-primary/25 pl-3.5">
       <figcaption className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
         From the judgment
       </figcaption>
       <blockquote className="doc-prose text-[0.9375rem] leading-relaxed text-muted-foreground">
         <CaseText value={value} />
       </blockquote>
+      {/* The passage is an extract. This is the way to the rest of it, landing
+          on this same sentence rather than at the top of tens of thousands of
+          words — which is the whole difference between a link and an answer. */}
+      {href ? (
+        <Link
+          href={href}
+          className={cn(
+            'mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary/90',
+            'transition-colors hover:text-primary motion-reduce:transition-none',
+            FOCUS_RING,
+          )}
+        >
+          Read it in the judgment
+          <ArrowUpRight aria-hidden className="size-3.5" />
+        </Link>
+      ) : null}
     </figure>
   );
 }
