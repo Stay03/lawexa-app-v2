@@ -626,17 +626,59 @@ function PricingGridSkeleton() {
  * NGN and USD variants of the same logical plan share a key.
  */
 function getTierKey(plan: IPlan): string {
-  // The slug_base shape is "{tier}-{interval}" (e.g., "pro-monthly"). Strip the
-  // interval suffix to get the tier identifier.
+  /**
+   * Remove the INTERVAL segment, wherever it sits — not the last one.
+   *
+   * This took the last segment on the assumption that a slug reads
+   * "{tier}-{interval}". That held while every slug was "pro-monthly". It
+   * broke the night the international plans arrived: `slug_base` strips only a
+   * trailing `-usd`, so "basic-monthly-international" kept its last segment as
+   * "international". Stripping it left "basic-monthly", its annual twin became
+   * "basic-annually", and the two never grouped — eight cards for four
+   * products, each with a term switch that could not work, live to every
+   * visitor abroad.
+   *
+   * The plan tells us its own interval, so nothing here has to guess which
+   * segment that is. Position is an assumption; `plan.interval` is a fact.
+   */
   const base = plan.slug_base ?? plan.slug;
-  const parts = base.split('-');
-  return parts.slice(0, -1).join('-');
+  const interval = String(plan.interval ?? '').toLowerCase();
+  const parts = base.split('-').filter((part) => part.length > 0);
+  const withoutInterval = interval
+    ? parts.filter((part) => part.toLowerCase() !== interval)
+    : parts.slice(0, -1);
+  /* Guard: if removing the interval removed everything — an unexpected slug —
+     fall back to the old behaviour rather than returning an empty key that
+     would collapse every plan into one card. */
+  return withoutInterval.length > 0
+    ? withoutInterval.join('-')
+    : parts.slice(0, -1).join('-');
+}
+
+/**
+ * The tier a key refers to, with the audience taken off.
+ *
+ * "International" says who a plan is FOR, not what it is. A visitor abroad is
+ * shown only international plans, so the word distinguishes nothing on their
+ * screen. It must come off in ONE place, because two things depend on it: the
+ * label a card shows, and where that card sits in the row. Strip it for the
+ * label alone and TIER_ORDER stops recognising the key, every foreign tier
+ * scores -1, and four correctly grouped cards appear in arbitrary order.
+ */
+function baseTierKey(tierKey: string): string {
+  const stripped = tierKey
+    .split('-')
+    .filter((part) => part.toLowerCase() !== 'international')
+    .join('-');
+  return stripped || tierKey;
 }
 
 /** Convert a tier key to a display name. */
 function getTierDisplayName(tierKey: string): string {
   if (TIER_DISPLAY_NAMES[tierKey]) return TIER_DISPLAY_NAMES[tierKey];
-  return tierKey
+  const base = baseTierKey(tierKey);
+  if (TIER_DISPLAY_NAMES[base]) return TIER_DISPLAY_NAMES[base];
+  return base
     .split('-')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
@@ -661,8 +703,10 @@ function groupPlansByTier(plans: IPlan[]): ITierGroup[] {
   }
 
   return Array.from(tierMap.values()).sort((a, b) => {
-    const ai = TIER_ORDER.indexOf(a.tierKey);
-    const bi = TIER_ORDER.indexOf(b.tierKey);
+    /* Ordered on the BASE key, so an international tier sits where its local
+       twin would. Ordering on the raw key scores every foreign tier -1. */
+    const ai = TIER_ORDER.indexOf(baseTierKey(a.tierKey));
+    const bi = TIER_ORDER.indexOf(baseTierKey(b.tierKey));
     return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
   });
 }
