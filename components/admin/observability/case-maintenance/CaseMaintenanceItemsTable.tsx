@@ -243,8 +243,22 @@ function ItemDetail({
     );
   }
 
+  /* THE ORDER OF THE NEXT TWO BRANCHES IS LOAD-BEARING. DO NOT SWAP THEM.
+     A gateway miss on the ordinary citation path closes the item with `detail`
+     set to an EMPTY ARRAY rather than null, and PHP serialises an empty
+     associative array as JSON `[]`, which is TRUTHY here. Measured on the live
+     queue: eight rows carry `detail: []`, every one a 404 with a real `error`
+     ("NWLR has no document at the derived key: no case found for key
+     '60_1_196'").
+     Because the error is tested first, those rows render their real reason.
+     Test the detail first and they fall through to `detail.changed`, which is
+     undefined, and the screen prints "Nothing changed" about a case the
+     provider could not find — a false statement about case law, produced
+     silently. Hence the emptiness check below rather than a bare `!detail`. */
   if (!error && !evidence) {
-    if (!detail) return <span className="text-muted-foreground">—</span>;
+    const emptyDetail =
+      !detail || (typeof detail === 'object' && Object.keys(detail).length === 0);
+    if (emptyDetail) return <span className="text-muted-foreground">—</span>;
     return (
       <span className="text-muted-foreground">
         {detail.changed ? 'Replaced from NWLR' : 'Nothing changed'}
@@ -320,14 +334,26 @@ function TieChoice({
             follows the count, and the server's own reasons are shown, because
             a reviewer overriding a refusal has to see what they are
             overriding. */}
+        {/* NEITHER LABEL MAY ASSERT WHY. The plural one used to read "These
+            matched equally", which repeats the same fault in miniature: two
+            candidates scoring 100 and 72 both clear a bar of 70 and did NOT
+            match equally. The server treats a tie as a MARGIN — its own reason
+            reads "within 5 points of each other" — so clearing the bar and
+            tying are different things, and only the server knows which
+            happened. Both labels now describe what is on the screen and leave
+            the reason to the reasons. */}
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           {qualified.length > 1
-            ? 'These matched equally. Pick the right case.'
+            ? 'More than one case cleared the bar. Pick the right one.'
             : 'This was not used automatically. Read why before you use it.'}
         </DropdownMenuLabel>
         {reasons.length > 0 ? (
           <p className="px-2 pb-1.5 text-[11px] leading-snug text-amber-600 dark:text-amber-500">
-            {reasons.join('. ')}
+            {/* The server sends each reason lowercase and unterminated, so
+                joining them raw reads "...use it. a Part signal ... . no year
+                the case carries ...". Capitalise for the sentence they are
+                rendered as; the wording itself stays the server's. */}
+            {reasons.map((reason) => reason.charAt(0).toUpperCase() + reason.slice(1)).join('. ')}
           </p>
         ) : null}
         {qualified.slice(0, 5).map((candidate) => (
