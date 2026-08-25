@@ -165,9 +165,18 @@ export function useRetryFailedCaseMaintenanceItems(uuid: string | null) {
 export function useDecideCaseMaintenanceItem(uuid: string | null) {
   const invalidate = useRunInvalidation(uuid);
   return useMutation({
-    mutationFn: ({ itemId, decision }: { itemId: number; decision: 'confirm' | 'reject' }) =>
+    mutationFn: ({
+      itemId,
+      decision,
+      providerCaseId,
+    }: {
+      itemId: number;
+      decision: 'confirm' | 'reject';
+      /** The candidate a person picked, when the item holds none itself. */
+      providerCaseId?: string | null;
+    }) =>
       decision === 'confirm'
-        ? adminCaseMaintenanceRunsApi.confirmItem(uuid as string, itemId)
+        ? adminCaseMaintenanceRunsApi.confirmItem(uuid as string, itemId, providerCaseId)
         : adminCaseMaintenanceRunsApi.rejectItem(uuid as string, itemId),
     onSuccess: invalidate,
   });

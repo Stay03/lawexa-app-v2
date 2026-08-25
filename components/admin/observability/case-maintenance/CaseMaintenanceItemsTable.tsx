@@ -5,6 +5,13 @@ import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ObservabilityTable, ErrorCell, StatusBadge } from '../index';
 import { itemStatusMeta, matchMethodLabel } from './status';
 import {
@@ -151,6 +158,17 @@ export function CaseMaintenanceItemsTable({
                       Yes, use it
                     </Button>
                   ) : null}
+                  {/* A TIE IS NOT A REFUSAL. Two candidates that both clear the
+                      bar leave the item with no stored candidate, because a
+                      machine should not choose between two equally good matches.
+                      For a while that meant the ONLY thing a person could do
+                      with a match that had qualified was discard it — and one
+                      was discarded that way before anyone noticed. The server
+                      takes a chosen candidate in preference to a stored one, so
+                      the choice belongs here. */}
+                  {item.provider_case_id === null ? (
+                    <TieChoice item={item} busy={busy} onDecide={onDecide} />
+                  ) : null}
                 </div>
               ) : null}
             </TableCell>
@@ -245,6 +263,65 @@ function ItemDetail({
       {evidence ? <Comparison evidence={evidence} /> : null}
       {!evidence && reference ? <ReferenceLine reference={reference} /> : null}
     </div>
+  );
+}
+
+/**
+ * Break a tie by picking one of the candidates that qualified.
+ *
+ * Only rendered where the search produced no winner but did produce candidates
+ * ABOVE the threshold — the case the backend refuses to decide on its own.
+ * Candidates below the bar are not offered: nothing there is worth writing into
+ * a case, and listing them would invite exactly the mistaken confirmation the
+ * threshold exists to prevent.
+ */
+function TieChoice({
+  item,
+  busy,
+  onDecide,
+}: {
+  item: CaseMaintenanceItem;
+  busy: boolean;
+  onDecide: (itemId: number, decision: 'confirm' | 'reject', providerCaseId?: string | null) => void;
+}) {
+  const search = caseMaintenanceDetail(item.detail)?.name_search;
+  const threshold = search?.threshold ?? null;
+  const qualified = (search?.candidates ?? []).filter(
+    (candidate) =>
+      candidate.provider_case_id !== null &&
+      candidate.title_similarity !== null &&
+      candidate.title_similarity !== undefined &&
+      threshold !== null &&
+      candidate.title_similarity >= threshold,
+  );
+  if (qualified.length === 0) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" disabled={busy}>
+          {busy ? <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" /> : null}
+          Choose one
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-w-[420px]">
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          Both matched equally. Pick the right case.
+        </DropdownMenuLabel>
+        {qualified.slice(0, 5).map((candidate) => (
+          <DropdownMenuItem
+            key={candidate.provider_case_id}
+            className="flex flex-col items-start gap-0.5 py-2"
+            onSelect={() => onDecide(item.id, 'confirm', candidate.provider_case_id)}
+          >
+            <span className="text-xs font-medium">{candidate.title ?? 'Untitled'}</span>
+            <span className="text-[11px] text-muted-foreground">
+              {candidate.citation ?? 'no citation'} · match {candidate.title_similarity}
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

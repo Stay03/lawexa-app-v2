@@ -151,9 +151,25 @@ async function retryFailed(uuid: string): Promise<ApiResponse<CaseMaintenanceRun
 async function confirmItem(
   uuid: string,
   itemId: number,
+  /**
+   * Which candidate to use, when the item does not carry one of its own.
+   *
+   * A name search that finds two equally good matches deliberately picks
+   * neither — a machine should not choose between two cases that match a
+   * record equally well. But the item then has no stored candidate, so an
+   * unqualified confirm is refused with "the item has no stored candidate",
+   * and for a while the only thing a person could do with a match that had
+   * PASSED the bar was throw it away. One was discarded that way before
+   * anybody noticed.
+   *
+   * The server takes this in preference to any stored candidate, so a human
+   * breaking a tie is exactly what it is for.
+   */
+  providerCaseId?: string | null,
 ): Promise<ApiResponse<CaseMaintenanceItem>> {
   const response = await apiClient.post<ApiResponse<CaseMaintenanceItem>>(
     `/admin/case-maintenance-runs/${uuid}/items/${itemId}/confirm`,
+    providerCaseId ? { provider_case_id: providerCaseId } : undefined,
   );
   return response.data;
 }

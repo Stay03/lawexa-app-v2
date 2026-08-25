@@ -112,9 +112,9 @@ export default function CaseMaintenanceRunPage({
    * rest of admin uses, so the failure looks like every other failure here.
    */
   const onDecide = useCallback(
-    (itemId: number, decision: 'confirm' | 'reject') => {
+    (itemId: number, decision: 'confirm' | 'reject', providerCaseId?: string | null) => {
       decide.mutate(
-        { itemId, decision },
+        { itemId, decision, providerCaseId },
         {
           onSuccess: () =>
             toast.success(
