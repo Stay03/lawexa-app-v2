@@ -282,7 +282,7 @@ function PricingPage() {
         />
       )}
 
-      {activeTab === 'payg' && <PackTabContent currency={currency} />}
+      {activeTab === 'payg' && <PackTabContent currency={effectiveCurrency} />}
 
       {activeTab === 'enterprise' && <EnterpriseTabContent />}
     </PageContainer>
@@ -394,7 +394,14 @@ function PackTabContent({ currency }: { currency: TCurrency }) {
   const pricingQuery = useMessagePackPricing(currency);
   const purchaseMutation = usePurchaseMessagePack();
 
-  const priceRow = pricingQuery.data?.data?.prices.find((p) => p.currency === currency);
+  /* Same rule as the plans grid above: follow what is actually priced. Packs
+     are naira on both sides of the border now, so a visitor whose currency
+     resolves to USD would otherwise be told packs are unavailable when they
+     are simply not sold in dollars. Fall back to a currency that has a price
+     rather than showing a dead end. */
+  const priceRows = pricingQuery.data?.data?.prices ?? [];
+  const priceRow =
+    priceRows.find((p) => p.currency === currency) ?? priceRows[0] ?? undefined;
   const messagesPerPack = pricingQuery.data?.data?.messages_per_pack ?? 10;
   const totalMessages = quantity * messagesPerPack;
 
