@@ -121,11 +121,6 @@ export function CaseMaintenanceItemsTable({
                       refuses with "the item has no stored candidate", the row
                       does not move, and the screen looks broken. The owner hit
                       exactly this and asked, reasonably, "use what?". */}
-                  {item.provider_case_id === null ? (
-                    <span className="mr-1 text-xs text-muted-foreground">
-                      Nothing found to use
-                    </span>
-                  ) : null}
                   {/* Safe first, and plain. Refusing writes nothing. */}
                   <Button
                     size="sm"
@@ -133,7 +128,14 @@ export function CaseMaintenanceItemsTable({
                     disabled={busy}
                     onClick={() => onDecide(item.id, 'reject')}
                   >
-                    {item.provider_case_id === null ? 'Clear it' : 'Not this one'}
+                    {/* ALWAYS "Not this one", never a second name for the same
+                        button. "Clear it" read better on a row with no
+                        candidate, but backend had already told the owner four
+                        times to click "Not this one" and named the rows. A
+                        reader hunting a label that is not on screen is a worse
+                        problem than a slightly loose word, and the line beside
+                        it already says nothing was found. */}
+                    Not this one
                   </Button>
                   {/* The one that writes a judgment into a case. Only offered
                       when there IS a judgment to write. */}

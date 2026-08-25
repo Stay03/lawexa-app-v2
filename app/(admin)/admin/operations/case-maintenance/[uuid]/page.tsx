@@ -165,7 +165,23 @@ export default function CaseMaintenanceRunPage({
             {run.created_by ? ` · started by ${run.created_by.name}` : ''}
           </p>
         </div>
-        <StatusBadge meta={runStatusMeta(run.status)} />
+        {/* "RUNNING" IS A LIE WHEN THE ONLY THING LEFT IS A PERSON.
+            A run stays `running` on the server until its parked items are
+            decided, which is correct — but the badge then spins "Running" at
+            somebody who is the reason it has not finished. The owner read it
+            exactly that way: "still saying running even when its done".
+            Nothing pending and nothing in flight, with items awaiting a
+            decision, means the machine has done everything it can. */}
+        <StatusBadge
+          meta={
+            run.status === 'running' &&
+            (run.progress?.awaiting_confirmation ?? 0) > 0 &&
+            (run.progress?.pending ?? 0) === 0 &&
+            (run.progress?.running ?? 0) === 0
+              ? { label: 'Waiting on you', tone: 'warning' }
+              : runStatusMeta(run.status)
+          }
+        />
       </div>
 
       <Card>
