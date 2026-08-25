@@ -192,7 +192,21 @@ function ItemDetail({
   error: string | null;
   statusCode: number | null;
 }) {
-  const evidence = detail?.evidence;
+  /* EVIDENCE THAT SAYS NOTHING IS NOT EVIDENCE. `Comparison` builds its line
+     from three booleans, and a name-search item carries none of them — so an
+     evidence object can be present, truthy, and render an entirely empty cell.
+     Measured on screen: a Done row with nothing at all under What happened,
+     while every citation-matched row beside it showed two lines. Treat it as
+     absent so the fallback below speaks instead. */
+  const rawEvidence = detail?.evidence;
+  const evidence =
+    rawEvidence &&
+    (rawEvidence.citation_match !== undefined ||
+      rawEvidence.year_match !== undefined ||
+      rawEvidence.title_match !== undefined ||
+      Boolean(rawEvidence.document_title))
+      ? rawEvidence
+      : undefined;
   const reference = detail?.reference;
   const search = detail?.name_search;
 
@@ -203,7 +217,7 @@ function ItemDetail({
   if (search) {
     return (
       <div className="space-y-0.5">
-        {error ? <ErrorCell error={error} /> : null}
+        {error ? <ErrorCell error={error} wrap /> : null}
         <NameSearchDetail search={search} />
       </div>
     );
@@ -220,7 +234,7 @@ function ItemDetail({
 
   return (
     <div className="space-y-0.5">
-      {error ? <ErrorCell error={error} /> : null}
+      {error ? <ErrorCell error={error} wrap /> : null}
       {/* The status code is sent on every failure precisely so a person can
           tell a provider outage from a case we simply could not find. */}
       {statusCode !== null ? (

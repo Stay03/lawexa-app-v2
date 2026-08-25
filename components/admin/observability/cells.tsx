@@ -31,11 +31,28 @@ export function TimeAgoCell({ value }: { value: string | null }) {
 export function ErrorCell({
   error,
   className,
+  wrap = false,
 }: {
   error: string | null;
   className?: string;
+  /**
+   * Show the whole message instead of one clipped line.
+   *
+   * The default keeps a long stack-ish error from wrecking a dense table, and
+   * the tooltip carries the rest. But where the message IS the row's content —
+   * the reason we refused to overwrite a case, which somebody is being asked to
+   * rule on — clipping it hides the part that decides the answer. Measured on
+   * screen: "The fetched document does not agree with the case it woul…", cut
+   * exactly at the meaning. A tooltip only helps a reader who guesses it exists.
+   */
+  wrap?: boolean;
 }) {
   if (!error) return <span className="text-sm text-muted-foreground">—</span>;
+  if (wrap) {
+    return (
+      <span className={cn('block text-sm text-destructive', className)}>{error}</span>
+    );
+  }
   return (
     <Tooltip>
       <TooltipTrigger asChild>
