@@ -190,6 +190,8 @@ export interface CaseMaintenanceEvidence {
 export interface CaseMaintenanceItemDetail {
   /** Whether this case was actually altered, as opposed to merely handled. */
   changed?: boolean;
+  /** Present on `name_search` items — see {@link CaseMaintenanceNameSearch}. */
+  name_search?: CaseMaintenanceNameSearch | null;
   evidence?: CaseMaintenanceEvidence;
   case_slug?: string | null;
   /** How the end of the judgment text was found. */
@@ -223,6 +225,45 @@ export interface CaseMaintenanceReference {
  * Two of the four items in the owner's run carried `detail: []`. See the field
  * itself for why an empty record arrives as a list.
  */
+/**
+ * What the name search found, when a citation could not identify a case.
+ *
+ * ── THIS WAS BEING SENT AND NOBODY READ IT ────────────────────────────────
+ * The screen rendered "Nothing changed" on every row that needed a decision,
+ * because nothing here was typed and the renderer fell through to the default.
+ * So the ONLY rows showing a reviewer nothing were the ones asking them to
+ * decide, and "Yes, use it" invited them to accept a case never displayed.
+ * The owner asked, exactly: "use what?".
+ *
+ * Everything needed to answer him was already on the payload.
+ */
+export interface CaseMaintenanceNameSearchCandidate {
+  title: string | null;
+  citation: string | null;
+  date: string | null;
+  provider_case_id: string | null;
+  /** 0 to 100. How close the reported name is to ours. */
+  title_similarity: number | null;
+  /** Whether any party name is common to both. A hard gate, never scored. */
+  shares_party: boolean | null;
+  party_reason: string | null;
+  part_agreement: string | null;
+  year_overlap: boolean | null;
+}
+
+export interface CaseMaintenanceNameSearch {
+  /** What we asked the provider for. */
+  query: string | null;
+  /** The candidate that won, or null when none was good enough. */
+  winner: CaseMaintenanceNameSearchCandidate | null;
+  /** Why a person is being asked — a tie, a low score, a failed gate. */
+  reasons?: string[] | null;
+  /** The score a candidate must beat to be written without a person. */
+  threshold?: number | null;
+  candidates?: CaseMaintenanceNameSearchCandidate[] | null;
+  auto_eligible?: boolean | null;
+}
+
 export function caseMaintenanceDetail(
   detail: CaseMaintenanceItemDetail | unknown[] | null,
 ): CaseMaintenanceItemDetail | null {

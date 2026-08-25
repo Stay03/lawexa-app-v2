@@ -11,6 +11,7 @@ import {
   caseMaintenanceDetail,
   type CaseMaintenanceItem,
   type CaseMaintenanceItemDetail,
+  type CaseMaintenanceNameSearch,
   type CaseMaintenanceReference,
 } from '@/types/admin-case-maintenance-runs';
 
@@ -193,6 +194,20 @@ function ItemDetail({
 }) {
   const evidence = detail?.evidence;
   const reference = detail?.reference;
+  const search = detail?.name_search;
+
+  /* A NAME SEARCH IS THE WHOLE STORY ON A ROW THAT NEEDS A DECISION, and it
+     was being thrown away. Rendered before the generic fallbacks so the rows
+     asking most of a reviewer stop being the only rows that tell them
+     nothing. */
+  if (search) {
+    return (
+      <div className="space-y-0.5">
+        {error ? <ErrorCell error={error} /> : null}
+        <NameSearchDetail search={search} />
+      </div>
+    );
+  }
 
   if (!error && !evidence) {
     if (!detail) return <span className="text-muted-foreground">—</span>;
@@ -213,6 +228,79 @@ function ItemDetail({
       ) : null}
       {evidence ? <Comparison evidence={evidence} /> : null}
       {!evidence && reference ? <ReferenceLine reference={reference} /> : null}
+    </div>
+  );
+}
+
+/**
+ * What the name search proposes, and how sure it is.
+ *
+ * The row's whole job is to let somebody rule on a match. That is impossible
+ * without seeing the match, which is what "use what?" meant. So: the case
+ * being proposed and its score when there is one, and when there is not, the
+ * reason plus the best thing found — because "we searched and the closest was
+ * this, scoring nothing" is a real answer and an empty cell is not.
+ */
+function NameSearchDetail({ search }: { search: CaseMaintenanceNameSearch }) {
+  const winner = search.winner ?? null;
+  const best = winner ?? search.candidates?.[0] ?? null;
+  const reason = search.reasons?.[0] ?? null;
+  /* A tie is the case that cleared the bar and still needs a person. Read from
+     the score against the threshold rather than by matching words in `reasons`,
+     which is prose and free to change. */
+  const tied =
+    !winner &&
+    best?.title_similarity !== null &&
+    best?.title_similarity !== undefined &&
+    search.threshold !== null &&
+    search.threshold !== undefined &&
+    best.title_similarity >= search.threshold;
+
+  return (
+    <div className="space-y-1">
+      {winner ? (
+        <>
+          <span className="block text-xs font-medium text-foreground">
+            Proposes: {winner.title ?? 'an untitled case'}
+          </span>
+          {winner.citation ? (
+            <span className="block text-xs text-muted-foreground">{winner.citation}</span>
+          ) : null}
+        </>
+      ) : (
+        /* WHY there is no winner, not just that there is none. Two candidates
+           scoring 75 against a threshold of 70 is not "nothing close enough" —
+           it is two cases equally close, which is the situation where a person
+           genuinely has to choose. Saying the wrong one contradicts the score
+           printed directly beneath it. */
+        <span className="block text-xs font-medium text-amber-700 dark:text-amber-400">
+          {tied ? 'More than one case matches equally' : 'Nothing close enough to use'}
+        </span>
+      )}
+
+      {/* The number the decision turns on, next to the line it had to clear. */}
+      {best?.title_similarity !== null && best?.title_similarity !== undefined ? (
+        <span className="block text-xs text-muted-foreground">
+          Name match {best.title_similarity}
+          {search.threshold !== null && search.threshold !== undefined
+            ? ` of ${search.threshold} needed`
+            : null}
+          {best.shares_party === false ? ' · no party in common' : null}
+          {best.shares_party === true ? ' · shares a party' : null}
+        </span>
+      ) : null}
+
+      {/* Not the winner, so name it — otherwise the score above reads as if it
+          belonged to a case being proposed. */}
+      {!winner && best?.title ? (
+        <span className="block text-xs text-muted-foreground">
+          Closest was {best.title}
+        </span>
+      ) : null}
+
+      {reason ? (
+        <span className="block text-xs text-muted-foreground">{reason}</span>
+      ) : null}
     </div>
   );
 }
