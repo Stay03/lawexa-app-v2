@@ -40,11 +40,18 @@ import type { AdminSetting, AdminSettingGroup } from '@/types/admin-settings';
 const GROUP_LABELS: Record<string, string> = {
   subscription: 'Subscription Settings',
   trial: 'Trial Settings',
+  pricing: 'Message Pack Pricing',
 };
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
   subscription: 'Configure subscription behavior and payment settings.',
   trial: 'Manage free trial duration, features, and enrollment.',
+  /* Every value in this group is in MINOR units — kobo and cents. The server
+     sends a description with each one saying so ("200 = $2 per pack of 10
+     messages") and the field renders it, which is the only thing standing
+     between someone and setting a pack to four cents. */
+  pricing:
+    'Pack and trial amounts, in minor units — kobo and cents, not naira and dollars. Each field says what its number means.',
 };
 
 /** Maps a boolean toggle key to the fields it controls. */
@@ -245,16 +252,24 @@ function SettingsLoadingSkeleton() {
 export function BillingSettingsContent() {
   const subscriptionQuery = useAdminSettings({ group: 'subscription' });
   const trialQuery = useAdminSettings({ group: 'trial' });
+  /* The pricing group was in the database and on no screen. Five live values —
+     both naira pack prices, the dollar pack price and both trial tokenisation
+     amounts — could only be changed by hand over the API, which is how the
+     owner came to be told "there is no way to change the usd value of packs in
+     the admin". He was right. */
+  const pricingQuery = useAdminSettings({ group: 'pricing' });
 
-  const isLoading = subscriptionQuery.isLoading || trialQuery.isLoading;
-  const isError = subscriptionQuery.isError || trialQuery.isError;
+  const isLoading =
+    subscriptionQuery.isLoading || trialQuery.isLoading || pricingQuery.isLoading;
+  const isError = subscriptionQuery.isError || trialQuery.isError || pricingQuery.isError;
 
   const allSettings = useMemo(
     () => [
       ...(subscriptionQuery.data?.data || []),
       ...(trialQuery.data?.data || []),
+      ...(pricingQuery.data?.data || []),
     ],
-    [subscriptionQuery.data, trialQuery.data]
+    [subscriptionQuery.data, trialQuery.data, pricingQuery.data]
   );
 
   const settingsByGroup = useMemo(() => {

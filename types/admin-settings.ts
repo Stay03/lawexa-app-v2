@@ -8,11 +8,16 @@ export type AdminSettingGroup =
   | 'auth'
   | 'feedback'
   | 'trending'
-  | 'rate_limits';
+  | 'rate_limits'
+  | 'pricing';
 
+/* Drives the render order on the billing settings screen. A group missing from
+   here is fetched and then silently not shown, which is how five live pricing
+   values sat in the database and on no screen. */
 export const BILLING_SETTING_GROUPS: AdminSettingGroup[] = [
   'subscription',
   'trial',
+  'pricing',
 ];
 
 export interface AdminSetting {
