@@ -77,6 +77,20 @@ function CurrencyPicker(props: ICurrencyPickerProps) {
       : CURRENCY_ORDER;
   const codes = offered.length > 0 ? offered : CURRENCY_ORDER;
 
+  /* A CONTROL THAT CANNOT CHANGE ANYTHING SHOULD NOT BE DRAWN.
+     The server picks the currency from the visitor's country and sends only
+     that set, so on the pricing page there is exactly one choice — a menu with
+     a single ticked row, under a caption reading "Auto-detected from your
+     location. Change anytime." Both halves of that are false: it detected
+     nothing the reader chose, and nothing can be changed.
+
+     Hiding it here rather than deleting the component keeps it honest in both
+     directions. It disappears while one currency is on offer and comes back by
+     itself the day two are, with no dead code left behind and nothing for
+     anyone to remember. Callers that pass no list — the pay-as-you-go dialog —
+     are unaffected, because they are offered the full set. */
+  if (codes.length < 2) return null;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

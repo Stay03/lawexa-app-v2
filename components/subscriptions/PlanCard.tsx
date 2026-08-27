@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Check, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, Sparkles, Loader2, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Collapsible,
   CollapsibleContent,
@@ -141,6 +142,49 @@ const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> =
 /******************************************************************************
                                Components
 ******************************************************************************/
+
+/**
+ * The "ⓘ" beside a price. Opens on hover AND on click, deliberately.
+ *
+ * Hover alone would hide this from every phone — a touch device never fires
+ * it, so the note would exist only for people on a mouse. Radix's Tooltip does
+ * not open on tap either, which is why this is a controlled Popover: click
+ * toggles it, pointer enter and leave drive it on a mouse, and focus opens it
+ * for the keyboard.
+ */
+function TaxNote() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Taxes and bank charges excluded"
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          className={cn(
+            'mt-1.5 inline-flex items-center gap-1 rounded text-xs text-muted-foreground',
+            'transition-colors hover:text-foreground focus-visible:outline-none',
+            'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+          )}
+        >
+          <Info aria-hidden className="size-3.5" />
+          <span className="underline decoration-dotted underline-offset-2">Taxes &amp; charges</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        className="w-auto max-w-[15rem] px-3 py-2 text-xs leading-snug"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        Taxes &amp; bank charges excluded.
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 /**
  * Default component. Renders a single plan card for the pricing grid.
@@ -297,6 +341,9 @@ function PlanCard(props: IPlanCardProps) {
               </div>
             </>
           )}
+
+          {/* Nothing is added to a free plan, so the note would be a lie there. */}
+          {!activePlan.is_free && <TaxNote />}
         </div>
 
         {/* Highlighted features */}
