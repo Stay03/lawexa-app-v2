@@ -155,18 +155,38 @@ function AdminMessagePacksTable({
               <TableCell className="text-right tabular-nums text-sm">
                 {pack.quantity}
               </TableCell>
-              {/* Messages */}
+              {/* Messages — only meaningful once the pack is paid for.
+                  A pack that was never paid comes back as consumed 10 of 10
+                  with 0 remaining, because messages are credited on payment and
+                  the server derives "consumed" as total minus remaining. So an
+                  UNPAID pack rendered as a fully USED one — and the person
+                  reading that row is, by definition, someone looking into a
+                  purchase that did not complete. Measured on pack 483: status
+                  pending, never paid, displayed 10/10 and "0 remaining". */}
               <TableCell>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-sm tabular-nums cursor-help">
-                      {pack.messages_consumed}/{pack.messages_total}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {pack.messages_remaining} remaining
-                  </TooltipContent>
-                </Tooltip>
+                {pack.status === 'completed' ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-sm tabular-nums cursor-help">
+                        {pack.messages_consumed}/{pack.messages_total}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {pack.messages_remaining} remaining
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-sm text-muted-foreground cursor-help">
+                        — of {pack.messages_total}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Not credited — this pack has not been paid for
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </TableCell>
               {/* Amount — currency-aware */}
               <TableCell className="text-right tabular-nums text-sm">

@@ -24,7 +24,24 @@ function AdminPlansContent() {
   // Read params from URL
   const params = useMemo<AdminPlansParams>(() => {
     const page = Number(searchParams.get('page')) || 1;
-    const per_page = Number(searchParams.get('per_page')) || 15;
+    /* 100, NOT 15 — AND THIS IS A WORKAROUND, NOT A PREFERENCE.
+       Paging this endpoint loses rows. There is no stable tiebreak on the
+       server, so the last page serves a reversed tail instead of the
+       remainder: it reports 33 plans, returns 33 rows, and those rows contain
+       only 30 distinct plans. Measured 27 August against production:
+
+         per_page=10  -> 30 of 33 seen, the 3 missing all USD
+         per_page=15  -> 30 of 33 seen, the 3 missing all USD   (the old default)
+         per_page=25  -> 25 of 33 seen, EVERY USD plan missing
+         per_page=50  -> all 33 seen
+         per_page=100 -> all 33 seen
+
+       One of the plans unreachable at the old default was Basic Monthly USD,
+       which is the plan behind the only live dollar subscription — so an admin
+       could not see the plan a paying customer was on. Asking for everything at
+       once sidesteps the defect because there is then only one page to lose
+       rows between. When the server sorts stably this can go back to paging. */
+    const per_page = Number(searchParams.get('per_page')) || 100;
     const is_active_raw = searchParams.get('is_active');
     const is_active =
       is_active_raw === 'true'

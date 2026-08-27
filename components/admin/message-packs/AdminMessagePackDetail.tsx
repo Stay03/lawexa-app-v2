@@ -82,8 +82,21 @@ function AdminMessagePackDetailView({ messagePack }: AdminMessagePackDetailProps
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6">
               <DetailField label="Quantity" value={String(pack.quantity)} />
               <DetailField label="Messages Total" value={pack.messages_total.toLocaleString()} />
-              <DetailField label="Messages Consumed" value={pack.messages_consumed.toLocaleString()} />
-              <DetailField label="Messages Remaining" value={pack.messages_remaining.toLocaleString()} />
+              {/* Consumed and remaining only mean anything once the pack is
+                  paid. Unpaid, the server reports consumed = total and
+                  remaining = 0, because messages are credited on payment and
+                  consumed is derived from the shortfall. This page is where
+                  someone lands when a purchase is stuck, so it is the worst
+                  possible place to say "all used up" about a pack nobody was
+                  ever charged for. */}
+              {pack.status === 'completed' ? (
+                <>
+                  <DetailField label="Messages Consumed" value={pack.messages_consumed.toLocaleString()} />
+                  <DetailField label="Messages Remaining" value={pack.messages_remaining.toLocaleString()} />
+                </>
+              ) : (
+                <DetailField label="Messages Credited" value="None — not paid for" />
+              )}
               <DetailField label="Amount" value={formatMoneyMinor(pack.amount_minor, pack.currency)} />
               <DetailField label="Currency" value={pack.currency} />
               {pack.paid_at && (
