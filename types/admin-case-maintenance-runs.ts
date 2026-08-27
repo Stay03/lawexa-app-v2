@@ -291,6 +291,23 @@ export interface CaseMaintenanceItem {
   status_code: number | null;
   started_at: string | null;
   completed_at: string | null;
+  /**
+   * How closely the BEST candidate resembled the case, 0-100. The server picks
+   * the best rather than the first, so this does not silently follow a change
+   * in candidate ordering.
+   *
+   * NULL AND ZERO ARE DIFFERENT THINGS AND MUST NEVER BE MERGED.
+   * `null` — nothing was scored. No candidate came back at all, or the item
+   *          never went to a name search. 68 of 116 items on 27 August.
+   * `0`    — we searched, candidates DID come back, and none resembled the
+   *          case. Item 103 has ten candidates, every one scoring 0, because
+   *          its title carried a citation into the query.
+   * Showing them as one group tells a reviewer that a hundred cases were looked
+   * at and found unrelated, which is false for the sixty-eight.
+   */
+  score: number | null;
+  /** The score at or above which the server accepts a match without asking. */
+  threshold: number | null;
 }
 
 /* ── Choosing what to run ──────────────────────────────────────────────────── */
@@ -426,9 +443,48 @@ export interface CaseMaintenanceRunsParams {
   status?: CaseMaintenanceRunStatus;
 }
 
+/**
+ * Sort keys the items endpoint accepts. Anything else is a 422, deliberately —
+ * a silently ignored sort parameter would leave the reviewer looking at an
+ * arbitrary order while believing it was ranked.
+ *
+ * `-score` puts the best matches first and the UNSCORED last, which is the
+ * order the review screen wants: certain at the top, nothing-found in the
+ * middle, never-searched out of the way.
+ */
+export type CaseMaintenanceItemSort = 'score' | '-score' | 'id' | '-id';
+
 export interface CaseMaintenanceItemsParams {
   page?: number;
   per_page?: number;
   status?: CaseMaintenanceItemStatus;
   match_method?: CaseMatchMethod;
+  /** Ordered in the database, so it holds across pages rather than sorting one
+   *  page in the browser and calling it ranked. */
+  sort?: CaseMaintenanceItemSort;
+}
+
+/* ── Deciding many at once ─────────────────────────────────────────────── */
+
+/**
+ * The outcome for ONE item inside a batch. A batch never fails as a whole: a
+ * partial success returns 200 with entries in `failed`, so the screen can name
+ * which ones did not go through instead of turning green on a half-write.
+ */
+export interface CaseMaintenanceDecideSuccess {
+  id: number;
+  status: CaseMaintenanceItemStatus;
+}
+
+export interface CaseMaintenanceDecideFailure {
+  id: number;
+  /** Server's words, shown to the reviewer as-is rather than reworded. */
+  reason: string;
+}
+
+export interface CaseMaintenanceDecideResult {
+  decision: 'confirm' | 'reject';
+  requested: number;
+  succeeded: CaseMaintenanceDecideSuccess[];
+  failed: CaseMaintenanceDecideFailure[];
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { Fragment } from 'react';
+
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 
@@ -37,6 +39,45 @@ const COLUMNS = [
   { key: 'detail', label: 'What happened', className: 'w-[30%]' },
   { key: 'act', label: <span className="sr-only">Decide</span>, className: 'w-[18%] text-right' },
 ];
+
+/* ── GROUPING BY CONFIDENCE ────────────────────────────────────────────────
+   Four bands, because the data means four different things and collapsing any
+   two of them tells the reviewer something false.
+
+   The two that must never merge are `nothing` and `unscored`, and the server
+   enforces the same split:
+     score 0    we searched, candidates came back, none resembled the case.
+                Item 103 has TEN candidates, every one scoring 0.
+     score null there was nothing to score — no candidate at all, or the item
+                never went to a name search. 100 of 116 items are in this state.
+   Showing both as "found nothing" would claim we looked at a hundred cases and
+   rejected them, when we never looked. */
+type ScoreBand = 'over' | 'under' | 'nothing' | 'unscored';
+
+function scoreBand(item: CaseMaintenanceItem): ScoreBand {
+  if (item.score === null || item.score === undefined) return 'unscored';
+  if (item.score === 0) return 'nothing';
+  /* Compared against the server's own bar rather than a number typed here, so
+     the grouping cannot drift from the rule the matcher actually applies. */
+  if (item.threshold !== null && item.threshold !== undefined && item.score >= item.threshold) {
+    return 'over';
+  }
+  return 'under';
+}
+
+const BAND_LABEL: Record<ScoreBand, string> = {
+  over: 'Strong match',
+  under: 'Needs your judgement',
+  nothing: 'Nothing resembled it',
+  unscored: 'Not searched by name',
+};
+
+const BAND_MEANING: Record<ScoreBand, string> = {
+  over: 'scored at or above the bar the matcher accepts on',
+  under: 'scored below the bar — close enough to be worth a look',
+  nothing: 'we searched, results came back, none of them were this case',
+  unscored: 'no candidate to score — matched another way, or nothing to search',
+};
 
 /**
  * Every case inside a run, and the one place a person decides something.
@@ -78,11 +119,30 @@ export function CaseMaintenanceItemsTable({
       isEmpty={items.length === 0}
       emptyText="No cases in this run yet"
     >
-      {items.map((item) => {
+      {items.map((item, index) => {
         const awaiting = item.status === 'awaiting_confirmation';
         const busy = decidingId === item.id;
+        /* A heading whenever the band changes. The rows arrive already ordered
+           by the server, so this only has to notice the boundary — it never
+           reorders anything itself, which would produce a page that looks
+           grouped and disagrees with page two. */
+        const band = scoreBand(item);
+        const newBand = index === 0 || scoreBand(items[index - 1]) !== band;
         return (
-          <TableRow key={item.id}>
+          <Fragment key={item.id}>
+          {newBand && (
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={COLUMNS.length} className="bg-muted/40 py-1.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs font-semibold">{BAND_LABEL[band]}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {BAND_MEANING[band]}
+                  </span>
+                </div>
+              </TableCell>
+            </TableRow>
+          )}
+          <TableRow>
             {/* `max-w-0` with a declared column width is what actually makes a
                 table cell truncate: without it the cell grows to its content and
                 pushes everything after it out of view. */}
@@ -173,6 +233,7 @@ export function CaseMaintenanceItemsTable({
               ) : null}
             </TableCell>
           </TableRow>
+          </Fragment>
         );
       })}
     </ObservabilityTable>

@@ -15,6 +15,7 @@ import type {
   CaseMaintenanceRun,
   CaseMaintenanceRunsParams,
   CaseMaintenanceStartPayload,
+  CaseMaintenanceDecideResult,
 } from '@/types/admin-case-maintenance-runs';
 
 /**
@@ -184,6 +185,36 @@ async function rejectItem(
   return response.data;
 }
 
+/**
+ * Decide many items at once.
+ *
+ * The whole point of batch review is that one press settles many cases, which
+ * is also exactly what makes it dangerous — a wrong press writes wrong
+ * citations into case law at scale. Two things guard that, and neither is
+ * cosmetic:
+ *
+ * A PARTIAL BATCH IS A 200, NOT AN ERROR. Items are decided individually and
+ * reported individually. Fifty sent with six refused comes back as forty-four
+ * in `succeeded` and six in `failed`, each with the server's own reason. A
+ * single overall status would leave the screen either falsely green or falsely
+ * red over a write that half happened.
+ *
+ * THE SERVER CAPS IT AT 100 IDS. Not enforced here — a client-side cap that
+ * disagrees with the server is worse than none, because it hides the real limit
+ * until the day the two drift apart.
+ */
+async function decideItems(
+  uuid: string,
+  decision: 'confirm' | 'reject',
+  itemIds: number[],
+): Promise<ApiResponse<CaseMaintenanceDecideResult>> {
+  const response = await apiClient.post<ApiResponse<CaseMaintenanceDecideResult>>(
+    `/admin/case-maintenance-runs/${uuid}/items/decide`,
+    { decision, item_ids: itemIds },
+  );
+  return response.data;
+}
+
 export const adminCaseMaintenanceRunsApi = {
   preview,
   startRun,
@@ -196,4 +227,5 @@ export const adminCaseMaintenanceRunsApi = {
   retryFailed,
   confirmItem,
   rejectItem,
+  decideItems,
 };

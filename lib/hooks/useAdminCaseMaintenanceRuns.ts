@@ -162,6 +162,28 @@ export function useRetryFailedCaseMaintenanceItems(uuid: string | null) {
  * observers over one list, and this codebase has already been bitten by a
  * mutation observer dropping per-call callbacks when it was shared that way.
  */
+/**
+ * Decide MANY items in one call.
+ *
+ * Deliberately does not throw on a partial batch. The server returns 200 with
+ * the refusals listed in `failed`, and the caller is expected to show them —
+ * turning a half-completed write into a thrown error would lose exactly the
+ * information the reviewer needs, which is WHICH ones did not go through.
+ */
+export function useDecideCaseMaintenanceItems(uuid: string | null) {
+  const invalidate = useRunInvalidation(uuid);
+  return useMutation({
+    mutationFn: ({
+      decision,
+      itemIds,
+    }: {
+      decision: 'confirm' | 'reject';
+      itemIds: number[];
+    }) => adminCaseMaintenanceRunsApi.decideItems(uuid as string, decision, itemIds),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDecideCaseMaintenanceItem(uuid: string | null) {
   const invalidate = useRunInvalidation(uuid);
   return useMutation({

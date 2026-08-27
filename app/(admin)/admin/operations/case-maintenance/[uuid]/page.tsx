@@ -65,10 +65,21 @@ export default function CaseMaintenanceRunPage({
   const effectiveFilter: CaseMaintenanceItemStatus | '' =
     !jumpedToWaiting && waiting > 0 ? 'awaiting_confirmation' : statusFilter;
 
+  /* BEST MATCH FIRST, UNSCORED LAST — and this is a default, not a preference.
+     Fifteen cases took a day because the near-certain and the hopeless arrived
+     interleaved in import order, so every row had to be opened to find out
+     which it was. Ordering by confidence puts the two extremes at the ends and
+     leaves only the middle needing a person.
+
+     Ordered in the database, so it holds ACROSS pages. Sorting one page in the
+     browser would look identical on page 1 and be meaningless by page 3, which
+     is the sort of thing nobody notices until the pile is large enough to
+     matter — which is exactly when it is relied on. */
   const itemsQuery = useCaseMaintenanceItems(uuid, {
     page,
     per_page: 20,
     status: effectiveFilter || undefined,
+    sort: '-score',
   });
 
   const pause = usePauseCaseMaintenanceRun(uuid);
