@@ -24,6 +24,7 @@ import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { cn, stripPastedTags } from '@/lib/utils';
 import { formatCost, getCurrencySymbol } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import { useAdminUserPlanPeriodConversations } from '@/lib/hooks/useAdmin';
 
 /** Identifies the slot whose conversations the sheet is drilling into. */
@@ -49,7 +50,10 @@ export function PlanPeriodConversationsSheet({
   slot,
 }: PlanPeriodConversationsSheetProps) {
   const [page, setPage] = useState(1);
-  const { exchangeRate, showNGN } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
 
   const { data, isLoading } = useAdminUserPlanPeriodConversations(
     open ? userUuid : '',

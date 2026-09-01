@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { AdminMessageRow } from '@/types/admin-messages';
 import {
   ROLE_LABEL,
@@ -97,7 +98,10 @@ export function MessageDetailSheet({
   onOpenChange,
   row,
 }: MessageDetailSheetProps) {
-  const { showNGN, exchangeRate } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
   const costOptions = { showNGN, exchangeRate };
 
   return (

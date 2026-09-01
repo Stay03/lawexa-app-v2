@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { AnalyticsStatCards as StatCardsType } from '@/types/admin';
 
 interface AnalyticsStatCardsProps {
@@ -64,7 +65,10 @@ function ChangePercentBadge({ value }: { value: number | null }) {
  * Default component. Renders 6 analytics stat cards in a responsive grid.
  */
 function AnalyticsStatCards({ statCards }: AnalyticsStatCardsProps) {
-  const { showNGN, exchangeRate } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
 
   const cards = [
     {

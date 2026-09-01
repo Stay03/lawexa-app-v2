@@ -24,6 +24,7 @@ import { AddToFolderDialog } from '@/components/folders';
 import { cn, stripPastedTags } from '@/lib/utils';
 import { formatCost, getCurrencySymbol } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type {
   AdminConversationListItem,
   AdminConversationsParams,
@@ -79,7 +80,11 @@ export function AdminConversationsTable({
   showTopics = false,
 }: AdminConversationsTableProps) {
   const router = useRouter();
-  const { exchangeRate, showNGN } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server's setting,
+     with a per-browser override on top. They come from different places on
+     purpose and must not be read from one store again. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
   const [folderConvId, setFolderConvId] = useState<string | null>(null);
 
   const handleRowClick = (id: string) => {

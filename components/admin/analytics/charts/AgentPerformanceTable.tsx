@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { AgentPerformanceRow } from '@/types/admin';
 
 interface AgentPerformanceTableProps {
@@ -24,7 +25,10 @@ interface AgentPerformanceTableProps {
 }
 
 export function AgentPerformanceTable({ data }: AgentPerformanceTableProps) {
-  const { showNGN, exchangeRate } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
 
   if (!data.length) {
     return (

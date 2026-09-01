@@ -3,6 +3,7 @@
 import { UserPlus, MessageSquare, Activity, RotateCcw, Zap } from 'lucide-react';
 import { formatCost, formatCompact } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import { ChangePercentBadge } from '@/components/admin/analytics/ChangePercentBadge';
 import {
   Tabs,
@@ -225,7 +226,10 @@ function ReturningUsersCard({ statCards }: { statCards: StatCardsType }) {
 /* ------------------------------------------------------------------ */
 
 function AIUsageCard({ statCards }: { statCards: StatCardsType }) {
-  const { showNGN, exchangeRate } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
 
   return (
     <div className={CARD}>

@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { AdminPagination } from '@/components/admin/AdminPagination';
 import { useAdminUserTokenUsage } from '@/lib/hooks/useAdmin';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import { formatCost } from '@/lib/utils/currency';
 import { Hash, Coins, Clock, Bot, MessageSquare } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -61,7 +62,10 @@ function isConversationRecord(record: TokenUsageBreakdownRecord): record is Toke
 
 export function AdminUserTokenUsage({ userUuid, hideSummary = false }: AdminUserTokenUsageProps) {
   const router = useRouter();
-  const { exchangeRate, showNGN } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
 
   const [params, setParams] = useState<AdminUserTokenUsageParams>({
     group_by: 'none',

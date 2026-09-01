@@ -5,6 +5,7 @@ import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type {
   AdminUserPlanPeriodsData,
   PlanPeriodReconciliation,
@@ -75,7 +76,10 @@ function ReconciliationBanner({
 }: {
   reconciliation: PlanPeriodReconciliation;
 }) {
-  const { exchangeRate, showNGN } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
   const { balanced, sum_of_slots, user_total } = reconciliation;
 
   if (balanced) {
@@ -114,7 +118,10 @@ function ReconciliationBanner({
 
 /** Grand totals across the user's entire history. */
 function TotalsRow({ totals }: { totals: PlanPeriodTotals }) {
-  const { exchangeRate, showNGN } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
 
   const stats = [
     { label: 'Total messages', value: totals.messages.toLocaleString() },

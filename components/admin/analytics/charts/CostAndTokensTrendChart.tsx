@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { CostAndTokensTrendPoint } from '@/types/admin';
 
 interface CostAndTokensTrendChartProps {
@@ -37,7 +38,10 @@ export function CostAndTokensTrendChart({
   data,
   granularity,
 }: CostAndTokensTrendChartProps) {
-  const { showNGN, exchangeRate } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
   const isHourly = granularity === 'hour';
   const xKey = isHourly ? 'hour' : 'date';
 

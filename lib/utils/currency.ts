@@ -1,15 +1,27 @@
 /**
- * Format a USD amount as either USD or NGN based on settings
+ * Format a USD amount as either USD or NGN.
+ *
+ * `options` is REQUIRED, and so is the rate inside it. Both used to be
+ * optional, defaulting to no conversion at a rate of 1500 — a number written
+ * into this file once and then left behind while the real rate moved. A caller
+ * that forgot to pass a rate got a confident wrong figure instead of an error.
+ *
+ * The rate is a server setting now (`usd_to_ngn_display_rate`). Read it with
+ * `useExchangeRate` and pass it in.
  */
 export function formatCost(
   usdAmount: string | number,
   options: {
     showNGN?: boolean;
-    exchangeRate?: number;
+    /* REQUIRED when showNGN can be true. It used to default to 1500, which
+       meant a caller that forgot it silently converted at a rate from months
+       ago instead of failing. The rate is a server setting now; read it with
+       useExchangeRate and pass it. */
+    exchangeRate: number;
     decimals?: number;
-  } = {}
+  },
 ): string {
-  const { showNGN = false, exchangeRate = 1500, decimals = 4 } = options;
+  const { showNGN = false, exchangeRate, decimals = 4 } = options;
   const numeric = typeof usdAmount === 'string' ? Number(usdAmount) : usdAmount;
 
   if (showNGN) {

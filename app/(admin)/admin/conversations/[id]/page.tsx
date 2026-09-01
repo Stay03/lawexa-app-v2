@@ -20,6 +20,7 @@ import { CompactToolChain } from '@/components/chat/compact-tool-chain';
 import { useAdminConversation } from '@/lib/hooks/useAdmin';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import { formatCost } from '@/lib/utils/currency';
 import { formatFileSize } from '@/lib/validations/admin-cases';
 import {
@@ -355,7 +356,11 @@ export default function AdminConversationDetailPage({
   const { id } = use(params);
   const { data, isLoading, error } = useAdminConversation(id);
   const { setOverride, clearOverride } = useBreadcrumbStore();
-  const { exchangeRate, showNGN } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server's setting,
+     with a per-browser override on top. They come from different places on
+     purpose and must not be read from one store again. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
 
   // Set breadcrumb label to conversation title
   useEffect(() => {

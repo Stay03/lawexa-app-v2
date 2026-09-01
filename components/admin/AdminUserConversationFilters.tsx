@@ -9,14 +9,14 @@ import {
 } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Settings2 } from 'lucide-react';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { ExchangeRateField } from '@/components/admin/ExchangeRateField';
 
 export function AdminUserConversationFilters() {
-  const { exchangeRate, showNGN, setExchangeRate, setShowNGN } =
-    useCurrencyStore();
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const setShowNGN = useCurrencyStore((s) => s.setShowNGN);
 
   return (
     <div className="flex justify-end">
@@ -45,29 +45,7 @@ export function AdminUserConversationFilters() {
               />
             </div>
 
-            {/* Exchange Rate Input */}
-            <div className="space-y-2">
-              <Label htmlFor="exchange-rate" className="text-sm">
-                USD to NGN Rate
-              </Label>
-              <Input
-                id="exchange-rate"
-                type="number"
-                min={1}
-                step={1}
-                value={exchangeRate}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value);
-                  if (!isNaN(value) && value > 0) {
-                    setExchangeRate(value);
-                  }
-                }}
-                className="h-9"
-              />
-              <p className="text-xs text-muted-foreground">
-                $1 = {exchangeRate.toLocaleString()}
-              </p>
-            </div>
+            <ExchangeRateField id="conversation-filters-rate" />
           </div>
         </PopoverContent>
       </Popover>

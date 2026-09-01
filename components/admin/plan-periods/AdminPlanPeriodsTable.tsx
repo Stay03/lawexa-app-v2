@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { formatCost, getCurrencySymbol } from '@/lib/utils/currency';
 import { formatMoneyMajor } from '@/lib/utils/payment-format';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { PlanPeriod, PlanPeriodProvider, PlanPeriodSource } from '@/types/admin-plan-periods';
 import type { PlanPeriodSlotSelection } from './PlanPeriodConversationsSheet';
 
@@ -53,7 +54,10 @@ function formatDay(value: string | null): string {
 }
 
 export function AdminPlanPeriodsTable({ periods, onSelect }: AdminPlanPeriodsTableProps) {
-  const { exchangeRate, showNGN } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
 
   if (periods.length === 0) {
     return (

@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminUser } from '@/lib/hooks/useAdmin';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import { ArrowLeft, CalendarClock, Webhook } from 'lucide-react';
 import {
   UserDetailHeader,
@@ -43,7 +44,11 @@ export default function AdminUserDetailPage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: userData, isLoading: userLoading, error } = useAdminUser(uuid);
-  const { exchangeRate, showNGN } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server's setting,
+     with a per-browser override on top. They come from different places on
+     purpose and must not be read from one store again. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
 
   const tabParam = searchParams.get('tab');

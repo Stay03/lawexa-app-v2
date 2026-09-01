@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/card';
 import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { UserDailyCostPoint, ViewAnalyticsGranularity } from '@/types/admin';
 
 interface DailyCostChartProps {
@@ -38,7 +39,10 @@ function formatHour(hour: string): string {
 }
 
 export function DailyCostChart({ data, granularity }: DailyCostChartProps) {
-  const { showNGN, exchangeRate } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server setting,
+     with a per-browser override on top. Different sources on purpose. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
   const maxCost = Math.max(...data.map((d) => d.cost), 0);
   const domainMax = Math.ceil(maxCost * 1.25) || 1;
 

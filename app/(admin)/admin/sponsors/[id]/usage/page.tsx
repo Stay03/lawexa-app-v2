@@ -31,6 +31,7 @@ import { CurrencySettings } from '@/components/admin/CurrencySettings';
 import { SponsorStatsGrid } from '@/components/admin/sponsors/SponsorStatsGrid';
 import { useSponsorUsage } from '@/lib/hooks/useAdminSponsors';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type {
   AdminCampaignStatus,
   AdminSponsorUsageCampaignRow,
@@ -53,7 +54,11 @@ export default function SponsorUsagePage({
   const sponsorId = Number(rawId);
 
   const { data, isLoading, error } = useSponsorUsage(sponsorId);
-  const { showNGN, exchangeRate } = useCurrencyStore();
+  /* showNGN is this browser's preference; the RATE is the server's setting,
+     with a per-browser override on top. They come from different places on
+     purpose and must not be read from one store again. */
+  const showNGN = useCurrencyStore((s) => s.showNGN);
+  const { rate: exchangeRate } = useExchangeRate();
   const costOptions = { showNGN, exchangeRate };
 
   const backLink = (
