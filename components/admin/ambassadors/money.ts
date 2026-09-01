@@ -29,8 +29,19 @@ const SYMBOLS: Readonly<Record<string, string>> = {
  * only the WHOLE part is grouped — the fractional part is copied through
  * untouched, so nothing is rounded and nothing is re-encoded.
  */
+/**
+ * The symbol for a currency, or the code and a space when we do not know one.
+ *
+ * Exported so a compact axis tick can be built from the SAME table this file
+ * formats with — a second copy would drift, and the drift would show up as one
+ * screen calling it $ and another calling it USD.
+ */
+export function currencySymbol(currency: string): string {
+  return SYMBOLS[currency] ?? `${currency} `;
+}
+
 export function formatAmount(currency: string, amount: string): string {
-  const symbol = SYMBOLS[currency] ?? `${currency} `;
+  const symbol = currencySymbol(currency);
   const [whole, fraction] = amount.split('.');
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${symbol}${grouped}${fraction ? `.${fraction}` : ''}`;
