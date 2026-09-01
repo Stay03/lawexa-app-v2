@@ -46,12 +46,15 @@ const GROUP_LABELS: Record<string, string> = {
 const GROUP_DESCRIPTIONS: Record<string, string> = {
   subscription: 'Configure subscription behavior and payment settings.',
   trial: 'Manage free trial duration, features, and enrollment.',
-  /* Every value in this group is in MINOR units — kobo and cents. The server
-     sends a description with each one saying so ("200 = $2 per pack of 10
-     messages") and the field renders it, which is the only thing standing
-     between someone and setting a pack to four cents. */
+  /* DO NOT say "everything here is in minor units" again. It was true of the
+     five prices and became false the moment the display rate joined the group:
+     1500 there means ₦1,500 to the dollar, not fifteen naira. A group-level
+     claim about units is a claim about fields nobody has added yet, and this
+     group is where money gets typed. The server sends a description with every
+     setting — "200 = $2 per pack of 10 messages" — and the field renders it, so
+     point at that rather than generalising over it. */
   pricing:
-    'Pack and trial amounts, in minor units — kobo and cents, not naira and dollars. Each field says what its number means.',
+    'Pack prices, trial charges and the display rate. Read the note under each field before changing it — some are in kobo or cents rather than naira or dollars.',
 };
 
 /** Maps a boolean toggle key to the fields it controls. */
