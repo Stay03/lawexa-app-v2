@@ -2,6 +2,7 @@ export { CaseMaintenanceRunsTable } from './CaseMaintenanceRunsTable';
 export { CaseMaintenanceItemsTable } from './CaseMaintenanceItemsTable';
 export { CaseMaintenancePreviewTable } from './CaseMaintenancePreviewTable';
 export { RunProgress } from './RunProgress';
+export { RejectAllShownButton } from './RejectAllShownButton';
 export {
   runStatusMeta,
   itemStatusMeta,

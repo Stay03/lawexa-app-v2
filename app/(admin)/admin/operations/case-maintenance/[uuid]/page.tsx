@@ -9,6 +9,7 @@ import { AdminPagination } from '@/components/admin';
 import { EnumFilterSelect, StatusBadge } from '@/components/admin/observability';
 import {
   CaseMaintenanceItemsTable,
+  RejectAllShownButton,
   RUN_TYPE_LABEL,
   RunProgress,
   runStatusMeta,
@@ -162,6 +163,11 @@ export default function CaseMaintenanceRunPage({
      learn it is over. */
   const decidable = run.status === 'running' || run.status === 'paused' || run.status === 'pending';
 
+  /* Read once: the table draws these rows and the reject-all control acts on
+     exactly the same array, so the count in the button cannot drift from the
+     rows underneath it. */
+  const shownItems = itemsQuery.data?.data ?? [];
+
   return (
     <div className="space-y-6">
       <BackLink />
@@ -224,17 +230,30 @@ export default function CaseMaintenanceRunPage({
               </span>
             ) : null}
           </CardTitle>
-          <EnumFilterSelect
-            value={effectiveFilter}
-            options={statusOptions}
-            onChange={changeFilter}
-            allLabel="Every case"
-            placeholder="Every case"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Beside the filter on purpose: what it acts on is what the filter
+                is currently showing, so the two belong within a glance of each
+                other. */}
+            {decidable ? (
+              <RejectAllShownButton
+                uuid={uuid}
+                items={shownItems}
+                disabled={decide.isPending}
+                onCleared={() => setPage(1)}
+              />
+            ) : null}
+            <EnumFilterSelect
+              value={effectiveFilter}
+              options={statusOptions}
+              onChange={changeFilter}
+              allLabel="Every case"
+              placeholder="Every case"
+            />
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <CaseMaintenanceItemsTable
-            items={itemsQuery.data?.data ?? []}
+            items={shownItems}
             isLoading={itemsQuery.isPending}
             onDecide={decidable ? onDecide : null}
             decidingId={
