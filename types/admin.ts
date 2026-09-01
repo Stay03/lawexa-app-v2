@@ -1059,15 +1059,51 @@ export interface SubscriptionAnalyticsParams {
   end_date?: string;
 }
 
+/**
+ * Money on the analytics endpoints, which is mid-change.
+ *
+ * The old server sent ONE number with every currency already added together at
+ * a rate nobody recorded. The new one sends an amount per currency. This union
+ * is true either way, which is why it is a union rather than a migration: the
+ * two deploys cannot be simultaneous, and a type that named only one shape
+ * would be a lie for however long the other side took to ship.
+ *
+ * Read these through components/admin/analytics/money.ts, never directly — a
+ * bare number here is the blended figure and must not be printed as naira
+ * without going through the reader that knows that.
+ */
+export type AnalyticsMoneyValue = number | Record<string, string>;
+
+/**
+ * A stat card whose value is money. Separate from `AnalyticsStatCard` because
+ * that one is shared by ten screens of COUNTS, and counts did not change shape;
+ * widening it would force every unrelated card to handle currencies.
+ *
+ * `change_percent` follows its money: one figure per currency, and a null
+ * inside the map means there was no earlier figure to compare against, which is
+ * not the same as no change.
+ */
+export interface AnalyticsMoneyStatCard {
+  value: AnalyticsMoneyValue;
+  change_percent: number | Record<string, number | null> | null;
+}
+
+/**
+ * A list or series that arrives flat today and grouped by currency after the
+ * change. Each currency is ranked and scaled on its own; see `seriesByCurrency`
+ * for why they are never merged into one list or one axis.
+ */
+export type ByCurrency<T> = T[] | Record<string, T[]>;
+
 export interface SubscriptionAnalyticsStatCards {
   total_subscriptions: AnalyticsStatCard;
   active_subscriptions: AnalyticsStatCard;
   new_subscriptions: AnalyticsStatCard;
   churned_subscriptions: AnalyticsStatCard;
-  mrr: AnalyticsStatCard;
-  revenue: AnalyticsStatCard;
+  mrr: AnalyticsMoneyStatCard;
+  revenue: AnalyticsMoneyStatCard;
   churn_rate: AnalyticsStatCard;
-  avg_revenue_per_user: AnalyticsStatCard;
+  avg_revenue_per_user: AnalyticsMoneyStatCard;
 }
 
 export interface SubscriptionsOverTimePoint {
@@ -1106,8 +1142,8 @@ export interface ChurnOverTimePoint {
 
 export interface SubscriptionAnalyticsCharts {
   subscriptions_over_time: SubscriptionsOverTimePoint[];
-  revenue_over_time: RevenueOverTimePoint[];
-  mrr_trend: MrrTrendPoint[];
+  revenue_over_time: ByCurrency<RevenueOverTimePoint>;
+  mrr_trend: ByCurrency<MrrTrendPoint>;
   plan_distribution: PlanDistributionPoint[];
   status_distribution: StatusDistributionPoint[];
   churn_over_time: ChurnOverTimePoint[];
@@ -1118,8 +1154,8 @@ export interface PlanBreakdownRow {
   active_count: number;
   new_in_period: number;
   churned_in_period: number;
-  revenue_in_period: number;
-  mrr_contribution: number;
+  revenue_in_period: AnalyticsMoneyValue;
+  mrr_contribution: AnalyticsMoneyValue;
 }
 
 export interface RecentSubscriptionRow {
@@ -1147,7 +1183,7 @@ export interface TopRevenueUserRow {
 export interface SubscriptionAnalyticsTables {
   plan_breakdown: PlanBreakdownRow[];
   recent_subscriptions: RecentSubscriptionRow[];
-  top_revenue_users: TopRevenueUserRow[];
+  top_revenue_users: ByCurrency<TopRevenueUserRow>;
 }
 
 export interface SubscriptionAnalyticsData {
