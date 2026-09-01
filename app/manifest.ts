@@ -21,7 +21,33 @@ export default function manifest(): MetadataRoute.Manifest {
     // (Chromium 110+; ignored by browsers that don't support it.)
     launch_handler: { client_mode: 'navigate-existing' },
     background_color: '#ffffff',
-    theme_color: '#C9A227',
+    /**
+     * THE STATUS BAR OF THE INSTALLED APP, NOT A BRAND SWATCH.
+     *
+     * The owner photographed a gold band across the top of a dark Chat screen on
+     * 1 September 2026 and asked why it was still there, having been told the bar
+     * was fixed on 22 August. Both were true. That fix corrected the page's
+     * `theme-color` metas and works in a browser tab. An INSTALLED app does not
+     * read them: Android bakes this value into the installed app and paints the
+     * system bar with it, so the brand gold sat above every screen whatever the
+     * page underneath was doing.
+     *
+     * Measured rather than reasoned: production serves the v2 pages `#ffffff`
+     * and `#0a0a0a` and no gold at all, so the gold in the photograph could only
+     * have come from here.
+     *
+     * WHY THIS VALUE. A manifest holds ONE colour and cannot follow the theme the
+     * way the in-page correction does, so it is a choice about which half to fit.
+     * The app's default theme is dark (`ThemeProvider defaultTheme="dark"`) and
+     * this is the same `#0a0a0a` the dark pages already declare, so the common
+     * case matches exactly. A reader in light mode gets a dark bar over a white
+     * page, which is a smaller mismatch than gold over either.
+     *
+     * It does not repaint an already-installed app straight away. Android
+     * refreshes the installed copy on its own schedule, days rather than minutes,
+     * and only a reinstall is immediate.
+     */
+    theme_color: '#0a0a0a',
     icons: [
       { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
