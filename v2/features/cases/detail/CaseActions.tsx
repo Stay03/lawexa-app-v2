@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+
+import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
 import Link from 'next/link';
 import { Check, FileText, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -70,10 +72,16 @@ export function CaseActions({
  */
 function ShareAction({ title }: { title: string }) {
   const [copied, setCopied] = useState(false);
+  /* An ambassador sharing a case gets their code on the link, so a signup from
+     it credits them. Everybody else gets the address exactly as before. Never
+     blocks or delays the share: no code, or an answer that has not arrived yet,
+     both mean share the plain link. */
+  const shareUrl = useShareUrl();
 
   const share = async () => {
-    const url = typeof window === 'undefined' ? '' : window.location.href;
-    if (!url) return;
+    const here = typeof window === 'undefined' ? '' : window.location.href;
+    if (!here) return;
+    const url = shareUrl(here);
 
     if (typeof navigator !== 'undefined' && 'share' in navigator) {
       try {
