@@ -5,6 +5,7 @@ import { Check, Share2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
 import {
   PUBLIC_QUIZ_RESULTS_NOTICE,
   publicQuizResultsPath,
@@ -90,7 +91,12 @@ export function ShareResults({
     [],
   );
 
-  const url = origin ? `${origin}${publicQuizResultsPath(gameUuid)}` : '';
+  /* An ambassador sharing their result carries their code, so a signup from
+     it credits them. Everybody else shares exactly what they shared before. */
+  const shareUrl = useShareUrl();
+  const url = origin
+    ? shareUrl(`${origin}${publicQuizResultsPath(gameUuid)}`)
+    : '';
   const { headline, ask } = quizShareInvite(standing);
 
   const confirmCopied = () => {
