@@ -10,6 +10,7 @@ import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
 import { notesApi } from '../api';
 import { NoteBookmarkButton } from '../bookmark/NoteBookmarkButton';
+import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
 
 /**
  * The note action row — save, copy link, export, and Edit for the author.
@@ -84,6 +85,10 @@ export function NoteActions({
  * the link.
  */
 function CopyLinkButton({ slug }: { slug: string }) {
+  /* An ambassador's code rides the link they copy, so a signup from it credits
+     them. Everybody else copies exactly what they copied before. */
+  const shareUrl = useShareUrl();
+
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -96,7 +101,9 @@ function CopyLinkButton({ slug }: { slug: string }) {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/notes/${slug}`);
+      await navigator.clipboard.writeText(
+        shareUrl(`${window.location.origin}/notes/${slug}`),
+      );
       setCopied(true);
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => {

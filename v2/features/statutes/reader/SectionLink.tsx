@@ -5,6 +5,7 @@ import { Check, Link2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
 
 /**
  * SectionLink — the "copy a link to this section" affordance on section
@@ -62,6 +63,10 @@ export const SectionLinkContext = createContext<SectionLinkContextValue | null>(
 );
 
 export function SectionCopyLink({ anchorId }: { anchorId: string }) {
+  /* An ambassador's code rides the link they copy, so a signup from it credits
+     them. Everybody else copies exactly what they copied before. */
+  const shareUrl = useShareUrl();
+
   const context = useContext(SectionLinkContext);
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
@@ -79,7 +84,7 @@ export function SectionCopyLink({ anchorId }: { anchorId: string }) {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(
-        `${window.location.origin}/statutes/${context.slug}/${info.path}`,
+        shareUrl(`${window.location.origin}/statutes/${context.slug}/${info.path}`),
       );
       setCopied(true);
       context.announce('Link copied');

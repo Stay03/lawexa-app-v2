@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { radarsApi } from '@/lib/api/radars';
 import { extractApiError } from '@/lib/utils/api-error';
+import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
 import type { RadarScanDetail } from '@/types/radar';
 import { radarsQueries } from '../queries';
 
@@ -80,8 +81,11 @@ export function ShareDialog({
 
   const isPrivate = scan.is_private;
   const isPending = publish.isPending || unpublish.isPending;
+  /* An ambassador's code rides the link they copy, so a signup from it credits
+     them. Everybody else copies exactly what they copied before. */
+  const shareUrl = useShareUrl();
   const shareableLink = origin
-    ? `${origin}/radars/${radarUuid}/scans/${scan.uuid}`
+    ? shareUrl(`${origin}/radars/${radarUuid}/scans/${scan.uuid}`)
     : '';
 
   const copyLink = async () => {

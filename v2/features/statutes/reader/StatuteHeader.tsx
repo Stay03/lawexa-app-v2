@@ -15,6 +15,7 @@ import {
   toAlpha2,
   type StatuteStatusTone,
 } from '../statute-row-model';
+import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
 
 /**
  * StatuteHeader — the reader's heading block, in the case-document header
@@ -147,6 +148,10 @@ function formatDocumentType(value: string | null | undefined): string | null {
  * silent: the address bar still has the link.
  */
 function CopyLinkButton({ slug }: { slug: string }) {
+  /* An ambassador's code rides the link they copy, so a signup from it credits
+     them. Everybody else copies exactly what they copied before. */
+  const shareUrl = useShareUrl();
+
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -160,7 +165,7 @@ function CopyLinkButton({ slug }: { slug: string }) {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(
-        `${window.location.origin}/statutes/${slug}`,
+        shareUrl(`${window.location.origin}/statutes/${slug}`),
       );
       setCopied(true);
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
