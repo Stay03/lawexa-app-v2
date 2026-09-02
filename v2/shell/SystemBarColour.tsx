@@ -47,6 +47,58 @@ export function SystemBarColour() {
       const painted = getComputedStyle(document.body).backgroundColor;
       if (!painted || painted === 'rgba(0, 0, 0, 0)') return;
 
+      /**
+       * WRITE A HEX, NEVER WHAT `getComputedStyle` HANDED US.
+       *
+       * The palette is authored in `oklch()`. Chrome serialises a computed
+       * colour in the space it was authored in, so this used to read
+       * `lab(2.75381 0 0)` — measured in the live DOM on 2 September 2026 — and
+       * that string went straight into the meta tag.
+       *
+       * A page stylesheet and a browser's system-UI painter are not the same
+       * parser. The tag can sit first, hold the right colour, and still do
+       * nothing if whatever reads it does not speak CSS Color 4. A hex is
+       * understood by every consumer that has ever read this attribute, and it
+       * costs one canvas assignment, so there is no reason to hand over
+       * anything else.
+       *
+       * This is NOT confirmed as the cause of the owner's phone ignoring the
+       * bar colour. It is a real defect found while looking for that, and it is
+       * worth removing whether or not it turns out to be the one.
+       */
+      /* PAINT IT AND READ THE PIXEL BACK. Reading `fillStyle` is not enough and
+         I measured why: canvas hands `lab()` and `oklch()` straight back
+         unchanged, converting only `rgb()` and hex. It normalises the values
+         that were already safe and preserves exactly the one that is not.
+         Painting a single pixel and reading its bytes goes through the actual
+         rasteriser, so any colour the browser can render comes back as three
+         numbers whatever space it was written in. */
+      let colour = painted;
+      const ctx = document.createElement('canvas').getContext('2d', {
+        willReadFrequently: true,
+      });
+      if (ctx) {
+        /* Painted TWICE over different starting colours. An unparseable value
+           leaves `fillStyle` untouched, and the rectangle is then painted in
+           whatever colour was already set — so a single pass returns a
+           confident black for a value the browser actually rejected. Measured:
+           an invalid string came back `#000000`, indistinguishable from a real
+           black. Two different starting colours cannot both be coincidence: if
+           the two reads agree, the value was parsed. */
+        const read = (fallback: string) => {
+          ctx.clearRect(0, 0, 1, 1);
+          ctx.fillStyle = fallback;
+          ctx.fillStyle = painted;
+          ctx.fillRect(0, 0, 1, 1);
+          const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+          return a > 0
+            ? `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`
+            : null;
+        };
+        const first = read('#ff0000');
+        if (first !== null && first === read('#00ff00')) colour = first;
+      }
+
       /* The media-scoped tags from `viewport.themeColor` cannot be corrected —
          they answer to the phone, not to us — so they are left alone and one
          unscoped tag is kept alongside them. An unscoped `theme-color` wins
@@ -79,7 +131,7 @@ export function SystemBarColour() {
        * repainting stays idempotent.
        */
       document.head.insertBefore(tag, document.head.firstChild);
-      tag.content = painted;
+      tag.content = colour;
     };
 
     /**
