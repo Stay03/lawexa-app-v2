@@ -58,8 +58,27 @@ export function SystemBarColour() {
       if (!tag) {
         tag = document.createElement('meta');
         tag.name = 'theme-color';
-        document.head.appendChild(tag);
       }
+      /**
+       * FIRST IN THE HEAD, NOT LAST. This was `appendChild` and that is why the
+       * bar stopped following the theme — the owner reported it on 1 September
+       * as "it used to switch and it stopped".
+       *
+       * The browser takes the FIRST `theme-color` whose `media` matches. The v2
+       * layout declares one for light AND one for dark, so whatever the phone is
+       * set to, one of them always matches and always sits earlier in the head
+       * than a tag appended at the end. Our correction was being written
+       * faithfully and then ignored, every time.
+       *
+       * The comment below used to say an unscoped tag wins over a media-scoped
+       * one that does not match. True, and beside the point once BOTH schemes
+       * are declared: there is no longer any such thing as a non-matching pair.
+       *
+       * Moving it to the front makes it the first match under every scheme.
+       * `insertBefore` on a node already in place is a move, not a duplicate, so
+       * repainting stays idempotent.
+       */
+      document.head.insertBefore(tag, document.head.firstChild);
       tag.content = painted;
     };
 
