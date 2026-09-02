@@ -11,20 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       'Lawexa powers lawyers, students, and teams to research cases and laws across jurisdictions, draft, study, and collaborate with AI to get legal work done faster and reliably',
     start_url: '/',
-    /* ── TEMPORARY, A TEST, AND IT MUST NOT STAY ───────────────────────────
-     * 2 September 2026. The installed app's top bar cannot follow the app's
-     * light/dark switch: Android paints it from the one colour baked in at
-     * install and the page cannot reach it. Proven the same day with a cyan
-     * test the owner photographed.
-     *
-     * `fullscreen` asks Android for the whole screen, so there is no top bar to
-     * mismatch. It also takes away his clock, his battery and his notification
-     * icons for as long as the app is open, which is why this is something he
-     * LOOKS AT before deciding rather than something we ship.
-     *
-     * PUT IT BACK TO `standalone` once he has seen it. Anyone who installs while
-     * this is live gets a full-screen app until they reinstall. */
-    display: 'fullscreen',
+    display: 'standalone',
     // With an origin-wide scope, Android's installed app (WebAPK) captures every
     // in-scope link — a shared case/note/radar/conversation/ambassador URL tapped
     // on a device that has Lawexa installed opens here instead of the browser.
