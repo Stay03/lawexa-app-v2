@@ -147,14 +147,27 @@ export function CaseMaintenanceItemsTable({
                 table cell truncate: without it the cell grows to its content and
                 pushes everything after it out of view. */}
             <TableCell className="max-w-0">
+              {/* A CASE WITH NO TITLE MUST STILL BE A ROW YOU CAN SEE.
+                  `title` is typed as a plain string, so an empty one rendered as
+                  a link with nothing in it: a blank line the reviewer cannot
+                  read, cannot click with any confidence, and cannot tell apart
+                  from the next blank one. That is the worst possible row on a
+                  screen whose whole job is telling near-identical cases apart.
+
+                  `??` does not help here — the empty string is not null, it is
+                  present and empty, which is the case that actually arrives. */}
               <Link
                 href={`/cases/${item.case.slug}`}
                 target="_blank"
                 rel="noreferrer"
-                title={item.case.title}
+                title={item.case.title?.trim() || 'This case has no title'}
                 className="block truncate font-medium underline-offset-4 hover:underline"
               >
-                {item.case.title}
+                {item.case.title?.trim() || (
+                  <span className="italic text-muted-foreground">
+                    Untitled case #{item.case.id}
+                  </span>
+                )}
               </Link>
               <div className="truncate text-xs text-muted-foreground">
                 {[item.case.citation, item.match_method ? matchMethodLabel(item.match_method) : null]
@@ -423,7 +436,12 @@ function TieChoice({
             className="flex flex-col items-start gap-0.5 py-2"
             onSelect={() => onDecide(item.id, 'confirm', candidate.provider_case_id)}
           >
-            <span className="text-xs font-medium">{candidate.title ?? 'Untitled'}</span>
+            {/* `??` misses the empty string, which is the form that actually
+                arrives. A candidate you are being asked to pick must never
+                render as nothing. */}
+            <span className="text-xs font-medium">
+              {candidate.title?.trim() || 'Untitled'}
+            </span>
             <span className="text-[11px] text-muted-foreground">
               {candidate.citation ?? 'no citation'} · match {candidate.title_similarity}
             </span>
@@ -463,7 +481,7 @@ function NameSearchDetail({ search }: { search: CaseMaintenanceNameSearch }) {
       {winner ? (
         <>
           <span className="block text-xs font-medium text-foreground">
-            Proposes: {winner.title ?? 'an untitled case'}
+            Proposes: {winner.title?.trim() || 'an untitled case'}
           </span>
           {winner.citation ? (
             <span className="block text-xs text-muted-foreground">{winner.citation}</span>

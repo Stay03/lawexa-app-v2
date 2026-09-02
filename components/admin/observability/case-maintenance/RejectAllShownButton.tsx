@@ -23,11 +23,23 @@ import type { CaseMaintenanceItem } from '@/types/admin-case-maintenance-runs';
  *
  * ── WHY IT EXISTS ──────────────────────────────────────────────────────────
  * A refresh run left 101 cases waiting on a person, and the owner could only
- * act on them one at a time. Backend then measured the pile and found every
- * single row scoring EXACTLY 67, which is the scorer saying the institution
- * matches and the litigant does not. So they are not 101 near misses needing
- * 101 judgements. They are 101 different cases, and the answer to all of them
- * is the same answer.
+ * act on them one at a time.
+ *
+ * ── AND WHY IT IS NOT "CLEAR THE WHOLE QUEUE" ──────────────────────────────
+ * This was first justified on a reading that every one of the 101 scored
+ * exactly 67, so the whole pile was one answer repeated. THAT WAS WRONG, and
+ * the correction arrived hours later: it came from the seven rows legible in a
+ * screenshot, which were the sorted top of the list. Rescoring all 101 gave 28
+ * at 67, 41 at 50, the rest lower, 4 with no candidate — and SOME ARE REAL
+ * MATCHES.
+ *
+ * The control survives that correction only because it never believed the
+ * uniformity. It acts on the rows on screen, states the count, and asks. Had it
+ * been built to the premise — one press clearing all 101 — it would now be a
+ * feature that silently rejects genuine matches.
+ *
+ * Keep that shape. A batch control is safe in proportion to how much of what it
+ * touches the person can actually see when they press it.
  *
  * ── WHY REJECT AND NOT ACCEPT ──────────────────────────────────────────────
  * Accepting writes a judgment into case law, so a wrong batch press there is
