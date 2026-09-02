@@ -47,23 +47,7 @@ export default function manifest(): MetadataRoute.Manifest {
      * refreshes the installed copy on its own schedule, days rather than minutes,
      * and only a reinstall is immediate.
      */
-    /* ── TEMPORARY. A TEST COLOUR, AND IT MUST NOT STAY ────────────────────
-     * 2 September 2026. The owner's installed app shows a black top bar that
-     * ignores the app's own light/dark switch. Our explanation is that Android
-     * paints that bar from THIS value, copied when the app is installed, and
-     * that nothing the page does can reach it. Everything else we have is
-     * inference; this is the one test that settles it outright.
-     *
-     * So this is a colour we have never used anywhere — not the brand gold, not
-     * the near-black, and none of the three in the developer control — because
-     * a colour we HAVE used could be a leftover from something else. He
-     * reinstalls, and if his bar comes back cyan the source is proven. If it
-     * stays black our whole explanation is wrong and we start again.
-     *
-     * REVERT TO `#0a0a0a` THE MOMENT HE HAS LOOKED. Anyone who installs the app
-     * while this is live keeps cyan as their bar until they reinstall, so the
-     * window is measured in minutes, deliberately. */
-    theme_color: '#00E5FF',
+    theme_color: '#0a0a0a',
     icons: [
       { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
