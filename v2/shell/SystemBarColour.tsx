@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 
+import { useBarColourTest } from '@/v2/bar-colour-test';
+
 /**
  * Paints the phone's own status bar the same colour as the app underneath it.
  *
@@ -35,12 +37,70 @@ import { useEffect } from 'react';
  * reaches the bottom edge.
  */
 export function SystemBarColour() {
+  /**
+   * A colour forced by hand from developer settings, or `null` for normal
+   * behaviour. It exists to answer one question the owner cannot otherwise
+   * settle: whether the INSTALLED app reads this page at all, or paints its bar
+   * from the colour fixed at install time. Both are the same near-black today,
+   * so only an obviously different colour can tell them apart. See
+   * `v2/bar-colour-test.ts`.
+   */
+  const forced = useBarColourTest();
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
     const root = document.documentElement;
 
+    /**
+     * Puts a colour on the page's own bar instruction, first in the head.
+     *
+     * Both callers need every part of this — finding or making the tag, moving
+     * it to the front, setting it — so it is one function rather than two
+     * copies that could drift. The reasoning for the position is below.
+     */
+    const write = (colour: string) => {
+      /* The media-scoped tags from `viewport.themeColor` cannot be corrected —
+         they answer to the phone, not to us — so they are left alone and one
+         unscoped tag is kept alongside them. */
+      let tag = document.querySelector<HTMLMetaElement>(
+        'meta[name="theme-color"]:not([media])',
+      );
+      if (!tag) {
+        tag = document.createElement('meta');
+        tag.name = 'theme-color';
+      }
+      /**
+       * FIRST IN THE HEAD, NOT LAST. This was `appendChild` and that is why the
+       * bar stopped following the theme — the owner reported it on 1 September
+       * as "it used to switch and it stopped".
+       *
+       * The browser takes the FIRST `theme-color` whose `media` matches. The v2
+       * layout declares one for light AND one for dark, so whatever the phone is
+       * set to, one of them always matches and always sits earlier in the head
+       * than a tag appended at the end. Our correction was being written
+       * faithfully and then ignored, every time.
+       *
+       * An unscoped tag beating a NON-matching media one was the old reasoning.
+       * True, and beside the point once BOTH schemes are declared: there is no
+       * longer any such thing as a non-matching pair.
+       *
+       * `insertBefore` on a node already in place is a move, not a duplicate, so
+       * repainting stays idempotent.
+       */
+      document.head.insertBefore(tag, document.head.firstChild);
+      tag.content = colour;
+    };
+
     const paint = () => {
+      /* The override wins outright and skips every step below it. That is the
+         point: the test is only meaningful if what reaches the bar is exactly
+         what he typed, with nothing of ours in between it and the answer. */
+      if (forced !== null) {
+        write(forced);
+        return;
+      }
+
       /* The colour the app is ACTUALLY painting, read from the page rather than
          restated here. A second copy of the background is a second thing to
          forget when the palette moves. */
@@ -99,39 +159,7 @@ export function SystemBarColour() {
         if (first !== null && first === read('#00ff00')) colour = first;
       }
 
-      /* The media-scoped tags from `viewport.themeColor` cannot be corrected —
-         they answer to the phone, not to us — so they are left alone and one
-         unscoped tag is kept alongside them. An unscoped `theme-color` wins
-         over a media-scoped one that does not match, which is why this must be
-         the only unscoped tag on the page. */
-      let tag = document.querySelector<HTMLMetaElement>(
-        'meta[name="theme-color"]:not([media])',
-      );
-      if (!tag) {
-        tag = document.createElement('meta');
-        tag.name = 'theme-color';
-      }
-      /**
-       * FIRST IN THE HEAD, NOT LAST. This was `appendChild` and that is why the
-       * bar stopped following the theme — the owner reported it on 1 September
-       * as "it used to switch and it stopped".
-       *
-       * The browser takes the FIRST `theme-color` whose `media` matches. The v2
-       * layout declares one for light AND one for dark, so whatever the phone is
-       * set to, one of them always matches and always sits earlier in the head
-       * than a tag appended at the end. Our correction was being written
-       * faithfully and then ignored, every time.
-       *
-       * The comment below used to say an unscoped tag wins over a media-scoped
-       * one that does not match. True, and beside the point once BOTH schemes
-       * are declared: there is no longer any such thing as a non-matching pair.
-       *
-       * Moving it to the front makes it the first match under every scheme.
-       * `insertBefore` on a node already in place is a move, not a duplicate, so
-       * repainting stays idempotent.
-       */
-      document.head.insertBefore(tag, document.head.firstChild);
-      tag.content = colour;
+      write(colour);
     };
 
     /**
@@ -159,7 +187,7 @@ export function SystemBarColour() {
     paint();
 
     return () => observer.disconnect();
-  }, []);
+  }, [forced]);
 
   return null;
 }

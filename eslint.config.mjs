@@ -119,6 +119,14 @@ const eslintConfig = defineConfig([
               // is expected to be deleted with the losing treatment once he
               // has. It imports `useSyncExternalStore` and nothing else.
               //
+              // `bar-colour-test.ts` earns its place on the same terms and is
+              // the most temporary of the lot: it exists ONLY to answer whether
+              // the installed app reads the page's bar instruction at all
+              // (2 September 2026), because two sources currently hold the same
+              // colour and looking at the bar cannot separate them. It comes out
+              // as soon as that is answered. `useSyncExternalStore` and nothing
+              // else.
+              //
               // `search-position.ts` earns its place on the same terms as
               // `stream-style.ts`: it imports `useSyncExternalStore` from React
               // and nothing else at all — no v2 type, no v2 runtime, no
@@ -130,9 +138,10 @@ const eslintConfig = defineConfig([
                 "stream-style.ts",
                 "search-position.ts",
                 "bar-tuning.ts",
+                "bar-colour-test.ts",
               ],
               message:
-                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style, @/v2/search-position, @/v2/bar-tuning and @/v2/routes.manifest are sanctioned crossings).",
+                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style, @/v2/search-position, @/v2/bar-tuning, @/v2/bar-colour-test and @/v2/routes.manifest are sanctioned crossings).",
             },
           ],
         },

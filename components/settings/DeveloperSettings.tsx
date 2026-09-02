@@ -15,6 +15,7 @@ import { V2_COOKIE_CLEAR, V2_COOKIE_SET, hasV2Cookie } from '@/v2/cookie';
 import { readStreamStyle, setStreamStyle } from '@/v2/stream-style';
 import { readSearchPosition, setSearchPosition } from '@/v2/search-position';
 import { BarTuningControls } from './BarTuningControls';
+import { BarColourTestControl } from './BarColourTestControl';
 
 export function DeveloperSettings() {
   // Lazy initializer reads the cookie once, on mount — never in an effect
@@ -128,6 +129,14 @@ export function DeveloperSettings() {
             one piece once the owner has chosen a treatment. */}
         <div className="border-t pt-6">
           <BarTuningControls />
+        </div>
+        {/* Also its own block, and also expected to be short-lived: it exists to
+            settle whether the INSTALLED app reads this page at all, and it comes
+            out once that is answered. It writes the page's own instruction and
+            never the colour fixed at install time — moving both would make the
+            result meaningless, which is the position it was built to escape. */}
+        <div className="border-t pt-6">
+          <BarColourTestControl />
         </div>
       </CardContent>
     </Card>
