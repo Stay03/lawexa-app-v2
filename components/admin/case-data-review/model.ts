@@ -143,19 +143,47 @@ export function groupSourceVerdict(group: DuplicateGroup): GroupSourceVerdict {
     return { kind: 'same_document', provider: sourceProviders(verified[0])[0] ?? 'a source' };
   }
 
-  // Different addresses only mean different reports when every copy actually
-  // has one. A missing external id is silence, and silence is not disagreement.
-  const externalIds = verified.map((row) =>
-    row.sources.map((doc) => doc.external_id).filter((id): id is string => Boolean(id))
+  /**
+   * Different addresses only mean different reports WITHIN ONE PROVIDER.
+   *
+   * Each provider numbers reports its own way — nwlr writes `1141_1_597`,
+   * judy.legal a plain number, akn-uri a path — so two copies held by different
+   * providers ALWAYS have different external ids, and reading that as "two
+   * different judgments" would flag every cross-provider pair as a case to hold
+   * back. That is a false alarm that stops a correct merge, which is the
+   * expensive direction to be wrong in here.
+   *
+   * So compare only the providers that appear on every copy. Where the copies
+   * share no provider at all there is nothing to compare and the verdict falls
+   * through to `all_verified`, which claims nothing.
+   */
+  const byProvider = verified.map((row) => {
+    const map = new Map<string, Set<string>>();
+    for (const doc of row.sources) {
+      if (!doc.external_id) continue;
+      const ids = map.get(doc.source) ?? new Set<string>();
+      ids.add(doc.external_id);
+      map.set(doc.source, ids);
+    }
+    return map;
+  });
+  const sharedProviders = [...byProvider[0].keys()].filter((provider) =>
+    byProvider.every((map) => map.has(provider))
   );
-  const everyCopyAddressed = externalIds.every((ids) => ids.length > 0);
-  const flat = externalIds.flat();
+  const disagreeing = sharedProviders.filter((provider) => {
+    const seen = byProvider.map((map) => [...(map.get(provider) ?? [])].sort().join('|'));
+    return new Set(seen).size === seen.length;
+  });
   if (
     verified.length === group.cases.length &&
-    everyCopyAddressed &&
-    new Set(flat).size === flat.length
+    sharedProviders.length > 0 &&
+    disagreeing.length === sharedProviders.length
   ) {
-    return { kind: 'different_reports', externalIds: flat };
+    const provider = disagreeing[0];
+    return {
+      kind: 'different_reports',
+      externalIds: byProvider.map((map) => [...(map.get(provider) ?? [])].join(', ')),
+    };
   }
 
   return { kind: 'all_verified' };
