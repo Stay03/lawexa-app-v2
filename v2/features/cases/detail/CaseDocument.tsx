@@ -216,9 +216,11 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
             </>
           ) : null}
           {/* Verified last, and only when true: it qualifies where the judgment
-              came from, which is what the rest of this line is about. WHICH
-              provider verified it is deliberately absent — that is admin-only,
-              by the owner's instruction, and this line is public. */}
+              came from, which is what the rest of this line is about.
+              THE READER IS TOLD OUR RESEARCHERS VERIFIED IT, never which outside
+              provider did. The owner's instruction, 3 September 2026. The
+              supplier's name lives on the admin duplicates row and nowhere a
+              reader can reach. */}
           {detail.is_verified ? (
             <>
               {detail.court?.name || date ? (
@@ -228,7 +230,7 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
               ) : null}
               <span
                 className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400"
-                title="The full report behind this case came from a verified provider"
+                title="Verified by our researchers"
               >
                 <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
                 Verified report

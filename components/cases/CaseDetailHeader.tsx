@@ -12,9 +12,13 @@ interface CaseDetailHeaderProps {
   tags: string[] | null;
   viewsCount: number;
   /**
-   * True when a named provider supplied the judgment behind this case. The
-   * provider itself is admin-only by the owner's instruction, so this badge
-   * says that it is verified and never by whom.
+   * True when a named provider supplied the judgment behind this case.
+   *
+   * The reader is told OUR researchers verified it, never which provider did.
+   * The owner's words on 3 September 2026: "remove this from the case page, say
+   * verified by our researchers instead". So the outside supplier is not named
+   * here or anywhere else a reader can see — it lives on the admin duplicates
+   * row and nowhere else.
    */
   isVerified?: boolean;
   className?: string;
@@ -70,7 +74,7 @@ function CaseDetailHeader({
             <Badge
               variant="outline"
               className="gap-1.5 border-emerald-600/30 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-400"
-              title="The full report behind this case came from a verified provider"
+              title="Verified by our researchers"
             >
               <ShieldCheck className="h-3 w-3" />
               Verified report
