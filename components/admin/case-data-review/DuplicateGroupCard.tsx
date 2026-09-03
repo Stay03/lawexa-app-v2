@@ -1,14 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { Bookmark, Eye, FileText, Gavel } from 'lucide-react';
+import { Bookmark, Eye, FileText, Gavel, ShieldCheck, SplitSquareHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FixStateChip } from './FixPreview';
-import { differingFields, formatDate } from './model';
+import {
+  differingFields,
+  formatDate,
+  groupSourceVerdict,
+  isVerified,
+  sourceProviders,
+} from './model';
+import type { GroupSourceVerdict } from './model';
 import type { CaseReviewRow, DuplicateGroup } from '@/types/admin-case-data-review';
 
 /** The fields worth comparing between two copies of the same case. */
-const COMPARED = ['title', 'citation', 'judgment_date', 'court', 'content'] as const;
+const COMPARED = [
+  'title',
+  'citation',
+  'judgment_date',
+  'court',
+  'content',
+  'source',
+] as const;
 type Compared = (typeof COMPARED)[number];
 
 /**
@@ -30,8 +44,10 @@ export function DuplicateGroupCard({ group }: { group: DuplicateGroup }) {
     judgment_date: row.judgment_date ?? '',
     court: row.court?.name ?? '',
     content: `${row.has_full_report}/${row.judges_count}`,
+    source: sourceProviders(row).join(','),
   }));
   const differing = differingFields<Record<Compared, string>>(comparable, [...COMPARED]);
+  const verdict = groupSourceVerdict(group);
 
   return (
     <article className="rounded-xl border bg-card p-4">
@@ -46,6 +62,8 @@ export function DuplicateGroupCard({ group }: { group: DuplicateGroup }) {
         </span>
       </header>
 
+      <SourceVerdictLine verdict={verdict} />
+
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         {group.cases.map((row) => (
           <DuplicateCase key={row.id} row={row} differing={differing} />
@@ -53,6 +71,56 @@ export function DuplicateGroupCard({ group }: { group: DuplicateGroup }) {
       </div>
     </article>
   );
+}
+
+/**
+ * What the providers say about the group, above the copies rather than on one
+ * of them, because it is a fact about the pair and not about either record.
+ *
+ * Only two of the five states earn a line. `all_verified` and `none` say
+ * nothing the copies do not already show, and a line that appears on every
+ * group stops being read.
+ */
+function SourceVerdictLine({ verdict }: { verdict: GroupSourceVerdict }) {
+  if (verdict.kind === 'same_document') {
+    return (
+      <p className="mt-2 flex items-start gap-1.5 rounded-md bg-emerald-50 px-2 py-1.5 text-xs text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200">
+        <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>
+          One {verdict.provider} document imported twice. Same source file behind
+          both copies, so this is a duplicate at the source rather than a guess
+          from matching fields.
+        </span>
+      </p>
+    );
+  }
+
+  if (verdict.kind === 'different_reports') {
+    return (
+      <p className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+        <SplitSquareHorizontal className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>
+          Verified as DIFFERENT reports ({verdict.externalIds.join(' and ')}), so
+          these are probably two judgments sharing a name. Check before treating
+          them as copies.
+        </span>
+      </p>
+    );
+  }
+
+  if (verdict.kind === 'one_verified') {
+    return (
+      <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+        <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>
+          Only <span className="tabular-nums">#{verdict.caseId}</span> carries a
+          source document. It is the copy to keep.
+        </span>
+      </p>
+    );
+  }
+
+  return null;
 }
 
 function DuplicateCase({
@@ -116,6 +184,27 @@ function DuplicateCase({
         <span className="inline-flex items-center gap-1">
           <Gavel className="h-3.5 w-3.5" aria-hidden />
           {row.judges_count}
+        </span>
+      </div>
+
+      {/* Provenance sits with the judgment facts because that is what it
+          qualifies: not how much text a copy holds, but where the text came
+          from. The unverified state is spelled out rather than left blank, so
+          the absence reads as a finding instead of a gap in the screen. */}
+      <div
+        className={cn(
+          'mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs',
+          differing.has('source') ? 'font-medium text-foreground' : 'text-muted-foreground'
+        )}
+      >
+        <span className="inline-flex items-center gap-1">
+          <ShieldCheck
+            className={cn('h-3.5 w-3.5', isVerified(row) && 'text-emerald-600 dark:text-emerald-400')}
+            aria-hidden
+          />
+          {isVerified(row)
+            ? `Verified by ${sourceProviders(row).join(', ')}`
+            : 'No source document'}
         </span>
       </div>
 

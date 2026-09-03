@@ -1,4 +1,9 @@
-import type { CaseProblemKey, FixState } from '@/types/admin-case-data-review';
+import type {
+  CaseProblemKey,
+  CaseReviewRow,
+  DuplicateGroup,
+  FixState,
+} from '@/types/admin-case-data-review';
 
 /**
  * Display model for the case data review screen.
@@ -74,4 +79,84 @@ export function differingFields<T extends Record<string, unknown>>(
     }
   }
   return differing;
+}
+
+/******************************************************************************
+                          Verified source documents
+******************************************************************************/
+
+/** The providers behind a copy, deduplicated, in the order the server sent. */
+export function sourceProviders(row: CaseReviewRow): string[] {
+  return [...new Set((row.sources ?? []).map((doc) => doc.source).filter(Boolean))];
+}
+
+/**
+ * A copy is verified when a named provider supplied the judgment behind it.
+ *
+ * The server's own flag wins where it is present. `sources` is the fallback for
+ * a payload that predates the flag, and the two cannot disagree in a way that
+ * matters: a row with source documents is verified whichever field says so.
+ */
+export function isVerified(row: CaseReviewRow): boolean {
+  return row.is_verified ?? (row.sources ?? []).length > 0;
+}
+
+/**
+ * What the source documents say about a whole group, which is more than any one
+ * copy says on its own.
+ *
+ * `same_document` is the strongest statement this screen can make: one document
+ * imported twice, proven by a shared hash rather than inferred from matching
+ * fields. `different_reports` is the one that STOPS a merge — both copies are
+ * verified but the providers address them as different reports, so they are
+ * probably two judgments that happen to share a name.
+ */
+export type GroupSourceVerdict =
+  | { kind: 'same_document'; provider: string }
+  | { kind: 'different_reports'; externalIds: string[] }
+  | { kind: 'one_verified'; caseId: number; provider: string }
+  | { kind: 'all_verified' }
+  | { kind: 'none' };
+
+export function groupSourceVerdict(group: DuplicateGroup): GroupSourceVerdict {
+  const verified = group.cases.filter(isVerified);
+  if (verified.length === 0) return { kind: 'none' };
+
+  if (verified.length === 1 && group.cases.length > 1) {
+    const only = verified[0];
+    return {
+      kind: 'one_verified',
+      caseId: only.id,
+      provider: sourceProviders(only)[0] ?? 'a source',
+    };
+  }
+
+  // A hash shared by EVERY copy, not merely by two of a group of three: a
+  // partial match would name the group after a fact true of only part of it.
+  const hashSets = verified.map(
+    (row) => new Set(row.sources.map((doc) => doc.content_hash).filter(Boolean))
+  );
+  const sharedHash = [...hashSets[0]].find((hash) =>
+    hashSets.every((set) => set.has(hash))
+  );
+  if (sharedHash) {
+    return { kind: 'same_document', provider: sourceProviders(verified[0])[0] ?? 'a source' };
+  }
+
+  // Different addresses only mean different reports when every copy actually
+  // has one. A missing external id is silence, and silence is not disagreement.
+  const externalIds = verified.map((row) =>
+    row.sources.map((doc) => doc.external_id).filter((id): id is string => Boolean(id))
+  );
+  const everyCopyAddressed = externalIds.every((ids) => ids.length > 0);
+  const flat = externalIds.flat();
+  if (
+    verified.length === group.cases.length &&
+    everyCopyAddressed &&
+    new Set(flat).size === flat.length
+  ) {
+    return { kind: 'different_reports', externalIds: flat };
+  }
+
+  return { kind: 'all_verified' };
 }

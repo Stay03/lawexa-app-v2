@@ -223,6 +223,21 @@ export interface Case {
   is_bookmarked: boolean;
   bookmarks_count: number;
   meta: CaseMeta;
+  /**
+   * True when a named provider supplied the judgment behind this case rather
+   * than it being typed in or imported blind.
+   *
+   * THE FLAG IS PUBLIC AND THE PROVIDER IS NOT. The owner set that line himself
+   * on 3 September 2026: a reader may know a judgment is verified, but which
+   * service verified it stays inside admin, where it lives on the duplicates
+   * row as `sources` (see `CaseSourceDocument`). So there is no provider name
+   * anywhere in this file, and adding one here would leak it to every reader.
+   *
+   * Optional because the corpus is mixed: cached responses and the lean bot
+   * payload predate the field, and `undefined` must read as "not stated" rather
+   * than "not verified".
+   */
+  is_verified?: boolean;
 }
 
 // View limit error from 429 response

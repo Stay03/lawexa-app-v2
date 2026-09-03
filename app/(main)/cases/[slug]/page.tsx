@@ -139,6 +139,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
           judgmentDate={caseDetail.judgment_date}
           tags={caseDetail.tags}
           viewsCount={caseDetail.views_count}
+          isVerified={caseDetail.is_verified ?? false}
           animationDelay={ANIMATION_DELAYS.header}
         />
 

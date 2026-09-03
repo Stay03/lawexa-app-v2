@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Scale, Calendar, Globe, Eye } from 'lucide-react';
+import { Scale, Calendar, Globe, Eye, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Court, Country } from '@/types/case';
@@ -11,6 +11,12 @@ interface CaseDetailHeaderProps {
   judgmentDate: string | null;
   tags: string[] | null;
   viewsCount: number;
+  /**
+   * True when a named provider supplied the judgment behind this case. The
+   * provider itself is admin-only by the owner's instruction, so this badge
+   * says that it is verified and never by whom.
+   */
+  isVerified?: boolean;
   className?: string;
   animationDelay?: number;
 }
@@ -25,6 +31,7 @@ function CaseDetailHeader({
   judgmentDate,
   tags,
   viewsCount,
+  isVerified = false,
   className,
   animationDelay = 0,
 }: CaseDetailHeaderProps) {
@@ -37,7 +44,7 @@ function CaseDetailHeader({
       })
     : null;
 
-  const hasMetadata = court || country || formattedDate || viewsCount > 0;
+  const hasMetadata = court || country || formattedDate || viewsCount > 0 || isVerified;
   const hasTags = tags && tags.length > 0;
 
   return (
@@ -56,6 +63,19 @@ function CaseDetailHeader({
           className="flex flex-wrap items-center gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both"
           style={{ animationDelay: `${animationDelay + 50}ms` }}
         >
+          {/* Verified leads the row: it qualifies every other badge beside it,
+              because a court and a date are worth more when a named provider
+              stands behind the judgment they describe. */}
+          {isVerified && (
+            <Badge
+              variant="outline"
+              className="gap-1.5 border-emerald-600/30 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-400"
+              title="The full report behind this case came from a verified provider"
+            >
+              <ShieldCheck className="h-3 w-3" />
+              Verified report
+            </Badge>
+          )}
           {court && (
             <Badge variant="outline" className="gap-1.5">
               <Scale className="h-3 w-3" />

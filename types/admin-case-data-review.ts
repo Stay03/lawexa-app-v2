@@ -103,6 +103,28 @@ export interface ReviewCreator {
   name: string;
 }
 
+/**
+ * One source document behind a case: proof that a named provider supplied this
+ * judgment rather than it being typed in or imported blind.
+ *
+ * ADMIN ONLY, BY INSTRUCTION. The owner drew the line himself on 3 September
+ * 2026: the public case endpoints may say a case is verified, but WHICH
+ * provider verified it stays inside admin. So this shape never appears on a
+ * public payload and nothing here may be rendered outside /admin.
+ *
+ * `external_id` is the provider's own address for the report, encoding part and
+ * page, so two copies carrying DIFFERENT external ids are two different
+ * reported judgments however alike their titles look. `content_hash` is the
+ * hash of the document itself, so two copies sharing one were imported from a
+ * single document and are a duplicate proven at the source rather than inferred
+ * from fields.
+ */
+export interface CaseSourceDocument {
+  source: string;
+  external_id: string | null;
+  content_hash: string | null;
+}
+
 export interface CaseReviewRow {
   id: number;
   title: string;
@@ -122,6 +144,21 @@ export interface CaseReviewRow {
   created_by: ReviewCreator | null;
   problems: CaseProblem[];
   fix: CaseFixPreview;
+  /**
+   * The same flag the public endpoints carry, repeated here so admin reads one
+   * field rather than inferring it from the length of `sources`.
+   */
+  is_verified: boolean;
+  /**
+   * Every source document behind this copy. EMPTY MEANS UNVERIFIED, not
+   * missing: a case nothing has supplied simply has no rows here.
+   *
+   * This is the signal that settles a duplicate. Every other field on this row
+   * describes how much a copy holds, and a copy can hold more of the wrong
+   * thing — case 6066 carries a 195,066-character judgment and no source
+   * document at all. This one says where the judgment came from.
+   */
+  sources: CaseSourceDocument[];
 }
 
 /******************************************************************************

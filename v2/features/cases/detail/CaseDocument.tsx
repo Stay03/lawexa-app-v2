@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, ShieldCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { formatTreatment, relatedToDisplay } from '@/lib/utils/related-cases';
@@ -213,6 +213,26 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
                 </span>
               ) : null}
               <span className="tabular-nums">{date}</span>
+            </>
+          ) : null}
+          {/* Verified last, and only when true: it qualifies where the judgment
+              came from, which is what the rest of this line is about. WHICH
+              provider verified it is deliberately absent — that is admin-only,
+              by the owner's instruction, and this line is public. */}
+          {detail.is_verified ? (
+            <>
+              {detail.court?.name || date ? (
+                <span aria-hidden className="text-muted-foreground/40">
+                  ·
+                </span>
+              ) : null}
+              <span
+                className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400"
+                title="The full report behind this case came from a verified provider"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+                Verified report
+              </span>
             </>
           ) : null}
         </p>
