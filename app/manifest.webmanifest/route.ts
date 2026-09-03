@@ -44,13 +44,32 @@ export async function GET(): Promise<Response> {
   const light = store.get(THEME_COOKIE)?.value === 'light';
 
   /**
-   * The exact surfaces the v2 pages already declare (`app/v2/layout.tsx`
-   * viewport: `#ffffff` light, `#0a0a0a` dark), so the bar the installed app
-   * keeps is the same colour the page renders under it. `background_color`
-   * (the install splash) follows for the same reason: a white flash before a
-   * dark app is the same mismatch in a different place.
+   * DARK GETS THE PAGE'S OWN SURFACE. LIGHT CANNOT, AND HERE IS WHY.
+   *
+   * This served `#ffffff` for light at first, matching the page exactly. The
+   * owner reinstalled and lost his clock, his wifi and his signal. Four
+   * screenshots settled it, two bars in both app themes, measured:
+   *
+   *   dark bar   → icons drawn WHITE, visible, in BOTH app themes
+   *   white bar  → icons drawn WHITE, invisible, in BOTH app themes
+   *   status bar pixel-identical between light and dark mode on each bar
+   *
+   * HIS PHONE ALWAYS PAINTS THE STATUS ICONS WHITE and ignores both this
+   * colour and the page's. There is no web API to ask Android for dark icons —
+   * iOS has one, Android does not — so the icons are not ours to fix. The one
+   * lever we hold is this colour, which means IT MUST BE DARK ENOUGH TO CARRY
+   * WHITE ICONS or the reader loses their clock.
+   *
+   * So light mode gets a grey rather than the page's white. `#52525b` puts
+   * white icons at 7.7:1, comfortably readable, while being visibly grey rather
+   * than the near-black slab over a white page that started all of this. It is
+   * a compromise on purpose: an exact match to the page is not available while
+   * the phone insists on white icons.
+   *
+   * Dark keeps `#0a0a0a`, the page's real surface, because white icons already
+   * read on it.
    */
-  const surface = light ? '#ffffff' : '#0a0a0a';
+  const surface = light ? '#52525b' : '#0a0a0a';
 
   const manifest: MetadataRoute.Manifest = {
     id: '/',
