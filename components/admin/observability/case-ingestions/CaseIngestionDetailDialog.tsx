@@ -13,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/admin/observability';
 import { ingestionStatusMeta } from './ingestion-status';
+import { sourceFormatLabel, isProviderFetch } from './source-format';
 import type { CaseIngestion } from '@/types/admin-case-ingestions';
 
 interface CaseIngestionDetailDialogProps {
@@ -45,8 +46,18 @@ export function CaseIngestionDetailDialog({
 
         {ingestion && (
           <dl className="divide-y divide-border">
-            <Row label="File">{ingestion.report_file_name ?? '—'}</Row>
-            <Row label="Uploader">
+            <Row label="Source">{sourceFormatLabel(ingestion.source_format)}</Row>
+            {/* A provider fetch has a provider id and no file; an upload is the
+                other way round. Showing the row that is always empty for this
+                job's kind reads as missing data, so each kind shows its own. */}
+            {isProviderFetch(ingestion.source_format) ? (
+              <Row label="Provider case">
+                <span className="font-mono text-xs">{ingestion.provider_case_id ?? '—'}</span>
+              </Row>
+            ) : (
+              <Row label="File">{ingestion.report_file_name ?? '—'}</Row>
+            )}
+            <Row label="Requested by">
               {ingestion.user ? `${ingestion.user.name} · ${ingestion.user.email}` : '—'}
             </Row>
             <Row label="Country">{ingestion.country?.name ?? '—'}</Row>
@@ -76,9 +87,11 @@ export function CaseIngestionDetailDialog({
                 </div>
               </Row>
             )}
-            <Row label="Storage path">
-              <span className="font-mono text-xs">{ingestion.report_file_path ?? '—'}</span>
-            </Row>
+            {!isProviderFetch(ingestion.source_format) && (
+              <Row label="Storage path">
+                <span className="font-mono text-xs">{ingestion.report_file_path ?? '—'}</span>
+              </Row>
+            )}
             <Row label="Started">
               {ingestion.started_at ? format(new Date(ingestion.started_at), 'PPpp') : '—'}
             </Row>

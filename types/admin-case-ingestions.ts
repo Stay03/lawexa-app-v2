@@ -12,6 +12,19 @@ export const CASE_INGESTION_STATUSES: CaseIngestionStatus[] = [
   'failed',
 ];
 
+/**
+ * How the judgment reached us. `pdf` and `akn_xml` are uploads and carry a file;
+ * `legal_api` is fetched from a provider by id and has no file at all, which is
+ * why the list cannot key on `report_file_name` alone.
+ */
+export type CaseIngestionSourceFormat = 'legal_api' | 'akn_xml' | 'pdf';
+
+export const CASE_INGESTION_SOURCE_FORMATS: CaseIngestionSourceFormat[] = [
+  'legal_api',
+  'akn_xml',
+  'pdf',
+];
+
 export interface CaseIngestionCountry {
   id: number;
   name: string;
@@ -31,6 +44,14 @@ export interface CaseIngestion {
   user: JobUserRef | null;
   country: CaseIngestionCountry | null;
   status: CaseIngestionStatus;
+  source_format: CaseIngestionSourceFormat;
+  /**
+   * The provider's own id for the judgment, e.g. `nwlr:1897_1_175`. Set only on
+   * `legal_api` jobs; an upload has no provider and leaves this null. It is the
+   * ONLY thing that identifies which case a provider job is for while it runs,
+   * because the case row does not exist yet.
+   */
+  provider_case_id: string | null;
   report_file_name: string | null;
   report_file_path: string | null;
   error: string | null;
@@ -50,6 +71,7 @@ export interface CaseIngestionSummary {
 
 export interface CaseIngestionsParams {
   status?: CaseIngestionStatus;
+  source_format?: CaseIngestionSourceFormat;
   user_id?: number;
   date_from?: string;
   date_to?: string;

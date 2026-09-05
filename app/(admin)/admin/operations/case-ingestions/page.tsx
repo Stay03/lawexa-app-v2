@@ -19,9 +19,12 @@ import {
   useCaseIngestions,
   useCaseIngestionSummary,
 } from '@/lib/hooks/useAdminCaseIngestions';
+import { sourceFormatLabel } from '@/components/admin/observability/case-ingestions/source-format';
 import {
+  CASE_INGESTION_SOURCE_FORMATS,
   CASE_INGESTION_STATUSES,
   type CaseIngestion,
+  type CaseIngestionSourceFormat,
   type CaseIngestionStatus,
   type CaseIngestionsParams,
 } from '@/types/admin-case-ingestions';
@@ -34,10 +37,12 @@ function PageContent() {
 
   const params = useMemo<CaseIngestionsParams>(() => {
     const status = searchParams.get('status') as CaseIngestionStatus | null;
+    const sourceFormat = searchParams.get('source_format') as CaseIngestionSourceFormat | null;
     return {
       page: Number(searchParams.get('page')) || 1,
       per_page: Number(searchParams.get('per_page')) || 15,
       status: status ?? undefined,
+      source_format: sourceFormat ?? undefined,
       user_id: searchParams.get('user_id') ? Number(searchParams.get('user_id')) : undefined,
     };
   }, [searchParams]);
@@ -69,10 +74,13 @@ function PageContent() {
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <FileText className="h-6 w-6 text-primary" />
-          Case PDF Ingestions
+          Case ingestions
         </h1>
+        {/* Not "PDF ingestions" any more: most jobs here are now judgments
+            fetched from NWLR by id, which never involve a file. */}
         <p className="text-sm text-muted-foreground">
-          Async judgment-PDF extraction jobs — health, failures, and the cases they created.
+          Judgments fetched from a provider or uploaded as a file — health, failures, and the
+          cases they created.
         </p>
       </div>
 
@@ -110,6 +118,16 @@ function PageContent() {
         <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
           <CardTitle className="text-lg">Ingestion jobs</CardTitle>
           <div className="flex items-center gap-2">
+            <EnumFilterSelect
+              value={params.source_format}
+              options={CASE_INGESTION_SOURCE_FORMATS}
+              onChange={(v) =>
+                updateParams({ source_format: v as CaseIngestionSourceFormat | undefined, page: 1 })
+              }
+              placeholder="Source"
+              allLabel="All sources"
+              labelFor={sourceFormatLabel}
+            />
             <EnumFilterSelect
               value={params.status}
               options={CASE_INGESTION_STATUSES}

@@ -15,11 +15,20 @@ import {
   type ObservabilityColumn,
 } from '@/components/admin/observability';
 import { ingestionStatusMeta } from './ingestion-status';
+import { sourceFormatLabel, isProviderFetch } from './source-format';
 import type { CaseIngestion } from '@/types/admin-case-ingestions';
 
+/* ONE "Source" COLUMN RATHER THAN TWO NEW ONES.
+   A provider fetch has no file and an upload has no provider id, so a `file`
+   column plus a `provider case id` column would each be empty on half the rows
+   and push an already-scrolling table two columns wider. One column carries
+   whichever identifier the row actually has, under a badge naming where it came
+   from — which is also the thing being filtered on just above the table.
+   `Uploader` is now `Requested by`: every job has a user, but on a provider
+   fetch that person asked for an import rather than uploading anything. */
 const COLUMNS: ObservabilityColumn[] = [
-  { key: 'file', label: 'Report file' },
-  { key: 'user', label: 'Uploader', className: 'w-[200px]' },
+  { key: 'source', label: 'Source' },
+  { key: 'user', label: 'Requested by', className: 'w-[200px]' },
   { key: 'country', label: 'Country', className: 'w-[110px]' },
   { key: 'status', label: 'Status', className: 'w-[130px]' },
   { key: 'result', label: 'Result', className: 'w-[240px]' },
@@ -48,9 +57,25 @@ export function CaseIngestionsTable({
       {ingestions.map((job, index) => (
         <TableRow key={job.id} className={cn(index % 2 === 1 && 'bg-muted/20')}>
           <TableCell className="max-w-[280px]">
-            <span className="block truncate text-sm font-medium">
-              {job.report_file_name ?? '—'}
-            </span>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="shrink-0 font-normal">
+                {sourceFormatLabel(job.source_format)}
+              </Badge>
+              {/* The identifier the row actually has. A provider fetch is only
+                  identifiable by its provider id until the case exists, so that
+                  is shown verbatim and in mono — it is a key someone copies. */}
+              {isProviderFetch(job.source_format) ? (
+                job.provider_case_id ? (
+                  <span className="block truncate font-mono text-xs">{job.provider_case_id}</span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">no provider id</span>
+                )
+              ) : (
+                <span className="block truncate text-sm font-medium">
+                  {job.report_file_name ?? '—'}
+                </span>
+              )}
+            </div>
           </TableCell>
           <TableCell>
             <UserCell user={job.user} />
