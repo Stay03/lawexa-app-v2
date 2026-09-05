@@ -14,12 +14,42 @@ import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/admin/observability';
 import { ingestionStatusMeta } from './ingestion-status';
 import { sourceFormatLabel, isProviderFetch } from './source-format';
-import type { CaseIngestion } from '@/types/admin-case-ingestions';
+import { duplicateRefs, duplicateSignalLabel } from './duplicates';
+import type { CaseDuplicateRef, CaseIngestion } from '@/types/admin-case-ingestions';
 
 interface CaseIngestionDetailDialogProps {
   ingestion: CaseIngestion | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+/**
+ * One case the ingest matched this judgment to, and WHY.
+ *
+ * The reason is the point. A reader here is deciding whether two case records
+ * are the same judgment, and "possible duplicate" alone gives them nothing to
+ * decide with, so the test that fired and the server's own sentence both show.
+ */
+function DuplicateLine({ item }: { item: CaseDuplicateRef }) {
+  const signal = duplicateSignalLabel(item.matched_on);
+  const label = item.case_title ?? `case ${item.case_id}`;
+  return (
+    <div className="space-y-0.5">
+      {item.case_slug ? (
+        <Link
+          href={`/admin/cases/${item.case_slug}`}
+          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+        >
+          {label}
+          <ExternalLink className="h-3 w-3 shrink-0" />
+        </Link>
+      ) : (
+        <span className="font-medium">{label}</span>
+      )}
+      {signal && <p className="text-xs text-muted-foreground">{signal}</p>}
+      {item.detail && <p className="text-xs text-muted-foreground">{item.detail}</p>}
+    </div>
+  );
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -64,7 +94,29 @@ export function CaseIngestionDetailDialog({
             <Row label="Status">
               <StatusBadge meta={ingestionStatusMeta(ingestion.status)} />
             </Row>
-            {ingestion.status === 'completed' && ingestion.result && (
+            {/* A duplicate job created nothing, so it has no case to link and no
+                error to explain itself: this row IS its result. */}
+            {ingestion.status === 'duplicate' && (
+              <Row label="Already held as">
+                {ingestion.result?.duplicate_of ? (
+                  <DuplicateLine item={ingestion.result.duplicate_of} />
+                ) : (
+                  <span className="text-muted-foreground">not named on the job</span>
+                )}
+              </Row>
+            )}
+            {/* Shown on a job that DID create a case. Nothing stopped it, so
+                this is the only warning anybody gets. */}
+            {ingestion.status !== 'duplicate' && duplicateRefs(ingestion).length > 0 && (
+              <Row label="Possible duplicates">
+                <div className="space-y-2">
+                  {duplicateRefs(ingestion).map((item) => (
+                    <DuplicateLine key={item.case_id} item={item} />
+                  ))}
+                </div>
+              </Row>
+            )}
+            {ingestion.status === 'completed' && ingestion.result?.case_slug && (
               <Row label="Created case">
                 <Link
                   href={`/admin/cases/${ingestion.result.case_slug}`}

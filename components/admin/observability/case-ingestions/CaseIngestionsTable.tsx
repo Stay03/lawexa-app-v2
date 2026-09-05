@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Eye, ExternalLink } from 'lucide-react';
+import { Eye, ExternalLink, Copy } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
 } from '@/components/admin/observability';
 import { ingestionStatusMeta } from './ingestion-status';
 import { sourceFormatLabel, isProviderFetch } from './source-format';
+import { duplicateRefs } from './duplicates';
 import type { CaseIngestion } from '@/types/admin-case-ingestions';
 
 /* ONE "Source" COLUMN RATHER THAN TWO NEW ONES.
@@ -40,6 +41,24 @@ interface CaseIngestionsTableProps {
   ingestions: CaseIngestion[];
   isLoading: boolean;
   onView: (ingestion: CaseIngestion) => void;
+}
+
+/** The held case a duplicate job stopped for, linked when there is a slug. */
+function DuplicateOf({ job }: { job: CaseIngestion }) {
+  const ref = job.result?.duplicate_of;
+  if (!ref) return <span className="text-sm text-muted-foreground">already held</span>;
+  const label = ref.case_title ?? `case ${ref.case_id}`;
+  return ref.case_slug ? (
+    <Link
+      href={`/admin/cases/${ref.case_slug}`}
+      className="inline-flex items-center gap-1 truncate text-sm text-primary hover:underline"
+    >
+      {label}
+      <ExternalLink className="h-3 w-3 shrink-0" />
+    </Link>
+  ) : (
+    <span className="truncate text-sm">{label}</span>
+  );
 }
 
 export function CaseIngestionsTable({
@@ -87,14 +106,33 @@ export function CaseIngestionsTable({
             <StatusBadge meta={ingestionStatusMeta(job.status)} />
           </TableCell>
           <TableCell className="max-w-[240px]">
-            {job.status === 'completed' && job.result ? (
-              <Link
-                href={`/admin/cases/${job.result.case_slug}`}
-                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                View case
-                <ExternalLink className="h-3 w-3" />
-              </Link>
+            {job.status === 'duplicate' ? (
+              /* No case was created, so there is nothing to link to but the
+                 case we already hold. Naming it here saves opening the row to
+                 find out what the job decided. */
+              <DuplicateOf job={job} />
+            ) : job.status === 'completed' && job.result?.case_slug ? (
+              <div className="space-y-1">
+                <Link
+                  href={`/admin/cases/${job.result.case_slug}`}
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  View case
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+                {/* The case WAS created and the ingest still thinks we hold it
+                    already. Nothing refused it, so the only thing standing
+                    between that and a duplicate in the library is somebody
+                    seeing this line. */}
+                {duplicateRefs(job).length > 0 && (
+                  <span className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                    <Copy className="h-3 w-3 shrink-0" />
+                    {duplicateRefs(job).length === 1
+                      ? 'may already be held'
+                      : `may already be held, ${duplicateRefs(job).length} matches`}
+                  </span>
+                )}
+              </div>
             ) : job.status === 'failed' ? (
               <div className="flex items-center gap-1.5">
                 {job.status_code != null && (
