@@ -7,6 +7,7 @@ import type {
   CaseMaintenanceItemsParams,
   CaseMaintenancePreviewParams,
   CaseMaintenanceRunsParams,
+  CaseMaintenanceRunStatus,
   CaseMaintenanceStartPayload,
 } from '@/types/admin-case-maintenance-runs';
 
@@ -60,12 +61,28 @@ export function useCaseMaintenanceRun(uuid: string | null) {
 export function useCaseMaintenanceItems(
   uuid: string | null,
   params: CaseMaintenanceItemsParams = {},
+  /**
+   * The status of the run these items belong to.
+   *
+   * ── THE ROWS CANNOT SEE THEIR OWN RUN ─────────────────────────────────
+   * The two queries above decide whether to poll by reading their own answer.
+   * A page of items cannot: an item is finished long before the run is, so
+   * asking the rows would stop the polling while the run was still working.
+   * The run's status is the only thing that knows, so the caller passes it and
+   * the rule stays here beside the other two.
+   *
+   * Without this the header moved every half minute while the table under it
+   * stood still, and a case that had finished still read "Waiting" until
+   * somebody touched the page. A run that is working looks hung.
+   */
+  runStatus?: CaseMaintenanceRunStatus,
 ) {
   return useQuery({
     queryKey: caseMaintenanceKeys.items(uuid ?? '', params),
     queryFn: () => adminCaseMaintenanceRunsApi.getItems(uuid as string, params),
     enabled: !!uuid,
     staleTime: STALE_MS,
+    refetchInterval: runStatus && IN_FLIGHT.has(runStatus) ? POLL_MS : false,
   });
 }
 

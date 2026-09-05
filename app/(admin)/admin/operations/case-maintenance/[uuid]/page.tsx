@@ -76,12 +76,17 @@ export default function CaseMaintenanceRunPage({
      browser would look identical on page 1 and be meaningless by page 3, which
      is the sort of thing nobody notices until the pile is large enough to
      matter — which is exactly when it is relied on. */
-  const itemsQuery = useCaseMaintenanceItems(uuid, {
-    page,
-    per_page: 20,
-    status: effectiveFilter || undefined,
-    sort: '-score',
-  });
+  const itemsQuery = useCaseMaintenanceItems(
+    uuid,
+    {
+      page,
+      per_page: 20,
+      status: effectiveFilter || undefined,
+      sort: '-score',
+    },
+    /* So the rows keep up with the header while the run works. See the hook. */
+    run?.status,
+  );
 
   const pause = usePauseCaseMaintenanceRun(uuid);
   const resume = useResumeCaseMaintenanceRun(uuid);
