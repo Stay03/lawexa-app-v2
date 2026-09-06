@@ -13,6 +13,11 @@ import {
   CaseBodyCard,
   CaseMetadataGrid,
   CaseJudgesSection,
+  CaseHistorySection,
+  CasePartiesSection,
+  CaseCounselSection,
+  CaseArgumentsSection,
+  CaseStatutesSection,
   ReaderModeWrapper,
   ViewFullReportButton,
   RelatedCasesSection,
@@ -37,15 +42,20 @@ import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 const ANIMATION_DELAYS = {
   header: 0,
-  actions: 50,
+  parties: 50,
+  actions: 100,
   viewReportButton: 150,
   principles: 200,
   body: 300,
   metadataStart: 400,
   judges: 600,
-  similarCases: 700,
-  citedCases: 800,
-  citedBy: 900,
+  counsel: 650,
+  argumentsSection: 700,
+  history: 750,
+  statutes: 800,
+  similarCases: 850,
+  citedCases: 900,
+  citedBy: 1000,
 } as const;
 
 /******************************************************************************
@@ -143,6 +153,17 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
           animationDelay={ANIMATION_DELAYS.header}
         />
 
+        {/* Who the cover names. The title carries two names and a report can
+            name a dozen more, so a reader looking for a party has nowhere else
+            on the page to look. */}
+        {caseDetail.parties && caseDetail.parties.length > 0 && (
+          <CasePartiesSection
+            parties={caseDetail.parties}
+            numbered={caseDetail.parties_numbered}
+            animationDelay={ANIMATION_DELAYS.parties}
+          />
+        )}
+
         {/* Actions */}
         <div
           className="animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both flex items-center gap-2 duration-200"
@@ -205,6 +226,7 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
           country={caseDetail.country}
           topic={caseDetail.topic}
           course={caseDetail.course}
+          reportPublishedDate={caseDetail.report_published_date}
           animationStartDelay={ANIMATION_DELAYS.metadataStart}
         />
 
@@ -213,6 +235,41 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
           judges={caseDetail.judges}
           animationDelay={ANIMATION_DELAYS.judges}
         />
+
+        {/* The lawyers who appeared, the printed line first */}
+        {caseDetail.counsel && caseDetail.counsel.length > 0 && (
+          <CaseCounselSection
+            counsel={caseDetail.counsel}
+            animationDelay={ANIMATION_DELAYS.counsel}
+          />
+        )}
+
+        {/* What each side argued and what the court said back. Only reviewed
+            rows render, and the server withholds the rest from most readers
+            before we ever see them. */}
+        {caseDetail.arguments && caseDetail.arguments.length > 0 && (
+          <CaseArgumentsSection
+            arguments={caseDetail.arguments}
+            animationDelay={ANIMATION_DELAYS.argumentsSection}
+          />
+        )}
+
+        {/* How the case got here. Both of these fields have been arriving on
+            every payload and nothing rendered either of them. */}
+        {caseDetail.court_history && caseDetail.court_history.length > 0 && (
+          <CaseHistorySection
+            steps={caseDetail.court_history}
+            animationDelay={ANIMATION_DELAYS.history}
+          />
+        )}
+
+        {/* Statutes, rules and books referred to */}
+        {caseDetail.statutes_cited && caseDetail.statutes_cited.length > 0 && (
+          <CaseStatutesSection
+            statutes={caseDetail.statutes_cited}
+            animationDelay={ANIMATION_DELAYS.statutes}
+          />
+        )}
 
         {/* Similar Cases */}
         {caseDetail.similar_cases && caseDetail.similar_cases.length > 0 && (

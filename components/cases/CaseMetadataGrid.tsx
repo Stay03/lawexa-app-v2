@@ -3,6 +3,7 @@ import {
   Globe,
   BookMarked,
   GraduationCap,
+  CalendarClock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CaseMetadataItem } from './CaseMetadataItem';
@@ -13,6 +14,15 @@ interface CaseMetadataGridProps {
   country: Country | null;
   topic: string | null;
   course: string | null;
+  /**
+   * The day the reporter issued the report, which is NOT the day the court
+   * gave judgment. It belongs here rather than beside the judgment date in
+   * the header: the two are months apart on some reports (Garkuwa, 27 January
+   * against 21 August 2023) and a reader who sees them side by side reads the
+   * later one as the decision. Absent on every case until the provider's
+   * published date is stored.
+   */
+  reportPublishedDate?: string | null;
   className?: string;
   animationStartDelay?: number;
 }
@@ -20,6 +30,19 @@ interface CaseMetadataGridProps {
 /**
  * Helper to safely render a value - handles objects by extracting name property
  */
+/**
+ * A date for a reader, or nothing at all.
+ *
+ * Returns null rather than "Invalid Date" when the string will not parse, so a
+ * bad value from the reporter drops the row instead of printing nonsense in it.
+ */
+function formatDay(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 function safeStringValue(value: unknown): string | null {
   if (typeof value === 'string') {
     return value;
@@ -38,6 +61,7 @@ function CaseMetadataGrid({
   country,
   topic,
   course,
+  reportPublishedDate,
   className,
   animationStartDelay = 400,
 }: CaseMetadataGridProps) {
@@ -92,6 +116,21 @@ function CaseMetadataGrid({
       icon: BookMarked,
       label: 'Topic',
       value: safeTopic,
+    });
+  }
+
+  const publishedOn = formatDay(reportPublishedDate);
+  if (publishedOn) {
+    items.push({
+      key: 'reportPublished',
+      icon: CalendarClock,
+      label: 'Report published',
+      value: (
+        <div>
+          <div>{publishedOn}</div>
+          <div className="text-xs text-muted-foreground">the day the reporter issued it</div>
+        </div>
+      ),
     });
   }
 

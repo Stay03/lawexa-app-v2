@@ -96,6 +96,9 @@ export interface CitedCaseEdge {
   slug: string | null;
   citation: string | null;
   treatment: CaseTreatment | null;
+  /** The reporter key of the cited report, `part_1_page`, or null when the
+   *  printed citation gives no part. Null is "unreadable", never "none". */
+  nwlr_key?: string | null;
 }
 
 // A reverse citation (cited_by): the old related-case shape plus a treatment label.
@@ -173,12 +176,132 @@ export interface ReportPrinciple {
 // One statute this judgment cited (statutes_cited[]). When `statute_id` is set
 // a `statute` object is included — render as a link; when null, render `raw`
 // as plain text (unresolved; a future healing job links these).
+/**
+ * One party as the report's cover prints it.
+ *
+ * `name` keeps the cover's capitals; casing happens at render through
+ * `casePartyName` so our column and the provider's stay byte-identical.
+ */
+export interface CaseParty {
+  position: number;
+  name: string;
+  /** "appellant" and "respondent" today; a cover may print another word. */
+  role: string;
+  /** Sent by the provider. Its meaning is not settled, so nothing renders it. */
+  group: number | null;
+  appeal_number: string | null;
+}
+
+/**
+ * Which SIDE the cover numbered, a sibling of `parties` and not a field on a
+ * row. A cover that numbers the respondents ("1st - 10th Respondents") and
+ * leaves the appellant bare is the usual shape, so the numbering is only
+ * printed for the side that carried it.
+ */
+export interface PartiesNumbered {
+  appellant: boolean;
+  respondent: boolean;
+}
+
+export interface CaseCounselPerson {
+  name: string;
+  /** "lead" for the named counsel, "with" for those the line puts with them. */
+  rank: 'lead' | 'with' | null;
+  /** The splitter could not read the line cleanly; the printed line is still
+   *  exact, so the reader is shown the line and told the split is uncertain. */
+  unsure: boolean;
+}
+
+/** One printed counsel line and the people read out of it. */
+export interface CaseCounselLine {
+  /** The line exactly as the report prints it, side included. */
+  line: string;
+  /** The line with the side removed. */
+  names: string | null;
+  side: string | null;
+  role: string | null;
+  /** Which numbered parties the line appears for, e.g. [1..10]. */
+  positions: number[];
+  people: CaseCounselPerson[];
+}
+
+export type CaseArgumentStatus =
+  | 'accepted'
+  | 'rejected'
+  | 'partly_accepted'
+  | 'not_decided'
+  | null;
+
+/**
+ * A case this submission stands on.
+ *
+ * `cited_case_id` and `slug` are null until the reporter key resolves to a
+ * case we hold, so anything rendering this must print the key or the name
+ * rather than build a link to nowhere.
+ */
+export interface CaseArgumentAuthority {
+  cited_case_id: number | null;
+  nwlr_key: string | null;
+  slug: string | null;
+  display_title: string | null;
+}
+
+/** The judge whose words answer a submission, with their role on the coram. */
+export interface CaseArgumentJudge {
+  id: number;
+  name: string;
+  slug: string | null;
+  role: string | null;
+}
+
+/**
+ * One submission and the court's answer to it.
+ *
+ * ── WHAT IS NULL HERE IS NORMAL ───────────────────────────────────────────
+ * `side` is null whenever the judgment wrote "learned counsel submitted"
+ * without naming a side, which is common and is not a fault. `verbatim_quote`
+ * and `verbatim_window` are null on EVERY row today, because the scorer that
+ * fills them does principles only.
+ *
+ * ── TWO ABSENCES THAT MEAN DIFFERENT THINGS ───────────────────────────────
+ * `judge` is ABSENT, not null, when no judge is attached to this row; that
+ * says nothing about the case's panel. And a reader below Researcher receives
+ * only reviewed rows, filtered at load time with no marker that anything was
+ * withheld, so a short list is not evidence that a case argued little.
+ */
+export interface CaseArgument {
+  id: number;
+  side: string | null;
+  counsel_name: string | null;
+  argument: string;
+  status?: CaseArgumentStatus;
+  court_response: string | null;
+  judge?: CaseArgumentJudge | null;
+  verbatim_quote: string | null;
+  verbatim_window: string | null;
+  authorities?: CaseArgumentAuthority[] | null;
+  /** False on every row until somebody reviews it. Absent counts as false. */
+  reviewed?: boolean;
+}
+
 export interface StatuteCitedEdge {
   id: number;
   statute_id: number | null;
   raw: string | null;
   provision: string | null;
   statute?: { id: number; title: string; slug: string } | null;
+  /**
+   * Which of the three printed lists the row came from.
+   *
+   * The provider prints statutes, rules of court and books as separate blocks
+   * and they all land in this table. Only a `statute` may ever render as a
+   * link to a statute page: a rule of court has no page here, and a textbook
+   * linked as legislation is a wrong answer wearing a citation's clothes.
+   *
+   * Absent on every row written before the column existed; treat an absent
+   * kind as `statute`, which is what those rows are.
+   */
+  kind?: 'statute' | 'rule' | 'book' | null;
 }
 
 // One step of the case's procedural chain (court_history[], ordered). When
@@ -194,6 +317,31 @@ export interface CourtHistoryStep {
   court: string | null;
   decided_date: string | null;
   outcome: CaseOutcome | null;
+
+  /* ── From the report's printed History block ─────────────────────────────
+     Everything below arrives from the provider's front matter. A step written
+     before these existed carries `label` alone, so the renderer must still
+     read a step that has nothing but a label. What comes back empty is empty
+     IN THE PRINT: most Supreme Court reports name the Court of Appeal's
+     division and number but not its panel. */
+
+  /** The court's full name where the print gives one, e.g. "High Court of the
+   *  Federal Capital Territory, Abuja". `court` is the section heading. */
+  court_name?: string | null;
+  /** e.g. "Court of Appeal, Abuja." */
+  division?: string | null;
+  /** Appeal or suit numbers as printed; a step can carry more than one. */
+  numbers?: string[] | null;
+  /** The date lines as printed, beside the parsed `decided_date`. */
+  date_raw?: string[] | null;
+  /** The panel that sat, as one printed string. */
+  coram?: string | null;
+  /** Where `coram` was read from, e.g. "cover"; null when the print named it
+   *  in the history block itself. */
+  coram_source?: string | null;
+  /** The whole section as printed, every line, so nothing is hidden by a
+   *  field we failed to parse. */
+  lines?: string[] | null;
 }
 
 // Meta information for SEO
@@ -270,6 +418,32 @@ export interface CaseDetail extends Case {
   report_principles?: ReportPrinciple[];
   statutes_cited?: StatuteCitedEdge[];
   court_history?: CourtHistoryStep[];
+  /**
+   * The day the reporter issued the report, kept apart from `judgment_date`.
+   * Optional because it exists only on cases imported or refreshed after the
+   * provider began sending it (5 September 2026).
+   */
+  report_published_date?: string | null;
+  nwlr_key?: string | null;
+
+  /* ── FOUR LISTS WHOSE ABSENCE MEANS SOMETHING ─────────────────────────────
+     `parties`, `counsel`, `cited_cases` and `cited_by` are ALWAYS PRESENT on
+     /cases/{slug}, where `[]` means the case genuinely has none, and ABSENT on
+     a listing row, where the question was never asked (a twenty-row listing
+     would otherwise fire eighty queries). They sit on CaseDetail rather than
+     Case for exactly that reason.
+
+     So `[]` and absent are two different facts and must never be flattened
+     into one. Read them with `?.length`, never `?? []` followed by a length
+     test, which turns "nobody asked" into "the case has none" — the shape of
+     the bug that hid the citation sections from every reader for months.
+
+     They stay optional here until the show payload carries them everywhere. */
+  parties?: CaseParty[];
+  parties_numbered?: PartiesNumbered | null;
+  counsel?: CaseCounselLine[];
+  /** Same presence rule as the four lists above. */
+  arguments?: CaseArgument[];
   has_full_report?: boolean;
   full_report?: FullReport | null;
   similar_cases?: RelatedCase[] | null;
