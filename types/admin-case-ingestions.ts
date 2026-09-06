@@ -82,6 +82,37 @@ export interface CaseDuplicateRef {
  * we already hold and `case_id`/`case_slug` are absent, which is why both are
  * optional here rather than merely empty.
  */
+/**
+ * What OUR model read off the report, before the provider overwrote it.
+ *
+ * ── WHY IT EXISTS AND WHY IT IS NOT `metadata` ────────────────────────────
+ * `result.metadata` is the MERGED answer: on the seven fields the provider
+ * wins, metadata holds the PROVIDER's value. `result.extracted` is the only
+ * place the model's own reading survives, which is what gives a disagreement
+ * two real sides to compare. Topic, tags, outcome and origin state are not
+ * here at all, because on those the model's value IS the saved value and
+ * there is nothing to disagree with.
+ *
+ * ── IT IS NULL FAR MORE OFTEN THAN IT IS SET ──────────────────────────────
+ * Null on the file and plugin paths, because only a provider ingest has a
+ * provider answer to overwrite one. Null on every ticket written before the
+ * build that added it, and nothing backfills it: a case gets one the next
+ * time it is ingested or refreshed. So null means "no model answer kept",
+ * NEVER "the two agreed", and nothing may render it as agreement.
+ */
+export interface CaseIngestionExtracted {
+  title?: string | null;
+  short_title?: string | null;
+  judgment_date?: string | null;
+  citation?: string | null;
+  suit_no?: string | null;
+  court_name?: string | null;
+  judge_names?: string[] | null;
+  /** The model's own reading of the cover, not the provider's. */
+  parties?: unknown[] | null;
+  counsel?: unknown[] | null;
+}
+
 export interface CaseIngestionResult {
   case_id?: number;
   case_slug?: string;
@@ -95,7 +126,15 @@ export interface CaseIngestionResult {
    */
   possible_duplicates?: CaseDuplicateRef[] | null;
   resolutions?: unknown;
+  /**
+   * The merged answer that was saved. Left as `unknown` because nothing has
+   * pinned its full shape; read it through the helpers in `extracted.ts`,
+   * which pull only the keys they can name and treat a key they cannot find
+   * as "nothing to compare" rather than as agreement.
+   */
   metadata?: unknown;
+  /** The model's own reading; see CaseIngestionExtracted. */
+  extracted?: CaseIngestionExtracted | null;
 }
 
 export interface CaseIngestion {

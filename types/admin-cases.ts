@@ -113,6 +113,16 @@ export interface CaseDetail {
   cited_cases: CitedCaseEdge[];
   cited_by: CitedByCaseSummary[];
   cited_by_count: number;
+  /**
+   * The cover's rows, served by the same /cases/{slug} the reader uses.
+   *
+   * Optional and deliberately loose: this file and `types/case.ts` both
+   * describe that one endpoint, and only the reader's copy models the row
+   * shapes. Anything needing those should read `types/case.ts`; these two
+   * exist here so an admin screen can count and name them.
+   */
+  parties?: { name?: string | null }[] | null;
+  counsel?: { line?: string | null }[] | null;
   creator: Creator | null;
   has_full_report: boolean;
   files: CaseFile[];

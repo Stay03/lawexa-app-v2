@@ -15,6 +15,8 @@ import { StatusBadge } from '@/components/admin/observability';
 import { ingestionStatusMeta } from './ingestion-status';
 import { sourceFormatLabel, isProviderFetch } from './source-format';
 import { duplicateRefs, duplicateSignalLabel } from './duplicates';
+import { extractedSummary, rowComparisons } from './extracted';
+import { useCase } from '@/lib/hooks/useAdminCases';
 import type { CaseDuplicateRef, CaseIngestion } from '@/types/admin-case-ingestions';
 
 interface CaseIngestionDetailDialogProps {
@@ -66,6 +68,16 @@ export function CaseIngestionDetailDialog({
   open,
   onOpenChange,
 }: CaseIngestionDetailDialogProps) {
+  const read = extractedSummary(ingestion);
+  /* The ticket carries the model's own parties and counsel but not the rows
+     that were saved, so the created case is fetched once, only while a
+     reviewer has this dialog open. The list never does this. */
+  const { data: caseResponse, isLoading: caseLoading } = useCase(
+    ingestion?.result?.case_slug,
+    { enabled: open && !read.absent && !!ingestion?.result?.case_slug }
+  );
+  const rows = rowComparisons(ingestion, caseResponse?.data);
+  const rowsDiffer = rows.filter((r) => r.countsDiffer || r.onlyModel.length || r.onlySaved.length);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -113,6 +125,68 @@ export function CaseIngestionDetailDialog({
                   {duplicateRefs(ingestion).map((item) => (
                     <DuplicateLine key={item.case_id} item={item} />
                   ))}
+                </div>
+              </Row>
+            )}
+            {/* What our own model read off the report, and whether the saved
+                value came out different. The model's reading survives only in
+                result.extracted, because the provider overwrites the saved one
+                on exactly these fields. */}
+            {!read.absent && (
+              <Row label="Our AI read">
+                <div className="space-y-1.5">
+                  <p>
+                    {read.partiesCount ?? '—'} {read.partiesCount === 1 ? 'party' : 'parties'}
+                    {' · '}
+                    {read.counselCount ?? '—'}{' '}
+                    {read.counselCount === 1 ? 'counsel line' : 'counsel lines'}
+                  </p>
+                  {read.disagreeing.length > 0 || rowsDiffer.length > 0 ? (
+                    <div className="space-y-1">
+                      <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                        Provider and our AI disagree
+                      </Badge>
+                      {read.disagreeing.map((field) => (
+                        <div key={field.key} className="text-xs">
+                          <span className="text-muted-foreground">{field.label}: </span>
+                          <span className="break-words">{field.model}</span>
+                          <span className="text-muted-foreground"> vs saved </span>
+                          <span className="break-words">{field.saved}</span>
+                        </div>
+                      ))}
+                      {rowsDiffer.map((row) => (
+                        <div key={row.label} className="text-xs">
+                          <span className="text-muted-foreground">{row.label}: </span>
+                          <span>
+                            {row.modelCount} read, {row.savedCount} saved
+                          </span>
+                          {row.onlyModel.length > 0 && (
+                            <span className="break-words text-muted-foreground">
+                              {' '}
+                              · only ours: {row.onlyModel.join(', ')}
+                            </span>
+                          )}
+                          {row.onlySaved.length > 0 && (
+                            <span className="break-words text-muted-foreground">
+                              {' '}
+                              · only saved: {row.onlySaved.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    /* Silence here would read as agreement, and on a ticket
+                       with nothing to compare that would be a claim we cannot
+                       make. */
+                    <p className="text-xs text-muted-foreground">
+                      {caseLoading
+                        ? 'checking the saved rows…'
+                        : read.nothingComparable && rows.length === 0
+                          ? 'nothing on the ticket to compare it against'
+                          : 'agrees with the saved values'}
+                    </p>
+                  )}
                 </div>
               </Row>
             )}
