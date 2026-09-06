@@ -13,13 +13,18 @@ interface CaseArgumentsSectionProps {
 /**
  * What each side argued, and what the court said back.
  *
- * ── ONLY REVIEWED ROWS REACH A READER ─────────────────────────────────────
- * The server already withholds unreviewed rows from anyone below Researcher,
- * at load time. This filters again rather than trusting that, because the
- * roles that DO receive unreviewed rows are reading the same public page as
- * everybody else, and an unvetted summary of a party's case is the last thing
- * that should appear under a judgment. A row with no `reviewed` field counts
- * as not reviewed: the safe direction is to show less.
+ * ── ONLY REVIEWED, UNREJECTED ROWS REACH A READER ─────────────────────────
+ * The server already withholds unreviewed and reviewer-rejected rows from
+ * anyone below Researcher, at load time. This filters again rather than
+ * trusting that, because the roles that DO receive them are reading the same
+ * public page as everybody else, and an unvetted or discarded summary of a
+ * party's case is the last thing that should appear under a judgment. A row
+ * with no `reviewed` field counts as not reviewed: the safe direction is to
+ * show less.
+ *
+ * `rejected_at` is the reviewer's decision and `status` is the court's. A
+ * submission the COURT rejected is a real outcome and renders, with its chip;
+ * a row a reviewer threw out never renders at all.
  *
  * ── NULL IS THE NORMAL CASE FOR HALF OF THESE FIELDS ──────────────────────
  * A judgment that writes "learned counsel submitted" names no side, and the
@@ -163,8 +168,10 @@ function sideLabel(side: string): string {
 }
 
 function groupBySide(rows: CaseArgument[]): ArgumentGroup[] {
-  // Unreviewed rows never render; see the note above the component.
-  const reviewed = rows.filter((row) => row?.reviewed === true && !!row.argument);
+  // Unreviewed and reviewer-rejected rows never render; see the note above.
+  const reviewed = rows.filter(
+    (row) => row?.reviewed === true && !row.rejected_at && !!row.argument
+  );
   if (reviewed.length === 0) return [];
 
   const groups: ArgumentGroup[] = [];

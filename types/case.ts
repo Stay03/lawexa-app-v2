@@ -282,6 +282,14 @@ export interface CaseArgument {
   authorities?: CaseArgumentAuthority[] | null;
   /** False on every row until somebody reviews it. Absent counts as false. */
   reviewed?: boolean;
+  /**
+   * When a REVIEWER threw the row out, which is a different fact from
+   * `status`: that one is the COURT's answer to the submission, and a court
+   * rejecting an argument is a real outcome a reader should see. The load-time
+   * filter drops rejected rows for ordinary readers, and the key is served to
+   * a Researcher or above so the page can drop them too.
+   */
+  rejected_at?: string | null;
 }
 
 export interface StatuteCitedEdge {
