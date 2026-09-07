@@ -31,10 +31,8 @@ import { firstCitation, formatCaseName } from '../case-name';
  *     ("ss 593, 594, 598, 600–602" as a joined list), keeping year-variants
  *     apart because CAMA 2004 and CAMA 2020 are different statutes;
  *   - case citations SPLIT into the party names and the report reference at
- *     the first year token, and rows that name the same case MERGE, carrying
- *     every report reference;
- *   - the strongest treatment in a merged set wins, so "distinguished" is
- *     never buried under a duplicate's "referred to".
+ *     the first year token, and every edge keeps its OWN row: see
+ *     `citedCaseRows` for why they used to merge and why they must not.
  *
  * UNLINKED ROWS BECOME SEARCHES (owner, July 30): an authority we do not hold
  * links to the library with its name as the query — `/cases?search=Macfoy v.
@@ -61,46 +59,14 @@ export function splitRawCitation(raw: string): { name: string; ref: string | nul
   return { name, ref: ref || null };
 }
 
-/** Merge key for "the same case cited twice": versus tokens and punctuation
- *  normalized away, so "MACFOY V. UAC" and "MACFOY VS. UAC" collide. */
-function caseKey(name: string): string {
-  return name
-    .toUpperCase()
-    .replace(/\b(?:VS?|VRS)\.?(?=\s)/g, ' V ')
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .trim();
-}
-
-/** Treatment strength, for picking the one that survives a merge — the
- *  specific verdicts outrank the catch-all "referred to". */
-const TREATMENT_RANK: Record<CaseTreatment, number> = {
-  overruled: 0,
-  not_followed: 1,
-  doubted: 2,
-  distinguished: 3,
-  approved: 4,
-  followed: 5,
-  applied: 6,
-  considered: 7,
-  referred_to: 8,
-};
-
-function strongerTreatment(
-  a: CaseTreatment | null,
-  b: CaseTreatment | null,
-): CaseTreatment | null {
-  if (!a) return b;
-  if (!b) return a;
-  return (TREATMENT_RANK[a] ?? 9) <= (TREATMENT_RANK[b] ?? 9) ? a : b;
-}
-
 export interface CitedCaseRow {
   key: string;
   /** Reader-facing case name (formatCaseName applied). */
   name: string;
-  /** The source string(s), for the title attribute. */
+  /** The source string, for the title attribute. */
   sourceTitle: string;
-  /** Report references, one per merged parallel citation. */
+  /** The report reference. An array because the row shape predates this
+   *  change and the renderer joins it; today it holds one entry or none. */
   refs: string[];
   /** Set when the case is in our library. */
   href: string | null;
@@ -109,9 +75,34 @@ export interface CitedCaseRow {
   treatment: CaseTreatment | null;
 }
 
-/** Group the outgoing citation edges into one row per distinct case. */
-export function groupCitedCases(edges: readonly CitedCaseEdge[]): CitedCaseRow[] {
-  const byKey = new Map<string, CitedCaseRow>();
+/**
+ * One row per citation edge, in the order the payload sends them.
+ *
+ * ── THIS MERGED ROWS THAT SHARED PARTY NAMES AND THAT WAS WRONG ───────────
+ * The old key was the case name alone and never consulted the report
+ * reference, so two different judgments between the same parties became one
+ * row. Measured on case 11979, 7 September 2026: 50 edges drew 46 rows, and
+ * one of the four collapses joined
+ *
+ *   Buhari v. Yabo (2018) 9 NWLR (Pt. 1624) 197
+ *   Buhari v. Yabo (2006) 17 NWLR (Pt. 1007) 162
+ *
+ * Different parts, twelve years apart, two different reports, drawn as one row
+ * with nothing on screen saying a second existed. A part implies a year and
+ * parts run in sequence, so a disagreeing part is the signature of a different
+ * case, not of a duplicate.
+ *
+ * The database was refused this exact rule the same morning, after a merge on
+ * party names alone went wrong on 4 September and a person had to undo it. The
+ * page was quietly doing what the database is not allowed to do.
+ *
+ * So a duplicate in the data now shows as a duplicate on the page. That is the
+ * honest state, and it is the one the team chose deliberately: the repair folds
+ * two cited rows only where they share a part-and-page key and their years do
+ * not contradict, and anything it refuses stays visible here.
+ */
+export function citedCaseRows(edges: readonly CitedCaseEdge[]): CitedCaseRow[] {
+  const rows: CitedCaseRow[] = [];
 
   for (const edge of edges) {
     const linked = edge.cited_case_id !== null && !!edge.slug;
@@ -131,39 +122,20 @@ export function groupCitedCases(edges: readonly CitedCaseEdge[]): CitedCaseRow[]
       ref = split.ref;
     }
 
-    const key = caseKey(name) || `edge-${edge.id}`;
-    const existing = byKey.get(key);
-    if (!existing) {
-      byKey.set(key, {
-        key,
-        name,
-        sourceTitle: source,
-        refs: ref ? [ref] : [],
-        href: linked ? `/cases/${edge.slug}` : null,
-        searchHref: linked ? null : caseSearchHref(name),
-        treatment: edge.treatment,
-      });
-      continue;
-    }
-
-    // A merge: keep the first row, add the new reference, keep the stronger
-    // treatment, and let a linked duplicate upgrade an unlinked one.
-    if (ref && !existing.refs.some((r) => sameRef(r, ref))) existing.refs.push(ref);
-    existing.treatment = strongerTreatment(existing.treatment, edge.treatment);
-    if (linked && !existing.href) {
-      existing.href = `/cases/${edge.slug}`;
-      existing.searchHref = null;
-    }
+    rows.push({
+      // The EDGE id: two rows may now carry the same name, and a key built
+      // from the name would collide in React's reconciler.
+      key: `edge-${edge.id}`,
+      name,
+      sourceTitle: source,
+      refs: ref ? [ref] : [],
+      href: linked ? `/cases/${edge.slug}` : null,
+      searchHref: linked ? null : caseSearchHref(name),
+      treatment: edge.treatment,
+    });
   }
 
-  return [...byKey.values()];
-}
-
-/** "(1962) A.C. 158" vs "(1962) AC 150" are near-dupes but not equal — compare
- *  loosely on letters+digits so only true repeats collapse. */
-function sameRef(a: string, b: string): boolean {
-  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, '');
-  return norm(a) === norm(b);
+  return rows;
 }
 
 function caseSearchHref(name: string): string {

@@ -20,7 +20,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { firstCitation, formatCaseName } from '../case-name';
 import { formatCaseDate, toAlpha2 } from '../case-row-model';
 import {
-  groupCitedCases,
+  citedCaseRows,
   groupStatutes,
   lawTypeLabel,
   normalizeBench,
@@ -124,7 +124,7 @@ export function buildCaseOutline(detail: CaseDetail): OutlineSection[] {
     sections.push({ id: SECTION.history, label: 'Case history' });
   if (groupStatutes(detail.statutes_cited ?? []).length > 0)
     sections.push({ id: SECTION.statutes, label: 'Statutes cited' });
-  if (groupCitedCases(detail.cited_cases ?? []).length > 0)
+  if (citedCaseRows(detail.cited_cases ?? []).length > 0)
     sections.push({ id: SECTION.cited, label: 'Cases cited' });
   if ((detail.cited_by?.length ?? 0) > 0)
     sections.push({ id: SECTION.citedBy, label: 'Cited by' });
@@ -166,7 +166,7 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
     }),
   );
 
-  const citedItems: AuthorityItem[] = groupCitedCases(detail.cited_cases ?? [])
+  const citedItems: AuthorityItem[] = citedCaseRows(detail.cited_cases ?? [])
     .map((row) => ({
       key: row.key,
       name: row.name,
