@@ -1015,18 +1015,24 @@ function CaseHistory({ steps }: { steps: CourtHistoryStep[] }) {
         {steps.map((step, index) => {
           const linked = step.related_case_id !== null && step.slug;
           const court = step.court_name || step.court || null;
+          const written = linked ? step.title || step.label : step.label;
           // A written sentence first, then the server's composed line, then the
-          // court on its own. `display_label` arrives with the front-matter
-          // work and is absent until then, which this handles by falling
-          // through to the court exactly as it will afterwards.
-          const label = linked
-            ? formatCaseName(step.title || step.label || step.display_label || court || '')
-            : step.label || step.display_label || court || '';
-          // Never repeat in the meta line what the text has already said.
+          // court on its own. `display_label` is absent on a payload that
+          // predates it, which this handles by falling through to the court
+          // exactly as it does afterwards.
+          const composed = !written && !!step.display_label;
+          const text = written || step.display_label || court || '';
+          const label = linked ? formatCaseName(text) : text;
+          // Never repeat in the meta line what the text has already said. The
+          // server's composed line already carries the court, the numbers AND
+          // the date — "Supreme Court of Nigeria (SC.86/2017, 27 January
+          // 2023)" — so a meta line built beside it printed the date twice, in
+          // two different formats. Beside a composed line only the outcome is
+          // new.
           const courtInText = !!court && label.includes(court);
           const stepMeta = [
-            courtInText ? null : court,
-            step.decided_date ? formatCaseDate(step.decided_date) : null,
+            composed || courtInText ? null : court,
+            !composed && step.decided_date ? formatCaseDate(step.decided_date) : null,
             step.outcome ? outcomeLabel(step.outcome) : null,
           ].filter((part): part is string => Boolean(part));
           // A row with nothing to say is not a row; an empty numbered bullet
