@@ -983,8 +983,22 @@ function PrincipleCaption({
 
 /**
  * The case's journey through the courts, in order. Linked steps navigate to the
- * earlier decision; unlinked steps render their label as text — same rule as an
+ * earlier decision; unlinked steps render their text plainly — same rule as an
  * unresolved citation.
+ *
+ * ── A STEP MAY NAME A COURT AND NOTHING ELSE, AND IT MUST STILL READ ──────
+ * This drew the court only on LINKED steps, so a row carrying a court and no
+ * written sentence rendered a bare date, or an empty numbered bullet when it
+ * had no date either. Measured on case 11979, 7 September 2026: of eight rows,
+ * two drew a date with no text and one drew nothing at all, while the payload
+ * held "Supreme Court of Nigeria", "Court of Appeal" and "High Court of the
+ * Federal Capital Territory, Abuja" all along.
+ *
+ * `label` is null on those rows on purpose: it is the sentence a PERSON wrote,
+ * and null is the only value that says nobody wrote one. So the text falls
+ * back through the server's composed `display_label` to the court itself, and
+ * the meta line drops whatever the text already said rather than printing the
+ * court twice.
  */
 function CaseHistory({ steps }: { steps: CourtHistoryStep[] }) {
   return (
@@ -1000,14 +1014,24 @@ function CaseHistory({ steps }: { steps: CourtHistoryStep[] }) {
       <ol className="flex flex-col">
         {steps.map((step, index) => {
           const linked = step.related_case_id !== null && step.slug;
+          const court = step.court_name || step.court || null;
+          // A written sentence first, then the server's composed line, then the
+          // court on its own. `display_label` arrives with the front-matter
+          // work and is absent until then, which this handles by falling
+          // through to the court exactly as it will afterwards.
           const label = linked
-            ? formatCaseName(step.title || step.label || '')
-            : step.label || '';
+            ? formatCaseName(step.title || step.label || step.display_label || court || '')
+            : step.label || step.display_label || court || '';
+          // Never repeat in the meta line what the text has already said.
+          const courtInText = !!court && label.includes(court);
           const stepMeta = [
-            linked ? step.court : null,
+            courtInText ? null : court,
             step.decided_date ? formatCaseDate(step.decided_date) : null,
             step.outcome ? outcomeLabel(step.outcome) : null,
           ].filter((part): part is string => Boolean(part));
+          // A row with nothing to say is not a row; an empty numbered bullet
+          // tells a reader the page is broken rather than that the data is thin.
+          if (!label && stepMeta.length === 0) return null;
 
           const body = (
             <>

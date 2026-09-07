@@ -350,6 +350,17 @@ export interface CourtHistoryStep {
   /** The whole section as printed, every line, so nothing is hidden by a
    *  field we failed to parse. */
   lines?: string[] | null;
+  /**
+   * The label when a PERSON wrote one, and a line composed from the columns
+   * when nobody did: "Court of Appeal, Abuja (CA/A/594/M/ 2011, 24 January
+   * 2017)". Null when the row names no court at all.
+   *
+   * It exists so every renderer says the same sentence instead of each
+   * inventing its own. It does NOT replace `label`, which stays null on a row
+   * nobody wrote for, because null is the only value that says so and an
+   * editor screen must never offer a machine line as if a person typed it.
+   */
+  display_label?: string | null;
 }
 
 // Meta information for SEO
