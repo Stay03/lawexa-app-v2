@@ -101,8 +101,78 @@ export interface CitedCaseRow {
  * two cited rows only where they share a part-and-page key and their years do
  * not contradict, and anything it refuses stays visible here.
  */
+/**
+ * ONE ruler, used on BOTH halves of the merge key.
+ *
+ * Letters and digits only, folded to lower case. Measuring the name one way
+ * and the reference another produced a count that looked reasonable and was
+ * wrong by three groups: "2 H.LC.722" and "2 H.L.C. 722" paired under one
+ * normalisation and not under the other. If you cannot say in one sentence
+ * what the ruler is, there are two of them.
+ */
+function flatten(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+/** Treatment strength, for the one that survives a join — the specific
+ *  verdicts outrank the catch-all "referred to". */
+const TREATMENT_RANK: Record<CaseTreatment, number> = {
+  overruled: 0,
+  not_followed: 1,
+  doubted: 2,
+  distinguished: 3,
+  approved: 4,
+  followed: 5,
+  applied: 6,
+  considered: 7,
+  referred_to: 8,
+};
+
+function strongerTreatment(
+  a: CaseTreatment | null,
+  b: CaseTreatment | null,
+): CaseTreatment | null {
+  if (!a) return b;
+  if (!b) return a;
+  return (TREATMENT_RANK[a] ?? 9) <= (TREATMENT_RANK[b] ?? 9) ? a : b;
+}
+
+/**
+ * One row per authority: edges join only when they name the same parties AND
+ * the same report at the same page.
+ *
+ * ── WHY NOT THE NAME ALONE, WHICH IS WHAT THIS USED TO DO ─────────────────
+ * Because two judgments between the same parties are ordinary here. Keying on
+ * the name drew "Buhari v. Yabo (2018) 9 NWLR (Pt. 1624) 197" and "(2006) 17
+ * NWLR (Pt. 1007) 162" as ONE row, hiding a second authority with nothing on
+ * screen to say so. The database was refused that same rule after a merge on
+ * party names went wrong on 4 September.
+ *
+ * ── WHY JOIN AT ALL, WHEN NOTHING JOINED FOR MOST OF TODAY ────────────────
+ * Because a refresh stores the report's print beside our own, and on a case
+ * old enough to cite English reports there is no NWLR key for the database
+ * fold to work on, so nothing repairs it. Bello holds 96 rows for about 71
+ * authorities, including "(1944) 2 K.B. 160", "2 KB. 160" and "2 KB 160" —
+ * one report, three rows, punctuation apart.
+ *
+ * So the reference decides it. Same parties and the same reference, flattened
+ * to letters and digits, is one authority. Anything that disagrees about a
+ * volume, a part or a page stays two rows:
+ *
+ *   Baker v. Bolton (1808) 1 Camp. 498  and  (1808) 1 Camp. 493 stay apart.
+ *   One is a typo and choosing which would be us guessing.
+ *
+ * A row whose text carries no year has no reference to compare, so its whole
+ * flattened string is the key — that joins "Read v. Brown 22 Q.B.D. 128" to
+ * "22 QBD 128" and still never joins two different texts.
+ *
+ * Measured over live payloads: Bello 96 rows to 77, nineteen removed in
+ * eighteen groups, none of which joins rows whose printed references differ.
+ * Garkuwa does not move at all: 50 rows before and after, Buhari still twice.
+ */
 export function citedCaseRows(edges: readonly CitedCaseEdge[]): CitedCaseRow[] {
-  const rows: CitedCaseRow[] = [];
+  const order: string[] = [];
+  const byKey = new Map<string, CitedCaseRow>();
 
   for (const edge of edges) {
     const linked = edge.cited_case_id !== null && !!edge.slug;
@@ -122,20 +192,34 @@ export function citedCaseRows(edges: readonly CitedCaseEdge[]): CitedCaseRow[] {
       ref = split.ref;
     }
 
-    rows.push({
-      // The EDGE id: two rows may now carry the same name, and a key built
-      // from the name would collide in React's reconciler.
-      key: `edge-${edge.id}`,
-      name,
-      sourceTitle: source,
-      refs: ref ? [ref] : [],
-      href: linked ? `/cases/${edge.slug}` : null,
-      searchHref: linked ? null : caseSearchHref(name),
-      treatment: edge.treatment,
-    });
+    const key = `${flatten(name)}||${flatten(ref ?? '')}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, {
+        // The first edge's id: rows sharing a name no longer share a key, and
+        // a key built from the name alone would collide in the reconciler.
+        key: `edge-${edge.id}`,
+        name,
+        sourceTitle: source,
+        refs: ref ? [ref] : [],
+        href: linked ? `/cases/${edge.slug}` : null,
+        searchHref: linked ? null : caseSearchHref(name),
+        treatment: edge.treatment,
+      });
+      order.push(key);
+      continue;
+    }
+
+    // A join. The references are the same report by construction, so only the
+    // link and the treatment can be better than what is already there.
+    existing.treatment = strongerTreatment(existing.treatment, edge.treatment);
+    if (linked && !existing.href) {
+      existing.href = `/cases/${edge.slug}`;
+      existing.searchHref = null;
+    }
   }
 
-  return rows;
+  return order.map((key) => byKey.get(key)!);
 }
 
 function caseSearchHref(name: string): string {
