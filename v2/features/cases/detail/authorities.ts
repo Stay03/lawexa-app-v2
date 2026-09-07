@@ -182,12 +182,48 @@ function compareProvisions(a: string, b: string): number {
   return a.length - b.length || a.localeCompare(b);
 }
 
-/** The library search for a statute drops the parenthetical abbreviation and
- *  the year tail — "Evidence Act, 2011" → "Evidence Act" — because the search
- *  matches titles, and the title in the library may carry either form. */
+/**
+ * Parentheticals that LOCATE a statute rather than NAME it.
+ *
+ * A bracket in a statute's title does one of two jobs and they pull opposite
+ * ways:
+ *
+ *   "Evidence Act (Cap E14)"           a shelf mark. Dropping it is right, and
+ *                                      joining that row to "Evidence Act" is
+ *                                      what we want.
+ *   "Court of Appeal (Amendment) Act"  part of the NAME. Dropping it makes an
+ *                                      Act and the Act that amends it one
+ *                                      statute, which no reading of the law
+ *                                      allows.
+ *
+ * Measured 7 September 2026 on rossek-v-acb-ltd: the principal Court of Appeal
+ * Act was GONE from the page and only "Court of Appeal (Amendment) Act, 1982"
+ * was drawn, so a reader was told the case relied on an amending Act and not on
+ * the Act it amends. It also swallowed "Customary Courts Law" into "Customary
+ * Courts (Amendment) Law, 1959".
+ *
+ * Only shelf marks drop and anything unrecognised is KEPT, because the two
+ * failures are not equal: keeping too much shows one Act as two rows, which a
+ * reader can see and judge, and dropping too much deletes a statute from the
+ * page with no sign it was there. Add a shape when one appears; never widen
+ * this into a similarity test.
+ */
+const SHELF_MARK =
+  /^(?:caps?\b|lfn\b|laws?\s+of\b|vol\.?\b|volume\b|ed\.?\b|edition\b|as\s+amended\b)/i;
+
+/** Drop the shelf-mark brackets and keep every other bracket. */
+function withoutShelfMarks(name: string): string {
+  return name.replace(/\(([^)]*)\)/g, (whole: string, inner: string) =>
+    SHELF_MARK.test(inner.trim()) ? ' ' : whole,
+  );
+}
+
+/** The library search for a statute drops the shelf mark and the year tail —
+ *  "Evidence Act, 2011" → "Evidence Act" — because the search matches titles
+ *  and the library title may carry either form. A NAMING bracket stays, so a
+ *  search for an amending Act does not fetch the Act it amends. */
 export function statuteSearchTerm(name: string): string {
-  const stripped = name
-    .replace(/\([^)]*\)/g, ' ')
+  const stripped = withoutShelfMarks(name)
     .replace(/,?\s*\b(?:19|20)\d{2}\b.*$/, '')
     .replace(/\s+/g, ' ')
     .replace(/[\s,;]+$/, '')
