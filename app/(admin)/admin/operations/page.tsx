@@ -25,6 +25,7 @@ const SIBLING_LINKS = [
   { title: 'Case Maintenance', href: '/admin/operations/case-maintenance' },
   { title: 'Case Enrichment', href: '/admin/cases/enrichments' },
   { title: 'Principle Review', href: '/admin/cases/principle-review' },
+  { title: 'Argument Review', href: '/admin/cases/argument-review' },
   { title: 'Quiz Generation', href: '/admin/quiz/generation' },
   { title: 'Scheduled Tasks', href: '/admin/operations/scheduled-tasks' },
 ];

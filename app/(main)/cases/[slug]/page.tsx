@@ -16,7 +16,6 @@ import {
   CaseHistorySection,
   CasePartiesSection,
   CaseCounselSection,
-  CaseArgumentsSection,
   CaseStatutesSection,
   ReaderModeWrapper,
   ViewFullReportButton,
@@ -50,7 +49,8 @@ const ANIMATION_DELAYS = {
   metadataStart: 400,
   judges: 600,
   counsel: 650,
-  argumentsSection: 700,
+  /* 700 was the arguments section, which this page no longer draws.
+     The gap is left so the surrounding delays keep their rhythm. */
   history: 750,
   statutes: 800,
   similarCases: 850,
@@ -244,15 +244,24 @@ function CaseViewPage({ params, searchParams }: CaseViewPageProps) {
           />
         )}
 
-        {/* What each side argued and what the court said back. Only reviewed
-            rows render, and the server withholds the rest from most readers
-            before we ever see them. */}
-        {caseDetail.arguments && caseDetail.arguments.length > 0 && (
-          <CaseArgumentsSection
-            arguments={caseDetail.arguments}
-            animationDelay={ANIMATION_DELAYS.argumentsSection}
-          />
-        )}
+        {/* ── ARGUMENTS ARE DELIBERATELY NOT DRAWN HERE ──────────────────
+            Owner's decision, 8 September 2026: "dont add the argument to case
+            page, Arthur prefers that so we go with that now". They are
+            reviewed in the admin instead, at /admin/cases/argument-review.
+
+            THE COMPONENT IS KEPT AND NOT DELETED because it is correct and the
+            preference may change; deleting working code because a preference
+            might change is how the preference changing costs a day.
+
+            IT WAS NOT SAFE TO LEAVE RENDERING. It filters `reviewed === true`,
+            and on the day it was removed not one argument in the system had
+            ever been reviewed — 0 of 4,964 — so it drew nothing and LOOKED
+            like the decision was already satisfied. The first approval on the
+            new review screen would have put arguments on this page. A guard
+            that only holds while a table is empty is not a guard.
+
+            The payload still carries `arguments`; this page chooses not to
+            draw them. */}
 
         {/* How the case got here. Both of these fields have been arriving on
             every payload and nothing rendered either of them. */}

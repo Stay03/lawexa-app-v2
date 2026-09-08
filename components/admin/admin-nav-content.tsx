@@ -19,6 +19,7 @@ import {
   Library,
   Sparkles,
   ClipboardCheck,
+  MessagesSquare,
   ClipboardList,
 } from 'lucide-react';
 import {
@@ -44,9 +45,10 @@ const contentNavItems = [
   // financials page is open — the same shape as Cases below.
   { title: 'Ambassadors', url: '/admin/ambassadors', icon: GraduationCap, excludePaths: ['/admin/ambassadors/financials'] },
   { title: 'Ambassador Money', url: '/admin/ambassadors/financials', icon: Coins },
-  { title: 'Cases', url: '/admin/cases', icon: Scale, excludePaths: ['/admin/cases/enrichments', '/admin/cases/principle-review', '/admin/cases/data-review'] },
+  { title: 'Cases', url: '/admin/cases', icon: Scale, excludePaths: ['/admin/cases/enrichments', '/admin/cases/principle-review', '/admin/cases/argument-review', '/admin/cases/data-review'] },
   { title: 'Case Enrichment', url: '/admin/cases/enrichments', icon: Sparkles },
   { title: 'Principle Review', url: '/admin/cases/principle-review', icon: ClipboardCheck },
+  { title: 'Argument Review', url: '/admin/cases/argument-review', icon: MessagesSquare },
   { title: 'Case Data Review', url: '/admin/cases/data-review', icon: ClipboardList },
   { title: 'Courses', url: '/admin/courses', icon: Library },
   { title: 'Statutes', url: '/admin/statutes', icon: BookOpen, excludePaths: ['/admin/statutes/import'] },
