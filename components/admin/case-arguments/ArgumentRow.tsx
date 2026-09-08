@@ -153,7 +153,26 @@ export function ArgumentRow({
       </div>
 
       <div className="flex items-start gap-1 sm:justify-end">
-        {done ? (
+        {/* ── KEEPING IS A ONE-WAY DOOR AND THE BUTTONS SAY SO ─────────────
+            The update route validates `reviewed` with Laravel's `accepted`
+            rule, which only permits TRUE, so there is no un-approve. Reject
+            is not a way back either: it sets `rejected_at` AND `reviewed`,
+            which is a third state rather than a return to untouched.
+
+            So a kept row shows a STATIC label, not a button. A button that
+            re-sends the same approval reads as a toggle and would invite a
+            reviewer to click it expecting the opposite of what it does.
+
+            A thrown-out row DOES keep its button, because approving it is a
+            real transition the server supports: approve clears the rejection.
+            The asymmetry is the API's, and the screen shows it rather than
+            hiding it behind two identical-looking controls. */}
+        {approved ? (
+          <span className="inline-flex items-center px-3 py-1.5 text-sm text-muted-foreground">
+            <Check className="mr-1 size-4" aria-hidden />
+            Kept
+          </span>
+        ) : rejected ? (
           <Button
             type="button"
             variant="ghost"
@@ -161,17 +180,8 @@ export function ArgumentRow({
             onClick={onApprove}
             className="text-muted-foreground"
           >
-            {approved ? (
-              <>
-                <Check className="mr-1 size-4" aria-hidden />
-                Kept
-              </>
-            ) : (
-              <>
-                <Undo2 className="mr-1 size-4" aria-hidden />
-                Keep instead
-              </>
-            )}
+            <Undo2 className="mr-1 size-4" aria-hidden />
+            Keep instead
           </Button>
         ) : (
           <>
