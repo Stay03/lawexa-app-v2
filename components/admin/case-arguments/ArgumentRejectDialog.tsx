@@ -63,7 +63,7 @@ function RejectForm({
           rows={3}
         />
         <p className="text-xs text-muted-foreground">
-          This is the only place we record what the extraction got wrong.
+          This is the only place we record what the AI got wrong.
         </p>
       </div>
 
@@ -110,9 +110,9 @@ export function ArgumentRejectDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Throw this argument out?</AlertDialogTitle>
           <AlertDialogDescription>
-            It stops being an argument on this case. The row is kept, so what
-            the extraction produced stays on record, and you can keep it after
-            all at any time.
+            It stops being an argument on this case. Nothing is deleted, so
+            what the AI wrote stays on record, and you can keep it after all at
+            any time.
           </AlertDialogDescription>
         </AlertDialogHeader>
 

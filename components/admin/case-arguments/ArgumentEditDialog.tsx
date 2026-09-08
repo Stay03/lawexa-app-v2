@@ -113,8 +113,8 @@ function EditForm({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              The judgment&apos;s verdict on the submission, not yours on the
-              extraction.
+              What the judgment did with this submission. Your own decision on
+              it is Keep or Throw out.
             </p>
           </div>
         </div>

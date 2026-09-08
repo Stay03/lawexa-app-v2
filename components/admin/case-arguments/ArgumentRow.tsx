@@ -139,8 +139,8 @@ export function ArgumentRow({
 
         {rejected && (
           <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            Thrown out. The row is kept, so what the extraction produced is
-            still on record.
+            Thrown out. Nothing was deleted, so what the AI wrote is still on
+            record.
           </p>
         )}
 

@@ -314,9 +314,25 @@ function ArgumentReviewPageContent() {
     <div className="space-y-4">
       <div className="space-y-1">
         <h1 className="text-xl font-semibold">Argument review</h1>
+        {/* ── EVERY CLAIM IN THIS SUBTITLE IS ONE A REVIEWER CAN CHECK ─────
+            The first version said "nothing here is visible to a reader until
+            you keep it". True when written and wrong by the evening: the
+            arguments section came off the case page the same day, so keeping
+            an argument now shows it to nobody, and a reviewer who kept a
+            hundred and then opened the case would have found the sentence
+            lying to them.
+
+            "Our extraction" went for a different reason. It is our word, not
+            the reader's, and the owner's rule is that a word nobody gave them
+            costs them minutes. The AI wrote these; say so.
+
+            The third sentence exists to answer the question the second one
+            provokes. Without it the reviewer works, looks at the case, sees
+            nothing, and reports a bug against their own afternoon. */}
         <p className="text-sm text-muted-foreground">
-          What each side put to the court, as our extraction read it. Nothing
-          here is visible to a reader until you keep it.
+          What each side put to the court, written by AI from the report.
+          Keeping an argument clears it to be shown. No case page draws
+          arguments today.
         </p>
       </div>
 
