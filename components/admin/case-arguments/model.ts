@@ -118,6 +118,8 @@ export function chunkIds(ids: number[], size: number): number[][] {
 export interface CounselGroup {
   /** The name to print above the submissions. Null when none was extracted. */
   counselName: string | null;
+  /** How that name was arrived at, so the heading can say so. */
+  counsel: CounselAttribution;
   rows: CaseArgumentReviewItem[];
 }
 
@@ -137,16 +139,62 @@ export function sideHeading(side: ArgumentSide | null): string {
 }
 
 /**
- * A row's counsel, preferring the matched record over the printed line.
+ * Where a row's counsel name came from. A heading reads as something the
+ * report said, so the screen has to know the difference.
  *
- * `counsel_name` already carries the server's choice between the two, but a
- * row can have a resolved `counsel` and a null `counsel_name`, so read both
- * rather than trusting one. An empty string is not a name.
+ * ── MOST OF THESE NAMES WERE NOT READ, THEY WERE ASSIGNED ─────────────────
+ * Counted over all 4,964 arguments on 9 September 2026, after finding the
+ * fault on Gafar v Govt., Kwara State:
+ *
+ *   2,161  44%  linked to a person the model named NOWHERE. Attributed from
+ *               the case's counsel list, by side.
+ *   1,554  31%  model named someone and the link agrees
+ *     217   4%  model named someone and the link DISAGREES
+ *     379   8%  model named someone, no link
+ *     653  13%  no name anywhere
+ *
+ * So just under half of every argument in the system carries a lawyer's name
+ * the extraction did not put there, and on case 12008 fifteen arguments across
+ * two silks are attributed to each other's counsel, with the correct name
+ * sitting unused in the raw column.
+ *
+ * The old version of this function preferred the LINKED record and fell back
+ * to the raw line, so the one row that held the name actually read was the one
+ * row where the screen hid it, in favour of the wrong one.
  */
-export function counselNameOf(row: CaseArgumentReviewItem): string | null {
-  const name = row.counsel?.name ?? row.counsel_name ?? row.counsel_name_raw;
-  const trimmed = name?.trim();
+export type CounselProvenance = 'read' | 'assigned' | 'conflict' | 'none';
+
+export interface CounselAttribution {
+  /** What to show: the name that was READ whenever one was. */
+  name: string | null;
+  /** The case record's name, only when it disagrees with what was read. */
+  linked: string | null;
+  provenance: CounselProvenance;
+}
+
+const clean = (value: string | null | undefined): string | null => {
+  const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+};
+
+export function counselAttribution(
+  row: CaseArgumentReviewItem
+): CounselAttribution {
+  const read = clean(row.counsel_name_raw);
+  // `counsel_name` is the server's own choice and follows the link, so both
+  // belong on the same side of this comparison.
+  const linked = clean(row.counsel?.name) ?? clean(row.counsel_name);
+
+  if (read && linked && read !== linked)
+    return { name: read, linked, provenance: 'conflict' };
+  if (read) return { name: read, linked: null, provenance: 'read' };
+  if (linked) return { name: linked, linked: null, provenance: 'assigned' };
+  return { name: null, linked: null, provenance: 'none' };
+}
+
+/** The name a row should be shown and grouped under. */
+export function counselNameOf(row: CaseArgumentReviewItem): string | null {
+  return counselAttribution(row).name;
 }
 
 /**
@@ -180,10 +228,21 @@ export function groupCaseArguments(
     }
     group.rows.push(row);
 
-    const name = counselNameOf(row);
+    /* Group on the name AND how it was arrived at. Two rows can carry the same
+       name with one of them read from the report and the other assigned from
+       the case record, and merging those under one heading would present the
+       assigned one as though the report had said it. */
+    const counsel = counselAttribution(row);
     const last = group.counsel[group.counsel.length - 1];
-    if (last && last.counselName === name) last.rows.push(row);
-    else group.counsel.push({ counselName: name, rows: [row] });
+    if (
+      last &&
+      last.counselName === counsel.name &&
+      last.counsel.provenance === counsel.provenance &&
+      last.counsel.linked === counsel.linked
+    )
+      last.rows.push(row);
+    else
+      group.counsel.push({ counselName: counsel.name, counsel, rows: [row] });
   }
 
   const rank = (side: ArgumentSide | null): number =>

@@ -235,10 +235,27 @@ export function CaseReviewPane({
               </h3>
               {group.counsel.map((block, blockIndex) => (
                 <div key={`${group.heading}-${blockIndex}`}>
+                  {/* ── A NAME OVER SUBMISSIONS READS AS THE REPORT'S WORD ──
+                      Just under half of these names were never read from a
+                      judgment; they were assigned from the case's counsel list
+                      by side, and on at least one case two silks have each
+                      other's submissions. So the heading says which kind of
+                      name it is rather than printing all of them the same way.
+                      See counselAttribution for the counts. */}
                   <p className="px-4 pt-3 text-sm font-medium">
                     {block.counselName ?? (
                       <span className="font-normal text-muted-foreground">
                         Counsel not recorded
+                      </span>
+                    )}
+                    {block.counsel.provenance === 'assigned' && (
+                      <span className="ml-2 font-normal text-xs text-muted-foreground">
+                        from the case record, not named here
+                      </span>
+                    )}
+                    {block.counsel.provenance === 'conflict' && (
+                      <span className="ml-2 font-normal text-xs text-amber-700 dark:text-amber-400">
+                        the case record says {block.counsel.linked}
                       </span>
                     )}
                   </p>
