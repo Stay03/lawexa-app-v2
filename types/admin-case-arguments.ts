@@ -121,9 +121,28 @@ export interface UpdateArgumentData {
   reviewed?: true;
 }
 
-/** Body for POST /{id}/reject. The reason is the only record of the mistake. */
+/**
+ * Body for POST /{id}/reject.
+ *
+ * ── THE NAME IS `rejection_reason` AND THAT IS NOT A PREFERENCE ───────────
+ * The api already calls it that in RejectVerificationRequest and
+ * RejectContentRequestRequest, and exposes it under that name on
+ * LawyerProfileResource and ContentRequestResource. Sending `reason` here
+ * would give one concept two names and leave the next person writing a
+ * rejection flow to pick between them.
+ *
+ * IT WENT NOWHERE UNTIL NOW, AND SILENTLY. The reject route validates with
+ * CaseArgumentListRequest, the LISTING request, so an unknown key is neither
+ * validated nor read. A body carrying the text was accepted with a 200 and
+ * discarded, identically to a body without it. No error, no log. The screen
+ * asked, the api answered, and nothing kept it.
+ *
+ * So this field only means anything once the column exists. Do not ship the
+ * dialog's "this is the only place we record what the AI got wrong" ahead of
+ * it, or that sentence is false for the length of the gap.
+ */
 export interface RejectArgumentData {
-  reason?: string;
+  rejection_reason?: string;
 }
 
 /** Result of POST /bulk-approve. */

@@ -161,7 +161,7 @@ function ArgumentReviewPageContent() {
     (item: CaseArgumentReviewItem, reason: string) => {
       setRowState(item.id, { kind: 'rejected' });
       rejectMutation.mutate(
-        { id: item.id, data: reason ? { reason } : {} },
+        { id: item.id, data: reason ? { rejection_reason: reason } : {} },
         {
           onError: (error) => {
             setRowState(item.id, {
