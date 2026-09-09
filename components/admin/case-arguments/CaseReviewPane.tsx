@@ -238,8 +238,8 @@ export function CaseReviewPane({
                   {/* ── A NAME OVER SUBMISSIONS READS AS THE REPORT'S WORD ──
                       Just under half of these names were never read from a
                       judgment; they were assigned from the case's counsel list
-                      by side, and on at least one case two silks have each
-                      other's submissions. So the heading says which kind of
+                      by side, and on one case eleven arguments are filed under
+                      the opposing lawyer. So the heading says which kind of
                       name it is rather than printing all of them the same way.
                       See counselAttribution for the counts. */}
                   <p className="px-4 pt-3 text-sm font-medium">

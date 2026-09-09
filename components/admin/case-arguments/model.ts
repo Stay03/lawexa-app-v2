@@ -154,9 +154,16 @@ export function sideHeading(side: ArgumentSide | null): string {
  *     653  13%  no name anywhere
  *
  * So just under half of every argument in the system carries a lawyer's name
- * the extraction did not put there, and on case 12008 fifteen arguments across
- * two silks are attributed to each other's counsel, with the correct name
- * sitting unused in the raw column.
+ * the extraction did not put there. The 217 split further: 17 are CROSSED,
+ * where both lawyers are on the case and the matcher picked the other one, and
+ * 200 are ABSENT, where the name that was read is on no counsel record for
+ * that case at all so the matcher fell back to a side default. Case 12008
+ * holds 11 of the 17, each argument given to the opposing lawyer with the
+ * correct name sitting unused in the raw column.
+ *
+ * (An earlier version of this comment said "fifteen arguments across two
+ * silks". Fifteen is the case's argument count, not the number crossed, and
+ * the owner reads "silk" as a fabric. Both were mine.)
  *
  * The old version of this function preferred the LINKED record and fell back
  * to the raw line, so the one row that held the name actually read was the one
