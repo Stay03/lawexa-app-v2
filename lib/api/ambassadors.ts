@@ -12,22 +12,73 @@ import type {
   RejectAmbassadorData,
 } from '@/types/ambassador';
 
+// Hoisted out of the object below so `getAllApplications` can call it. One
+// implementation, one URL — a second copy of the path is a second thing to
+// change.
+const getAdminList = async (params: AmbassadorListParams = {}): Promise<AmbassadorListResponse> => {
+  const response = await apiClient.get<AmbassadorListResponse>('/admin/ambassador-applications', {
+    params: {
+      page: params.page ?? 1,
+      per_page: params.per_page ?? 15,
+      status: params.status || undefined,
+      sort: params.sort || undefined,
+      direction: params.direction || undefined,
+    },
+  });
+  return response.data;
+};
+
+/**
+ * Every application, walked a page at a time until there is nothing new.
+ *
+ * ── WHY THE FINANCIALS SCREEN CALLS THIS ───────────────────────────────────
+ * A financials row carries no university, no level and no country: those three
+ * live on the APPLICATION and nowhere else. `/admin/ambassadors/financials`
+ * takes no parameters at all, so there is nothing to ask it for — the two are
+ * joined client-side on `application_uuid` → application `uuid`. Measured
+ * 2026-09-09: all 113 financial rows carry an `application_uuid`, all 113 find
+ * an application, and university, level and country are set on every one.
+ *
+ * No `status` is sent. The join is by uuid, so a pending or rejected
+ * application costs one row of memory and saves an assumption about which
+ * statuses can appear in the financials list.
+ *
+ * The walk stops on a page that adds no NEW uuid rather than on `last_page`
+ * alone, and `MAX_PAGES` sits under both: a request loop against admin routes
+ * is worse than a short list.
+ */
+const getAllApplications = async (perPage = 100): Promise<AmbassadorApplication[]> => {
+  const MAX_PAGES = 50;
+  const seen = new Set<string>();
+  const all: AmbassadorApplication[] = [];
+
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const response = await getAdminList({ page, per_page: perPage });
+    const batch = response.data ?? [];
+
+    let added = 0;
+    for (const application of batch) {
+      if (seen.has(application.uuid)) continue;
+      seen.add(application.uuid);
+      all.push(application);
+      added += 1;
+    }
+
+    if (added === 0) break;
+
+    const lastPage = response.pagination?.last_page;
+    if (typeof lastPage === 'number' && page >= lastPage) break;
+  }
+
+  return all;
+};
+
 /**
  * Admin Ambassador Applications API. All endpoints require role:admin.
  */
 export const adminAmbassadorsApi = {
-  getAdminList: async (params: AmbassadorListParams = {}): Promise<AmbassadorListResponse> => {
-    const response = await apiClient.get<AmbassadorListResponse>('/admin/ambassador-applications', {
-      params: {
-        page: params.page ?? 1,
-        per_page: params.per_page ?? 15,
-        status: params.status || undefined,
-        sort: params.sort || undefined,
-        direction: params.direction || undefined,
-      },
-    });
-    return response.data;
-  },
+  getAdminList,
+  getAllApplications,
 
   // Optional review_notes. Returns 409 if already approved/rejected.
   approve: async (uuid: string, data: ApproveAmbassadorData): Promise<ApiResponse<AmbassadorApplication>> => {
