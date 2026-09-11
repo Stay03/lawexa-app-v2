@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,6 @@ import type {
 ******************************************************************************/
 
 function EnrichmentsPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [selectedRun, setSelectedRun] = useState<CaseEnrichmentRun | null>(null);
@@ -75,9 +74,18 @@ function EnrichmentsPageContent() {
 
   const listQuery = useCaseEnrichments(params, { enabled: !waitingForSummary });
 
+  // The URL is written with history.pushState, not router.push. In next
+  // 16.2.12 a router.push to this page is dropped when the page was opened with
+  // a query string and Next has already prefetched the route: Next answers with
+  // a replaceState of the old URL, and the filter change never happens
+  // (measured 11 Sep 2026, lost 10 of 10 times after a fresh ?sweep=stopped).
+  // The App Router syncs usePathname and useSearchParams with a native
+  // pushState, and Back still returns to the previous list. The query is read
+  // from window.location, as lib/utils/url-params.ts does, so a second change
+  // before the first has synced builds on the real URL.
   const updateParams = useCallback(
     (updates: Partial<CaseEnrichmentsParams>) => {
-      const next = new URLSearchParams(searchParams.toString());
+      const next = new URLSearchParams(window.location.search);
       Object.entries(updates).forEach(([key, value]) => {
         if (value === null || value === undefined || value === false) {
           next.delete(key);
@@ -88,9 +96,14 @@ function EnrichmentsPageContent() {
         }
       });
       const qs = next.toString();
-      router.push(qs ? `/admin/cases/enrichments?${qs}` : '/admin/cases/enrichments');
+      window.history.pushState(
+        // MUST be `null`; the reason is in lib/utils/url-params.ts.
+        null,
+        '',
+        qs ? `/admin/cases/enrichments?${qs}` : '/admin/cases/enrichments'
+      );
     },
-    [router, searchParams]
+    []
   );
 
   const handleView = useCallback((run: CaseEnrichmentRun) => {
