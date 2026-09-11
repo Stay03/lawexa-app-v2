@@ -19,6 +19,11 @@ import type {
 
 interface EnrichmentFiltersProps {
   params: CaseEnrichmentsParams;
+  /**
+   * The sweep filters the API has, read from its summary. A toggle for one it
+   * lacks would list every run under a sweep's note.
+   */
+  availableSweeps: EnrichmentSweep[];
   onParamsChange: (updates: Partial<CaseEnrichmentsParams>) => void;
 }
 
@@ -27,8 +32,8 @@ const TRIGGERS: EnrichmentTrigger[] = ['ingest', 'backfill', 'manual', 'resume']
 const ALL = 'all';
 
 /**
- * The two sweep states a partial case can sit in without the sweep moving it.
- * They share one URL parameter, so turning one on turns the other off.
+ * The two sweep states a partial case can sit in without the sweep resuming
+ * it. They share one URL parameter, so turning one on turns the other off.
  */
 const SWEEP_TOGGLES: {
   value: EnrichmentSweep;
@@ -41,7 +46,7 @@ const SWEEP_TOGGLES: {
     label: 'Stopped',
     icon: CirclePause,
     note:
-      'Partial cases the resume sweep has stopped retrying: its last 3 attempts read no new part. A later run that reads a part, or a changed report, clears the stop.',
+      'Partial cases the resume sweep no longer retries. Their last 3 attempts read no new part. An attempt that reads a new part, or a change to the report text, ends the stop.',
   },
   {
     value: 'text_changed',
@@ -52,8 +57,13 @@ const SWEEP_TOGGLES: {
   },
 ];
 
-export function EnrichmentFilters({ params, onParamsChange }: EnrichmentFiltersProps) {
-  const activeSweep = SWEEP_TOGGLES.find((toggle) => toggle.value === params.sweep);
+export function EnrichmentFilters({
+  params,
+  availableSweeps,
+  onParamsChange,
+}: EnrichmentFiltersProps) {
+  const toggles = SWEEP_TOGGLES.filter((toggle) => availableSweeps.includes(toggle.value));
+  const activeSweep = toggles.find((toggle) => toggle.value === params.sweep);
   const oneCase = params.case_id !== undefined;
   const hasActiveFilters =
     !!params.status || !!params.trigger || !!params.unmapped_outcomes || !!activeSweep || oneCase;
@@ -61,9 +71,10 @@ export function EnrichmentFilters({ params, onParamsChange }: EnrichmentFiltersP
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-3">
-        {/* Status */}
+        {/* Status. A sweep list holds partial runs only, so it is off while one is on. */}
         <Select
           value={params.status ?? ALL}
+          disabled={!!params.sweep}
           onValueChange={(value) =>
             onParamsChange({
               status: value === ALL ? undefined : (value as EnrichmentStatus),
@@ -125,8 +136,8 @@ export function EnrichmentFilters({ params, onParamsChange }: EnrichmentFiltersP
           Unmapped outcomes
         </Button>
 
-        {/* Sweep states */}
-        {SWEEP_TOGGLES.map((toggle) => {
+        {/* Sweep states, only those the API has */}
+        {toggles.map((toggle) => {
           const on = params.sweep === toggle.value;
           const Icon = toggle.icon;
           return (
@@ -137,7 +148,13 @@ export function EnrichmentFilters({ params, onParamsChange }: EnrichmentFiltersP
               size="sm"
               className="h-9 gap-1.5"
               aria-pressed={on}
-              onClick={() => onParamsChange({ sweep: on ? undefined : toggle.value, page: 1 })}
+              onClick={() =>
+                onParamsChange(
+                  on
+                    ? { sweep: undefined, page: 1 }
+                    : { sweep: toggle.value, status: undefined, page: 1 }
+                )
+              }
             >
               <Icon className="h-4 w-4" />
               {toggle.label}

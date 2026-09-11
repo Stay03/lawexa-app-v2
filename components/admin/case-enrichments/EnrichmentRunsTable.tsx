@@ -35,6 +35,8 @@ interface EnrichmentRunsTableProps {
    * runs, such as the failed runs behind a stop, are not in that list.
    */
   showCaseRunsLink?: boolean;
+  /** What an empty list says. A sweep list holds cases, not runs. */
+  emptyMessage?: string;
 }
 
 /** Human summary of what a run wrote, e.g. "3 principles · 2 statutes". */
@@ -80,6 +82,7 @@ export function EnrichmentRunsTable({
   isLoading,
   onView,
   showCaseRunsLink = false,
+  emptyMessage = 'No enrichment runs found',
 }: EnrichmentRunsTableProps) {
   if (isLoading) {
     return (
@@ -114,7 +117,7 @@ export function EnrichmentRunsTable({
   if (runs.length === 0) {
     return (
       <div className="rounded-lg border py-12 text-center text-muted-foreground">
-        No enrichment runs found
+        {emptyMessage}
       </div>
     );
   }

@@ -78,9 +78,9 @@ function StatCard({
  * does not resume (Stopped, Report changed), then Unmapped outcomes. Seven cards
  * in one three-across grid leave one alone on a row, and four across leaves
  * too little room below 1536 px: measured on 11 Sep 2026, a card at four across
- * has 116 px of text room at 1280 and 156 px at 1440, while "Sweep gave up ·
- * needs a person" needs 170 px and "Unmapped outcomes" 138 px. So the watch
- * group is two by two until 2xl.
+ * has 116 px of text room at 1280 and 156 px at 1440, while "Missing parts · 14
+ * partial runs" needs 156 px and "Unmapped outcomes" 138 px. So the watch group
+ * is two by two until 2xl.
  */
 export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummaryCardsProps) {
   if (isLoading || !summary) {
@@ -185,7 +185,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           icon={CirclePause}
           label="Stopped"
           value={stoppedCases}
-          hint="Sweep gave up · needs a person"
+          hint="Sweep no longer retries"
           tone={(stoppedCases ?? 0) > 0 ? 'warning' : 'default'}
         />
         <StatCard

@@ -15,8 +15,8 @@ export type EnrichmentTrigger = 'ingest' | 'backfill' | 'manual' | 'resume';
 export type EnrichmentStatus = 'running' | 'completed' | 'partial' | 'failed' | 'skipped';
 
 /**
- * Why a run was skipped. `already_running`: another run of the case was still
- * going, and `stats.running` is its id. `superseded`: a queued resume that
+ * Why a run was skipped. `already_running`: another run of the case was
+ * running, and `stats.running` is its id. `superseded`: a queued resume that
  * another run of the case overtook, and `stats.overtaken_by` is that run's id.
  */
 export type EnrichmentSkipReason =
@@ -26,10 +26,11 @@ export type EnrichmentSkipReason =
   | 'superseded';
 
 /**
- * A state of a partial case that the resume sweep does not move on its own.
- * `stopped`: 3 attempts in a row recovered no part over the current report
- * text. `text_changed`: the report was replaced after the partial run, so the
- * sweep neither retries nor stops it. A case is in one state at most.
+ * A state of a partial case that the resume sweep does not resume. `stopped`:
+ * each of the last 3 attempts recovered no new part over the current report
+ * text, and an attempt with no recorded text counts as over it.
+ * `text_changed`: the report text changed after the partial run. A case is in
+ * one state at most.
  */
 export type EnrichmentSweep = 'stopped' | 'text_changed';
 
@@ -103,7 +104,7 @@ export interface EnrichmentStats {
   scalars?: string[];
   reason?: EnrichmentSkipReason;
   chunks?: EnrichmentChunks | number;
-  /** On an `already_running` skip: the run that was still going. */
+  /** On an `already_running` skip: the run that was running at the time. */
   running?: number;
   /** On a `superseded` skip: the run that overtook this one. */
   overtaken_by?: number;
@@ -139,15 +140,17 @@ export interface CaseEnrichmentSummary {
    */
   partial_cases?: number;
   /**
-   * The part of `partial_cases` the resume sweep has stopped on: 3 attempts in
-   * a row recovered no part over the case's current report text, so nothing
-   * retries it. Optional for the same reason.
+   * The part of `partial_cases` the resume sweep no longer retries: each of the
+   * last 3 attempts recovered no new part over the case's current report text,
+   * and an attempt with no recorded text counts as over it. Optional for the
+   * same reason; its presence also says the API accepts `sweep=stopped`.
    */
   partial_stopped_cases?: number;
   /**
    * The part of `partial_cases` whose partial run read a report text the case
-   * no longer holds. The sweep neither retries nor stops these, and it never
-   * overlaps `partial_stopped_cases`. Optional for the same reason.
+   * no longer holds, which the sweep does not resume. It never overlaps
+   * `partial_stopped_cases`. Optional for the same reason; its presence also
+   * says the API accepts `sweep=text_changed`.
    */
   partial_text_changed_cases?: number;
   /** Lifetime run counts by status. `partial` is optional for the same reason. */

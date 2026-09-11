@@ -42,13 +42,14 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 /**
  * The other run a skip names, with the row label that says how: the run that
- * was still going, or the run that overtook a queued resume. Null otherwise.
+ * was running when this one was skipped, or the run that overtook a queued
+ * resume. Past tense, because the skip may be old. Null otherwise.
  */
 function skipOtherRun(stats: EnrichmentStats | null): { label: string; id: number } | null {
   if (!stats) return null;
   const candidate =
     stats.reason === 'already_running'
-      ? { label: 'Still going', id: stats.running }
+      ? { label: 'Was running', id: stats.running }
       : stats.reason === 'superseded'
         ? { label: 'Overtaken by', id: stats.overtaken_by }
         : null;

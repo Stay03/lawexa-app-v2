@@ -24,8 +24,20 @@ import type {
   EnrichmentTrigger,
 } from '@/types/admin-case-enrichments';
 
-/** The sweep values the API accepts. Anything else in the URL is dropped. */
+/** The sweep values the API can accept. Anything else in the URL is dropped. */
 const SWEEPS: readonly EnrichmentSweep[] = ['stopped', 'text_changed'];
+
+/** The summary field whose presence says the API accepts that sweep value. */
+const SWEEP_COUNT_FIELD = {
+  stopped: 'partial_stopped_cases',
+  text_changed: 'partial_text_changed_cases',
+} as const satisfies Record<EnrichmentSweep, string>;
+
+/** How a sweep list names its rows, which are cases rather than runs. */
+const SWEEP_ROWS: Record<EnrichmentSweep, { plural: string; empty: string }> = {
+  stopped: { plural: 'stopped cases', empty: 'No stopped cases' },
+  text_changed: { plural: 'changed cases', empty: 'No cases with a changed report' },
+};
 
 const isSweep = (value: string | null): value is EnrichmentSweep =>
   value !== null && (SWEEPS as readonly string[]).includes(value);
@@ -41,26 +53,40 @@ function EnrichmentsPageContent() {
   const [selectedRun, setSelectedRun] = useState<CaseEnrichmentRun | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
+  const { data: summaryData, isLoading: summaryLoading } = useCaseEnrichmentSummary();
+  const summary = summaryData?.data;
+
+  // The API has a sweep filter when its summary carries that sweep's count.
+  // Null until the summary arrives, when nothing is known yet.
+  const availableSweeps = useMemo<EnrichmentSweep[] | null>(
+    () => (summary ? SWEEPS.filter((sweep) => summary[SWEEP_COUNT_FIELD[sweep]] !== undefined) : null),
+    [summary]
+  );
+
   const params = useMemo<CaseEnrichmentsParams>(() => {
     const status = searchParams.get('status') as EnrichmentStatus | null;
     const trigger = searchParams.get('trigger') as EnrichmentTrigger | null;
-    const sweep = searchParams.get('sweep');
+    const sweepParam = searchParams.get('sweep');
+    const caseIdParam = searchParams.get('case_id');
+    // Kept while the summary is unknown, dropped once it shows the API lacks
+    // it. Any other value would be a 422, so it never leaves the page.
+    const sweep =
+      isSweep(sweepParam) && (availableSweeps === null || availableSweeps.includes(sweepParam))
+        ? sweepParam
+        : undefined;
     return {
       page: Number(searchParams.get('page')) || 1,
       per_page: Number(searchParams.get('per_page')) || 15,
-      status: status ?? undefined,
+      // A sweep list holds partial runs only, so a status beside it could only
+      // empty the list. The status control is disabled while a sweep is on.
+      status: sweep ? undefined : (status ?? undefined),
       trigger: trigger ?? undefined,
       unmapped_outcomes: searchParams.get('unmapped_outcomes') === '1' || undefined,
-      // The API answers any other sweep value with a 422, so a hand-edited URL
-      // is dropped here instead of breaking the list.
-      sweep: isSweep(sweep) ? sweep : undefined,
-      case_id: searchParams.get('case_id')
-        ? Number(searchParams.get('case_id'))
-        : undefined,
+      sweep,
+      case_id: caseIdParam !== null && /^[1-9][0-9]*$/.test(caseIdParam) ? Number(caseIdParam) : undefined,
     };
-  }, [searchParams]);
+  }, [searchParams, availableSweeps]);
 
-  const { data: summaryData, isLoading: summaryLoading } = useCaseEnrichmentSummary();
   const { data, isLoading } = useCaseEnrichments(params);
 
   const updateParams = useCallback(
@@ -86,6 +112,8 @@ function EnrichmentsPageContent() {
     setDetailOpen(true);
   }, []);
 
+  const sweepRows = params.sweep ? SWEEP_ROWS[params.sweep] : null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -98,27 +126,32 @@ function EnrichmentsPageContent() {
         </p>
       </div>
 
-      <EnrichmentSummaryCards summary={summaryData?.data} isLoading={summaryLoading} />
+      <EnrichmentSummaryCards summary={summary} isLoading={summaryLoading} />
 
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Enrichment runs</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <EnrichmentFilters params={params} onParamsChange={updateParams} />
+          <EnrichmentFilters
+            params={params}
+            availableSweeps={availableSweeps ?? []}
+            onParamsChange={updateParams}
+          />
 
           <EnrichmentRunsTable
             runs={data?.data || []}
             isLoading={isLoading}
             onView={handleView}
             showCaseRunsLink={params.sweep !== undefined}
+            emptyMessage={sweepRows?.empty}
           />
 
           {data?.pagination && (
             <AdminPagination
               pagination={data.pagination}
               onPageChange={(page) => updateParams({ page })}
-              itemLabel="runs"
+              itemLabel={sweepRows?.plural ?? 'runs'}
             />
           )}
         </CardContent>
