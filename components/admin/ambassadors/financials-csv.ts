@@ -20,28 +20,90 @@ import type { FinancialsRow } from './financials';
  * one the server did not.
  */
 
+/**
+ * An amount that arrives as TEXT and must reach the file exactly as sent.
+ *
+ * The api sends money as a decimal string, "2000.00". A negative amount would
+ * start with "-", and the formula guard in `csvField` would put a quote in front
+ * of it. Excel and Sheets SHOW that quote when they open a CSV, so the cell
+ * would read '-5000 and the column would stop summing. Turning the text into a
+ * number would drop the ".00" and change the file. So an amount is wrapped in
+ * this marker, and the guard passes a marked cell through untouched.
+ *
+ * The marker is only ever made for text that IS a plain decimal (`csvAmount`).
+ * Anything else comes back as an ordinary string and is guarded, so the
+ * exemption cannot carry a formula into the file.
+ */
+export interface CsvNumericText {
+  readonly numericText: string;
+}
+
 /** A value a CSV cell can hold. `null` and `undefined` are empty cells. */
-export type CsvValue = string | number | null | undefined;
+export type CsvValue = string | number | CsvNumericText | null | undefined;
+
+/** Digits, an optional leading minus, and an optional decimal part. */
+const PLAIN_DECIMAL = /^-?[0-9]+(\.[0-9]+)?$/;
 
 /**
- * One CSV field, quoted only when it has to be.
+ * An amount from the api, marked so the formula guard leaves it alone. Text that
+ * is not a plain decimal is returned unmarked, so it is guarded like any string.
+ */
+export function csvAmount(text: string | null | undefined): CsvValue {
+  if (text === null || text === undefined) return null;
+  return PLAIN_DECIMAL.test(text) ? { numericText: text } : text;
+}
+
+/**
+ * The first characters that make a spreadsheet read a cell as a formula, from
+ * OWASP's CSV injection guidance: = + - @, a tab and a carriage return.
+ */
+const FORMULA_START = new Set(['=', '+', '-', '@', '\t', '\r']);
+
+/**
+ * RFC 4180 quoting, only when it has to.
  *
  * A comma, a quote, a newline or a carriage return each end a field or a record
- * for a reader that does not see the quotes, and internal quotes are doubled —
- * RFC 4180. University names carry commas often enough that this is not
- * theoretical.
+ * for a reader that does not see the quotes, and internal quotes are doubled.
+ * University names carry commas often enough that this is not theoretical.
  */
-function csvField(value: CsvValue): string {
-  if (value === null || value === undefined) return '';
-  const text = String(value);
+function quoteIfNeeded(text: string): string {
   if (!/["\n\r,]/.test(text)) return text;
   return `"${text.replace(/"/g, '""')}"`;
 }
 
 /**
+ * One CSV field.
+ *
+ * ── A STRING THAT STARTS LIKE A FORMULA GETS A LEADING QUOTE ───────────────
+ * Applicants type their own phone number, social handle, faculty and law
+ * school, and a spreadsheet runs a cell starting with = + - @, a tab or a
+ * carriage return as a formula. The rule, set 2026-09-11: prefix a single quote
+ * to a STRING cell starting with one of those, and leave numbers alone.
+ *
+ * Measured on the live data the same night: 75 of the 153 applications have a
+ * phone number starting with "+" and 31 have a social handle starting with "@",
+ * so those cells now open as text with a visible leading quote. Without it
+ * Excel turns "+2348012345678" into a number and drops the plus, and shows
+ * #NAME? for an @handle. Across the 114 financials rows no text cell started
+ * with one of those characters, and the only amount was a plain decimal, so the
+ * financials file came out unchanged.
+ *
+ * A number is never a formula, and a `CsvNumericText` is an amount already
+ * checked to be a plain decimal, so neither is touched.
+ */
+function csvField(value: CsvValue): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') return quoteIfNeeded(String(value));
+  if (typeof value === 'object') return quoteIfNeeded(value.numericText);
+  const text = FORMULA_START.has(value.charAt(0)) ? `'${value}` : value;
+  return quoteIfNeeded(text);
+}
+
+/**
  * A whole file: the header, then one line per row, CRLF between lines as RFC
- * 4180 has it, and every cell through `csvField`. The applications export
- * builds its file with this too, so the two files quote alike.
+ * 4180 has it, and every cell through `csvField`, which quotes and neutralises
+ * formulas. The applications export builds its file with this too, so the two
+ * files quote alike and both carry the guard.
  */
 export function csvDocument(header: string[], rows: CsvValue[][]): string {
   const lines: CsvValue[][] = [header, ...rows];
@@ -80,6 +142,8 @@ export function localDayOf(iso: string | null): string {
  * a day-by-day record, and a boolean in a spreadsheet outlives every bit of
  * that context. The busiest day and its size are exported instead, which is the
  * evidence itself.
+ *
+ * Amounts go through `csvAmount`, so a negative one would still sum.
  */
 export function financialsCsv(rows: FinancialsRow[], currencies: string[]): string {
   const header = [
@@ -109,7 +173,7 @@ export function financialsCsv(rows: FinancialsRow[], currencies: string[]): stri
       row.country,
       row.referred_count,
       row.paid_count,
-      ...currencies.map((code) => row.revenue?.[code] ?? null),
+      ...currencies.map((code) => csvAmount(row.revenue?.[code])),
       row.gifted_messages,
       localDayOf(row.last_referral_at),
       localDayOf(row.busiest_day?.date ?? null),

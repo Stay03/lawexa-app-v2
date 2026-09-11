@@ -14,6 +14,9 @@ import { replaceUrlParams } from '@/lib/utils/url-params';
  * `router.replace`, and a late echo of an older value wiped what the owner was
  * typing. Read that docblock before changing the reconcile below.
  *
+ * This is a deliberate copy, not a duplicate to tidy away. Deleting it in
+ * favour of an import from `v2/` breaks that boundary and fails eslint.
+ *
  * One thing is added: `resets`, the query-string keys a new search deletes.
  * The applications screen passes `page`, so a narrower result never opens on a
  * page past its end.
