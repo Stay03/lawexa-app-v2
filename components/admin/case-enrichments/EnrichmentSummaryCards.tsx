@@ -1,6 +1,14 @@
 'use client';
 
-import { Database, Hourglass, ListChecks, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  CirclePause,
+  Database,
+  Hourglass,
+  ListChecks,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -56,6 +64,9 @@ function StatCard({
  * A partial case that already has principles is not in `remaining_cases`, so
  * the covered share includes it. The line says "have structures" rather than
  * "enriched" for that reason, and names the partial count beside it.
+ *
+ * Stopped sits beside Partial because it is a part of it: the partial cases
+ * the resume sweep has given up on, which only a person moves on.
  */
 export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummaryCardsProps) {
   if (isLoading || !summary) {
@@ -63,7 +74,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
       <div className="space-y-4">
         <Skeleton className="h-16 w-full" />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-[92px] w-full" />
           ))}
         </div>
@@ -74,6 +85,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
   const { eligible_cases, remaining_cases, enriched_cases, runs, unmapped_outcomes } =
     summary;
   const partialCases = summary.partial_cases ?? 0;
+  const stoppedCases = summary.partial_stopped_cases ?? 0;
   const partialRuns = runs.partial;
   const coverage =
     eligible_cases > 0
@@ -113,7 +125,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
         </CardContent>
       </Card>
 
-      {/* Headline counts */}
+      {/* Headline counts: coverage on the first row, what to watch on the second */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <StatCard
           icon={Database}
@@ -142,6 +154,13 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
               ? 'Waiting on missing parts'
               : `Missing parts · ${partialRuns.toLocaleString()} partial run${partialRuns === 1 ? '' : 's'}`
           }
+        />
+        <StatCard
+          icon={CirclePause}
+          label="Stopped"
+          value={stoppedCases}
+          hint="Sweep gave up · needs a person"
+          tone={stoppedCases > 0 ? 'warning' : 'default'}
         />
         <StatCard
           icon={AlertTriangle}

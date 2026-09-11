@@ -14,8 +14,16 @@ export type EnrichmentTrigger = 'ingest' | 'backfill' | 'manual' | 'resume';
  */
 export type EnrichmentStatus = 'running' | 'completed' | 'partial' | 'failed' | 'skipped';
 
-/** `already_running`: another run on the same case was still going. */
-export type EnrichmentSkipReason = 'already_enriched' | 'no_full_report' | 'already_running';
+/**
+ * Why a run was skipped. `already_running`: another run of the case was still
+ * going, and `stats.running` is its id. `superseded`: a queued resume that
+ * another run of the case overtook, and `stats.overtaken_by` is that run's id.
+ */
+export type EnrichmentSkipReason =
+  | 'already_enriched'
+  | 'no_full_report'
+  | 'already_running'
+  | 'superseded';
 
 /** Compact case reference embedded on an enrichment run. */
 export interface EnrichmentCaseRef {
@@ -32,8 +40,11 @@ export interface EnrichmentCaseRef {
 export interface EnrichmentChunkError {
   chunk: number;
   error: string;
-  /** The AI service's error code when it gave one, else null. */
-  code?: string | number | null;
+  /**
+   * The classifier's error code, such as "retry_deadline" or
+   * "connection_error", or null. The API sends a string or null.
+   */
+  code?: string | null;
 }
 
 /** A scalar read from a later part, held until every part before it is read. */
@@ -84,6 +95,10 @@ export interface EnrichmentStats {
   scalars?: string[];
   reason?: EnrichmentSkipReason;
   chunks?: EnrichmentChunks | number;
+  /** On an `already_running` skip: the run that was still going. */
+  running?: number;
+  /** On a `superseded` skip: the run that overtook this one. */
+  overtaken_by?: number;
 }
 
 /** One enrichment attempt (automatic on upload, backfill command, manual, or resume). */
@@ -115,6 +130,12 @@ export interface CaseEnrichmentSummary {
    * frontend can deploy before the API that sends it.
    */
   partial_cases?: number;
+  /**
+   * The part of `partial_cases` the resume sweep has stopped on: 3 attempts in
+   * a row recovered no part over the case's current report text, so nothing
+   * retries it. Optional for the same reason.
+   */
+  partial_stopped_cases?: number;
   /** Lifetime run counts by status. `partial` is optional for the same reason. */
   runs: Record<Exclude<EnrichmentStatus, 'partial'>, number> & { partial?: number };
   /** Rows carrying outcome_raw — the outcome-enum extension feed. */
@@ -127,6 +148,11 @@ export interface CaseEnrichmentsParams {
   trigger?: EnrichmentTrigger;
   case_id?: number;
   unmapped_outcomes?: boolean;
+  /**
+   * Only the partial runs of cases the resume sweep has stopped on, one row per
+   * case. "stopped" is the only value the API accepts; anything else is a 422.
+   */
+  sweep?: 'stopped';
   date_from?: string;
   date_to?: string;
   per_page?: number;

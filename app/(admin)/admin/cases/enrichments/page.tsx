@@ -43,6 +43,9 @@ function EnrichmentsPageContent() {
       status: status ?? undefined,
       trigger: trigger ?? undefined,
       unmapped_outcomes: searchParams.get('unmapped_outcomes') === '1' || undefined,
+      // The API answers any other sweep value with a 422, so a hand-edited URL
+      // is dropped here instead of breaking the list.
+      sweep: searchParams.get('sweep') === 'stopped' ? 'stopped' : undefined,
       case_id: searchParams.get('case_id')
         ? Number(searchParams.get('case_id'))
         : undefined,
@@ -100,6 +103,7 @@ function EnrichmentsPageContent() {
             runs={data?.data || []}
             isLoading={isLoading}
             onView={handleView}
+            showCaseRunsLink={params.sweep === 'stopped'}
           />
 
           {data?.pagination && (
@@ -131,8 +135,8 @@ export default function CaseEnrichmentsPage() {
       fallback={
         <div className="space-y-6">
           <Skeleton className="h-16 w-full" />
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-[92px] w-full" />
             ))}
           </div>

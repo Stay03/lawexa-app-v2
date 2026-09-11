@@ -29,6 +29,12 @@ interface EnrichmentRunsTableProps {
   runs: CaseEnrichmentRun[];
   isLoading: boolean;
   onView: (run: CaseEnrichmentRun) => void;
+  /**
+   * Link each row to every run of its case. On the stopped list a row is the
+   * partial run the sweep read, and the failed runs behind the stop are not in
+   * that list.
+   */
+  showCaseRunsLink?: boolean;
 }
 
 /** Human summary of what a run wrote, e.g. "3 principles · 2 statutes". */
@@ -39,6 +45,7 @@ export function summarizeStats(stats: EnrichmentStats | null, status: string): s
     if (stats.reason === 'already_enriched') return 'Already enriched';
     if (stats.reason === 'no_full_report') return 'No full report';
     if (stats.reason === 'already_running') return 'Already running';
+    if (stats.reason === 'superseded') return 'Overtaken by another run';
     return 'Skipped';
   }
   const parts: string[] = [];
@@ -68,7 +75,12 @@ function resultSummary(run: CaseEnrichmentRun): string {
   return `${progress.read} of ${progress.total} parts read · ${written}`;
 }
 
-export function EnrichmentRunsTable({ runs, isLoading, onView }: EnrichmentRunsTableProps) {
+export function EnrichmentRunsTable({
+  runs,
+  isLoading,
+  onView,
+  showCaseRunsLink = false,
+}: EnrichmentRunsTableProps) {
   if (isLoading) {
     return (
       <div className="overflow-hidden rounded-lg border">
@@ -126,12 +138,22 @@ export function EnrichmentRunsTable({ runs, isLoading, onView }: EnrichmentRunsT
               {/* Case */}
               <TableCell className="max-w-[280px]">
                 {run.case ? (
-                  <Link
-                    href={`/admin/cases/${run.case.slug}`}
-                    className="block truncate text-sm font-medium hover:underline"
-                  >
-                    {getCaseDisplayTitle(run.case)}
-                  </Link>
+                  <>
+                    <Link
+                      href={`/admin/cases/${run.case.slug}`}
+                      className="block truncate text-sm font-medium hover:underline"
+                    >
+                      {getCaseDisplayTitle(run.case)}
+                    </Link>
+                    {showCaseRunsLink && (
+                      <Link
+                        href={`/admin/cases/enrichments?case_id=${run.case.id}`}
+                        className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                      >
+                        All runs of this case
+                      </Link>
+                    )}
+                  </>
                 ) : (
                   <span className="text-sm text-muted-foreground">Deleted case</span>
                 )}

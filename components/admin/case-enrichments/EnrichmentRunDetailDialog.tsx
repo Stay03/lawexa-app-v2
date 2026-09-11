@@ -22,7 +22,7 @@ import {
   withheldScalars,
   withheldText,
 } from './chunks';
-import type { CaseEnrichmentRun } from '@/types/admin-case-enrichments';
+import type { CaseEnrichmentRun, EnrichmentStats } from '@/types/admin-case-enrichments';
 import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface EnrichmentRunDetailDialogProps {
@@ -40,6 +40,22 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+/**
+ * The other run a skip names, with the row label that says how: the run that
+ * was still going, or the run that overtook a queued resume. Null otherwise.
+ */
+function skipOtherRun(stats: EnrichmentStats | null): { label: string; id: number } | null {
+  if (!stats) return null;
+  const candidate =
+    stats.reason === 'already_running'
+      ? { label: 'Still going', id: stats.running }
+      : stats.reason === 'superseded'
+        ? { label: 'Overtaken by', id: stats.overtaken_by }
+        : null;
+  if (!candidate || typeof candidate.id !== 'number' || !Number.isInteger(candidate.id)) return null;
+  return { label: candidate.label, id: candidate.id };
+}
+
 export function EnrichmentRunDetailDialog({
   run,
   open,
@@ -49,6 +65,7 @@ export function EnrichmentRunDetailDialog({
   const progress = run ? partsProgress(run.stats) : null;
   const errors = record ? partErrors(record) : [];
   const withheld = record ? withheldScalars(record) : [];
+  const otherRun = run && run.status === 'skipped' ? skipOtherRun(run.stats) : null;
   // A first read asks for every part; only a resume asks for some of them.
   const askedForSome =
     progress !== null &&
@@ -90,6 +107,7 @@ export function EnrichmentRunDetailDialog({
               <Row label="Continues">Run #{progress.resumes}</Row>
             )}
             <Row label="Result">{summarizeStats(run.stats, run.status)}</Row>
+            {otherRun && <Row label={otherRun.label}>Run #{otherRun.id}</Row>}
             {run.stats?.scalars && run.stats.scalars.length > 0 && (
               <Row label="Scalars written">
                 <div className="flex flex-wrap gap-1">
