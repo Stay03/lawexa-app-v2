@@ -31,6 +31,15 @@ const getAdminList = async (params: AmbassadorListParams = {}): Promise<Ambassad
 /**
  * Every application, walked a page at a time until there is nothing new.
  *
+ * ── WHY THE APPLICATIONS SCREEN CALLS THIS ─────────────────────────────────
+ * `GET /admin/ambassador-applications` filters on `status` and on nothing
+ * else, and caps `per_page` at 50. Measured 2026-09-10: `search`, `country`,
+ * `level`, `university` and `sort=reviewed_at` each returned all 153
+ * applications unfiltered, and asking for 100 per page returned 50. So the
+ * applications screen takes every row from here and filters, searches, sorts
+ * and pages them itself. `perPage` defaults to the cap because asking for more
+ * changes nothing.
+ *
  * ── WHY THE FINANCIALS SCREEN CALLS THIS ───────────────────────────────────
  * A financials row carries no university, no level and no country: those three
  * live on the APPLICATION and nowhere else. `/admin/ambassadors/financials`
@@ -47,7 +56,7 @@ const getAdminList = async (params: AmbassadorListParams = {}): Promise<Ambassad
  * alone, and `MAX_PAGES` sits under both: a request loop against admin routes
  * is worse than a short list.
  */
-const getAllApplications = async (perPage = 100): Promise<AmbassadorApplication[]> => {
+const getAllApplications = async (perPage = 50): Promise<AmbassadorApplication[]> => {
   const MAX_PAGES = 50;
   const seen = new Set<string>();
   const all: AmbassadorApplication[] = [];

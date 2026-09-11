@@ -20,6 +20,9 @@ import type { FinancialsRow } from './financials';
  * one the server did not.
  */
 
+/** A value a CSV cell can hold. `null` and `undefined` are empty cells. */
+export type CsvValue = string | number | null | undefined;
+
 /**
  * One CSV field, quoted only when it has to be.
  *
@@ -28,11 +31,21 @@ import type { FinancialsRow } from './financials';
  * RFC 4180. University names carry commas often enough that this is not
  * theoretical.
  */
-function csvField(value: string | number | null | undefined): string {
+function csvField(value: CsvValue): string {
   if (value === null || value === undefined) return '';
   const text = String(value);
   if (!/["\n\r,]/.test(text)) return text;
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+/**
+ * A whole file: the header, then one line per row, CRLF between lines as RFC
+ * 4180 has it, and every cell through `csvField`. The applications export
+ * builds its file with this too, so the two files quote alike.
+ */
+export function csvDocument(header: string[], rows: CsvValue[][]): string {
+  const lines: CsvValue[][] = [header, ...rows];
+  return lines.map((values) => values.map(csvField).join(',')).join('\r\n');
 }
 
 /**
@@ -48,7 +61,9 @@ export function localDay(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function localDayOf(iso: string | null): string {
+/** A timestamp from the API as `localDay`, or an empty cell when there is none
+ *  or it does not parse. */
+export function localDayOf(iso: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
@@ -83,8 +98,9 @@ export function financialsCsv(rows: FinancialsRow[], currencies: string[]): stri
     'Most signups in a day',
   ];
 
-  const lines = rows.map((row) =>
-    [
+  return csvDocument(
+    header,
+    rows.map((row) => [
       row.name,
       row.email,
       row.code,
@@ -98,12 +114,8 @@ export function financialsCsv(rows: FinancialsRow[], currencies: string[]): stri
       localDayOf(row.last_referral_at),
       localDayOf(row.busiest_day?.date ?? null),
       row.busiest_day?.signups ?? 0,
-    ]
-      .map(csvField)
-      .join(',')
+    ])
   );
-
-  return [header.map(csvField).join(','), ...lines].join('\r\n');
 }
 
 /**

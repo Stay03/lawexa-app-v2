@@ -30,14 +30,14 @@ interface FacetSelectProps {
 }
 
 /**
- * One dimension of the financials filter, picked from the values that are
- * actually in the loaded rows.
+ * One dimension of an ambassador list's filter (financials or applications),
+ * picked from the values that are actually in the loaded rows.
  *
  * The options are never a hard-coded list: universities, levels and countries
  * are whatever the ambassadors themselves wrote on their applications, so the
  * caller counts them off the rows and hands them over. The count beside each
- * one is how many ambassadors the OTHER filters leave in it, which is what
- * makes it possible to see a dead end before clicking it.
+ * one is how many rows the OTHER filters leave in it, which is what makes it
+ * possible to see a dead end before clicking it.
  */
 export function FacetSelect({
   allLabel,

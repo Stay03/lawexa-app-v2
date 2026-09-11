@@ -3,9 +3,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   BadgeCheck,
   CalendarClock,
   Download,
@@ -33,6 +30,7 @@ import {
 } from '@/components/admin/observability';
 import { currencySymbol, moneyLines } from '@/components/admin/ambassadors/money';
 import { FinancialsFilterBar } from '@/components/admin/ambassadors/FinancialsFilterBar';
+import { SortButton, SortIcon } from '@/components/admin/ambassadors/SortButton';
 import {
   currenciesIn,
   facetOptions,
@@ -51,6 +49,7 @@ import {
   localDay,
 } from '@/components/admin/ambassadors/financials-csv';
 import { adminAmbassadorsApi } from '@/lib/api/ambassadors';
+import { useAllAmbassadorApplications } from '@/lib/hooks/useAdminAmbassadors';
 import type { AmbassadorFinancialRow } from '@/types/ambassador';
 
 /**
@@ -120,15 +119,6 @@ function dayLabel(iso: string | null): string {
   return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-function SortIcon({ active, direction }: { active: boolean; direction: 'asc' | 'desc' }) {
-  if (!active) return <ArrowUpDown aria-hidden className="size-3.5 opacity-40" />;
-  return direction === 'asc' ? (
-    <ArrowUp aria-hidden className="size-3.5 text-primary" />
-  ) : (
-    <ArrowDown aria-hidden className="size-3.5 text-primary" />
-  );
-}
-
 /** A count column's header. Three clicks return the table to the order the
  *  server sent, which is the only way back to it. */
 function SortHeader({
@@ -144,16 +134,12 @@ function SortHeader({
 }) {
   const active = sort !== null && sort.column === column && sort.currency === null;
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className="-mr-3 h-8 gap-1.5 font-semibold"
+    <SortButton
+      label={label}
+      active={active}
+      direction={active ? sort.direction : 'desc'}
       onClick={() => onSort(column)}
-    >
-      {label}
-      <SortIcon active={active} direction={active ? sort.direction : 'desc'} />
-    </Button>
+    />
   );
 }
 
@@ -272,12 +258,8 @@ export default function AmbassadorFinancialsPage() {
 
   // Second call, and it has to be: the financials row carries no university,
   // level or country, and the financials endpoint takes no parameters that
-  // could add them.
-  const profiles = useQuery({
-    queryKey: ['ambassador-application-profiles'],
-    queryFn: () => adminAmbassadorsApi.getAllApplications(),
-    staleTime: 5 * 60 * 1000,
-  });
+  // could add them. The applications screen reads the same query.
+  const profiles = useAllAmbassadorApplications();
 
   const rows = useMemo(() => query.data?.data?.ambassadors ?? [], [query.data]);
   const totals = query.data?.data?.totals;

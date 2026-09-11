@@ -18,6 +18,12 @@ import type {
  * ── AND NOTHING HERE ADDS UP MONEY ─────────────────────────────────────────
  * `revenue` is a currency map. Sorting by it sorts WITHIN one named currency
  * and never across two — see `compareAmounts` below.
+ *
+ * ── THE SEARCH, FACET AND DATE-WINDOW PIECES ARE SHARED ────────────────────
+ * The applications list (`./applications`) filters with `haystackOf`,
+ * `searchTerms`, `windowCutoff` and `countFacet` from this file, so the two
+ * ambassador lists search and count the same way. Anything that knows about
+ * money or referrals stays typed to `FinancialsRow`.
  */
 
 /**
@@ -56,12 +62,21 @@ export function joinApplications(
       university,
       level,
       country,
-      haystack: [row.name, row.email, row.code, university, level, country]
-        .filter((part): part is string => Boolean(part))
-        .join(' ')
-        .toLowerCase(),
+      haystack: haystackOf([row.name, row.email, row.code, university, level, country]),
     };
   });
+}
+
+/**
+ * The searchable fields of a row as one lowercased string, empty fields left
+ * out. Built once when the rows load, so a keystroke only runs `includes` over
+ * it. Shared with the applications list.
+ */
+export function haystackOf(parts: (string | null | undefined)[]): string {
+  return parts
+    .filter((part): part is string => Boolean(part))
+    .join(' ')
+    .toLowerCase();
 }
 
 /* ── Filters ──────────────────────────────────────────────────────────────── */
@@ -92,13 +107,35 @@ const DATE_WINDOW_DAYS: Record<DateWindow, number | null> = {
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
-export interface FinancialsFilters {
+/**
+ * The earliest moment a date window lets through, or `null` for all time.
+ *
+ * `now` is passed in rather than read here: React Compiler rejects a clock read
+ * during render, and a cutoff that moves on every frame would make the memo
+ * around the caller impossible to reuse.
+ */
+export function windowCutoff(dateWindow: DateWindow, now: number): number | null {
+  const days = DATE_WINDOW_DAYS[dateWindow];
+  return days === null ? null : now - days * DAY_IN_MS;
+}
+
+/** The search box's text as lowercase terms. A row matches when its haystack
+ *  holds every term, in any order. */
+export function searchTerms(search: string): string[] {
+  return search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/** The five controls both ambassador lists have: a search, three facets and a
+ *  date window. The applications list adds a status to them. */
+export interface AmbassadorListFilters {
   search: string;
   university: string | null;
   level: string | null;
   country: string | null;
   window: DateWindow;
 }
+
+export type FinancialsFilters = AmbassadorListFilters;
 
 /** Nothing selected, which shows every ambassador — including the ones who
  *  referred nobody. */
@@ -110,7 +147,7 @@ export const NO_FILTERS: FinancialsFilters = {
   window: 'all',
 };
 
-export function isFiltered(filters: FinancialsFilters): boolean {
+export function isFiltered(filters: AmbassadorListFilters): boolean {
   return (
     filters.search.trim() !== '' ||
     filters.university !== null ||
@@ -126,9 +163,8 @@ export type FacetKey = (typeof FACET_KEYS)[number];
 /**
  * Rows that pass every filter.
  *
- * `now` is passed in rather than read here: React Compiler rejects a clock read
- * during render, and a cutoff that moves on every frame would make the memo
- * around this call impossible to reuse.
+ * `now` is passed in rather than read here, for the reason `windowCutoff`
+ * gives.
  *
  * `skip` leaves one facet out, which is what makes the facet lists show what is
  * still reachable rather than what would empty the table.
@@ -139,9 +175,8 @@ export function filterRows(
   now: number,
   skip?: FacetKey
 ): FinancialsRow[] {
-  const terms = filters.search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const days = DATE_WINDOW_DAYS[filters.window];
-  const cutoff = days === null ? null : now - days * DAY_IN_MS;
+  const terms = searchTerms(filters.search);
+  const cutoff = windowCutoff(filters.window, now);
 
   return rows.filter((row) => {
     for (const key of FACET_KEYS) {
@@ -168,33 +203,43 @@ export interface FacetOption {
 }
 
 /**
- * The choices for one facet, counted over the rows the OTHER filters leave.
+ * One facet's choices, counted over rows the caller has already narrowed by
+ * the OTHER filters. Shared with the applications list.
  *
  * A value that no longer matches anything drops out, so picking a country and
  * then a university cannot land on an empty table. The value that is currently
  * selected always stays in the list, even at zero, because a filter you cannot
  * see is a filter you cannot undo.
  */
+export function countFacet<Row>(
+  rows: Row[],
+  valueOf: (row: Row) => string | null,
+  selected: string | null
+): FacetOption[] {
+  const counts = new Map<string, number>();
+
+  for (const row of rows) {
+    const value = valueOf(row);
+    if (!value) continue;
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+
+  if (selected !== null && !counts.has(selected)) counts.set(selected, 0);
+
+  return Array.from(counts, ([value, count]) => ({ value, count })).sort((a, b) =>
+    a.value.localeCompare(b.value, undefined, { numeric: true })
+  );
+}
+
+/** The choices for one financials facet, counted over the rows the OTHER
+ *  filters leave. */
 export function facetOptions(
   rows: FinancialsRow[],
   filters: FinancialsFilters,
   key: FacetKey,
   now: number
 ): FacetOption[] {
-  const counts = new Map<string, number>();
-
-  for (const row of filterRows(rows, filters, now, key)) {
-    const value = row[key];
-    if (!value) continue;
-    counts.set(value, (counts.get(value) ?? 0) + 1);
-  }
-
-  const selected = filters[key];
-  if (selected !== null && !counts.has(selected)) counts.set(selected, 0);
-
-  return Array.from(counts, ([value, count]) => ({ value, count })).sort((a, b) =>
-    a.value.localeCompare(b.value, undefined, { numeric: true })
-  );
+  return countFacet(filterRows(rows, filters, now, key), (row) => row[key], filters[key]);
 }
 
 /* ── Sorting ──────────────────────────────────────────────────────────────── */
