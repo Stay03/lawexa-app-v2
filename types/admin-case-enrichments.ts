@@ -25,6 +25,14 @@ export type EnrichmentSkipReason =
   | 'already_running'
   | 'superseded';
 
+/**
+ * A state of a partial case that the resume sweep does not move on its own.
+ * `stopped`: 3 attempts in a row recovered no part over the current report
+ * text. `text_changed`: the report was replaced after the partial run, so the
+ * sweep neither retries nor stops it. A case is in one state at most.
+ */
+export type EnrichmentSweep = 'stopped' | 'text_changed';
+
 /** Compact case reference embedded on an enrichment run. */
 export interface EnrichmentCaseRef {
   id: number;
@@ -136,6 +144,12 @@ export interface CaseEnrichmentSummary {
    * retries it. Optional for the same reason.
    */
   partial_stopped_cases?: number;
+  /**
+   * The part of `partial_cases` whose partial run read a report text the case
+   * no longer holds. The sweep neither retries nor stops these, and it never
+   * overlaps `partial_stopped_cases`. Optional for the same reason.
+   */
+  partial_text_changed_cases?: number;
   /** Lifetime run counts by status. `partial` is optional for the same reason. */
   runs: Record<Exclude<EnrichmentStatus, 'partial'>, number> & { partial?: number };
   /** Rows carrying outcome_raw — the outcome-enum extension feed. */
@@ -149,10 +163,10 @@ export interface CaseEnrichmentsParams {
   case_id?: number;
   unmapped_outcomes?: boolean;
   /**
-   * Only the partial runs of cases the resume sweep has stopped on, one row per
-   * case. "stopped" is the only value the API accepts; anything else is a 422.
+   * Only the partial runs of cases in that sweep state, one row per case. The
+   * API accepts "stopped" and "text_changed"; anything else is a 422.
    */
-  sweep?: 'stopped';
+  sweep?: EnrichmentSweep;
   date_from?: string;
   date_to?: string;
   per_page?: number;

@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, CirclePause, X } from 'lucide-react';
+import { AlertTriangle, CirclePause, FileDiff, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import type {
   CaseEnrichmentsParams,
   EnrichmentStatus,
+  EnrichmentSweep,
   EnrichmentTrigger,
 } from '@/types/admin-case-enrichments';
 
@@ -25,11 +26,37 @@ const STATUSES: EnrichmentStatus[] = ['running', 'completed', 'partial', 'failed
 const TRIGGERS: EnrichmentTrigger[] = ['ingest', 'backfill', 'manual', 'resume'];
 const ALL = 'all';
 
+/**
+ * The two sweep states a partial case can sit in without the sweep moving it.
+ * They share one URL parameter, so turning one on turns the other off.
+ */
+const SWEEP_TOGGLES: {
+  value: EnrichmentSweep;
+  label: string;
+  icon: typeof CirclePause;
+  note: string;
+}[] = [
+  {
+    value: 'stopped',
+    label: 'Stopped',
+    icon: CirclePause,
+    note:
+      'Partial cases the resume sweep has stopped retrying: its last 3 attempts read no new part. A later run that reads a part, or a changed report, clears the stop.',
+  },
+  {
+    value: 'text_changed',
+    label: 'Report changed',
+    icon: FileDiff,
+    note:
+      'Partial cases whose report text changed after their partial run, which the resume sweep does not resume.',
+  },
+];
+
 export function EnrichmentFilters({ params, onParamsChange }: EnrichmentFiltersProps) {
-  const stopped = params.sweep === 'stopped';
+  const activeSweep = SWEEP_TOGGLES.find((toggle) => toggle.value === params.sweep);
   const oneCase = params.case_id !== undefined;
   const hasActiveFilters =
-    !!params.status || !!params.trigger || !!params.unmapped_outcomes || stopped || oneCase;
+    !!params.status || !!params.trigger || !!params.unmapped_outcomes || !!activeSweep || oneCase;
 
   return (
     <div className="space-y-2">
@@ -98,23 +125,25 @@ export function EnrichmentFilters({ params, onParamsChange }: EnrichmentFiltersP
           Unmapped outcomes
         </Button>
 
-        {/* Stopped toggle: partial cases the resume sweep has given up on */}
-        <Button
-          type="button"
-          variant={stopped ? 'default' : 'outline'}
-          size="sm"
-          className="h-9 gap-1.5"
-          aria-pressed={stopped}
-          onClick={() =>
-            onParamsChange({
-              sweep: stopped ? undefined : 'stopped',
-              page: 1,
-            })
-          }
-        >
-          <CirclePause className="h-4 w-4" />
-          Stopped
-        </Button>
+        {/* Sweep states */}
+        {SWEEP_TOGGLES.map((toggle) => {
+          const on = params.sweep === toggle.value;
+          const Icon = toggle.icon;
+          return (
+            <Button
+              key={toggle.value}
+              type="button"
+              variant={on ? 'default' : 'outline'}
+              size="sm"
+              className="h-9 gap-1.5"
+              aria-pressed={on}
+              onClick={() => onParamsChange({ sweep: on ? undefined : toggle.value, page: 1 })}
+            >
+              <Icon className="h-4 w-4" />
+              {toggle.label}
+            </Button>
+          );
+        })}
 
         {hasActiveFilters && (
           <Button
@@ -139,12 +168,7 @@ export function EnrichmentFilters({ params, onParamsChange }: EnrichmentFiltersP
         )}
       </div>
 
-      {stopped && (
-        <p className="text-xs text-muted-foreground">
-          Partial cases the resume sweep has stopped retrying: its last 3 attempts read no
-          new part. A later run that reads a part, or a changed report, clears the stop.
-        </p>
-      )}
+      {activeSweep && <p className="text-xs text-muted-foreground">{activeSweep.note}</p>}
       {/* case_id arrives from a link, with no control of its own, so the list
           says it is narrowed and Clear widens it again. */}
       {oneCase && (

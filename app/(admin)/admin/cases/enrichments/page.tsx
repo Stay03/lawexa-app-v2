@@ -20,8 +20,15 @@ import type {
   CaseEnrichmentRun,
   CaseEnrichmentsParams,
   EnrichmentStatus,
+  EnrichmentSweep,
   EnrichmentTrigger,
 } from '@/types/admin-case-enrichments';
+
+/** The sweep values the API accepts. Anything else in the URL is dropped. */
+const SWEEPS: readonly EnrichmentSweep[] = ['stopped', 'text_changed'];
+
+const isSweep = (value: string | null): value is EnrichmentSweep =>
+  value !== null && (SWEEPS as readonly string[]).includes(value);
 
 /******************************************************************************
                                 Page Content
@@ -37,6 +44,7 @@ function EnrichmentsPageContent() {
   const params = useMemo<CaseEnrichmentsParams>(() => {
     const status = searchParams.get('status') as EnrichmentStatus | null;
     const trigger = searchParams.get('trigger') as EnrichmentTrigger | null;
+    const sweep = searchParams.get('sweep');
     return {
       page: Number(searchParams.get('page')) || 1,
       per_page: Number(searchParams.get('per_page')) || 15,
@@ -45,7 +53,7 @@ function EnrichmentsPageContent() {
       unmapped_outcomes: searchParams.get('unmapped_outcomes') === '1' || undefined,
       // The API answers any other sweep value with a 422, so a hand-edited URL
       // is dropped here instead of breaking the list.
-      sweep: searchParams.get('sweep') === 'stopped' ? 'stopped' : undefined,
+      sweep: isSweep(sweep) ? sweep : undefined,
       case_id: searchParams.get('case_id')
         ? Number(searchParams.get('case_id'))
         : undefined,
@@ -103,7 +111,7 @@ function EnrichmentsPageContent() {
             runs={data?.data || []}
             isLoading={isLoading}
             onView={handleView}
-            showCaseRunsLink={params.sweep === 'stopped'}
+            showCaseRunsLink={params.sweep !== undefined}
           />
 
           {data?.pagination && (
@@ -135,8 +143,13 @@ export default function CaseEnrichmentsPage() {
       fallback={
         <div className="space-y-6">
           <Skeleton className="h-16 w-full" />
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-[92px] w-full" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-[92px] w-full" />
             ))}
           </div>

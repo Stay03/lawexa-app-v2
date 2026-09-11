@@ -30,9 +30,9 @@ interface EnrichmentRunsTableProps {
   isLoading: boolean;
   onView: (run: CaseEnrichmentRun) => void;
   /**
-   * Link each row to every run of its case. On the stopped list a row is the
-   * partial run the sweep read, and the failed runs behind the stop are not in
-   * that list.
+   * Link each row to every run of its case. On a sweep list (stopped or report
+   * changed) a row is the partial run the sweep read, and the case's other
+   * runs, such as the failed runs behind a stop, are not in that list.
    */
   showCaseRunsLink?: boolean;
 }

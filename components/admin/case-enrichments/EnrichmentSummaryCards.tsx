@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CirclePause,
   Database,
+  FileDiff,
   Hourglass,
   ListChecks,
   Loader2,
@@ -28,7 +29,8 @@ function StatCard({
 }: {
   icon: typeof Database;
   label: string;
-  value: number;
+  /** Null when the API did not send the count: shown as a dash, never as 0. */
+  value: number | null;
   hint?: string;
   tone?: 'default' | 'warning';
 }) {
@@ -49,7 +51,9 @@ function StatCard({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="text-2xl font-semibold tabular-nums">{value.toLocaleString()}</p>
+          <p className="text-2xl font-semibold tabular-nums">
+            {value === null ? '—' : value.toLocaleString()}
+          </p>
           {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
         </div>
       </CardContent>
@@ -65,16 +69,31 @@ function StatCard({
  * the covered share includes it. The line says "have structures" rather than
  * "enriched" for that reason, and names the partial count beside it.
  *
- * Stopped sits beside Partial because it is a part of it: the partial cases
- * the resume sweep has given up on, which only a person moves on.
+ * THE PARTIAL COUNTS SHOW A DASH WHEN THE API DOES NOT SEND THEM. The frontend
+ * can deploy before the API that adds them, and a 0 would claim no case is
+ * partial, stopped or changed when the API has simply not said.
+ *
+ * TWO GROUPS OF CARDS, EACH SIZED FOR ITS COUNT. Coverage is three cards, three
+ * across. What to watch is four: Partial, then the two partial states the sweep
+ * does not resume (Stopped, Report changed), then Unmapped outcomes. Seven cards
+ * in one three-across grid leave one alone on a row, and four across leaves
+ * too little room below 1536 px: measured on 11 Sep 2026, a card at four across
+ * has 116 px of text room at 1280 and 156 px at 1440, while "Sweep gave up ·
+ * needs a person" needs 170 px and "Unmapped outcomes" 138 px. So the watch
+ * group is two by two until 2xl.
  */
 export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummaryCardsProps) {
   if (isLoading || !summary) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-16 w-full" />
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-[92px] w-full" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[92px] w-full" />
           ))}
         </div>
@@ -84,8 +103,9 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
 
   const { eligible_cases, remaining_cases, enriched_cases, runs, unmapped_outcomes } =
     summary;
-  const partialCases = summary.partial_cases ?? 0;
-  const stoppedCases = summary.partial_stopped_cases ?? 0;
+  const partialCases = summary.partial_cases ?? null;
+  const stoppedCases = summary.partial_stopped_cases ?? null;
+  const textChangedCases = summary.partial_text_changed_cases ?? null;
   const partialRuns = runs.partial;
   const coverage =
     eligible_cases > 0
@@ -119,14 +139,16 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           <p className="mt-2 text-xs text-muted-foreground">
             {(eligible_cases - remaining_cases).toLocaleString()} of{' '}
             {eligible_cases.toLocaleString()} eligible cases have structures
-            {partialCases > 0 && ` · ${partialCases.toLocaleString()} partial`} ·{' '}
-            {remaining_cases.toLocaleString()} remaining
+            {partialCases !== null &&
+              partialCases > 0 &&
+              ` · ${partialCases.toLocaleString()} partial`}{' '}
+            · {remaining_cases.toLocaleString()} remaining
           </p>
         </CardContent>
       </Card>
 
-      {/* Headline counts: coverage on the first row, what to watch on the second */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      {/* Coverage counts */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <StatCard
           icon={Database}
           label="Eligible"
@@ -145,6 +167,10 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           value={enriched_cases}
           hint="≥1 completed run"
         />
+      </div>
+
+      {/* What to watch */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
         <StatCard
           icon={Hourglass}
           label="Partial"
@@ -160,7 +186,14 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           label="Stopped"
           value={stoppedCases}
           hint="Sweep gave up · needs a person"
-          tone={stoppedCases > 0 ? 'warning' : 'default'}
+          tone={(stoppedCases ?? 0) > 0 ? 'warning' : 'default'}
+        />
+        <StatCard
+          icon={FileDiff}
+          label="Report changed"
+          value={textChangedCases}
+          hint="Report changed after the run"
+          tone={(textChangedCases ?? 0) > 0 ? 'warning' : 'default'}
         />
         <StatCard
           icon={AlertTriangle}
