@@ -111,7 +111,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
   const partialCases = sentCount(summary.partial_cases);
   const stoppedCases = sentCount(summary.partial_stopped_cases);
   const textChangedCases = sentCount(summary.partial_text_changed_cases);
-  const partialRuns = runs.partial;
+  const partialRuns = sentCount(runs.partial);
   const coverage =
     eligible_cases > 0
       ? Math.round(((eligible_cases - remaining_cases) / eligible_cases) * 100)
@@ -181,7 +181,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           label="Partial"
           value={partialCases}
           hint={
-            partialRuns === undefined
+            partialRuns === null
               ? 'Waiting on missing parts'
               : `Missing parts · ${partialRuns.toLocaleString()} partial run${partialRuns === 1 ? '' : 's'}`
           }

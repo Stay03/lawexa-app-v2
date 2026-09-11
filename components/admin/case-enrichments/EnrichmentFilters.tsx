@@ -25,6 +25,12 @@ interface EnrichmentFiltersProps {
    * toggle for one it lacks would list every run under a sweep's note.
    */
   availableSweeps: EnrichmentSweep[];
+  /**
+   * True while a sweep in the URL waits for the summary. Until it lands the
+   * page cannot tell whether the sweep applies, so what the controls show can
+   * still change.
+   */
+  disabled?: boolean;
   onParamsChange: (updates: Partial<CaseEnrichmentsParams>) => void;
 }
 
@@ -35,6 +41,7 @@ const ALL = 'all';
 export function EnrichmentFilters({
   params,
   availableSweeps,
+  disabled = false,
   onParamsChange,
 }: EnrichmentFiltersProps) {
   const activeSweep =
@@ -50,7 +57,7 @@ export function EnrichmentFilters({
             control reads Partial and cannot be changed. */}
         <Select
           value={params.sweep ? 'partial' : (params.status ?? ALL)}
-          disabled={!!params.sweep}
+          disabled={disabled || !!params.sweep}
           onValueChange={(value) =>
             onParamsChange({
               status: value === ALL ? undefined : (value as EnrichmentStatus),
@@ -74,6 +81,7 @@ export function EnrichmentFilters({
         {/* Trigger */}
         <Select
           value={params.trigger ?? ALL}
+          disabled={disabled}
           onValueChange={(value) =>
             onParamsChange({
               trigger: value === ALL ? undefined : (value as EnrichmentTrigger),
@@ -94,13 +102,15 @@ export function EnrichmentFilters({
           </SelectContent>
         </Select>
 
-        {/* Unmapped outcomes toggle */}
+        {/* Unmapped outcomes. A sweep list does not combine with it, so while a
+            sweep is on the toggle is off and cannot be turned on. */}
         <Button
           type="button"
           variant={params.unmapped_outcomes ? 'default' : 'outline'}
           size="sm"
           className={cn('h-9 gap-1.5')}
           aria-pressed={!!params.unmapped_outcomes}
+          disabled={disabled || !!params.sweep}
           onClick={() =>
             onParamsChange({
               unmapped_outcomes: params.unmapped_outcomes ? undefined : true,
@@ -125,15 +135,17 @@ export function EnrichmentFilters({
               size="sm"
               className="h-9 gap-1.5"
               aria-pressed={on}
+              disabled={disabled}
               onClick={() =>
-                // Status is cleared both ways, so a hand-edited ?status= does
-                // not come back when the sweep goes off. Unmapped outcomes is
-                // cleared on the way in, as a sweep list is its own question.
-                onParamsChange(
-                  on
-                    ? { sweep: undefined, status: undefined, page: 1 }
-                    : { sweep, status: undefined, unmapped_outcomes: undefined, page: 1 }
-                )
+                // Status and Unmapped outcomes are cleared both ways, so a
+                // hand-edited ?status= or ?unmapped_outcomes= does not come
+                // back when the sweep goes off.
+                onParamsChange({
+                  sweep: on ? undefined : sweep,
+                  status: undefined,
+                  unmapped_outcomes: undefined,
+                  page: 1,
+                })
               }
             >
               <Icon className="h-4 w-4" />
@@ -148,6 +160,7 @@ export function EnrichmentFilters({
             variant="ghost"
             size="sm"
             className="h-9 gap-1 text-muted-foreground"
+            disabled={disabled}
             onClick={() =>
               onParamsChange({
                 status: undefined,

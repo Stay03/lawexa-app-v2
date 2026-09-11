@@ -11,6 +11,7 @@ import { EnrichmentSummaryCards } from '@/components/admin/case-enrichments/Enri
 import { EnrichmentFilters } from '@/components/admin/case-enrichments/EnrichmentFilters';
 import { EnrichmentRunsTable } from '@/components/admin/case-enrichments/EnrichmentRunsTable';
 import { EnrichmentRunDetailDialog } from '@/components/admin/case-enrichments/EnrichmentRunDetailDialog';
+import { LoadFailed } from '@/components/admin/case-enrichments/LoadFailed';
 import { isSweep, SWEEP_META, sweepsIn } from '@/components/admin/case-enrichments/sweeps';
 
 import {
@@ -65,7 +66,10 @@ function EnrichmentsPageContent() {
       // empty the list. The status control reads Partial while a sweep is on.
       status: sweep ? undefined : (status ?? undefined),
       trigger: trigger ?? undefined,
-      unmapped_outcomes: searchParams.get('unmapped_outcomes') === '1' || undefined,
+      // The API lists no sweep beside unmapped outcomes, and the pair could read
+      // "No stopped cases" next to a Stopped count of 1. The toggle is disabled
+      // while a sweep is on, so only a hand-edited URL would send both.
+      unmapped_outcomes: sweep ? undefined : (searchParams.get('unmapped_outcomes') === '1' || undefined),
       sweep,
       // "99999999999999999999" passes the pattern and becomes 1e20.
       case_id: Number.isSafeInteger(caseId) ? caseId : undefined,
@@ -112,6 +116,11 @@ function EnrichmentsPageContent() {
   }, []);
 
   const sweepRows = params.sweep ? SWEEP_META[params.sweep] : null;
+  // A failed request with nothing to show says so, rather than staying a
+  // skeleton or reading as an empty list. A failed background refetch keeps
+  // what is already on screen.
+  const summaryFailed = summaryQuery.isError && summary === undefined;
+  const listFailed = listQuery.isError && listQuery.data === undefined;
 
   return (
     <div className="space-y-6">
@@ -125,7 +134,15 @@ function EnrichmentsPageContent() {
         </p>
       </div>
 
-      <EnrichmentSummaryCards summary={summary} isLoading={summaryQuery.isLoading} />
+      {summaryFailed ? (
+        <LoadFailed
+          message="The enrichment summary could not be loaded."
+          onRetry={() => summaryQuery.refetch()}
+          retrying={summaryQuery.isFetching}
+        />
+      ) : (
+        <EnrichmentSummaryCards summary={summary} isLoading={summaryQuery.isLoading} />
+      )}
 
       <Card>
         <CardHeader>
@@ -135,18 +152,27 @@ function EnrichmentsPageContent() {
           <EnrichmentFilters
             params={params}
             availableSweeps={availableSweeps ?? []}
+            disabled={waitingForSummary}
             onParamsChange={updateParams}
           />
 
           {/* isPending, not isLoading: a list held for the summary is pending
               without fetching, and shows the skeleton rather than "no runs". */}
-          <EnrichmentRunsTable
-            runs={listQuery.data?.data || []}
-            isLoading={listQuery.isPending}
-            onView={handleView}
-            showCaseRunsLink={params.sweep !== undefined}
-            emptyMessage={sweepRows?.empty}
-          />
+          {listFailed ? (
+            <LoadFailed
+              message={`The ${sweepRows?.plural ?? 'enrichment runs'} could not be loaded.`}
+              onRetry={() => listQuery.refetch()}
+              retrying={listQuery.isFetching}
+            />
+          ) : (
+            <EnrichmentRunsTable
+              runs={listQuery.data?.data || []}
+              isLoading={listQuery.isPending}
+              onView={handleView}
+              showCaseRunsLink={params.sweep !== undefined}
+              emptyMessage={sweepRows?.empty}
+            />
+          )}
 
           {listQuery.data?.pagination && (
             <AdminPagination
