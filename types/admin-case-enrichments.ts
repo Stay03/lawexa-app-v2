@@ -10,7 +10,9 @@ export type EnrichmentTrigger = 'ingest' | 'backfill' | 'manual' | 'resume';
 
 /**
  * `partial` ends the RUN, not the case: some parts of the report came back and
- * were written, and the rest wait for a resume.
+ * were written, and the rest stay missing until a later run reads them. The
+ * resume sweep starts those runs, except for a stopped case or one whose report
+ * text changed.
  */
 export type EnrichmentStatus = 'running' | 'completed' | 'partial' | 'failed' | 'skipped';
 
@@ -27,10 +29,9 @@ export type EnrichmentSkipReason =
 
 /**
  * A state of a partial case that the resume sweep does not resume. `stopped`:
- * each of the last 3 attempts recovered no new part over the current report
- * text, and an attempt with no recorded text counts as over it.
- * `text_changed`: the report text changed after the partial run. A case is in
- * one state at most.
+ * each of the last 3 attempts after the partial run read the current report
+ * text or recorded none, and recovered no new part. `text_changed`: the report
+ * text changed after the partial run. A case is in one state at most.
  */
 export type EnrichmentSweep = 'stopped' | 'text_changed';
 
@@ -126,7 +127,12 @@ export interface CaseEnrichmentRun {
   created_at: string;
 }
 
-/** Dashboard aggregate from GET /api/admin/case-enrichments/summary. */
+/**
+ * Dashboard aggregate from GET /api/admin/case-enrichments/summary.
+ *
+ * The three partial counts are optional because the frontend can deploy before
+ * the API that sends them. The screens treat anything but a number as not sent.
+ */
 export interface CaseEnrichmentSummary {
   /** Cases with a full report — the enrichable universe. */
   eligible_cases: number;
@@ -134,23 +140,20 @@ export interface CaseEnrichmentSummary {
   remaining_cases: number;
   /** Distinct cases with >= 1 completed run. */
   enriched_cases: number;
-  /**
-   * Cases whose latest run with an outcome is partial. Optional because the
-   * frontend can deploy before the API that sends it.
-   */
+  /** Cases whose latest run with an outcome is partial. */
   partial_cases?: number;
   /**
    * The part of `partial_cases` the resume sweep no longer retries: each of the
-   * last 3 attempts recovered no new part over the case's current report text,
-   * and an attempt with no recorded text counts as over it. Optional for the
-   * same reason; its presence also says the API accepts `sweep=stopped`.
+   * last 3 attempts after the partial run read the current report text or
+   * recorded none, and recovered no new part. Its presence also says the API
+   * accepts `sweep=stopped`.
    */
   partial_stopped_cases?: number;
   /**
    * The part of `partial_cases` whose partial run read a report text the case
    * no longer holds, which the sweep does not resume. It never overlaps
-   * `partial_stopped_cases`. Optional for the same reason; its presence also
-   * says the API accepts `sweep=text_changed`.
+   * `partial_stopped_cases`. Its presence also says the API accepts
+   * `sweep=text_changed`.
    */
   partial_text_changed_cases?: number;
   /** Lifetime run counts by status. `partial` is optional for the same reason. */

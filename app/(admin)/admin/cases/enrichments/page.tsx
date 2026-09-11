@@ -11,6 +11,7 @@ import { EnrichmentSummaryCards } from '@/components/admin/case-enrichments/Enri
 import { EnrichmentFilters } from '@/components/admin/case-enrichments/EnrichmentFilters';
 import { EnrichmentRunsTable } from '@/components/admin/case-enrichments/EnrichmentRunsTable';
 import { EnrichmentRunDetailDialog } from '@/components/admin/case-enrichments/EnrichmentRunDetailDialog';
+import { isSweep, SWEEP_META, sweepsIn } from '@/components/admin/case-enrichments/sweeps';
 
 import {
   useCaseEnrichments,
@@ -24,24 +25,6 @@ import type {
   EnrichmentTrigger,
 } from '@/types/admin-case-enrichments';
 
-/** The sweep values the API can accept. Anything else in the URL is dropped. */
-const SWEEPS: readonly EnrichmentSweep[] = ['stopped', 'text_changed'];
-
-/** The summary field whose presence says the API accepts that sweep value. */
-const SWEEP_COUNT_FIELD = {
-  stopped: 'partial_stopped_cases',
-  text_changed: 'partial_text_changed_cases',
-} as const satisfies Record<EnrichmentSweep, string>;
-
-/** How a sweep list names its rows, which are cases rather than runs. */
-const SWEEP_ROWS: Record<EnrichmentSweep, { plural: string; empty: string }> = {
-  stopped: { plural: 'stopped cases', empty: 'No stopped cases' },
-  text_changed: { plural: 'changed cases', empty: 'No cases with a changed report' },
-};
-
-const isSweep = (value: string | null): value is EnrichmentSweep =>
-  value !== null && (SWEEPS as readonly string[]).includes(value);
-
 /******************************************************************************
                                 Page Content
 ******************************************************************************/
@@ -53,41 +36,44 @@ function EnrichmentsPageContent() {
   const [selectedRun, setSelectedRun] = useState<CaseEnrichmentRun | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const { data: summaryData, isLoading: summaryLoading } = useCaseEnrichmentSummary();
-  const summary = summaryData?.data;
+  const summaryQuery = useCaseEnrichmentSummary();
+  const summary = summaryQuery.data?.data;
 
-  // The API has a sweep filter when its summary carries that sweep's count.
-  // Null until the summary arrives, when nothing is known yet.
-  const availableSweeps = useMemo<EnrichmentSweep[] | null>(
-    () => (summary ? SWEEPS.filter((sweep) => summary[SWEEP_COUNT_FIELD[sweep]] !== undefined) : null),
-    [summary]
-  );
+  // The sweep filters the API has, from its summary. Null until the summary
+  // request settles; a failed summary counts as an API with none.
+  const availableSweeps = useMemo<EnrichmentSweep[] | null>(() => {
+    if (summary) return sweepsIn(summary);
+    return summaryQuery.isPending ? null : [];
+  }, [summary, summaryQuery.isPending]);
+
+  const sweepParam = searchParams.get('sweep');
+  // A sweep in the URL holds the list until the summary settles. Loading it
+  // earlier would filter by a sweep the page cannot yet show, with its toggle,
+  // note and Clear hidden.
+  const waitingForSummary = isSweep(sweepParam) && availableSweeps === null;
 
   const params = useMemo<CaseEnrichmentsParams>(() => {
     const status = searchParams.get('status') as EnrichmentStatus | null;
     const trigger = searchParams.get('trigger') as EnrichmentTrigger | null;
-    const sweepParam = searchParams.get('sweep');
     const caseIdParam = searchParams.get('case_id');
-    // Kept while the summary is unknown, dropped once it shows the API lacks
-    // it. Any other value would be a 422, so it never leaves the page.
-    const sweep =
-      isSweep(sweepParam) && (availableSweeps === null || availableSweeps.includes(sweepParam))
-        ? sweepParam
-        : undefined;
+    const caseId = caseIdParam !== null && /^[1-9][0-9]*$/.test(caseIdParam) ? Number(caseIdParam) : NaN;
+    // Any sweep the API does not accept is a 422, so it never leaves the page.
+    const sweep = isSweep(sweepParam) && availableSweeps?.includes(sweepParam) ? sweepParam : undefined;
     return {
       page: Number(searchParams.get('page')) || 1,
       per_page: Number(searchParams.get('per_page')) || 15,
       // A sweep list holds partial runs only, so a status beside it could only
-      // empty the list. The status control is disabled while a sweep is on.
+      // empty the list. The status control reads Partial while a sweep is on.
       status: sweep ? undefined : (status ?? undefined),
       trigger: trigger ?? undefined,
       unmapped_outcomes: searchParams.get('unmapped_outcomes') === '1' || undefined,
       sweep,
-      case_id: caseIdParam !== null && /^[1-9][0-9]*$/.test(caseIdParam) ? Number(caseIdParam) : undefined,
+      // "99999999999999999999" passes the pattern and becomes 1e20.
+      case_id: Number.isSafeInteger(caseId) ? caseId : undefined,
     };
-  }, [searchParams, availableSweeps]);
+  }, [searchParams, sweepParam, availableSweeps]);
 
-  const { data, isLoading } = useCaseEnrichments(params);
+  const listQuery = useCaseEnrichments(params, { enabled: !waitingForSummary });
 
   const updateParams = useCallback(
     (updates: Partial<CaseEnrichmentsParams>) => {
@@ -112,7 +98,7 @@ function EnrichmentsPageContent() {
     setDetailOpen(true);
   }, []);
 
-  const sweepRows = params.sweep ? SWEEP_ROWS[params.sweep] : null;
+  const sweepRows = params.sweep ? SWEEP_META[params.sweep] : null;
 
   return (
     <div className="space-y-6">
@@ -126,7 +112,7 @@ function EnrichmentsPageContent() {
         </p>
       </div>
 
-      <EnrichmentSummaryCards summary={summary} isLoading={summaryLoading} />
+      <EnrichmentSummaryCards summary={summary} isLoading={summaryQuery.isLoading} />
 
       <Card>
         <CardHeader>
@@ -139,17 +125,19 @@ function EnrichmentsPageContent() {
             onParamsChange={updateParams}
           />
 
+          {/* isPending, not isLoading: a list held for the summary is pending
+              without fetching, and shows the skeleton rather than "no runs". */}
           <EnrichmentRunsTable
-            runs={data?.data || []}
-            isLoading={isLoading}
+            runs={listQuery.data?.data || []}
+            isLoading={listQuery.isPending}
             onView={handleView}
             showCaseRunsLink={params.sweep !== undefined}
             emptyMessage={sweepRows?.empty}
           />
 
-          {data?.pagination && (
+          {listQuery.data?.pagination && (
             <AdminPagination
-              pagination={data.pagination}
+              pagination={listQuery.data.pagination}
               onPageChange={(page) => updateParams({ page })}
               itemLabel={sweepRows?.plural ?? 'runs'}
             />
@@ -176,12 +164,12 @@ export default function CaseEnrichmentsPage() {
       fallback={
         <div className="space-y-6">
           <Skeleton className="h-16 w-full" />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-[92px] w-full" />
             ))}
           </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 2xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-[92px] w-full" />
             ))}

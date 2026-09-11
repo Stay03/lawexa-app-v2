@@ -61,6 +61,9 @@ function StatCard({
   );
 }
 
+/** A count the API sent, or null for anything else (absent, null, a string). */
+const sentCount = (value: unknown): number | null => (typeof value === 'number' ? value : null);
+
 /**
  * Dashboard header: coverage progress bar + the headline counts.
  * Progress = 1 − remaining/eligible (per the backend contract).
@@ -69,30 +72,32 @@ function StatCard({
  * the covered share includes it. The line says "have structures" rather than
  * "enriched" for that reason, and names the partial count beside it.
  *
- * THE PARTIAL COUNTS SHOW A DASH WHEN THE API DOES NOT SEND THEM. The frontend
+ * THE PARTIAL COUNTS SHOW A DASH UNLESS THE API SENDS A NUMBER. The frontend
  * can deploy before the API that adds them, and a 0 would claim no case is
- * partial, stopped or changed when the API has simply not said.
+ * partial, stopped or changed when the API has simply not said. The page reads
+ * the same fields the same way to decide which sweep toggles exist.
  *
  * TWO GROUPS OF CARDS, EACH SIZED FOR ITS COUNT. Coverage is three cards, three
- * across. What to watch is four: Partial, then the two partial states the sweep
- * does not resume (Stopped, Report changed), then Unmapped outcomes. Seven cards
- * in one three-across grid leave one alone on a row, and four across leaves
- * too little room below 1536 px: measured on 11 Sep 2026, a card at four across
- * has 116 px of text room at 1280 and 156 px at 1440, while "Missing parts · 14
- * partial runs" needs 156 px and "Unmapped outcomes" 138 px. So the watch group
- * is two by two until 2xl.
+ * across from lg. What to watch is four: Partial, then the two partial states
+ * the sweep does not resume (Stopped, Report changed), then Unmapped outcomes.
+ * Seven cards in one three-across grid leave one alone on a row, and four
+ * across leaves too little room below 1536 px: measured on 11 Sep 2026, a card
+ * at four across has 116 px of text room at 1280 and 156 px at 1440, while
+ * "Missing parts · 14 partial runs" needs 156 px and "Unmapped outcomes" 138
+ * px. So the watch group is two across until 2xl. Below lg both groups are two
+ * across, as the cards were before.
  */
 export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummaryCardsProps) {
   if (isLoading || !summary) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-16 w-full" />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-[92px] w-full" />
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 2xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[92px] w-full" />
           ))}
@@ -103,9 +108,9 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
 
   const { eligible_cases, remaining_cases, enriched_cases, runs, unmapped_outcomes } =
     summary;
-  const partialCases = summary.partial_cases ?? null;
-  const stoppedCases = summary.partial_stopped_cases ?? null;
-  const textChangedCases = summary.partial_text_changed_cases ?? null;
+  const partialCases = sentCount(summary.partial_cases);
+  const stoppedCases = sentCount(summary.partial_stopped_cases);
+  const textChangedCases = sentCount(summary.partial_text_changed_cases);
   const partialRuns = runs.partial;
   const coverage =
     eligible_cases > 0
@@ -148,7 +153,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
       </Card>
 
       {/* Coverage counts */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <StatCard
           icon={Database}
           label="Eligible"
@@ -170,7 +175,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
       </div>
 
       {/* What to watch */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 2xl:grid-cols-4">
         <StatCard
           icon={Hourglass}
           label="Partial"
@@ -188,11 +193,14 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           hint="Sweep no longer retries"
           tone={(stoppedCases ?? 0) > 0 ? 'warning' : 'default'}
         />
+        {/* "Report changed after the partial run" needs about 191 px on one
+            line; a card at four across from 1536 px has 180. The label already
+            names the report. */}
         <StatCard
           icon={FileDiff}
           label="Report changed"
           value={textChangedCases}
-          hint="Report changed after the run"
+          hint="Changed after the partial run"
           tone={(textChangedCases ?? 0) > 0 ? 'warning' : 'default'}
         />
         <StatCard

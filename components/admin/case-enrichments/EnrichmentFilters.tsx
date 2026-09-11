@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, CirclePause, FileDiff, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { SWEEP_META } from './sweeps';
 import type {
   CaseEnrichmentsParams,
   EnrichmentStatus,
@@ -20,8 +21,8 @@ import type {
 interface EnrichmentFiltersProps {
   params: CaseEnrichmentsParams;
   /**
-   * The sweep filters the API has, read from its summary. A toggle for one it
-   * lacks would list every run under a sweep's note.
+   * The sweep filters the API has, read from its summary, in display order. A
+   * toggle for one it lacks would list every run under a sweep's note.
    */
   availableSweeps: EnrichmentSweep[];
   onParamsChange: (updates: Partial<CaseEnrichmentsParams>) => void;
@@ -31,39 +32,13 @@ const STATUSES: EnrichmentStatus[] = ['running', 'completed', 'partial', 'failed
 const TRIGGERS: EnrichmentTrigger[] = ['ingest', 'backfill', 'manual', 'resume'];
 const ALL = 'all';
 
-/**
- * The two sweep states a partial case can sit in without the sweep resuming
- * it. They share one URL parameter, so turning one on turns the other off.
- */
-const SWEEP_TOGGLES: {
-  value: EnrichmentSweep;
-  label: string;
-  icon: typeof CirclePause;
-  note: string;
-}[] = [
-  {
-    value: 'stopped',
-    label: 'Stopped',
-    icon: CirclePause,
-    note:
-      'Partial cases the resume sweep no longer retries. Their last 3 attempts read no new part. An attempt that reads a new part, or a change to the report text, ends the stop.',
-  },
-  {
-    value: 'text_changed',
-    label: 'Report changed',
-    icon: FileDiff,
-    note:
-      'Partial cases whose report text changed after their partial run, which the resume sweep does not resume.',
-  },
-];
-
 export function EnrichmentFilters({
   params,
   availableSweeps,
   onParamsChange,
 }: EnrichmentFiltersProps) {
-  const toggles = SWEEP_TOGGLES.filter((toggle) => availableSweeps.includes(toggle.value));
-  const activeSweep = toggles.find((toggle) => toggle.value === params.sweep);
+  const activeSweep =
+    params.sweep && availableSweeps.includes(params.sweep) ? SWEEP_META[params.sweep] : undefined;
   const oneCase = params.case_id !== undefined;
   const hasActiveFilters =
     !!params.status || !!params.trigger || !!params.unmapped_outcomes || !!activeSweep || oneCase;
@@ -71,9 +46,10 @@ export function EnrichmentFilters({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-3">
-        {/* Status. A sweep list holds partial runs only, so it is off while one is on. */}
+        {/* Status. Every row of a sweep list is partial, so while one is on the
+            control reads Partial and cannot be changed. */}
         <Select
-          value={params.status ?? ALL}
+          value={params.sweep ? 'partial' : (params.status ?? ALL)}
           disabled={!!params.sweep}
           onValueChange={(value) =>
             onParamsChange({
@@ -137,27 +113,31 @@ export function EnrichmentFilters({
         </Button>
 
         {/* Sweep states, only those the API has */}
-        {toggles.map((toggle) => {
-          const on = params.sweep === toggle.value;
-          const Icon = toggle.icon;
+        {availableSweeps.map((sweep) => {
+          const meta = SWEEP_META[sweep];
+          const on = params.sweep === sweep;
+          const Icon = meta.icon;
           return (
             <Button
-              key={toggle.value}
+              key={sweep}
               type="button"
               variant={on ? 'default' : 'outline'}
               size="sm"
               className="h-9 gap-1.5"
               aria-pressed={on}
               onClick={() =>
+                // Status is cleared both ways, so a hand-edited ?status= does
+                // not come back when the sweep goes off. Unmapped outcomes is
+                // cleared on the way in, as a sweep list is its own question.
                 onParamsChange(
                   on
-                    ? { sweep: undefined, page: 1 }
-                    : { sweep: toggle.value, status: undefined, page: 1 }
+                    ? { sweep: undefined, status: undefined, page: 1 }
+                    : { sweep, status: undefined, unmapped_outcomes: undefined, page: 1 }
                 )
               }
             >
               <Icon className="h-4 w-4" />
-              {toggle.label}
+              {meta.label}
             </Button>
           );
         })}

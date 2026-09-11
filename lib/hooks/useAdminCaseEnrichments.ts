@@ -24,11 +24,17 @@ export const caseEnrichmentKeys = {
 /**
  * List enrichment runs. While any run is in-flight the list is polled every
  * 30s so status transitions (running → completed/failed) surface on their own.
+ * `enabled: false` holds the request, as the enrichments page does while a
+ * sweep in the URL waits for the summary to say whether the API has it.
  */
-export function useCaseEnrichments(params: CaseEnrichmentsParams = {}) {
+export function useCaseEnrichments(
+  params: CaseEnrichmentsParams = {},
+  options: { enabled?: boolean } = {}
+) {
   return useQuery({
     queryKey: caseEnrichmentKeys.list(params),
     queryFn: () => adminCaseEnrichmentsApi.getEnrichments(params),
+    enabled: options.enabled ?? true,
     staleTime: 15 * 1000,
     refetchInterval: (query) =>
       query.state.data?.data?.some((run) => run.status === 'running')
