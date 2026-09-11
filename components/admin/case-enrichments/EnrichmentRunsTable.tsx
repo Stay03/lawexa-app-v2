@@ -38,6 +38,7 @@ export function summarizeStats(stats: EnrichmentStats | null, status: string): s
   if (status === 'skipped') {
     if (stats.reason === 'already_enriched') return 'Already enriched';
     if (stats.reason === 'no_full_report') return 'No full report';
+    if (stats.reason === 'already_running') return 'Already running';
     return 'Skipped';
   }
   const parts: string[] = [];
@@ -55,14 +56,15 @@ export function summarizeStats(stats: EnrichmentStats | null, status: string): s
 }
 
 /**
- * The result column: how much of the report is still unread, when some is,
- * then what the run wrote. A running run has read nothing yet, so it shows
- * only the dash.
+ * The result column: for a partial run, how much of the report has been read,
+ * then what the run wrote. Only a partial run says it. A failed or running run
+ * has no list of parts read, where "0 of 3 parts read" would look like
+ * progress, and a completed run has read every part.
  */
 function resultSummary(run: CaseEnrichmentRun): string {
   const written = summarizeStats(run.stats, run.status);
-  const progress = run.status === 'running' ? null : partsProgress(run.stats);
-  if (!progress || progress.read >= progress.total) return written;
+  const progress = run.status === 'partial' ? partsProgress(run.stats) : null;
+  if (!progress || progress.read === null || progress.read >= progress.total) return written;
   return `${progress.read} of ${progress.total} parts read · ${written}`;
 }
 

@@ -22,8 +22,12 @@ export function chunkRecord(stats: EnrichmentStats | null): EnrichmentChunks | n
 }
 
 export interface PartsProgress {
-  /** Parts read over this report text so far, across every run on it. */
-  read: number;
+  /**
+   * Parts read over this report text so far, across every run on it. Null
+   * when the record has no list of parts read: a running run, and a failed
+   * run where no part answered, carry a plan and no `done`.
+   */
+  read: number | null;
   total: number;
   missing: number[];
   /** Parts this run asked the model for. */
@@ -40,7 +44,7 @@ export function partsProgress(stats: EnrichmentStats | null): PartsProgress | nu
   const plan = isRecord(record.plan) ? record.plan : null;
   const resumes = plan?.resumes;
   return {
-    read: indexList(record.done).length,
+    read: Array.isArray(record.done) ? indexList(record.done).length : null,
     total: record.total,
     missing: indexList(record.missing),
     requested: indexList(plan?.requested),
@@ -78,4 +82,11 @@ export function withheldText(value: unknown): string {
     return String(value);
   }
   return JSON.stringify(value);
+}
+
+/** A part error's code as text, or null when the service gave none. */
+export function errorCodeText(code: unknown): string | null {
+  if (typeof code === 'number' && Number.isFinite(code)) return String(code);
+  if (typeof code === 'string' && code.trim() !== '') return code.trim();
+  return null;
 }

@@ -14,7 +14,8 @@ export type EnrichmentTrigger = 'ingest' | 'backfill' | 'manual' | 'resume';
  */
 export type EnrichmentStatus = 'running' | 'completed' | 'partial' | 'failed' | 'skipped';
 
-export type EnrichmentSkipReason = 'already_enriched' | 'no_full_report';
+/** `already_running`: another run on the same case was still going. */
+export type EnrichmentSkipReason = 'already_enriched' | 'no_full_report' | 'already_running';
 
 /** Compact case reference embedded on an enrichment run. */
 export interface EnrichmentCaseRef {
@@ -24,10 +25,15 @@ export interface EnrichmentCaseRef {
   slug: string;
 }
 
-/** A part of the report that failed, and why. Part indexes count from 0. */
+/**
+ * A part of the report that failed, and why. Part indexes count from 0. A
+ * failed run can carry these with no list of parts read at all.
+ */
 export interface EnrichmentChunkError {
   chunk: number;
   error: string;
+  /** The AI service's error code when it gave one, else null. */
+  code?: string | number | null;
 }
 
 /** A scalar read from a later part, held until every part before it is read. */

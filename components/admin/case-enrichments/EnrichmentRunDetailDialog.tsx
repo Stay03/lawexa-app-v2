@@ -15,6 +15,7 @@ import { EnrichmentStatusBadge, EnrichmentTriggerBadge } from './EnrichmentBadge
 import { summarizeStats } from './EnrichmentRunsTable';
 import {
   chunkRecord,
+  errorCodeText,
   partErrors,
   partLabel,
   partsProgress,
@@ -100,7 +101,10 @@ export function EnrichmentRunDetailDialog({
                 </div>
               </Row>
             )}
-            {progress && (
+            {/* Only when the API sent the list: a running run, and a failed run
+                where no part answered, have none, and "0 of 3" would look like
+                progress. */}
+            {progress && progress.read !== null && (
               <Row label="Parts read">
                 {progress.read} of {progress.total}
               </Row>
@@ -126,12 +130,16 @@ export function EnrichmentRunDetailDialog({
             {errors.length > 0 && (
               <Row label="Part errors">
                 <ul className="space-y-1.5">
-                  {errors.map((entry, i) => (
-                    <li key={`${entry.chunk}-${i}`} className="whitespace-pre-wrap text-destructive">
-                      <span className="font-medium">{partLabel(entry.chunk)}:</span>{' '}
-                      {String(entry.error)}
-                    </li>
-                  ))}
+                  {errors.map((entry, i) => {
+                    const code = errorCodeText(entry.code);
+                    return (
+                      <li key={`${entry.chunk}-${i}`} className="whitespace-pre-wrap text-destructive">
+                        <span className="font-medium">{partLabel(entry.chunk)}:</span>{' '}
+                        {String(entry.error)}
+                        {code && <span className="text-muted-foreground"> · code {code}</span>}
+                      </li>
+                    );
+                  })}
                 </ul>
               </Row>
             )}
