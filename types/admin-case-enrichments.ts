@@ -1,9 +1,18 @@
 // Admin Case Enrichment monitoring — type definitions
 // Backend: docs/api/case-structures-and-enrichment.md §3 (role:admin)
 
-export type EnrichmentTrigger = 'ingest' | 'backfill' | 'manual';
+/**
+ * What started a run. `resume` is the 30-minute sweep
+ * (`case-enrichments:resume-partial`) asking for the parts a partial run left
+ * missing.
+ */
+export type EnrichmentTrigger = 'ingest' | 'backfill' | 'manual' | 'resume';
 
-export type EnrichmentStatus = 'running' | 'completed' | 'failed' | 'skipped';
+/**
+ * `partial` ends the RUN, not the case: some parts of the report came back and
+ * were written, and the rest wait for a resume.
+ */
+export type EnrichmentStatus = 'running' | 'completed' | 'partial' | 'failed' | 'skipped';
 
 export type EnrichmentSkipReason = 'already_enriched' | 'no_full_report';
 
@@ -13,6 +22,48 @@ export interface EnrichmentCaseRef {
   title: string;
   display_title?: string | null;
   slug: string;
+}
+
+/** A part of the report that failed, and why. Part indexes count from 0. */
+export interface EnrichmentChunkError {
+  chunk: number;
+  error: string;
+}
+
+/** A scalar read from a later part, held until every part before it is read. */
+export interface EnrichmentWithheldScalar {
+  chunk: number;
+  /** Whatever the model read for that field, which is not always a string. */
+  value: unknown;
+}
+
+/**
+ * How a run's report was cut and which parts came back, on runs from the API
+ * deploy that introduced partial runs (September 2026). Part indexes count
+ * from 0. Read it only through `components/admin/case-enrichments/chunks.ts`:
+ * older runs have no record, and a run made by the API's factories can carry
+ * a plain number in its place.
+ */
+export interface EnrichmentChunks {
+  /** Hash of the report text this run read. */
+  report: string;
+  /** Chunk size / overlap / cap, e.g. "40000/2000/20". */
+  geometry: string;
+  extractor: string;
+  /** Parts the report cuts into. */
+  total: number;
+  /** Written before the model call, so a failed or reaped run still has it. */
+  plan?: {
+    requested: number[];
+    /** The partial run this one continues, or null on a first read. */
+    resumes: number | null;
+  };
+  /** Every part read over this report text so far. Absent when none came back. */
+  done?: number[];
+  missing?: number[];
+  errors?: EnrichmentChunkError[];
+  /** Keyed by field name. */
+  withheld?: Record<string, EnrichmentWithheldScalar>;
 }
 
 /**
@@ -26,9 +77,10 @@ export interface EnrichmentStats {
   histories?: number;
   scalars?: string[];
   reason?: EnrichmentSkipReason;
+  chunks?: EnrichmentChunks | number;
 }
 
-/** One enrichment attempt (automatic on upload, backfill command, or manual). */
+/** One enrichment attempt (automatic on upload, backfill command, manual, or resume). */
 export interface CaseEnrichmentRun {
   id: number;
   case: EnrichmentCaseRef | null;
@@ -52,8 +104,13 @@ export interface CaseEnrichmentSummary {
   remaining_cases: number;
   /** Distinct cases with >= 1 completed run. */
   enriched_cases: number;
-  /** Lifetime run counts by status. */
-  runs: Record<EnrichmentStatus, number>;
+  /**
+   * Cases whose latest run with an outcome is partial. Optional because the
+   * frontend can deploy before the API that sends it.
+   */
+  partial_cases?: number;
+  /** Lifetime run counts by status. `partial` is optional for the same reason. */
+  runs: Record<Exclude<EnrichmentStatus, 'partial'>, number> & { partial?: number };
   /** Rows carrying outcome_raw — the outcome-enum extension feed. */
   unmapped_outcomes: number;
 }

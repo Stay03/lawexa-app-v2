@@ -21,8 +21,8 @@ interface EnrichmentFiltersProps {
   onParamsChange: (updates: Partial<CaseEnrichmentsParams>) => void;
 }
 
-const STATUSES: EnrichmentStatus[] = ['running', 'completed', 'failed', 'skipped'];
-const TRIGGERS: EnrichmentTrigger[] = ['ingest', 'backfill', 'manual'];
+const STATUSES: EnrichmentStatus[] = ['running', 'completed', 'partial', 'failed', 'skipped'];
+const TRIGGERS: EnrichmentTrigger[] = ['ingest', 'backfill', 'manual', 'resume'];
 const ALL = 'all';
 
 export function EnrichmentFilters({ params, onParamsChange }: EnrichmentFiltersProps) {

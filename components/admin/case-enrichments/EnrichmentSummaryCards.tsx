@@ -1,6 +1,6 @@
 'use client';
 
-import { Database, ListChecks, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
+import { Database, Hourglass, ListChecks, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -50,16 +50,20 @@ function StatCard({
 }
 
 /**
- * Dashboard header: coverage progress bar + the four headline counts.
+ * Dashboard header: coverage progress bar + the headline counts.
  * Progress = 1 − remaining/eligible (per the backend contract).
+ *
+ * A partial case that already has principles is not in `remaining_cases`, so
+ * the covered share includes it. The line says "have structures" rather than
+ * "enriched" for that reason, and names the partial count beside it.
  */
 export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummaryCardsProps) {
   if (isLoading || !summary) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-16 w-full" />
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+          {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-[92px] w-full" />
           ))}
         </div>
@@ -69,6 +73,8 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
 
   const { eligible_cases, remaining_cases, enriched_cases, runs, unmapped_outcomes } =
     summary;
+  const partialCases = summary.partial_cases ?? 0;
+  const partialRuns = runs.partial;
   const coverage =
     eligible_cases > 0
       ? Math.round(((eligible_cases - remaining_cases) / eligible_cases) * 100)
@@ -100,14 +106,15 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
             {(eligible_cases - remaining_cases).toLocaleString()} of{' '}
-            {eligible_cases.toLocaleString()} eligible cases enriched ·{' '}
+            {eligible_cases.toLocaleString()} eligible cases have structures
+            {partialCases > 0 && ` · ${partialCases.toLocaleString()} partial`} ·{' '}
             {remaining_cases.toLocaleString()} remaining
           </p>
         </CardContent>
       </Card>
 
       {/* Headline counts */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <StatCard
           icon={Database}
           label="Eligible"
@@ -125,6 +132,16 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           label="Enriched"
           value={enriched_cases}
           hint="≥1 completed run"
+        />
+        <StatCard
+          icon={Hourglass}
+          label="Partial"
+          value={partialCases}
+          hint={
+            partialRuns === undefined
+              ? 'Waiting on missing parts'
+              : `Missing parts · ${partialRuns.toLocaleString()} partial run${partialRuns === 1 ? '' : 's'}`
+          }
         />
         <StatCard
           icon={AlertTriangle}

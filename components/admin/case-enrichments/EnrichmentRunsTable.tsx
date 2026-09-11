@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { EnrichmentStatusBadge, EnrichmentTriggerBadge } from './EnrichmentBadges';
+import { partsProgress } from './chunks';
 import type { CaseEnrichmentRun, EnrichmentStats } from '@/types/admin-case-enrichments';
 import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
@@ -32,24 +33,37 @@ interface EnrichmentRunsTableProps {
 
 /** Human summary of what a run wrote, e.g. "3 principles · 2 statutes". */
 export function summarizeStats(stats: EnrichmentStats | null, status: string): string {
-  if (!stats) return '—';
+  // A running run carries only its plan; what it wrote arrives when it ends.
+  if (!stats || status === 'running') return '—';
   if (status === 'skipped') {
     if (stats.reason === 'already_enriched') return 'Already enriched';
     if (stats.reason === 'no_full_report') return 'No full report';
     return 'Skipped';
   }
   const parts: string[] = [];
-  const push = (n: number | undefined, singular: string) => {
-    if (n && n > 0) parts.push(`${n} ${n === 1 ? singular : `${singular}s`}`);
+  const push = (n: number | undefined, singular: string, plural = `${singular}s`) => {
+    if (n && n > 0) parts.push(`${n} ${n === 1 ? singular : plural}`);
   };
   push(stats.principles, 'principle');
   push(stats.citations, 'citation');
   push(stats.statutes, 'statute');
-  push(stats.histories, 'history');
+  push(stats.histories, 'history', 'histories');
   if (stats.scalars && stats.scalars.length > 0) {
     parts.push(`${stats.scalars.length} scalar${stats.scalars.length === 1 ? '' : 's'}`);
   }
   return parts.length > 0 ? parts.join(' · ') : 'Nothing new';
+}
+
+/**
+ * The result column: how much of the report is still unread, when some is,
+ * then what the run wrote. A running run has read nothing yet, so it shows
+ * only the dash.
+ */
+function resultSummary(run: CaseEnrichmentRun): string {
+  const written = summarizeStats(run.stats, run.status);
+  const progress = run.status === 'running' ? null : partsProgress(run.stats);
+  if (!progress || progress.read >= progress.total) return written;
+  return `${progress.read} of ${progress.total} parts read · ${written}`;
 }
 
 export function EnrichmentRunsTable({ runs, isLoading, onView }: EnrichmentRunsTableProps) {
@@ -131,8 +145,9 @@ export function EnrichmentRunsTable({ runs, isLoading, onView }: EnrichmentRunsT
                 <EnrichmentStatusBadge status={run.status} />
               </TableCell>
 
-              {/* Result: stats or error */}
-              <TableCell className="max-w-[320px]">
+              {/* Result: stats or error. It wraps, because a partial run's
+                  summary is longer than the column and would run into Finished. */}
+              <TableCell className="max-w-[320px] whitespace-normal">
                 {run.status === 'failed' && run.error ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -147,7 +162,7 @@ export function EnrichmentRunsTable({ runs, isLoading, onView }: EnrichmentRunsT
                 ) : (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-sm text-muted-foreground">
-                      {summarizeStats(run.stats, run.status)}
+                      {resultSummary(run)}
                     </span>
                     {run.outcome_raw && (
                       <Badge
