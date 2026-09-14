@@ -11,13 +11,23 @@ import type { JobUserRef } from '@/lib/utils/observability';
  * a duplicate row has no start and no run to watch: the decision was made
  * before the work was queued. Reading it as a failure would have somebody
  * retrying it, and retrying is exactly the thing it exists to prevent.
+ *
+ * `not_found` is terminal and it is not a failure either: the provider was
+ * asked and does not have that judgment. Retrying buys the same answer again.
+ *
+ * Measured 14 September 2026: the API validates `status` against its own enum,
+ * so `?status=not_found` has always worked; this list is the screen's filter
+ * and it is the only thing that ever omitted the value. The summary endpoint
+ * hand-wrote five buckets and left not_found uncounted until that same day,
+ * which is why 18 rows existed with no count to find them by.
  */
 export type CaseIngestionStatus =
   | 'pending'
   | 'running'
   | 'completed'
   | 'failed'
-  | 'duplicate';
+  | 'duplicate'
+  | 'not_found';
 
 export const CASE_INGESTION_STATUSES: CaseIngestionStatus[] = [
   'pending',
@@ -25,6 +35,7 @@ export const CASE_INGESTION_STATUSES: CaseIngestionStatus[] = [
   'completed',
   'failed',
   'duplicate',
+  'not_found',
 ];
 
 /**
