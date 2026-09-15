@@ -20,6 +20,7 @@ export { AiProvidersTable } from './ai/AiProvidersTable';
 export { AiProviderFormDialog } from './ai/AiProviderFormDialog';
 export { AiProviderDeleteDialog } from './ai/AiProviderDeleteDialog';
 export { AiProviderTestButton } from './ai/AiProviderTestButton';
+export { AiProviderLimitsCard } from './ai/AiProviderLimitsCard';
 export { AdminNavConversationsSection } from './admin-nav-conversations';
 export { AnalyticsPeriodSelector } from './analytics/AnalyticsPeriodSelector';
 export { AnalyticsStatCards } from './analytics/AnalyticsStatCards';

@@ -145,6 +145,18 @@ export function useTestAiProvider() {
   });
 }
 
+/**
+ * Hook for reading a provider's account limits on demand.
+ *
+ * A mutation rather than a query because every call spends a request at the
+ * vendor. Nobody wants that refetching on window focus.
+ */
+export function useCheckAiProviderLimits() {
+  return useMutation({
+    mutationFn: (id: number) => adminAiApi.getProviderLimits(id),
+  });
+}
+
 // ============================================
 // Model Hooks
 // ============================================

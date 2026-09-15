@@ -88,6 +88,68 @@ export interface AdminAiTestProviderResponse {
 }
 
 // ============================================
+// Provider account limits
+// ============================================
+
+/**
+ * A provider that publishes no account limits. Only OpenRouter does, and the
+ * API says so without calling anyone rather than reporting another provider's
+ * 404 as a failure of ours.
+ */
+export interface AdminAiProviderLimitsUnsupported {
+  supported: false;
+}
+
+/** The limits read did not come back. */
+export interface AdminAiProviderLimitsFailure {
+  supported: true;
+  success: false;
+  /**
+   * The status the provider answered with. ABSENT when the request threw
+   * before any response arrived, which is a different failure from a refusal
+   * and has to read differently.
+   */
+  status?: number;
+  error?: string;
+  response_time_ms?: number;
+}
+
+/** What the provider says is on the key. */
+export interface AdminAiProviderLimitsReading {
+  supported: true;
+  success: true;
+  response_time_ms?: number;
+  label?: string | null;
+  is_free_tier?: boolean | null;
+  /** The cap on the key. NULL MEANS NO CAP, which is the opposite of 0. */
+  limit?: number | null;
+  /** What is left of `limit`. Null alongside a null limit. */
+  limit_remaining?: number | null;
+  /**
+   * When the cap refills. Typed `unknown` on purpose: the API passes this
+   * field through from the vendor untouched, and no live response has been
+   * read yet, so the only verified shape is the ISO string in the API's own
+   * test fixture. Narrow it at the render site rather than trusting it here.
+   */
+  limit_reset?: unknown;
+  usage?: number | null;
+  usage_daily?: number | null;
+  usage_weekly?: number | null;
+  usage_monthly?: number | null;
+}
+
+export type AdminAiProviderLimits =
+  | AdminAiProviderLimitsUnsupported
+  | AdminAiProviderLimitsFailure
+  | AdminAiProviderLimitsReading;
+
+export interface AdminAiProviderLimitsResponse {
+  success: boolean;
+  message: string;
+  data: AdminAiProviderLimits;
+}
+
+// ============================================
 // AI Models
 // ============================================
 

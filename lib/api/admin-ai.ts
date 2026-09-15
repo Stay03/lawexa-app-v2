@@ -6,6 +6,7 @@ import type {
   AdminAiCreateProviderData,
   AdminAiUpdateProviderData,
   AdminAiTestProviderResponse,
+  AdminAiProviderLimitsResponse,
   AdminAiMutationResponse,
   AdminAiProvider,
   AdminAiProviderDetail,
@@ -123,6 +124,19 @@ export const adminAiApi = {
   ): Promise<AdminAiTestProviderResponse> => {
     const response = await apiClient.post<AdminAiTestProviderResponse>(
       `/admin/ai-providers/${id}/test`
+    );
+    return response.data;
+  },
+
+  /**
+   * Read what the provider says is left on the account key. Superadmin only:
+   * an admin gets a 403 from this route even though the rest of the page works.
+   */
+  getProviderLimits: async (
+    id: number
+  ): Promise<AdminAiProviderLimitsResponse> => {
+    const response = await apiClient.get<AdminAiProviderLimitsResponse>(
+      `/admin/ai-providers/${id}/limits`
     );
     return response.data;
   },

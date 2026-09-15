@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils';
 import { useAdminAiProvider } from '@/lib/hooks/useAdminAi';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { AiProviderTestButton } from '@/components/admin/ai/AiProviderTestButton';
+import { AiProviderLimitsCard } from '@/components/admin/ai/AiProviderLimitsCard';
 import { AiProviderFormDialog } from '@/components/admin/ai/AiProviderFormDialog';
 import { AiProviderDeleteDialog } from '@/components/admin/ai/AiProviderDeleteDialog';
 import type { AdminAiProvider } from '@/types/admin-ai';
@@ -219,6 +220,9 @@ export default function AiProviderDetailPage({
           </div>
         </CardContent>
       </Card>
+
+      {/* Account Limits Card */}
+      <AiProviderLimitsCard providerId={provider.id} />
 
       {/* Models Card */}
       <Card>
