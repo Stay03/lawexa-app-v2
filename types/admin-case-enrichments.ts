@@ -44,6 +44,40 @@ export interface EnrichmentCaseRef {
 }
 
 /**
+ * What the AI service said under a part's failure. Every field is optional:
+ * runs from before the API carried it have `error` and nothing else.
+ *
+ * Measured on every enrichment run the admin API held, 15 September 2026:
+ * 95 failed runs that day carry `code` 'schema_violation' (90), 'rate_limited'
+ * (4) or 'retry_deadline' (1). `retryable` is false on a schema violation and
+ * true on a rate limit, which is the distinction no screen was drawing.
+ */
+export interface EnrichmentChunkErrorDetails {
+  code?: string;
+  message?: string;
+  retryable?: boolean;
+  last_error_code?: string;
+  details?: {
+    /**
+     * The model's answer, cut to 405 characters: 200 of the opening, a marker,
+     * then 200 of the ending. The AI service truncates it before the API's own
+     * trimmer does, so the whole answer is not stored anywhere. Do not measure
+     * its length or count its brackets: both describe the cut, not the model.
+     */
+    raw_output?: string;
+    raw_output_first_attempt?: string;
+    /**
+     * What the validator said, untruncated. On 8-15 September every recorded
+     * entry was a JSON parse error carrying the character the answer stopped
+     * at (98 of 98), and none complained about a field or a type.
+     */
+    validation_errors?: string[];
+    upstream_code?: string;
+    upstream_details?: unknown;
+  };
+}
+
+/**
  * A part of the report that failed, and why. Part indexes count from 0. A
  * failed run can carry these with no list of parts read at all.
  */
@@ -55,6 +89,7 @@ export interface EnrichmentChunkError {
    * "connection_error", or null. The API sends a string or null.
    */
   code?: string | null;
+  details?: EnrichmentChunkErrorDetails;
 }
 
 /** A scalar read from a later part, held until every part before it is read. */

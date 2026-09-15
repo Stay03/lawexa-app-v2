@@ -15,20 +15,98 @@ import { EnrichmentStatusBadge, EnrichmentTriggerBadge } from './EnrichmentBadge
 import { summarizeStats } from './EnrichmentRunsTable';
 import {
   chunkRecord,
-  errorCodeText,
   partErrors,
+  partFailure,
   partLabel,
   partsProgress,
   withheldScalars,
   withheldText,
 } from './chunks';
-import type { CaseEnrichmentRun, EnrichmentStats } from '@/types/admin-case-enrichments';
+import type {
+  CaseEnrichmentRun,
+  EnrichmentChunkError,
+  EnrichmentStats,
+} from '@/types/admin-case-enrichments';
 import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 
 interface EnrichmentRunDetailDialogProps {
   run: CaseEnrichmentRun | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+/**
+ * One failed part, with what the AI service said underneath it.
+ *
+ * The top line alone ("Model output did not conform to response_schema after 1
+ * retry") sent three people looking for a schema problem on 15 September 2026.
+ * The answer was in `validation_errors` on the same object: the reads are cut
+ * off mid-JSON, and the validator names the character it stopped at.
+ */
+function PartErrorItem({ entry }: { entry: EnrichmentChunkError }) {
+  const failure = partFailure(entry);
+
+  return (
+    <li className="min-w-0 space-y-1.5">
+      <p className="whitespace-pre-wrap text-destructive">
+        <span className="font-medium">{partLabel(entry.chunk)}:</span> {String(entry.error)}
+      </p>
+      {failure && (
+        <div className="min-w-0 space-y-1.5 rounded-md border bg-muted/40 p-2">
+          {failure.cutAt !== null && (
+            <p>The answer stopped after {failure.cutAt.toLocaleString()} characters.</p>
+          )}
+          {(failure.code || failure.upstreamCode || failure.retryable !== null) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {failure.code && (
+                <Badge variant="outline" className="font-mono text-xs font-normal">
+                  {failure.code}
+                </Badge>
+              )}
+              {failure.upstreamCode && (
+                <Badge variant="outline" className="font-mono text-xs font-normal">
+                  {failure.upstreamCode}
+                </Badge>
+              )}
+              {failure.retryable !== null && (
+                <span className="text-xs text-muted-foreground">
+                  {failure.retryable
+                    ? 'The service marked this retryable'
+                    : 'The service marked this not retryable'}
+                </span>
+              )}
+            </div>
+          )}
+          {failure.validatorLines.length > 0 && (
+            <ul className="space-y-0.5">
+              {failure.validatorLines.map((line, index) => (
+                <li
+                  key={`${index}-${line}`}
+                  className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground"
+                >
+                  {line}
+                </li>
+              ))}
+            </ul>
+          )}
+          {failure.sample && (
+            <details className="min-w-0">
+              <summary className="cursor-pointer text-xs text-muted-foreground">
+                The opening and the ending of the answer
+              </summary>
+              <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-background p-2 font-mono text-xs">
+                {failure.sample}
+              </pre>
+              <p className="mt-1 text-xs text-muted-foreground">
+                405 characters of it. The AI service cuts the answer before we store it, so the
+                whole thing is kept nowhere.
+              </p>
+            </details>
+          )}
+        </div>
+      )}
+    </li>
+  );
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -148,17 +226,10 @@ export function EnrichmentRunDetailDialog({
             )}
             {errors.length > 0 && (
               <Row label="Part errors">
-                <ul className="space-y-1.5">
-                  {errors.map((entry, i) => {
-                    const code = errorCodeText(entry.code);
-                    return (
-                      <li key={`${entry.chunk}-${i}`} className="whitespace-pre-wrap text-destructive">
-                        <span className="font-medium">{partLabel(entry.chunk)}:</span>{' '}
-                        {String(entry.error)}
-                        {code && <span className="text-muted-foreground"> · code {code}</span>}
-                      </li>
-                    );
-                  })}
+                <ul className="min-w-0 space-y-3">
+                  {errors.map((entry, i) => (
+                    <PartErrorItem key={`${entry.chunk}-${i}`} entry={entry} />
+                  ))}
                 </ul>
               </Row>
             )}

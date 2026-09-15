@@ -4,6 +4,7 @@
 
 import type {
   EnrichmentChunkError,
+  EnrichmentChunkErrorDetails,
   EnrichmentChunks,
   EnrichmentStats,
   EnrichmentWithheldScalar,
@@ -61,6 +62,81 @@ export function partErrors(record: EnrichmentChunks): EnrichmentChunkError[] {
   );
 }
 
+/** What the AI service said under one part's failure, in a shape a screen can draw. */
+export interface PartFailure {
+  /** 'schema_violation', 'rate_limited', 'retry_deadline', or null on an old run. */
+  code: string | null;
+  retryable: boolean | null;
+  /**
+   * Where the model's answer stopped, in characters, when the validator named
+   * the position. Null when it did not, which is not the same as "not cut".
+   */
+  cutAt: number | null;
+  /** The validator's own lines, untruncated, in the order it wrote them. */
+  validatorLines: string[];
+  /** The stored 405-character sample of the answer, opening and ending. */
+  sample: string | null;
+  firstAttemptSample: string | null;
+  upstreamCode: string | null;
+}
+
+const textList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+
+const text = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+
+/* The validator writes the character it stopped at into its own sentence, e.g.
+   "JSON parse error: Unterminated string starting at at pos 28795". That number
+   is the only untruncated evidence of how long the answer was, because both the
+   AI service and the API trim the answer itself. */
+const CUT_POSITION = /pos (\d+)/;
+
+function cutPosition(lines: string[]): number | null {
+  for (const line of lines) {
+    const found = CUT_POSITION.exec(line);
+    if (found) return Number(found[1]);
+  }
+  return null;
+}
+
+/**
+ * The detail under a part error, or null when the run carries none. Runs made
+ * before the API sent this have `error` alone and must still read cleanly.
+ */
+export function partFailure(entry: EnrichmentChunkError): PartFailure | null {
+  const outer: EnrichmentChunkErrorDetails | null = isRecord(entry.details)
+    ? (entry.details as EnrichmentChunkErrorDetails)
+    : null;
+  const inner = isRecord(outer?.details) ? outer.details : null;
+  const code = text(outer?.code) ?? text(entry.code);
+  const validatorLines = textList(inner?.validation_errors);
+  const sample = text(inner?.raw_output);
+  const firstAttemptSample = text(inner?.raw_output_first_attempt);
+  const upstreamCode = text(inner?.upstream_code);
+  const retryable = typeof outer?.retryable === 'boolean' ? outer.retryable : null;
+
+  if (
+    code === null &&
+    retryable === null &&
+    validatorLines.length === 0 &&
+    sample === null &&
+    firstAttemptSample === null &&
+    upstreamCode === null
+  ) {
+    return null;
+  }
+
+  return {
+    code,
+    retryable,
+    cutAt: cutPosition(validatorLines),
+    validatorLines,
+    sample,
+    firstAttemptSample,
+    upstreamCode,
+  };
+}
+
 /** Held scalars as [field, held] pairs, in the order the API sent them. */
 export function withheldScalars(record: EnrichmentChunks): [string, EnrichmentWithheldScalar][] {
   if (!isRecord(record.withheld)) return [];
@@ -82,11 +158,4 @@ export function withheldText(value: unknown): string {
     return String(value);
   }
   return JSON.stringify(value);
-}
-
-/** A part error's code as text, or null when the service gave none. */
-export function errorCodeText(code: unknown): string | null {
-  if (typeof code === 'number' && Number.isFinite(code)) return String(code);
-  if (typeof code === 'string' && code.trim() !== '') return code.trim();
-  return null;
 }
