@@ -264,7 +264,7 @@ export function AiProviderLimitsCard({ providerId }: AiProviderLimitsCardProps) 
               Account limits
             </CardTitle>
             <CardDescription>
-              What the provider says is left on this key. Superadmin only.
+              What the provider says is left on this key.
             </CardDescription>
           </div>
           <Button
@@ -294,8 +294,8 @@ export function AiProviderLimitsCard({ providerId }: AiProviderLimitsCardProps) 
 
         {!limits.isPending && failed && (
           <p className="text-destructive">
-            The request did not get through. An admin who is not a superadmin gets
-            turned away here.
+            The request did not get through. If it keeps failing, reload the page:
+            a session that has lapsed fails here the same way.
           </p>
         )}
 

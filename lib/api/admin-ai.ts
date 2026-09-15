@@ -129,8 +129,12 @@ export const adminAiApi = {
   },
 
   /**
-   * Read what the provider says is left on the account key. Superadmin only:
-   * an admin gets a 403 from this route even though the rest of the page works.
+   * Read what the provider says is left on the account key.
+   *
+   * Superadmin, but so is every other route under the admin/ai-providers
+   * prefix, including the list and the detail this card sits on. A role 403
+   * here implies a role 403 on the whole page, so nobody reaches this card
+   * and then fails on permissions alone.
    */
   getProviderLimits: async (
     id: number
