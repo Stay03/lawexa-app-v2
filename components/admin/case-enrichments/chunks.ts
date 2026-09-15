@@ -72,6 +72,14 @@ export interface PartFailure {
    * the position. Null when it did not, which is not the same as "not cut".
    */
   cutAt: number | null;
+  /**
+   * What the validator's complaint means. An unterminated string is an answer
+   * that stopped inside a value, which is a cut; any other parse failure says
+   * only that the JSON would not parse. Null when it said nothing.
+   *
+   * Of today's 92 validator lines, 81 name an unterminated string.
+   */
+  cutKind: 'truncated' | 'unparsable' | null;
   /** The validator's own lines, untruncated, in the order it wrote them. */
   validatorLines: string[];
   /** The stored 405-character sample of the answer, opening and ending. */
@@ -91,11 +99,21 @@ const text = (value: unknown): string | null => (typeof value === 'string' ? val
    AI service and the API trim the answer itself. */
 const CUT_POSITION = /pos (\d+)/;
 
+/** An answer that stops inside a string value was cut; the rest only failed to parse. */
+const TRUNCATED = /unterminated/i;
+const PARSE_FAILURE = /json parse error|expecting/i;
+
 function cutPosition(lines: string[]): number | null {
   for (const line of lines) {
     const found = CUT_POSITION.exec(line);
     if (found) return Number(found[1]);
   }
+  return null;
+}
+
+function cutKind(lines: string[]): PartFailure['cutKind'] {
+  if (lines.some((line) => TRUNCATED.test(line))) return 'truncated';
+  if (lines.some((line) => PARSE_FAILURE.test(line))) return 'unparsable';
   return null;
 }
 
@@ -130,6 +148,7 @@ export function partFailure(entry: EnrichmentChunkError): PartFailure | null {
     code,
     retryable,
     cutAt: cutPosition(validatorLines),
+    cutKind: cutKind(validatorLines),
     validatorLines,
     sample,
     firstAttemptSample,

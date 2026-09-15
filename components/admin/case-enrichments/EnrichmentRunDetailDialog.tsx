@@ -45,16 +45,32 @@ interface EnrichmentRunDetailDialogProps {
  */
 function PartErrorItem({ entry }: { entry: EnrichmentChunkError }) {
   const failure = partFailure(entry);
+  /* The service's own sentence names a schema, and no schema failed: every
+     validator line is a parse error. Lead with what the validator measured and
+     keep the service's wording underneath, where it is evidence rather than a
+     diagnosis. When the validator said nothing, the service's sentence is all
+     there is and it leads. */
+  const cutAt = failure?.cutAt ?? null;
+  const headline =
+    cutAt === null
+      ? null
+      : failure?.cutKind === 'truncated'
+        ? `the answer was cut off after ${cutAt.toLocaleString()} characters`
+        : `the answer would not parse, at character ${cutAt.toLocaleString()}`;
 
   return (
     <li className="min-w-0 space-y-1.5">
       <p className="whitespace-pre-wrap text-destructive">
-        <span className="font-medium">{partLabel(entry.chunk)}:</span> {String(entry.error)}
+        <span className="font-medium">{partLabel(entry.chunk)}:</span>{' '}
+        {headline ?? String(entry.error)}
       </p>
       {failure && (
         <div className="min-w-0 space-y-1.5 rounded-md border bg-muted/40 p-2">
-          {failure.cutAt !== null && (
-            <p>The answer stopped after {failure.cutAt.toLocaleString()} characters.</p>
+          {headline && (
+            <p className="text-muted-foreground">
+              The service reported:{' '}
+              <span className="text-foreground">{String(entry.error)}</span>
+            </p>
           )}
           {(failure.code || failure.upstreamCode || failure.retryable !== null) && (
             <div className="flex flex-wrap items-center gap-1.5">
