@@ -43,6 +43,20 @@ function count(value: number | null | undefined): string {
 }
 
 /**
+ * The same figure as money. Every number on this card is US DOLLARS: the cap,
+ * what is left of it, and all four usage totals.
+ *
+ * It was printed bare until 16 September 2026 because the unit was unverified
+ * and a wrong currency reads as fact. Stay confirmed it that morning against
+ * OpenRouter's own account page, so the symbol is now a measured thing rather
+ * than an assumption.
+ */
+function money(value: number | null | undefined): string {
+  if (typeof value !== 'number') return '—';
+  return `$${count(value)}`;
+}
+
+/**
  * `limit_reset` as an instant, when it is one.
  *
  * The API passes this field through from the vendor untouched and no live
@@ -181,9 +195,9 @@ function Reading({ data }: { data: AdminAiProviderLimitsReading }) {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p>
               <span className="text-lg font-medium tabular-nums">
-                {count(remaining)}
+                {money(remaining)}
               </span>
-              <span className="text-muted-foreground"> left of {count(cap)}</span>
+              <span className="text-muted-foreground"> left of {money(cap)}</span>
             </p>
             <p className="text-sm">
               <ResetLine value={data.limit_reset} />
@@ -201,10 +215,10 @@ function Reading({ data }: { data: AdminAiProviderLimitsReading }) {
       )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Figure label="Used, all time" value={count(data.usage)} />
-        <Figure label="Today" value={count(data.usage_daily)} />
-        <Figure label="This week" value={count(data.usage_weekly)} />
-        <Figure label="This month" value={count(data.usage_monthly)} />
+        <Figure label="Used, all time" value={money(data.usage)} />
+        <Figure label="Today" value={money(data.usage_daily)} />
+        <Figure label="This week" value={money(data.usage_weekly)} />
+        <Figure label="This month" value={money(data.usage_monthly)} />
       </div>
 
       <p className="text-xs text-muted-foreground">
