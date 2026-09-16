@@ -78,9 +78,11 @@ function ResetLine({ value }: { value: unknown }) {
         </span>
       );
     }
+    // "Resets at daily" is what "Resets at {raw}" produces when the vendor
+    // sends a word rather than a timestamp. A colon reads correctly for both.
     return (
       <span>
-        Resets at <span className="font-mono text-xs">{raw}</span>
+        Resets: <span className="font-mono text-xs">{raw}</span>
       </span>
     );
   }
