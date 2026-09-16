@@ -17,6 +17,7 @@ import {
 import { ingestionStatusMeta } from './ingestion-status';
 import { sourceFormatLabel, isProviderFetch } from './source-format';
 import { duplicateRefs } from './duplicates';
+import { ingestionFailure } from './failure';
 import type { CaseIngestion } from '@/types/admin-case-ingestions';
 
 /* ONE "Source" COLUMN RATHER THAN TWO NEW ONES.
@@ -135,7 +136,12 @@ export function CaseIngestionsTable({
               </div>
             ) : job.status === 'failed' ? (
               <div className="flex items-center gap-1.5">
-                {job.status_code != null && (
+                {/* The badge reads as an upstream status. On 55 of 95 failed
+                    rows the code is 500, which no upstream returned: the job
+                    was killed at its time limit, or the worker died, or MySQL
+                    broke a deadlock. Showing it there says the opposite of what
+                    happened, on the row a reader sees first. */}
+                {ingestionFailure(job).statusIsHttp && job.status_code != null && (
                   <Badge variant="outline" className="font-mono text-[10px]">
                     {job.status_code}
                   </Badge>

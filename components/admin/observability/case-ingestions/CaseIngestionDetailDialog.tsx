@@ -15,6 +15,7 @@ import { StatusBadge } from '@/components/admin/observability';
 import { ingestionStatusMeta } from './ingestion-status';
 import { sourceFormatLabel, isProviderFetch } from './source-format';
 import { duplicateRefs, duplicateSignalLabel } from './duplicates';
+import { ingestionFailure } from './failure';
 import { extractedSummary, rowComparisons } from './extracted';
 import { useCase } from '@/lib/hooks/useAdminCases';
 import type { CaseDuplicateRef, CaseIngestion } from '@/types/admin-case-ingestions';
@@ -201,18 +202,23 @@ export function CaseIngestionDetailDialog({
                 </Link>
               </Row>
             )}
-            {ingestion.status === 'failed' && (
-              <Row label="Error">
-                <div className="space-y-1">
-                  {ingestion.status_code != null && (
-                    <Badge variant="outline" className="font-mono text-[10px]">
-                      HTTP {ingestion.status_code}
-                    </Badge>
-                  )}
-                  <p className="whitespace-pre-wrap text-destructive">{ingestion.error}</p>
-                </div>
-              </Row>
-            )}
+            {ingestion.status === 'failed' &&
+              (() => {
+                const failure = ingestionFailure(ingestion);
+                return (
+                  <Row label="Error">
+                    <div className="space-y-1">
+                      {failure.statusIsHttp && ingestion.status_code != null && (
+                        <Badge variant="outline" className="font-mono text-[10px]">
+                          HTTP {ingestion.status_code}
+                        </Badge>
+                      )}
+                      {failure.headline && <p className="font-medium">{failure.headline}</p>}
+                      <p className="whitespace-pre-wrap text-destructive">{ingestion.error}</p>
+                    </div>
+                  </Row>
+                );
+              })()}
             {!isProviderFetch(ingestion.source_format) && (
               <Row label="Storage path">
                 <span className="font-mono text-xs">{ingestion.report_file_path ?? '—'}</span>
