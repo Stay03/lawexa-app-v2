@@ -22,9 +22,24 @@ interface AiProviderLimitsCardProps {
   providerId: number;
 }
 
-/** A count as people read it, or an em dash when the provider sent nothing. */
+/**
+ * A figure as people read it, or an em dash when the provider sent nothing.
+ *
+ * The live key returns usage to NINE decimal places and not always the same
+ * number of them: 1028.629850302 beside 22.5583582. `toLocaleString()` defaults
+ * to at most three fraction digits with no minimum, so those rendered as
+ * "1,028.63" and "22.558" in one row of four, which reads as a broken screen.
+ *
+ * Fixing that with a flat two decimals would break the other caller: `limit`
+ * and `limit_remaining` are whole numbers when a cap exists, and "1,000.00"
+ * left of "240.00" is wrong in the other direction. So the rule is per value —
+ * whole numbers stay whole, fractions settle at two.
+ */
 function count(value: number | null | undefined): string {
-  return typeof value === 'number' ? value.toLocaleString() : '—';
+  if (typeof value !== 'number') return '—';
+  return Number.isInteger(value)
+    ? value.toLocaleString()
+    : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /**
