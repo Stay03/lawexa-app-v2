@@ -670,6 +670,26 @@ export interface Message {
    * mislabelled as Lawexa.
    */
   is_ai: boolean;
+  /**
+   * How `content` should be drawn. MEASURED ON PRODUCTION 17 Sep 2026 over 30
+   * messages: present on every one, never absent, only ever `'plain'` or
+   * `'markdown'`.
+   *
+   * NOTHING RENDERS FROM THIS FIELD. Every channel message is drawn as
+   * markdown, for every reader and every writer, so the feed never consults it.
+   * It is kept as a record of what the server sends and because an explicit
+   * opt-OUT, if one is ever wanted, belongs here.
+   *
+   * WHY IT CANNOT DRIVE THE RENDERER TODAY. Human messages all carry `'plain'`,
+   * and so do Lawexa's own replies while `is_ai` is true (the backend team read
+   * all three write paths that produce them). Honouring the field would
+   * therefore have drawn markdown for nobody, and treating `'plain'` as an
+   * opt-out would have switched it off for the assistant, which has drawn
+   * markdown in every channel since August.
+   *
+   * Optional on the type because older clients and older payloads predate it.
+   */
+  body_format?: 'plain' | 'markdown';
   /** Null for Lawexa (`is_ai: true`) OR a hard-deleted human (`is_ai: false`). */
   author: SlimUser | null;
   content: string;

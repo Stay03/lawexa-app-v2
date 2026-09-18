@@ -20,7 +20,6 @@ import type { Message } from '@/types/collab';
 
 import { LawexaMessageContent } from './LawexaMessageContent';
 import { MessageAttachmentList } from './MessageAttachmentList';
-import { MessageContent } from './MessageContent';
 
 interface MessageRowProps {
   message: Message;
@@ -136,16 +135,50 @@ export function MessageRow({
       {/* A message sent from v2 can be nothing but files (backend,
           2026-08-05), and `content` is then `""` — which the text renderer
           would turn into a blank line of body height above them. */}
-      {message.content !== '' &&
-        (message.is_ai ? (
-          <LawexaMessageContent
-            content={message.content}
-            metadata={message.metadata}
-            animateReveal={animateReveal}
-          />
-        ) : (
-          <MessageContent content={message.content} metadata={message.metadata} />
-        ))}
+      {/* MARKDOWN FOR EVERY MESSAGE, FROM ANYONE. Slack and Discord both render
+          their markdown for every writer with no special group, and the owner
+          asked for the same here: "if i paste a markdown text it shows as
+          normal text because im not part of the special group. i dont think
+          thats a good fix."
+
+          THE OBJECTION THAT JUSTIFIED THE TWO-TIER VERSION WAS WRONG. The worry
+          was that somebody typing an asterisk would see their words rewritten.
+          Measured against this tree's own pipeline (remark-gfm + remark-breaks)
+          on 18 Sep 2026:
+
+            3 * 4 * 5        unchanged, spaced markers stay literal
+            a_variable_name  unchanged, underscores inside a word do not emphasise
+            *maybe           unchanged, an unpaired marker stays a marker
+            CA/J/28/95       unchanged
+            #3 on the list   unchanged, a heading needs a space after the hash
+            > quoted         becomes a blockquote
+            1. / 2. lines    become a list
+            bare URL         becomes a link
+
+          Unbalanced and badly spaced markers rendering literally IS the escape
+          mechanism, and it is what both of those products rely on.
+
+          WHAT IT COSTS, and this part is real: runs of spaces collapse, because
+          the prose container leaves `white-space` at its default. A
+          space-aligned table loses its columns unless it is fenced in ``` or
+          indented four spaces, either of which becomes a code block and keeps
+          every space. Line breaks survive regardless — remark-breaks turns each
+          newline into a hard break, checked on the parsed tree rather than
+          assumed.
+
+          `body_format` NO LONGER DECIDES ANYTHING HERE. Every message carries
+          it and human messages all carry `'plain'` (measured over 30 messages,
+          17 Sep), so honouring it would have meant markdown for nobody but the
+          assistant. It stays on the type as a record of what the server sends.
+          `is_ai` survives only for the reveal animation, which belongs to a
+          just-arrived Lawexa reply and to nothing else. */}
+      {message.content !== '' && (
+        <LawexaMessageContent
+          content={message.content}
+          metadata={message.metadata}
+          animateReveal={animateReveal}
+        />
+      )}
       {/* AND IT CAN END UP WITH NEITHER. Delete the only attachment of a
           file-only message and the server keeps the message, serving it back
           with `content: ""` and `attachments: []` — measured on production,

@@ -46,7 +46,6 @@ import { InlineReplies } from './InlineReplies';
 import { LawexaMessageContent } from './LawexaMessageContent';
 import { MESSAGE_MEASURE } from './measure';
 import { MessageAttachments } from './MessageAttachments';
-import { MessageContent } from './MessageContent';
 import { ReactionChips, ReactionTrayPopover } from './reactions';
 import { useLongPress } from './use-long-press';
 import { LawexaMark } from '../ui/avatars';
@@ -408,19 +407,26 @@ export const MessageRow = memo(function MessageRow({
             would hand the reader something to undo before they could use it. */}
         {hasText && (
           <div data-message-body>
-            {message.is_ai ? (
-              <LawexaMessageContent
-                content={message.content}
-                metadata={message.metadata}
-                viewerUuid={viewerUuid}
-              />
-            ) : (
-              <MessageContent
-                content={message.content}
-                metadata={message.metadata}
-                viewerUuid={viewerUuid}
-              />
-            )}
+            {/* MARKDOWN FOR EVERY MESSAGE, FROM ANYONE, exactly as the live
+                site does it. The reasoning, the measurements behind it and the
+                one real cost are written out once in the v1 twin,
+                `components/collab/MessageRow.tsx`. The short version: spaced
+                and unpaired markers render literally, which is the escape
+                mechanism Slack and Discord rely on; runs of spaces collapse, so
+                an aligned table needs a ``` fence to keep its columns; line
+                breaks survive through remark-breaks.
+
+                `body_format` decides nothing here. Human messages all carry
+                `'plain'`, so honouring it would have meant markdown for nobody
+                but the assistant.
+
+                THE TWO TREES MUST CHANGE TOGETHER. v2 may not import from v1,
+                so this decision is duplicated on purpose. */}
+            <LawexaMessageContent
+              content={message.content}
+              metadata={message.metadata}
+              viewerUuid={viewerUuid}
+            />
           </div>
         )}
 
