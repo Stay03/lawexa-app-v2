@@ -105,6 +105,8 @@ export function FieldPanel({
   const [draft, setDraft] = useState<string | null>(null);
   const [refused, setRefused] = useState<string>();
 
+  );
+
   const current = draft ?? value;
   const touched = draft !== null;
   const changed = touched && draft !== value;
@@ -229,9 +231,36 @@ export function FieldPanel({
        * thumb on both shapes.
        */
       footer={
-        <>
+        /* ── THE PAIR, SIDE BY SIDE ────────────────────────────────────────
+           The owner, 19 September 2026, on the previous arrangement: "i dont
+           like the buttons they just look messy, vanilla and basic like no
+           thought was put into it". Three treatments were built and filmed and
+           he picked this one from the pictures, in both themes.
+
+           WHAT WAS WRONG WITH THE OLD ONE. A full-width gold Done with Cancel
+           as bare text underneath it. The two had the same width and wildly
+           different weight, so Cancel read as an orphaned line under a button
+           rather than as the other half of a pair.
+
+           WHY CANCEL CARRIES A SURFACE. `secondary` gives it a real fill, so
+           the two actions are visibly the same kind of thing and the fill on
+           Done is what marks it as the main one. Measured on the built page:
+
+               dark    Cancel 14.27 : 1    Done 6.67 : 1
+               light   Cancel 16.12 : 1    Done 4.73 : 1
+
+           The Samsung shape he originally pointed at — both actions as flat
+           text, no fill — was built as well and cannot ship without a second
+           gold: its Done is gold text on a white sheet at 3.83 : 1 against a
+           floor of 4.5. A fill is what lets the label be dark. That treatment
+           stays available if he asks for the colour.
+
+           `flex-1` on both so they split the width evenly on a phone, and
+           `md:flex-none` so the desktop footer right-aligns them at their
+           natural size. */
+        <div className="flex gap-2.5">
           <DialogClose asChild>
-            <Button type="button" variant="ghost" className="md:w-auto">
+            <Button type="button" variant="secondary" className="flex-1 md:w-auto md:flex-none">
               Cancel
             </Button>
           </DialogClose>
@@ -239,11 +268,11 @@ export function FieldPanel({
             type="button"
             onClick={handleDone}
             disabled={!changed}
-            className="md:w-auto"
+            className="flex-1 md:w-auto md:flex-none"
           >
             Done
           </Button>
-        </>
+        </div>
       }
     >
       <div className="space-y-2">
