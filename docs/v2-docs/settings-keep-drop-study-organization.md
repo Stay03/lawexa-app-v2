@@ -154,17 +154,37 @@ owner probably sees all of theirs. A plain member of an organization that owns n
 spaces, who belongs to two of them, would read "Spaces owned by this organization: 2"
 as a fact about the organization, and no line on the screen says whose view it is.
 
-Two honest ways out:
+### The rule this settles under, which holds whichever way §0 goes
 
-1. An endpoint that lists an organization's spaces. That is a backend ask, and one is
-   not worth raising while §0 is open: a screen that may move is not a screen to
-   request an API for.
-2. Copy that says **"Spaces you can see"**, and a count that never claims to be the
-   total.
+> **A number on a screen either counts the thing its label names, or the label
+> changes.**
 
-Option 2 ships today and is honest. Option 1 is better and costs a round trip with
-backend. **This is a product call, and it goes with the §0 question rather than
-ahead of it.**
+"Spaces you can see: 2" is honest. "Spaces owned by this organization: 2", computed
+from the viewer's own memberships, is false for every member who is not in all of
+them, and false **silently** — the screen carries no line telling the reader whose
+view produced the figure.
+
+**Decision: ship the honest label.** The block reads "Spaces you can see" and its
+count never claims to be the organization's total. If an endpoint that lists an
+organization's spaces arrives later, the copy tightens then. **Do not ship the first
+sentence with the second sentence's number.**
+
+The endpoint remains the better answer and it is a backend ask. One is **not** raised
+while §0 is open: a screen that may move is not a screen to request an API for.
+
+---
+
+## §5b — The shape of the work, in one line
+
+**Layout and copy, not a rewrite.** The four-answer handling, the `?panel=` overlay
+binding, the roster-derived governance and the inline server error all survive
+intact and are not re-opened. What changes is what the page puts in front of a
+reader and how it is arranged.
+
+One decision to carry across rather than rediscover, with its reason attached:
+**the delete dialog is deliberately the one overlay kept out of the URL**, because a
+link that re-arms "Delete this organization?" on every refresh is an armed trigger.
+Whoever moves this screen inherits that, not a bug report about an inconsistency.
 
 ---
 
