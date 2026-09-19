@@ -49,12 +49,48 @@
    A sweep of the gold ramp, dark text throughout, on a white sheet:
 
        0.60   4.53 label   4.00 pill
-       0.64   5.36 label   3.39 pill      <- chosen, margin on both
+       0.64   5.36 label   3.39 pill
        0.66   5.78 label   3.14 pill
        0.68   6.25 label   2.90 pill      <- pill rule already gone
 
-   Light takes oklch(0.64 0.13 85) with a dark label, so both themes carry gold
-   with dark text and the light pill keeps an edge against white.
+   ── THERE IS A THIRD BAR, AND 0.64 FAILED IT ───────────────────────────────
+   A screen sweep of every element painted `--primary` found the selected
+   account-type indicator: a solid gold dot inside a row tinted with the SAME
+   gold at 10% over the card. That dot is how a reader sees which choice is
+   selected, so 1.4.11 applies to it as well, and a lighter gold moves the dot
+   and its own background together — the fill rises, the tint rises with it,
+   and the gap closes.
+
+   THE THREE BARS PULL THE SAME TOKEN IN OPPOSITE DIRECTIONS. Dark text on gold
+   wants the gold LIGHT. The dot against its own tint wants the gold DARK. Both
+   comparisons contain the gold, so no arrangement of the tint escapes it — a
+   neutral 4% tint instead of the gold one moves the dot from 3.01 to 3.07, and
+   changes nothing that matters.
+
+   The whole ramp, modelled on the surface the live page actually paints
+   (rgb(243,244,244) under the row, derived from the measured tint) and checked
+   against the built page at 0.62, which measured 3.02 where this says 3.01:
+
+       L       label (4.5)   pill (3.0)   dot (3.0)   worst margin
+       0.56      3.85 !        4.71         3.78
+       0.58      4.18 !        4.34         3.50        the original, label fails
+       0.600     4.53          4.00         3.25        x1.006
+       0.605     4.65          3.90         3.17        x1.033
+       0.610     4.73          3.83         3.12        x1.041   <- taken
+       0.615     4.83          3.75         3.06        x1.020
+       0.620     4.92          3.69         3.01        x1.004
+       0.64      5.36          3.39         2.78 !      dot fails
+
+   **LIGHT TAKES oklch(0.61 0.13 85)**, the value whose WORST margin is the
+   largest. 0.62 passes too, but at 3.01 on a bar of 3.00 — and rejecting 0.60
+   for a 0.03 margin on the label while shipping a 0.01 margin on the dot would
+   be the same thinness accepted in one place and refused in another.
+
+   NOTE HOW NARROW THE WINDOW IS: 0.60 to 0.62, and the best worst-case margin
+   in it is 4%. That is a sign the constraint set is over-tight, not that 0.61
+   is a good answer. The structural release valve is a SECOND token for the
+   selected indicator, so a dot on a pale row and a label on a filled pill stop
+   being the same colour. That is a design decision and it is not taken here.
 
    DARK IS RESTATED, NOT CHANGED. Same values it already had. Without the
    second rule the light override above would follow the document element into
@@ -66,9 +102,9 @@
    1.31 : 1 for a button that is plainly legible.
    ============================================================================= */
 html.v2-document-lock {
-  --primary: oklch(0.64 0.13 85);
+  --primary: oklch(0.61 0.13 85);
   --primary-foreground: oklch(0.20 0.06 82);
-  --ring: oklch(0.64 0.13 85);
+  --ring: oklch(0.61 0.13 85);
 }
 
 html.v2-document-lock.dark {
