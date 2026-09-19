@@ -92,6 +92,32 @@
    selected indicator, so a dot on a pale row and a label on a filled pill stop
    being the same colour. That is a design decision and it is not taken here.
 
+   ── PRECONDITION ON ANY FUTURE CHANGE TO `--primary` ───────────────────────
+   **Re-measure all three bars on a BUILT PAGE, never on the ramp above.** The
+   ramp is a model, and this one was optimistic exactly where there was least
+   room: it predicted the dot at 3.22 for 0.62 and the built page gave 3.02
+   against a bar of 3.00. It is calibrated now — it agrees with the page to
+   0.01 — and it will drift again the moment a surface under one of these
+   elements changes, because the dot's contrast depends on the card colour
+   beneath a 10% tint, which no one editing a gold would think to check.
+
+   WHAT THAT CHECK HAS TO DO, written out because this repo carries no browser
+   dependency and a script committed here would be one nobody could run:
+
+     · drive a real browser against `V2_ENABLED=true next start`, phone width
+     · walk EVERY element whose background resolves to `--primary`, including
+       the ones carrying no text — a dot is a control and 1.4.11 applies to it
+     · composite translucent ancestors down to something opaque before calling
+       it a surface. The selected row is `--primary` at ALPHA 0.1, and reading
+       that ancestor's raw rgb says the dot sits on solid gold, scoring 1.04
+     · read colour by painting it into a 1x1 canvas and reading the bytes back.
+       `getComputedStyle` answers in `lab()` for these tokens, and parsing those
+       three numbers as red, green and blue gives 1.31 : 1 for a button anyone
+       can plainly read
+     · assert black on white prints 21.00, and print how many elements were
+       examined and whether the setup interaction actually landed. A screen the
+       check never reached must not read as a screen that passed.
+
    DARK IS RESTATED, NOT CHANGED. Same values it already had. Without the
    second rule the light override above would follow the document element into
    dark mode, since both classes sit on <html> and the later rule wins.
