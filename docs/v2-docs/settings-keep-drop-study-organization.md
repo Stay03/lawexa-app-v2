@@ -164,13 +164,41 @@ from the viewer's own memberships, is false for every member who is not in all o
 them, and false **silently** — the screen carries no line telling the reader whose
 view produced the figure.
 
-**Decision: ship the honest label.** The block reads "Spaces you can see" and its
-count never claims to be the organization's total. If an endpoint that lists an
-organization's spaces arrives later, the copy tightens then. **Do not ship the first
-sentence with the second sentence's number.**
+### The server confirms it has no such number (backend, 2026-09-19)
 
-The endpoint remains the better answer and it is a backend ask. One is **not** raised
-while §0 is open: a screen that may move is not a screen to request an API for.
+Checked on the backend side before any ticket was written. `OrganizationResource`
+returns:
+
+    uuid, name, slug, type, type_label, email, phone, address, city, state,
+    country, bio, description, website, logo_url, is_verified, verified_at,
+    and bn_number / cac_document_url behind a `when`
+
+**No spaces count, no spaces relation, no `withCount` on the organization model or
+its resource.** So the figure could only ever be computed client-side from a list
+the server deliberately scopes to the viewer. `/api/spaces` is behaving correctly;
+it is the wrong input for a question about what an organization owns.
+
+### Three positions, and the rule settles only two of them
+
+| | what ships | does it satisfy the rule |
+| --- | --- | --- |
+| a | "Spaces owned by this organization: 2", from the viewer's list | **no** — this is the thing the rule forbids |
+| b | "Spaces you can see: 2" | yes |
+| c | no count at all, just the spaces the reader can open | yes |
+
+**(a) is ruled out here and needs nobody's permission to rule out.** Between (b) and
+(c) the rule is silent, and backend's argument for (c) is real: a count nobody can
+act on, that changes depending on who is looking, is worse than no count.
+
+There is also (d): **ask backend for a viewer-independent count.** That is a small
+field, and it is a product judgement about what one account may learn about another,
+so it is the owner's call rather than ours or backend's. Backend has declined to
+guess and is right to.
+
+**This study does not pick between (b), (c) and (d).** All three go to the owner
+with the §0 placement question. No backend ask is raised in the meantime: a screen
+whose address is unsettled is not a screen to request an API for, and backend should
+not receive a ticket that a placement decision could delete.
 
 ---
 
