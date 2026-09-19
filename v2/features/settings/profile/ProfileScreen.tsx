@@ -31,6 +31,7 @@ import {
   SettingsTextField,
   type SettingsChoice,
 } from '../SettingsForm';
+import { ChoicePanel } from '../ChoicePanel';
 import { SETTINGS_COLUMN } from '../SettingsList';
 import { FieldPanel } from './FieldPanel';
 import { OptionPicker } from './OptionPicker';
@@ -303,7 +304,8 @@ function ProfileForm({ user }: { user: User }) {
   const openChooser =
     chooser.value === 'country' ||
     chooser.value === 'expertise' ||
-    chooser.value === 'university'
+    chooser.value === 'university' ||
+    chooser.value === 'account-type'
       ? chooser.value
       : null;
 
@@ -461,24 +463,114 @@ function ProfileForm({ user }: { user: User }) {
    * to the RECORD is decided in one place, at save time
    * (`settleProfileValues`), so nothing here has to remember which fields a
    * lawyer stops having.
+   *
+   * A PURE FUNCTION, because two callers need the same answer: the form state
+   * below, and the payload the sheet writes. Computing it twice in two places
+   * is how the screen and the record start disagreeing about what a type change
+   * means.
    */
+  const withType = (
+    previous: ProfileFormValues,
+    type: UserType,
+  ): ProfileFormValues => ({
+    ...previous,
+    user_type: type,
+    student_education_level:
+      type === 'law_student' ? previous.student_education_level : null,
+    /* PROFESSION IS CARRIED OVER, NOT EMPTIED.
+       It used to blank here when a lawyer or a student moved to Other roles, so
+       that the picker a third type opens "should not start out saying Lawyer".
+       That reasoning holds on its own and it lost to a bigger rule today: the
+       owner asked for a type change to stop deleting anything, and a blank sent
+       for a field the record holds is a deletion whatever its motive. It shows
+       the profession they had, they can change it, and switching back leaves it
+       exactly as it was. */
+    profession: previous.profession,
+  });
+
   const chooseType = (type: UserType) => {
     // Changing the type changes which rows exist, so every message on screen is
     // now about a question that may no longer be asked.
     setErrors({});
-    setValues((previous) => ({
-      ...previous,
-      user_type: type,
-      student_education_level:
-        type === 'law_student' ? previous.student_education_level : null,
-      // The two types that name their own profession keep it derived, so the
-      // picker a third type opens should not start out saying "Lawyer".
-      profession:
-        type === 'other' &&
-        (previous.profession === 'lawyer' || previous.profession === 'student')
-          ? ''
-          : previous.profession,
-    }));
+    setValues((previous) => withType(previous, type));
+  };
+
+  /**
+   * THE SHEET'S PICK IS THE SAVE, which is the owner's instruction of
+   * 19 September 2026 and the reason Account type is a row rather than a block.
+   *
+   * ── THE PAYLOAD IS MEASURED AGAINST THE RECORD, NOT AGAINST THE SCREEN ────
+   * `original` is what the server holds; `values` is that plus whatever is
+   * being typed elsewhere on the page and has not been saved. Building this
+   * write off `values` would post somebody's half-finished bio because they
+   * changed their account type, which they never asked for. So the diff is
+   * `original` with only the type change applied, and everything else on the
+   * form stays unsaved and stays theirs.
+   *
+   * ── ONE TAP CAN EMPTY OTHER FIELDS, AND IT IS SUPPOSED TO ────────────────
+   * `settleProfileValues` clears what the new type does not ask for: a lawyer
+   * moving to Other roles loses law school, call to bar year, call number,
+   * certifications, work experience, areas of expertise and profession. That is
+   * the existing rule and the payload carries it, so the record and the screen
+   * agree the moment the sheet closes. It is also why the caller may put a
+   * question in front of this.
+   */
+  const saveType = (type: UserType) => {
+    const nextRecord = settleProfileValues(withType(original, type), original);
+    const typePayload = buildProfilePayload(nextRecord, original);
+
+    // The sheet closes itself once Done has handed the answer over, so there is
+    // no `chooser.close()` here. Two closes in one frame is guarded inside the
+    // hook rather than harmless by luck, and one owner of the closing is the
+    // reason it never has to be.
+    chooseType(type);
+
+    if (!hasChanges(typePayload)) return;
+
+    saveProfile.mutate(typePayload, {
+      onSuccess: () => {
+        // The baseline moves to what this write settled, so the sticky bar goes
+        // back to counting only the edits that are still unsaved. Values are
+        // SETTLED against the new baseline rather than replaced by it, for the
+        // same reason the form's own save does it: a save that overlapped
+        // somebody typing must keep their words.
+        setOriginal(nextRecord);
+        setValues((current) => settleProfileValues(current, nextRecord));
+        toast.success('Account type saved');
+      },
+      onError: (error) => {
+        /* BACK TO WHAT THE SERVER STILL HOLDS. The three keys the type change
+           owns are put back from `original`, and `settleProfileValues` then
+           recomputes everything that hangs off them. Other fields are somebody's
+           unsaved typing, and a failed type change is no reason to take it.
+
+           This matters more here than it does under the Save button. A failed
+           save there leaves the value on screen next to the button that failed,
+           so a reader can see both and press it again. By the time this runs the
+           sheet has closed over the page, so a type left on screen that the
+           record does not hold would sit there looking saved. */
+        setValues((current) =>
+          settleProfileValues(
+            {
+              ...current,
+              user_type: original.user_type,
+              student_education_level: original.student_education_level,
+              profession: original.profession,
+            },
+            original,
+          ),
+        );
+        const apiError = extractApiError(error);
+        const mapped = apiError.errors
+          ? mapServerErrors(apiError.errors)
+          : { fields: {}, matched: false };
+        setErrors(mapped.matched ? mapped.fields : { form: apiError.message });
+        // A TOAST, because the sheet is shut and the form message it would
+        // otherwise land in is at the bottom of a long page. The two are not
+        // exclusive: the message is set above so the field still carries it.
+        toast.error(apiError.message);
+      },
+    });
   };
 
   /**
@@ -594,6 +686,13 @@ function ProfileForm({ user }: { user: User }) {
     });
   };
 
+  /* What the Account type row shows, and what its icon is. An account that has
+     never chosen one finds no entry here, and the row falls back to its
+     placeholder rather than drawing a blank line where a value goes. */
+  const accountType = ACCOUNT_TYPES.find(
+    (option) => option.value === values.user_type,
+  );
+
   const selectedExpertise = (expertiseAreas ?? []).filter((area) =>
     values.areas_of_expertise.includes(area.id),
   );
@@ -651,16 +750,37 @@ function ProfileForm({ user }: { user: User }) {
             error={errors.date_of_birth}
             autoComplete="bday"
           />
-        </SettingsFormGroup>
+          {/* ── A ROW THAT OPENS A SHEET, NOT THREE ROWS ON THE PAGE ───────
+              The owner, 19 September 2026: "it shows the setting then when you
+              touch it, it then shows the modal with the option like in the
+              screenshot and thats how it gets saved instead of selection one
+              from the page and clicking save changes at the bottom".
 
-        <SettingsChoiceGroup
-          name="profile-account-type"
-          legend="Account type"
-          description="This decides which details the rest of this screen asks for."
-          value={values.user_type}
-          options={ACCOUNT_TYPES}
-          onChange={chooseType}
-        />
+              The three answers still exist, in `ChoicePanel`, drawn by the same
+              row component that drew them here. What changed is where they live
+              and when the write happens: the sheet's Done writes, which is why
+              this is the only control on the screen whose value never reaches
+              the Save button's diff.
+
+              IT SITS IN THIS GROUP RATHER THAN ITS OWN, and the first build of
+              it had its own. A group headed "Account type" above a row labelled
+              "Account type" printed the same three words twice inside 60px.
+              Every other single-row group here heads itself differently from
+              its row ("Your work" over "Profession") and this one has no second
+              name, so the heading was furniture. The sentence that was under
+              that heading is the row's hint now, which also puts it next to the
+              control it is about. */}
+          <SettingsPickerField
+            icon={accountType?.icon ?? Briefcase}
+            label="Account type"
+            value={accountType?.label ?? null}
+            placeholder="Not set"
+            hint="This decides which details the rest of this screen asks for."
+            onOpen={() => chooser.show('account-type')}
+            error={errors.user_type}
+            disabled={saveProfile.isPending}
+          />
+        </SettingsFormGroup>
 
         {visibility.showEducationLevelToggle ? (
           <SettingsChoiceGroup
@@ -817,6 +937,21 @@ function ProfileForm({ user }: { user: User }) {
         onCommit={(next) => {
           if (heldField) set(heldField, next);
         }}
+      />
+
+      {/* THE ONLY OVERLAY ON THIS SCREEN THAT WRITES. The other three hand a
+          value back to the form and the page's Save button carries it; this one
+          posts when its own Done is pressed, which is why `saveType` and not
+          `chooseType` is wired to it. */}
+      <ChoicePanel
+        {...chooser.bind('account-type')}
+        title="Account type"
+        description="This decides which details the rest of this screen asks for."
+        name="profile-account-type"
+        value={values.user_type}
+        options={ACCOUNT_TYPES}
+        onChoose={saveType}
+        busy={saveProfile.isPending}
       />
 
       <OptionPicker

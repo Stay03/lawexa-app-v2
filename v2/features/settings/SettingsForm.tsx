@@ -498,6 +498,87 @@ export interface SettingsChoice<T extends string> {
  * The hover wash moves onto the UNCHOSEN rows only. Painted over a chosen row
  * it lightened exactly the tint that says it is chosen.
  */
+/**
+ * ONE ROW, SO THE TREATMENT ABOVE HAS ONE HOME.
+ *
+ * The same three answers are now offered in two places: down the page, and
+ * inside a sheet that a row opens. The owner, 19 September 2026, pointing at a
+ * Samsung settings sheet: "it shows the setting then when you touch it, it then
+ * shows the modal with the option like in the screenshot".
+ *
+ * Everything the docblock above measured — the tint, the filled ring, the icon
+ * colour, the label deliberately NOT recoloured — has to hold in both, and a
+ * second copy of this markup is how two surfaces drift apart one utility at a
+ * time. So the row is this function and both callers render it. The group keeps
+ * the fieldset, the legend and the block; the sheet brings its own container.
+ */
+export function SettingsChoiceRow<T extends string>({
+  name,
+  option,
+  selected,
+  onChange,
+}: {
+  name: string;
+  option: SettingsChoice<T>;
+  selected: boolean;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <label
+      className={cn(
+        'v2-interactive flex min-h-14 cursor-pointer items-start gap-3.5 px-4 py-2.5',
+        'transition-colors duration-150 motion-reduce:transition-none',
+        'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-inset',
+        selected ? 'bg-primary/10' : 'hover:bg-foreground/[0.04]',
+      )}
+    >
+      <input
+        type="radio"
+        name={name}
+        value={option.value}
+        checked={selected}
+        onChange={() => onChange(option.value)}
+        className="sr-only"
+      />
+      <option.icon
+        aria-hidden
+        className={cn(
+          'mt-0.5 size-5 shrink-0 transition-colors duration-150 motion-reduce:transition-none',
+          selected ? 'text-primary' : 'text-muted-foreground',
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] leading-snug font-medium text-foreground">
+          {option.label}
+        </span>
+        {option.description ? (
+          <span className="block text-[13px] leading-snug text-muted-foreground">
+            {option.description}
+          </span>
+        ) : null}
+      </span>
+      {/* The tick is always in the DOM, so choosing does not change the
+          row's shape under the finger that chose it. Only the colours
+          move, and they move over 150ms. */}
+      <span
+        aria-hidden
+        className={cn(
+          'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 motion-reduce:transition-none',
+          selected
+            ? 'border-primary bg-primary text-primary-foreground'
+            : // NOT `border-border`. That token is 4.5% of lightness
+              // away from the block it sits on, which is right for a
+              // hairline between rows and leaves an empty circle
+              // invisible. This is the same ring in both themes.
+              'border-foreground/25 text-transparent',
+        )}
+      >
+        <Check aria-hidden className="size-3.5" strokeWidth={3} />
+      </span>
+    </label>
+  );
+}
+
 export function SettingsChoiceGroup<T extends string>({
   name,
   legend,
@@ -525,64 +606,15 @@ export function SettingsChoiceGroup<T extends string>({
         </p>
       ) : null}
       <div className={cn(SETTINGS_BLOCK, 'mt-2')}>
-        {options.map((option) => {
-          const selected = value === option.value;
-          return (
-            <label
-              key={option.value}
-              className={cn(
-                'v2-interactive flex min-h-14 cursor-pointer items-start gap-3.5 px-4 py-2.5',
-                'transition-colors duration-150 motion-reduce:transition-none',
-                'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-inset',
-                selected ? 'bg-primary/10' : 'hover:bg-foreground/[0.04]',
-              )}
-            >
-              <input
-                type="radio"
-                name={name}
-                value={option.value}
-                checked={selected}
-                onChange={() => onChange(option.value)}
-                className="sr-only"
-              />
-              <option.icon
-                aria-hidden
-                className={cn(
-                  'mt-0.5 size-5 shrink-0 transition-colors duration-150 motion-reduce:transition-none',
-                  selected ? 'text-primary' : 'text-muted-foreground',
-                )}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] leading-snug font-medium text-foreground">
-                  {option.label}
-                </span>
-                {option.description ? (
-                  <span className="block text-[13px] leading-snug text-muted-foreground">
-                    {option.description}
-                  </span>
-                ) : null}
-              </span>
-              {/* The tick is always in the DOM, so choosing does not change the
-                  row's shape under the finger that chose it. Only the colours
-                  move, and they move over 150ms. */}
-              <span
-                aria-hidden
-                className={cn(
-                  'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 motion-reduce:transition-none',
-                  selected
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : // NOT `border-border`. That token is 4.5% of lightness
-                      // away from the block it sits on, which is right for a
-                      // hairline between rows and leaves an empty circle
-                      // invisible. This is the same ring in both themes.
-                      'border-foreground/25 text-transparent',
-                )}
-              >
-                <Check aria-hidden className="size-3.5" strokeWidth={3} />
-              </span>
-            </label>
-          );
-        })}
+        {options.map((option) => (
+          <SettingsChoiceRow
+            key={option.value}
+            name={name}
+            option={option}
+            selected={value === option.value}
+            onChange={onChange}
+          />
+        ))}
       </div>
     </fieldset>
   );

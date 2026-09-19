@@ -267,49 +267,46 @@ export function settleProfileValues(
     facebook_url: next.facebook_url.trim(),
   };
 
+  /* Only the NEW visibility is consulted now. What a field used to be visible
+     under decided whether it got blanked, and blanking is gone, so the old
+     visibility has no reader left. */
   const nextVisibility = visibilityFor(settled);
-  const originalVisibility = visibilityFor(original);
 
-  const scope = (
-    field: ScopedTextField,
-    visible: boolean,
-    wasVisible: boolean,
-  ) => {
+  /**
+   * A FIELD THE NEW TYPE DOES NOT ASK FOR IS HIDDEN, NOT EMPTIED.
+   *
+   * It emptied until 19 September 2026: `wasVisible ? '' : original[field]`
+   * wrote a blank for anything that had been on screen and no longer was. The
+   * blank reached the payload and the server wrote it, so changing a type
+   * destroyed answers. Measured across the six transitions, a lawyer moving to
+   * law student lost five and to other roles lost seven, a call number among
+   * them, with no way back.
+   *
+   * That was tolerable while the page's Save button stood between the choice
+   * and the write, because the rows visibly disappeared first. Account type now
+   * saves from its own sheet, so it would not have been.
+   *
+   * The owner, asked directly whether to keep wiping or to hide and keep:
+   * "alright go with that", 20:14, on a recommendation to stop wiping. So the
+   * value stays on the record, stays out of the diff, and comes back whole if
+   * the type comes back. The backend clears none of this by itself, which
+   * @backendclaude confirmed out of `ProfileController::update()`.
+   *
+   * `wasVisible` is therefore gone as an argument rather than ignored, so a
+   * caller cannot pass it and believe it still does something.
+   */
+  const scope = (field: ScopedTextField, visible: boolean) => {
     if (visible) return;
-    settled[field] = wasVisible ? '' : original[field];
+    settled[field] = original[field];
   };
 
-  scope(
-    'university',
-    nextVisibility.showUniversity,
-    originalVisibility.showUniversity,
-  );
-  scope('level', nextVisibility.showLevel, originalVisibility.showLevel);
-  scope(
-    'law_school',
-    nextVisibility.showLawSchool,
-    originalVisibility.showLawSchool,
-  );
-  scope(
-    'call_to_bar_year',
-    nextVisibility.showCallToBarYear,
-    originalVisibility.showCallToBarYear,
-  );
-  scope(
-    'call_number',
-    nextVisibility.showCallNumber,
-    originalVisibility.showCallNumber,
-  );
-  scope(
-    'other_certifications',
-    nextVisibility.showOtherCertifications,
-    originalVisibility.showOtherCertifications,
-  );
-  scope(
-    'work_experience',
-    nextVisibility.showWorkExperience,
-    originalVisibility.showWorkExperience,
-  );
+  scope('university', nextVisibility.showUniversity);
+  scope('level', nextVisibility.showLevel);
+  scope('law_school', nextVisibility.showLawSchool);
+  scope('call_to_bar_year', nextVisibility.showCallToBarYear);
+  scope('call_number', nextVisibility.showCallNumber);
+  scope('other_certifications', nextVisibility.showOtherCertifications);
+  scope('work_experience', nextVisibility.showWorkExperience);
 
   // PROFESSION IS DERIVED for the two types that name one. v1 did the same, in
   // two places (the type switcher wrote it, the payload builder wrote it
@@ -325,10 +322,11 @@ export function settleProfileValues(
     settled.profession = next.profession.trim();
   }
 
+  // KEPT FOR THE SAME REASON AS THE TEXT FIELDS ABOVE. This emptied the list
+  // when the new type stopped asking for it, which is the fifteen areas of law
+  // a lawyer had chosen one at a time.
   if (!nextVisibility.showAreasOfExpertise) {
-    settled.areas_of_expertise = originalVisibility.showAreasOfExpertise
-      ? []
-      : original.areas_of_expertise;
+    settled.areas_of_expertise = original.areas_of_expertise;
   }
 
   return settled;
