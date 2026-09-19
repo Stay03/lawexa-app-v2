@@ -105,8 +105,6 @@ export function FieldPanel({
   const [draft, setDraft] = useState<string | null>(null);
   const [refused, setRefused] = useState<string>();
 
-  );
-
   const current = draft ?? value;
   const touched = draft !== null;
   const changed = touched && draft !== value;
