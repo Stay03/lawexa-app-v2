@@ -25,6 +25,10 @@ import { V2PushLifecycle } from '@/v2/runtime/push/lifecycle';
 import { RealtimeSpine } from '@/v2/runtime/realtime/spine';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
+/* v2-only colour corrections, scoped to `html.v2-document-lock` for the same
+   soft-nav reason `shell.css` is. Separate file because that one declares
+   itself mechanics-only and these are colours. */
+import '@/v2/shell/tokens.css';
 
 /**
  * v2 metadata convention (exemplar for every phase-3+ feature route):

@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -208,30 +209,41 @@ export function FieldPanel({
       guardUnsaved={changed}
       title={spec?.label ?? ''}
       /**
-       * DONE SITS BESIDE CANCEL, IN THE BAR, NOT AT THE FOOT OF THE SHEET.
+       * BOTH ACTIONS SIT AT THE FOOT, TOGETHER.
        *
-       * It was a full-width button at the bottom, with Cancel at the top left,
-       * and the owner called the result messy on 17 August 2026. He was right
-       * and the convention says why: a confirm belongs at the TOP RIGHT, and a
-       * cancel sits at the top right too UNLESS it is paired with one — at
-       * which point it moves to the top left. Paired. Two exits at opposite
-       * ends of a 200px sheet is the arrangement neither platform uses.
+       * The history here matters, because this looks like a revert and is not.
+       * It began as a full-width button at the BOTTOM with Cancel at the TOP
+       * LEFT, and the owner called that messy on 17 August 2026. He was right:
+       * two exits at opposite ends of a 200px sheet is the arrangement neither
+       * platform uses. The fix then was to pair them in the bar at the top.
        *
-       * `ResponsiveOverlay` already had the slot for this and its own note
-       * says so: "one control on the trailing edge of the phone bar — a Save,
-       * usually". The first version simply did not use it.
+       * On 19 September he sent a Samsung sheet as the reference and asked for
+       * "something nicer and cleaner": title top left and large, the actions
+       * together at the foot. THAT IS THE THIRD ARRANGEMENT, not the first one
+       * again. What he rejected was the split, and this does not split them.
+       *
+       * They are at the foot because that is where a thumb is on a phone, and
+       * `ResponsiveOverlay` stacks them full width there and right-aligns them
+       * on a desktop. Cancel is passed FIRST: the footer is `flex-col-reverse`,
+       * so the last child lands on top and the confirm ends up under the
+       * thumb on both shapes.
        */
-      action={
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={handleDone}
-          disabled={!changed}
-          className="font-semibold"
-        >
-          Done
-        </Button>
+      footer={
+        <>
+          <DialogClose asChild>
+            <Button type="button" variant="ghost" className="md:w-auto">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button
+            type="button"
+            onClick={handleDone}
+            disabled={!changed}
+            className="md:w-auto"
+          >
+            Done
+          </Button>
+        </>
       }
     >
       <div className="space-y-2">

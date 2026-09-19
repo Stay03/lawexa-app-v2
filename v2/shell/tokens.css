@@ -1,0 +1,78 @@
+/* =============================================================================
+   v2 colour tokens — corrections that must not reach v1
+   =============================================================================
+
+   Route scoping works the same way `shell.css` describes it, and for the same
+   reason: this sheet is imported only by `app/v2/layout.tsx`, but React 19
+   never removes a precedence stylesheet from <head>, so after a soft nav out of
+   v2 its rules would keep applying to v1. Everything here is therefore scoped
+   to `html.v2-document-lock`, the class `DocumentLock` adds to <html> while the
+   v2 layout is mounted and removes on unmount.
+
+   WHY <html> AND NOT A WRAPPER INSIDE THE PAGE. These declarations first went
+   on a `[data-v2]` div in the v2 layout, and the button came back at exactly
+   the same rgb as before the change. Radix portals every dialog to
+   `document.body`, so the sheet is a SIBLING of that wrapper, and a custom
+   property reaches an element only by inheritance. Measured on the built app,
+   19 September 2026:
+
+       --primary at :root          lab(51.27 14.67 79.04)   the shared gold
+       --primary at the wrapper    lab(58.38 10.25 62.12)   the corrected gold
+       --primary at the sheet      lab(51.27 14.67 79.04)   the shared gold
+
+   The wrapper had the value and the surface that needed it read past it. The
+   document element is above the portal, so it carries.
+
+   ── THE PRIMARY BUTTON ─────────────────────────────────────────────────────
+   MEASURED off the rendered button in a browser, with text typed into the
+   field, because `Done` is `disabled={!changed}` and an untouched panel paints
+   it at half opacity. Two of us measured that faded fill and argued about the
+   brand palette before noticing which state it was in.
+
+       dark   enabled   6.67 : 1   passes AA
+       light  enabled   4.21 : 1   fails AA
+
+   Light mode put WHITE text on `--primary` at oklch(0.58 0.14 82), and that
+   gold sits where no text colour clears the bar: near-black gets 4.17, pure
+   black 4.83. It is not a fault of this button. Every filled primary in light
+   mode has been failing and the settings panel is the first place it appears
+   at size.
+
+   TWO RULES HAVE TO PASS. AA text contrast is 4.5 : 1 for the label against
+   its own fill; WCAG 1.4.11 is 3 : 1 for the pill against the sheet behind it.
+   Brand gold with dark text passes the first handsomely and fails the second
+   on white:
+
+       #C9A227 + dark text     7.50 label   2.42 pill
+       oklch(0.74) same        7.82 label   2.32 pill
+
+   A sweep of the gold ramp, dark text throughout, on a white sheet:
+
+       0.60   4.53 label   4.00 pill
+       0.64   5.36 label   3.39 pill      <- chosen, margin on both
+       0.66   5.78 label   3.14 pill
+       0.68   6.25 label   2.90 pill      <- pill rule already gone
+
+   Light takes oklch(0.64 0.13 85) with a dark label, so both themes carry gold
+   with dark text and the light pill keeps an edge against white.
+
+   DARK IS RESTATED, NOT CHANGED. Same values it already had. Without the
+   second rule the light override above would follow the document element into
+   dark mode, since both classes sit on <html> and the later rule wins.
+
+   Every number here came from painting the colour into a 1x1 canvas and
+   reading the bytes back, with black-on-white asserted to print 21.00. The
+   first reader parsed `lab()` output as red, green and blue and reported
+   1.31 : 1 for a button that is plainly legible.
+   ============================================================================= */
+html.v2-document-lock {
+  --primary: oklch(0.64 0.13 85);
+  --primary-foreground: oklch(0.20 0.06 82);
+  --ring: oklch(0.64 0.13 85);
+}
+
+html.v2-document-lock.dark {
+  --primary: oklch(0.70 0.14 82);
+  --primary-foreground: oklch(0.20 0.06 82);
+  --ring: oklch(0.70 0.14 82);
+}

@@ -86,8 +86,22 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * plain property against another and does not depend on how a shorthand and its
  * longhand happen to be ordered.
  */
+/* ── WHY `bg-popover` AND NOT `bg-background` ───────────────────────────────
+ * The owner, 19 September 2026, with three screenshots: "in the dark on it
+ * looks so dark and messed up look how the Samsung dark on is nice".
+ *
+ * These surfaces used `bg-background`, WHICH IS THE SAME TOKEN AS THE PAGE THEY
+ * COVER. In dark mode that is `oklch(0.145)` for both, and the scrim then
+ * crushes the page to near black as well, so a black sheet sat on a black page
+ * with a rounded corner as the only evidence that anything had opened.
+ *
+ * In dark mode elevation reads as LIGHTER, not darker. `--popover` already
+ * exists for exactly this and is `oklch(0.205)`. In light mode `--background`
+ * and `--popover` are both `oklch(1)`, so the light theme is byte-identical and
+ * only dark changes.
+ */
 const SURFACE_PHONE =
-  'fixed left-0 right-0 top-0 z-50 flex h-[calc(100dvh-var(--keyboard-inset,0px))] flex-col bg-background text-sm outline-none';
+  'fixed left-0 right-0 top-0 z-50 flex h-[calc(100dvh-var(--keyboard-inset,0px))] flex-col bg-popover text-sm outline-none';
 
 /**
  * Phone, sized to what is IN it: a sheet on the bottom edge rather than a whole
@@ -116,7 +130,7 @@ const SURFACE_PHONE =
  * `min-h-0 flex-1` region that was already built to do exactly that.
  */
 const SURFACE_PHONE_CONTENT =
-  'fixed left-0 right-0 bottom-[var(--keyboard-inset,0px)] z-50 flex max-h-[calc(100dvh-var(--keyboard-inset,0px)-2rem)] flex-col overflow-hidden rounded-t-3xl bg-background text-sm outline-none';
+  'fixed left-0 right-0 bottom-[var(--keyboard-inset,0px)] z-50 flex max-h-[calc(100dvh-var(--keyboard-inset,0px)-2rem)] flex-col overflow-hidden rounded-t-3xl bg-popover text-sm outline-none';
 
 /**
  * Desktop: the centred card, geometry matched to `DialogContent` so a converted
@@ -193,7 +207,17 @@ export function ResponsiveOverlay({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        <DialogOverlay />
+        {/* A LIGHTER SCRIM, OVERRIDDEN HERE RATHER THAN IN THE PRIMITIVE.
+            `DialogOverlay` defaults to `bg-black/80`, which over an already
+            dark page leaves it crushed to near black. The owner's reference
+            (Samsung, 19 Sep) keeps the list behind the sheet legible, and the
+            sheet separates by being LIGHTER rather than by the page being
+            darker. Now that the surface is `bg-popover` the scrim no longer has
+            to do that work alone.
+
+            Overridden locally on purpose: `DialogOverlay` is shared with every
+            dialog in both apps, v1 included, and v1 is frozen. */}
+        <DialogOverlay className="bg-black/50" />
         <DialogSurface
           ref={surfaceRef}
           className={cn(
@@ -277,7 +301,7 @@ export function ResponsiveOverlay({
               the separating there instead. */}
           <header
             className={cn(
-              'shrink-0 bg-background md:border-b-0 md:pt-6 md:pb-4',
+              'shrink-0 bg-popover md:border-b-0 md:pt-6 md:pb-4',
               size === 'fill'
                 ? 'border-b pt-[env(safe-area-inset-top,0px)]'
                 : 'md:border-b-0',
@@ -295,7 +319,7 @@ export function ResponsiveOverlay({
                 'items-center gap-2 md:flex md:h-auto md:px-6 md:pr-12',
                 size === 'fill'
                   ? 'flex h-14 px-2'
-                  : 'grid h-11 grid-cols-[1fr_auto_1fr] px-4',
+                  : 'flex px-4 pt-4 pb-1',
               )}
             >
               {/* ── THE WAY OUT SAYS WHAT IT DOES ──────────────────────────
@@ -309,8 +333,8 @@ export function ResponsiveOverlay({
                   Somebody who has typed something they did not mean had no
                   button that said so. An arrow would not have said it either:
                   an arrow means the previous screen, not "throw this away". */}
-              <DialogClose asChild>
-                {size === 'fill' ? (
+              {size === 'fill' ? (
+                <DialogClose asChild>
                   <button
                     type="button"
                     aria-label="Close"
@@ -321,35 +345,31 @@ export function ResponsiveOverlay({
                   >
                     <ChevronLeft aria-hidden className="size-5" />
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    /* `justify-self-start` IS THE WHOLE FIX. The row is a
-                       three-column grid so the title can be centred, which
-                       makes this button's cell a full `1fr` wide — and a
-                       button centres its own text, so "Cancel" floated in the
-                       middle of that empty column instead of sitting at the
-                       edge. Photographed by the owner, 17 August 2026: "is
-                       there where you put the cancel button??"
+                </DialogClose>
+              ) : null}
+              {/* ── CANCEL LEFT THE HEADER ON 19 SEPTEMBER ───────────────────
+                  It used to sit at the top left of the sheet, which is why the
+                  title beside it was CENTRED: "Cancel Full name" read as one
+                  phrase otherwise. Both of those exist in the history of this
+                  file and both were right at the time.
 
-                       I had filmed this sheet BEFORE the title was centred and
-                       only measured it afterwards. The measurements all passed
-                       — the button was present, enabled and correctly wired.
-                       None of them could see where it was. */
-                    className={cn(
-                      'v2-interactive -ml-2 shrink-0 justify-self-start rounded-full px-2 py-1 text-sm text-muted-foreground md:hidden',
-                      FOCUS_RING,
-                    )}
-                  >
-                    Cancel
-                  </button>
-                )}
-              </DialogClose>
+                  The owner sent a Samsung sheet as the reference: title top
+                  left and large, the actions together at the foot. That is not
+                  a revert of 17 August. What he rejected then was a SPLIT —
+                  Cancel at the top left and a full-width button at the bottom,
+                  two exits at opposite ends of a 200px sheet. Putting BOTH at
+                  the foot is the arrangement neither of those was.
+
+                  With nothing beside the title, the reason to centre it is
+                  gone, so it is left aligned and larger. Cancel is now the
+                  caller's `footer`, next to the confirm. */}
 
               <DialogTitle
                 className={cn(
-                  'min-w-0 truncate text-base leading-none font-medium md:flex-1 md:text-left md:whitespace-normal',
-                  size === 'fill' ? 'flex-1' : 'text-center',
+                  'min-w-0 md:flex-1 md:text-left md:whitespace-normal',
+                  size === 'fill'
+                    ? 'flex-1 truncate text-base leading-none font-medium'
+                    : 'flex-1 text-left text-lg leading-snug font-semibold',
                 )}
               >
                 {title}
@@ -363,8 +383,6 @@ export function ResponsiveOverlay({
                 <div className="shrink-0 justify-self-end md:hidden">
                   {action}
                 </div>
-              ) : size === 'content' ? (
-                <div aria-hidden className="md:hidden" />
               ) : null}
             </div>
 
@@ -390,7 +408,7 @@ export function ResponsiveOverlay({
                `DialogFooter` already has. */
             <footer
               className={cn(
-                'flex shrink-0 flex-col-reverse gap-2 bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex-row md:justify-end md:border-t-0 md:px-6 md:py-4 md:pb-4',
+                'flex shrink-0 flex-col-reverse gap-2 bg-popover px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex-row md:justify-end md:border-t-0 md:px-6 md:py-4 md:pb-4',
                 size === 'fill' && 'border-t',
               )}
             >
