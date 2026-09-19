@@ -128,9 +128,23 @@ const SURFACE_PHONE =
  * The cap keeps a long-but-not-endless body honest: at `max-h` the header and
  * footer stay put and the middle scrolls, because they are `shrink-0` around a
  * `min-h-0 flex-1` region that was already built to do exactly that.
+ *
+ * ── IT FLOATS, IT IS NOT GLUED TO THE EDGE ─────────────────────────────────
+ * The owner, 19 September 2026, on the filmed panel: "look at the samsung modal
+ * it goes up slightly above the bottom of the phone, I want that".
+ *
+ * So the sheet is inset on three sides and rounded on all four corners rather
+ * than pinned flush with only its top corners cut. That is One UI's shape and
+ * it reads as an object placed over the page instead of a drawer welded to the
+ * frame.
+ *
+ * THE BOTTOM OFFSET CARRIES THE SAFE AREA NOW, which is why the footer below
+ * stops doing it for this shape. A floating sheet already clears the home
+ * indicator, and padding the footer for it as well would leave a visible band
+ * of empty popover under the buttons.
  */
 const SURFACE_PHONE_CONTENT =
-  'fixed left-0 right-0 bottom-[var(--keyboard-inset,0px)] z-50 flex max-h-[calc(100dvh-var(--keyboard-inset,0px)-2rem)] flex-col overflow-hidden rounded-t-3xl bg-popover text-sm outline-none';
+  'fixed left-2 right-2 bottom-[calc(var(--keyboard-inset,0px)+max(0.5rem,env(safe-area-inset-bottom)))] z-50 flex max-h-[calc(100dvh-var(--keyboard-inset,0px)-3rem)] flex-col overflow-hidden rounded-3xl bg-popover text-sm outline-none';
 
 /**
  * Desktop: the centred card, geometry matched to `DialogContent` so a converted
@@ -401,15 +415,22 @@ export function ResponsiveOverlay({
           </div>
 
           {footer ? (
-            /* Stacked and full width on a phone, which is where a thumb is, and
-               padded out of the home indicator. `flex-col-reverse` puts the
-               LAST child on top, so callers pass Cancel then the primary action
-               and get the right order on both shapes — the same contract
-               `DialogFooter` already has. */
+            /* Stacked and full width on a phone, which is where a thumb is.
+               `flex-col-reverse` puts the LAST child on top, so callers pass
+               Cancel then the primary action and get the right order on both
+               shapes — the same contract `DialogFooter` already has.
+
+               THE HOME-INDICATOR PADDING BELONGS TO THE `fill` SHAPE ONLY.
+               `fill` reaches the bottom edge, so its footer has to clear the
+               indicator itself. `content` now FLOATS above that edge, and
+               padding it twice would leave a band of empty popover under the
+               buttons that reads as a layout mistake. */
             <footer
               className={cn(
-                'flex shrink-0 flex-col-reverse gap-2 bg-popover px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex-row md:justify-end md:border-t-0 md:px-6 md:py-4 md:pb-4',
-                size === 'fill' && 'border-t',
+                'flex shrink-0 flex-col-reverse gap-2 bg-popover px-4 py-3 md:flex-row md:justify-end md:border-t-0 md:px-6 md:py-4 md:pb-4',
+                size === 'fill'
+                  ? 'border-t pb-[max(0.75rem,env(safe-area-inset-bottom))]'
+                  : 'pb-4',
               )}
             >
               {footer}
