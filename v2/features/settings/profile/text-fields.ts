@@ -1,9 +1,6 @@
 import {
   AtSign,
-  Award,
-  Briefcase,
   Building,
-  CalendarDays,
   Facebook,
   House,
   IdCard,
@@ -68,10 +65,7 @@ export type ProfileTextFieldName = Extract<
   | 'address'
   | 'university'
   | 'law_school'
-  | 'call_to_bar_year'
   | 'call_number'
-  | 'other_certifications'
-  | 'work_experience'
   | 'linkedin_url'
   | 'website_url'
   | 'twitter_url'
@@ -168,29 +162,18 @@ export const PROFILE_TEXT_FIELDS: Record<
     label: 'Law school',
     placeholder: 'Where you went to law school',
   },
-  call_to_bar_year: {
-    icon: CalendarDays,
-    label: 'Year of call',
-    placeholder: 'e.g. 2020',
-    inputMode: 'numeric',
-    maxLength: 4,
-  },
+  /* Year of call, other certifications and work experience stood here until
+     20 September 2026 and went with their rows rather than being hidden.
+
+     A SPEC LEFT BEHIND STAYS REACHABLE. The screen validates `?field=` against
+     this table, so `?field=call_to_bar_year` would still have opened a panel,
+     for a field with no row on the page behind it, editing a value nothing on
+     the screen shows. This table is the list of what can be edited, so a field
+     that can no longer be edited leaves it. */
   call_number: {
     icon: IdCard,
     label: 'Call number',
     placeholder: 'Your call number',
-  },
-  other_certifications: {
-    icon: Award,
-    label: 'Other certifications',
-    placeholder: 'Anything else you are certified in',
-    multiline: true,
-  },
-  work_experience: {
-    icon: Briefcase,
-    label: 'Work experience',
-    placeholder: 'Where you have practised, and for how long',
-    multiline: true,
   },
   linkedin_url: {
     icon: Linkedin,

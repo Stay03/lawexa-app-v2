@@ -835,12 +835,30 @@ function ProfileForm({ user }: { user: User }) {
               />
             ) : null}
             {visibility.showLawSchool ? textRow('law_school') : null}
-            {visibility.showCallToBarYear ? textRow('call_to_bar_year') : null}
             {visibility.showCallNumber ? textRow('call_number') : null}
-            {visibility.showOtherCertifications
-              ? textRow('other_certifications')
-              : null}
-            {visibility.showWorkExperience ? textRow('work_experience') : null}
+            {/* ── YEAR OF CALL, CERTIFICATIONS AND WORK EXPERIENCE ARE GONE ──
+                The owner, 20 September 2026: "Those 3 not in onboarding remove
+                them from the profile page".
+
+                He asked which of these fields onboarding collects, and the
+                answer was two of five. Law school is step 6 and required; call
+                number is step 8 and required for lawyers. The other three are
+                asked NOWHERE, and year of call was the strangest of them:
+                `useOnboarding.ts` sends `call_to_bar_year` from a store value
+                that no step ever writes, so the only way it could be filled was
+                this screen.
+
+                THE VALUES ARE NOT DELETED. The fields stay in
+                `ProfileFormValues`, in the payload type and on the record; they
+                simply have no control any more, so they never enter the diff.
+                An account that already holds a call-to-bar year keeps it.
+
+                `lib/utils/profile-field-config.ts` IS UNCHANGED ON PURPOSE. v1
+                reads the same visibility flags in
+                `components/settings/education-info-form.tsx`, and v1 is frozen
+                (19 Sep: fix it only to stop harm to live users). Editing the
+                shared config to tidy three unused flags would have changed a v1
+                screen nobody asked us to touch. */}
           </SettingsFormGroup>
         ) : null}
 
