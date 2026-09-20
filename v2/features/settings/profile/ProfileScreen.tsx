@@ -834,7 +834,26 @@ function ProfileForm({ user }: { user: User }) {
                 error={errors.level}
               />
             ) : null}
-            {visibility.showLawSchool ? textRow('law_school') : null}
+            {/* LAW SCHOOL IS FOR STUDENTS, NOT LAWYERS. The owner,
+                20 September 2026: "ok remove for lawyer, keep for student".
+
+                `showLawSchool` is `isLawyer || (isLawStudent && level ===
+                'law_school')`, so it has always shown lawyers a field
+                onboarding never asks them for: step 6 gates it on
+                `isLawStudent ? level === 'law_school' : false`, which is
+                literally `false` for a lawyer. Same fault as year of call, one
+                row down, and I reported it to him as collected before reading
+                that gate.
+
+                SUBTRACTED HERE RATHER THAN FIXED IN THE FLAG. The honest change
+                is to drop `isLawyer` from `showLawSchool` in
+                `lib/utils/profile-field-config.ts`, and frozen v1 reads that
+                same flag in `components/settings/education-info-form.tsx`.
+                Editing it would silently remove the row from a v1 screen
+                nobody asked us to touch. */}
+            {visibility.showLawSchool && values.user_type !== 'lawyer'
+              ? textRow('law_school')
+              : null}
             {visibility.showCallNumber ? textRow('call_number') : null}
             {/* ── YEAR OF CALL, CERTIFICATIONS AND WORK EXPERIENCE ARE GONE ──
                 The owner, 20 September 2026: "Those 3 not in onboarding remove
