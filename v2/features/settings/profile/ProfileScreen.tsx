@@ -1156,7 +1156,20 @@ function ProfileForm({ user }: { user: User }) {
         options={countryOptions}
         isLoading={countriesQuery.isPending}
         selected={values.country ? [values.country] : []}
-        emptyMessage="No country matches that."
+        /* WHICH EMPTY IS THIS. "No country matches that" is only true after a
+           search. Said to somebody who has typed nothing, it reports a failed
+           search that never happened — and on 21 September 2026 that is what
+           the screen said to everyone, because the list's provider had died and
+           the list arrived empty. The reader was told their search found
+           nothing when there was nothing to search. Same treatment as the
+           University row below. */
+        emptyMessage={
+          countriesQuery.isError
+            ? 'The country list could not be loaded. Try again shortly.'
+            : countryOptions.length === 0
+              ? 'The country list is unavailable right now.'
+              : 'No country matches that.'
+        }
         onChange={(ids) => set('country', ids[0] ?? '')}
         onClear={() => set('country', '')}
       />
