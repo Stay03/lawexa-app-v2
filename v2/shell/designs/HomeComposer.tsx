@@ -50,6 +50,16 @@ import {
   RedactionUnavailableError,
   startConversation,
 } from '@/v2/features/conversations/start-conversation';
+import {
+  ACCEPTED_FILE_TYPES,
+  ALLOWED_FILE_TYPES,
+  ATTACHMENT_HINT,
+  ATTACHMENT_SIZE_ERROR,
+  ATTACHMENT_TYPE_ERROR,
+  MAX_FILES_PER_TURN,
+  isImageAttachment,
+  maxSizeFor,
+} from '@/v2/features/conversations/attachment-rules';
 import { JurisdictionField } from './composer/JurisdictionField';
 import { WorkflowField } from './composer/WorkflowField';
 import { useWorkflowSelection } from './composer/useWorkflowSelection';
@@ -90,25 +100,29 @@ import { useWorkflowSelection } from './composer/useWorkflowSelection';
  */
 
 /** Per-file upload slot — v1's `FileUploadEntry` shape, byte-for-byte. */
+/** The picture itself when there is one, the document glyph otherwise. A
+ *  component rather than a ternary inline, because the `next/image` pragma
+ *  belongs on the element and not buried in a branch. */
+function AttachmentIcon({ preview }: { preview?: string }) {
+  if (!preview) {
+    return <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />;
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={preview} alt="" className="size-5 shrink-0 rounded object-cover" />;
+}
+
 interface FileUploadEntry {
   key: string;
   file_name: string;
   file_size: number;
   status: 'uploading' | 'uploaded' | 'failed';
+  /** Object URL for a picture, revoked when the chip goes. Same contract as
+   *  the conversation composer's — see `attachment-rules.ts`. */
+  preview?: string;
   file_id?: number;
   error?: string;
 }
 
-const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.rtf';
-const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_FILES_PER_TURN = 10;
-const ALLOWED_FILE_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/rtf',
-  'text/rtf',
-];
 /** Attachment exit window — must clear before the row leaves the DOM. */
 const CHIP_EXIT_MS = 160;
 
@@ -212,7 +226,7 @@ export function HomeComposer({
         rejectedType = true;
         continue;
       }
-      if (file.size > MAX_DOCUMENT_SIZE) {
+      if (file.size > maxSizeFor(file)) {
         rejectedSize = true;
         continue;
       }
@@ -232,14 +246,20 @@ export function HomeComposer({
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       accepted.push({
         file,
-        entry: { key: slotKey, file_name: file.name, file_size: file.size, status: 'uploading' },
+        entry: {
+          key: slotKey,
+          file_name: file.name,
+          file_size: file.size,
+          status: 'uploading',
+          preview: isImageAttachment(file) ? URL.createObjectURL(file) : undefined,
+        },
       });
     }
 
     if (rejectedType) {
-      setError('Only PDF, DOC, DOCX, and RTF files are supported.');
+      setError(ATTACHMENT_TYPE_ERROR);
     } else if (rejectedSize) {
-      setError('Each file must be 10MB or less.');
+      setError(ATTACHMENT_SIZE_ERROR);
     } else if (rejectedCap) {
       setError(`You can attach at most ${MAX_FILES_PER_TURN} files per message.`);
     } else if (rejectedDuplicate && accepted.length === 0) {
@@ -293,7 +313,11 @@ export function HomeComposer({
       return next;
     });
     window.setTimeout(() => {
-      setUploads((prev) => prev.filter((u) => u.key !== key));
+      setUploads((prev) => {
+        const going = prev.find((u) => u.key === key);
+        if (going?.preview) URL.revokeObjectURL(going.preview);
+        return prev.filter((u) => u.key !== key);
+      });
       setRemoving((prev) => {
         const next = new Set(prev);
         next.delete(key);
@@ -339,6 +363,8 @@ export function HomeComposer({
       // The turn is committed — clear the draft (removes it from storage) and the
       // attachment chips. We are navigating away, so no further local reset needed.
       onValueChange('');
+      // Every thumbnail made for this turn is released as the tray empties.
+      for (const u of uploads) if (u.preview) URL.revokeObjectURL(u.preview);
       setUploads([]);
 
       if (result.status === 'existing') {
@@ -491,7 +517,7 @@ export function HomeComposer({
                     ) : isFailed ? (
                       <AlertCircle className="size-3.5 shrink-0" aria-hidden />
                     ) : (
-                      <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                      <AttachmentIcon preview={upload.preview} />
                     )}
                     <span className="max-w-[140px] truncate" title={upload.file_name}>
                       {upload.file_name}
@@ -521,6 +547,11 @@ export function HomeComposer({
           <PromptInputTextarea
             placeholder={placeholder}
             className={cn('text-foreground placeholder:text-muted-foreground', textareaClassName)}
+            /* Pasting a picture here does what the attach button does, and what
+               pasting one into the conversation composer does. A screenshot
+               landing in one box and vanishing in the other is the kind of
+               difference somebody finds by accident. */
+            onPasteFiles={(files) => void handleFilesAdded(files)}
           />
 
           <PromptInputActions className="flex items-center gap-2 px-2 pb-1">
@@ -560,7 +591,7 @@ export function HomeComposer({
                     <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
                       <Paperclip className="text-muted-foreground" />
                       <span className="flex-1">Attach files</span>
-                      <span className="text-xs text-muted-foreground">PDF, DOC, RTF</span>
+                      <span className="text-xs text-muted-foreground">{ATTACHMENT_HINT}</span>
                     </DropdownMenuItem>
 
                     <DropdownMenuSeparator />
@@ -661,7 +692,8 @@ export function HomeComposer({
               </div>
               <h3 className="mb-2 text-center text-base font-medium">Drop to upload</h3>
               <p className="text-center text-sm text-muted-foreground">
-                Release to attach a PDF, DOC, DOCX or RTF to your message
+                Release to attach a PDF, DOC, DOCX, RTF or a picture to your
+                message
               </p>
             </div>
           </div>

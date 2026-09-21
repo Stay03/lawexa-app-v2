@@ -126,6 +126,12 @@ function PromptInput({
 export type PromptInputTextareaProps = {
   disableAutosize?: boolean
   onLargePaste?: (text: string) => void
+  /**
+   * Pictures found on the clipboard. OPTIONAL, so a caller that does not pass
+   * it keeps the old behaviour exactly — a pasted screenshot goes nowhere,
+   * which is what every caller did before 21 September 2026.
+   */
+  onPasteFiles?: (files: File[]) => void
 } & React.ComponentProps<typeof Textarea>
 
 function PromptInputTextarea({
@@ -133,6 +139,7 @@ function PromptInputTextarea({
   onKeyDown,
   disableAutosize = false,
   onLargePaste,
+  onPasteFiles,
   ...props
 }: PromptInputTextareaProps) {
   const { value, setValue, maxHeight, onSubmit, disabled, textareaRef } =
@@ -185,12 +192,38 @@ function PromptInputTextarea({
   }
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    if (onLargePaste) {
-      const text = e.clipboardData.getData("text/plain")
-      if (text.length > 4000) {
-        e.preventDefault()
-        onLargePaste(text)
+    const text = e.clipboardData.getData("text/plain")
+
+    /* A SCREENSHOT ON THE CLIPBOARD ARRIVES WITH NO FILE NAME, and a nameless
+       file reaches the server without an extension to validate. Naming it from
+       its own type is what the channels composer already does; this does not
+       widen what may be sent, it gives an unnamed thing the name it should
+       have had. */
+    if (onPasteFiles) {
+      const images = Array.from(e.clipboardData.files).filter((f) =>
+        f.type.startsWith("image/")
+      )
+      if (images.length > 0) {
+        const named = images.map((f) =>
+          f.name
+            ? f
+            : new File([f], `pasted-image.${f.type.split("/")[1] || "png"}`, {
+                type: f.type,
+              })
+        )
+        /* ONLY SWALLOW THE PASTE WHEN THERE IS NO TEXT TO KEEP. A copy that
+           carries a picture AND text — a spreadsheet cell, a block of rich
+           text — still pastes its text, because breaking ordinary pasting to
+           serve the rarer case is a bad trade. */
+        if (!text.trim()) e.preventDefault()
+        onPasteFiles(named)
+        if (!text.trim()) return
       }
+    }
+
+    if (onLargePaste && text.length > 4000) {
+      e.preventDefault()
+      onLargePaste(text)
     }
   }
 

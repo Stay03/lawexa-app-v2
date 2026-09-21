@@ -37,6 +37,16 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { MessageAttachment } from '@/types/chat';
 import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
 import { PastedContentCard } from './PastedContentCard';
+import {
+  ACCEPTED_FILE_TYPES,
+  ALLOWED_FILE_TYPES,
+  ATTACHMENT_HINT,
+  ATTACHMENT_SIZE_ERROR,
+  ATTACHMENT_TYPE_ERROR,
+  MAX_FILES_PER_TURN,
+  isImageAttachment,
+  maxSizeFor,
+} from '../attachment-rules';
 import { usePastedContent } from './usePastedContent';
 
 /**
@@ -71,7 +81,8 @@ import { usePastedContent } from './usePastedContent';
  * pasted chips). Overlays (the jurisdiction popover, tooltips, the +-menu) float above.
  *
  * EVERY capability is preserved: jurisdiction picker, real attachments (upload chips +
- * drag-drop, PDF/DOC/DOCX/RTF, 10MB × 10, dedup, symmetric add/remove animation),
+ * drag-drop, PDF/DOC/DOCX/RTF at 10MB and JPG/PNG/WEBP at 5MB, × 10, dedup,
+ * symmetric add/remove animation),
  * pasted-content staging, the plus-menu (Attach + the conversation's STICKY privacy
  * modes shown locked, with honest confidential copy), the redacted pill, the
  * confidential file notice, per-conversation draft persistence, the Send/Stop toggle
@@ -80,16 +91,6 @@ import { usePastedContent } from './usePastedContent';
  * confidential toggle / study mode — those are turn-1 create concerns owned by the home
  * composer.
  */
-const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.rtf';
-const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_FILES_PER_TURN = 10;
-const ALLOWED_FILE_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/rtf',
-  'text/rtf',
-];
 /** Attachment exit window — must clear before the row leaves the DOM. */
 const CHIP_EXIT_MS = 160;
 
@@ -98,6 +99,10 @@ interface FileUploadEntry {
   file_name: string;
   file_size: number;
   status: 'uploading' | 'uploaded' | 'failed';
+  /** Object URL for a picture, made from the local File so the thumbnail is
+   *  there before the upload finishes and without a second request. Revoked
+   *  when the chip goes, or the image stays in memory for the session. */
+  preview?: string;
   file_id?: number;
   error?: string;
 }
@@ -248,7 +253,7 @@ export function ConversationComposer({
         rejectedType = true;
         continue;
       }
-      if (file.size > MAX_DOCUMENT_SIZE) {
+      if (file.size > maxSizeFor(file)) {
         rejectedSize = true;
         continue;
       }
@@ -268,12 +273,18 @@ export function ConversationComposer({
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       accepted.push({
         file,
-        entry: { key: slotKey, file_name: file.name, file_size: file.size, status: 'uploading' },
+        entry: {
+          key: slotKey,
+          file_name: file.name,
+          file_size: file.size,
+          status: 'uploading',
+          preview: isImageAttachment(file) ? URL.createObjectURL(file) : undefined,
+        },
       });
     }
 
-    if (rejectedType) showError('Only PDF, DOC, DOCX, and RTF files are supported.');
-    else if (rejectedSize) showError('Each file must be 10MB or less.');
+    if (rejectedType) showError(ATTACHMENT_TYPE_ERROR);
+    else if (rejectedSize) showError(ATTACHMENT_SIZE_ERROR);
     else if (rejectedCap) showError(`You can attach at most ${MAX_FILES_PER_TURN} files per message.`);
     else if (rejectedDuplicate && accepted.length === 0) showError('That file is already attached.');
 
@@ -318,7 +329,11 @@ export function ConversationComposer({
       return next;
     });
     window.setTimeout(() => {
-      setUploads((prev) => prev.filter((u) => u.key !== key));
+      setUploads((prev) => {
+        const going = prev.find((u) => u.key === key);
+        if (going?.preview) URL.revokeObjectURL(going.preview);
+        return prev.filter((u) => u.key !== key);
+      });
       setRemoving((prev) => {
         const next = new Set(prev);
         next.delete(key);
@@ -360,6 +375,8 @@ export function ConversationComposer({
 
     setInput('');
     clearPasted();
+    // Send empties the tray, so every thumbnail made for it is released here.
+    for (const u of uploads) if (u.preview) URL.revokeObjectURL(u.preview);
     setUploads([]);
     setIsSubmitting(true);
     try {
@@ -508,6 +525,16 @@ export function ConversationComposer({
                     <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
                   ) : u.status === 'failed' ? (
                     <AlertCircle className="size-3.5 shrink-0" aria-hidden />
+                  ) : u.preview ? (
+                    /* A PERSON WHO PASTES TWO SCREENSHOTS CANNOT TELL THEM
+                       APART BY NAME — both arrive as `pasted-image.png`. The
+                       thumbnail is the only thing that distinguishes them. */
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={u.preview}
+                      alt=""
+                      className="size-5 shrink-0 rounded object-cover"
+                    />
                   ) : (
                     <FileText className="text-muted-foreground size-3.5 shrink-0" aria-hidden />
                   )}
@@ -598,7 +625,11 @@ export function ConversationComposer({
                 <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
                   <Paperclip className="text-muted-foreground" />
                   <span className="flex-1">Attach files</span>
-                  <span className="text-muted-foreground text-xs">PDF, DOC, RTF</span>
+                  {/* THE LIMIT IS STATED WHERE THE CHOICE IS MADE. A person who
+                      picks an 8MB photo should learn it here, not from a 422
+                      after watching it upload. Two numbers because the caps
+                      genuinely differ, and one of them would be a lie. */}
+                  <span className="text-muted-foreground text-xs">{ATTACHMENT_HINT}</span>
                 </DropdownMenuItem>
 
                 {(isRedacted || isConfidential) && (
@@ -648,6 +679,11 @@ export function ConversationComposer({
               // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
               className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
               onLargePaste={addPasted}
+              /* A pasted picture goes down the SAME path as one chosen with the
+                 attach button, so the type check, the size cap, the duplicate
+                 check and the chip are all one implementation rather than two
+                 that can drift. */
+              onPasteFiles={(files) => void handleFilesAdded(files)}
             />
 
             {isStreaming ? (
@@ -697,7 +733,8 @@ export function ConversationComposer({
               </div>
               <h3 className="mb-2 text-center text-base font-medium">Drop to upload</h3>
               <p className="text-muted-foreground text-center text-sm">
-                Release to attach a PDF, DOC, DOCX or RTF to your message
+                Release to attach a PDF, DOC, DOCX, RTF or a picture to your
+                message
               </p>
             </div>
           </div>
