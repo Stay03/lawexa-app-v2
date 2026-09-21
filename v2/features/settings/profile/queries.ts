@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { authApi } from '@/lib/api/auth';
+import { countriesApi } from '@/lib/api/countries';
 import { expertiseApi } from '@/lib/api/expertise';
 import { universityApi } from '@/lib/api/universities';
 import { STALE_TIMES } from '@/v2/runtime/query';
@@ -13,35 +14,29 @@ export interface ProfileCountry {
 }
 
 /**
- * The list of countries, from the same public service v1 reads.
+ * The list of countries, from our own API.
  *
- * ── WHY THE FETCHER IS RESTATED HERE ───────────────────────────────────────
- * v1 keeps it inside `lib/hooks/useCountries.ts`, which is a HOOK, and v2 is
- * barred from importing v1 hooks (the `import/no-restricted-paths` rule) for
- * the reason this whole tree exists: a v1 hook drags v1's own query policy,
- * its own key, and whatever else it grows into the v2 bundle. What is copied
- * is nine lines of `fetch` and a sort, and the SHAPE is kept identical, above
- * all that the stored value is the country's common NAME. That matters twice
- * over: it is what the backend already holds for every existing account, and
- * `getLevelOptions` keys its study-level names off exactly those strings.
+ * ── THE FETCHER IS NO LONGER RESTATED HERE, AND THAT WAS THE BUG ───────────
+ * This file used to carry its own copy of a `fetch` to
+ * `restcountries.com/v3.1`, matching one in `lib/hooks/useCountries.ts`. The
+ * comment justified the duplication as "nine lines of fetch and a sort". On 21
+ * September 2026 that provider retired the version both copies called and
+ * began answering **HTTP 200 with a deprecation body**, so the
+ * `if (!response.ok) throw` in each never fired, `.map` ran over an object,
+ * and every country list in the app went empty in silence.
  *
- * NOT `lib/api/jurisdictions.ts`, which is a different list for a different
- * question: the jurisdictions Lawexa carries law for, not the countries a
- * person can live in.
+ * Two copies is how one gets fixed and the other does not, so both now call
+ * `lib/api/countries.ts`. That is an API module rather than a v1 HOOK, so the
+ * `import/no-restricted-paths` rule this file was working around does not
+ * apply — v2 already imports `authApi`, `expertiseApi` and `universityApi`
+ * from the same place.
+ *
+ * THE STORED VALUE IS STILL THE COUNTRY'S NAME, unchanged. It is what the
+ * backend holds for every existing account and what `getLevelOptions` keys its
+ * study-level names off.
  */
-async function fetchCountries(): Promise<ProfileCountry[]> {
-  const response = await fetch(
-    'https://restcountries.com/v3.1/all?fields=name,cca2',
-  );
-  if (!response.ok) throw new Error('The country list could not be loaded.');
-  const payload = (await response.json()) as {
-    name: { common: string };
-    cca2: string;
-  }[];
-  return payload
-    .map((country) => ({ name: country.name.common, code: country.cca2 }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
+const fetchCountries = countriesApi.getAll;
+
 
 /**
  * The profile screen's read.

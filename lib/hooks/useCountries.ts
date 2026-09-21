@@ -3,42 +3,26 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-export interface Country {
-  name: string;
-  code: string; // ISO 3166-1 alpha-2 (e.g., "NG", "US")
-}
+import { countriesApi } from '@/lib/api/countries';
+import type { Country } from '@/lib/api/countries';
 
-interface RestCountryResponse {
-  name: {
-    common: string;
-    official: string;
-  };
-  cca2: string;
-}
+export type { Country };
 
-async function fetchCountries(): Promise<Country[]> {
-  const response = await fetch(
-    'https://restcountries.com/v3.1/all?fields=name,cca2'
-  );
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch countries');
-  }
-
-  const data: RestCountryResponse[] = await response.json();
-
-  return data
-    .map((country) => ({
-      name: country.name.common,
-      code: country.cca2,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
+/**
+ * THE FETCHER USED TO LIVE HERE, AND SO DID A COPY OF IT IN v2.
+ *
+ * Both called `restcountries.com/v3.1`, which retired that version and now
+ * answers HTTP 200 with a deprecation body — so `if (!response.ok) throw`
+ * never fired, `.map` ran over an object, and every country list in the app
+ * went empty in silence. Both copies now call `lib/api/countries.ts`, which
+ * reads our own `/countries/iso`. One module, because two copies is how one of
+ * them gets fixed and the other does not.
+ */
 
 export function useCountries(search?: string) {
   const { data: countries, isLoading, error } = useQuery({
     queryKey: ['countries'],
-    queryFn: fetchCountries,
+    queryFn: countriesApi.getAll,
     staleTime: 1000 * 60 * 60 * 24, // 24 hours - countries rarely change
     gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours
   });
