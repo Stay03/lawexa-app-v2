@@ -21,7 +21,6 @@ import type { StudentEducationLevel } from '@/types/onboarding';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
-  SettingsChoiceGroup,
   SettingsFormGroup,
   SettingsPickerField,
   type SettingsChoice,
@@ -303,7 +302,8 @@ function ProfileForm({ user }: { user: User }) {
     chooser.value === 'account-type' ||
     chooser.value === 'gender' ||
     chooser.value === 'profession' ||
-    chooser.value === 'level'
+    chooser.value === 'level' ||
+    chooser.value === 'study-place'
       ? chooser.value
       : null;
 
@@ -853,14 +853,33 @@ function ProfileForm({ user }: { user: User }) {
           />
         </SettingsFormGroup>
 
+        {/* ── THE LAST INLINE CONTROL ON THE SCREEN ──────────────────────
+            "Where you study" was a choice group drawn straight onto the page,
+            and it survived my own count of this screen because that group
+            renders labels in a div while I was counting list rows. The
+            instrument could not see it; @techleadclaude read it off the
+            screenshot.
+
+            IT IS NOT A STORED FIELD. The backend infers where a law student
+            studies from whichever of `university` and `law_school` holds a
+            value, so this row's Done changes which question the screen asks
+            next rather than writing anything. `commitField` sends no request
+            when the diff is empty, which is exactly what happens here. */}
         {visibility.showEducationLevelToggle ? (
-          <SettingsChoiceGroup
-            name="profile-study-place"
-            legend="Where you study"
-            value={values.student_education_level ?? ''}
-            options={STUDY_PLACES}
-            onChange={(value) => set('student_education_level', value)}
-          />
+          <SettingsFormGroup id="study-place" label="Where you study">
+            <SettingsPickerField
+              icon={School}
+              label="Where you study"
+              value={
+                STUDY_PLACES.find(
+                  (o) => o.value === values.student_education_level,
+                )?.label ?? null
+              }
+              placeholder="Not set"
+              onOpen={() => chooser.show('study-place')}
+              disabled={saveProfile.isPending}
+            />
+          </SettingsFormGroup>
         ) : null}
 
         {/* ── THE ANSWER FOLLOWS THE QUESTION ───────────────────────────────
@@ -1069,6 +1088,21 @@ function ProfileForm({ user }: { user: User }) {
           answer, which is what `ChoicePanel` is, and each writes its own field
           on Done. Their rows are `SettingsPickerField` like every other row, so
           the screen has one shape and one rule. */}
+      {/* Two answers, and choosing one decides whether the next row asks for a
+          university or a law school. It writes no field of its own; see the
+          row for why. */}
+      <ChoicePanel
+        {...chooser.bind('study-place')}
+        title="Where you study"
+        name="profile-study-place"
+        value={values.student_education_level ?? ''}
+        options={STUDY_PLACES}
+        onChoose={(value) =>
+          commitField({ student_education_level: value }, 'Where you study')
+        }
+        busy={saveProfile.isPending}
+      />
+
       <ChoicePanel
         {...chooser.bind('gender')}
         title="Gender"
