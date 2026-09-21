@@ -853,34 +853,6 @@ function ProfileForm({ user }: { user: User }) {
           />
         </SettingsFormGroup>
 
-        {/* ── THE LAST INLINE CONTROL ON THE SCREEN ──────────────────────
-            "Where you study" was a choice group drawn straight onto the page,
-            and it survived my own count of this screen because that group
-            renders labels in a div while I was counting list rows. The
-            instrument could not see it; @techleadclaude read it off the
-            screenshot.
-
-            IT IS NOT A STORED FIELD. The backend infers where a law student
-            studies from whichever of `university` and `law_school` holds a
-            value, so this row's Done changes which question the screen asks
-            next rather than writing anything. `commitField` sends no request
-            when the diff is empty, which is exactly what happens here. */}
-        {visibility.showEducationLevelToggle ? (
-          <SettingsFormGroup id="study-place" label="Where you study">
-            <SettingsPickerField
-              icon={School}
-              label="Where you study"
-              value={
-                STUDY_PLACES.find(
-                  (o) => o.value === values.student_education_level,
-                )?.label ?? null
-              }
-              placeholder="Not set"
-              onOpen={() => chooser.show('study-place')}
-              disabled={saveProfile.isPending}
-            />
-          </SettingsFormGroup>
-        ) : null}
 
         {/* ── THE ANSWER FOLLOWS THE QUESTION ───────────────────────────────
             This group used to sit below "Where you are", second from last.
@@ -898,6 +870,44 @@ function ProfileForm({ user }: { user: User }) {
             all, so for them it follows the account type just as closely. */}
         {visibility.showEducationSection ? (
           <SettingsFormGroup id="education" label="Education and credentials">
+            {/* ── THE LAST INLINE CONTROL, AND IT LIVES HERE ─────────────
+                "Where you study" was a choice group drawn onto the page. It
+                survived my own count because that group renders labels in a
+                div while I was counting list rows; @techleadclaude read it off
+                the screenshot.
+
+                IT IS IN THIS GROUP RATHER THAN ITS OWN. My first attempt gave
+                it a section headed "Where you study" above a row labelled
+                "Where you study", which is the same duplication I removed from
+                Account type yesterday, rebuilt. It decides whether the rows
+                below it ask for a university or a law school, so it belongs
+                above them, inside the group it governs.
+
+                ITS DONE WRITES NO FIELD. The level is inferred from whichever
+                of `university` and `law_school` holds a value, so
+                `student_education_level` never enters the payload and
+                `commitField` sends no request for an empty diff. That
+                inference is also why the level does not survive a reload until
+                the matching field is filled, which is the open question with
+                Stay. */}
+            {visibility.showEducationLevelToggle ? (
+              <SettingsPickerField
+                icon={
+                  STUDY_PLACES.find(
+                    (o) => o.value === values.student_education_level,
+                  )?.icon ?? School
+                }
+                label="Where you study"
+                value={
+                  STUDY_PLACES.find(
+                    (o) => o.value === values.student_education_level,
+                  )?.label ?? null
+                }
+                placeholder="Not set"
+                onOpen={() => chooser.show('study-place')}
+                disabled={saveProfile.isPending}
+              />
+            ) : null}
             {/* A LIST, NOT A BOX. The owner, 17 August 2026: "for the
                 university there should be a list like in the onboarding there
                 no list in the setting". Onboarding offers the institutions we
