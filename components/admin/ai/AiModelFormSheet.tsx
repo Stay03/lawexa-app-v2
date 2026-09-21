@@ -74,6 +74,10 @@ const createSchema = z.object({
   max_context_tokens: z.number().int().min(1000, 'Minimum context is 1000 tokens').optional(),
   supports_vision: z.boolean().optional(),
   supports_streaming: z.boolean().optional(),
+  /* NULL IS A VALUE HERE AND THE FORM MUST BE ABLE TO HOLD IT. A model
+     nobody has set reads null, and that is what the select shows. It is not
+     offered as a CHOICE — see the control below. */
+  tool_calling_mode: z.enum(['native', 'xml']).nullable().optional(),
   provider_routing: providerRoutingSchema,
   _allowFallbacksTouched: z.boolean().optional(),
 });
@@ -105,6 +109,9 @@ export function AiModelFormSheet({
       max_context_tokens: undefined,
       supports_vision: false,
       supports_streaming: false,
+      // Deliberately null: the server decides what an unset mode means, and a
+      // form that quietly picks one hides the same gap one layer up.
+      tool_calling_mode: null,
       provider_routing: null,
       _allowFallbacksTouched: false,
     },
@@ -130,6 +137,7 @@ export function AiModelFormSheet({
           max_context_tokens: model.max_context_tokens || undefined,
           supports_vision: model.supports_vision,
           supports_streaming: model.supports_streaming,
+          tool_calling_mode: model.tool_calling_mode ?? null,
           provider_routing: routing
             ? {
                 order: routing.order ?? undefined,
@@ -434,6 +442,49 @@ export function AiModelFormSheet({
                           onCheckedChange={field.onChange}
                         />
                       </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {/* ── TOOL CALLING MODE ────────────────────────────────────
+                    The owner, 21 September 2026: "yes Add Tool calling mode to
+                    the Edit Model form". Until now the column could only be
+                    changed with `php artisan tinker`, and a model left unset
+                    falls to the legacy path: every earlier turn is handed to it
+                    wrapped in `<message>` tags, and the model copies the
+                    wrapping into its own replies. Measured on model 211 that
+                    day — tags on the second turn while it was unset, none
+                    across 22 messages once it read `native`.
+
+                    TWO OPTIONS, AND "Not set" IS NOT ONE OF THEM. An unset
+                    model shows "Not set" as the placeholder, so the state is
+                    visible, but it cannot be CHOSEN: picking it would be
+                    choosing the legacy path by name, and nobody wants that on
+                    purpose. Anything already unset stays unset until someone
+                    decides, which is the server's call and not this form's. */}
+                <FormField
+                  control={form.control}
+                  name="tool_calling_mode"
+                  render={({ field }) => (
+                    <FormItem className="rounded-lg border p-3">
+                      <FormLabel className="text-sm font-medium">
+                        Tool calling mode
+                      </FormLabel>
+                      <Select
+                        value={field.value ?? undefined}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Not set — uses the legacy path" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="native">native</SelectItem>
+                          <SelectItem value="xml">xml</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />

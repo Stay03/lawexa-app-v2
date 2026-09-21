@@ -168,6 +168,21 @@ export interface AdminAiProviderRouting {
   allow_fallbacks?: boolean;
 }
 
+/**
+ * How tool calls are declared to a model, and how its history is wrapped.
+ *
+ * `native` sends the provider's own tool-call format and no visible markings.
+ * `xml` wraps every prior turn in `<message>` tags with a timestamp prefix, and
+ * a model that sees that pattern copies it into its own replies (measured on
+ * model 211, 21 September 2026: tags on the second turn with the column null,
+ * none across 22 messages once it was set to `native`).
+ *
+ * NULL IS A REAL STATE AND IS NOT THE SAME AS `xml`. Every new model row starts
+ * null and falls to the legacy path, which is why this reached production; the
+ * server decides what null means, so nothing here may substitute a value for it.
+ */
+export type AdminAiToolCallingMode = 'native' | 'xml';
+
 export interface AdminAiModel {
   id: number;
   provider_id: number;
@@ -178,6 +193,8 @@ export interface AdminAiModel {
   max_context_tokens: number;
   supports_vision: boolean;
   supports_streaming: boolean;
+  /** `null` on a model nobody has set — see {@link AdminAiToolCallingMode}. */
+  tool_calling_mode?: AdminAiToolCallingMode | null;
   provider_routing?: AdminAiProviderRouting | null;
   provider?: AdminAiModelProvider;
   created_at: string;
@@ -203,6 +220,9 @@ export interface AdminAiCreateModelData {
   max_context_tokens?: number;
   supports_vision?: boolean;
   supports_streaming?: boolean;
+  /** Sent on CREATE as well as update: a new row left null is how the legacy
+   *  wrapping reached production in the first place. */
+  tool_calling_mode?: AdminAiToolCallingMode | null;
   provider_routing?: AdminAiProviderRouting | null;
 }
 
@@ -215,6 +235,7 @@ export interface AdminAiUpdateModelData {
   max_context_tokens?: number;
   supports_vision?: boolean;
   supports_streaming?: boolean;
+  tool_calling_mode?: AdminAiToolCallingMode | null;
   provider_routing?: AdminAiProviderRouting | null;
 }
 
