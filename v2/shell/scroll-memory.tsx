@@ -115,6 +115,25 @@ const STORAGE_KEY = 'v2-scroll-memory';
 const MAX_ENTRIES = 50;
 /** How long a streaming page gets to grow before a restore gives up at top. */
 const RESTORE_DEADLINE_MS = 3000;
+/**
+ * How short a returning page may be and still keep the reader's place, counted
+ * in screenfuls of the scroller itself.
+ *
+ * ── DO NOT SIMPLIFY THIS AWAY (it reads like an arbitrary constant) ────────
+ * The obvious version of the fix below is "if the offset does not fit, go to
+ * the furthest the page can hold". That reintroduces the bug this whole module
+ * was written for in July: a page still streaming in is a fraction of its full
+ * height, so the furthest it can hold is the bottom of the skeleton, and the
+ * reader is parked there and then thrown again when the rest arrives. The
+ * restore docblock above calls that "the very bug being fixed".
+ *
+ * ONE SCREENFUL SEPARATES THE TWO CASES. A page that is a few pixels short is
+ * there, and the nearest place it can hold is within a finger's width of where
+ * the reader was. A page that is screens short has not arrived, and the top is
+ * the honest place to wait. The number is a judgement, and one screen is the
+ * smallest gap that cannot be confused with a partial render.
+ */
+const CLAMP_WITHIN_SCREENS = 1;
 /** How long a hard-loaded entry gets to become router-owned before the
  *  settle effect stops retrying its stamp. */
 const STAMP_DEADLINE_MS = 5000;
@@ -352,9 +371,38 @@ export function ScrollMemory() {
         return;
       }
 
-      // Streaming return: pin to the honest skeleton position and wait for
-      // the page to grow tall enough to hold the reader's place.
-      if (first) first.scrollTop = 0;
+      /* ── A PAGE THAT IS NEARLY TALL ENOUGH KEEPS THE READER'S PLACE ───────
+         Pinning to zero is right for a skeleton and wrong for a page that is
+         already there, and the two were not being told apart.
+
+         THE OWNER'S REPORT, 21 September 2026: scroll to the bottom of
+         Settings, open a field, press Cancel, and the page is at the top. He
+         filmed it, and his own reading off the film was "seems the scroll to
+         the bottom is the issue". It is. Closing a panel is a history pop, so
+         this runs; and AT THE VERY BOTTOM THE SAVED OFFSET EQUALS THE MAXIMUM
+         EXACTLY, so `fits` has no slack at all and any shrink of a single
+         pixel — the panel still unmounting, a hint line re-wrapping — sends
+         him to the top. The same film shows the same Cancel from mid-page
+         returning him exactly where he was, because there the offset sits well
+         inside the maximum. Same action, two depths, two outcomes.
+
+         SO CLAMP WHEN THE PAGE IS ESSENTIALLY THERE, AND ONLY THEN. Within one
+         screenful of holding his place, the nearest position it CAN hold is a
+         better answer than the top: he stays at the bottom, off by a few
+         pixels. Further short than that and the content genuinely has not
+         arrived, which is the streaming case the docblock above describes, and
+         the top is still the honest position to wait at.
+
+         THE RETRY AND ITS ABORT ARE BOTH LEFT ALONE. The loop below still
+         walks the position to the exact offset as the page grows, and a touch
+         still cancels it. A page that keeps moving under a reader's finger is
+         worse than one that settled a few pixels off. */
+      if (first) {
+        const room = Math.max(0, first.scrollHeight - first.clientHeight);
+        const nearlyTallEnough =
+          room >= target - first.clientHeight * CLAMP_WITHIN_SCREENS;
+        first.scrollTop = nearlyTallEnough ? Math.min(target, room) : 0;
+      }
       for (const type of abortEvents) {
         document.addEventListener(type, abort, { capture: true, passive: true });
       }
