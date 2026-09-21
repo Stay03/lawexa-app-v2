@@ -1,6 +1,7 @@
 import {
   AtSign,
   Building,
+  Cake,
   Facebook,
   House,
   IdCard,
@@ -60,6 +61,7 @@ export type ProfileTextFieldName = Extract<
   | 'name'
   | 'username'
   | 'bio'
+  | 'date_of_birth'
   | 'state'
   | 'city'
   | 'address'
@@ -89,7 +91,7 @@ export interface ProfileTextFieldSpec {
   maxLength?: number;
   /** A fixed glyph before the value, in both places (the handle's `@`). */
   prefix?: string;
-  type?: 'text' | 'url';
+  type?: 'text' | 'url' | 'date';
   inputMode?: 'text' | 'url' | 'numeric';
   autoComplete?: string;
   spellCheck?: boolean;
@@ -130,6 +132,18 @@ export const PROFILE_TEXT_FIELDS: Record<
     placeholder: 'A line or two about yourself',
     multiline: true,
     maxLength: PROFILE_LIMITS.bio,
+  },
+  /* A DATE INPUT IN A PANEL. It was the last control edited in place, and it
+     stayed there because tapping it opens the phone's own calendar, which is
+     better than anything a panel could draw. That is still true: the calendar
+     is unchanged and the panel is only what keeps the value, so the row obeys
+     the same Done as every other row. */
+  date_of_birth: {
+    icon: Cake,
+    label: 'Date of birth',
+    placeholder: 'YYYY-MM-DD',
+    type: 'date',
+    autoComplete: 'bday',
   },
   state: {
     icon: MapPin,

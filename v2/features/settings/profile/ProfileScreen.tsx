@@ -5,10 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Briefcase,
   Building2,
-  Cake,
   GraduationCap,
   Globe,
-  Loader2,
   Scale,
   School,
   Tags,
@@ -16,7 +14,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import { PROFESSION_OPTIONS, getLevelOptions } from '@/types/onboarding';
 import type { User, UserType } from '@/types/auth';
@@ -27,8 +24,6 @@ import {
   SettingsChoiceGroup,
   SettingsFormGroup,
   SettingsPickerField,
-  SettingsSelectField,
-  SettingsTextField,
   type SettingsChoice,
 } from '../SettingsForm';
 import { ChoicePanel } from '../ChoicePanel';
@@ -305,7 +300,10 @@ function ProfileForm({ user }: { user: User }) {
     chooser.value === 'country' ||
     chooser.value === 'expertise' ||
     chooser.value === 'university' ||
-    chooser.value === 'account-type'
+    chooser.value === 'account-type' ||
+    chooser.value === 'gender' ||
+    chooser.value === 'profession' ||
+    chooser.value === 'level'
       ? chooser.value
       : null;
 
@@ -515,6 +513,73 @@ function ProfileForm({ user }: { user: User }) {
    * agree the moment the sheet closes. It is also why the caller may put a
    * question in front of this.
    */
+  /**
+   * ONE FIELD, WRITTEN ON ITS OWN. The owner, 20 September 2026: "I want each
+   * input to have its own done button so that saves that particular one instead
+   * of have a general save at the bottom that saves everything".
+   *
+   * `saveType` was the first of these and this is that function with the patch
+   * made an argument, because every row now needs the same four properties:
+   *
+   *  - THE DIFF IS AGAINST THE RECORD, NOT THE SCREEN. `original` is what the
+   *    server holds; `values` is that plus whatever else is half-typed on the
+   *    page. Building the payload off `values` would post somebody's unfinished
+   *    bio because they saved their name, which they never asked for.
+   *  - WHAT THE PATCH IMPLIES TRAVELS WITH IT. `settleProfileValues` decides
+   *    what a change means for the fields that hang off it, so a caller states
+   *    the field it owns and nothing else.
+   *  - A FAILED WRITE PUTS BACK ONLY WHAT IT TOUCHED. Every other field on the
+   *    form is someone's unsaved typing and a failure here is no reason to take
+   *    it.
+   *  - THE ERROR LANDS ON THE FIELD. A 422 for the handle belongs under the
+   *    handle, which is why `mutations.ts` carries `meta.silentError` and why
+   *    this maps rather than toasting a whole-form message.
+   */
+  const commitField = (patch: Partial<ProfileFormValues>, what: string) => {
+    const keys = Object.keys(patch) as (keyof ProfileFormValues)[];
+    const nextRecord = settleProfileValues({ ...original, ...patch }, original);
+    const payload = buildProfilePayload(nextRecord, original);
+
+    // On screen at once, so the row reads right while the write is in flight.
+    setValues((current) => ({ ...current, ...patch }));
+    setErrors((previous) => {
+      const next = { ...previous };
+      for (const key of keys) if (isAddressableField(key)) delete next[key];
+      delete next.form;
+      return next;
+    });
+
+    if (!hasChanges(payload)) return;
+
+    saveProfile.mutate(payload, {
+      onSuccess: () => {
+        setOriginal(nextRecord);
+        setValues((current) => settleProfileValues(current, nextRecord));
+        toast.success(`${what} saved`);
+      },
+      onError: (error) => {
+        /* BUILT AS A PATCH, NOT ASSIGNED KEY BY KEY. Writing
+           `restored[key] = original[key]` over a union of keys narrows the
+           target to `never`, because the compiler has to satisfy every member
+           of the union at once. Collecting the same values into a partial and
+           spreading it says the same thing and type-checks. */
+        const revert = keys.reduce<Partial<ProfileFormValues>>(
+          (acc, key) => ({ ...acc, [key]: original[key] }),
+          {},
+        );
+        setValues((current) =>
+          settleProfileValues({ ...current, ...revert }, original),
+        );
+        const apiError = extractApiError(error);
+        const mapped = apiError.errors
+          ? mapServerErrors(apiError.errors)
+          : { fields: {}, matched: false };
+        setErrors(mapped.matched ? mapped.fields : { form: apiError.message });
+        toast.error(apiError.message);
+      },
+    });
+  };
+
   const saveType = (type: UserType) => {
     const nextRecord = settleProfileValues(withType(original, type), original);
     const typePayload = buildProfilePayload(nextRecord, original);
@@ -729,27 +794,33 @@ function ProfileForm({ user }: { user: User }) {
           {textRow('name')}
           {textRow('username')}
           {textRow('bio')}
-          <SettingsSelectField
+          {/* ── EVERY ROW OPENS, CHANGES, AND IS PRESSED DONE ──────────────
+              The owner, 20 September 2026: "I want each input to have its own
+              done button so that saves that particular one instead of have a
+              general save at the bottom that saves everything".
+
+              Gender was a select sitting on the page. A select has no Done and
+              never can, and saving it the instant it changes is the invisible
+              save he is objecting to — he wants to know when a change is kept.
+              So it became a row like the rest. One rule for the screen, and no
+              exception to explain. */}
+          <SettingsPickerField
             icon={VenusAndMars}
             label="Gender"
-            value={values.gender}
-            onChange={(value) => set('gender', value)}
-            options={GENDERS}
+            value={
+              GENDERS.find((option) => option.value === values.gender)?.label ??
+              null
+            }
             placeholder="Not set"
+            onOpen={() => chooser.show('gender')}
             error={errors.gender}
+            disabled={saveProfile.isPending}
           />
-          {/* The one control still typed into on the page, and only in the
-              sense that a date input is typed into: on a phone it opens the
-              platform's calendar, which is a better answer than any panel. */}
-          <SettingsTextField
-            icon={Cake}
-            label="Date of birth"
-            type="date"
-            value={values.date_of_birth}
-            onChange={(value) => set('date_of_birth', value)}
-            error={errors.date_of_birth}
-            autoComplete="bday"
-          />
+          {/* DATE OF BIRTH KEEPS THE PLATFORM PICKER, it just keeps it inside a
+              panel now. Tapping a date input opens the phone's own calendar
+              either way; what changes is that the value it produces is kept by
+              a Done rather than by a button at the bottom of the page. */}
+          {textRow('date_of_birth')}
           {/* ── A ROW THAT OPENS A SHEET, NOT THREE ROWS ON THE PAGE ───────
               The owner, 19 September 2026: "it shows the setting then when you
               touch it, it then shows the modal with the option like in the
@@ -824,14 +895,17 @@ function ProfileForm({ user }: { user: User }) {
               />
             ) : null}
             {visibility.showLevel ? (
-              <SettingsSelectField
+              <SettingsPickerField
                 icon={GraduationCap}
                 label="Level"
-                value={values.level}
-                onChange={(value) => set('level', value)}
-                options={levelOptions}
+                value={
+                  levelOptions.find((o) => o.value === values.level)?.label ??
+                  null
+                }
                 placeholder="Not set"
+                onOpen={() => chooser.show('level')}
                 error={errors.level}
+                disabled={saveProfile.isPending}
               />
             ) : null}
             {/* LAW SCHOOL IS FOR STUDENTS, NOT LAWYERS. The owner,
@@ -884,14 +958,17 @@ function ProfileForm({ user }: { user: User }) {
         {visibility.showProfession || visibility.showAreasOfExpertise ? (
           <SettingsFormGroup id="work" label="Your work">
             {visibility.showProfession ? (
-              <SettingsSelectField
+              <SettingsPickerField
                 icon={Briefcase}
                 label="Profession"
-                value={values.profession}
-                onChange={(value) => set('profession', value)}
-                options={PROFESSIONS}
+                value={
+                  PROFESSIONS.find((o) => o.value === values.profession)
+                    ?.label ?? null
+                }
                 placeholder="Not set"
+                onOpen={() => chooser.show('profession')}
                 error={errors.profession}
+                disabled={saveProfile.isPending}
               />
             ) : null}
             {visibility.showAreasOfExpertise ? (
@@ -930,34 +1007,23 @@ function ProfileForm({ user }: { user: User }) {
         </SettingsFormGroup>
       </div>
 
-      {/* THE CONFIRM RIDES THE BOTTOM EDGE. The form is long enough that a
-          button at the end of it would be a scroll away from most of the rows
-          it applies to, and both reference apps keep their confirm on screen.
-          `sticky` inside the shell's own scroll region, never `fixed`: the
-          shell is `100dvh - keyboard-inset`, so this rides above the on-screen
-          keyboard for free. It is always rendered, so nothing appears or
-          disappears under the reader's thumb; only its state changes. */}
-      <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-border/70 bg-background/95 px-4 py-3 backdrop-blur-sm">
-        {errors.form ? (
-          <p
-            role="alert"
-            className="mb-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] leading-snug text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-          >
-            {errors.form}
-          </p>
-        ) : null}
-        <div className="flex items-center justify-end gap-3">
-          <p className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
-            {dirty ? 'Unsaved changes' : ''}
-          </p>
-          <Button type="submit" disabled={!dirty || saveProfile.isPending}>
-            {saveProfile.isPending ? (
-              <Loader2 aria-hidden className="animate-spin" />
-            ) : null}
-            {saveProfile.isPending ? 'Saving' : 'Save changes'}
-          </Button>
-        </div>
-      </div>
+      {/* ── THE SAVE BAR IS GONE ────────────────────────────────────────
+          The owner, 20 September 2026: "I dont like the save changes what
+          shows. I dont like that flow thats why I want each input to have its
+          own done button so that saves that particular one instead of have a
+          general save at the bottom that saves everything."
+
+          Every row on this screen now writes its own field when its Done is
+          pressed, so there is no state left for a bar to report and no diff
+          left for a button to send. It came out only once the last four
+          controls had panels of their own; removing it earlier would have left
+          gender, date of birth, level and profession with no way to save at
+          all.
+
+          A WHOLE-FORM ERROR HAS NOWHERE TO LAND NOW, and that is the reason
+          `commitField` maps a 422 onto the field that caused it. A refusal the
+          server does not attribute to a field still reaches the reader, as the
+          toast that `commitField` raises beside it. */}
 
       {/* ONE panel for sixteen rows. It is always rendered, like the two
           pickers under it, because an overlay unmounted while closed cannot
@@ -971,8 +1037,16 @@ function ProfileForm({ user }: { user: User }) {
         validate={(candidate) =>
           heldField ? validateField(heldField, candidate) : undefined
         }
+        /* DONE IS THE SAVE NOW. It used to call `set`, which put the value in
+           the form and left it for the button at the bottom of the page. The
+           owner asked for the opposite and was right that the old flow hides a
+           trap: tapping Done, leaving the screen, and losing the change. */
         onCommit={(next) => {
-          if (heldField) set(heldField, next);
+          if (!heldField) return;
+          commitField(
+            { [heldField]: next } as Partial<ProfileFormValues>,
+            PROFILE_TEXT_FIELDS[heldField].label,
+          );
         }}
       />
 
@@ -988,6 +1062,44 @@ function ProfileForm({ user }: { user: User }) {
         value={values.user_type}
         options={ACCOUNT_TYPES}
         onChoose={saveType}
+        busy={saveProfile.isPending}
+      />
+
+      {/* THE THREE THAT WERE SELECTS. Each is a short fixed list with one
+          answer, which is what `ChoicePanel` is, and each writes its own field
+          on Done. Their rows are `SettingsPickerField` like every other row, so
+          the screen has one shape and one rule. */}
+      <ChoicePanel
+        {...chooser.bind('gender')}
+        title="Gender"
+        name="profile-gender"
+        value={values.gender}
+        options={GENDERS}
+        onChoose={(value) => commitField({ gender: value }, 'Gender')}
+        busy={saveProfile.isPending}
+      />
+
+      <ChoicePanel
+        {...chooser.bind('profession')}
+        title="Profession"
+        name="profile-profession"
+        value={values.profession}
+        options={PROFESSIONS}
+        onChoose={(value) => commitField({ profession: value }, 'Profession')}
+        busy={saveProfile.isPending}
+      />
+
+      {/* THE LEVEL LIST IS COUNTRY-SHAPED. "300 Level" in Nigeria, "Junior" in
+          the United States, and a stored level that falls outside the current
+          country's list is added back rather than dropped, which the list this
+          reads already does. */}
+      <ChoicePanel
+        {...chooser.bind('level')}
+        title="Level"
+        name="profile-level"
+        value={values.level}
+        options={levelOptions}
+        onChoose={(value) => commitField({ level: value }, 'Level')}
         busy={saveProfile.isPending}
       />
 

@@ -446,7 +446,14 @@ export interface SettingsChoice<T extends string> {
   value: T;
   label: string;
   description?: string;
-  icon: LucideIcon;
+  /**
+   * OPTIONAL SINCE 20 September 2026. Account type has three answers that each
+   * mean something a glyph can carry, so it has icons. Gender, profession and
+   * level are plain lists where an icon per row would be decoration invented to
+   * fill a column, and the rows keep the indicator and the label aligned
+   * without one.
+   */
+  icon?: LucideIcon;
 }
 
 /**
@@ -540,13 +547,15 @@ export function SettingsChoiceRow<T extends string>({
         onChange={() => onChange(option.value)}
         className="sr-only"
       />
-      <option.icon
-        aria-hidden
-        className={cn(
-          'mt-0.5 size-5 shrink-0 transition-colors duration-150 motion-reduce:transition-none',
-          selected ? 'text-primary' : 'text-muted-foreground',
-        )}
-      />
+      {option.icon ? (
+        <option.icon
+          aria-hidden
+          className={cn(
+            'mt-0.5 size-5 shrink-0 transition-colors duration-150 motion-reduce:transition-none',
+            selected ? 'text-primary' : 'text-muted-foreground',
+          )}
+        />
+      ) : null}
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] leading-snug font-medium text-foreground">
           {option.label}
