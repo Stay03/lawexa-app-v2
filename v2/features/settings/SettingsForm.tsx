@@ -524,11 +524,21 @@ export function SettingsChoiceRow<T extends string>({
   option,
   selected,
   onChange,
+  control = 'radio',
 }: {
   name: string;
   option: SettingsChoice<T>;
   selected: boolean;
+  /** Radio: called with the row's value. Checkbox: called on every toggle,
+   *  and the caller adds or removes the value. */
   onChange: (value: T) => void;
+  /**
+   * `checkbox` for a list that holds several answers, such as areas of
+   * expertise. Same row, square mark: a round mark says "one of these" and a
+   * square one says "any of these", which is the only way a reader can tell
+   * the two lists apart before tapping.
+   */
+  control?: 'radio' | 'checkbox';
 }) {
   /* CENTRED, NOT TOP-ALIGNED. The row is at least 56px and a one-line label
      is about 20px, so `items-start` left the label and circle 12px from the
@@ -545,7 +555,7 @@ export function SettingsChoiceRow<T extends string>({
       )}
     >
       <input
-        type="radio"
+        type={control}
         name={name}
         value={option.value}
         checked={selected}
@@ -577,7 +587,8 @@ export function SettingsChoiceRow<T extends string>({
       <span
         aria-hidden
         className={cn(
-          'flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 motion-reduce:transition-none',
+          'flex size-5 shrink-0 items-center justify-center border transition-colors duration-150 motion-reduce:transition-none',
+          control === 'checkbox' ? 'rounded-md' : 'rounded-full',
           selected
             ? 'border-primary bg-primary text-primary-foreground'
             : // NOT `border-border`. That token is 4.5% of lightness

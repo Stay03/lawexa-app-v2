@@ -440,22 +440,6 @@ function ProfileForm({ user }: { user: User }) {
     [expertiseAreas],
   );
 
-  const set = <K extends keyof ProfileFormValues>(
-    field: K,
-    value: ProfileFormValues[K],
-  ) => {
-    setValues((previous) => ({ ...previous, [field]: value }));
-    // Touching a field answers whatever was said about it, and retires the
-    // whole-form message, which was about the state the form was just in.
-    setErrors((previous) => {
-      if (!(field in previous) && previous.form === undefined) return previous;
-      const next = { ...previous };
-      if (isAddressableField(field)) delete next[field];
-      delete next.form;
-      return next;
-    });
-  };
-
   /**
    * Choosing a type also settles what depends on it, IN THE FORM. What it does
    * to the RECORD is decided in one place, at save time
@@ -1170,8 +1154,8 @@ function ProfileForm({ user }: { user: User }) {
               ? 'The country list is unavailable right now.'
               : 'No country matches that.'
         }
-        onChange={(ids) => set('country', ids[0] ?? '')}
-        onClear={() => set('country', '')}
+        onChange={(ids) => commitField({ country: ids[0] ?? '' }, 'Country')}
+        busy={saveProfile.isPending}
       />
 
       <OptionPicker
@@ -1200,8 +1184,8 @@ function ProfileForm({ user }: { user: User }) {
         /* And a reader whose university we have never heard of must still be
            able to say where they study. */
         allowCustomValue
-        onChange={(ids) => set('university', ids[0] ?? '')}
-        onClear={() => set('university', '')}
+        onChange={(ids) => commitField({ university: ids[0] ?? '' }, 'University')}
+        busy={saveProfile.isPending}
       />
 
       <OptionPicker
@@ -1216,11 +1200,12 @@ function ProfileForm({ user }: { user: User }) {
         multiple
         emptyMessage="No area matches that."
         onChange={(ids) =>
-          set(
-            'areas_of_expertise',
-            ids.map(Number).filter(Number.isInteger),
+          commitField(
+            { areas_of_expertise: ids.map(Number).filter(Number.isInteger) },
+            'Areas of expertise',
           )
         }
+        busy={saveProfile.isPending}
       />
     </form>
   );
