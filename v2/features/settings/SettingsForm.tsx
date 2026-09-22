@@ -530,10 +530,15 @@ export function SettingsChoiceRow<T extends string>({
   selected: boolean;
   onChange: (value: T) => void;
 }) {
+  /* CENTRED, NOT TOP-ALIGNED. The row is at least 56px and a one-line label
+     is about 20px, so `items-start` left the label and circle 12px from the
+     top and 24px from the bottom, which is what the owner photographed on
+     22 September 2026 ("text is not in the middle of the highlighted area").
+     Measured after the change: equal gaps on one-line and two-line rows. */
   return (
     <label
       className={cn(
-        'v2-interactive flex min-h-14 cursor-pointer items-start gap-3.5 px-4 py-2.5',
+        'v2-interactive flex min-h-14 cursor-pointer items-center gap-3.5 px-4 py-2.5',
         'transition-colors duration-150 motion-reduce:transition-none',
         'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-inset',
         selected ? 'bg-primary/10' : 'hover:bg-foreground/[0.04]',
@@ -551,7 +556,7 @@ export function SettingsChoiceRow<T extends string>({
         <option.icon
           aria-hidden
           className={cn(
-            'mt-0.5 size-5 shrink-0 transition-colors duration-150 motion-reduce:transition-none',
+            'size-5 shrink-0 transition-colors duration-150 motion-reduce:transition-none',
             selected ? 'text-primary' : 'text-muted-foreground',
           )}
         />
@@ -572,7 +577,7 @@ export function SettingsChoiceRow<T extends string>({
       <span
         aria-hidden
         className={cn(
-          'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 motion-reduce:transition-none',
+          'flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 motion-reduce:transition-none',
           selected
             ? 'border-primary bg-primary text-primary-foreground'
             : // NOT `border-border`. That token is 4.5% of lightness
