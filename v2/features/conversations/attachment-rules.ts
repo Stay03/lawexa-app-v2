@@ -116,7 +116,18 @@ export function allowedTypesFor(redacted: boolean): readonly string[] {
 
 export const ATTACHMENT_HINT_REDACTED = 'PDF, DOC, RTF 10MB · no pictures while redacted';
 
-/** Said when a picture is refused, and it names the reason rather than the rule. */
+/**
+ * Said when a picture is refused. It names the reason rather than the rule, and
+ * the remedy matters as much as the reason.
+ *
+ * IT DOES NOT SAY "TURN REDACTION OFF". Redaction is a property of the whole
+ * conversation, so switching it off to send one picture strips protection from
+ * every message already in it — and a person who wants that picture in will do
+ * exactly what the error tells them. The remedy has to be the one that keeps
+ * redaction where it is, which is why this matches the server's wording
+ * (`ChatController`) word for word: two refusals pointing different ways is
+ * worse than either.
+ */
 export const ATTACHMENT_REDACTED_IMAGE_ERROR =
-  'Pictures cannot be attached while redaction is on, because redaction only works on text. Attach a document, or turn redaction off for this conversation.';
+  'Pictures cannot be attached while redaction is on, because redaction cannot be applied to a picture. Attach the document itself, or start a new conversation for this picture.';
 
