@@ -51,12 +51,14 @@ import {
   startConversation,
 } from '@/v2/features/conversations/start-conversation';
 import {
-  ACCEPTED_FILE_TYPES,
-  ALLOWED_FILE_TYPES,
   ATTACHMENT_HINT,
+  ATTACHMENT_HINT_REDACTED,
+  ATTACHMENT_REDACTED_IMAGE_ERROR,
   ATTACHMENT_SIZE_ERROR,
   ATTACHMENT_TYPE_ERROR,
   MAX_FILES_PER_TURN,
+  acceptedTypesFor,
+  allowedTypesFor,
   isImageAttachment,
   maxSizeFor,
 } from '@/v2/features/conversations/attachment-rules';
@@ -217,13 +219,15 @@ export function HomeComposer({
     const remainingSlots = MAX_FILES_PER_TURN - uploads.length;
     const accepted: { file: File; entry: FileUploadEntry }[] = [];
     let rejectedType = false;
+    let rejectedRedactedImage = false;
     let rejectedSize = false;
     let rejectedDuplicate = false;
     let rejectedCap = false;
 
     for (const file of newFiles) {
-      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-        rejectedType = true;
+      if (!allowedTypesFor(redacted).includes(file.type)) {
+        if (redacted && isImageAttachment(file)) rejectedRedactedImage = true;
+        else rejectedType = true;
         continue;
       }
       if (file.size > maxSizeFor(file)) {
@@ -257,7 +261,7 @@ export function HomeComposer({
     }
 
     if (rejectedType) {
-      setError(ATTACHMENT_TYPE_ERROR);
+      setError(rejectedRedactedImage ? ATTACHMENT_REDACTED_IMAGE_ERROR : ATTACHMENT_TYPE_ERROR);
     } else if (rejectedSize) {
       setError(ATTACHMENT_SIZE_ERROR);
     } else if (rejectedCap) {
@@ -415,7 +419,7 @@ export function HomeComposer({
   return (
     <FileUpload
       onFilesAdded={signedIn ? handleFilesAdded : () => {}}
-      accept={ACCEPTED_FILE_TYPES}
+      accept={acceptedTypesFor(redacted)}
       multiple
       disabled={!signedIn}
     >
@@ -425,7 +429,7 @@ export function HomeComposer({
         <input
           ref={fileInputRef}
           type="file"
-          accept={ACCEPTED_FILE_TYPES}
+          accept={acceptedTypesFor(redacted)}
           multiple
           hidden
           onChange={(event) => {
@@ -591,7 +595,9 @@ export function HomeComposer({
                     <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
                       <Paperclip className="text-muted-foreground" />
                       <span className="flex-1">Attach files</span>
-                      <span className="text-xs text-muted-foreground">{ATTACHMENT_HINT}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {redacted ? ATTACHMENT_HINT_REDACTED : ATTACHMENT_HINT}
+                      </span>
                     </DropdownMenuItem>
 
                     <DropdownMenuSeparator />

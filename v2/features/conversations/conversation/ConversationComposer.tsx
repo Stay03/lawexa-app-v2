@@ -38,12 +38,14 @@ import type { MessageAttachment } from '@/types/chat';
 import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
 import { PastedContentCard } from './PastedContentCard';
 import {
-  ACCEPTED_FILE_TYPES,
-  ALLOWED_FILE_TYPES,
   ATTACHMENT_HINT,
+  ATTACHMENT_HINT_REDACTED,
+  ATTACHMENT_REDACTED_IMAGE_ERROR,
   ATTACHMENT_SIZE_ERROR,
   ATTACHMENT_TYPE_ERROR,
   MAX_FILES_PER_TURN,
+  acceptedTypesFor,
+  allowedTypesFor,
   isImageAttachment,
   maxSizeFor,
 } from '../attachment-rules';
@@ -244,13 +246,20 @@ export function ConversationComposer({
     const remainingSlots = MAX_FILES_PER_TURN - uploads.length;
     const accepted: { file: File; entry: FileUploadEntry }[] = [];
     let rejectedType = false;
+    let rejectedRedactedImage = false;
     let rejectedSize = false;
     let rejectedDuplicate = false;
     let rejectedCap = false;
 
+    /* A redacted conversation takes documents and refuses pictures, because
+       redaction runs over text and cannot touch an image. The server refuses
+       too; this is so the person hears it at the composer rather than after
+       the upload. */
+    const allowedHere = allowedTypesFor(isRedacted);
     for (const file of newFiles) {
-      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-        rejectedType = true;
+      if (!allowedHere.includes(file.type)) {
+        if (isRedacted && isImageAttachment(file)) rejectedRedactedImage = true;
+        else rejectedType = true;
         continue;
       }
       if (file.size > maxSizeFor(file)) {
@@ -283,7 +292,8 @@ export function ConversationComposer({
       });
     }
 
-    if (rejectedType) showError(ATTACHMENT_TYPE_ERROR);
+    if (rejectedRedactedImage) showError(ATTACHMENT_REDACTED_IMAGE_ERROR);
+    else if (rejectedType) showError(ATTACHMENT_TYPE_ERROR);
     else if (rejectedSize) showError(ATTACHMENT_SIZE_ERROR);
     else if (rejectedCap) showError(`You can attach at most ${MAX_FILES_PER_TURN} files per message.`);
     else if (rejectedDuplicate && accepted.length === 0) showError('That file is already attached.');
@@ -393,11 +403,15 @@ export function ConversationComposer({
     // max-w; an embedding card is its own constraint) — so every host's pill
     // fills the same gutters and no two states can disagree about size.
     <div className="w-full px-4 pb-3 pt-2">
-      <FileUpload onFilesAdded={handleFilesAdded} accept={ACCEPTED_FILE_TYPES} multiple>
+      <FileUpload
+        onFilesAdded={handleFilesAdded}
+        accept={acceptedTypesFor(isRedacted)}
+        multiple
+      >
         <input
           ref={fileInputRef}
           type="file"
-          accept={ACCEPTED_FILE_TYPES}
+          accept={acceptedTypesFor(isRedacted)}
           multiple
           hidden
           onChange={(event) => {
@@ -629,7 +643,9 @@ export function ConversationComposer({
                       picks an 8MB photo should learn it here, not from a 422
                       after watching it upload. Two numbers because the caps
                       genuinely differ, and one of them would be a lie. */}
-                  <span className="text-muted-foreground text-xs">{ATTACHMENT_HINT}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {isRedacted ? ATTACHMENT_HINT_REDACTED : ATTACHMENT_HINT}
+                  </span>
                 </DropdownMenuItem>
 
                 {(isRedacted || isConfidential) && (

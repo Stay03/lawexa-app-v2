@@ -86,3 +86,37 @@ export const ATTACHMENT_SIZE_ERROR =
   'Documents must be 10MB or less, and pictures 5MB or less.';
 /** Shown at the point of CHOOSING, so nobody learns the limit from a refusal. */
 export const ATTACHMENT_HINT = 'PDF, DOC, RTF 10MB · JPG, PNG, WEBP 5MB';
+
+/* ── REDACTED CONVERSATIONS TAKE DOCUMENTS AND NOT PICTURES ───────────────
+ *
+ * Redaction runs over TEXT. `RedactionClient::redact` takes a string, so an
+ * attached document has its names removed and a photograph of the same page
+ * does not — the picture is assembled at send time and never meets the
+ * redactor. Before 21 September 2026 that gap was unreachable, because a
+ * scanned PDF was refused for having no extractable text; the picture work
+ * shipped that evening made it reachable.
+ *
+ * The server fails closed and answers 422. This exists so the person is told
+ * at the composer instead, because a control that offers what the server
+ * refuses makes them choose a file and watch it upload before it fails. The
+ * two are not alternatives: the server refuses, the composer explains.
+ *
+ * REDACTING A PICTURE IS NOT THE MISSING FEATURE. It would mean OCR, then
+ * detection, then painting over pixels, and each step can half-fail while
+ * looking successful — which is worse than refusing, because somebody would
+ * believe they were protected.
+ */
+export function acceptedTypesFor(redacted: boolean): string {
+  return redacted ? '.pdf,.doc,.docx,.rtf' : ACCEPTED_FILE_TYPES;
+}
+
+export function allowedTypesFor(redacted: boolean): readonly string[] {
+  return redacted ? ALLOWED_DOCUMENT_TYPES : ALLOWED_FILE_TYPES;
+}
+
+export const ATTACHMENT_HINT_REDACTED = 'PDF, DOC, RTF 10MB · no pictures while redacted';
+
+/** Said when a picture is refused, and it names the reason rather than the rule. */
+export const ATTACHMENT_REDACTED_IMAGE_ERROR =
+  'Pictures cannot be attached while redaction is on, because redaction only works on text. Attach a document, or turn redaction off for this conversation.';
+
