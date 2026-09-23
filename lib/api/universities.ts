@@ -14,6 +14,9 @@ export interface University {
 export interface UniversityQueryParams {
   search?: string;
   country_code?: string;
+  /** `law_school` returns only law schools (Nigeria's seven campuses, and one
+   *  each for Ghana, Kenya and Uganda as of 23 September 2026). */
+  type?: 'university' | 'law_school';
   sort?: 'name' | 'created_at';
   order?: 'asc' | 'desc';
   per_page?: number;

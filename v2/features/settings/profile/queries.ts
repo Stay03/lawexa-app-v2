@@ -135,6 +135,28 @@ export const universityQueries = {
       staleTime: STALE_TIMES.reference,
     }),
 
+  /**
+   * The law schools for a country, or every law school when the country is not
+   * known. The owner, 23 September 2026, said yes to: ask where somebody
+   * attends law school only when their country has law schools on our list,
+   * and pick it from that list. So an EMPTY answer is meaningful: it is what
+   * hides the question.
+   */
+  lawSchools: (countryCode: string | undefined, enabled: boolean) =>
+    queryOptions({
+      queryKey: ['v2', 'universities', 'law_school', countryCode ?? null],
+      queryFn: () =>
+        universityApi.getAll({
+          type: 'law_school',
+          country_code: countryCode,
+          per_page: 50,
+          sort: 'name',
+          order: 'asc',
+        }),
+      enabled,
+      staleTime: STALE_TIMES.reference,
+    }),
+
   /** Below two characters this never runs: the server's own threshold, and the
    *  country list stays on screen rather than emptying itself for one letter. */
   search: (term: string) =>

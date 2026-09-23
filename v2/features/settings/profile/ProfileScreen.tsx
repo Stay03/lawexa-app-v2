@@ -304,7 +304,8 @@ function ProfileForm({ user }: { user: User }) {
     chooser.value === 'gender' ||
     chooser.value === 'profession' ||
     chooser.value === 'level' ||
-    chooser.value === 'study-place'
+    chooser.value === 'study-place' ||
+    chooser.value === 'law-school'
       ? chooser.value
       : null;
 
@@ -346,26 +347,34 @@ function ProfileForm({ user }: { user: User }) {
   };
   const heldField = editingField ?? lastField;
 
-  const visibility = useMemo(() => visibilityFor(values), [values]);
+  /* By ACCOUNT TYPE only. Read by the queries below, which need nothing that
+     depends on where a law student studies; `visibility` further down adds
+     that once the law-school list is known. */
+  const typeVisibility = useMemo(() => visibilityFor(values), [values]);
 
   // The country ROW needs no list: what it shows is the string already stored.
   // So the 250-country fetch waits until somebody opens the picker, and the
   // static tier then keeps it for the rest of the session.
   const countriesQuery = useQuery({
     ...profileQueries.countries(),
-    enabled: openChooser === 'country' || openChooser === 'university',
+    /* A law student needs the country CODE on load, to know whether their
+       country has law schools to offer. One cached call either way. */
+    enabled:
+      openChooser === 'country' ||
+      openChooser === 'university' ||
+      values.user_type === 'law_student',
   });
   // Expertise is the other way round: the row shows the NAMES behind a list of
   // ids, so it has to be read as soon as the row is on screen.
   const expertiseQuery = useQuery({
     ...profileQueries.expertise(),
-    enabled: visibility.showAreasOfExpertise,
+    enabled: typeVisibility.showAreasOfExpertise,
   });
   const expertiseAreas = expertiseQuery.data?.data;
   // Same reason as expertise: the row shows the NAME behind a stored slug.
   const professionsQuery = useQuery({
     ...profileQueries.professions(),
-    enabled: visibility.showProfession,
+    enabled: typeVisibility.showProfession,
   });
   const professions = professionsQuery.data;
   const payload = useMemo(
@@ -389,6 +398,43 @@ function ProfileForm({ user }: { user: User }) {
       (country) => country.name === values.country,
     )?.code;
   }, [countriesQuery.data, values.country]);
+
+  /* ── THE LAW SCHOOL QUESTION IS ASKED ONLY WHERE WE HAVE LAW SCHOOLS ──────
+     The owner, 23 September 2026, answering "should the profile ask where
+     someone attended law school only when their country has law schools on
+     our list?": "Yes". Nigeria has seven campuses on the list, and Ghana,
+     Kenya and Uganda one each; most countries have none.
+
+     So the list decides three things: whether "Where you study" is asked at
+     all, what the Law school row offers, and, where the country has none,
+     that a law student studies at a university. Until the list arrives the
+     question stays offered, so nothing on screen vanishes on the first
+     paint. A country we cannot resolve to a code asks for every law school. */
+  const lawSchoolsQuery = useQuery(
+    universityQueries.lawSchools(
+      countryCode,
+      values.user_type === 'law_student' &&
+        (!values.country || countryCode !== undefined || countriesQuery.isSuccess),
+    ),
+  );
+  const lawSchoolOptions = useMemo(
+    () =>
+      (lawSchoolsQuery.data?.data ?? []).map((school) => ({
+        id: school.name,
+        label: school.name,
+      })),
+    [lawSchoolsQuery.data],
+  );
+  const offersLawSchool =
+    !lawSchoolsQuery.isSuccess || lawSchoolOptions.length > 0;
+  const studyLevel =
+    values.user_type === 'law_student' && !offersLawSchool
+      ? 'university'
+      : values.student_education_level;
+  const visibility = useMemo(
+    () => visibilityFor({ ...values, student_education_level: studyLevel }),
+    [values, studyLevel],
+  );
 
   const countryUniversities = useQuery(
     universityQueries.byCountry(
@@ -563,7 +609,7 @@ function ProfileForm({ user }: { user: User }) {
     const nextRecord = settleProfileValues(
       {
         ...original,
-        student_education_level: values.student_education_level,
+        student_education_level: studyLevel,
         ...patch,
       },
       original,
@@ -920,7 +966,7 @@ function ProfileForm({ user }: { user: User }) {
                 a student with a university saved who chose Law school was read
                 back as University. Profiles that have not answered since hold
                 `null` and are still inferred. */}
-            {visibility.showEducationLevelToggle ? (
+            {visibility.showEducationLevelToggle && offersLawSchool ? (
               <SettingsPickerField
                 icon={
                   STUDY_PLACES.find(
@@ -984,9 +1030,17 @@ function ProfileForm({ user }: { user: User }) {
                 same flag in `components/settings/education-info-form.tsx`.
                 Editing it would silently remove the row from a v1 screen
                 nobody asked us to touch. */}
-            {visibility.showLawSchool && values.user_type !== 'lawyer'
-              ? textRow('law_school')
-              : null}
+            {visibility.showLawSchool && values.user_type !== 'lawyer' ? (
+              <SettingsPickerField
+                icon={Building2}
+                label="Law school"
+                value={values.law_school || null}
+                placeholder="Not set"
+                onOpen={() => chooser.show('law-school')}
+                error={errors.law_school}
+                disabled={saveProfile.isPending}
+              />
+            ) : null}
             {visibility.showCallNumber ? textRow('call_number') : null}
             {/* ── YEAR OF CALL, CERTIFICATIONS AND WORK EXPERIENCE ARE GONE ──
                 The owner, 20 September 2026: "Those 3 not in onboarding remove
@@ -1244,6 +1298,23 @@ function ProfileForm({ user }: { user: User }) {
            able to say where they study. */
         allowCustomValue
         onChange={(ids) => commitField({ university: ids[0] ?? '' }, 'University')}
+        busy={saveProfile.isPending}
+      />
+
+      <OptionPicker
+        {...chooser.bind('law-school')}
+        title="Where did you attend law school?"
+        searchLabel="Search law schools"
+        searchPlaceholder="Search law schools"
+        options={lawSchoolOptions}
+        isLoading={lawSchoolsQuery.isPending}
+        selected={values.law_school ? [values.law_school] : []}
+        emptyMessage={
+          lawSchoolsQuery.isError
+            ? 'The law school list could not be loaded. Try again shortly.'
+            : 'No law school matches that.'
+        }
+        onChange={(ids) => commitField({ law_school: ids[0] ?? '' }, 'Law school')}
         busy={saveProfile.isPending}
       />
 
