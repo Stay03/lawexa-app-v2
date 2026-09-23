@@ -521,7 +521,28 @@ function ProfileForm({ user }: { user: User }) {
    */
   const commitField = (patch: Partial<ProfileFormValues>, what: string) => {
     const keys = Object.keys(patch) as (keyof ProfileFormValues)[];
-    const nextRecord = settleProfileValues({ ...original, ...patch }, original);
+    /* WHERE YOU STUDY IS CARRIED FROM THE SCREEN, NOT FROM THE RECORD.
+       `student_education_level` is stored nowhere: the server has no field for
+       it and it is inferred from which of `university` and `law_school` holds
+       a value. So choosing it writes nothing, `original` never learns it, and
+       a record built from `original` alone still says "not chosen". For a law
+       student that hides University and Law school, and the scoping rule in
+       `settleProfileValues` then drops the very answer being saved.
+
+       The owner, 23 September 2026: "seems where you study and university
+       doesnt actually save". Reproduced on lawexa.com the same night as a law
+       student: Where you study -> University, then Lagos State University;
+       the row showed it and no request was sent. Taking the answer on screen
+       makes the university the thing that records it, which is the only way
+       the backend can. */
+    const nextRecord = settleProfileValues(
+      {
+        ...original,
+        student_education_level: values.student_education_level,
+        ...patch,
+      },
+      original,
+    );
     const payload = buildProfilePayload(nextRecord, original);
 
     // On screen at once, so the row reads right while the write is in flight.
