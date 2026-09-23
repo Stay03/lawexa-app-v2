@@ -300,12 +300,54 @@ export function ScrollMemory() {
       persistNow(); // synchronous — this may be the last tick before unload
     };
 
+    /* ── A SAVE WIPES THE STAMP, AND NOTHING ON THIS PAGE PUTS IT BACK ─────
+       Every settings save calls `router.refresh()`. Next commits a refresh
+       with `preserveCustomHistoryState: false` (next 16.2,
+       segment-cache/navigation.js, `completeSoftNavigation`), so it rewrites
+       the page's history entry WITHOUT this module's key. The settle effect
+       re-stamps only when the path or query changes through the router, and
+       opening or closing a panel does neither: panels write the URL quietly.
+       So after one save the entry stays unmarked, every panel's Back pops to
+       an entry `restore` cannot name, and an unnamed entry restores to 0.
+
+       THE OWNER'S VIDEO, 22 September 2026, reproduced on lawexa.com the same
+       night with the save intercepted: the key was present on a fresh page
+       and `null` after saving City; after saving the account type, three
+       Cancels in a row each landed at 0. A dev build did NOT show it (the
+       refresh re-ran the settle effect there), which is why two earlier local
+       runs kept their place.
+
+       Re-marked HERE, in the capture-phase click that opens the next panel,
+       because it runs before the panel's push and the pushed entry clones the
+       key. With `activeKey`, the key the page was settled with, so the
+       offsets already recorded under it are found again.
+
+       NOT GATED ON `stampingSuspended`. That flag is raised by every push and
+       traverse, panels included, and lowered only by the settle effect, which
+       panels never re-run; so after the first panel it stays raised for the
+       life of the page. Gated on it, this re-mark never ran (measured: same
+       jump, key still null). What the flag protects against is a history
+       write while a navigation is being processed, and the Navigation API
+       says that directly: `navigation.transition` is set only while one is in
+       flight. Engines without the API have no transition to report, and a
+       click precedes the navigation it starts, so it proceeds there. */
+    const reassertStamp = () => {
+      if (!activeKey) return;
+      const nav = (window as { navigation?: { transition?: unknown } }).navigation;
+      if (nav?.transition) return;
+      const state = window.history.state as HistoryState;
+      if (state && NEXT_MARKER in state && readKey(state) === null) {
+        window.history.replaceState({ ...state, [KEY_FIELD]: activeKey }, '', window.location.href);
+      }
+    };
+
     // The pre-push snapshot: every activation (mouse or keyboard — keyboard
     // link activation synthesizes a click) records the current entry's TRUE
     // position before any transition can move the scroller. Recording the
     // reader's real position is valid at any moment, so over-recording on
     // non-navigating clicks costs one map write and can never corrupt.
     const onAnyClick = () => {
+      reassertStamp();
       if (restorePending) return;
       const el = activeScroller();
       if (!el) return;
@@ -314,8 +356,8 @@ export function ScrollMemory() {
     };
 
     // FALLBACK: rAF-throttled continuous saving for engines without the API.
-    // Same read-only key resolution as the snapshot — the settle effect owns
-    // all stamping.
+    // Same key resolution as the snapshot. It never stamps: only the settle
+    // effect and the click above write the key.
     let rafId = 0;
     const saveFrame = () => {
       rafId = 0;
