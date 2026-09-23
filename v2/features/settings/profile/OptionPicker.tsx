@@ -232,23 +232,16 @@ export function OptionPicker({
       ? typed
       : null;
 
-  /* THE OTHER BOX TAKES FOCUS WITHOUT LETTING THE BROWSER SCROLL FOR IT.
+  /* THE OTHER STEP'S BOX TAKES FOCUS WITHOUT LETTING THE BROWSER SCROLL.
      Opened by the tap that chose Other, so the keyboard coming up answers
-     that tap. `autoFocus` did it with the browser's own scroll-into-view,
-     which moves EVERY scrollable ancestor, and the sheet's frame counts even
-     though it is `overflow: hidden`: measured on a production build, the
-     title and search box went off the top and Cancel and Done rose to the
-     middle of the screen. So focus with `preventScroll`, then scroll only the
-     list, and only as far as the box needs. */
+     that tap. `autoFocus` scrolls every scrollable ancestor to reveal the
+     box, and the sheet's frame counts even though it is `overflow: hidden`
+     (measured 23 September 2026: the title and footer were pushed off). */
   const focusOtherBox = (input: HTMLInputElement | null) => {
     if (!input || document.activeElement === input) return;
     input.focus({ preventScroll: true });
-    const list = input.closest<HTMLElement>('.overflow-y-auto');
-    if (!list) return;
-    const overflow =
-      input.getBoundingClientRect().bottom - list.getBoundingClientRect().bottom;
-    if (overflow > 0) list.scrollTop += overflow + 12;
   };
+  const otherInputId = useId();
 
   const renderRow = (option: PickerOption, icon?: typeof Plus) => (
     <Fragment key={option.id}>
@@ -259,18 +252,6 @@ export function OptionPicker({
         selected={current.includes(option.id)}
         onChange={handlePick}
       />
-      {otherChosen && option.id === otherId ? (
-        <div className="px-4 pt-1 pb-3 md:px-6">
-          <Input
-            ref={focusOtherBox}
-            value={otherText}
-            onChange={(event) => setOtherText(event.target.value)}
-            aria-label={otherLabel ?? 'Type your answer'}
-            placeholder={otherLabel ?? 'Type your answer'}
-            maxLength={100}
-          />
-        </div>
-      ) : null}
     </Fragment>
   );
 
@@ -315,6 +296,44 @@ export function OptionPicker({
         </div>
       }
     >
+      {/* ── OTHER IS ITS OWN STEP, NOT A BOX UNDER THE LAST ROW ────────────
+          The owner, 23 September 2026, with a screenshot of the first
+          version: "The others is a complete mess. Do something about it".
+          The box sat under the Other row at the foot of a 38-row list, the
+          one place the keyboard covers, with the list still around it.
+
+          So choosing Other swaps the list for one question with the box at
+          the top of the sheet, the shape of every other text answer on this
+          page (City, Bio). The footer is unchanged, and "Back to the list"
+          undoes the choice without closing anything. */}
+      {otherChosen ? (
+        <div className="flex flex-col gap-2.5 pt-1">
+          <label
+            htmlFor={otherInputId}
+            className="text-[15px] leading-snug font-medium text-foreground"
+          >
+            {otherLabel ?? 'Type your answer'}
+          </label>
+          <Input
+            id={otherInputId}
+            ref={focusOtherBox}
+            value={otherText}
+            onChange={(event) => setOtherText(event.target.value)}
+            maxLength={100}
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(null);
+              setOtherText('');
+            }}
+            className="v2-interactive mt-1 self-start rounded-md text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Back to the list
+          </button>
+        </div>
+      ) : (
       <div>
         {/* Pinned to the top of the scrolling body, over the rows, so the box
             is still there after scrolling 199 countries. Pulled out to the
@@ -326,8 +345,12 @@ export function OptionPicker({
             box 16px below where it sits and it covered the top of the first
             row (measured: search box bottom 235, first row top 219). The
             negative offset cancels the padding the `-mt-4` already pulls the
-            box over. The desktop body has no top padding, so `top-0` there. */}
-        <div className="sticky -top-4 z-10 -mx-4 -mt-4 bg-popover px-4 pt-4 pb-3 md:top-0 md:-mx-6 md:mt-0 md:px-6 md:pt-1">
+            box over. The desktop body has no top padding, so `top-0` there.
+
+            THE HAIRLINE UNDER IT is where rows go when they scroll. Without
+            it a row cut in half by the box read as broken (the owner's
+            screenshot, 23 September 2026: "Lawyer" half-hidden). */}
+        <div className="sticky -top-4 z-10 -mx-4 -mt-4 border-b border-border bg-popover px-4 pt-4 pb-3 md:top-0 md:-mx-6 md:mt-0 md:px-6 md:pt-1">
           <div className="relative">
             <Search
               aria-hidden
@@ -381,6 +404,7 @@ export function OptionPicker({
           </fieldset>
         )}
       </div>
+      )}
     </ResponsiveOverlay>
   );
 }

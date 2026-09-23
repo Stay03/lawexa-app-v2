@@ -1225,7 +1225,7 @@ function ProfileForm({ user }: { user: User }) {
             : 'No profession matches that.'
         }
         otherId={otherProfessionSlug}
-        otherLabel="Type your profession"
+        otherLabel="What is your profession?"
         onChange={(ids) => commitField({ profession: ids[0] ?? '' }, 'Profession')}
         busy={saveProfile.isPending}
       />
