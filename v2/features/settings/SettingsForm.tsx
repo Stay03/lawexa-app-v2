@@ -548,7 +548,13 @@ export function SettingsChoiceRow<T extends string>({
   return (
     <label
       className={cn(
-        'v2-interactive flex min-h-14 cursor-pointer items-center gap-3.5 px-4 py-2.5',
+        // `relative` holds the visually hidden radio INSIDE this row. Without
+        // it the `sr-only` input is positioned against the nearest positioned
+        // ancestor, which is the fixed sheet, and focusing a row far down a
+        // long list made the browser scroll the sheet's own frame to reach it:
+        // measured 1369px on the profession sheet, 23 September 2026, with the
+        // title and footer pushed off the sheet.
+        'v2-interactive relative flex min-h-14 cursor-pointer items-center gap-3.5 px-4 py-2.5',
         'transition-colors duration-150 motion-reduce:transition-none',
         'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-inset',
         selected ? 'bg-primary/10' : 'hover:bg-foreground/[0.04]',

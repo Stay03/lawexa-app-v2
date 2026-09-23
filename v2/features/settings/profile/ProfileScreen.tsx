@@ -223,10 +223,11 @@ const GENDERS = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-const PROFESSIONS = PROFESSION_OPTIONS.map((option) => ({
-  value: option.value,
-  label: option.label,
-}));
+/** The old onboarding list, for the ROW's label only, while the served list
+ *  is loading. Every slug on it is also on the served list (af35312). */
+const LEGACY_PROFESSION_LABELS = new Map<string, string>(
+  PROFESSION_OPTIONS.map((option) => [option.value, option.label]),
+);
 
 /**
  * Every value in the form except the one that is not a stored field:
@@ -361,6 +362,12 @@ function ProfileForm({ user }: { user: User }) {
     enabled: visibility.showAreasOfExpertise,
   });
   const expertiseAreas = expertiseQuery.data?.data;
+  // Same reason as expertise: the row shows the NAME behind a stored slug.
+  const professionsQuery = useQuery({
+    ...profileQueries.professions(),
+    enabled: visibility.showProfession,
+  });
+  const professions = professionsQuery.data;
   const payload = useMemo(
     () => buildProfilePayload(values, original),
     [values, original],
@@ -439,6 +446,24 @@ function ProfileForm({ user }: { user: User }) {
       })),
     [expertiseAreas],
   );
+  const professionOptions = useMemo(
+    () =>
+      (professions ?? []).map((row) => ({ id: row.slug, label: row.name })),
+    [professions],
+  );
+  const otherProfessionSlug = professions?.find((row) => row.is_other)?.slug;
+
+  /* WHAT THE PROFESSION ROW SAYS. An exact slug match is a listed profession;
+     anything else that is stored was typed under Other and is shown as typed.
+     Until the list arrives, the old onboarding labels cover every stored slug
+     they know. */
+  const professionLabel = !values.profession
+    ? null
+    : (professions?.find((row) => row.slug === values.profession)?.name ??
+      (professions
+        ? values.profession
+        : (LEGACY_PROFESSION_LABELS.get(values.profession) ??
+          values.profession)));
 
   /**
    * Choosing a type also settles what depends on it, IN THE FORM. What it does
@@ -995,10 +1020,7 @@ function ProfileForm({ user }: { user: User }) {
               <SettingsPickerField
                 icon={Briefcase}
                 label="Profession"
-                value={
-                  PROFESSIONS.find((o) => o.value === values.profession)
-                    ?.label ?? null
-                }
+                value={professionLabel}
                 placeholder="Not set"
                 onOpen={() => chooser.show('profession')}
                 error={errors.profession}
@@ -1128,13 +1150,29 @@ function ProfileForm({ user }: { user: User }) {
         busy={saveProfile.isPending}
       />
 
-      <ChoicePanel
+      {/* THE SERVED LIST, IN A SEARCHABLE SHEET. The owner, 22 September
+          2026: "The profession list should be populated with a decent number
+          of profession especially the ones that need lawyers or legal
+          assistants ... Should it be on the API ... when others is selected it
+          should allow the person type it in". Backend serves 38 rows plus
+          Other from `GET /professions`; the SLUG is saved (see `Profession`),
+          and Other opens a box whose text is saved instead. */}
+      <OptionPicker
         {...chooser.bind('profession')}
         title="Profession"
-        name="profile-profession"
-        value={values.profession}
-        options={PROFESSIONS}
-        onChoose={(value) => commitField({ profession: value }, 'Profession')}
+        searchLabel="Search professions"
+        searchPlaceholder="Search professions"
+        options={professionOptions}
+        isLoading={professionsQuery.isPending}
+        selected={values.profession ? [values.profession] : []}
+        emptyMessage={
+          professionsQuery.isError
+            ? 'The profession list could not be loaded. Try again shortly.'
+            : 'No profession matches that.'
+        }
+        otherId={otherProfessionSlug}
+        otherLabel="Type your profession"
+        onChange={(ids) => commitField({ profession: ids[0] ?? '' }, 'Profession')}
         busy={saveProfile.isPending}
       />
 

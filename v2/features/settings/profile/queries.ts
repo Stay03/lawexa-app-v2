@@ -5,6 +5,7 @@ import { countriesApi } from '@/lib/api/countries';
 import { expertiseApi } from '@/lib/api/expertise';
 import { universityApi } from '@/lib/api/universities';
 import { STALE_TIMES } from '@/v2/runtime/query';
+import { fetchProfessions } from './api';
 
 /** One country, as the two rows of this form need it. */
 export interface ProfileCountry {
@@ -85,6 +86,16 @@ export const profileQueries = {
     queryOptions({
       queryKey: [...profileQueries.all, 'expertise'] as const,
       queryFn: () => expertiseApi.getAll({ per_page: 100 }),
+      staleTime: STALE_TIMES.static,
+    }),
+
+  /** The profession list. Static like the two above: backend can edit it
+   *  without a deploy, and a change reaching a tab on its next load is soon
+   *  enough for a list somebody answers once. */
+  professions: () =>
+    queryOptions({
+      queryKey: [...profileQueries.all, 'professions'] as const,
+      queryFn: fetchProfessions,
       staleTime: STALE_TIMES.static,
     }),
 };
