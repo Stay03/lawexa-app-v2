@@ -205,6 +205,20 @@ export function OptionPicker({
       title={title}
       description={description}
       size="content"
+      /* ONE HEIGHT, WHATEVER THE LIST HOLDS AND WHETHER THE KEYBOARD IS UP.
+
+         The owner, 23 September 2026: "the country modal is very jumpy
+         especially when the phone keyboard popsup". A `content` sheet is as
+         tall as what is in it, and this one's content is a list that a search
+         shrinks from 199 rows to 1. Measured on lawexa.com, the search box
+         dropped 115px between typing "g" and "gh"; with a keyboard up the cap
+         hid that, and the cap lifted again the moment the keyboard closed.
+
+         So the sheet takes the cap as its height. Its top edge never moves;
+         the keyboard only raises its bottom edge, and a short result list
+         leaves empty sheet under it rather than a shorter sheet. The desktop
+         card gets a fixed height for the same reason. */
+      className="h-[calc(100dvh-var(--keyboard-inset,0px)-3rem)] md:h-[min(40rem,calc(100dvh-4rem-var(--keyboard-inset,0px)))]"
       footer={
         /* The pair from `ChoicePanel`, at the same widths, so the three kinds
            of sheet on this page end the same way. */
@@ -225,10 +239,7 @@ export function OptionPicker({
         </div>
       }
     >
-      {/* A FIXED HEIGHT, because the sheet is sized to its content. Without it
-          the sheet shrinks as a search narrows the list, and the search box
-          the reader is typing into moves down the screen under them. */}
-      <div className="min-h-[60dvh] md:min-h-[26rem]">
+      <div>
         {/* Pinned to the top of the scrolling body, over the rows, so the box
             is still there after scrolling 199 countries. Pulled out to the
             body's edges and given the sheet's own colour so rows pass under
