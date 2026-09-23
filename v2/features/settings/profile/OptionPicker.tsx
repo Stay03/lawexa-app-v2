@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -69,8 +69,6 @@ export function OptionPicker({
   onChange,
   onSearchChange,
   allowCustomValue = false,
-  otherId,
-  otherLabel,
   busy = false,
 }: {
   open: boolean;
@@ -108,18 +106,6 @@ export function OptionPicker({
    * is telling them their own institution does not exist.
    */
   allowCustomValue?: boolean;
-  /**
-   * The id of an "Other" row. Choosing it opens a text box under it, and Done
-   * saves what was typed there instead of the id.
-   *
-   * The owner, 22 September 2026, on the profession list: "when others is
-   * selected it should allow the person type it in". It stays in the results
-   * whatever is searched, because a search that finds nothing is exactly when
-   * somebody needs it. Single choice only.
-   */
-  otherId?: string;
-  /** The text box's accessible name and placeholder. */
-  otherLabel?: string;
   /** A write is in flight, so Done must not start a second one. */
   busy?: boolean;
 }) {
@@ -131,27 +117,8 @@ export function OptionPicker({
      answer until a row is tapped, and the draft is dropped in the close handler
      rather than in an effect. */
   const [draft, setDraft] = useState<string[] | null>(null);
-  const [otherText, setOtherText] = useState('');
   const current = draft ?? selected;
-
-  /* A SAVED ANSWER THAT IS ON NO LIST was typed under Other, so reopening the
-     box shows it rather than an empty field. */
-  const savedFreeText =
-    !multiple &&
-    otherId !== undefined &&
-    selected[0] !== undefined &&
-    selected[0] !== otherId &&
-    !options.some((option) => option.id === selected[0])
-      ? selected[0]
-      : '';
-  const otherChosen =
-    !multiple && otherId !== undefined && current[0] === otherId;
-  const otherValue = otherText.trim();
-  const changed =
-    draft !== null &&
-    (otherChosen
-      ? otherValue.length > 0 && otherValue !== selected[0]
-      : !sameSet(draft, selected));
+  const changed = draft !== null && !sameSet(draft, selected);
 
   // Search and draft are both cleared as the sheet CLOSES, in the event rather
   // than in an effect, so it never reopens filtered by an old word or holding
@@ -161,7 +128,6 @@ export function OptionPicker({
       setSearch('');
       onSearchChange?.('');
       setDraft(null);
-      setOtherText('');
     }
     onOpenChange(next);
   };
@@ -174,7 +140,6 @@ export function OptionPicker({
   const handlePick = (id: string) => {
     if (!multiple) {
       setDraft([id]);
-      if (id === otherId && !otherText) setOtherText(savedFreeText);
       return;
     }
     setDraft(
@@ -186,7 +151,7 @@ export function OptionPicker({
 
   const handleDone = () => {
     if (!changed || draft === null) return;
-    onChange(otherChosen ? [otherValue] : draft);
+    onChange(draft);
     handleOpenChange(false);
   };
 
@@ -209,19 +174,9 @@ export function OptionPicker({
     : selected.map(
         (id) => options.find((option) => option.id === id) ?? { id, label: id },
       );
-  const listed = typed
+  const rest = typed
     ? filtered
     : filtered.filter((option) => !selected.includes(option.id));
-  const otherOption =
-    otherId === undefined
-      ? undefined
-      : options.find((option) => option.id === otherId);
-  const rest =
-    otherOption &&
-    !listed.includes(otherOption) &&
-    !pinned.some((option) => option.id === otherId)
-      ? [...listed, otherOption]
-      : listed;
 
   /** Only when what they typed is not already on the list, so the escape never
    *  sits above the very row it duplicates. */
@@ -232,27 +187,15 @@ export function OptionPicker({
       ? typed
       : null;
 
-  /* THE OTHER STEP'S BOX TAKES FOCUS WITHOUT LETTING THE BROWSER SCROLL.
-     Opened by the tap that chose Other, so the keyboard coming up answers
-     that tap. `autoFocus` scrolls every scrollable ancestor to reveal the
-     box, and the sheet's frame counts even though it is `overflow: hidden`
-     (measured 23 September 2026: the title and footer were pushed off). */
-  const focusOtherBox = (input: HTMLInputElement | null) => {
-    if (!input || document.activeElement === input) return;
-    input.focus({ preventScroll: true });
-  };
-  const otherInputId = useId();
-
   const renderRow = (option: PickerOption, icon?: typeof Plus) => (
-    <Fragment key={option.id}>
-      <SettingsChoiceRow
-        name={name}
-        control={multiple ? 'checkbox' : 'radio'}
-        option={{ value: option.id, label: option.label, icon }}
-        selected={current.includes(option.id)}
-        onChange={handlePick}
-      />
-    </Fragment>
+    <SettingsChoiceRow
+      key={option.id}
+      name={name}
+      control={multiple ? 'checkbox' : 'radio'}
+      option={{ value: option.id, label: option.label, icon }}
+      selected={current.includes(option.id)}
+      onChange={handlePick}
+    />
   );
 
   return (
@@ -296,44 +239,6 @@ export function OptionPicker({
         </div>
       }
     >
-      {/* ── OTHER IS ITS OWN STEP, NOT A BOX UNDER THE LAST ROW ────────────
-          The owner, 23 September 2026, with a screenshot of the first
-          version: "The others is a complete mess. Do something about it".
-          The box sat under the Other row at the foot of a 38-row list, the
-          one place the keyboard covers, with the list still around it.
-
-          So choosing Other swaps the list for one question with the box at
-          the top of the sheet, the shape of every other text answer on this
-          page (City, Bio). The footer is unchanged, and "Back to the list"
-          undoes the choice without closing anything. */}
-      {otherChosen ? (
-        <div className="flex flex-col gap-2.5 pt-1">
-          <label
-            htmlFor={otherInputId}
-            className="text-[15px] leading-snug font-medium text-foreground"
-          >
-            {otherLabel ?? 'Type your answer'}
-          </label>
-          <Input
-            id={otherInputId}
-            ref={focusOtherBox}
-            value={otherText}
-            onChange={(event) => setOtherText(event.target.value)}
-            maxLength={100}
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setDraft(null);
-              setOtherText('');
-            }}
-            className="v2-interactive mt-1 self-start rounded-md text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Back to the list
-          </button>
-        </div>
-      ) : (
       <div>
         {/* Pinned to the top of the scrolling body, over the rows, so the box
             is still there after scrolling 199 countries. Pulled out to the
@@ -395,7 +300,10 @@ export function OptionPicker({
             {/* ABOVE the results, not below them. Somebody types their own
                 institution precisely because ours does not have it, so the
                 answer they want must not sit under near-misses. */}
-            {custom ? renderRow({ id: custom, label: `Use “${custom}”` }, Plus) : null}
+            {/* "ADD", the owner's own word (23 September 2026: "if it's not
+                there then show add"). It adds to this person's answer only;
+                the shared list does not change. */}
+            {custom ? renderRow({ id: custom, label: `Add “${custom}”` }, Plus) : null}
             {pinned.map((option) => renderRow(option))}
             {pinned.length > 0 && rest.length > 0 ? (
               <div aria-hidden className="mx-4 my-1 h-px bg-border md:mx-6" />
@@ -404,7 +312,6 @@ export function OptionPicker({
           </fieldset>
         )}
       </div>
-      )}
     </ResponsiveOverlay>
   );
 }

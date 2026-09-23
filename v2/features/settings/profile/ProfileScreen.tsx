@@ -494,10 +494,13 @@ function ProfileForm({ user }: { user: User }) {
   );
   const professionOptions = useMemo(
     () =>
-      (professions ?? []).map((row) => ({ id: row.slug, label: row.name })),
+      (professions ?? [])
+        // No "Other" row: typing a profession the list lacks offers it as
+        // Add "..." instead (see the picker below).
+        .filter((row) => !row.is_other)
+        .map((row) => ({ id: row.slug, label: row.name })),
     [professions],
   );
-  const otherProfessionSlug = professions?.find((row) => row.is_other)?.slug;
 
   /* WHAT THE PROFESSION ROW SAYS. An exact slug match is a listed profession;
      anything else that is stored was typed under Other and is shown as typed.
@@ -1209,13 +1212,19 @@ function ProfileForm({ user }: { user: User }) {
           of profession especially the ones that need lawyers or legal
           assistants ... Should it be on the API ... when others is selected it
           should allow the person type it in". Backend serves 38 rows plus
-          Other from `GET /professions`; the SLUG is saved (see `Profession`),
-          and Other opens a box whose text is saved instead. */}
+          Other from `GET /professions`; the SLUG is saved (see `Profession`).
+
+          NO OTHER ROW. The owner, 23 September 2026, after two versions of an
+          Other step: "Seems this other is chaotic, can it just be that after
+          the person write it in search, if it's not there then show add".
+          So the search box is the one place to type: a profession the list
+          lacks is offered as Add "...", and its text is saved as typed,
+          exactly as University does. */}
       <OptionPicker
         {...chooser.bind('profession')}
         title="Profession"
-        searchLabel="Search professions"
-        searchPlaceholder="Search professions"
+        searchLabel="Search or type your profession"
+        searchPlaceholder="Search or type your profession"
         options={professionOptions}
         isLoading={professionsQuery.isPending}
         selected={values.profession ? [values.profession] : []}
@@ -1224,8 +1233,7 @@ function ProfileForm({ user }: { user: User }) {
             ? 'The profession list could not be loaded. Try again shortly.'
             : 'No profession matches that.'
         }
-        otherId={otherProfessionSlug}
-        otherLabel="What is your profession?"
+        allowCustomValue
         onChange={(ids) => commitField({ profession: ids[0] ?? '' }, 'Profession')}
         busy={saveProfile.isPending}
       />
