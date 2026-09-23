@@ -888,13 +888,13 @@ function ProfileForm({ user }: { user: User }) {
                 below it ask for a university or a law school, so it belongs
                 above them, inside the group it governs.
 
-                ITS DONE WRITES NO FIELD. The level is inferred from whichever
-                of `university` and `law_school` holds a value, so
-                `student_education_level` never enters the payload and
-                `commitField` sends no request for an empty diff. That
-                inference is also why the level does not survive a reload until
-                the matching field is filled, which is the open question with
-                Stay. */}
+                ITS DONE SAVES `study_institution_type` since 23 September
+                2026 (backend f512cac). Before that the answer was stored
+                nowhere and inferred from which of `university` and
+                `law_school` held a value, so it did not survive a reload, and
+                a student with a university saved who chose Law school was read
+                back as University. Profiles that have not answered since hold
+                `null` and are still inferred. */}
             {visibility.showEducationLevelToggle ? (
               <SettingsPickerField
                 icon={
@@ -1104,8 +1104,8 @@ function ProfileForm({ user }: { user: User }) {
           on Done. Their rows are `SettingsPickerField` like every other row, so
           the screen has one shape and one rule. */}
       {/* Two answers, and choosing one decides whether the next row asks for a
-          university or a law school. It writes no field of its own; see the
-          row for why. */}
+          university or a law school. It saves `study_institution_type`; see
+          the row for why that field exists. */}
       <ChoicePanel
         {...chooser.bind('study-place')}
         title="Where you study"

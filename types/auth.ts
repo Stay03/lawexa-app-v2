@@ -22,6 +22,13 @@ export interface UserProfile {
   state?: string;
   // Education fields
   university?: string;
+  /**
+   * Where a law student studies, STORED since 23 September 2026 (backend
+   * f512cac). `null` on every profile that has not answered since, and for
+   * those the app still infers it from which of `university` and
+   * `law_school` holds a value.
+   */
+  study_institution_type?: 'university' | 'law_school' | null;
   level?: string;
   call_to_bar_year?: number;
   call_number?: string;

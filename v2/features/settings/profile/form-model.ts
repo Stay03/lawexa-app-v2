@@ -124,6 +124,8 @@ export type ProfileSavePayload = Omit<
   'call_to_bar_year'
 > & {
   call_to_bar_year?: number | null;
+  /** Backend f512cac: the stored answer to "Where you study". */
+  study_institution_type?: 'university' | 'law_school';
 };
 
 /** The form's addressable error slots. `form` is the whole-form message for a
@@ -166,11 +168,17 @@ export function profileFormValuesFromUser(user: User): ProfileFormValues {
     gender: profile?.gender ?? '',
     date_of_birth: profile?.date_of_birth ?? '',
     user_type: profile?.user_type ?? '',
-    student_education_level: inferStudentEducationLevel(
-      profile?.user_type,
-      profile?.university,
-      profile?.law_school,
-    ),
+    /* THE STORED ANSWER FIRST. Until 23 September 2026 this was only ever
+       inferred, which read a student who had a university saved and then
+       chose Law school straight back as University. Profiles that have not
+       answered since hold `null`, and for them the inference still stands. */
+    student_education_level:
+      profile?.study_institution_type ??
+      inferStudentEducationLevel(
+        profile?.user_type,
+        profile?.university,
+        profile?.law_school,
+      ),
     profession: profile?.profession ?? '',
     country: profile?.country ?? '',
     state: profile?.state ?? '',
@@ -361,6 +369,15 @@ export function buildProfilePayload(
   }
   if (values.profession !== original.profession) {
     payload.profession = values.profession;
+  }
+  // Only a law student is asked, and only a real answer is sent: the server
+  // takes "university" or "law_school" and refuses anything else with a 422.
+  if (
+    values.user_type === 'law_student' &&
+    values.student_education_level &&
+    values.student_education_level !== original.student_education_level
+  ) {
+    payload.study_institution_type = values.student_education_level;
   }
 
   if (values.bio !== original.bio) payload.bio = values.bio;
