@@ -3,11 +3,34 @@ import type { JurisdictionChoice } from './jurisdiction';
 // Message role types
 export type MessageRole = 'user' | 'assistant' | 'tool';
 
-// Attachment on a message (PDF file)
+// Attachment on a message (a document or a picture)
 export interface MessageAttachment {
   file_id: number;
   file_name: string;
   file_size: number;
+  /**
+   * Known for a file uploaded in this session (the upload answers with it) and
+   * for a history row (read from `metadata.files`, see {@link ApiMessageFile}).
+   * Absent on older confidential transcripts, which stored only the three
+   * fields above; a reader then falls back to the file name's extension.
+   */
+  mime_type?: string;
+}
+
+/**
+ * One entry of a user message's `metadata.files`, as `ChatController` writes it
+ * (read from lawexa-api-v3 main, 24 September 2026). The message resource's
+ * `attachments` list keeps only id, name and size, so this is where the type
+ * lives. `rendered_from_file_id` marks a page picture the server made from a
+ * scanned PDF; the PDF itself is not listed beside it.
+ */
+export interface ApiMessageFile {
+  file_id: number;
+  file_name: string;
+  file_size: number;
+  file_mime_type?: string;
+  is_image?: boolean;
+  rendered_from_file_id?: number;
 }
 
 // Chat message interface
@@ -498,6 +521,8 @@ export interface ApiMessage {
     // the user saw stream in. reason describes why it was cut short.
     partial?: boolean;
     reason?: 'cancelled' | 'error' | 'timeout';
+    /** The files on a user message, with their types. */
+    files?: ApiMessageFile[];
   } | null;
   // Canonical multi-attachment shape (backend normalizes both legacy and new
   // storage shapes into this array). Always check `attachments` first.

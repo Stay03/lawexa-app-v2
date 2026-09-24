@@ -1,20 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { FileUp } from 'lucide-react';
 import { cn, stripContextTags, parsePastedContent } from '@/lib/utils';
 import { formatMessageTimestamp } from '@/lib/utils/date';
-import { formatFileSize } from '@/lib/validations/admin-cases';
 import type { ChatMessage } from '@/types/chat';
 import { PastedContentCard } from '../PastedContentCard';
+import { SentAttachments } from './SentAttachments';
 
 /**
  * UserMessageRow — v2 port of v1's user message block (§C KEEP). Right-aligned
  * rounded-3xl bubble; content over 1000 chars truncates with a Show more / Show
  * less toggle; a click reveals the timestamp (also shown on hover via the group,
- * so the reveal is reachable on touch too); attachment chips and pasted-content
- * cards below. The inline content-context tags (case/statute/note slugs, radar
- * uuids) are stripped for display, exactly as v1 does.
+ * so the reveal is reachable on touch too); the sent files ({@link
+ * SentAttachments}) and pasted-content cards below. The inline content-context
+ * tags (case/statute/note slugs, radar uuids) are stripped for display, exactly
+ * as v1 does.
  */
 const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
 
@@ -90,20 +90,7 @@ export function UserMessageRow({ message }: { message: ChatMessage }) {
         <UserMessageBubble content={displayContent} />
       )}
 
-      {attachments.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {attachments.map((a) => (
-            <div
-              key={a.file_id}
-              className="bg-muted/60 text-muted-foreground flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs"
-            >
-              <FileUp className="h-3 w-3" />
-              <span className="max-w-[150px] truncate">{a.file_name}</span>
-              <span>{formatFileSize(a.file_size)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {attachments.length > 0 && <SentAttachments attachments={attachments} />}
 
       <div
         className={cn(

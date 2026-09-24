@@ -88,6 +88,7 @@ interface InitAttachment {
   file_id: number;
   file_name: string;
   file_size: number;
+  mime_type?: string;
 }
 
 interface StoredInit {

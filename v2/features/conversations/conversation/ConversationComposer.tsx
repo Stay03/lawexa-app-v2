@@ -38,16 +38,17 @@ import type { MessageAttachment } from '@/types/chat';
 import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
 import { PastedContentCard } from './PastedContentCard';
 import {
-  ATTACHMENT_HINT,
-  ATTACHMENT_HINT_REDACTED,
-  ATTACHMENT_REDACTED_IMAGE_ERROR,
+  ALLOWED_FILE_TYPES,
   ATTACHMENT_SIZE_ERROR,
   ATTACHMENT_TYPE_ERROR,
   MAX_FILES_PER_TURN,
   acceptedTypesFor,
   allowedTypesFor,
+  attachmentHintFor,
   isImageAttachment,
   maxSizeFor,
+  privateModeFileError,
+  privateModeOf,
 } from '../attachment-rules';
 import { usePastedContent } from './usePastedContent';
 
@@ -106,6 +107,8 @@ interface FileUploadEntry {
    *  when the chip goes, or the image stays in memory for the session. */
   preview?: string;
   file_id?: number;
+  /** From the upload's answer, so the sent message can show a picture as one. */
+  mime_type?: string;
   error?: string;
 }
 
@@ -230,6 +233,9 @@ export function ConversationComposer({
   };
   const hideError = () => setErrorOpen(false);
 
+  /** The private mode that limits files here, fixed for the conversation. */
+  const privateMode = privateModeOf(isRedacted, isConfidential);
+
   const uploadedFiles = uploads.filter((u) => u.status === 'uploaded');
   const isUploading = uploads.some((u) => u.status === 'uploading');
   const canSend =
@@ -246,19 +252,18 @@ export function ConversationComposer({
     const remainingSlots = MAX_FILES_PER_TURN - uploads.length;
     const accepted: { file: File; entry: FileUploadEntry }[] = [];
     let rejectedType = false;
-    let rejectedRedactedImage = false;
+    let rejectedByMode = false;
     let rejectedSize = false;
     let rejectedDuplicate = false;
     let rejectedCap = false;
 
-    /* A redacted conversation takes documents and refuses pictures, because
-       redaction runs over text and cannot touch an image. The server refuses
-       too; this is so the person hears it at the composer rather than after
-       the upload. */
-    const allowedHere = allowedTypesFor(isRedacted);
+    /* A redacted or confidential conversation takes no PDF and no picture
+       (`attachment-rules.ts`). The server refuses too; this is so the person
+       hears it at the composer rather than after the upload. */
+    const allowedHere = allowedTypesFor(privateMode);
     for (const file of newFiles) {
       if (!allowedHere.includes(file.type)) {
-        if (isRedacted && isImageAttachment(file)) rejectedRedactedImage = true;
+        if (privateMode && ALLOWED_FILE_TYPES.includes(file.type)) rejectedByMode = true;
         else rejectedType = true;
         continue;
       }
@@ -292,7 +297,7 @@ export function ConversationComposer({
       });
     }
 
-    if (rejectedRedactedImage) showError(ATTACHMENT_REDACTED_IMAGE_ERROR);
+    if (rejectedByMode && privateMode) showError(privateModeFileError(privateMode));
     else if (rejectedType) showError(ATTACHMENT_TYPE_ERROR);
     else if (rejectedSize) showError(ATTACHMENT_SIZE_ERROR);
     else if (rejectedCap) showError(`You can attach at most ${MAX_FILES_PER_TURN} files per message.`);
@@ -314,6 +319,7 @@ export function ConversationComposer({
                     file_id: res.data.id,
                     file_name: res.data.original_name,
                     file_size: res.data.size,
+                    mime_type: res.data.mime_type,
                   }
                 : u,
             ),
@@ -381,6 +387,7 @@ export function ConversationComposer({
       file_id: u.file_id!,
       file_name: u.file_name,
       file_size: u.file_size,
+      mime_type: u.mime_type,
     }));
 
     setInput('');
@@ -405,13 +412,13 @@ export function ConversationComposer({
     <div className="w-full px-4 pb-3 pt-2">
       <FileUpload
         onFilesAdded={handleFilesAdded}
-        accept={acceptedTypesFor(isRedacted)}
+        accept={acceptedTypesFor(privateMode)}
         multiple
       >
         <input
           ref={fileInputRef}
           type="file"
-          accept={acceptedTypesFor(isRedacted)}
+          accept={acceptedTypesFor(privateMode)}
           multiple
           hidden
           onChange={(event) => {
@@ -529,7 +536,9 @@ export function ConversationComposer({
                   onClick={stop}
                   className={cn(
                     'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',
-                    u.status === 'failed' ? 'bg-destructive/10 text-destructive' : 'bg-secondary',
+                    u.status === 'failed'
+                      ? 'max-w-full flex-wrap bg-destructive/10 text-destructive'
+                      : 'bg-secondary',
                     isRemoving
                       ? 'motion-safe:animate-out motion-safe:fade-out motion-safe:zoom-out-95 motion-safe:duration-150'
                       : 'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150',
@@ -558,11 +567,6 @@ export function ConversationComposer({
                   {u.status === 'uploaded' && (
                     <span className="text-muted-foreground">{formatBytes(u.file_size)}</span>
                   )}
-                  {u.status === 'failed' && u.error && (
-                    <span className="max-w-[160px] truncate opacity-80" title={u.error}>
-                      {u.error}
-                    </span>
-                  )}
                   <button
                     type="button"
                     onClick={() => removeUpload(u.key)}
@@ -571,6 +575,14 @@ export function ConversationComposer({
                   >
                     <X className="size-3.5" />
                   </button>
+                  {/* THE SERVER'S WHOLE MESSAGE, on a line of its own under the
+                      name. It used to be cut at 160px (about 25 characters) with
+                      the rest only on a mouse hover, so a phone never showed why a
+                      file was refused. The owner said yes to showing it in full,
+                      24 September 2026. */}
+                  {u.status === 'failed' && u.error && (
+                    <span className="basis-full break-words opacity-80">{u.error}</span>
+                  )}
                 </div>
               );
             })}
@@ -644,7 +656,7 @@ export function ConversationComposer({
                       after watching it upload. Two numbers because the caps
                       genuinely differ, and one of them would be a lie. */}
                   <span className="text-muted-foreground text-xs">
-                    {isRedacted ? ATTACHMENT_HINT_REDACTED : ATTACHMENT_HINT}
+                    {attachmentHintFor(privateMode)}
                   </span>
                 </DropdownMenuItem>
 

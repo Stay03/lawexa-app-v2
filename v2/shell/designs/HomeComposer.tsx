@@ -51,16 +51,18 @@ import {
   startConversation,
 } from '@/v2/features/conversations/start-conversation';
 import {
-  ATTACHMENT_HINT,
-  ATTACHMENT_HINT_REDACTED,
-  ATTACHMENT_REDACTED_IMAGE_ERROR,
+  ALLOWED_FILE_TYPES,
   ATTACHMENT_SIZE_ERROR,
   ATTACHMENT_TYPE_ERROR,
   MAX_FILES_PER_TURN,
   acceptedTypesFor,
+  allowedInMode,
   allowedTypesFor,
+  attachmentHintFor,
   isImageAttachment,
   maxSizeFor,
+  privateModeFileError,
+  privateModeOf,
 } from '@/v2/features/conversations/attachment-rules';
 import { JurisdictionField } from './composer/JurisdictionField';
 import { WorkflowField } from './composer/WorkflowField';
@@ -122,6 +124,8 @@ interface FileUploadEntry {
    *  the conversation composer's — see `attachment-rules.ts`. */
   preview?: string;
   file_id?: number;
+  /** From the upload's answer, so the sent message can show a picture as one. */
+  mime_type?: string;
   error?: string;
 }
 
@@ -208,6 +212,18 @@ export function HomeComposer({
   // send button honestly reflect that instead of enabling a no-op.)
   const canSend = value.trim().length > 0;
 
+  /* The private mode that limits files, and the files it refuses. Here a mode
+     can be switched on AFTER files were attached, so the pick-time check
+     alone would let a PDF through to a redacted chat. The refusal is derived,
+     not stored: switching the mode off, or removing the file, clears it. */
+  const privateMode = privateModeOf(redacted, confidential);
+  const refusedByMode = uploads.filter(
+    (u) => u.status !== 'failed' && !allowedInMode(u, privateMode),
+  );
+  const modeError =
+    privateMode && refusedByMode.length > 0 ? privateModeFileError(privateMode) : null;
+  const shownError = error ?? modeError;
+
   // ── Attachments ──────────────────────────────────────────────────────────
   const handleFilesAdded = async (newFiles: File[]) => {
     if (!signedIn || newFiles.length === 0) return;
@@ -219,14 +235,14 @@ export function HomeComposer({
     const remainingSlots = MAX_FILES_PER_TURN - uploads.length;
     const accepted: { file: File; entry: FileUploadEntry }[] = [];
     let rejectedType = false;
-    let rejectedRedactedImage = false;
+    let rejectedByMode = false;
     let rejectedSize = false;
     let rejectedDuplicate = false;
     let rejectedCap = false;
 
     for (const file of newFiles) {
-      if (!allowedTypesFor(redacted).includes(file.type)) {
-        if (redacted && isImageAttachment(file)) rejectedRedactedImage = true;
+      if (!allowedTypesFor(privateMode).includes(file.type)) {
+        if (privateMode && ALLOWED_FILE_TYPES.includes(file.type)) rejectedByMode = true;
         else rejectedType = true;
         continue;
       }
@@ -260,8 +276,10 @@ export function HomeComposer({
       });
     }
 
-    if (rejectedType) {
-      setError(rejectedRedactedImage ? ATTACHMENT_REDACTED_IMAGE_ERROR : ATTACHMENT_TYPE_ERROR);
+    if (rejectedByMode && privateMode) {
+      setError(privateModeFileError(privateMode));
+    } else if (rejectedType) {
+      setError(ATTACHMENT_TYPE_ERROR);
     } else if (rejectedSize) {
       setError(ATTACHMENT_SIZE_ERROR);
     } else if (rejectedCap) {
@@ -289,6 +307,7 @@ export function HomeComposer({
                     file_id: uploadRes.data.id,
                     file_name: uploadRes.data.original_name,
                     file_size: uploadRes.data.size,
+                    mime_type: uploadRes.data.mime_type,
                   }
                 : u,
             ),
@@ -333,7 +352,7 @@ export function HomeComposer({
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     const message = value.trim();
-    if (!message || isSubmitting || isUploading) return;
+    if (!message || isSubmitting || isUploading || refusedByMode.length > 0) return;
 
     // Guest: v1 opens an in-place auth modal (boundary-blocked). The v2-honest
     // equivalent routes to the real login page; the typed text is already saved in
@@ -353,6 +372,7 @@ export function HomeComposer({
             file_id: u.file_id!,
             file_name: u.file_name,
             file_size: u.file_size,
+            mime_type: u.mime_type,
           })),
           jurisdiction,
           workflowId: workflow.value ? Number(workflow.value) : undefined,
@@ -419,7 +439,7 @@ export function HomeComposer({
   return (
     <FileUpload
       onFilesAdded={signedIn ? handleFilesAdded : () => {}}
-      accept={acceptedTypesFor(redacted)}
+      accept={acceptedTypesFor(privateMode)}
       multiple
       disabled={!signedIn}
     >
@@ -429,7 +449,7 @@ export function HomeComposer({
         <input
           ref={fileInputRef}
           type="file"
-          accept={acceptedTypesFor(redacted)}
+          accept={acceptedTypesFor(privateMode)}
           multiple
           hidden
           onChange={(event) => {
@@ -441,13 +461,13 @@ export function HomeComposer({
 
       {/* Create / upload error banner — distinct from the per-chip failed state
           below. Fades in/out (owner motion rule); cleared on the next keystroke. */}
-      {error ? (
+      {shownError ? (
         <div
           role="alert"
           className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <span className="flex-1">{error}</span>
+          <span className="flex-1">{shownError}</span>
         </div>
       ) : null}
 
@@ -504,13 +524,15 @@ export function HomeComposer({
               {uploads.map((upload) => {
                 const isRemoving = removing.has(upload.key);
                 const isFailed = upload.status === 'failed';
+                const isRefused = refusedByMode.includes(upload);
                 return (
                   <div
                     key={upload.key}
                     onClick={stop}
                     className={cn(
                       'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',
-                      isFailed ? 'bg-destructive/10 text-destructive' : 'bg-secondary',
+                      isFailed || isRefused ? 'bg-destructive/10 text-destructive' : 'bg-secondary',
+                      isFailed && 'max-w-full flex-wrap',
                       isRemoving
                         ? 'motion-safe:animate-out motion-safe:fade-out motion-safe:zoom-out-95 motion-safe:duration-150'
                         : 'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150',
@@ -529,11 +551,6 @@ export function HomeComposer({
                     {upload.status === 'uploaded' ? (
                       <span className="text-muted-foreground">{formatBytes(upload.file_size)}</span>
                     ) : null}
-                    {isFailed && upload.error ? (
-                      <span className="max-w-[160px] truncate opacity-80" title={upload.error}>
-                        {upload.error}
-                      </span>
-                    ) : null}
                     <button
                       type="button"
                       onClick={() => removeUpload(upload.key)}
@@ -542,6 +559,11 @@ export function HomeComposer({
                     >
                       <X className="size-3.5" />
                     </button>
+                    {/* The server's whole message, on its own line: see the
+                        conversation composer's chip. */}
+                    {isFailed && upload.error ? (
+                      <span className="basis-full break-words opacity-80">{upload.error}</span>
+                    ) : null}
                   </div>
                 );
               })}
@@ -596,7 +618,7 @@ export function HomeComposer({
                       <Paperclip className="text-muted-foreground" />
                       <span className="flex-1">Attach files</span>
                       <span className="text-xs text-muted-foreground">
-                        {redacted ? ATTACHMENT_HINT_REDACTED : ATTACHMENT_HINT}
+                        {attachmentHintFor(privateMode)}
                       </span>
                     </DropdownMenuItem>
 
@@ -674,7 +696,7 @@ export function HomeComposer({
                   sendButtonClassName,
                 )}
                 onClick={handleSubmit}
-                disabled={!canSend || isUploading || isSubmitting}
+                disabled={!canSend || isUploading || isSubmitting || refusedByMode.length > 0}
                 aria-label="Send message"
               >
                 {isSubmitting ? (

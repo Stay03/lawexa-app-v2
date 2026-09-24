@@ -65,6 +65,18 @@ export function parseImageTarget(value: string): ImageTarget | null {
   return { messageUuid, attachmentId };
 }
 
+/**
+ * What the viewer reads from a picture, and nothing else.
+ *
+ * Narrower than a channel attachment ON PURPOSE: the AI chat shows its sent
+ * pictures in the same viewer (24 September 2026), and a chat file carries an
+ * id, a name and a size, never a MIME category or an upload status. `url` may
+ * be empty there, because the chat payload carries no link: the frame then
+ * fails its first paint and mints one through `GET /files/{id}/download`,
+ * exactly as it does for a channel link that expired.
+ */
+export type ViewerImage = Pick<MessageAttachment, 'id' | 'url' | 'original_name' | 'size'>;
+
 /** What the viewer shows: the message's pictures, and where in them to start. */
 export interface ImageSet {
   /** Needed to write the URL for a sibling — the set's own identity. */
@@ -72,7 +84,7 @@ export interface ImageSet {
   /** Every picture in the message, IN THE ORDER IT WAS SENT (the server
    *  preserves `attachment_ids`), so swiping right moves the way the eye
    *  already read the tiles. */
-  images: readonly MessageAttachment[];
+  images: readonly ViewerImage[];
   /** Where the target sits in {@link ImageSet.images}; never `-1`. */
   index: number;
 }

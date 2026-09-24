@@ -24,9 +24,14 @@ import {
 } from '@/components/ui/dialog';
 import { filesApi } from '@/lib/api/files';
 import { formatBytes } from '@/lib/utils/format-bytes';
-import type { Message, MessageAttachment } from '@/types/collab';
+import type { Message } from '@/types/collab';
 import { useHeldValue } from '../use-held-value';
-import { formatImageTarget, resolveImageSet, type ImageSet } from './image-target';
+import {
+  formatImageTarget,
+  resolveImageSet,
+  type ImageSet,
+  type ViewerImage,
+} from './image-target';
 import { useFreshFileUrl, useOpenFileInNewTab } from './use-file-url';
 
 /**
@@ -254,6 +259,43 @@ export function MessageImageViewer({
     [messages, shownValue],
   );
 
+  return (
+    <PictureViewer
+      open={value !== null}
+      set={set}
+      resolving={resolving}
+      onSelect={onSelect}
+      onClose={onClose}
+    />
+  );
+}
+
+/**
+ * The viewer itself, for a set of pictures resolved by the caller.
+ *
+ * Split from {@link MessageImageViewer} on 24 September 2026 so the AI chat
+ * opens its sent pictures in THIS viewer rather than in a second one: the
+ * channel resolves its set from `?image=` and its message cache, the chat from
+ * its own transcript, and everything a reader sees past that point is shared.
+ * `onSelect` receives a {@link formatImageTarget} value built from
+ * `set.messageUuid`, whoever the caller is.
+ */
+export function PictureViewer({
+  open,
+  set,
+  resolving,
+  onSelect,
+  onClose,
+}: {
+  open: boolean;
+  /** The pictures and the place in them; `null` when nothing resolves. Hold
+   *  the last value through the exit, as {@link MessageImageViewer} does, or
+   *  the "can't find it" panel flashes on the way out. */
+  set: ImageSet | null;
+  resolving: boolean;
+  onSelect: (next: string) => void;
+  onClose: () => void;
+}) {
   /**
    * THE URLS THAT HAVE BEEN MINTED, KEPT ABOVE THE FRAMES THAT MINTED THEM.
    *
@@ -279,7 +321,7 @@ export function MessageImageViewer({
 
   return (
     <Dialog
-      open={value !== null}
+      open={open}
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
@@ -642,7 +684,7 @@ function ViewerStage({
 
 /** One frozen empty set, so a closed (or unresolved) viewer hands the same
  *  array to every derivation instead of a fresh `[]` per render. */
-const EMPTY_IMAGES: readonly MessageAttachment[] = [];
+const EMPTY_IMAGES: readonly ViewerImage[] = [];
 
 /**
  * The bar: what this is, and the three things a reader can do with it.
@@ -660,7 +702,7 @@ function ViewerChrome({
   onPress,
   onClose,
 }: {
-  image: MessageAttachment | null;
+  image: ViewerImage | null;
   index: number;
   count: number;
   /** The file the last press was about, or `null` — see {@link ViewerStage}.
@@ -776,7 +818,7 @@ function ViewerChrome({
 function usePictureDownload() {
   const [failed, setFailed] = useState(false);
   const mutation = useMutation({
-    mutationFn: async (image: MessageAttachment) => {
+    mutationFn: async (image: ViewerImage) => {
       const response = await filesApi.getDownloadUrl(image.id);
       const url = response.data?.url;
       if (!url) throw new Error('The download link came back empty.');
@@ -807,7 +849,7 @@ function usePictureDownload() {
     meta: { silentError: true },
   });
 
-  const save = (image: MessageAttachment) => {
+  const save = (image: ViewerImage) => {
     setFailed(false);
     mutation.mutate(image, { onError: () => setFailed(true) });
   };
@@ -835,7 +877,7 @@ function ViewerFrame({
   mintedUrls,
   onMintedUrl,
 }: {
-  image: MessageAttachment;
+  image: ViewerImage;
   mintedUrls: ReadonlyMap<number, string>;
   onMintedUrl: (id: number, url: string) => void;
 }) {
@@ -1012,7 +1054,7 @@ function ViewerDots({
   index,
   onSelect,
 }: {
-  images: readonly MessageAttachment[];
+  images: readonly ViewerImage[];
   index: number;
   onSelect: (position: number) => void;
 }) {

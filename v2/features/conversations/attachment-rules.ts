@@ -1,3 +1,5 @@
+import type { MessageAttachment } from '@/types/chat';
+
 /**
  * attachment-rules — what the chat will accept on a message, in ONE place.
  *
@@ -79,6 +81,23 @@ export function maxSizeFor(file: File): number {
   return isImageAttachment(file) ? MAX_IMAGE_SIZE : MAX_DOCUMENT_SIZE;
 }
 
+const PICTURE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+
+/**
+ * True for a SENT file the thread shows as a picture.
+ *
+ * The type when the message carries one; the extension only when it does not,
+ * which is an older confidential transcript. The extension is a fair reading
+ * there because the upload rule above admits no other picture types.
+ */
+export function isPictureAttachment(attachment: MessageAttachment): boolean {
+  if (attachment.mime_type) {
+    return (ALLOWED_IMAGE_TYPES as readonly string[]).includes(attachment.mime_type.toLowerCase());
+  }
+  const extension = attachment.file_name.split('.').pop()?.toLowerCase();
+  return extension !== undefined && PICTURE_EXTENSIONS.includes(extension);
+}
+
 /** One wording for both composers, so the two cannot describe different rules. */
 export const ATTACHMENT_TYPE_ERROR =
   'Only PDF, DOC, DOCX, RTF, JPG, PNG and WEBP files are supported.';
@@ -87,47 +106,87 @@ export const ATTACHMENT_SIZE_ERROR =
 /** Shown at the point of CHOOSING, so nobody learns the limit from a refusal. */
 export const ATTACHMENT_HINT = 'PDF, DOC, RTF 10MB · JPG, PNG, WEBP 5MB';
 
-/* ── REDACTED CONVERSATIONS TAKE DOCUMENTS AND NOT PICTURES ───────────────
+/* ── REDACTED AND CONFIDENTIAL CONVERSATIONS TAKE NO PDF AND NO PICTURE ────
  *
- * Redaction runs over TEXT. `RedactionClient::redact` takes a string, so an
- * attached document has its names removed and a photograph of the same page
- * does not — the picture is assembled at send time and never meets the
- * redactor. Before 21 September 2026 that gap was unreachable, because a
- * scanned PDF was refused for having no extractable text; the picture work
- * shipped that evening made it reachable.
+ * The owner's rule, 24 September 2026: "dont allow pdf or images in redacted
+ * and confidential but this should be settable". Word and RTF stay, because
+ * his words name PDFs and pictures only.
  *
- * The server fails closed and answers 422. This exists so the person is told
- * at the composer instead, because a control that offers what the server
- * refuses makes them choose a file and watch it upload before it fails. The
- * two are not alternatives: the server refuses, the composer explains.
+ * WHY THOSE TWO. Redaction runs over TEXT (`RedactionClient::redact` takes a
+ * string), so a picture reaches the model with every name still in it. A
+ * scanned PDF is now read by OCR, which sends the pages unredacted to a
+ * company that saw no document before (backend, 24 September 2026). Both
+ * cross the line a private mode promises to hold.
  *
- * REDACTING A PICTURE IS NOT THE MISSING FEATURE. It would mean OCR, then
- * detection, then painting over pixels, and each step can half-fail while
- * looking successful — which is worse than refusing, because somebody would
- * believe they were protected.
+ * The server refuses these too. This exists so the person is told at the
+ * composer instead, because a control that offers what the server refuses
+ * makes them choose a file and watch it upload before it fails. The two are
+ * not alternatives: the server refuses, the composer explains.
+ *
+ * "SETTABLE" IS THE SERVER'S HALF. The owner wants this rule changeable, so
+ * it cannot stay hard-coded in the app. Backend is building the setting; when
+ * it sends the allowed types per mode, this module reads them from there and
+ * the lists below go. Until then this is the one place the rule lives.
  */
-export function acceptedTypesFor(redacted: boolean): string {
-  return redacted ? '.pdf,.doc,.docx,.rtf' : ACCEPTED_FILE_TYPES;
+export type PrivateMode = 'redacted' | 'confidential';
+
+/** The mode that limits files here, or `null`. Redacted is named first when
+ *  both are on: its reason (names reach the model) is the one a person
+ *  chose the mode for. */
+export function privateModeOf(redacted: boolean, confidential: boolean): PrivateMode | null {
+  if (redacted) return 'redacted';
+  if (confidential) return 'confidential';
+  return null;
 }
 
-export function allowedTypesFor(redacted: boolean): readonly string[] {
-  return redacted ? ALLOWED_DOCUMENT_TYPES : ALLOWED_FILE_TYPES;
+const PRIVATE_MODE_TYPES: readonly string[] = [
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/rtf',
+  'text/rtf',
+];
+
+export function acceptedTypesFor(mode: PrivateMode | null): string {
+  return mode ? '.doc,.docx,.rtf' : ACCEPTED_FILE_TYPES;
 }
 
-export const ATTACHMENT_HINT_REDACTED = 'PDF, DOC, RTF 10MB · no pictures while redacted';
+export function allowedTypesFor(mode: PrivateMode | null): readonly string[] {
+  return mode ? PRIVATE_MODE_TYPES : ALLOWED_FILE_TYPES;
+}
+
+/** True when a file already chosen may go in this mode. Reads the type the
+ *  upload answered with; an entry without one is judged by its name. */
+export function allowedInMode(
+  file: { mime_type?: string; file_name: string },
+  mode: PrivateMode | null,
+): boolean {
+  if (mode === null) return true;
+  if (file.mime_type) return PRIVATE_MODE_TYPES.includes(file.mime_type.toLowerCase());
+  const extension = file.file_name.split('.').pop()?.toLowerCase();
+  return extension === 'doc' || extension === 'docx' || extension === 'rtf';
+}
+
+const MODE_NAME: Record<PrivateMode, string> = {
+  redacted: 'redaction',
+  confidential: 'confidential mode',
+};
+
+export function attachmentHintFor(mode: PrivateMode | null): string {
+  if (mode === null) return ATTACHMENT_HINT;
+  return `DOC, DOCX, RTF 10MB · no PDFs or pictures while ${mode}`;
+}
 
 /**
- * Said when a picture is refused. It names the reason rather than the rule, and
- * the remedy matters as much as the reason.
+ * Said when a PDF or a picture is refused. It names the reason rather than the
+ * rule, and the remedy matters as much as the reason.
  *
- * IT DOES NOT SAY "TURN REDACTION OFF". Redaction is a property of the whole
- * conversation, so switching it off to send one picture strips protection from
- * every message already in it — and a person who wants that picture in will do
+ * IT DOES NOT SAY "TURN THE MODE OFF". The mode belongs to the whole
+ * conversation, so switching it off to send one file strips protection from
+ * every message already in it, and a person who wants that file in will do
  * exactly what the error tells them. The remedy has to be the one that keeps
- * redaction where it is, which is why this matches the server's wording
- * (`ChatController`) word for word: two refusals pointing different ways is
- * worse than either.
+ * the mode where it is.
  */
-export const ATTACHMENT_REDACTED_IMAGE_ERROR =
-  'Pictures cannot be attached while redaction is on, because redaction cannot be applied to a picture. Attach the document itself, or start a new conversation for this picture.';
+export function privateModeFileError(mode: PrivateMode): string {
+  return `PDFs and pictures cannot be attached while ${MODE_NAME[mode]} is on. Attach the text as a Word or RTF document, or start a new conversation for this file.`;
+}
 

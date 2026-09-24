@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { filesApi } from '@/lib/api/files';
+import { isNotFoundError } from '@/lib/utils/api-error';
 
 /**
  * use-file-url — the two things every surface does with a channel file's bytes:
@@ -44,6 +45,12 @@ export interface OpenInNewTab {
   opening: boolean;
   /** The last attempt was refused or blocked. Say so where it was pressed. */
   failed: boolean;
+  /**
+   * The server answered 404: the file itself is gone, so trying again cannot
+   * help. A confidential chat's files are deleted after 24 hours, and its
+   * thread still names them (24 September 2026). Implies `failed`.
+   */
+  gone: boolean;
 }
 
 /**
@@ -65,8 +72,10 @@ export interface OpenInNewTab {
 export function useOpenFileInNewTab(): OpenInNewTab {
   const fresh = useFreshFileUrl();
   const [failed, setFailed] = useState(false);
+  const [gone, setGone] = useState(false);
   const open = (id: number) => {
     setFailed(false);
+    setGone(false);
     fresh.mutate(id, {
       onSuccess: (response) => {
         const url = response.data?.url;
@@ -76,8 +85,11 @@ export function useOpenFileInNewTab(): OpenInNewTab {
         }
         if (!window.open(url, '_blank', 'noopener')) setFailed(true);
       },
-      onError: () => setFailed(true),
+      onError: (error) => {
+        setFailed(true);
+        setGone(isNotFoundError(error));
+      },
     });
   };
-  return { open, opening: fresh.isPending, failed };
+  return { open, opening: fresh.isPending, failed, gone };
 }

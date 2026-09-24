@@ -67,11 +67,18 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
       // Normalize the two server shapes: prefer `attachments` (array,
       // new), fall back to `attachment` (singular, legacy). Always set
       // both on the local message so old and new renderers both work.
-      const list = apiMsg.attachments && apiMsg.attachments.length > 0
+      const listed = apiMsg.attachments && apiMsg.attachments.length > 0
         ? apiMsg.attachments
         : apiMsg.attachment
           ? [apiMsg.attachment]
           : undefined;
+      // `attachments` carries id, name and size only; the type is on
+      // `metadata.files`, joined here by file id.
+      const files = apiMsg.metadata?.files ?? [];
+      const list = listed?.map((attachment) => {
+        const mimeType = files.find((entry) => entry.file_id === attachment.file_id)?.file_mime_type;
+        return mimeType ? { ...attachment, mime_type: mimeType } : attachment;
+      });
       messages.push({
         id: `msg_${apiMsg.id}`,
         role: 'user',

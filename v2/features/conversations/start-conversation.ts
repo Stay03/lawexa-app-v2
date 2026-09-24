@@ -111,7 +111,12 @@ function newTempId(): string {
 
 /** Strip an uploaded file to the wire/handoff attachment shape. */
 function toAttachment(a: StartAttachment): MessageAttachment {
-  return { file_id: a.file_id, file_name: a.file_name, file_size: a.file_size };
+  return {
+    file_id: a.file_id,
+    file_name: a.file_name,
+    file_size: a.file_size,
+    ...(a.mime_type && { mime_type: a.mime_type }),
+  };
 }
 
 /**
