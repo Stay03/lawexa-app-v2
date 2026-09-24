@@ -18,6 +18,17 @@ import { SentAttachments } from './SentAttachments';
  */
 const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
 
+/**
+ * The marker the server writes into a message for each file it attached:
+ * `<attached_image name="a1.png" />`, or `<attached_document name="scan.pdf"
+ * pages_as_images="1" />` for a scan sent as pages. The message resource
+ * removes only the paired `<attached_document>…</attached_document>` form, so
+ * these single tags reached the bubble as text (seen 24 September 2026). The
+ * files already show under the bubble, so the markers are removed here, and
+ * only on a message that has files, which is when the server writes them.
+ */
+const ATTACHMENT_MARKER = /\s*<attached_(?:image|document)\b[^>]*\/>/g;
+
 function UserMessageBubble({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false);
   const shouldTruncate = content.length > USER_MESSAGE_TRUNCATE_LENGTH;
@@ -57,7 +68,10 @@ function UserMessageBubble({ content }: { content: string }) {
 export function UserMessageRow({ message }: { message: ChatMessage }) {
   const [showTime, setShowTime] = useState(false);
 
-  const displayContent = stripContextTags(message.content);
+  const hasFiles = (message.attachments?.length ?? 0) > 0 || message.attachment !== undefined;
+  const displayContent = stripContextTags(
+    hasFiles ? message.content.replace(ATTACHMENT_MARKER, '') : message.content,
+  );
   const { pastedTexts, remainingText } = parsePastedContent(displayContent);
 
   // Prefer the canonical multi-attachment array; fall back to the legacy singular.

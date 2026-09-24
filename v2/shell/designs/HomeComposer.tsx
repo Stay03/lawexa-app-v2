@@ -223,6 +223,9 @@ export function HomeComposer({
   const modeError =
     privateMode && refusedByMode.length > 0 ? privateModeFileError(privateMode) : null;
   const shownError = error ?? modeError;
+  /** A refused file holds Send, as in the conversation composer: it used to
+   *  be dropped from the message in silence. */
+  const hasFailedUpload = uploads.some((u) => u.status === 'failed');
 
   // ── Attachments ──────────────────────────────────────────────────────────
   const handleFilesAdded = async (newFiles: File[]) => {
@@ -352,7 +355,9 @@ export function HomeComposer({
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     const message = value.trim();
-    if (!message || isSubmitting || isUploading || refusedByMode.length > 0) return;
+    if (!message || isSubmitting || isUploading || hasFailedUpload || refusedByMode.length > 0) {
+      return;
+    }
 
     // Guest: v1 opens an in-place auth modal (boundary-blocked). The v2-honest
     // equivalent routes to the real login page; the typed text is already saved in
@@ -696,7 +701,13 @@ export function HomeComposer({
                   sendButtonClassName,
                 )}
                 onClick={handleSubmit}
-                disabled={!canSend || isUploading || isSubmitting || refusedByMode.length > 0}
+                disabled={
+                  !canSend ||
+                  isUploading ||
+                  isSubmitting ||
+                  hasFailedUpload ||
+                  refusedByMode.length > 0
+                }
                 aria-label="Send message"
               >
                 {isSubmitting ? (

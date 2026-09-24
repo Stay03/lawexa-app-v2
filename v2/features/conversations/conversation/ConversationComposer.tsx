@@ -238,9 +238,14 @@ export function ConversationComposer({
 
   const uploadedFiles = uploads.filter((u) => u.status === 'uploaded');
   const isUploading = uploads.some((u) => u.status === 'uploading');
+  /* A REFUSED FILE HOLDS SEND. It used to be dropped from the message in
+     silence, so the person believed a file went that never did. The chip
+     says why it was refused; removing it lets the message go. */
+  const hasFailedUpload = uploads.some((u) => u.status === 'failed');
   const canSend =
     (input.trim().length > 0 || uploadedFiles.length > 0 || pastedItems.length > 0) &&
     !isUploading &&
+    !hasFailedUpload &&
     !isSubmitting &&
     !disabled;
 
@@ -379,7 +384,7 @@ export function ConversationComposer({
   };
 
   const handleSubmit = async () => {
-    if (isStreaming || isSubmitting || isUploading || disabled) return;
+    if (isStreaming || isSubmitting || isUploading || hasFailedUpload || disabled) return;
     const fullMessage = serializePastedContent(pastedItems.map((i) => i.text), input);
     if (!fullMessage) return;
 
