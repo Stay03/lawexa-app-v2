@@ -11,6 +11,7 @@ import {
   Globe,
   ImagePlus,
   Loader2,
+  Lock,
   MoreHorizontal,
   Trash2,
   TriangleAlert,
@@ -427,7 +428,13 @@ export function NoteEditorScreen({
                 onClick={() => setPublishOpen(true)}
                 className={cn(ACTION_PILL, FOCUS_RING)}
               >
-                <Globe aria-hidden className="size-4" />
+                {/* A lock for a note published to its author alone: the globe
+                    read as public on one that is not. */}
+                {record.is_private === false ? (
+                  <Globe aria-hidden className="size-4" />
+                ) : (
+                  <Lock aria-hidden className="size-4" />
+                )}
                 Published
               </button>
             ) : (
