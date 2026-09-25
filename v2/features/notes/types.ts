@@ -67,6 +67,13 @@ export interface NoteRecord {
   updated_at?: string;
   is_bookmarked: boolean;
   bookmarks_count: number;
+  /**
+   * The note's price, when it has one. The API serialises decimals as
+   * strings ("1500.00"), so both forms are accepted and `null`/absent means
+   * free. Read only by the publish sheet, to open on the saved price.
+   */
+  price_ngn?: string | number | null;
+  price_usd?: string | number | null;
 }
 
 export interface NoteListEnvelope {
@@ -106,6 +113,25 @@ export interface NoteUpdateInput {
   /** `null` clears the title (allowed); omit to leave it alone. */
   title?: string | null;
   content?: string;
+}
+
+/**
+ * What publishing sends, through the same `PUT /notes/{id}` as a save (the API
+ * has no separate publish route). The owner said yes to publishing in v2 on
+ * 25 September 2026 ("add the button"), after it had been carved out with the
+ * marketplace; these are v1's publish fields, no more.
+ *
+ * The price fields are sent ONLY for an account that may set a price, and are
+ * left out entirely otherwise, so the API's creator check never sees a price
+ * from anyone else. `null` clears a price (the API accepts it).
+ */
+export interface NotePublishInput {
+  status: NoteStatus;
+  is_private: boolean;
+  /** At most 10; the API caps each at 100 characters. */
+  tags: string[];
+  price_ngn?: number | null;
+  price_usd?: number | null;
 }
 
 /** Response envelope for a content-image upload (`POST /api/files`). */

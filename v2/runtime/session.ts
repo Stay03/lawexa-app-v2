@@ -51,6 +51,12 @@ export interface SessionUser {
    * arrives verified, so gating on `is_verified` alone would nag Google users.
    */
   auth_provider: AuthProvider;
+  /**
+   * May this account put a price on a note? A creator or an admin, the rule
+   * v1's publish page uses (`canSetPrice`). A PRESENTATION fact like
+   * `is_verified`: the note API is the authority on whether a price is kept.
+   */
+  can_set_price: boolean;
 }
 
 export interface SessionDTO {
@@ -87,6 +93,7 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
         avatar_url: user.avatar_url ?? null,
         is_verified: user.is_verified,
         auth_provider: user.auth_provider,
+        can_set_price: user.is_creator === true || user.role === 'admin',
       },
     };
   } catch {

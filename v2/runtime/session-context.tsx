@@ -112,6 +112,12 @@ export interface V2SessionSnapshot {
    * verify, so gating on `isVerified` alone would nag every Google account.
    */
   readonly authProvider: AuthProvider | null;
+  /**
+   * May this account price a note (a creator or an admin)? `false` when
+   * signed out. Presentation only: it decides whether the publish sheet
+   * offers a price, and the note API decides whether one is kept.
+   */
+  readonly canSetPrice: boolean;
 }
 
 /**
@@ -141,6 +147,7 @@ export function V2SessionProvider({
   role,
   isVerified,
   authProvider,
+  canSetPrice,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
@@ -154,6 +161,7 @@ export function V2SessionProvider({
       role,
       isVerified,
       authProvider,
+      canSetPrice,
     }),
     [
       signedIn,
@@ -165,6 +173,7 @@ export function V2SessionProvider({
       role,
       isVerified,
       authProvider,
+      canSetPrice,
     ],
   );
 

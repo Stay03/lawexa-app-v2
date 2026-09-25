@@ -4,6 +4,7 @@ import type {
   NoteEnvelope,
   NoteImageUpload,
   NoteListEnvelope,
+  NotePublishInput,
   NoteUpdateInput,
 } from './types';
 
@@ -76,6 +77,13 @@ export const notesApi = {
 
   /** Save by id. The input type cannot carry `slug`, so a save can never break links. */
   update: async (id: number, data: NoteUpdateInput): Promise<NoteEnvelope> => {
+    const response = await apiClient.put<NoteEnvelope>(`/notes/${id}`, data);
+    return response.data;
+  },
+
+  /** Publish, unpublish or reprice by id: the same route as a save, with the
+   *  publish fields only (see `NotePublishInput`). */
+  publish: async (id: number, data: NotePublishInput): Promise<NoteEnvelope> => {
     const response = await apiClient.put<NoteEnvelope>(`/notes/${id}`, data);
     return response.data;
   },

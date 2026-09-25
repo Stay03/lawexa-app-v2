@@ -8,6 +8,7 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import {
   AtSign,
   BookOpen,
+  Globe,
   ImagePlus,
   Loader2,
   MoreHorizontal,
@@ -25,7 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { quietReplaceUrlPath } from '@/v2/runtime/url-params';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { ACTION_PILL, CREATE_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { NoteRecord } from '../types';
 import { NOTE_CONTENT_LIMIT, type NoteDraft } from './autosave-machine';
 import { CaseMentionList, MENTION_LISTBOX_ID, mentionOptionId } from './CaseMentionList';
@@ -42,6 +43,7 @@ import { createNoteExtensions } from './extensions';
 import { FormattingBar } from './FormattingBar';
 import { openCaseMention, useFormatState } from './formatting';
 import { LinkDialog } from './LinkDialog';
+import { PublishSheet } from './PublishSheet';
 import { createCaseMentionStore } from './mention-store';
 import { stripPastedPresentation } from './paste-sanitizer';
 import { RestoreDraftBar } from './RestoreDraftBar';
@@ -87,7 +89,7 @@ export function NoteEditorScreen({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { userId: viewerId } = useV2Session();
+  const { userId: viewerId, canSetPrice } = useV2Session();
 
   const [record, setRecord] = useState<NoteRecord | null>(initialRecord);
   const recordRef = useRef(record);
@@ -114,6 +116,7 @@ export function NoteEditorScreen({
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkHref, setLinkHref] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const [restoreDismissed, setRestoreDismissed] = useState(false);
 
   const [title, setTitle] = useState(initialRecord?.title ?? '');
@@ -413,6 +416,31 @@ export function NoteEditorScreen({
             retryScheduled={autosave.retryScheduled}
             onRetry={retrySave}
           />
+          {/* PUBLISH (owner, 25 September 2026: "add the button"). Only once the
+              note exists, and only while its text is saved, so what goes out is
+              what is on screen. Published notes keep the button as a quieter
+              "Published" that reopens the same sheet. */}
+          {record ? (
+            record.status === 'published' ? (
+              <button
+                type="button"
+                onClick={() => setPublishOpen(true)}
+                className={cn(ACTION_PILL, FOCUS_RING)}
+              >
+                <Globe aria-hidden className="size-4" />
+                Published
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPublishOpen(true)}
+                disabled={autosave.status !== 'clean'}
+                className={cn(CREATE_PILL, FOCUS_RING, 'disabled:opacity-50')}
+              >
+                Publish
+              </button>
+            )
+          ) : null}
           {record ? (
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -533,6 +561,19 @@ export function NoteEditorScreen({
         onOpenChange={setLinkOpen}
         onSubmit={applyLink}
       />
+
+      {record ? (
+        <PublishSheet
+          open={publishOpen}
+          onOpenChange={setPublishOpen}
+          record={record}
+          canSetPrice={canSetPrice}
+          onPublished={(next) => {
+            recordRef.current = next;
+            setRecord(next);
+          }}
+        />
+      ) : null}
 
       {record ? (
         <DeleteNoteDialog

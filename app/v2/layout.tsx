@@ -235,6 +235,8 @@ export default async function V2Layout({
           // unverified registered account. Signed out ⇒ `false` / `null`.
           isVerified={user?.is_verified ?? false}
           authProvider={user?.auth_provider ?? null}
+          // Whether the note publish sheet offers a price (creator or admin).
+          canSetPrice={user?.can_set_price ?? false}
         >
           {/* THE NOTIFICATION SPINE (phase-5 W1) — v2's one app-wide realtime
               mount: the users.{uuid} socket, the `.channel.unread` writers, the
