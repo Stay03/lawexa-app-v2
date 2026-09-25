@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Check, Globe, Loader2, Lock } from 'lucide-react';
+import { Check, Globe, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { radarsApi } from '@/lib/api/radars';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
+import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
 import type { RadarScanDetail } from '@/types/radar';
 import { radarsQueries } from '../queries';
 
@@ -177,59 +177,5 @@ export function ShareDialog({
         ) : null}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function VisibilityOption({
-  icon: Icon,
-  title,
-  description,
-  selected,
-  busy,
-  onSelect,
-}: {
-  icon: typeof Lock;
-  title: string;
-  description: string;
-  selected: boolean;
-  busy: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onSelect}
-      disabled={busy}
-      className={cn(
-        'v2-interactive flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors',
-        selected
-          ? 'border-primary bg-primary/5'
-          : 'border-border hover:bg-muted/50',
-      )}
-    >
-      <span
-        aria-hidden
-        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted"
-      >
-        <Icon className="size-5 text-muted-foreground" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-foreground">
-          {title}
-        </span>
-        <span className="block text-sm text-muted-foreground">
-          {description}
-        </span>
-      </span>
-      {selected ? (
-        <Check aria-hidden className="size-5 shrink-0 text-primary" />
-      ) : busy ? (
-        <Loader2
-          aria-hidden
-          className="size-5 shrink-0 animate-spin text-muted-foreground"
-        />
-      ) : null}
-    </button>
   );
 }

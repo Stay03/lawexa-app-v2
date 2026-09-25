@@ -1,12 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Check, Link2 } from 'lucide-react';
-
 import { cn } from '@/lib/utils';
 import type { StatuteDetail } from '@/types/statute';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
-import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
 import { StatuteBookmarkButton } from '../bookmark/StatuteBookmarkButton';
 import {
@@ -15,7 +11,7 @@ import {
   toAlpha2,
   type StatuteStatusTone,
 } from '../statute-row-model';
-import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
+import { ShareButton } from '@/v2/features/sharing/ShareButton';
 
 /**
  * StatuteHeader — the reader's heading block, in the case-document header
@@ -118,7 +114,11 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <CopyLinkButton slug={detail.slug} />
+        <ShareButton
+          path={`/statutes/${detail.slug}`}
+          title={detail.title}
+          label="Share this statute"
+        />
         <StatuteBookmarkButton
           statuteId={detail.id}
           isBookmarked={detail.is_bookmarked}
@@ -136,62 +136,6 @@ function formatDocumentType(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).replace(/_/g, ' ');
-}
-
-/**
- * Copy the statute's clean canonical URL. The confirmation lives IN the
- * control (icon flips to a check for two seconds) — the case page's
- * copy-action rule — and the label swap is a POLITE live region, so a screen
- * reader hears "Link copied" without being interrupted. The reset timer is
- * RE-ARMED on each click (never stacked, so a rapid second copy still gets
- * its full two seconds) and cleared on unmount. Clipboard denial fails
- * silent: the address bar still has the link.
- */
-function CopyLinkButton({ slug }: { slug: string }) {
-  /* An ambassador's code rides the link they copy, so a signup from it credits
-     them. Everybody else copies exactly what they copied before. */
-  const shareUrl = useShareUrl();
-
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    },
-    [],
-  );
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(
-        shareUrl(`${window.location.origin}/statutes/${slug}`),
-      );
-      setCopied(true);
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => {
-        timerRef.current = null;
-        setCopied(false);
-      }, 2000);
-    } catch {
-      // No clipboard permission — nothing to report.
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={() => void copy()}
-      className={cn(ACTION_PILL, FOCUS_RING)}
-    >
-      {copied ? (
-        <Check aria-hidden className="size-4 text-primary" />
-      ) : (
-        <Link2 aria-hidden className="size-4" />
-      )}
-      <span aria-live="polite">{copied ? 'Link copied' : 'Copy link'}</span>
-    </button>
-  );
 }
 
 function Dot() {

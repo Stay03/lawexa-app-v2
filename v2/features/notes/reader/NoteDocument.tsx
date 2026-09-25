@@ -101,6 +101,7 @@ export function NoteDocument({
         <NoteActions
           noteId={note.id}
           slug={note.slug}
+          title={note.title}
           isBookmarked={note.is_bookmarked}
           bookmarksCount={note.bookmarks_count}
           canExport={body.length > 0}
