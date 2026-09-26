@@ -29,6 +29,7 @@ import { usePastedContent } from '@/lib/hooks/usePastedContent';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { AuthedEventSource } from '@/lib/stream/authed-event-source';
 import { useJurisdictionChoice } from '@/lib/hooks/useJurisdictionChoice';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { JurisdictionStatus } from '@/components/chat/jurisdiction-status';
@@ -127,7 +128,7 @@ export function FloatingPromptInput({ className, contextId, contextType, context
   const isMobile = useIsMobile();
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const eventSourceRef = useRef<AuthedEventSource | null>(null);
   const executionIdRef = useRef<string | null>(null);
   const hasReconnectedRef = useRef<boolean>(false);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
@@ -287,10 +288,13 @@ export function FloatingPromptInput({ className, contextId, contextType, context
       executionIdRef.current = executionId;
       setIsStreaming(true);
 
-      const encodedToken = encodeURIComponent(token);
-      const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}?token=${encodedToken}`;
+      // The login token goes in the Authorization header, never in the address
+      // (addresses end up in logs and history).
+      const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}`;
 
-      const eventSource = new EventSource(streamUrl);
+      const eventSource = new AuthedEventSource(streamUrl, {
+        getToken: () => useAuthStore.getState().token,
+      });
       eventSourceRef.current = eventSource;
 
       eventSource.addEventListener('connected', () => {

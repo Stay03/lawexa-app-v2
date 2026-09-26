@@ -25,6 +25,7 @@ import { chatApi } from '@/lib/api/chat';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { extractBlockedReason } from '@/lib/utils/api-error';
+import { AuthedEventSource, CLOSED, CONNECTING } from '@/lib/stream/authed-event-source';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import {
   isErrorMessage,
@@ -344,7 +345,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // no cursor has backlog and re-arm on the next setTarget (appendText / thinking).
 
   // ── Connection / resilience state (v1 refs, as closure vars) ──
-  let eventSource: EventSource | null = null;
+  let eventSource: AuthedEventSource | null = null;
   let watchdog: ReturnType<typeof setInterval> | null = null;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
   let lastEventTime = 0;
@@ -1072,9 +1073,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
     executionId = execId;
 
-    const encodedToken = encodeURIComponent(token);
-    const streamUrl = `${API_BASE_URL}/api/chat/stream/${execId}?token=${encodedToken}`;
-    const es = new EventSource(streamUrl);
+    // The login token travels in the Authorization header, never in the address
+    // (addresses end up in logs and history). See AuthedEventSource.
+    const streamUrl = `${API_BASE_URL}/api/chat/stream/${execId}`;
+    const es = new AuthedEventSource(streamUrl, { getToken });
     eventSource = es;
     startWatchdog();
 
@@ -1619,10 +1621,24 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // EventSource is permanently CLOSED (readyState 2).
     es.onerror = () => {
       if (eventSource !== es) return;
-      if (es.readyState === 0) return; // CONNECTING — browser is auto-reconnecting
+      if (es.readyState === CONNECTING) return; // reconnecting on its own, with Last-Event-ID
+      const loginRejected = es.readyState === CLOSED && es.status === 401;
       stopWatchdog();
       es.close();
       eventSource = null;
+      if (loginRejected) {
+        // The login is gone or expired: reconnecting cannot help. Keep what was
+        // streamed so far and stop, on the same path as a missing token.
+        finalizeOpenPlaceholder('error');
+        executionId = null;
+        isCancelling = false;
+        toolCallQueue.clear();
+        resetStreamingBuffers();
+        const error = 'Authentication required';
+        setState((prev) => ({ ...prev, error, isStreaming: false, isCancelling: false }));
+        handlers.onError?.(error);
+        return;
+      }
       reconnectStream();
     };
   }

@@ -121,10 +121,14 @@ export const chatApi = {
    * the EventSource open after calling this.
    */
   cancelStream: async (executionId: string, token: string): Promise<void> => {
-    const encodedToken = encodeURIComponent(token);
-    const url = `${API_BASE_URL}/api/chat/stream/${executionId}/cancel?token=${encodedToken}`;
+    // Token in the Authorization header, never in the address (addresses end up
+    // in logs and history). Still a raw fetch, for the reasons above.
+    const url = `${API_BASE_URL}/api/chat/stream/${executionId}/cancel`;
     try {
-      await fetch(url, { method: 'POST' });
+      await fetch(url, {
+        method: 'POST',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      });
     } catch {
       // Ignore — the SSE stream will still deliver a terminal event regardless,
       // and the watchdog will recover if anything is truly stuck.

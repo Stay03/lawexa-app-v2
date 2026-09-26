@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { AxiosError } from 'axios';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { AuthedEventSource } from '@/lib/stream/authed-event-source';
 import {
   isErrorMessage,
   type ChatMessage,
@@ -86,7 +87,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     error: null,
   });
 
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const eventSourceRef = useRef<AuthedEventSource | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastEventTimeRef = useRef<number>(0);
@@ -661,11 +662,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // Store execution ID for reconnection
       executionIdRef.current = executionId;
 
-      // Connect to SSE stream
-      const encodedToken = encodeURIComponent(token);
-      const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}?token=${encodedToken}`;
+      // Connect to SSE stream. The login token goes in the Authorization header,
+      // never in the address (addresses end up in logs and history).
+      const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}`;
 
-      const eventSource = new EventSource(streamUrl);
+      const eventSource = new AuthedEventSource(streamUrl, {
+        getToken: () => useAuthStore.getState().token,
+      });
       eventSourceRef.current = eventSource;
 
       // Start watchdog timer
