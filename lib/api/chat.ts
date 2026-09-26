@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { ApiResponse } from '@/types/api';
 import type {
   ChatStartRequest,
   ChatStartResponse,
@@ -61,6 +62,15 @@ export const chatApi = {
    */
   listConversations: async (params?: ListConversationsParams): Promise<ConversationsListResponse> => {
     const response = await apiClient.get<ConversationsListResponse>('/conversations', { params });
+    return response.data;
+  },
+
+  /**
+   * Delete a conversation for the authenticated user. The server refuses a
+   * conversation that runs a Radar, with a `message` saying why.
+   */
+  deleteConversation: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/conversations/${id}`);
     return response.data;
   },
 

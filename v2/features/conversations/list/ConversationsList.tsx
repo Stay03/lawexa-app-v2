@@ -16,6 +16,8 @@ import { NewRowsPill } from '@/v2/shell/NewRowsPill';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
+import { DeleteConversationDialog } from '@/v2/features/conversations/DeleteConversationDialog';
+import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
 import { useConversationsSearch } from './useConversationsSearch';
 import { ConversationsSearchBar } from './ConversationsSearchBar';
 import { ConversationRow } from './ConversationRow';
@@ -143,6 +145,17 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
     rowsArePlaceholder: query.isPlaceholderData,
   });
 
+  // DELETE. One confirm for the whole list, keyed by the targeted chat's id.
+  // On success the row is held for its exit collapse BEFORE the caches drop it
+  // (the mutation runs `onDeleted` first), so it folds out instead of vanishing.
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const { presented, beginExit } = useExitingRows(visibleRows, conversationId);
+  const onDeleted = (id: string) => {
+    const index = visibleRows.findIndex((row) => row.id === id);
+    if (index !== -1) beginExit(visibleRows[index], index);
+    setDeleteTarget(null);
+  };
+
   // Sentinel rooted against the shell's REAL scroll container (review finding:
   // with a viewport root, the nested `.v2-shell__content` overflow region clips
   // the sentinel with its PLAIN rect and the 320px prefetch margin is silently
@@ -229,12 +242,14 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
             </div>
           ) : null}
           <ul className="flex flex-col">
-            {visibleRows.map((conversation, index) => (
+            {presented.map(({ row: conversation, exiting }, index) => (
               <ConversationRow
                 key={conversation.id}
                 conversation={conversation}
                 now={now}
                 index={index}
+                exiting={exiting}
+                onDelete={() => setDeleteTarget(conversation.id)}
               />
             ))}
           </ul>
@@ -254,6 +269,15 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
           </div>
         </div>
       )}
+
+      <DeleteConversationDialog
+        conversationId={deleteTarget}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        onDeleted={onDeleted}
+      />
 
       {/* The floating search pill, and nothing else: a conversation is started
           from the home composer, never from this list. */}

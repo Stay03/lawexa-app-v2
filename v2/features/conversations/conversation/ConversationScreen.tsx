@@ -11,7 +11,7 @@ import { MessageList } from './MessageList';
 import { ConversationComposer } from './ConversationComposer';
 import { ComposerSkeleton } from './skeletons';
 import { ConfidentialBanner } from './ConfidentialBanner';
-import { ConversationShare } from './ConversationShare';
+import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider } from './chat-context';
 import { clearEmbeddedComposer, publishEmbeddedComposer } from './embedded-composer';
 
@@ -199,18 +199,24 @@ export function ConversationScreen({
         {controller.isConfidential && (
           <ConfidentialBanner onDelete={controller.deleteConfidential} />
         )}
-        {/* The owner's "Share chat" row in the header menu. Not inside another
-            route (the case side chat has its own header), and never on a
-            confidential or redacted chat. */}
+        {/* The owner's "Share chat" and "Delete chat" rows in the header menu.
+            Not inside another route (the case side chat has its own header).
+            Share is never on a confidential or redacted chat; delete is never
+            on a confidential one, whose banner owns the device-only delete. */}
         {!embed ? (
-          <ConversationShare
+          <ConversationActions
             conversationId={conversationId}
             viewerId={serverUserId}
-            enabled={
+            canShare={
               controller.isOwnerResolved &&
               controller.isOwner &&
               !controller.isConfidential &&
               !controller.isRedacted
+            }
+            canDelete={
+              controller.isOwnerResolved &&
+              controller.isOwner &&
+              !controller.isConfidential
             }
           />
         ) : null}

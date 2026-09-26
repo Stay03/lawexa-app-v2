@@ -1,20 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Globe, Lock, Share2 } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Globe, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { conversationSharingApi } from '@/lib/api/conversationSharing';
 import type { ConversationData } from '@/types/chat';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
 import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
-import {
-  clearScreenContext,
-  setScreenContext,
-  type ScreenAction,
-} from '@/v2/shell/screen-context';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { conversationsQueries } from '../queries';
 
@@ -31,32 +24,34 @@ import { conversationsQueries } from '../queries';
  * again (`/unpublish`) closes the link.
  *
  * ── NEVER FOR A CONFIDENTIAL OR REDACTED CHAT ──────────────────────────────
- * The caller passes `enabled` false for both, so the menu row never appears.
+ * `ConversationActions` gets `canShare` false for both, so the menu row never
+ * appears.
  * The server already refuses to publish a confidential chat (422). For a
  * redacted chat this row being absent is the guard until the server refuses
  * too (backend's 12523d9, held for the owner's go).
  *
  * ── WHERE IT LIVES ─────────────────────────────────────────────────────────
- * A "Share chat" row in the header's menu, the slot every v2 screen uses for
- * its own actions (`screen-context.ts`). The dialog reads the SAME detail query
- * the screen already holds, so opening it costs no request, and a change writes
+ * A "Share chat" row in the header's menu, published by `ConversationActions`
+ * with the chat's other actions. The dialog reads the SAME detail record the
+ * screen already holds, so opening it costs no request, and a change writes
  * `is_private` back into that cache so the screen never refetches.
  */
 export function ConversationShare({
   conversationId,
   viewerId,
-  enabled,
+  detail,
+  open,
+  onOpenChange,
 }: {
   conversationId: string;
   viewerId: number | null;
-  /** The owner, on a chat that is neither confidential nor redacted. */
-  enabled: boolean;
+  /** The cached detail record; the host renders this only once it exists. */
+  detail: ConversationData;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const detailOptions = conversationsQueries.detail({ conversationId, viewerId });
-  const { data: detail } = useQuery({ ...detailOptions, enabled });
 
   const writePrivacy = (isPrivate: boolean) => {
     queryClient.setQueryData<ConversationData>(detailOptions.queryKey, (old) =>
@@ -77,33 +72,13 @@ export function ConversationShare({
     onError: () => toast.error("Couldn't make this chat private. Try again."),
   });
 
-  const ready = enabled && detail !== undefined;
-  const actions = useMemo<readonly ScreenAction[]>(
-    () =>
-      ready
-        ? [{ id: 'share-chat', label: 'Share chat', icon: Share2, onSelect: () => setOpen(true) }]
-        : [],
-    [ready],
-  );
-
-  useEffect(() => {
-    if (actions.length === 0) {
-      clearScreenContext();
-      return;
-    }
-    setScreenContext({ pathname, back: null, actions });
-  }, [pathname, actions]);
-  useEffect(() => () => clearScreenContext(), []);
-
-  if (!ready) return null;
-
   const isPrivate = detail.is_private;
   const busy = publish.isPending || unpublish.isPending;
 
   return (
     <ResponsiveOverlay
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={onOpenChange}
       title="Share chat"
       description="Anyone with the link can read this chat: your questions and the answers. They cannot reply, and they cannot see your other chats."
       size="content"
