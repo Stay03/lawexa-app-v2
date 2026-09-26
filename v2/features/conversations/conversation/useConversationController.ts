@@ -676,7 +676,10 @@ export function useConversationController(
   // "Ask again": re-send the last user turn (there is NO backend regenerate
   // endpoint, so this drives a fresh turn through engine.send — it genuinely adds
   // a new turn to the server thread, which is why the UI labels it "Ask again"
-  // rather than faking an in-place regenerate). Guarded to completed, non-streaming.
+  // rather than faking an in-place regenerate). Guarded to completed, non-streaming,
+  // and to the owner: a viewer of a shared chat cannot add a turn to it (the
+  // server answers 404 for a conversation that is not theirs), so they are not
+  // offered the button.
   const lastUserContent = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       if (messages[i].role === 'user') return messages[i].content;
@@ -694,7 +697,7 @@ export function useConversationController(
     );
   }, [messages]);
 
-  const canRegenerate = !isStreaming && lastIsCompletedAssistant && !!lastUserContent;
+  const canRegenerate = isOwner && !isStreaming && lastIsCompletedAssistant && !!lastUserContent;
 
   const regenerate = useCallback(() => {
     if (isStreaming || !lastUserContent) return;
