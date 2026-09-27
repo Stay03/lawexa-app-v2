@@ -13,14 +13,13 @@ import { ArrowDown, RotateCcw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   isErrorMessage,
-  isToolMessage,
-  isHandoverMessage,
   type ConversationReference,
   type ErrorMessage,
 } from '@/types/chat';
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
 import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
 import { groupMessages, type MessageGroup } from './message-groups';
+import { computeStreamStart } from './stream-start';
 import { UserMessageRow } from './rows/UserMessageRow';
 import { AssistantMessageRow } from './rows/AssistantMessageRow';
 import { HandoverRow } from './rows/HandoverRow';
@@ -107,17 +106,6 @@ const UNVIRTUALIZED_TAIL = 3;
  */
 const useIsomorphicLayoutEffect =
   typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
-/** First tool/handover start, else first streaming placeholder — pure. */
-function computeStreamStart(messages: readonly EngineMessage[]): number | null {
-  for (const m of messages) {
-    if (isToolMessage(m) || isHandoverMessage(m)) return m.timestamp.getTime();
-  }
-  for (const m of messages) {
-    if (m.role === 'assistant' && m.isStreaming) return m.timestamp.getTime();
-  }
-  return null;
-}
 
 export interface MessageListProps {
   messages: readonly EngineMessage[];
