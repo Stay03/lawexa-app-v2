@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import type { StatuteDetail } from '@/types/statute';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
@@ -96,11 +97,21 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
         </p>
 
         {/* What repealed it — the next fact a lawyer needs after seeing
-            "Repealed": which instrument displaced this text, and when. */}
+            "Repealed": which instrument displaced this text, and when. When
+            that instrument is in the library, its name opens it. */}
         {detail.repealed_by?.title ? (
           <p className="text-xs text-muted-foreground">
             Repealed by{' '}
-            <span className="text-foreground">{detail.repealed_by.title}</span>
+            {detail.repealed_by.statute?.slug ? (
+              <Link
+                href={`/statutes/${detail.repealed_by.statute.slug}`}
+                className="rounded-sm text-foreground underline decoration-primary/45 decoration-dotted underline-offset-4 transition-colors hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {detail.repealed_by.title}
+              </Link>
+            ) : (
+              <span className="text-foreground">{detail.repealed_by.title}</span>
+            )}
             {formatStatuteDate(detail.repealed_by.date) ? (
               <>
                 {' · '}

@@ -15,6 +15,16 @@ export interface StatuteRepealedBy {
   date: string | null;
   // FRBR work URI of the repealing instrument, e.g. "/akn/gh/act/2020/1023".
   uri: string | null;
+  // The repealing instrument when it is in the library (show payload; absent or
+  // null when it is not, verified live Sep 27, 2026 on statutes 607 and 807).
+  statute?: StatuteRepealedByStatute | null;
+}
+
+export interface StatuteRepealedByStatute {
+  id: number;
+  uuid: string;
+  title: string;
+  slug: string;
 }
 
 // Statute creator (embedded in responses)
