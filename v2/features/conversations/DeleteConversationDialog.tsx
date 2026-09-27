@@ -98,7 +98,11 @@ export function DeleteConversationDialog({
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          {/* The variant, not a bg-destructive class: the action renders a Button
+              through a Slot that concatenates classes without resolving them, so a
+              class override loses to the default variant's gold. */}
           <AlertDialogAction
+            variant="destructive"
             disabled={busy}
             aria-busy={busy || undefined}
             onClick={(event) => {
@@ -106,7 +110,6 @@ export function DeleteConversationDialog({
               if (conversationId === null || busy) return;
               deleteConversation.mutate(conversationId);
             }}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {busy ? <Loader2 aria-hidden className="animate-spin" /> : null}
             Delete
