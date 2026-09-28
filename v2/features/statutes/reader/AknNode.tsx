@@ -89,10 +89,19 @@ function hasClass(el: Element, name: string): boolean {
 }
 
 /**
- * A paragraph's layout marker, for the printed forms (the marker set agreed
- * with backend on 28 September 2026, b20a3778/cb8983ac): `centre`, `right`, or
- * `gap` (an empty line of space). A paragraph with none keeps the default.
+ * The longest text a form sets at the margin after a blank: a name or
+ * initials ("B.", "C.D."). Anything longer is the rest of a sentence,
+ * and the blank before it stays inline.
  */
+const MARGIN_NAME_MAX = 16;
+
+function inlineText(nodes: readonly ChildNode[]): string {
+  return nodes
+    .map((node) => node.textContent ?? '')
+    .join('')
+    .trim();
+}
+
 function isFill(node: ChildNode): boolean {
   return (
     node.nodeType === Node.ELEMENT_NODE &&
@@ -101,6 +110,11 @@ function isFill(node: ChildNode): boolean {
   );
 }
 
+/**
+ * A paragraph's layout marker, for the printed forms (the marker set agreed
+ * with backend on 28 September 2026, b20a3778/cb8983ac): `centre`, `right`, or
+ * `gap` (an empty line of space). A paragraph with none keeps the default.
+ */
 function paragraphClass(el: Element): string {
   if (hasClass(el, 'centre')) return 'akn-p akn-p-centre';
   if (hasClass(el, 'right')) return 'akn-p akn-p-right';
@@ -221,38 +235,34 @@ function renderElement(
   }
 
   if (tag === 'p') {
-    // A form line that ENDS in a blank, STARTS with one, or IS one: that blank
-    // runs across the free width, as on the printed page ("A.B. ……" to the
-    // margin, "……C.D." with C.D. at the margin, a whole writing line). The
-    // words are one wrapper, so the line still wraps as ordinary text; only
-    // the edge blank stretches. (Letting every text run and blank become its
-    // own flex item split long lines into columns: caught on the TF 001
-    // sample, 28 September 2026. A lone blank drawn at its 4ch minimum was
-    // caught on backend's TF 001 content the same day.)
+    // A form line whose last blank runs to the margin, as on the printed page:
+    // "A.B. ……" (the blank ends the line), "……C.D." and "Signed……B." (only a
+    // name or initials follow it, set at the margin), or a whole writing line.
+    // The words on each side are one wrapper, so they still wrap as ordinary
+    // text; only that blank stretches. A blank followed by more prose stays
+    // inline, or the sentence after it would break off into a block of its
+    // own. (Letting every text run and blank become its own flex item split
+    // long lines into columns: caught on the TF 001 sample, 28 September 2026.
+    // A lone blank at its 4ch minimum and a stub before "B." were caught on
+    // backend's TF 001 content the same day.)
     const nodes = Array.from(element.childNodes).filter(
       (node) => node.nodeType !== Node.TEXT_NODE || (node as Text).data.trim() !== '',
     );
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-    if (last && isFill(last)) {
+    const fillAt = nodes.findLastIndex(isFill);
+    const after = nodes.slice(fillAt + 1);
+    if (fillAt >= 0 && inlineText(after).length <= MARGIN_NAME_MAX) {
+      const before = nodes.slice(0, fillAt);
       return (
         <p key={key} className={`${paragraphClass(element)} akn-p-fill-line`}>
-          {nodes.length > 1 && (
-            <span className="akn-fill-words">{renderInlineNodes(nodes.slice(0, -1))}</span>
+          {before.length > 0 && (
+            <span className="akn-fill-words">{renderInlineNodes(before)}</span>
           )}
           <span className="akn-fill akn-fill-stretch">
-            {renderInlineChildren(last as Element)}
+            {renderInlineChildren(nodes[fillAt] as Element)}
           </span>
-        </p>
-      );
-    }
-    if (first && isFill(first)) {
-      return (
-        <p key={key} className={`${paragraphClass(element)} akn-p-fill-line`}>
-          <span className="akn-fill akn-fill-stretch">
-            {renderInlineChildren(first as Element)}
-          </span>
-          <span className="akn-fill-words">{renderInlineNodes(nodes.slice(1))}</span>
+          {after.length > 0 && (
+            <span className="akn-fill-words">{renderInlineNodes(after)}</span>
+          )}
         </p>
       );
     }

@@ -374,6 +374,16 @@
   flex: 1 0 6ch;
 }
 
+/* A centred writing line (a signature over "Secretary") is a centred half
+   line on the page, not a full-width rule. */
+.v2-statute-doc .akn-p-centre.akn-p-fill-line {
+  justify-content: center;
+}
+
+.v2-statute-doc .akn-p-centre > .akn-fill-stretch {
+  flex: 0 1 50%;
+}
+
 /** Editorial annotations — "[As substituted by …]" — quiet, never loud. */
 .v2-statute-doc .akn-remark {
   font-size: 0.8125em;
