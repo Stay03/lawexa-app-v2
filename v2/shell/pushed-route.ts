@@ -338,6 +338,13 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Billing'),
         };
       }
+      if (depth === 2 && second === 'referrals') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Referrals'),
+        };
+      }
       return null;
 
     default:
