@@ -1,9 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,7 +10,7 @@ import { cn } from '@/lib/utils';
 import type { StatuteAnnotation, StatuteAnnotationType } from '@/types/statute';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useStatuteNotes } from './context';
-import { partLabel } from './labels';
+import { NoteRow } from './NoteRow';
 
 /**
  * The notes panel: every researcher's note on this statute, in reading order,
@@ -35,7 +34,7 @@ const TYPE_LABEL: Record<StatuteAnnotationType, string> = {
 };
 
 export function NotesSheet() {
-  const { open, closePanel, notes, status, retry, focus, clearFocus, jumpTo } = useStatuteNotes();
+  const { slug, open, closePanel, notes, status, retry, focus, clearFocus, jumpTo } = useStatuteNotes();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
@@ -129,17 +128,18 @@ export function NotesSheet() {
           ) : (
             <div className="flex flex-col gap-6">
               {wholeStatute.length > 0 ? (
-                <NoteGroup title="The whole statute" notes={wholeStatute} />
+                <NoteGroup title="The whole statute" notes={wholeStatute} slug={slug} />
               ) : null}
               {placed.length > 0 ? (
                 <NoteGroup
                   title={wholeStatute.length > 0 || detached.length > 0 ? 'In the text' : null}
                   notes={placed}
+                  slug={slug}
                   onSelect={jumpTo}
                 />
               ) : null}
               {detached.length > 0 ? (
-                <NoteGroup title="Part no longer in the statute" notes={detached} />
+                <NoteGroup title="Part no longer in the statute" notes={detached} slug={slug} />
               ) : null}
             </div>
           )}
@@ -187,10 +187,12 @@ function FilterRow({
 function NoteGroup({
   title,
   notes,
+  slug,
   onSelect,
 }: {
   title: string | null;
   notes: readonly StatuteAnnotation[];
+  slug: string;
   onSelect?: (note: StatuteAnnotation) => void;
 }) {
   return (
@@ -201,47 +203,11 @@ function NoteGroup({
       <ul className="flex flex-col divide-y divide-border">
         {notes.map((note) => (
           <li key={note.uuid}>
-            <NoteRow note={note} onSelect={onSelect} />
+            <NoteRow note={note} slug={slug} onSelect={onSelect} />
           </li>
         ))}
       </ul>
     </section>
-  );
-}
-
-function NoteRow({ note, onSelect }: { note: StatuteAnnotation; onSelect?: (note: StatuteAnnotation) => void }) {
-  const body = (
-    <>
-      <span className="flex flex-wrap items-center gap-2">
-        {note.node ? <span className="text-sm font-medium text-foreground">{partLabel(note.node.eid)}</span> : null}
-        <Badge variant="secondary">{note.type_label}</Badge>
-        {note.status === 'decided' ? <Badge variant="outline">Decided</Badge> : null}
-      </span>
-      {note.quote ? (
-        <span className="font-serif text-[0.9375rem] italic leading-snug text-foreground/90">“{note.quote}”</span>
-      ) : null}
-      <span className="whitespace-pre-line text-sm text-muted-foreground">{note.body}</span>
-      {note.decision ? <span className="text-sm text-foreground">Decision: {note.decision}</span> : null}
-      {note.text_changed ? (
-        <span className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
-          <AlertTriangle aria-hidden className="size-3.5" />
-          Text changed: these words are no longer in this part.
-        </span>
-      ) : null}
-    </>
-  );
-
-  if (!onSelect) {
-    return <div className="flex flex-col gap-1.5 py-3">{body}</div>;
-  }
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(note)}
-      className={cn('-mx-2 flex w-[calc(100%+1rem)] flex-col gap-1.5 rounded-lg px-2 py-3 text-left transition-colors hover:bg-secondary', FOCUS_RING)}
-    >
-      {body}
-    </button>
   );
 }
 

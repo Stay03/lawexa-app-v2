@@ -264,3 +264,10 @@ export interface StatuteAnnotationsResponse {
   message: string;
   data: StatuteAnnotation[];
 }
+
+// One note, as every write (update, decide) answers it.
+export interface StatuteAnnotationResponse {
+  success: boolean;
+  message: string;
+  data: StatuteAnnotation;
+}

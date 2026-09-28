@@ -33,6 +33,8 @@ export function canSeeStatuteNotes(role: UserRole | null): boolean {
 export type NoteJump = (annotation: StatuteAnnotation) => void;
 
 interface StatuteNotesValue {
+  /** The statute's slug: the notes cache key the panel's edits write to. */
+  readonly slug: string;
   readonly enabled: boolean;
   readonly notes: readonly StatuteAnnotation[];
   readonly status: 'idle' | 'pending' | 'error' | 'ready';
@@ -77,6 +79,7 @@ export function StatuteNotesProvider({ slug, children }: { slug: string; childre
   const { refetch } = query;
   const value = useMemo<StatuteNotesValue>(
     () => ({
+      slug,
       enabled,
       notes: query.data ?? NO_NOTES,
       status: !enabled ? 'idle' : query.isPending ? 'pending' : query.isError ? 'error' : 'ready',
@@ -89,7 +92,7 @@ export function StatuteNotesProvider({ slug, children }: { slug: string; childre
       registerJump,
       jumpTo,
     }),
-    [enabled, query.data, query.isPending, query.isError, refetch, open, focus, openPanel, closePanel, clearFocus, registerJump, jumpTo],
+    [slug, enabled, query.data, query.isPending, query.isError, refetch, open, focus, openPanel, closePanel, clearFocus, registerJump, jumpTo],
   );
 
   return <StatuteNotesContext.Provider value={value}>{children}</StatuteNotesContext.Provider>;
@@ -102,6 +105,7 @@ export function useStatuteNotes(): StatuteNotesValue {
 }
 
 const DISABLED: StatuteNotesValue = {
+  slug: '',
   enabled: false,
   notes: NO_NOTES,
   status: 'idle',

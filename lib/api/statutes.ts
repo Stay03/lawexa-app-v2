@@ -10,6 +10,8 @@ import type {
   StatuteFacetsResponse,
   StatuteNodeType,
   StatuteAnnotationsResponse,
+  StatuteAnnotationResponse,
+  StatuteAnnotationType,
 } from '@/types/statute';
 
 /* ── The statute paywall contract (backend live Aug 2026, switch currently OFF) ─
@@ -229,5 +231,32 @@ export const statutesApi = {
       `/statutes/${slug}/annotations`,
     );
     return response.data;
+  },
+
+  /** Change a note's type or text. Its place and quote never change here. */
+  updateAnnotation: async (
+    uuid: string,
+    changes: { type?: StatuteAnnotationType; body?: string },
+  ): Promise<StatuteAnnotationResponse> => {
+    const response = await apiClient.patch<StatuteAnnotationResponse>(
+      `/statute-annotations/${uuid}`,
+      changes,
+    );
+    return response.data;
+  },
+
+  /** Record what was decided ("keep as printed", "corrected"); the note
+   *  becomes decided, with the decider and the time. */
+  decideAnnotation: async (uuid: string, decision: string): Promise<StatuteAnnotationResponse> => {
+    const response = await apiClient.post<StatuteAnnotationResponse>(
+      `/statute-annotations/${uuid}/decide`,
+      { decision },
+    );
+    return response.data;
+  },
+
+  /** Delete a note (soft-deleted on the server). */
+  deleteAnnotation: async (uuid: string): Promise<void> => {
+    await apiClient.delete(`/statute-annotations/${uuid}`);
   },
 };
