@@ -331,6 +331,13 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Message packs'),
         };
       }
+      if (depth === 2 && second === 'billing') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Billing'),
+        };
+      }
       return null;
 
     default:
