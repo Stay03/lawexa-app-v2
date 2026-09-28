@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { SETTINGS_COLUMN } from '../SettingsList';
+import { SettingsState as ProfileState } from '../SettingsState';
 
 /**
  * The `/settings/profile` states: the silhouette, the two refusals, and the
@@ -57,43 +58,6 @@ export function ProfileFallback() {
         </div>
       </div>
     </>
-  );
-}
-
-function ProfileState({
-  icon: Icon,
-  title,
-  description,
-  action,
-  tone = 'quiet',
-}: {
-  icon: typeof TriangleAlert;
-  title: string;
-  description: string;
-  action?: React.ReactNode;
-  tone?: 'quiet' | 'alarm';
-}) {
-  return (
-    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-      <span
-        aria-hidden
-        className={cn(
-          'flex size-12 items-center justify-center rounded-2xl',
-          tone === 'alarm'
-            ? 'bg-destructive/10 text-destructive'
-            : 'bg-secondary text-muted-foreground',
-        )}
-      >
-        <Icon className="size-6" />
-      </span>
-      <div className="space-y-1">
-        <p className="text-base font-semibold text-foreground">{title}</p>
-        <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-          {description}
-        </p>
-      </div>
-      {action}
-    </div>
   );
 }
 

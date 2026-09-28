@@ -24,7 +24,7 @@ import { visibleSettingsGroups } from './rows';
  * changes no setting, holds no form and owns no state; the one thing it fetches
  * is the plan on the account card, which the owner asked for by name.
  *
- * Five of its nine rows still open the classic app through the proxy. That is
+ * Five of its ten rows still open the classic app through the proxy. That is
  * deliberate and it is how the whole v2 tree has grown: these are real settings
  * people need today, and a row that goes nowhere is worse than a row that goes
  * to the page that works. Which rows those are, and the two edits that move one

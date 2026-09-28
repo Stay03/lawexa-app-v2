@@ -83,18 +83,27 @@ export interface AuthResponse {
   token: string;
 }
 
+/**
+ * One signed-in token, from `GET /auth/sessions` (SessionResource).
+ *
+ * Checked against the live answer on 28 September 2026: `device` is null when
+ * the token has no device row, a script's token reports `type: "bot"` with no
+ * browser or platform, and any field of `device` can be null. The earlier
+ * shape here promised none of that and nothing had read it yet.
+ */
 export interface Session {
   id: number;
   name: string;
   device: {
-    name: string;
-    type: 'desktop' | 'phone' | 'tablet';
-    browser: string;
-    platform: string;
-    location: string;
-    ip_address: string;
-  };
-  last_used_at: string;
+    name: string | null;
+    /** Seen: "desktop", "phone", "tablet", "bot". Kept open: the API may add more. */
+    type: string | null;
+    browser: string | null;
+    platform: string | null;
+    location: string | null;
+    ip_address: string | null;
+  } | null;
+  last_used_at: string | null;
   created_at: string;
   is_current: boolean;
 }

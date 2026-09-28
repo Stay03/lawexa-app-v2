@@ -317,6 +317,13 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Notifications'),
         };
       }
+      if (depth === 2 && second === 'devices') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Signed-in devices'),
+        };
+      }
       return null;
 
     default:

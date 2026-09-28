@@ -5,6 +5,7 @@ import {
   FlaskConical,
   Gauge,
   MessageSquarePlus,
+  MonitorSmartphone,
   Paintbrush,
   Ticket,
   User,
@@ -19,12 +20,13 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
  * settings/rows — every door on the settings screen, in one table.
  *
  * ── WHERE EACH ROW ACTUALLY GOES TODAY (READ THIS BEFORE BUILDING ONE) ─────
- * This is a screen built option by option. FOUR rows already land in v2; the
+ * This is a screen built option by option. FIVE rows already land in v2; the
  * rest cross into the classic app through the proxy, exactly as
  * `v2/shell/nav.config.ts` describes for an unmigrated nav row: v2 shell, v1
  * content, until the route joins `v2/routes.manifest.ts`.
  *
  *   Profile         /settings/profile        → V2 (rebuilt, 16 August 2026)
+ *   Devices         /settings/devices        → V2 (new, 28 September 2026)
  *   Organization    /organization            → V2 (rebuilt, phase-5 W5)
  *   Usage           /settings/usage          → v1
  *   Billing         /settings/billing        → v1
@@ -145,6 +147,16 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         label: 'Profile',
         icon: User,
         href: '/settings/profile',
+        requiresAccount: true,
+      },
+      {
+        // NEW IN v2 (28 September 2026). v1 never had it: its "Privacy &
+        // Security" page is a "coming soon" card that promised sessions. The
+        // API has served GET/DELETE /auth/sessions all along.
+        id: 'devices',
+        label: 'Signed-in devices',
+        icon: MonitorSmartphone,
+        href: '/settings/devices',
         requiresAccount: true,
       },
       {
