@@ -351,6 +351,13 @@
   vertical-align: baseline;
 }
 
+/* A blank inside a sentence stays inline, at a fixed width, so it reads as
+   a place to write, not as a gap (the oath's "I …… do solemnly swear", long
+   on the page; techlead's call, 28 September 2026). */
+.v2-statute-doc .akn-fill:not(.akn-fill-stretch) {
+  min-width: 12ch;
+}
+
 /* A line that ends in a blank, starts with one, or is one: the words are one
    wrapping unit and the edge blank takes the rest of the line (AknNode wraps
    them so). When the words and a short blank fit on one line, the blank
