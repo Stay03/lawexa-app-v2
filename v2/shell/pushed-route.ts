@@ -310,6 +310,13 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Developer'),
         };
       }
+      if (depth === 2 && second === 'notifications') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Notifications'),
+        };
+      }
       return null;
 
     default:

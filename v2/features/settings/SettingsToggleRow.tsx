@@ -28,6 +28,7 @@ export function SettingsToggleRow({
   checked,
   onCheckedChange,
   disabled = false,
+  dimmed = false,
 }: {
   icon: LucideIcon;
   label: string;
@@ -37,6 +38,11 @@ export function SettingsToggleRow({
   onCheckedChange: (next: boolean) => void;
   /** The platform refuses it (no push in this browser): shown, not operable. */
   disabled?: boolean;
+  /**
+   * Has no effect right now (alerts while paused): drawn faded, still
+   * operable, so a choice can be arranged before it takes effect again.
+   */
+  dimmed?: boolean;
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -45,10 +51,11 @@ export function SettingsToggleRow({
       <label
         htmlFor={id}
         className={cn(
-          'group flex min-h-14 items-center gap-3.5 px-4 py-2.5',
+          'group flex min-h-14 items-center gap-3.5 px-4 py-2.5 transition-[opacity,background-color] duration-150 motion-reduce:transition-none',
           disabled
             ? 'cursor-not-allowed opacity-60'
-            : 'cursor-pointer transition-colors duration-150 hover:bg-foreground/[0.04] motion-reduce:transition-none',
+            : 'cursor-pointer hover:bg-foreground/[0.04]',
+          dimmed && !disabled && 'opacity-60',
         )}
       >
         <Icon
