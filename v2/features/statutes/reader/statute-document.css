@@ -305,6 +305,74 @@
   font-style: italic;
 }
 
+/* ── Printed forms (the layout markers, AknNode `paragraphClass`) ─────────── */
+
+/**
+ * A form reads like the Gazette page: lines close together, headings centred,
+ * signature lines to the right, and blanks drawn as dotted leaders. The box
+ * is quiet (a hairline and room) so it reads as a form inside the schedule,
+ * not as a card.
+ */
+.v2-statute-doc .akn-form {
+  margin: 0.75rem 0;
+  padding: 1rem 1.125rem;
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  border-radius: 0.75rem;
+}
+
+.v2-statute-doc .akn-form .akn-p + .akn-p {
+  margin-top: 0.2em;
+}
+
+.v2-statute-doc .akn-p-centre {
+  text-align: center;
+}
+
+.v2-statute-doc .akn-p-right {
+  text-align: right;
+}
+
+/** An empty line of space between blocks of the form. */
+.v2-statute-doc .akn-p-gap {
+  min-height: 0.9em;
+}
+
+/**
+ * A blank to fill in. The printed "……" is still the text (so search and note
+ * quotes see it); it is drawn as a dotted rule instead of dots. A blank that
+ * ends its line runs to the right edge, as on the page.
+ */
+.v2-statute-doc .akn-fill {
+  display: inline-block;
+  min-width: 4ch;
+  color: transparent;
+  border-bottom: 1px dotted color-mix(in oklch, var(--foreground) 55%, transparent);
+  line-height: 1.1;
+  vertical-align: baseline;
+}
+
+/* A line ending in a blank: the text before it is one wrapping unit, and the
+   last blank takes the rest of the line (AknNode wraps them so). */
+/* When the words and a short blank fit on one line, the blank stretches to
+   the edge; when they do not, the blank drops to its own full-width line
+   below, as a writing line on the printed form, instead of narrowing the
+   whole paragraph beside it (caught on the phone, 28 September 2026). */
+.v2-statute-doc .akn-p-fill-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.3em;
+}
+
+.v2-statute-doc .akn-fill-lead {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.v2-statute-doc .akn-fill-stretch {
+  flex: 1 0 6ch;
+}
+
 /** Editorial annotations — "[As substituted by …]" — quiet, never loud. */
 .v2-statute-doc .akn-remark {
   font-size: 0.8125em;

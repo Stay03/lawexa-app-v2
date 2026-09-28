@@ -82,6 +82,24 @@ const INLINE_MAP: Record<string, 'strong' | 'em' | 'u' | 'sup' | 'sub'> = {
   sub: 'sub',
 };
 
+/** True when `el` carries `name` among its `class` values (AKN keeps the
+ *  HTML-style attribute; the form markers ride on it). */
+function hasClass(el: Element, name: string): boolean {
+  return (el.getAttribute('class') ?? '').split(/\s+/).includes(name);
+}
+
+/**
+ * A paragraph's layout marker, for the printed forms (the marker set agreed
+ * with backend on 28 September 2026, b20a3778/cb8983ac): `centre`, `right`, or
+ * `gap` (an empty line of space). A paragraph with none keeps the default.
+ */
+function paragraphClass(el: Element): string {
+  if (hasClass(el, 'centre')) return 'akn-p akn-p-centre';
+  if (hasClass(el, 'right')) return 'akn-p akn-p-right';
+  if (hasClass(el, 'gap')) return 'akn-p akn-p-gap';
+  return 'akn-p';
+}
+
 /* ── The block component (the memo boundary) ─────────────────────────────── */
 
 export const AknBlockView = memo(function AknBlockView({
@@ -195,10 +213,44 @@ function renderElement(
   }
 
   if (tag === 'p') {
+    // A form line that ENDS in a blank: the blank runs to the right edge, as on
+    // the printed page. Everything before it is one wrapper, so the line still
+    // wraps as ordinary text; only the last blank stretches. (Letting every
+    // text run and blank become its own flex item split long lines into
+    // columns: caught on the TF 001 sample, 28 September 2026.)
+    const nodes = Array.from(element.childNodes).filter(
+      (node) => node.nodeType !== Node.TEXT_NODE || (node as Text).data.trim() !== '',
+    );
+    const last = nodes[nodes.length - 1];
+    if (
+      nodes.length > 1 &&
+      last?.nodeType === Node.ELEMENT_NODE &&
+      localName(last as Element) === 'span' &&
+      hasClass(last as Element, 'fill')
+    ) {
+      return (
+        <p key={key} className={`${paragraphClass(element)} akn-p-fill-end`}>
+          <span className="akn-fill-lead">{renderInlineNodes(nodes.slice(0, -1))}</span>
+          <span className="akn-fill akn-fill-stretch">
+            {renderInlineChildren(last as Element)}
+          </span>
+        </p>
+      );
+    }
     return (
-      <p key={key} className="akn-p">
+      <p key={key} className={paragraphClass(element)}>
         {renderInlineChildren(element)}
       </p>
+    );
+  }
+
+  // A printed form: the whole form's box. Its lines are ordinary paragraphs
+  // carrying the layout markers above.
+  if (tag === 'blockcontainer' && hasClass(element, 'form')) {
+    return (
+      <div key={key} className="akn-form">
+        {renderBlockChildren(element)}
+      </div>
     );
   }
 
@@ -527,9 +579,13 @@ function renderMixedChildren(parent: Element): ReactNode {
  * semantics (`ref`, `term`, `date`, …) keep their text and lose only markup.
  */
 function renderInlineChildren(parent: Element): ReactNode {
+  return renderInlineNodes(Array.from(parent.childNodes));
+}
+
+function renderInlineNodes(nodes: readonly ChildNode[]): ReactNode {
   const children: ReactNode[] = [];
   let index = 0;
-  for (const node of parent.childNodes) {
+  for (const node of nodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       children.push(renderText((node as Text).data, index));
     } else if (node.nodeType === Node.ELEMENT_NODE) {
@@ -560,6 +616,12 @@ function renderInlineNode(element: Element): ReactNode {
       return <sub>{renderInlineChildren(element)}</sub>;
     default:
       break;
+  }
+
+  if (tag === 'span' && hasClass(element, 'fill')) {
+    // A blank to fill in. The printed "……" stays in the text (search and note
+    // quotes still see it); the stylesheet draws it as a dotted leader.
+    return <span className="akn-fill">{renderInlineChildren(element)}</span>;
   }
 
   if (tag === 'remark') {
