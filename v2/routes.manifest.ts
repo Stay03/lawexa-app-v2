@@ -127,6 +127,7 @@ export const V2_ROUTES = [
   // wildcard. See the block above.
   '/settings',
   '/settings/profile',
+  '/settings/developer',
   // Legacy collab addresses — v2-only redirect shells (see the block above).
   '/channel-invitations',
   '/space-invitations',
