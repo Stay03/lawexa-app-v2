@@ -130,6 +130,9 @@ export const V2_ROUTES = [
   '/settings/developer',
   '/settings/notifications',
   '/settings/devices',
+  '/settings/message-packs',
+  // Where the payment provider returns a v2 buyer of message packs.
+  '/payg/callback',
   // Legacy collab addresses — v2-only redirect shells (see the block above).
   '/channel-invitations',
   '/space-invitations',
