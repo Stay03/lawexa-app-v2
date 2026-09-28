@@ -29,3 +29,7 @@ test('before pricing loads, nothing is offered and the stored choice stands', ()
 test('an empty price list offers nothing and keeps the stored choice', () => {
   assert.deepEqual(currencyOffer(pricing([]), 'USD'), { offered: [], currency: 'USD' });
 });
+
+test('a buyer in Nigeria who once chose dollars is priced in Naira', () => {
+  assert.deepEqual(currencyOffer(pricing(['NGN']), 'USD'), { offered: ['NGN'], currency: 'NGN' });
+});
