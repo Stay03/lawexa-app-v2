@@ -339,8 +339,8 @@
 
 /**
  * A blank to fill in. The printed "……" is still the text (so search and note
- * quotes see it); it is drawn as a dotted rule instead of dots. A blank that
- * ends its line runs to the right edge, as on the page.
+ * quotes see it); it is drawn as a dotted rule instead of dots. A blank at
+ * either end of its line runs across the free width, as on the page.
  */
 .v2-statute-doc .akn-fill {
   display: inline-block;
@@ -351,20 +351,21 @@
   vertical-align: baseline;
 }
 
-/* A line ending in a blank: the text before it is one wrapping unit, and the
-   last blank takes the rest of the line (AknNode wraps them so). */
-/* When the words and a short blank fit on one line, the blank stretches to
-   the edge; when they do not, the blank drops to its own full-width line
-   below, as a writing line on the printed form, instead of narrowing the
-   whole paragraph beside it (caught on the phone, 28 September 2026). */
-.v2-statute-doc .akn-p-fill-end {
+/* A line that ends in a blank, starts with one, or is one: the words are one
+   wrapping unit and the edge blank takes the rest of the line (AknNode wraps
+   them so). When the words and a short blank fit on one line, the blank
+   stretches to the margin; when they do not, the blank drops to its own
+   full-width line, as a writing line on the printed form, instead of
+   narrowing the whole paragraph beside it (caught on the phone, 28 September
+   2026). */
+.v2-statute-doc .akn-p-fill-line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: 0.3em;
 }
 
-.v2-statute-doc .akn-fill-lead {
+.v2-statute-doc .akn-fill-words {
   flex: 0 1 auto;
   min-width: 0;
 }
