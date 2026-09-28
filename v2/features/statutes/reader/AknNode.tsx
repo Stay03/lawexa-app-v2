@@ -1,8 +1,9 @@
 'use client';
 
-import { memo, type ReactNode } from 'react';
+import { Fragment, memo, type ReactNode } from 'react';
 
 import { aknAnchorId, childByLocal, localName, type AknBlock } from './akn';
+import { printedLines } from './printed-lines';
 import { SectionCopyLink } from './SectionLink';
 
 /**
@@ -299,6 +300,26 @@ function Fragmented({ children }: { children: ReactNode }) {
 }
 
 /**
+ * One text node as the page shows it: a plain string, or, when the print had
+ * line breaks in it (a form, a formula), its lines with a `<br>` between them.
+ * Which breaks count is `printedLines`'s rule.
+ */
+function renderText(text: string, keyIndex: number): ReactNode {
+  const lines = printedLines(text);
+  if (lines.length === 1) return lines[0];
+  return (
+    <Fragmented key={keyIndex}>
+      {lines.map((line, i) => (
+        <Fragment key={i}>
+          {i > 0 ? <br /> : null}
+          {line}
+        </Fragment>
+      ))}
+    </Fragmented>
+  );
+}
+
+/**
  * A numbered section: "1. Heading" as one hanging heading, then content. A
  * block-root section leaves its anchor id to the block wrapper; a nested one
  * carries its own. The heading hosts the copy-link affordance — which renders
@@ -462,7 +483,7 @@ function renderBlockChildren(parent: Element, exclude?: string[]): ReactNode {
   for (const node of parent.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = (node as Text).data;
-      if (text.trim()) children.push(text);
+      if (text.trim()) children.push(renderText(text, index));
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as Element;
       if (!excluded?.has(localName(el))) {
@@ -484,7 +505,7 @@ function renderMixedChildren(parent: Element): ReactNode {
   for (const node of parent.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = (node as Text).data;
-      if (text.trim()) children.push(text);
+      if (text.trim()) children.push(renderText(text, index));
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as Element;
       const tag = localName(el);
@@ -510,7 +531,7 @@ function renderInlineChildren(parent: Element): ReactNode {
   let index = 0;
   for (const node of parent.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) {
-      children.push((node as Text).data);
+      children.push(renderText((node as Text).data, index));
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       children.push(
         <Fragmented key={index}>{renderInlineNode(node as Element)}</Fragmented>,

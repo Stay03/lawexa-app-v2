@@ -102,6 +102,8 @@ export function buildServerOutline(data: StatuteOutlineData): ServerOutlineModel
         const division: AknOutlineDivision = {
           id: anchorIdOf(entry),
           label,
+          // The walk's depth: how many LABELLED divisions this one sits in.
+          depth: stack.filter((frame) => frame.division !== null).length,
           sections: [],
           ...(entry.locked ? { locked: true } : {}),
         };

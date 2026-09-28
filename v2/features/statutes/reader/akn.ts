@@ -70,6 +70,13 @@ export interface AknOutlineDivision {
   label: string;
   /** Same contract as {@link AknOutlineSection.locked}. */
   locked?: boolean;
+  /**
+   * How many labelled divisions this one sits inside: 0 for a top-level Part,
+   * Chapter or Schedule, 1 for a Part inside a Chapter or a Schedule, or for a
+   * lettered sub-division ("V-A") inside a Part. Absent means 0. The contents
+   * panel indents by it, so a Chapter's "Part I" is not read as the Act's.
+   */
+  depth?: number;
   sections: AknOutlineSection[];
 }
 
@@ -194,6 +201,21 @@ function firstElementChild(el: Element): Element | null {
   return el.children.length > 0 ? el.children[0] : null;
 }
 
+/**
+ * A lettered sub-division marker: an `hcontainer` that holds only its own
+ * number and heading ("V-A" / "SECURITIES EXCHANGES"), with the sections it
+ * introduces following it as siblings rather than as children. That is how
+ * the ISA 2025 stores its 15 sub-divisions (V-A to XVI-B).
+ */
+function isGroupMarker(el: Element): boolean {
+  if (localName(el) !== 'hcontainer' || el.children.length === 0) return false;
+  for (const child of el.children) {
+    const name = localName(child);
+    if (name !== 'num' && name !== 'heading' && name !== 'subheading') return false;
+  }
+  return true;
+}
+
 /** "Part I — SUPERIOR COURTS" / "1. Composition of the Supreme Court". */
 function joinNumHeading(num: string, heading: string, separator: string): string {
   if (num && heading) return `${num}${separator}${heading}`;
@@ -230,6 +252,8 @@ class ModelBuilder {
    * body blocks instead of skipped — no label may vanish by construction.
    */
   walk(container: Element, depth: number, labelsLifted: boolean): void {
+    /** The sub-division marker the following sections belong to, if any. */
+    let group: AknOutlineDivision | null = null;
     for (const child of container.children) {
       const name = localName(child);
 
@@ -282,7 +306,7 @@ class ModelBuilder {
           ' ',
         );
         if (label) {
-          const division = this.divisionStack[this.divisionStack.length - 1];
+          const division = group ?? this.divisionStack[this.divisionStack.length - 1];
           if (division) {
             division.sections.push({ id, label });
           } else {
@@ -296,12 +320,22 @@ class ModelBuilder {
 
       // Any other content at this level (hcontainer, longTitle, a stray
       // paragraph, an unknown future element) is one body block.
-      this.push({
-        id: this.anchorId(child),
-        kind: 'body',
-        element: child,
-        depth,
-      });
+      const id = this.anchorId(child);
+      this.push({ id, kind: 'body', element: child, depth });
+
+      // A sub-division marker also opens a contents entry one level down,
+      // which the sections after it attach to until the next marker.
+      if (isGroupMarker(child)) {
+        const label = joinNumHeading(
+          collapsedText(childByLocal(child, 'num')),
+          collapsedText(childByLocal(child, 'heading')),
+          ' — ',
+        );
+        if (label) {
+          group = { id, label, depth: this.divisionStack.length, sections: [] };
+          this.outline.push(group);
+        }
+      }
     }
   }
 
@@ -320,7 +354,12 @@ class ModelBuilder {
       // Only LABELLED divisions appear in the outline (an anonymous subpart
       // would be an empty rail row); their sections attach to the nearest
       // labelled ancestor either way.
-      const entry: AknOutlineDivision = { id, label, sections: [] };
+      const entry: AknOutlineDivision = {
+        id,
+        label,
+        depth: this.divisionStack.length,
+        sections: [],
+      };
       this.outline.push(entry);
       this.divisionStack.push(entry);
       this.walk(el, depth + 1, true);

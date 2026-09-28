@@ -57,10 +57,18 @@ import type { AknOutlineDivision } from './akn';
  * observes only rendered blocks, so a locked id never becomes active.
  *
  * ONLY locked rows change shape: they opt into a flex row so the mark can
- * trail the label. Unlocked rows keep the exact pre-paywall markup and class
- * strings — a full document (no locked entries anywhere) therefore renders
- * DOM byte-identical to before the paywall existed, which is the feature's
- * inertness requirement, enforced here per row rather than per document.
+ * trail the label. Unlocked rows carry no paywall markup at all, so a full
+ * document (no locked entries anywhere) renders no trace of the paywall —
+ * the feature's inertness requirement, enforced here per row rather than
+ * per document.
+ *
+ * ── NESTING ─────────────────────────────────────────────────────────────────
+ * Rows indent by `depth` (see {@link AknOutlineDivision.depth}): a Chapter's
+ * Parts, a Schedule's Parts and a Part's lettered sub-divisions sit under
+ * their parent, because several Acts restart "Part I" in every Chapter and a
+ * flat list made those rows indistinguishable (PIA 2021, 28 Sep 2026). The
+ * rail also sets the active division's ancestors in full colour, so the
+ * reader sees which Chapter the current Part belongs to.
  */
 
 export interface OutlineHandle {
@@ -178,10 +186,51 @@ function activeDivisionOf(
   return outline[0]?.id ?? null;
 }
 
+/**
+ * The active division and every division it sits inside, found by walking back
+ * to each shallower entry — the outline is flat, in document order, and
+ * `depth` is what nests it.
+ */
+function activeChainOf(
+  outline: AknOutlineDivision[],
+  activeDivision: string | null,
+): ReadonlySet<string> {
+  const chain = new Set<string>();
+  const index = outline.findIndex((division) => division.id === activeDivision);
+  if (index < 0) return chain;
+  chain.add(outline[index].id);
+  let depth = outline[index].depth ?? 0;
+  for (let i = index - 1; i >= 0 && depth > 0; i -= 1) {
+    const ancestorDepth = outline[i].depth ?? 0;
+    if (ancestorDepth < depth) {
+      chain.add(outline[i].id);
+      depth = ancestorDepth;
+    }
+  }
+  return chain;
+}
+
+/**
+ * Left padding by nesting level, so a Chapter's Parts, a Schedule's Parts and
+ * a Part's lettered sub-divisions sit under their parent. Static class names
+ * (Tailwind reads them from the source); two levels of indent is the most any
+ * of our Acts nests, and anything deeper stays at the second.
+ */
+const RAIL_DIVISION_PAD = ['pl-3.5', 'pl-6', 'pl-8'] as const;
+const RAIL_SECTION_PAD = ['pl-6', 'pl-8', 'pl-10'] as const;
+const SHEET_DIVISION_PAD = ['pl-3', 'pl-6', 'pl-9'] as const;
+const SHEET_SECTION_PAD = ['pl-7', 'pl-10', 'pl-12'] as const;
+
+function level(division: AknOutlineDivision): 0 | 1 | 2 {
+  const depth = division.depth ?? 0;
+  return depth >= 2 ? 2 : depth === 1 ? 1 : 0;
+}
+
 /* ── The wide-screen rail ────────────────────────────────────────────────── */
 
 export function StatuteOutlineRail({ outline, activeId, onJump }: OutlineHandle) {
   const activeDivision = activeDivisionOf(outline, activeId);
+  const activeChain = activeChainOf(outline, activeDivision);
 
   return (
     <nav
@@ -202,9 +251,10 @@ export function StatuteOutlineRail({ outline, activeId, onJump }: OutlineHandle)
                 aria-current={divisionCurrent ? 'location' : undefined}
                 className={cn(
                   division.locked
-                    ? 'v2-interactive flex w-full items-center gap-1.5 rounded-r-md py-1.5 pl-3.5 pr-2 text-left text-xs transition-colors'
-                    : 'v2-interactive block w-full rounded-r-md py-1.5 pl-3.5 pr-2 text-left text-xs transition-colors',
-                  isActiveDivision
+                    ? 'v2-interactive flex w-full items-center gap-1.5 rounded-r-md py-1.5 pr-2 text-left text-xs transition-colors'
+                    : 'v2-interactive block w-full rounded-r-md py-1.5 pr-2 text-left text-xs transition-colors',
+                  RAIL_DIVISION_PAD[level(division)],
+                  activeChain.has(division.id)
                     ? 'font-medium text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
                   FOCUS_RING,
@@ -237,8 +287,9 @@ export function StatuteOutlineRail({ outline, activeId, onJump }: OutlineHandle)
                           aria-current={sectionCurrent ? 'location' : undefined}
                           className={cn(
                             section.locked
-                              ? 'v2-interactive flex w-full items-center gap-1.5 rounded-r-md py-1 pl-6 pr-2 text-left text-[11px] leading-snug transition-colors'
-                              : 'v2-interactive block w-full rounded-r-md py-1 pl-6 pr-2 text-left text-[11px] leading-snug transition-colors',
+                              ? 'v2-interactive flex w-full items-center gap-1.5 rounded-r-md py-1 pr-2 text-left text-[11px] leading-snug transition-colors'
+                              : 'v2-interactive block w-full rounded-r-md py-1 pr-2 text-left text-[11px] leading-snug transition-colors',
+                            RAIL_SECTION_PAD[level(division)],
                             sectionCurrent
                               ? 'font-medium text-foreground'
                               : 'text-muted-foreground/80 hover:text-foreground',
@@ -363,8 +414,9 @@ export function StatuteContentsSheet({
                     aria-current={activeId === division.id ? 'location' : undefined}
                     className={cn(
                       division.locked
-                        ? 'v2-interactive flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-secondary'
-                        : 'v2-interactive block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-secondary',
+                        ? 'v2-interactive flex w-full items-center gap-2 rounded-lg py-2 pr-3 text-left text-sm transition-colors hover:bg-secondary'
+                        : 'v2-interactive block w-full rounded-lg py-2 pr-3 text-left text-sm transition-colors hover:bg-secondary',
+                      SHEET_DIVISION_PAD[level(division)],
                       activeId === division.id
                         ? 'font-medium text-primary'
                         : 'text-foreground',
@@ -392,8 +444,9 @@ export function StatuteContentsSheet({
                             }
                             className={cn(
                               section.locked
-                                ? 'v2-interactive flex w-full items-center gap-2 rounded-lg py-1.5 pl-7 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary'
-                                : 'v2-interactive block w-full rounded-lg py-1.5 pl-7 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary',
+                                ? 'v2-interactive flex w-full items-center gap-2 rounded-lg py-1.5 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary'
+                                : 'v2-interactive block w-full rounded-lg py-1.5 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary',
+                              SHEET_SECTION_PAD[level(division)],
                               activeId === section.id
                                 ? 'font-medium text-primary'
                                 : 'text-muted-foreground',
