@@ -237,20 +237,22 @@ function renderElement(
   if (tag === 'p') {
     // A form line whose last blank runs to the margin, as on the printed page:
     // "A.B. ……" (the blank ends the line), "……C.D." and "Signed……B." (only a
-    // name or initials follow it, set at the margin), or a whole writing line.
-    // The words on each side are one wrapper, so they still wrap as ordinary
-    // text; only that blank stretches. A blank followed by more prose stays
-    // inline, or the sentence after it would break off into a block of its
-    // own. (Letting every text run and blank become its own flex item split
-    // long lines into columns: caught on the TF 001 sample, 28 September 2026.
-    // A lone blank at its 4ch minimum and a stub before "B." were caught on
-    // backend's TF 001 content the same day.)
+    // name or initials follow it, set at the margin), "……(Petitioners) as the
+    // case may be)" (the blank opens the line, so no sentence is split), or a
+    // whole writing line. The words on each side are one wrapper, so they
+    // still wrap as ordinary text; only that blank stretches. A blank in the
+    // middle of prose stays inline, or the sentence after it would break off
+    // into a block of its own. (Letting every text run and blank become its
+    // own flex item split long lines into columns: caught on the TF 001
+    // sample, 28 September 2026. A lone blank at its 4ch minimum, a stub
+    // before "B." and a stub opening TF 005's "(Petitioners)" line were caught
+    // on backend's marked forms the same day.)
     const nodes = Array.from(element.childNodes).filter(
       (node) => node.nodeType !== Node.TEXT_NODE || (node as Text).data.trim() !== '',
     );
     const fillAt = nodes.findLastIndex(isFill);
     const after = nodes.slice(fillAt + 1);
-    if (fillAt >= 0 && inlineText(after).length <= MARGIN_NAME_MAX) {
+    if (fillAt === 0 || (fillAt > 0 && inlineText(after).length <= MARGIN_NAME_MAX)) {
       const before = nodes.slice(0, fillAt);
       return (
         <p key={key} className={`${paragraphClass(element)} akn-p-fill-line`}>
