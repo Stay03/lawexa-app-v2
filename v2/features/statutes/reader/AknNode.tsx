@@ -357,6 +357,20 @@ function renderElement(
     if (childByLocal(element, 'num')) {
       return <NumberedBlock key={key} element={element} blockRoot={blockRoot} />;
     }
+    // A container with its own eId (a definition in an interpretation
+    // section, `…__def-attorney-general-of-the-federation`) keeps that id on
+    // the page, so a deep link or a researcher's note can find it. The
+    // wrapper is `display: contents`: the layout is exactly the fragment's.
+    // (Eight Electoral Act notes on s.155 definitions had no place to land
+    // without it, 28 September 2026.)
+    const anchorId = blockRoot ? null : aknAnchorId(element);
+    if (anchorId) {
+      return (
+        <div key={key} id={anchorId} className="akn-anchor">
+          {renderBlockChildren(element)}
+        </div>
+      );
+    }
     return <Fragmented key={key}>{renderBlockChildren(element)}</Fragmented>;
   }
 

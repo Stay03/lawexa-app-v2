@@ -9,6 +9,7 @@ import type {
   StatuteListParams,
   StatuteFacetsResponse,
   StatuteNodeType,
+  StatuteAnnotationsResponse,
 } from '@/types/statute';
 
 /* ── The statute paywall contract (backend live Aug 2026, switch currently OFF) ─
@@ -215,6 +216,17 @@ export const statutesApi = {
   getAknOutline: async (slug: string): Promise<StatuteOutlineResponse> => {
     const response = await apiClient.get<StatuteOutlineResponse>(
       `/public/statutes/${slug}/akn/outline`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Researchers' notes on a statute, in reading order. Researcher and up
+   * only: an ordinary account gets 403, so callers gate on the role first.
+   */
+  getAnnotations: async (slug: string): Promise<StatuteAnnotationsResponse> => {
+    const response = await apiClient.get<StatuteAnnotationsResponse>(
+      `/statutes/${slug}/annotations`,
     );
     return response.data;
   },

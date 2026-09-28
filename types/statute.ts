@@ -210,3 +210,57 @@ export interface StatuteNavigateResponse {
     total_count: number;
   };
 }
+
+/**
+ * A researcher's note on a statute: a printing error, a typo, a doubt, or a
+ * plain note (`GET /statutes/{slug}/annotations`, researcher and up; an
+ * ordinary account gets 403).
+ *
+ * Where it sits: `node` is the part it belongs to, with the eId the AKN export
+ * writes, so the reader places it with no second lookup. `null` with a null
+ * `quote` is a note on the whole statute; `null` WITH a quote is `detached`
+ * (the part was deleted and the note kept). `quote` is the words it marks;
+ * `text_changed` says the server no longer finds them in the part's text.
+ * `prefix`, `suffix` and the offsets are hints for telling one occurrence of
+ * the quote from another, and are null on imported notes.
+ */
+export interface StatuteAnnotation {
+  uuid: string;
+  statute_id: number;
+  node: {
+    id: number;
+    eid: string;
+    node_type: string;
+    number: string | null;
+    position: number;
+  } | null;
+  quote: string | null;
+  prefix: string | null;
+  suffix: string | null;
+  start_offset: number | null;
+  end_offset: number | null;
+  type: StatuteAnnotationType;
+  type_label: string;
+  status: 'open' | 'decided';
+  status_label: string;
+  body: string;
+  decision: string | null;
+  source: 'manual' | 'log_import' | 'typos_import';
+  text_changed: boolean;
+  detached: boolean;
+  created_by?: { id: number; name: string } | null;
+  decided_by?: { id: number; name: string } | null;
+  decided_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StatuteAnnotationType = 'print_error' | 'typo' | 'doubt' | 'note';
+
+// Notes on one statute, in reading order (whole-statute notes first, then by
+// the part's position, detached notes last).
+export interface StatuteAnnotationsResponse {
+  success: boolean;
+  message: string;
+  data: StatuteAnnotation[];
+}

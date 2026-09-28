@@ -6,6 +6,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { statutesQueries } from '../queries';
 import { StatuteDocument } from './StatuteDocument';
 import { StatuteHeader } from './StatuteHeader';
+import { StatuteNotesProvider } from '../notes/context';
 import {
   STATUTE_COLUMN,
   StatuteDocumentSkeleton,
@@ -105,21 +106,24 @@ export function StatuteScreen({
     // `relative` anchors the contents rail beside the column; the flex column
     // is what lets the mobile contents pill stick to the bottom edge for the
     // whole read (the CaseScreen layout mechanics). `.v2-statute-doc` scopes
-    // the reading typography.
-    <div className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-24 pt-5 sm:pt-8">
-      <article
-        aria-label={detail.title}
-        className="flex flex-col gap-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
-      >
-        <StatuteHeader detail={detail} />
-        {/* KEYED BY SLUG: a statute→statute navigation reuses this component
-            instance, and an inherited `mountedCount` ≥ the new document's
-            block count would mount the entire second document in ONE
-            synchronous commit — the exact jank the progressive mount exists
-            to prevent — and skip its deep link. The key resets the engine. */}
-        <StatuteDocument key={slug} slug={slug} provision={provision} />
-      </article>
-    </div>
+    // the reading typography. The notes provider shares researchers' notes
+    // between the header's Notes button and the document's underlines.
+    <StatuteNotesProvider slug={slug}>
+      <div className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-24 pt-5 sm:pt-8">
+        <article
+          aria-label={detail.title}
+          className="flex flex-col gap-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+        >
+          <StatuteHeader detail={detail} />
+          {/* KEYED BY SLUG: a statute→statute navigation reuses this component
+              instance, and an inherited `mountedCount` ≥ the new document's
+              block count would mount the entire second document in ONE
+              synchronous commit — the exact jank the progressive mount exists
+              to prevent — and skip its deep link. The key resets the engine. */}
+          <StatuteDocument key={slug} slug={slug} provision={provision} />
+        </article>
+      </div>
+    </StatuteNotesProvider>
   );
 }
 

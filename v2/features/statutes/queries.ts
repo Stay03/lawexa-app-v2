@@ -180,6 +180,20 @@ export const statutesQueries = {
     }),
 
   /**
+   * Researchers' notes on one statute (`GET /statutes/{slug}/annotations`),
+   * in reading order. Researcher and up only: the call site gates `enabled`
+   * on the role, so an ordinary reader's page never makes the request (the
+   * server's 403 is the real guard). `standard` staleness: notes change as
+   * researchers work, so a return visit re-checks them.
+   */
+  annotations: (slug: string) =>
+    queryOptions({
+      queryKey: [...statutesQueries.all, 'annotations', slug] as const,
+      queryFn: async () => (await statutesApi.getAnnotations(slug)).data,
+      staleTime: STALE_TIMES.standard,
+    }),
+
+  /**
    * The AKN outline — every element in reading order with per-entry `locked`
    * flags and the true section count, no body text. The reader consumes it
    * ONLY when the document arrived partial (`enabled` is the call site's, per

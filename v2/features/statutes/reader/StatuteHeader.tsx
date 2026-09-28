@@ -13,6 +13,7 @@ import {
   type StatuteStatusTone,
 } from '../statute-row-model';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
+import { NotesButton } from '../notes/NotesButton';
 
 /**
  * StatuteHeader — the reader's heading block, in the case-document header
@@ -137,6 +138,7 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
           variant="full"
         />
         <AddToFolderButton target={{ type: 'statute', contentId: detail.id }} />
+        <NotesButton />
       </div>
     </header>
   );

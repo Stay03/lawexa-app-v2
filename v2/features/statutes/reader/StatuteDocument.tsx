@@ -37,6 +37,10 @@ import {
   isRateLimited,
 } from './states';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useStatuteNotes } from '../notes/context';
+import { noteAnchorId } from '../notes/note-ranges';
+import { NotesSheet } from '../notes/NotesSheet';
+import { useNoteHighlights } from '../notes/use-note-highlights';
 import './statute-document.css';
 
 /**
@@ -173,6 +177,11 @@ export function StatuteDocument({
     return () => window.clearTimeout(timer);
   }, [mountedCount, blocks.length]);
 
+  /* ── Researchers' notes (researcher and up; see notes/context.tsx) ────── */
+
+  const statuteNotes = useStatuteNotes();
+  const { notesAtPoint, flash } = useNoteHighlights(statuteNotes.notes, visibleCount);
+
   const blockIndexById = useMemo(() => {
     const map = new Map<string, number>();
     blocks.forEach((block, index) => {
@@ -238,6 +247,40 @@ export function StatuteDocument({
       });
     });
   };
+
+  // The notes panel's jump: a note's part may be nested (a subsection inside
+  // a section's block), so the mount runs through its HOLDER block, then the
+  // landing flashes the note's words once the scroll has settled.
+  const { registerJump } = statuteNotes;
+  useEffect(() => {
+    registerJump((note) => {
+      if (!note.node) return;
+      const anchorId = noteAnchorId(note.node.eid);
+      const index = blockIndexById.get(anchorId) ?? holderBlockIndex(blocks, anchorId);
+      if (index !== null && index !== undefined) {
+        setMountedCount((prev) => Math.max(prev, index + 1));
+      }
+      // A definition's anchor is `display: contents` and has no box to
+      // scroll to; its first child stands in for it.
+      const land = () => {
+        const el = document.getElementById(anchorId);
+        const box = el && getComputedStyle(el).display === 'contents' ? (el.firstElementChild ?? el) : el;
+        box?.scrollIntoView({ block: 'center' });
+      };
+      requestAnimationFrame(() => {
+        land();
+        requestAnimationFrame(() => {
+          land();
+          flash(note);
+          // `content-visibility` estimates above the target settle into real
+          // heights a beat later; one more landing keeps the note centred
+          // instead of drifting to the screen's edge (filmed on s.35).
+          window.setTimeout(land, 250);
+        });
+      });
+    });
+    return () => registerJump(null);
+  }, [registerJump, blockIndexById, blocks, flash]);
 
   /* ── Arrival deep links: `#akn-…` hash, or the citation path ──────────── */
 
@@ -515,13 +558,28 @@ export function StatuteDocument({
       </span>
 
       <SectionLinkContext.Provider value={sectionLinks}>
-        <div className="akn-doc motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+        <div
+          className="akn-doc motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+          // A tap on an underlined phrase opens the notes at that place. A
+          // drag that selected text is a selection, not a tap.
+          onClick={
+            statuteNotes.enabled
+              ? (event) => {
+                  if (window.getSelection()?.isCollapsed === false) return;
+                  const hits = notesAtPoint(event.clientX, event.clientY);
+                  if (hits.length > 0) statuteNotes.openPanel(hits);
+                }
+              : undefined
+          }
+        >
           {blocks.slice(0, visibleCount).map((block) => (
             <AknBlockView key={block.key} block={block} />
           ))}
           {mounting ? <DocumentMountingTail /> : null}
         </div>
       </SectionLinkContext.Provider>
+
+      {statuteNotes.enabled ? <NotesSheet /> : null}
 
       {/* Where the excerpt ends on a partial document: the fade over our own
           last rendered lines, then the upgrade card. The headline count

@@ -566,3 +566,39 @@
 .v2-statute-doc .akn-table .akn-p + .akn-p {
   margin-top: 0.5em;
 }
+
+/* ── Researchers' notes (notes/use-note-highlights.ts) ──────────────────── */
+
+/**
+ * Painted with the CSS Custom Highlight API, which adds no element to the
+ * text. `::highlight` takes only colour, background and text-decoration, so a
+ * note is a dotted underline in the accent colour: visible to a researcher
+ * scanning for them, quiet enough to read through. A jump from the notes list
+ * lands on a brief wash of the same colour.
+ */
+.v2-statute-doc ::highlight(statute-note) {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 2px;
+  text-decoration-color: color-mix(in oklch, var(--primary) 85%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.v2-statute-doc ::highlight(statute-note-active) {
+  background-color: color-mix(in oklab, var(--primary) 28%, transparent);
+  color: var(--foreground);
+}
+
+/** A container that only carries an eId (a definition): present for its id,
+ *  absent from the layout. Jumps land on its first child (StatuteDocument).
+ *  The wrapper breaks `.akn-p + .akn-p` between one definition and the next,
+ *  so the same 0.75em is restated across it: the page reads as before. */
+.v2-statute-doc .akn-anchor {
+  display: contents;
+}
+
+.v2-statute-doc .akn-anchor + .akn-anchor > .akn-p:first-child,
+.v2-statute-doc .akn-p + .akn-anchor > .akn-p:first-child,
+.v2-statute-doc .akn-anchor + .akn-p {
+  margin-top: 0.75em;
+}
