@@ -12,12 +12,12 @@ import type { IMessagePackPricingData } from '@/types/message-pack';
 import type { TCurrency } from '@/types/payment';
 import { setCurrency, useCurrency } from '@/v2/runtime/currency';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
+import { currencyOffer } from './currency-offer';
 import { usePurchasePacks } from './queries';
 
 const MIN_PACKS = 1;
 /** v1's limit, kept: the purchase endpoint was written against it. */
 const MAX_PACKS = 10;
-const CURRENCIES: readonly TCurrency[] = ['NGN', 'USD'];
 
 /**
  * BuyPanel — how many packs, in which currency, and Pay.
@@ -29,7 +29,9 @@ const CURRENCIES: readonly TCurrency[] = ['NGN', 'USD'];
  * returns it to `/payg/callback`, which verifies and comes back here.
  *
  * The currency switch is a deliberate choice, so it is stored as one
- * (`v2/runtime/currency.ts`, shared with v1).
+ * (`v2/runtime/currency.ts`, shared with v1). It lists only the currencies
+ * the pricing offers this buyer (dollars only outside Nigeria), and when only
+ * one is offered there is no switch at all, just the currency named.
  */
 export function BuyPanel({
   open,
@@ -40,7 +42,8 @@ export function BuyPanel({
   onOpenChange: (open: boolean) => void;
   pricing: IMessagePackPricingData | null;
 }) {
-  const { currency } = useCurrency();
+  const { currency: stored } = useCurrency();
+  const { offered, currency } = currencyOffer(pricing, stored);
   const [quantity, setQuantity] = useState(MIN_PACKS);
   const purchase = usePurchasePacks();
 
@@ -153,37 +156,45 @@ export function BuyPanel({
           </div>
         </div>
 
-        {/* Currency */}
-        <div role="radiogroup" aria-label="Currency" className="grid grid-cols-2 gap-2">
-          {CURRENCIES.map((option) => {
-            const row = pricing?.prices.find((p) => p.currency === option) ?? null;
-            const selected = option === currency;
-            return (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                disabled={busy || row === null}
-                onClick={() => setCurrency(option)}
-                className={cn(
-                  'v2-interactive flex flex-col items-start rounded-xl border px-3.5 py-2.5 text-left transition-colors duration-150 motion-reduce:transition-none',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  selected
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:bg-foreground/[0.04]',
-                )}
-              >
-                <span className="text-[15px] leading-snug font-medium text-foreground">
-                  {option === 'NGN' ? 'Naira' : 'US dollars'}
-                </span>
-                <span className="text-[13px] leading-snug text-muted-foreground tabular-nums">
-                  {row ? `${formatMoneyMajor(row.price_major, option)} per pack` : 'Not available'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Currency: a switch only when there is a choice to make. */}
+        {offered.length > 1 ? (
+          <div role="radiogroup" aria-label="Currency" className="grid grid-cols-2 gap-2">
+            {offered.map((option) => {
+              const row = pricing?.prices.find((p) => p.currency === option) ?? null;
+              const selected = option === currency;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  disabled={busy}
+                  onClick={() => setCurrency(option)}
+                  className={cn(
+                    'v2-interactive flex flex-col items-start rounded-xl border px-3.5 py-2.5 text-left transition-colors duration-150 motion-reduce:transition-none',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    selected
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:bg-foreground/[0.04]',
+                  )}
+                >
+                  <span className="text-[15px] leading-snug font-medium text-foreground">
+                    {currencyName(option)}
+                  </span>
+                  {row ? (
+                    <span className="text-[13px] leading-snug text-muted-foreground tabular-nums">
+                      {formatMoneyMajor(row.price_major, option)} per pack
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : priceRow ? (
+          <p className="text-[13px] leading-snug text-muted-foreground">
+            Priced in {currencyName(currency)}: {formatMoneyMajor(priceRow.price_major, currency)} per pack.
+          </p>
+        ) : null}
 
         {errorMessage ? (
           <p
@@ -196,4 +207,8 @@ export function BuyPanel({
       </div>
     </ResponsiveOverlay>
   );
+}
+
+function currencyName(currency: TCurrency): string {
+  return currency === 'NGN' ? 'Naira' : 'US dollars';
 }

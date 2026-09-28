@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { formatMoneyMajor } from '@/lib/utils/payment-format';
 import type { IMessagePack } from '@/types/message-pack';
 import { useCurrency } from '@/v2/runtime/currency';
+import { currencyOffer } from './currency-offer';
 import { SETTINGS_COLUMN } from '../SettingsList';
 import { SettingsFormGroup } from '../SettingsForm';
 import { SettingsState } from '../SettingsState';
@@ -41,7 +42,7 @@ export function MessagePacksScreen() {
   const balance = useQuery(messagePacksQueries.balance());
   const pricing = useQuery(messagePacksQueries.pricing());
   const history = useInfiniteQuery(messagePacksQueries.history());
-  const { currency } = useCurrency();
+  const { currency: storedCurrency } = useCurrency();
   const [buyOpen, setBuyOpen] = useState(false);
 
   if (balance.isPending || history.isPending) return <MessagePacksFallback />;
@@ -77,6 +78,9 @@ export function MessagePacksScreen() {
 
   const packs = history.data.pages.flatMap((page) => page.data);
   const perPack = pricing.data?.messages_per_pack ?? null;
+  // Priced in what this buyer is offered (dollars only outside Nigeria),
+  // the same rule the buy panel uses.
+  const { currency } = currencyOffer(pricing.data, storedCurrency);
   const priceRow = pricing.data?.prices.find((row) => row.currency === currency) ?? null;
 
   return (
