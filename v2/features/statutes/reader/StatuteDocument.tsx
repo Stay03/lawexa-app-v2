@@ -38,7 +38,8 @@ import {
 } from './states';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStatuteNotes } from '../notes/context';
-import { noteAnchorId } from '../notes/note-ranges';
+import { draftFromSelection, noteAnchorId, type SelectionDraft } from '../notes/note-ranges';
+import { AddNoteButton } from '../notes/AddNoteButton';
 import { NotesSheet } from '../notes/NotesSheet';
 import { useNoteHighlights } from '../notes/use-note-highlights';
 import './statute-document.css';
@@ -181,6 +182,30 @@ export function StatuteDocument({
 
   const statuteNotes = useStatuteNotes();
   const { notesAtPoint, flash } = useNoteHighlights(statuteNotes.notes, visibleCount);
+
+  // A researcher's selection in the text offers "Add note" beside it. The
+  // selection is read when it settles (a short pause after the last change),
+  // which covers a mouse drag and a phone's long-press handles alike.
+  const docRef = useRef<HTMLDivElement | null>(null);
+  const [selectionDraft, setSelectionDraft] = useState<SelectionDraft | null>(null);
+  const notesEnabled = statuteNotes.enabled;
+  useEffect(() => {
+    if (!notesEnabled) return;
+    let timer: number | null = null;
+    const read = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        const root = docRef.current;
+        setSelectionDraft(root ? draftFromSelection(window.getSelection(), root) : null);
+      }, 250);
+    };
+    document.addEventListener('selectionchange', read);
+    return () => {
+      document.removeEventListener('selectionchange', read);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [notesEnabled]);
 
   const blockIndexById = useMemo(() => {
     const map = new Map<string, number>();
@@ -559,6 +584,7 @@ export function StatuteDocument({
 
       <SectionLinkContext.Provider value={sectionLinks}>
         <div
+          ref={docRef}
           className="akn-doc motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
           // A tap on an underlined phrase opens the notes at that place. A
           // drag that selected text is a selection, not a tap.
@@ -579,7 +605,18 @@ export function StatuteDocument({
         </div>
       </SectionLinkContext.Provider>
 
-      {statuteNotes.enabled ? <NotesSheet /> : null}
+      {statuteNotes.enabled ? (
+        <NotesSheet inViewEid={activeId ? activeId.replace(/^akn-/, '') : null} />
+      ) : null}
+      {statuteNotes.enabled && selectionDraft && !statuteNotes.open ? (
+        <AddNoteButton
+          rect={selectionDraft.rect}
+          onAdd={() => {
+            statuteNotes.startDraft({ kind: 'part', eid: selectionDraft.eid, quote: selectionDraft.quote });
+            setSelectionDraft(null);
+          }}
+        />
+      ) : null}
 
       {/* Where the excerpt ends on a partial document: the fade over our own
           last rendered lines, then the upgrade card. The headline count

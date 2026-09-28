@@ -138,3 +138,38 @@ function chooseOccurrence(
 
   return starts[0];
 }
+
+/** The server's limits on a new note's quote and its context (StoreStatuteAnnotationRequest). */
+export const QUOTE_MAX = 2000;
+export const CONTEXT_MAX = 100;
+/** How much surrounding text a new note keeps to tell repeats apart. */
+const CONTEXT_CHARS = 60;
+
+export interface QuoteDraft {
+  readonly quote: string;
+  readonly prefix: string;
+  readonly suffix: string;
+  readonly startOffset: number;
+  readonly endOffset: number;
+}
+
+/**
+ * The quote a reader selected, with the words either side of it, read from
+ * the part's text by the server's rule. `start` is where the selection
+ * begins in that text; when the selection's own text is not found there
+ * (a stray character at an edge), the first occurrence stands in.
+ */
+export function quoteDraft<H>(index: TextIndex<H>, selected: string, start: number): QuoteDraft | null {
+  const quote = normalizeQuote(selected);
+  if (!quote || quote.length > QUOTE_MAX) return null;
+  const at = index.text.startsWith(quote, start) ? start : index.text.indexOf(quote);
+  if (at === -1) return null;
+  const end = at + quote.length;
+  return {
+    quote,
+    prefix: index.text.slice(Math.max(0, at - CONTEXT_CHARS), at).trimStart().slice(-CONTEXT_MAX),
+    suffix: index.text.slice(end, end + CONTEXT_CHARS).trimEnd().slice(0, CONTEXT_MAX),
+    startOffset: at,
+    endOffset: end,
+  };
+}

@@ -271,3 +271,21 @@ export interface StatuteAnnotationResponse {
   message: string;
   data: StatuteAnnotation;
 }
+
+/**
+ * A new note (`POST /statutes/{id}/annotations`). `eid` places it on a part
+ * of the statute; with neither `eid` nor `quote` it is a note on the whole
+ * statute. A `quote` must be found in that part's text as the page shows it
+ * (the server answers 422 otherwise); `prefix`, `suffix` and the offsets
+ * are hints for telling one occurrence of the quote from another.
+ */
+export interface StatuteAnnotationCreate {
+  eid?: string;
+  quote?: string;
+  prefix?: string;
+  suffix?: string;
+  start_offset?: number;
+  end_offset?: number;
+  type: StatuteAnnotationType;
+  body: string;
+}

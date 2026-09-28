@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { Plus, RotateCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import type { StatuteAnnotation, StatuteAnnotationType } from '@/types/statute';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useStatuteNotes } from './context';
+import { NewNoteForm } from './NewNoteForm';
 import { NoteRow } from './NoteRow';
 
 /**
@@ -33,8 +34,9 @@ const TYPE_LABEL: Record<StatuteAnnotationType, string> = {
   note: 'Note',
 };
 
-export function NotesSheet() {
-  const { slug, open, closePanel, notes, status, retry, focus, clearFocus, jumpTo } = useStatuteNotes();
+export function NotesSheet({ inViewEid }: { inViewEid: string | null }) {
+  const { slug, open, closePanel, notes, status, retry, focus, clearFocus, jumpTo, draft, startDraft } =
+    useStatuteNotes();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
@@ -70,7 +72,28 @@ export function NotesSheet() {
           <SheetDescription>
             Printing errors, typos and doubts recorded by researchers. Only researchers see them.
           </SheetDescription>
+          {!draft ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2 self-start"
+              onClick={() => startDraft({ kind: 'statute' })}
+            >
+              <Plus aria-hidden className="size-4" />
+              New note
+            </Button>
+          ) : null}
         </SheetHeader>
+
+        {/* Keyed by the draft, so a new selection starts a fresh form. */}
+        {draft ? (
+          <NewNoteForm
+            key={draft.kind === 'part' ? `${draft.eid}:${draft.quote?.startOffset ?? 'part'}` : 'statute'}
+            draft={draft}
+            inViewEid={inViewEid}
+          />
+        ) : null}
 
         {status === 'ready' && notes.length > 0 ? (
           focus ? (

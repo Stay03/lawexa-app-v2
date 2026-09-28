@@ -1,4 +1,4 @@
-import { buildTextIndex, locateQuote, type TextPiece } from './match';
+import { buildTextIndex, locateQuote, quoteDraft, type QuoteDraft, type TextPiece } from './match';
 import type { StatuteAnnotation } from '@/types/statute';
 
 /**
@@ -81,4 +81,40 @@ export function numberRange(element: Element): Range | null {
   const range = document.createRange();
   range.selectNodeContents(num);
   return range;
+}
+
+/** What a reader's selection offers to note: the part it sits in (the
+ *  innermost element carrying an `akn-{eId}` id), the quote with its
+ *  context, and where on screen the selection ends, for the Add note button. */
+export interface SelectionDraft {
+  readonly eid: string;
+  readonly quote: QuoteDraft;
+  readonly rect: DOMRect;
+}
+
+const ANCHOR_PREFIX = 'akn-';
+
+/**
+ * The note a selection inside `root` could become, or null: nothing is
+ * selected, the selection leaves the statute's text, or its words are not
+ * one part's words. A selection across two parts belongs to their shared
+ * parent, whose text holds both, so it is placed there.
+ */
+export function draftFromSelection(selection: Selection | null, root: Element): SelectionDraft | null {
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return null;
+
+  const common = range.commonAncestorContainer;
+  const start = common.nodeType === Node.ELEMENT_NODE ? (common as Element) : common.parentElement;
+  const part = start?.closest(`[id^="${ANCHOR_PREFIX}"]`);
+  if (!part || !root.contains(part)) return null;
+
+  const index = buildTextIndex(pieceWalk(part));
+  const first = index.points.findIndex((point) => range.comparePoint(point.handle, point.offset) === 0);
+  if (first === -1) return null;
+  const quote = quoteDraft(index, range.toString(), first);
+  if (!quote) return null;
+
+  return { eid: part.id.slice(ANCHOR_PREFIX.length), quote, rect: range.getBoundingClientRect() };
 }

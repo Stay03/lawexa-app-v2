@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTextIndex, locateQuote, type TextPiece } from './match';
+import { buildTextIndex, locateQuote, quoteDraft, type TextPiece } from './match';
 
 const text = (value: string, handle: string): TextPiece<string> => ({ kind: 'text', text: value, handle });
 const brk: TextPiece<string> = { kind: 'break' };
@@ -58,4 +58,22 @@ test('a repeated quote: the start offset chooses when there is no context', () =
 test('a repeated quote with no hints takes the first, as an imported note means', () => {
   const index = buildTextIndex([text('the Commission shall; and the Commission may', 'p')]);
   assert.deepEqual(locateQuote(index, 'the Commission')?.start, { handle: 'p', offset: 0 });
+});
+
+test('a selection becomes a quote with the words either side of it', () => {
+  const index = buildTextIndex([text('shall provide  permanent voters card (PVC).', 'p')]);
+  const draft = quoteDraft(index, ' permanent voters\ncard ', 14);
+  assert.deepEqual(draft, {
+    quote: 'permanent voters card',
+    prefix: 'shall provide ',
+    suffix: ' (PVC).',
+    startOffset: 14,
+    endOffset: 35,
+  });
+});
+
+test('a selection that is not in the part gives no draft', () => {
+  const index = buildTextIndex([text('by his or herself', 'p')]);
+  assert.equal(quoteDraft(index, 'by himself', 0), null);
+  assert.equal(quoteDraft(index, '   ', 0), null);
 });

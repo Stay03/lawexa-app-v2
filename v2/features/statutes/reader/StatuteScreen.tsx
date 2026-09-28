@@ -108,7 +108,7 @@ export function StatuteScreen({
     // whole read (the CaseScreen layout mechanics). `.v2-statute-doc` scopes
     // the reading typography. The notes provider shares researchers' notes
     // between the header's Notes button and the document's underlines.
-    <StatuteNotesProvider slug={slug}>
+    <StatuteNotesProvider slug={slug} statuteId={detail.id}>
       <div className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-24 pt-5 sm:pt-8">
         <article
           aria-label={detail.title}

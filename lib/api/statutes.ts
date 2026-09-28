@@ -12,6 +12,7 @@ import type {
   StatuteAnnotationsResponse,
   StatuteAnnotationResponse,
   StatuteAnnotationType,
+  StatuteAnnotationCreate,
 } from '@/types/statute';
 
 /* ── The statute paywall contract (backend live Aug 2026, switch currently OFF) ─
@@ -251,6 +252,18 @@ export const statutesApi = {
     const response = await apiClient.post<StatuteAnnotationResponse>(
       `/statute-annotations/${uuid}/decide`,
       { decision },
+    );
+    return response.data;
+  },
+
+  /** Record a new note on a statute, by the statute's id. */
+  createAnnotation: async (
+    statuteId: number,
+    note: StatuteAnnotationCreate,
+  ): Promise<StatuteAnnotationResponse> => {
+    const response = await apiClient.post<StatuteAnnotationResponse>(
+      `/statutes/${statuteId}/annotations`,
+      note,
     );
     return response.data;
   },

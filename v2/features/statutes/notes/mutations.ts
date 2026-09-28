@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { statutesApi } from '@/lib/api/statutes';
-import type { StatuteAnnotation, StatuteAnnotationType } from '@/types/statute';
+import type { StatuteAnnotation, StatuteAnnotationCreate, StatuteAnnotationType } from '@/types/statute';
 import { statutesQueries } from '../queries';
 
 /**
@@ -55,5 +55,21 @@ export function useDeleteNote(slug: string) {
   return useMutation({
     mutationFn: ({ uuid }: { uuid: string }) => statutesApi.deleteAnnotation(uuid),
     onSuccess: (_response, { uuid }) => cache.remove(uuid),
+  });
+}
+
+/**
+ * A new note. The list is refetched afterwards rather than patched: the
+ * server orders notes (whole statute first, then by the part's position),
+ * and a refetch is the one way the new note lands exactly where it belongs.
+ */
+export function useCreateNote(slug: string, statuteId: number | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (note: StatuteAnnotationCreate) => {
+      if (statuteId === null) throw new Error('The statute is not loaded yet.');
+      return statutesApi.createAnnotation(statuteId, note);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: statutesQueries.annotations(slug).queryKey }),
   });
 }
