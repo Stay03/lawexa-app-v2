@@ -345,6 +345,13 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Referrals'),
         };
       }
+      if (depth === 2 && second === 'usage') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Usage'),
+        };
+      }
       return null;
 
     default:
