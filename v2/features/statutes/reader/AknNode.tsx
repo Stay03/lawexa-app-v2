@@ -96,12 +96,12 @@ function hasClass(el: Element, name: string): boolean {
 const MARGIN_NAME_MAX = 16;
 
 /**
- * The longest label a blank stretches after to the margin: "A.B.", "Suit
- * No.", "In the Judicial Division", "The …… day of ……, 20". After a longer
- * run of words (the rest of a sentence) the blank stays inline at a fixed
- * width, as the print sets it ("…Lagos State, this ……… day", "…sitting at
- * ………"), instead of dropping to a line of its own (the 230-form compare,
- * 29 September 2026).
+ * The longest label a blank with words after it stretches after to the
+ * margin: "A.B. …… Claimant", "C.D and E.F …… Defendants". After a longer
+ * run of words the blank and the words after it stay inline at a fixed
+ * width, as the print sets them ("…Lagos State, this ……… day", "…20
+ * ……]:"), instead of the words landing alone on a line of their own (the
+ * 230-form compare, 29 September 2026).
  */
 const STRETCH_LABEL_MAX = 40;
 
@@ -269,10 +269,10 @@ function renderElement(
     //
     // The blank and the words after it are one unit (the tail), so a short
     // word after a blank ("day", "]:", "Filed.") never wraps onto a line of
-    // its own. The blank stretches only after a short label, and never on a
-    // right-aligned line: there the text keeps to the right with a short
-    // blank ("Suit No. ……", "(Sgd) ……"), as printed. After a longer run of
-    // words the tail stays inline at a fixed width. (All three caught by the
+    // its own. It never stretches on a right-aligned line: there the text
+    // keeps to the right with a short blank ("Suit No. ……", "(Sgd) ……"), as
+    // printed. After a longer run of words, a tail with words in it stays
+    // inline at a fixed width. (Both caught by the
     // 230-form compare, 29 September 2026: a stretching blank pushed right-
     // aligned text to the left margin in about 50 forms, and left "day",
     // "]:" and ")" alone on their own lines in about 25.)
@@ -280,8 +280,14 @@ function renderElement(
     const after = nodes.slice(fillAt + 1);
     if (fillAt === 0 || (fillAt > 0 && inlineText(after).length <= MARGIN_NAME_MAX)) {
       const before = nodes.slice(0, fillAt);
+      // A blank with nothing after it keeps the writing line it had: it runs
+      // to the margin, or takes a full line of its own after a long sentence
+      // (the Electoral and ISA forms were signed off that way, 28 September
+      // 2026). Only a blank with words after it goes inline after a long
+      // sentence.
       const stretch =
-        !hasClass(element, 'right') && inlineText(before).length <= STRETCH_LABEL_MAX;
+        !hasClass(element, 'right') &&
+        (after.length === 0 || inlineText(before).length <= STRETCH_LABEL_MAX);
       const fill = (
         <span className={stretch ? 'akn-fill akn-fill-stretch' : 'akn-fill'}>
           {renderInlineChildren(nodes[fillAt] as Element)}
