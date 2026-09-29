@@ -22,6 +22,7 @@ import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
 import { V2PushLifecycle } from '@/v2/runtime/push/lifecycle';
+import { V2PushTapListener } from '@/v2/runtime/push/tap-listener';
 import { RealtimeSpine } from '@/v2/runtime/realtime/spine';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
@@ -256,6 +257,9 @@ export default async function V2Layout({
               messages are ignored entirely (digest §F.16); while a tab is
               visible the spine above is the delivery path. */}
           <V2PushLifecycle />
+          {/* A notification tapped while the app is open: the worker posts
+              the link here and this routes to it. Renders null. */}
+          <V2PushTapListener />
           {/* Seed the browser query cache with the server-prefetched recents — BOTH the
               sidebar/drawer infinite list and the home's single-page peek, which are
               different query keys — so signed-in first paint is real rows rather than a

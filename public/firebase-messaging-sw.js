@@ -35,8 +35,16 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// Tap the notification → focus an existing Lawexa tab (and navigate it) or open
-// a new one at the deep link.
+// Tap the notification → focus an existing Lawexa tab and move it to the deep
+// link, or open a new one there.
+//
+// This worker controls no Lawexa page (Firebase registers it under its own
+// scope), so the browser refuses `client.navigate` on every open tab. When it
+// does, the link is posted to the tab and v2 routes there itself
+// (v2/runtime/push/tap.ts; keep the type string in step). A v1 page does not
+// listen, so it only comes to the front, as before.
+const OPEN_URL_MESSAGE = 'lawexa:open-url';
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || '/';
@@ -46,9 +54,9 @@ self.addEventListener('notificationclick', (event) => {
       .then((clientList) => {
         for (const client of clientList) {
           if ('focus' in client) {
-            client.focus();
-            if ('navigate' in client) client.navigate(url).catch(() => {});
-            return undefined;
+            const post = () => client.postMessage({ type: OPEN_URL_MESSAGE, url });
+            const moved = 'navigate' in client ? client.navigate(url).catch(post) : Promise.resolve(post());
+            return Promise.all([client.focus().catch(() => undefined), moved]);
           }
         }
         return clients.openWindow ? clients.openWindow(url) : undefined;
