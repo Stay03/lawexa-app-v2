@@ -241,6 +241,14 @@ export interface StatuteAnnotation {
   end_offset: number | null;
   type: StatuteAnnotationType;
   type_label: string;
+  /** Stay's print-note shape (29 September 2026): what kind of fault, the
+   *  words as printed, the words as we typed them, and why. Absent on notes
+   *  written before the rewrite, which carry only `type` and `body`. */
+  kind?: PrintNoteKind | null;
+  kind_label?: string | null;
+  printed_text?: string | null;
+  our_text?: string | null;
+  reason?: string | null;
   status: 'open' | 'decided';
   status_label: string;
   body: string;
@@ -256,6 +264,16 @@ export interface StatuteAnnotation {
 }
 
 export type StatuteAnnotationType = 'print_error' | 'typo' | 'doubt' | 'note';
+
+/** The seven kinds of print fault Stay approved (29 September 2026). */
+export type PrintNoteKind =
+  | 'typo'
+  | 'missing'
+  | 'grammar'
+  | 'punctuation'
+  | 'reference'
+  | 'unclear'
+  | 'layout';
 
 // Notes on one statute, in reading order (whole-statute notes first, then by
 // the part's position, detached notes last).

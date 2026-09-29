@@ -67,7 +67,7 @@ export function NotesSheet({ inViewEid }: { inViewEid: string | null }) {
       <SheetContent side="right" className="w-[92vw] max-w-md gap-0">
         <SheetHeader className="border-b border-border px-5 pb-3">
           <SheetTitle>
-            Notes{status === 'ready' ? <span className="text-muted-foreground"> · {notes.length}</span> : null}
+            Print notes{status === 'ready' ? <span className="text-muted-foreground"> · {notes.length}</span> : null}
           </SheetTitle>
           <SheetDescription>
             Printing errors, typos and doubts recorded by researchers. Only researchers see them.
@@ -81,7 +81,7 @@ export function NotesSheet({ inViewEid }: { inViewEid: string | null }) {
               onClick={() => startDraft({ kind: 'statute' })}
             >
               <Plus aria-hidden className="size-4" />
-              New note
+              New print note
             </Button>
           ) : null}
         </SheetHeader>
@@ -99,10 +99,10 @@ export function NotesSheet({ inViewEid }: { inViewEid: string | null }) {
           focus ? (
             <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-2.5 text-sm">
               <span className="text-muted-foreground">
-                {shown.length === 1 ? 'The note at this place' : `${shown.length} notes at this place`}
+                {shown.length === 1 ? 'The print note at this place' : `${shown.length} print notes at this place`}
               </span>
               <button type="button" onClick={clearFocus} className={cn('font-medium text-primary hover:underline', FOCUS_RING)}>
-                Show all notes
+                Show all print notes
               </button>
             </div>
           ) : (
@@ -138,16 +138,16 @@ export function NotesSheet({ inViewEid }: { inViewEid: string | null }) {
             <NotesSkeleton />
           ) : status === 'error' ? (
             <div className="flex flex-col items-start gap-3 py-6 text-sm">
-              <p className="text-muted-foreground">The notes could not be loaded.</p>
+              <p className="text-muted-foreground">The print notes could not be loaded.</p>
               <Button variant="outline" size="sm" onClick={retry}>
                 <RotateCcw aria-hidden className="size-4" />
                 Try again
               </Button>
             </div>
           ) : notes.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">No notes on this statute yet.</p>
+            <p className="py-6 text-sm text-muted-foreground">No print notes on this statute yet.</p>
           ) : shown.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">No notes match these filters.</p>
+            <p className="py-6 text-sm text-muted-foreground">No print notes match these filters.</p>
           ) : (
             <div className="flex flex-col gap-6">
               {wholeStatute.length > 0 ? (
@@ -238,7 +238,7 @@ function NotesSkeleton() {
   return (
     <>
       <span role="status" className="sr-only">
-        Loading notes
+        Loading print notes
       </span>
       <div aria-hidden className="flex flex-col gap-5 pt-2">
         {[0, 1, 2, 3].map((i) => (

@@ -49,7 +49,7 @@ export function NewNoteForm({ draft, inViewEid }: { draft: NoteDraft; inViewEid:
   const errorMessage = apiError
     ? apiError.status >= 400 && apiError.status < 500
       ? apiError.message
-      : "Couldn't save the note. Try again."
+      : "Couldn't save the print note. Try again."
     : null;
 
   const save = () => {
@@ -84,7 +84,7 @@ export function NewNoteForm({ draft, inViewEid }: { draft: NoteDraft; inViewEid:
         save();
       }}
     >
-      <h3 className="text-sm font-semibold text-foreground">New note</h3>
+      <h3 className="text-sm font-semibold text-foreground">New print note</h3>
 
       {fixedPart ? (
         <div className="flex flex-col gap-1">
@@ -94,7 +94,7 @@ export function NewNoteForm({ draft, inViewEid }: { draft: NoteDraft; inViewEid:
           ) : null}
         </div>
       ) : (
-        <div role="radiogroup" aria-label="Where the note goes" className="flex flex-col gap-1.5">
+        <div role="radiogroup" aria-label="Where the print note goes" className="flex flex-col gap-1.5">
           <PlaceOption selected={place === 'statute'} onSelect={() => setPlace('statute')}>
             The whole statute
           </PlaceOption>
@@ -146,7 +146,7 @@ export function NewNoteForm({ draft, inViewEid }: { draft: NoteDraft; inViewEid:
         </Button>
         <Button type="submit" size="sm" disabled={!trimmed || create.isPending}>
           {create.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
-          Save note
+          Save print note
         </Button>
       </div>
     </form>

@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { StatuteAnnotation, StatuteAnnotationType } from '@/types/statute';
+import type { PrintNoteKind, StatuteAnnotation, StatuteAnnotationType } from '@/types/statute';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { partLabel } from './labels';
 import { useDecideNote, useDeleteNote, useUpdateNote } from './mutations';
@@ -38,6 +38,44 @@ export const NOTE_TYPES: readonly { value: StatuteAnnotationType; label: string 
   { value: 'doubt', label: 'Doubt' },
   { value: 'note', label: 'Note' },
 ];
+
+export const PRINT_NOTE_KIND_LABEL: Record<PrintNoteKind, string> = {
+  typo: 'Typo',
+  missing: 'Missing',
+  grammar: 'Grammar',
+  punctuation: 'Punctuation',
+  reference: 'Reference',
+  unclear: 'Unclear',
+  layout: 'Layout',
+};
+
+/**
+ * The printed words beside ours, so the difference reads at a glance (Stay,
+ * 29 September 2026: "it should show printed text and our text"). An empty
+ * side says what its emptiness means: words we added are "not in the print",
+ * words we left out are "left out".
+ */
+function PrintedAgainstOurs({ printed, ours }: { printed: string | null; ours: string | null }) {
+  return (
+    <span className="grid grid-cols-2 gap-2">
+      <ComparedSide label="Printed" text={printed} empty="not in the print" />
+      <ComparedSide label="Our text" text={ours} empty="left out" />
+    </span>
+  );
+}
+
+function ComparedSide({ label, text, empty }: { label: string; text: string | null; empty: string }) {
+  return (
+    <span className="flex min-w-0 flex-col gap-0.5 rounded-md bg-secondary/60 px-2.5 py-2">
+      <span className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+      {text ? (
+        <span className="break-words font-serif text-[0.9375rem] leading-snug text-foreground">{text}</span>
+      ) : (
+        <span className="text-sm italic text-muted-foreground">{empty}</span>
+      )}
+    </span>
+  );
+}
 
 /** The API's limits (StoreStatuteAnnotationRequest, DecideStatuteAnnotationRequest). */
 const BODY_MAX = 5000;
@@ -58,17 +96,20 @@ export function NoteRow({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const remove = useDeleteNote(slug);
 
+  const compared = Boolean(note.printed_text || note.our_text);
   const content = (
     <>
       <span className="flex flex-wrap items-center gap-2">
         {note.node ? <span className="text-sm font-medium text-foreground">{partLabel(note.node.eid)}</span> : null}
-        <Badge variant="secondary">{note.type_label}</Badge>
+        <Badge variant="secondary">{note.kind ? (note.kind_label ?? PRINT_NOTE_KIND_LABEL[note.kind]) : note.type_label}</Badge>
         {note.status === 'decided' ? <Badge variant="outline">Decided</Badge> : null}
       </span>
-      {note.quote ? (
+      {compared ? (
+        <PrintedAgainstOurs printed={note.printed_text ?? null} ours={note.our_text ?? null} />
+      ) : note.quote ? (
         <span className="font-serif text-[0.9375rem] italic leading-snug text-foreground/90">“{note.quote}”</span>
       ) : null}
-      <span className="whitespace-pre-line text-sm text-muted-foreground">{note.body}</span>
+      <span className="whitespace-pre-line text-sm text-muted-foreground">{note.reason || note.body}</span>
       {note.decision ? (
         <span className="text-sm text-foreground">
           <span className="font-medium">Decision:</span> {note.decision}
@@ -116,9 +157,9 @@ export function NoteRow({
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this print note?</AlertDialogTitle>
             <AlertDialogDescription>
-              {note.node ? `The ${note.type_label.toLowerCase()} note on ${partLabel(note.node.eid)}` : 'This note'} is
+              {note.node ? `The ${note.type_label.toLowerCase()} print note on ${partLabel(note.node.eid)}` : 'This print note'} is
               deleted for every researcher.
             </AlertDialogDescription>
           </AlertDialogHeader>

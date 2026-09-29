@@ -33,7 +33,7 @@ export function AddNoteButton({ rect, onAdd }: { rect: DOMRect; onAdd: () => voi
       )}
     >
       <NotebookPen aria-hidden className="size-4" />
-      Add note
+      Add print note
     </button>
   );
 }

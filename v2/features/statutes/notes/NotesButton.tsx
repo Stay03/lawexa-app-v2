@@ -25,7 +25,7 @@ export function NotesButton() {
     >
       <NotebookPen aria-hidden className="size-4" />
       <span>
-        Notes
+        Print notes
         {status === 'ready' ? <span className="text-muted-foreground"> · {notes.length}</span> : null}
       </span>
     </button>
