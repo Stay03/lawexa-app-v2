@@ -95,6 +95,16 @@ function hasClass(el: Element, name: string): boolean {
  */
 const MARGIN_NAME_MAX = 16;
 
+/**
+ * The longest label a blank stretches after to the margin: "A.B.", "Suit
+ * No.", "In the Judicial Division", "The …… day of ……, 20". After a longer
+ * run of words (the rest of a sentence) the blank stays inline at a fixed
+ * width, as the print sets it ("…Lagos State, this ……… day", "…sitting at
+ * ………"), instead of dropping to a line of its own (the 230-form compare,
+ * 29 September 2026).
+ */
+const STRETCH_LABEL_MAX = 40;
+
 function inlineText(nodes: readonly ChildNode[]): string {
   return nodes
     .map((node) => node.textContent ?? '')
@@ -111,15 +121,21 @@ function isFill(node: ChildNode): boolean {
 }
 
 /**
- * A paragraph's layout marker, for the printed forms (the marker set agreed
- * with backend on 28 September 2026, b20a3778/cb8983ac): `centre`, `right`, or
- * `gap` (an empty line of space). A paragraph with none keeps the default.
+ * A paragraph's layout markers, for the printed forms (the marker set agreed
+ * with backend on 28 September 2026, b20a3778/cb8983ac, widened on 29
+ * September, fb9b9081): one of `centre`, `right` or `gap` (an empty line of
+ * space), and `indent-1` or `indent-2` to set the line in by one or two
+ * steps. Bold comes as `<b>` inside the line. A paragraph with none keeps
+ * the default.
  */
 function paragraphClass(el: Element): string {
-  if (hasClass(el, 'centre')) return 'akn-p akn-p-centre';
-  if (hasClass(el, 'right')) return 'akn-p akn-p-right';
-  if (hasClass(el, 'gap')) return 'akn-p akn-p-gap';
-  return 'akn-p';
+  const classes = ['akn-p'];
+  if (hasClass(el, 'centre')) classes.push('akn-p-centre');
+  else if (hasClass(el, 'right')) classes.push('akn-p-right');
+  else if (hasClass(el, 'gap')) classes.push('akn-p-gap');
+  if (hasClass(el, 'indent-2')) classes.push('akn-p-indent-2');
+  else if (hasClass(el, 'indent-1')) classes.push('akn-p-indent-1');
+  return classes.join(' ');
 }
 
 /* ── The block component (the memo boundary) ─────────────────────────────── */
@@ -250,21 +266,47 @@ function renderElement(
     const nodes = Array.from(element.childNodes).filter(
       (node) => node.nodeType !== Node.TEXT_NODE || (node as Text).data.trim() !== '',
     );
+    //
+    // The blank and the words after it are one unit (the tail), so a short
+    // word after a blank ("day", "]:", "Filed.") never wraps onto a line of
+    // its own. The blank stretches only after a short label, and never on a
+    // right-aligned line: there the text keeps to the right with a short
+    // blank ("Suit No. ……", "(Sgd) ……"), as printed. After a longer run of
+    // words the tail stays inline at a fixed width. (All three caught by the
+    // 230-form compare, 29 September 2026: a stretching blank pushed right-
+    // aligned text to the left margin in about 50 forms, and left "day",
+    // "]:" and ")" alone on their own lines in about 25.)
     const fillAt = nodes.findLastIndex(isFill);
     const after = nodes.slice(fillAt + 1);
     if (fillAt === 0 || (fillAt > 0 && inlineText(after).length <= MARGIN_NAME_MAX)) {
       const before = nodes.slice(0, fillAt);
+      const stretch =
+        !hasClass(element, 'right') && inlineText(before).length <= STRETCH_LABEL_MAX;
+      const fill = (
+        <span className={stretch ? 'akn-fill akn-fill-stretch' : 'akn-fill'}>
+          {renderInlineChildren(nodes[fillAt] as Element)}
+        </span>
+      );
+      const tail = (
+        <span className={stretch ? 'akn-fill-tail' : 'akn-fill-tail-inline'}>
+          {fill}
+          {after.length > 0 && (stretch ? <span>{renderInlineNodes(after)}</span> : renderInlineNodes(after))}
+        </span>
+      );
+      if (!stretch) {
+        return (
+          <p key={key} className={paragraphClass(element)}>
+            {renderInlineNodes(before)}
+            {tail}
+          </p>
+        );
+      }
       return (
         <p key={key} className={`${paragraphClass(element)} akn-p-fill-line`}>
           {before.length > 0 && (
             <span className="akn-fill-words">{renderInlineNodes(before)}</span>
           )}
-          <span className="akn-fill akn-fill-stretch">
-            {renderInlineChildren(nodes[fillAt] as Element)}
-          </span>
-          {after.length > 0 && (
-            <span className="akn-fill-words">{renderInlineNodes(after)}</span>
-          )}
+          {tail}
         </p>
       );
     }
@@ -526,9 +568,17 @@ function TableView({ element }: { element: Element }) {
     }
   }
 
+  // A printed form's table (backend's marks, 29 September 2026): `form-table`
+  // is a ruled register or account; `form-table side` is two things set side
+  // by side on the page ("PROBATE REGISTRAR" beside the seal), with no rules.
+  const formTable = hasClass(element, 'form-table');
+  let tableClass = 'akn-table';
+  if (formTable) tableClass += ' akn-form-table';
+  if (formTable && hasClass(element, 'side')) tableClass += ' akn-form-table-side';
+
   return (
     <div className="akn-table-wrap">
-      <table className="akn-table">
+      <table className={tableClass}>
         {caption}
         {groups}
         {looseRows.length > 0 ? <tbody>{looseRows}</tbody> : null}
@@ -555,13 +605,24 @@ function TableRow({ element }: { element: Element }) {
   for (const child of element.children) {
     const tag = localName(child);
     if (tag === 'th') {
-      cells.push(<th key={index}>{renderBlockChildren(child)}</th>);
+      cells.push(<th key={index}>{renderCell(child)}</th>);
     } else if (tag === 'td') {
-      cells.push(<td key={index}>{renderBlockChildren(child)}</td>);
+      cells.push(<td key={index}>{renderCell(child)}</td>);
     }
     index += 1;
   }
   return <tr>{cells}</tr>;
+}
+
+/**
+ * A cell holding paragraphs renders them as blocks. A cell holding only a
+ * line of text (a printed form's register row: words, a blank, bold) renders
+ * it inline, so its blank stays on the cell's line instead of becoming a
+ * paragraph of its own.
+ */
+function renderCell(cell: Element): ReactNode {
+  const hasParagraph = Array.from(cell.children).some((child) => localName(child) === 'p');
+  return hasParagraph ? renderBlockChildren(cell) : renderInlineChildren(cell);
 }
 
 /* ── Child walks ─────────────────────────────────────────────────────────── */

@@ -377,8 +377,24 @@
   min-width: 0;
 }
 
+/* The blank and the words after it wrap as one unit, so "…… Claimant" or
+   "……]:" never leaves its last word alone on a line. */
+.v2-statute-doc .akn-fill-tail {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: baseline;
+  column-gap: 0.3em;
+}
+
 .v2-statute-doc .akn-fill-stretch {
   flex: 1 0 6ch;
+}
+
+/* After a long run of words, or on a right-aligned line, the blank keeps a
+   fixed width inline and stays on one line with the word after it
+   ("…this ……… day", "Suit No. ……, 20 ………"). */
+.v2-statute-doc .akn-fill-tail-inline {
+  white-space: nowrap;
 }
 
 /* A centred writing line (a signature over "Secretary") is a centred half
@@ -387,8 +403,18 @@
   justify-content: center;
 }
 
-.v2-statute-doc .akn-p-centre > .akn-fill-stretch {
+.v2-statute-doc .akn-p-centre > .akn-fill-tail {
   flex: 0 1 50%;
+}
+
+/* A line set in from the margin by one or two steps (backend's `indent`
+   mark: hanging lists, numbered notes, indented address blocks). */
+.v2-statute-doc .akn-p-indent-1 {
+  padding-inline-start: 2em;
+}
+
+.v2-statute-doc .akn-p-indent-2 {
+  padding-inline-start: 4em;
 }
 
 /** Editorial annotations — "[As substituted by …]" — quiet, never loud. */
@@ -565,6 +591,34 @@
 /** Cell paragraphs are dense rows, not prose paragraphs. */
 .v2-statute-doc .akn-table .akn-p + .akn-p {
   margin-top: 0.5em;
+}
+
+/* Two things set side by side on a printed form ("PROBATE REGISTRAR" beside
+   "Seal of Court"): a row with no rules and no frame, its last cell against
+   the right margin, as on the page. */
+.v2-statute-doc .akn-table-wrap:has(> .akn-form-table-side) {
+  border: 0;
+  border-radius: 0;
+  margin: 0.25rem 0;
+}
+
+.v2-statute-doc .akn-form-table-side {
+  min-width: 0;
+}
+
+.v2-statute-doc .akn-form-table-side td,
+.v2-statute-doc .akn-form-table-side th {
+  border: 0;
+  padding: 0 0.75rem 0 0;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.v2-statute-doc .akn-form-table-side td:last-child:not(:first-child) {
+  padding-right: 0;
+  text-align: right;
 }
 
 /* ── Researchers' notes (notes/use-note-highlights.ts) ──────────────────── */
