@@ -13,6 +13,7 @@ import {
   SettingsLinkRow,
 } from './SettingsList';
 import { visibleSettingsGroups } from './rows';
+import { SignOutRow } from './sign-out/SignOutRow';
 
 /**
  * SettingsScreen — the v2 settings home: the account you are in, and every door
@@ -78,6 +79,14 @@ export function SettingsScreen() {
             ))}
           </SettingsBlock>
         ))}
+
+        {/* Sign out closes the screen, as it does in both reference apps. A
+            guest has no account to leave, so the block is not drawn for one. */}
+        {signedIn && role !== 'guest' ? (
+          <SettingsBlock id="session" label="Session">
+            <SignOutRow />
+          </SettingsBlock>
+        ) : null}
       </div>
     </div>
   );

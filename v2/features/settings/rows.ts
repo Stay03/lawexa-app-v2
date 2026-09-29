@@ -61,14 +61,11 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
  * will live. (`/settings/general` is not listed either: it is a one-line
  * `redirect()` onto `/settings/appearance`.)
  *
- * ── SIGNING OUT IS NOT HERE YET ────────────────────────────────────────────
- * Both reference apps end their settings screen with it, and v2 has no sign-out
- * anywhere. It is not a link, though: v1's sign-out deactivates this device's
- * push token, wipes the confidential transcripts from IndexedDB, clears the auth
- * store and the query cache, and only then navigates
- * (`lib/hooks/useAuth.ts`) — plus v2's own httpOnly session cookie would have to
- * be cleared with it. That is an option's worth of work, and the instruction for
- * this pass was the base only.
+ * ── SIGNING OUT IS NOT A ROW HERE ──────────────────────────────────────────
+ * It closes the screen in its own block (`sign-out/SignOutRow.tsx`, 29
+ * September 2026), because it is an action, not a door: it stops this device's
+ * push, revokes the token, wipes the confidential transcripts, clears the login,
+ * the cache and v2's session cookie, then loads the sign-in page.
  */
 
 /**

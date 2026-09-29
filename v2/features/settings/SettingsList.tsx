@@ -162,12 +162,12 @@ export function SettingsLinkRow({
 
 /**
  * One height per block, at the live row height (`min-h-14`, 3.5rem) times the
- * signed-in row count: 3, 4, 2, 1 (Your account gained Signed-in devices on 28
- * September 2026). Written as literal classes rather than computed, because
- * Tailwind v4 scans source TEXT and would never see a class assembled at
- * runtime.
+ * signed-in row count: 3, 4, 2, 1, then 1 for Sign out (Your account gained
+ * Signed-in devices on 28 September 2026; Sign out came on 29 September).
+ * Written as literal classes rather than computed, because Tailwind v4 scans
+ * source TEXT and would never see a class assembled at runtime.
  */
-const FALLBACK_BLOCK_HEIGHTS = ['h-42', 'h-56', 'h-28', 'h-14'] as const;
+const FALLBACK_BLOCK_HEIGHTS = ['h-42', 'h-56', 'h-28', 'h-14', 'h-14'] as const;
 
 /**
  * The screen's silhouette, drawn by `app/v2/settings/loading.tsx` while the
@@ -175,7 +175,7 @@ const FALLBACK_BLOCK_HEIGHTS = ['h-42', 'h-56', 'h-28', 'h-14'] as const;
  *
  * It draws the SAME blocks in the SAME column at the SAME row heights as the
  * live screen, so the hand-off moves nothing. The row COUNTS are the signed-in
- * shape (3 / 4 / 2 / 1); a guest sees fewer rows arrive than were reserved,
+ * shape (3 / 4 / 2 / 1 / 1); a guest sees fewer rows arrive than were reserved,
  * which settles upward and is the harmless direction for a list to change in.
  *
  * `aria-hidden` + `inert`: a fallback is deleted rather than reconciled, so
