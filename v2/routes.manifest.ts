@@ -136,6 +136,10 @@ export const V2_ROUTES = [
   '/settings/usage',
   // Where the payment provider returns a v2 buyer of message packs.
   '/payg/callback',
+  // Where it returns a v2 buyer of a plan, an upgrade or a free trial.
+  '/subscription/callback',
+  '/subscription/upgrade/callback',
+  '/trial/verify',
   // Legacy collab addresses — v2-only redirect shells (see the block above).
   '/channel-invitations',
   '/space-invitations',
