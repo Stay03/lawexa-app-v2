@@ -89,7 +89,7 @@ export function UsageScreen() {
                   {ai.totalLeft === null ? 'Unlimited' : `${ai.totalLeft} ${ai.totalLeft === 1 ? 'message' : 'messages'} left`}
                 </span>
                 <span className="text-[13px] leading-snug text-muted-foreground tabular-nums">
-                  {limitLine(ai.plan, 'on your plan')}
+                  {ai.plan.kind === 'unlimited' ? `${ai.plan.used} used` : limitLine(ai.plan, 'on your plan')}
                 </span>
               </span>
             </div>
