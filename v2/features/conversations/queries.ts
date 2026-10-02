@@ -359,7 +359,9 @@ export const conversationsQueries = {
         { viewerId },
       ] as const,
       queryFn: async (): Promise<ConversationData> => {
-        const response = await chatApi.getConversation(conversationId);
+        // The steps' results are left out and fetched when a step is opened
+        // (tools/use-tool-result.ts): they were most of a long chat's download.
+        const response = await chatApi.getConversation(conversationId, { lazyResults: true });
         // Mirrors the engine's former inline check exactly, so the screen's error
         // copy is unchanged: a non-success envelope surfaces the API's message.
         if (!response.success || !response.data.messages) {

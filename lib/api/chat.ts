@@ -10,7 +10,8 @@ import type {
   ListConversationsParams,
   ListMessagesParams,
   MessagesListResponse,
-  DocumentUploadResponse
+  DocumentUploadResponse,
+  ApiMessage,
 } from '@/types/chat';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -44,8 +45,24 @@ export const chatApi = {
   /**
    * Get a conversation with all its messages
    */
-  getConversation: async (id: string): Promise<ConversationResponse> => {
-    const response = await apiClient.get<ConversationResponse>(`/conversations/${id}`);
+  getConversation: async (id: string, options?: { lazyResults?: boolean }): Promise<ConversationResponse> => {
+    // `results=lazy`: the steps' results are left out, to be fetched one at
+    // a time by getToolResult. v2 asks for it; v1 never does, so its answer
+    // is unchanged.
+    const response = await apiClient.get<ConversationResponse>(`/conversations/${id}`, {
+      params: options?.lazyResults ? { results: 'lazy' } : undefined,
+    });
+    return response.data;
+  },
+
+  /**
+   * One step's result, left out of a lazy chat download. Same access rule as
+   * opening the chat.
+   */
+  getToolResult: async (conversationId: string, messageId: number): Promise<ApiResponse<ApiMessage>> => {
+    const response = await apiClient.get<ApiResponse<ApiMessage>>(
+      `/conversations/${conversationId}/messages/${messageId}/result`,
+    );
     return response.data;
   },
 

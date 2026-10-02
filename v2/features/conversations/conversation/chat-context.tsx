@@ -17,6 +17,8 @@ import { createContext, useContext, useMemo } from 'react';
 interface V2ChatContextValue {
   sendMessage: (message: string) => void;
   isStreaming: boolean;
+  /** The open chat's id: a step's result is fetched under it (tools/use-tool-result.ts). */
+  conversationId: string;
 }
 
 const V2ChatContext = createContext<V2ChatContextValue | null>(null);
@@ -25,17 +27,19 @@ export function V2ChatProvider({
   children,
   sendMessage,
   isStreaming,
+  conversationId,
 }: {
   children: React.ReactNode;
   sendMessage: (message: string) => void;
   isStreaming: boolean;
+  conversationId: string;
 }) {
   // Stable value — only changes when the streaming flag flips, never per token
   // (tokens flow through the per-message streaming store, not this context), so
   // the card subtree never re-renders on stream growth.
   const value = useMemo<V2ChatContextValue>(
-    () => ({ sendMessage, isStreaming }),
-    [sendMessage, isStreaming],
+    () => ({ sendMessage, isStreaming, conversationId }),
+    [sendMessage, isStreaming, conversationId],
   );
   return <V2ChatContext.Provider value={value}>{children}</V2ChatContext.Provider>;
 }

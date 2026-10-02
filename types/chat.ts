@@ -60,6 +60,15 @@ export interface ToolMessage extends ChatMessage {
   toolStatus: 'calling' | 'complete';
   latencyMs?: number;
   agentSlug?: string;
+  /**
+   * The step's result was left out of the chat download (v2 asks for
+   * `?results=lazy`): `toolResult.data` is null, and the result is fetched
+   * from `/conversations/{id}/messages/{messageId}/result` when the step is
+   * opened. Absent when the result came with the chat or the live stream.
+   */
+  resultRef?: { messageId: number; size: number | null };
+  /** A `read_statute` step's statute name, kept for its label when the result is not loaded. */
+  statuteTitle?: string;
 }
 
 // Handover message - when orchestrator delegates to a sub-agent
@@ -512,6 +521,10 @@ export interface ApiMessage {
     task?: string;
     parent_agent?: number;
     handover_type?: 'consult' | 'transfer';
+    // A step's result left out of a lazy chat download: the step's label and
+    // state still need these.
+    statute_title?: string;
+    error?: string;
     // Error message fields
     error_code?: string;
     retryable?: boolean;
@@ -530,6 +543,10 @@ export interface ApiMessage {
   // Legacy alias for clients not migrated — equals attachments[0].
   attachment?: MessageAttachment;
   created_at: string;
+  /** A step result left out of a lazy chat download (`?results=lazy`): `content` is empty. */
+  has_result?: boolean;
+  /** That result's size in bytes, when left out. */
+  result_size?: number;
 }
 
 // Document upload response (POST /api/files/documents)

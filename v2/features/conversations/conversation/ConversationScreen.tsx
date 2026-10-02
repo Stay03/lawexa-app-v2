@@ -188,7 +188,7 @@ export function ConversationScreen({
     error && error !== 'confidential_transcript_lost' && error !== 'not_found' ? error : null;
 
   return (
-    <V2ChatProvider sendMessage={sendFollowUp} isStreaming={isStreaming}>
+    <V2ChatProvider sendMessage={sendFollowUp} isStreaming={isStreaming} conversationId={conversationId}>
       <div
         ref={screenRef}
         data-v2-marker="V2-CONVERSATION"

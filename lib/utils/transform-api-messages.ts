@@ -17,6 +17,32 @@ import type {
  * conversation page) and the floating chat panel. Keep it dependency-free so
  * both callers behave identically when rendering a saved thread.
  */
+/**
+ * A step's result message read into the shape a tool row carries: the JSON
+ * payload's `data` when the content is JSON, the raw text otherwise. Shared
+ * with v2's lazy result fetch, which receives the same message by itself.
+ */
+export function parseToolResult(result: Pick<ApiMessage, 'content' | 'metadata'>): {
+  success: boolean;
+  data: unknown;
+  error: string | null;
+} {
+  try {
+    const resultData = JSON.parse(result.content);
+    return {
+      success: result.metadata?.success ?? resultData.success ?? true,
+      data: resultData.data ?? resultData,
+      error: null,
+    };
+  } catch {
+    return {
+      success: result.metadata?.success ?? true,
+      data: result.content,
+      error: null,
+    };
+  }
+}
+
 export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMessage[] {
   const messages: ConversationMessage[] = [];
 
@@ -145,23 +171,19 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         ? toolResultsByIteration.get(apiMsg.metadata.iteration)?.shift()
         : undefined;
 
-      // Parse tool result if available
+      // Parse tool result if available. A result left out of a lazy download
+      // (v2's `?results=lazy`) keeps its state and label from its metadata,
+      // and a reference to fetch it by when the step is opened.
       let parsedToolResult = undefined;
-      if (toolResult) {
-        try {
-          const resultData = JSON.parse(toolResult.content);
-          parsedToolResult = {
-            success: toolResult.metadata?.success ?? resultData.success ?? true,
-            data: resultData.data ?? resultData,
-            error: null,
-          };
-        } catch {
-          parsedToolResult = {
-            success: toolResult.metadata?.success ?? true,
-            data: toolResult.content,
-            error: null,
-          };
-        }
+      const lazyResult = !!toolResult?.has_result && !toolResult.content;
+      if (toolResult && lazyResult) {
+        parsedToolResult = {
+          success: toolResult.metadata?.success ?? true,
+          data: null,
+          error: toolResult.metadata?.error ?? null,
+        };
+      } else if (toolResult) {
+        parsedToolResult = parseToolResult(toolResult);
       }
 
       messages.push({
@@ -174,6 +196,10 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         toolResult: parsedToolResult,
         toolStatus: 'complete',
         latencyMs: toolResult?.metadata?.latency_ms,
+        ...(toolResult && lazyResult
+          ? { resultRef: { messageId: toolResult.id, size: toolResult.result_size ?? null } }
+          : {}),
+        ...(toolResult?.metadata?.statute_title ? { statuteTitle: toolResult.metadata.statute_title } : {}),
       } as ToolMessage);
     }
     // Skip tool role messages (already captured via tool_call)

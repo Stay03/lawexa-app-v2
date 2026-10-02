@@ -7,7 +7,9 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ToolCallDetails } from './ToolCallDetails';
+import { useToolResult } from './use-tool-result';
 import {
   EntityResultCard,
   SearchResultsList,
@@ -92,6 +94,8 @@ export function formatToolMessage(
   parameters: Record<string, unknown>,
   isComplete: boolean,
   toolResult?: { success: boolean; data: unknown; error: string | null },
+  /** The statute's name from the result's metadata, when the result is not loaded. */
+  statuteTitle?: string,
 ): { action: string; detail?: string } {
   const query = parameters.query as string | undefined;
 
@@ -127,7 +131,7 @@ export function formatToolMessage(
       const mode = parameters.mode as string | undefined;
       const section = parameters.section as string | undefined;
       const start = parameters.start as number | undefined;
-      const statuteName = getStatuteTitle(toolResult) || null;
+      const statuteName = getStatuteTitle(toolResult) || statuteTitle || null;
 
       if (mode === 'outline') {
         return {
@@ -206,6 +210,42 @@ export function formatToolMessage(
  * the small note affordance and statute display still show, the heavier result
  * lists fall back to the generic details.
  */
+/**
+ * The opened step: its result fetched first when the chat download left it
+ * out (use-tool-result.ts), with a short skeleton meanwhile and a retry if
+ * the fetch fails, then the body the result calls for.
+ */
+function LoadedToolStepBody({
+  message,
+  open,
+  showSearchResults,
+}: {
+  message: ToolMessage;
+  open: boolean;
+  showSearchResults: boolean;
+}) {
+  const result = useToolResult(message, open);
+  if (result.status === 'loading') {
+    return (
+      <div role="status" aria-label="Loading the step's result" className="space-y-2 pt-2">
+        <Skeleton className="h-3.5 w-3/4 rounded" />
+        <Skeleton className="h-3.5 w-1/2 rounded" />
+      </div>
+    );
+  }
+  if (result.status === 'error') {
+    return (
+      <p className="text-muted-foreground pt-2 text-sm">
+        The result did not load.{' '}
+        <button type="button" onClick={() => void result.retry()} className="v2-interactive text-foreground font-medium underline underline-offset-2">
+          Try again
+        </button>
+      </p>
+    );
+  }
+  return <ToolStepBody message={result.message} showSearchResults={showSearchResults} />;
+}
+
 function ToolStepBody({
   message,
   showSearchResults,
@@ -261,6 +301,7 @@ export function ToolStepItem({
     message.toolParameters,
     isComplete,
     message.toolResult ?? undefined,
+    message.statuteTitle,
   );
   // Glance-level zero signal: a search that affirmatively returned nothing hints
   // it on the COLLAPSED line, so a user need not expand to learn it found nothing.
@@ -318,7 +359,7 @@ export function ToolStepItem({
 
         <CollapsibleContent className="v2-collapse">
           <div className="border-border ml-[9px] mt-1.5 border-l pl-4">
-            <ToolStepBody message={message} showSearchResults={showSearchResults} />
+            <LoadedToolStepBody message={message} open={isExpanded} showSearchResults={showSearchResults} />
           </div>
         </CollapsibleContent>
       </Collapsible>
