@@ -102,8 +102,8 @@ export function useNoteHighlights(notes: readonly StatuteAnnotation[], mountedCo
 }
 
 /** The text position under a point: the standard API where it exists,
- *  WebKit's older one otherwise. */
-function caretAt(x: number, y: number): { node: Node; offset: number } | null {
+ *  WebKit's older one otherwise. Shared with the reader's annotations. */
+export function caretAt(x: number, y: number): { node: Node; offset: number } | null {
   const doc = document as Document & {
     caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
   };

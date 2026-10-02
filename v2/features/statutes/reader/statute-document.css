@@ -670,6 +670,40 @@
   color: var(--foreground);
 }
 
+/**
+ * A reader's own annotations (annotations/), painted the same way, one layer
+ * per colour. A filled background, where print notes are a dotted underline,
+ * so the two never read alike. Weaker on the dark theme, where a strong fill
+ * would drown light text.
+ */
+.v2-statute-doc {
+  --annotation-strength: 42%;
+}
+
+html.dark .v2-statute-doc {
+  --annotation-strength: 30%;
+}
+
+.v2-statute-doc ::highlight(reader-annotation-yellow) {
+  background-color: color-mix(in oklab, #facc15 var(--annotation-strength), transparent);
+}
+
+.v2-statute-doc ::highlight(reader-annotation-green) {
+  background-color: color-mix(in oklab, #4ade80 var(--annotation-strength), transparent);
+}
+
+.v2-statute-doc ::highlight(reader-annotation-blue) {
+  background-color: color-mix(in oklab, #60a5fa var(--annotation-strength), transparent);
+}
+
+.v2-statute-doc ::highlight(reader-annotation-pink) {
+  background-color: color-mix(in oklab, #f472b6 var(--annotation-strength), transparent);
+}
+
+.v2-statute-doc ::highlight(reader-annotation-purple) {
+  background-color: color-mix(in oklab, #c084fc var(--annotation-strength), transparent);
+}
+
 /** A container that only carries an eId (a definition): present for its id,
  *  absent from the layout. Jumps land on its first child (StatuteDocument).
  *  The wrapper breaks `.akn-p + .akn-p` between one definition and the next,

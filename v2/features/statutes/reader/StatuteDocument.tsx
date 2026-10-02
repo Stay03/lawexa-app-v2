@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -42,6 +42,17 @@ import { draftFromSelection, noteAnchorId, type SelectionDraft } from '../notes/
 import { AddNoteButton } from '../notes/AddNoteButton';
 import { NotesSheet } from '../notes/NotesSheet';
 import { useNoteHighlights } from '../notes/use-note-highlights';
+import { AnnotateButton } from '../annotations/AnnotateButton';
+import { AnnotationCard, type AnnotationCardState } from '../annotations/AnnotationCard';
+import { isUnplaceable, type AnnotationColour } from '../annotations/model';
+import {
+  annotationQueries,
+  useCreateAnnotation,
+  useDeleteAnnotation,
+  useUpdateAnnotation,
+} from '../annotations/queries';
+import { UnplacedAnnotations } from '../annotations/UnplacedAnnotations';
+import { useAnnotationHighlights } from '../annotations/use-annotation-highlights';
 import './statute-document.css';
 
 /**
@@ -129,7 +140,7 @@ export function StatuteDocument({
   /** The citation path segment from the URL (`section-54-2`), or null. */
   provision: string | null;
 }) {
-  const { role } = useV2Session();
+  const { role, signedIn } = useV2Session();
   const query = useQuery(statutesQueries.akn(slug));
   const xml = query.data?.xml ?? null;
   /** The paywall marker — null is "full document", the only state a paid
@@ -183,14 +194,38 @@ export function StatuteDocument({
   const statuteNotes = useStatuteNotes();
   const { notesAtPoint, flash } = useNoteHighlights(statuteNotes.notes, visibleCount);
 
-  // A researcher's selection in the text offers "Add note" beside it. The
-  // selection is read when it settles (a short pause after the last change),
-  // which covers a mouse drag and a phone's long-press handles alike.
+  /* ── The reader's own annotations (signed-in readers; annotations/) ────── */
+
+  const annotationsEnabled = signedIn && role !== 'guest';
+  const annotationsQuery = useQuery({ ...annotationQueries.mine(slug), enabled: annotationsEnabled });
+  const annotations = useMemo(() => annotationsQuery.data ?? [], [annotationsQuery.data]);
+  const { annotationsAtPoint, rectOf, notFound } = useAnnotationHighlights(annotations, visibleCount);
+  const unplaced = useMemo(
+    () => annotations.filter((annotation) => isUnplaceable(annotation) || notFound.includes(annotation.uuid)),
+    [annotations, notFound],
+  );
+  const createAnnotation = useCreateAnnotation(slug);
+  const updateAnnotation = useUpdateAnnotation(slug);
+  const deleteAnnotation = useDeleteAnnotation(slug);
+  const [card, setCard] = useState<AnnotationCardState | null>(null);
+  // The selection an open "create" card will save: held apart from the live
+  // selection, which the card's own text box clears.
+  const [annotationDraft, setAnnotationDraft] = useState<SelectionDraft | null>(null);
+  const closeCard = useCallback(() => {
+    setCard(null);
+    setAnnotationDraft(null);
+  }, []);
+
+  // A selection in the text offers "Add note" to a researcher and "Annotate"
+  // to any signed-in reader. The selection is read when it settles (a short
+  // pause after the last change), which covers a mouse drag and a phone's
+  // long-press handles alike.
   const docRef = useRef<HTMLDivElement | null>(null);
   const [selectionDraft, setSelectionDraft] = useState<SelectionDraft | null>(null);
   const notesEnabled = statuteNotes.enabled;
+  const selecting = notesEnabled || annotationsEnabled;
   useEffect(() => {
-    if (!notesEnabled) return;
+    if (!selecting) return;
     let timer: number | null = null;
     const read = () => {
       if (timer !== null) window.clearTimeout(timer);
@@ -205,7 +240,7 @@ export function StatuteDocument({
       document.removeEventListener('selectionchange', read);
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [notesEnabled]);
+  }, [selecting]);
 
   const blockIndexById = useMemo(() => {
     const map = new Map<string, number>();
@@ -586,18 +621,32 @@ export function StatuteDocument({
         <div
           ref={docRef}
           className="akn-doc motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
-          // A tap on an underlined phrase opens the notes at that place. A
-          // drag that selected text is a selection, not a tap.
+          // A tap on the reader's own annotation opens it; a tap on an
+          // underlined print note opens the notes at that place. A drag that
+          // selected text is a selection, not a tap.
           onClick={
-            statuteNotes.enabled
+            selecting
               ? (event) => {
                   if (window.getSelection()?.isCollapsed === false) return;
+                  if (annotationsEnabled) {
+                    const [uuid] = annotationsAtPoint(event.clientX, event.clientY);
+                    const annotation = uuid ? annotations.find((row) => row.uuid === uuid) : undefined;
+                    const rect = uuid ? rectOf(uuid) : null;
+                    if (annotation && rect) {
+                      setCard({ mode: 'view', rect, annotation });
+                      return;
+                    }
+                  }
+                  if (!statuteNotes.enabled) return;
                   const hits = notesAtPoint(event.clientX, event.clientY);
                   if (hits.length > 0) statuteNotes.openPanel(hits);
                 }
               : undefined
           }
         >
+          {annotationsEnabled ? (
+            <UnplacedAnnotations annotations={unplaced} onDelete={(uuid) => deleteAnnotation.mutate(uuid)} />
+          ) : null}
           {blocks.slice(0, visibleCount).map((block) => (
             <AknBlockView key={block.key} block={block} />
           ))}
@@ -615,6 +664,41 @@ export function StatuteDocument({
             statuteNotes.startDraft({ kind: 'part', eid: selectionDraft.eid, quote: selectionDraft.quote });
             setSelectionDraft(null);
           }}
+        />
+      ) : null}
+      {annotationsEnabled && selectionDraft && !card ? (
+        <AnnotateButton
+          rect={selectionDraft.rect}
+          besideNote={statuteNotes.enabled && !statuteNotes.open}
+          onAnnotate={() => {
+            setAnnotationDraft(selectionDraft);
+            setCard({ mode: 'create', rect: selectionDraft.rect });
+            setSelectionDraft(null);
+          }}
+        />
+      ) : null}
+      {card ? (
+        <AnnotationCard
+          key={card.mode === 'view' ? card.annotation.uuid : 'create'}
+          state={card}
+          onClose={closeCard}
+          onCreate={(body: string, colour: AnnotationColour) => {
+            if (!annotationDraft) return;
+            const { eid, quote } = annotationDraft;
+            window.getSelection()?.removeAllRanges();
+            createAnnotation.mutate({
+              eid,
+              quote: quote.quote,
+              prefix: quote.prefix,
+              suffix: quote.suffix,
+              start_offset: quote.startOffset,
+              end_offset: quote.endOffset,
+              body,
+              colour,
+            });
+          }}
+          onUpdate={(uuid, change) => updateAnnotation.mutate({ uuid, change })}
+          onDelete={(uuid) => deleteAnnotation.mutate(uuid)}
         />
       ) : null}
 
