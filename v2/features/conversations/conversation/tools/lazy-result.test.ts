@@ -22,7 +22,7 @@ const tools = (messages: ApiMessage[]) =>
 test('a lazy result keeps its tick, time and statute name, and a reference to fetch it by', () => {
   const [step] = tools([
     call(10, 1),
-    result(11, 1, { has_result: true, result_size: 5400 }, { statute_title: 'Electoral Act 2026' }),
+    result(11, 1, { has_result: true, result_bytes: 5400 }, { statute_title: 'Electoral Act 2026' }),
   ]);
   assert.equal(step.toolResult?.success, true);
   assert.equal(step.toolResult?.data, null);

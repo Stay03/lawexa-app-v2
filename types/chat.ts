@@ -546,7 +546,7 @@ export interface ApiMessage {
   /** A step result left out of a lazy chat download (`?results=lazy`): `content` is empty. */
   has_result?: boolean;
   /** That result's size in bytes, when left out. */
-  result_size?: number;
+  result_bytes?: number;
 }
 
 // Document upload response (POST /api/files/documents)

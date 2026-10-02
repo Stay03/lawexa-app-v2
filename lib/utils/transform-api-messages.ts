@@ -197,7 +197,7 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         toolStatus: 'complete',
         latencyMs: toolResult?.metadata?.latency_ms,
         ...(toolResult && lazyResult
-          ? { resultRef: { messageId: toolResult.id, size: toolResult.result_size ?? null } }
+          ? { resultRef: { messageId: toolResult.id, size: toolResult.result_bytes ?? null } }
           : {}),
         ...(toolResult?.metadata?.statute_title ? { statuteTitle: toolResult.metadata.statute_title } : {}),
       } as ToolMessage);
