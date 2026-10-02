@@ -26,7 +26,7 @@ export function UnplacedAnnotations({
   const count = annotations.length;
 
   return (
-    <section className="mb-6 rounded-2xl bg-amber-500/10 text-[13px] text-amber-900 dark:text-amber-200">
+    <section className="mb-6 rounded-2xl bg-amber-500/10 font-sans text-[13px] text-amber-900 dark:text-amber-200">
       <button
         type="button"
         aria-expanded={open}
