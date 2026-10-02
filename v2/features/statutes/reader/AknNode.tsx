@@ -3,6 +3,7 @@
 import { Fragment, memo, type ReactNode } from 'react';
 
 import { aknAnchorId, childByLocal, localName, type AknBlock } from './akn';
+import { isEditorialNotesEid } from './editorial-notes';
 import { printedLines } from './printed-lines';
 import { SectionCopyLink } from './SectionLink';
 
@@ -395,6 +396,21 @@ function renderElement(
       <li key={key} className="akn-list-item">
         {renderMixedChildren(element)}
       </li>
+    );
+  }
+
+  // An editorial notes block ("Textual Amendments" and the like) is the
+  // publisher's notes on the law, set apart so it never reads as the law:
+  // smaller, muted, headed by its title. See editorial-notes.ts.
+  if (tag === 'hcontainer' && isEditorialNotesEid(element.getAttribute('eId'))) {
+    const anchorId = blockRoot ? null : aknAnchorId(element);
+    const heading = childByLocal(element, 'heading');
+    const title = heading?.textContent?.trim() || 'Editorial notes';
+    return (
+      <aside key={key} id={anchorId ?? undefined} aria-label={title} className="akn-editorial-notes">
+        <p className="akn-editorial-notes-title">{heading ? renderInlineChildren(heading) : title}</p>
+        {renderBlockChildren(element, ['heading'])}
+      </aside>
     );
   }
 
