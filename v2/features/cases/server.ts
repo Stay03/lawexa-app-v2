@@ -1,9 +1,11 @@
 import 'server-only';
+import { headers } from 'next/headers';
 import { dehydrate, type DehydratedState } from '@tanstack/react-query';
-import type { CaseListParams, CaseListResponse } from '@/types/case';
+import type { CaseDetailResponse, CaseListParams, CaseListResponse } from '@/types/case';
 import { apiFetch } from '@/v2/runtime/api-server';
 import { verifySession } from '@/v2/runtime/session';
 import { makeQueryClient } from '@/v2/runtime/query';
+import { clientIpFrom } from './client-ip';
 import { CASES_PAGE_SIZE, casesQueries } from './queries';
 
 /**
@@ -103,6 +105,89 @@ export async function prefetchCasesListState(
     // `new QueryClient()`) so the v2 dehydrate configuration still applies.
     const queryClient = makeQueryClient();
     queryClient.setQueryData(leaf.queryKey, { pages: [page], pageParams: [1] });
+    return dehydrate(queryClient);
+  } catch {
+    return undefined;
+  }
+}
+
+/* ──────────────────────────── case prefetch ─────────────────────────────── */
+
+/**
+ * Bound on the case read's cost to the first byte. The API answers a case in
+ * about 0.3 to 0.7 s; past this the page stops waiting and the screen fetches
+ * the case itself, exactly as before, so a slow API never makes the page slower
+ * than it was.
+ */
+const CASE_PREFETCH_TIMEOUT_MS = 1500;
+
+/**
+ * The server-to-server key that lets the API treat this request as the
+ * reader's own (backend a0020709): their IP for the view log and throttle,
+ * their User-Agent for bot detection. Read from the server environment only.
+ */
+function ssrKey(): string | null {
+  const key = process.env.LAWEXA_SSR_KEY?.trim();
+  return key ? key : null;
+}
+
+/**
+ * Fetch the case page's payload with the reader's own session and return the
+ * dehydrated cache for the page's `<HydrationBoundary>`, so the case is in the
+ * first HTML instead of arriving after the app code (7.1 s to the title on a
+ * first visit at phone speed, measured on live 8aa6a90).
+ *
+ * WHEN IT DOES NOTHING, and the page loads exactly as before:
+ * - **No session.** `GET /cases/{slug}` needs a token, and the signed-out
+ *   preview is a separate plan (techlead ae7554dd point 3).
+ * - **No `LAWEXA_SSR_KEY`.** Without the trusted header the API would log
+ *   every server-read view under this server's IP and location (backend
+ *   a0020709). The key turns the feature on, once backend's middleware is live.
+ * - **Any failure or a slow answer**, including the reader's view limit: the
+ *   entry is simply absent and the screen fetches and explains it as today.
+ *
+ * ONE VIEW PER LOAD, AS BEFORE. The hydrated entry is fresh for the detail's
+ * own `reference` stale time, so the screen does not fetch again on mount.
+ *
+ * A fresh query client for the same reason as the list prefetch: the layout's
+ * shared client would carry this case into its own boundary too.
+ */
+export async function prefetchCaseDetailState(
+  slug: string,
+  searchQuery?: string,
+): Promise<DehydratedState | undefined> {
+  try {
+    const key = ssrKey();
+    if (!key) return undefined;
+    const session = await verifySession();
+    if (!session) return undefined;
+
+    const leaf = casesQueries.detail(slug, searchQuery);
+    const query = new URLSearchParams({
+      include_similar_cases: 'true',
+      include_cited_cases: 'true',
+      include_cited_by: 'true',
+    });
+    if (searchQuery) query.set('q', searchQuery);
+
+    const incoming = await headers();
+    const forward: Record<string, string> = { 'X-Lawexa-SSR-Key': key };
+    const userAgent = incoming.get('user-agent');
+    if (userAgent) {
+      forward['User-Agent'] = userAgent;
+      forward['X-Lawexa-Client-UA'] = userAgent;
+    }
+    const ip = clientIpFrom(incoming);
+    if (ip) forward['X-Lawexa-Client-IP'] = ip;
+
+    const detail = await apiFetch<CaseDetailResponse>(
+      `/cases/${encodeURIComponent(slug)}?${query.toString()}`,
+      { headers: forward, signal: AbortSignal.timeout(CASE_PREFETCH_TIMEOUT_MS) },
+    );
+    if (!detail?.success || !detail.data) return undefined;
+
+    const queryClient = makeQueryClient();
+    queryClient.setQueryData(leaf.queryKey, detail);
     return dehydrate(queryClient);
   } catch {
     return undefined;

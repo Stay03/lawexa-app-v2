@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import { HydrationBoundary } from '@tanstack/react-query';
 
 import { SEO, getAppUrl } from '@/lib/constants/seo';
 import { fetchCaseForMetadata } from '@/lib/api/server';
 import { CaseScreen } from '@/v2/features/cases/detail/CaseScreen';
+import { prefetchCaseDetailState } from '@/v2/features/cases/server';
 
 /**
  * v2 `/cases/[slug]` — server shell.
@@ -19,6 +21,7 @@ import { CaseScreen } from '@/v2/features/cases/detail/CaseScreen';
  */
 interface CasePageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ q?: string }>;
 }
 
 export async function generateMetadata({ params }: CasePageProps): Promise<Metadata> {
@@ -84,20 +87,29 @@ export async function generateMetadata({ params }: CasePageProps): Promise<Metad
  * safety argument as `app/v2/conversations/page.tsx`, which carries the full
  * note.
  *
- * WHAT THE PAYLOAD HOLDS. Only this route's metadata — head content, invisible
- * in-app — and that read is itself revalidated every five minutes server-side.
- * The case a reader SEES comes from the client query, which carries their
- * session and therefore their bookmark state and view allowance, and which has
- * its own freshness policy. Re-using this segment can only skip a round trip;
- * it cannot show anyone stale case data.
+ * WHAT THE PAYLOAD HOLDS. The route's metadata, and, for a signed-in reader
+ * once `LAWEXA_SSR_KEY` is set, their own case read (see
+ * `prefetchCaseDetailState`). The router cache is the reader's own browser, so
+ * re-using the segment shows them only what they were already shown, and the
+ * hydrated query never overwrites a newer entry in their cache. Re-using this
+ * segment can only skip a round trip; it cannot show anyone stale case data.
  */
 export const unstable_dynamicStaleTime = 300;
 
-export default async function V2CasePage({ params }: CasePageProps) {
-  // The only await in the body: the route params, which cost no I/O. The case
-  // itself is a client query — it is per-reader (bookmark state, view limits),
-  // so it must not be server-rendered into a shared payload.
+export default async function V2CasePage({ params, searchParams }: CasePageProps) {
   const { slug } = await params;
+  // `?q=` is part of the case query's key (read attribution), read here so the
+  // server fills the exact entry the screen reads.
+  const searchQuery = (await searchParams).q?.trim() || undefined;
 
-  return <CaseScreen slug={slug} />;
+  // The case in the first HTML for a signed-in reader, fetched with their own
+  // session, so it is theirs alone (bookmark state, view allowance). Absent
+  // (no session, no key, a slow or failed read) the screen fetches as before.
+  const state = await prefetchCaseDetailState(slug, searchQuery);
+
+  return (
+    <HydrationBoundary state={state}>
+      <CaseScreen slug={slug} />
+    </HydrationBoundary>
+  );
 }
