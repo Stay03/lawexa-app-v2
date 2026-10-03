@@ -4,7 +4,7 @@ import { createElement, useMemo, type ReactNode } from 'react';
 import Link from 'next/link';
 
 import { CaseMentionLink } from '@/v2/features/conversations/conversation/markdown/CaseMentionLink';
-import { parseNoteHtml, type NoteNode, type NoteTag } from './note-html';
+import { parseNoteHtml, type NoteNode, type NoteTag } from '@/lib/notes/note-html';
 
 /**
  * NoteContent — the note body, as REACT ELEMENTS.

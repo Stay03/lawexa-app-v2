@@ -1,8 +1,9 @@
 /**
- * note-text — the notes feature's PURE text derivations. No React, no DOM, no
- * imports: the list, the reader and (later) the editor all read from here, so a
- * note's title and its preview can never say two different things on two
- * screens.
+ * note-text — the notes feature's PURE text derivations. No React, no DOM, one
+ * import (`htmlToPlainText`, moved to lib/notes/plain-text.ts so v1's note
+ * reader can share the walker that uses it, and re-exported here): the
+ * list, the reader and (later) the editor all read from here, so a note's
+ * title and its preview can never say two different things on two screens.
  *
  * WHY A MODULE OF ITS OWN. Two of the three helpers below encode a CONTRACT
  * decision rather than a formatting preference — the untitled fallback is a
@@ -11,6 +12,8 @@
  * from ever reaching the browser as markup. Both are the kind of rule that
  * rots the moment it is re-typed at a second call site.
  */
+
+import { htmlToPlainText } from '@/lib/notes/plain-text';
 
 /**
  * What an untitled note is CALLED on screen.
@@ -36,38 +39,7 @@ export function noteHasTitle(title: string | null | undefined): boolean {
   return !!title?.trim();
 }
 
-const ENTITIES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&#039;': "'",
-  '&apos;': "'",
-  '&nbsp;': ' ',
-};
-
-/**
- * Reduce markup to the text it wrapped — a ONE-WAY degrade.
- *
- * Tags become spaces (so `<p>a</p><p>b</p>` reads "a b", not "ab"), the handful
- * of entities that actually occur are decoded, and whitespace is collapsed. The
- * result is only ever rendered as a React text child, so nothing here can
- * re-promote content to markup; the ampersand is decoded LAST so a
- * doubly-encoded entity cannot be resurrected into a live one by an earlier
- * pass.
- *
- * Pure string work, no DOM — identical on the server and in the browser, which
- * is what lets the reader use it as its `DOMParser`-unavailable fallback.
- */
-export function htmlToPlainText(html: string | null | undefined): string {
-  if (!html) return '';
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&[a-z#0-9]+;/gi, (entity) => ENTITIES[entity.toLowerCase()] ?? entity)
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+export { htmlToPlainText };
 
 /**
  * A note's preview line, as PLAIN TEXT.

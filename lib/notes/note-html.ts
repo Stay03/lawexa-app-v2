@@ -1,4 +1,4 @@
-import { htmlToPlainText } from '../note-text';
+import { htmlToPlainText } from './plain-text';
 
 /**
  * note-html — stored note HTML → a SANITISED, SERIALISABLE NODE TREE.
