@@ -74,8 +74,12 @@ export function extractCaseSlug(href: string | undefined): string | null {
   }
 }
 
+// v1's global `.case-mention` rule (unlayered, so it beats Tailwind's layer)
+// makes the link an inline-flex box with nowrap: a long case name cannot wrap
+// and runs off a phone screen. The `!` utilities let it wrap like text, and
+// box-decoration-clone keeps the tinted pill on each line it spans.
 const TRIGGER_CLASS =
-  'case-mention v2-interactive text-primary focus-visible:ring-ring focus-visible:ring-offset-background -mx-0.5 rounded-sm px-0.5 font-medium transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1';
+  'case-mention inline! whitespace-normal! box-decoration-clone v2-interactive text-primary focus-visible:ring-ring focus-visible:ring-offset-background -mx-0.5 rounded-sm px-0.5 font-medium transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1';
 
 /** Shared width cap: ~450px, but never wider than the viewport minus the
  *  collision padding (16px each side), so it fits a 320px screen. */
