@@ -103,6 +103,16 @@ export const chatApi = {
    * Delete a conversation for the authenticated user. The server refuses a
    * conversation that runs a Radar, with a `message` saying why.
    */
+  /**
+   * Rename a chat (`PATCH /conversations/{id}` with `{ title }`), owner only.
+   * The contract asked of backend on 3 October 2026 (long-list #12); the
+   * answer carries the stored title.
+   */
+  renameConversation: async (id: string, title: string): Promise<ApiResponse<{ id: string; title: string }>> => {
+    const response = await apiClient.patch<ApiResponse<{ id: string; title: string }>>(`/conversations/${id}`, { title });
+    return response.data;
+  },
+
   deleteConversation: async (id: string): Promise<ApiResponse<null>> => {
     const response = await apiClient.delete<ApiResponse<null>>(`/conversations/${id}`);
     return response.data;

@@ -41,3 +41,26 @@ export function useDeleteConversation({
     },
   });
 }
+
+/**
+ * Rename a server-held conversation (`PATCH /conversations/{id}`, long-list
+ * #12). The stored title comes back and is written into every cached list in
+ * place, so the sidebar shows it at once without moving the row; the open
+ * chat's header re-reads it through the engine (`onRenamed`).
+ *
+ * `silentError`: the dialog shows the API's reason inline.
+ */
+export function useRenameConversation({ onRenamed }: { onRenamed: (title: string) => void }) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conversationId, title }: { conversationId: string; title: string }) =>
+      chatApi.renameConversation(conversationId, title),
+    meta: { silentError: true },
+    onSuccess: (response, { conversationId, title }) => {
+      const stored = response.data?.title ?? title;
+      conversationsCache.patch(queryClient, conversationId, { title: stored });
+      void queryClient.invalidateQueries({ queryKey: [...conversationsQueries.details(), conversationId] });
+      onRenamed(stored);
+    },
+  });
+}

@@ -218,6 +218,13 @@ export function ConversationScreen({
               controller.isOwner &&
               !controller.isConfidential
             }
+            canRename={
+              controller.isOwnerResolved &&
+              controller.isOwner &&
+              !controller.isConfidential
+            }
+            currentTitle={controller.stream.conversationTitle}
+            onRenamed={() => void controller.stream.fetchConversationTitle(conversationId)}
           />
         ) : null}
 
