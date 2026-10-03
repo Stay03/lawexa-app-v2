@@ -195,8 +195,11 @@ export function CasesBrowser() {
         onChange={onInputChange}
         onClear={onClear}
         busy={library.isFetching && dim}
-        placeholder="Search cases by title..."
-        label="Search cases by title"
+        // The search matches more than the title: a case's name, any of its
+        // citations, its suit number and what it decided all find it, best
+        // match first (checked against /api/cases on 3 October 2026).
+        placeholder="Search by case name, citation or topic"
+        label="Search cases by name, citation or topic"
       />
     </div>
   );
@@ -222,6 +225,15 @@ export function CasesBrowser() {
           </button>
         ) : null}
       </div>
+
+      {/* What the list now shows, once a search has results. No count: the
+          search returns its best matches, and its total stops near 500 for
+          almost any phrase, so a number would read as more than it means. */}
+      {view === 'library' && activeSearch && rows.length > 0 ? (
+        <p className="mb-1 truncate px-2 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+          Best matches for <span className="font-medium text-foreground">&ldquo;{activeSearch}&rdquo;</span>
+        </p>
+      ) : null}
 
       {view === 'trending' && rows.length > 0 ? (
         <p className="mb-1 px-2 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
