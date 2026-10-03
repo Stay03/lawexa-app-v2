@@ -198,7 +198,7 @@ export function CasesBrowser() {
         // The search matches more than the title: a case's name, any of its
         // citations, its suit number and what it decided all find it, best
         // match first (checked against /api/cases on 3 October 2026).
-        placeholder="Search by case name, citation or topic"
+        placeholder="Search name, citation or topic"
         label="Search cases by name, citation or topic"
       />
     </div>
