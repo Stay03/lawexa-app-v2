@@ -6,6 +6,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { CaseMentionLink } from './CaseMentionLink';
+import { linkReferenceLines } from './reference-lines';
 import { rehypeStreamWords } from './rehype-stream-words';
 
 /**
@@ -135,7 +136,9 @@ export const MarkdownText = memo(function MarkdownText({
    *  overhead at all. */
   animate?: boolean;
 }) {
-  const blocks = useMemo(() => splitMarkdownBlocks(content), [content]);
+  // The reference list's raw addresses become linked case names first
+  // (reference-lines.ts), so they cannot run off a phone screen.
+  const blocks = useMemo(() => splitMarkdownBlocks(linkReferenceLines(content)), [content]);
   const rehypePlugins = animate ? REHYPE_ANIMATED : REHYPE_PLAIN;
   return (
     <div className={cn(PROSE_CLASS, className)}>
