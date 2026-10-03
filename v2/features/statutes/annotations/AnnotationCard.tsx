@@ -10,6 +10,7 @@ import { formatUsageDate } from '@/v2/features/settings/usage/model';
 import {
   ANNOTATION_BODY_MAX,
   ANNOTATION_COLOURS,
+  DEFAULT_ANNOTATION_COLOUR,
   colourOf,
   isPending,
   type AnnotationColour,
@@ -18,8 +19,10 @@ import {
 
 /**
  * The card beside an annotation's words: writing a new one (colour and an
- * optional note, then Save), or opening a saved one (its note, who can see
- * it, and Colour, Edit, Delete). On a phone it is a sheet along the bottom
+ * optional note, then Save), or opening a saved one (its note, its date, and
+ * Colour, Edit, Delete). A new one starts in the default colour, so Save
+ * alone is enough; the reader can pick another before or after saving
+ * (Stay, 3 October 2026). On a phone it is a sheet along the bottom
  * edge; wider, it sits under the words, kept on screen.
  *
  * Escape or a press outside closes it. Delete asks first, in the card.
@@ -66,7 +69,7 @@ export function AnnotationCard({
   const [editing, setEditing] = useState(state.mode === 'create');
   const [picking, setPicking] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [colour, setColour] = useState<AnnotationColour>(saved ? colourOf(saved) : 'yellow');
+  const [colour, setColour] = useState<AnnotationColour>(saved ? colourOf(saved) : DEFAULT_ANNOTATION_COLOUR);
   const [body, setBody] = useState(saved?.body ?? '');
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -172,7 +175,7 @@ export function AnnotationCard({
               <p className="text-[14px] text-muted-foreground">A highlight, with no note.</p>
             )}
             <p className="text-[12px] text-muted-foreground">
-              Only you can see this · {formatUsageDate(saved.created_at)}
+              {formatUsageDate(saved.created_at)}
             </p>
           </div>
           {confirming ? (
