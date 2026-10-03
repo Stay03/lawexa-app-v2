@@ -3,6 +3,7 @@ import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import { casesApi } from '@/lib/api/cases';
 import type { CaseDetail } from '@/types/case';
 import { getCaseDisplayTitle } from '@/lib/utils/case-title';
+import { htmlToText } from '@/lib/utils/html-to-text';
 
 interface UseCaseMentionTooltipsOptions {
   containerRef: React.RefObject<HTMLElement | null>;
@@ -74,10 +75,10 @@ function extractSlug(mention: HTMLAnchorElement): string | null {
   return null;
 }
 
+// Through DOMParser, never a detached <div>: a detached element still loads
+// its images, so an onerror in case text would run (fixed 3 October 2026).
 function stripHtml(html: string): string {
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return div.textContent || div.innerText || '';
+  return htmlToText(html);
 }
 
 function truncateText(text: string, maxLength: number): string {
