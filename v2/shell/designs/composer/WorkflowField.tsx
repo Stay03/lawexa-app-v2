@@ -1,6 +1,5 @@
 'use client';
 
-import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -24,7 +23,7 @@ import type { WorkflowOption } from './useWorkflowSelection';
  */
 
 const TRIGGER_CLASS =
-  'v2-interactive h-8 shrink-0 gap-1 rounded-full border-none bg-transparent px-2.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&>span]:truncate';
+  'v2-interactive h-8 min-w-0 gap-1 rounded-full border-none bg-transparent px-2.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&>span]:truncate *:data-[slot=select-value]:block';
 
 interface WorkflowFieldProps {
   options: WorkflowOption[];
@@ -53,13 +52,16 @@ export function WorkflowField({
   if (options.length === 0) return null;
 
   return (
-    <div className="shrink-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+    // The jurisdiction now stands above the box, so the name has the control
+    // row to itself: it takes the room there is and ends in an ellipsis only
+    // when it still does not fit (a long admin workflow name at 360px).
+    <div className="flex min-w-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
       <Select value={value} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger
           size="sm"
           onClick={stop}
           aria-label="Workflow"
-          className={cn(TRIGGER_CLASS, 'max-w-[9rem]')}
+          className={TRIGGER_CLASS}
         >
           <SelectValue />
         </SelectTrigger>

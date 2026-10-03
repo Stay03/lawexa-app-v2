@@ -73,6 +73,9 @@ interface JurisdictionFieldProps {
   disabled?: boolean;
   /** Keep clicks inside portaled content from bubbling to PromptInput's root. */
   stop: (event: React.SyntheticEvent) => void;
+  /** A word before the flag ("Jurisdiction:") where the chip stands on its own
+   *  above the message box rather than among the box's controls. */
+  label?: string;
 }
 
 export function JurisdictionField({
@@ -81,6 +84,7 @@ export function JurisdictionField({
   onChange,
   disabled,
   stop,
+  label: leadingLabel,
 }: JurisdictionFieldProps) {
   const [open, setOpen] = useState(false);
 
@@ -158,6 +162,9 @@ export function JurisdictionField({
             </>
           ) : (
             <>
+              {leadingLabel ? (
+                <span className="font-medium text-foreground">{leadingLabel}</span>
+              ) : null}
               {label.mode === 'none' ? (
                 <Layers className="size-3.5 shrink-0" aria-hidden />
               ) : (

@@ -502,6 +502,22 @@ export function HomeComposer({
         </div>
       ) : null}
 
+      {/* The jurisdiction stands above the box, as on the chat screen, so the
+          model name keeps the box's control row to itself on a narrow phone
+          (owner, 3 October 2026). */}
+      {signedIn ? (
+        <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+          <JurisdictionField
+            signedIn={signedIn}
+            value={jurisdiction}
+            onChange={setJurisdiction}
+            disabled={isSubmitting}
+            stop={stop}
+            label="Jurisdiction:"
+          />
+        </div>
+      ) : null}
+
       {/* Confidential surface cue — a soft emerald ring that fades in/out with the
           mode (the primitive swaps its own outline; this animates the whole surface
           so the change never just snaps). */}
@@ -678,14 +694,6 @@ export function HomeComposer({
                   stop={stop}
                 />
 
-                {/* Jurisdiction chip — v1's real picker over the live list. */}
-                <JurisdictionField
-                  signedIn={signedIn}
-                  value={jurisdiction}
-                  onChange={setJurisdiction}
-                  disabled={isSubmitting}
-                  stop={stop}
-                />
               </div>
             ) : (
               <span className="flex-1" />
