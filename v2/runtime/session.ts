@@ -57,6 +57,13 @@ export interface SessionUser {
    * `is_verified`: the note API is the authority on whether a price is kept.
    */
   can_set_price: boolean;
+  /**
+   * Is this account an approved ambassador? From `/auth/me`'s top-level
+   * `is_ambassador` (backend 22a2725, 3 October 2026). `null` when the
+   * server did not say, so a client can tell "not an ambassador" apart from
+   * "not known yet" and keep today's behaviour for the second.
+   */
+  is_ambassador: boolean | null;
 }
 
 export interface SessionDTO {
@@ -78,7 +85,7 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
     const token = await getSessionToken();
     if (!token) return null;
 
-    const result = await apiFetch<ApiResponse<{ user: User }>>('/auth/me');
+    const result = await apiFetch<ApiResponse<{ user: User; is_ambassador?: boolean }>>('/auth/me');
     const user = result.data?.user;
     if (!user) return null;
 
@@ -94,6 +101,7 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
         is_verified: user.is_verified,
         auth_provider: user.auth_provider,
         can_set_price: user.is_creator === true || user.role === 'admin',
+        is_ambassador: typeof result.data?.is_ambassador === 'boolean' ? result.data.is_ambassador : null,
       },
     };
   } catch {

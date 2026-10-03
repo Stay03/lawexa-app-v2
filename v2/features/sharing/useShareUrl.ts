@@ -27,8 +27,8 @@ import { withReferral } from './referral-link';
  * reader shares from.
  */
 export function useShareUrl(): (url: string) => string {
-  const { userId } = useV2Session();
-  const { data: code } = useQuery(sharingQueries.referralCode(userId));
+  const { userId, isAmbassador } = useV2Session();
+  const { data: code } = useQuery(sharingQueries.referralCode(userId, isAmbassador));
 
   /* Not memoised deliberately. It closes over one string and callers use it
      inside an event handler, so a new function per render costs nothing and a

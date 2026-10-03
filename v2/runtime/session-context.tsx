@@ -118,6 +118,13 @@ export interface V2SessionSnapshot {
    * offers a price, and the note API decides whether one is kept.
    */
   readonly canSetPrice: boolean;
+  /**
+   * Is this account an approved ambassador? `false` means the server said no;
+   * `null` means it did not say (signed out, or a server without the field).
+   * It decides only whether the share links ask for a referral code, so a
+   * non-ambassador's screens stop asking `/ambassadors/code` for a 403.
+   */
+  readonly isAmbassador: boolean | null;
 }
 
 /**
@@ -148,6 +155,7 @@ export function V2SessionProvider({
   isVerified,
   authProvider,
   canSetPrice,
+  isAmbassador,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
@@ -162,6 +170,7 @@ export function V2SessionProvider({
       isVerified,
       authProvider,
       canSetPrice,
+      isAmbassador,
     }),
     [
       signedIn,
@@ -174,6 +183,7 @@ export function V2SessionProvider({
       isVerified,
       authProvider,
       canSetPrice,
+      isAmbassador,
     ],
   );
 

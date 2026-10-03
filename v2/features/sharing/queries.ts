@@ -32,7 +32,7 @@ export const sharingQueries = {
 
   /** `viewerId` is in the key so a sign-out and a different sign-in cannot read
    *  the previous person's code out of the cache. */
-  referralCode: (viewerId: number | null) =>
+  referralCode: (viewerId: number | null, isAmbassador: boolean | null = null) =>
     queryOptions({
       queryKey: [...sharingQueries.all(), 'referral-code', { viewerId }] as const,
       queryFn: async (): Promise<string | null> => {
@@ -50,8 +50,10 @@ export const sharingQueries = {
         }
       },
       staleTime: STALE_TIMES.reference,
-      /* Signed-out people cannot have a code, so nothing is asked for them. */
-      enabled: viewerId !== null,
+      /* Signed-out people cannot have a code, and neither can an account the
+         server says is not an ambassador, so nothing is asked for either.
+         `null` (the server did not say) still asks, as before (long-list #14). */
+      enabled: viewerId !== null && isAmbassador !== false,
       /* One refusal is the answer, not a transient failure to ride out. */
       retry: false,
     }),
