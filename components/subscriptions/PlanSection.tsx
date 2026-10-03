@@ -7,6 +7,7 @@ import { Crown, Sparkles, ArrowUpRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { isOnePeriodSubscription, onePeriodSentence } from '@/lib/utils/one-period-subscription';
 import type { ICurrentSubscriptionData } from '@/types/subscription';
 import type { ITrialData } from '@/types/trial';
 
@@ -95,7 +96,13 @@ function PlanSection(props: IPlanSectionProps) {
             <p className="mt-1 text-sm text-muted-foreground">
               {plan.formatted_amount}
               {!plan.is_free && <span> / {plan.interval_label.toLowerCase()}</span>}
-              {subscription?.next_payment_date && status === 'active' && (
+              {status === 'active' && isOnePeriodSubscription(subscription) && subscription?.ends_at && (
+                <span>
+                  {' · '}
+                  {onePeriodSentence(plan.interval, format(new Date(subscription.ends_at), 'MMM d, yyyy'))}
+                </span>
+              )}
+              {subscription?.next_payment_date && status === 'active' && !isOnePeriodSubscription(subscription) && (
                 <span>
                   {' · '}Your subscription will auto renew on{' '}
                   {format(new Date(subscription.next_payment_date), 'MMM d, yyyy')}.

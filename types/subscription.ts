@@ -57,6 +57,10 @@ export interface ISubscription {
   next_payment_date: string | null;
   cancelled_at: string | null;
   ends_at: string | null;
+  /** False for a single period that ends by itself at `ends_at` (a payment
+   *  Paystack cannot charge again), and for a cancelled or expired plan.
+   *  Absent from older servers, which means renewing. */
+  renews?: boolean;
   days_until_renewal: number | null;
   is_in_grace_period: boolean;
   has_access: boolean;

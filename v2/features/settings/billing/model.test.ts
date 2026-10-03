@@ -39,6 +39,22 @@ test('an active plan shows its price per month and its renewal date', () => {
   assert.equal(s.cancel, 'subscription');
 });
 
+test('a single paid period says it covers one month and when it ends, with nothing to cancel', () => {
+  const s = summarisePlan(data(sub({ renews: false, ends_at: '2026-11-01T00:00:00Z' })), null);
+  assert.equal(s.detail, '₦5,000 a month · ends 1 November 2026');
+  assert.equal(
+    s.note?.text,
+    'This payment covers one month. Ends 1 November 2026. Pay again to continue, or pay by card or direct debit for automatic renewal.',
+  );
+  assert.equal(s.cancel, null);
+});
+
+test('a plan from a server without the renews field still reads as renewing', () => {
+  const s = summarisePlan(data(sub({ ends_at: '2026-11-01T00:00:00Z' })), null);
+  assert.equal(s.detail, '₦5,000 a month · renews 1 October 2026');
+  assert.equal(s.cancel, 'subscription');
+});
+
 test('a cancelled plan has nothing left to cancel and says when it ends', () => {
   const s = summarisePlan(data(sub({ status: 'cancelled', ends_at: '2026-10-01T00:00:00Z' })), null);
   assert.equal(s.detail, 'Cancelled · ends 1 October 2026');

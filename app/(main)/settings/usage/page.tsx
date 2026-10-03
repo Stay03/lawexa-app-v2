@@ -141,7 +141,16 @@ function PlanHeader({ plan }: { plan: IUserLimitsPlan }) {
               <span className="font-medium">{formatDate(sub.ends_at)}</span>
             </p>
           )}
-          {!inGrace && sub?.next_payment_date && (
+          {/* An end date on a plan outside its grace period is a single paid
+              period that will not renew (backend 08eb8edb), so it says when it
+              ends, not when it renews. */}
+          {!inGrace && sub?.ends_at && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ends on{' '}
+              <span className="font-medium text-foreground">{formatDate(sub.ends_at)}</span>
+            </p>
+          )}
+          {!inGrace && !sub?.ends_at && sub?.next_payment_date && (
             <p className="mt-1 text-sm text-muted-foreground">
               Renews on{' '}
               <span className="font-medium text-foreground">

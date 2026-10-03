@@ -1,3 +1,4 @@
+import { isOnePeriodSubscription, onePeriodSentence } from '@/lib/utils/one-period-subscription';
 import type { ICurrentSubscriptionData } from '@/types/subscription';
 import type { ITrialData } from '@/types/trial';
 
@@ -90,6 +91,15 @@ export function summarisePlan(
       return { detail: 'Expired', note: null, cancel: null, isFree: false };
     case 'active':
     default:
+      // A single paid period: nothing renews and nothing is left to cancel.
+      if (isOnePeriodSubscription(subscription) && endsAt) {
+        return {
+          detail: `${price} · ends ${endsAt}`,
+          note: { text: onePeriodSentence(plan.interval, endsAt), tone: 'quiet' },
+          cancel: null,
+          isFree: false,
+        };
+      }
       return {
         detail: nextPayment ? `${price} · renews ${nextPayment}` : price,
         note: null,
