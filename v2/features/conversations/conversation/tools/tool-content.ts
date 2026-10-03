@@ -226,6 +226,27 @@ export function extractResultMessage(message: ToolMessage): string | null {
 }
 
 /**
+ * Why a failed step failed, in the server's words. A reloaded chat keeps the
+ * stored error as the step's whole content, and the shared parser (v1-shared)
+ * reads plain text into `data` with `error` left null, so the reason sits in
+ * `data`. A streamed step carries it in `error`. `null` only when neither
+ * holds any text, so "Unknown error" appears only when nothing was stored.
+ */
+export function extractStepError(message: ToolMessage): string | null {
+  const result = message.toolResult;
+  if (!result || result.success !== false) return null;
+  if (result.error?.trim()) return result.error.trim();
+  const { data } = result;
+  if (typeof data === 'string') return data.trim() || null;
+  if (data && typeof data === 'object') {
+    const { error, message: text } = data as Record<string, unknown>;
+    if (typeof error === 'string' && error.trim()) return error.trim();
+    if (typeof text === 'string' && text.trim()) return text.trim();
+  }
+  return null;
+}
+
+/**
  * The note produced by a note-WRITE tool, as the `NoteLinkInfo` the shared
  * {@link NoteLinkCard} consumes. Requires both a title and a resolvable URL —
  * otherwise `null`, so the generic renderer shows a clean stripped preview

@@ -22,6 +22,7 @@ import {
   detectEmptyResult,
   extractCreatedNote,
   extractSingleEntity,
+  extractStepError,
   extractWebResults,
   formatDuration,
   isMemoryTool,
@@ -366,7 +367,7 @@ export function ToolStepItem({
 
       {isError && !isExpanded && (
         <p className="text-destructive ml-7 mt-1 text-sm">
-          Error: {message.toolResult?.error || 'Unknown error'}
+          Error: {extractStepError(message) || 'Unknown error'}
         </p>
       )}
     </div>

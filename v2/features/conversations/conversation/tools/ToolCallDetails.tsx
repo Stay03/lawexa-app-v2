@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import type { ToolMessage } from '@/types/chat';
-import { classifyParameters, detectEmptyResult, extractResultMessage } from './tool-content';
+import { classifyParameters, detectEmptyResult, extractResultMessage, extractStepError } from './tool-content';
 import {
   BoundedScroll,
   ToolEmptyLine,
@@ -37,7 +37,7 @@ export function ToolCallDetails({ message, className }: ToolCallDetailsProps) {
 
   const isComplete = message.toolStatus === 'complete';
   const success = message.toolResult?.success !== false;
-  const error = message.toolResult?.error ?? null;
+  const error = extractStepError(message);
   const serverMessage = extractResultMessage(message);
   // An affirmative "returned zero" (empty-list payload) — null when the shape is
   // merely unrecognised, so an unreadable result never masquerades as zero.
