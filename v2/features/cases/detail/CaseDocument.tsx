@@ -6,12 +6,12 @@ import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, ShieldCheck } from '
 
 import { cn } from '@/lib/utils';
 import { formatTreatment, relatedToDisplay } from '@/lib/utils/related-cases';
-import type { RelatedCaseDisplay } from '@/lib/utils/related-cases';
 import type {
   CaseDetail,
   CaseOutcome,
   CoramRole,
   CourtHistoryStep,
+  RelatedCase,
   ReportPrinciple,
 } from '@/types/case';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
@@ -182,10 +182,8 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
     // each band.
     .sort((a, b) => Number(!!b.badge) - Number(!!a.badge));
 
-  const citedByItems = (detail.cited_by ?? []).map(relatedToDisplay).map(toLibraryItem);
-  const similarItems = (detail.similar_cases ?? [])
-    .map(relatedToDisplay)
-    .map(toLibraryItem);
+  const citedByItems = (detail.cited_by ?? []).map(toLibraryItem);
+  const similarItems = (detail.similar_cases ?? []).map(toLibraryItem);
 
   // The body is the summary; the excerpt is the honest fallback when a case has
   // not been written up yet. Neither is invented when both are absent.
@@ -404,8 +402,15 @@ function CopyCitation({ name, citation }: { name: string; citation: string }) {
   );
 }
 
-/** Map a library case (cited_by / similar — always linked) to the row model. */
-function toLibraryItem(display: RelatedCaseDisplay): AuthorityItem {
+/**
+ * Map a library case (cited_by / similar — always linked) to the row model.
+ * The name is the case's own title: the shared display title (v1-shared) has
+ * the citation appended, and the reference line below already carries it, so
+ * a row read "Zenon Pet.Gas v Idrisiyya Ltd, (2006) 8 NWLR (Pt. 982) 221; …"
+ * over "(2006) 8 NWLR (Pt. 982) 221 · 2005".
+ */
+function toLibraryItem(c: RelatedCase): AuthorityItem {
+  const display = relatedToDisplay(c);
   const reference = [
     firstCitation(display.citation),
     display.court?.name,
@@ -415,7 +420,7 @@ function toLibraryItem(display: RelatedCaseDisplay): AuthorityItem {
     .join(' · ');
   return {
     key: display.key,
-    name: formatCaseName(display.title),
+    name: formatCaseName(c.display_title || c.title || display.title),
     nameTitle: display.title,
     reference: reference || null,
     href: display.href,
