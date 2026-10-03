@@ -17,6 +17,24 @@ import type {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 /**
+ * The query flags that make a chat's answers smaller, for the callers that
+ * ask (v2). Without them each answer is exactly as v1 has always received it.
+ *  - `lazyResults`: the transcript leaves out each step's result
+ *    (`results=lazy`); a step fetches its own with getToolResult.
+ *  - `withoutMessages`: the status check leaves out the messages
+ *    (`messages=none`), for a caller that reads only the status.
+ */
+export function chatQueryParams(options?: {
+  lazyResults?: boolean;
+  withoutMessages?: boolean;
+}): Record<string, string> | undefined {
+  const params: Record<string, string> = {};
+  if (options?.lazyResults) params.results = 'lazy';
+  if (options?.withoutMessages) params.messages = 'none';
+  return Object.keys(params).length > 0 ? params : undefined;
+}
+
+/**
  * Chat API service
  */
 export const chatApi = {
@@ -46,11 +64,8 @@ export const chatApi = {
    * Get a conversation with all its messages
    */
   getConversation: async (id: string, options?: { lazyResults?: boolean }): Promise<ConversationResponse> => {
-    // `results=lazy`: the steps' results are left out, to be fetched one at
-    // a time by getToolResult. v2 asks for it; v1 never does, so its answer
-    // is unchanged.
     const response = await apiClient.get<ConversationResponse>(`/conversations/${id}`, {
-      params: options?.lazyResults ? { results: 'lazy' } : undefined,
+      params: chatQueryParams(options),
     });
     return response.data;
   },
@@ -69,8 +84,10 @@ export const chatApi = {
   /**
    * Get conversation status (for recovery from dropped SSE connections)
    */
-  getStatus: async (id: string): Promise<ConversationStatusResponse> => {
-    const response = await apiClient.get<ConversationStatusResponse>(`/conversations/${id}/status`);
+  getStatus: async (id: string, options?: { withoutMessages?: boolean }): Promise<ConversationStatusResponse> => {
+    const response = await apiClient.get<ConversationStatusResponse>(`/conversations/${id}/status`, {
+      params: chatQueryParams(options),
+    });
     return response.data;
   },
 

@@ -664,11 +664,13 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         return;
       }
       try {
-        const response = await chatApi.getStatus(convId);
+        // Only the status is read here, and the reload below leaves out the
+        // steps' results (a step fetches its own): both answers stay small.
+        const response = await chatApi.getStatus(convId, { withoutMessages: true });
         if (response.data.status !== 'pending') {
           stopPolling();
           try {
-            const conv = await chatApi.getConversation(convId);
+            const conv = await chatApi.getConversation(convId, { lazyResults: true });
             if (conv.success && conv.data.messages) {
               const transformed = transformApiMessages(conv.data.messages);
               setState((prev) => ({
@@ -726,7 +728,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     if (!convId || staleCheckInFlight) return;
     staleCheckInFlight = true;
     try {
-      const response = await chatApi.getStatus(convId);
+      const response = await chatApi.getStatus(convId, { withoutMessages: true });
       if (response.data.status !== 'pending') {
         stopWatchdog();
         if (eventSource) {
@@ -735,7 +737,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         }
         executionId = null;
         try {
-          const conv = await chatApi.getConversation(convId);
+          const conv = await chatApi.getConversation(convId, { lazyResults: true });
           if (conv.success && conv.data.messages) {
             const transformed = transformApiMessages(conv.data.messages);
             setState((prev) => ({
@@ -1032,7 +1034,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
   async function fetchConversationTitle(convId: string) {
     try {
-      const response = await chatApi.getConversation(convId);
+      const response = await chatApi.getConversation(convId, { lazyResults: true });
       if (response.success && response.data.title) {
         setState((prev) => ({ ...prev, conversationTitle: response.data.title }));
       }
@@ -2070,7 +2072,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
   async function recoverPendingState(convId: string): Promise<RecoverResult> {
     try {
-      const response = await chatApi.getStatus(convId);
+      // The open-time check reads only the status and the execution id. For a
+      // finished chat the full answer also carried every message (351 KB for
+      // a 38-message chat, measured 3 October 2026), so it is asked without.
+      const response = await chatApi.getStatus(convId, { withoutMessages: true });
       const status = response.data;
       if (status.status === 'pending') {
         setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
