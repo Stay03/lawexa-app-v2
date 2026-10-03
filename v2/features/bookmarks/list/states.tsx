@@ -64,8 +64,8 @@ function PageState({
 
 /**
  * One skeleton row, mirroring `BookmarkRow`'s geometry EXACTLY — the same
- * nesting (`gap-2` between the identity block and the star, `gap-3 px-2 py-3`
- * inside it), so the tile, the text column and the star land on the same
+ * nesting (`gap-2` between the identity block and the bookmark button, `gap-3 px-2 py-3`
+ * inside it), so the tile, the text column and the bookmark button land on the same
  * pixels the resolved row will use and nothing reflows on hand-off.
  *
  * TWO TEXT LINES, which is the row's MEDIAN, not its maximum: cases, statutes
@@ -141,31 +141,31 @@ const EMPTY_COPY: Record<
     icon: Bookmark,
     title: 'Nothing saved yet',
     description:
-      'Press the star on a case, statute, note or folder and it lands here — ready for the next time you need it.',
+      'Save a case, statute, note or folder and it lands here — ready for the next time you need it.',
     browse: { href: '/cases', label: 'Browse cases' },
   },
   case: {
     icon: Scale,
     title: 'No saved cases',
-    description: 'Cases you star anywhere in Lawexa appear here.',
+    description: 'Cases you save anywhere in Lawexa appear here.',
     browse: { href: '/cases', label: 'Browse cases' },
   },
   statute: {
     icon: BookText,
     title: 'No saved statutes',
-    description: 'Statutes you star appear here, ready to re-open.',
+    description: 'Statutes you save appear here, ready to re-open.',
     browse: { href: '/statutes', label: 'Browse statutes' },
   },
   note: {
     icon: NotebookPen,
     title: 'No saved notes',
-    description: 'Notes you star appear here.',
+    description: 'Notes you save appear here.',
     browse: { href: '/notes', label: 'Browse notes' },
   },
   folder: {
     icon: FolderOpen,
     title: 'No saved folders',
-    description: 'Folders you star appear here.',
+    description: 'Folders you save appear here.',
     browse: { href: '/folders', label: 'Browse folders' },
   },
 };
