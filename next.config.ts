@@ -1,5 +1,8 @@
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { NextConfig } from "next";
+import { PHASE_PRODUCTION_SERVER } from "next/constants";
 
 /**
  * Resolve a stable build identifier tied to the deployed commit.
@@ -36,55 +39,87 @@ function resolveBuildId(): string | null {
   }
 }
 
-const buildId = resolveBuildId();
+/**
+ * The deployment id the build used, read back by `next start`. `undefined`
+ * when the build output cannot be read, `null` when the build had none.
+ *
+ * `next start` evaluates this file again, so without this the server resolves
+ * its own id from the runtime environment. Production (Coolify, 3 October 2026)
+ * builds with no commit SHA and runs with one: the build's files then name
+ * every chunk without `?dpl=` and the server's tags name it with, and a first
+ * visit downloaded 20 to 31 files twice (243 to 558 KB extra per page,
+ * measured on live). Reusing the build's id keeps the two in step.
+ */
+function builtDeploymentId(): string | null | undefined {
+  try {
+    const files = JSON.parse(
+      readFileSync(join(process.cwd(), ".next", "required-server-files.json"), "utf8"),
+    );
+    const id = files?.config?.deploymentId;
+    return typeof id === "string" && id.length > 0 ? id : null;
+  } catch {
+    return undefined;
+  }
+}
 
-const nextConfig: NextConfig = {
-  // Tie the deployment id to the deployed commit so version skew across a deploy
-  // forces clients onto fresh assets (hard reload on stale chunk fetch). Omit
-  // `deploymentId` when no SHA is resolvable; `generateBuildId` then supplies the
-  // build id (and is otherwise bypassed while `deploymentId` is set).
-  generateBuildId: () => buildId,
-  ...(buildId ? { deploymentId: buildId } : {}),
-  async redirects() {
-    return [
-      {
-        source: '/statutes-v2/:slug',
-        destination: '/statutes/:slug',
-        permanent: true,
-      },
-      {
-        // Typo alias: /ambassador (singular) -> /ambassadors
-        source: '/ambassador',
-        destination: '/ambassadors',
-        permanent: false,
-      },
-    ];
-  },
-  async rewrites() {
-    return [
-      {
-        // Serve the static ambassador landing page at the clean /ambassadors URL.
-        source: '/ambassadors',
-        destination: '/ambassadors/index.html',
-      },
-      {
-        // The face-card maker an approved ambassador is sent to, at a clean URL
-        // for the same reason as the line above: this address is printed in the
-        // welcome email and read by people, so it must not end in `.html`.
-        //
-        // It lives in `public/` rather than the app tree ON PURPOSE. The page is
-        // one self-contained file — its display font, its logo and its artwork
-        // are all embedded, and it paints the card on a canvas — so routing it
-        // through the app would buy nothing and cost it a React runtime.
-        //
-        // The backend reads this address from a setting
-        // (`LAWEXA_AMBASSADOR_FACE_CARD_URL`), so moving it later costs a config
-        // change and no deploy.
-        source: '/ambassadors/face-card',
-        destination: '/ambassadors/face-card/index.html',
-      },
-    ];
-  },
+function resolveDeploymentId(phase: string): string | null {
+  if (phase === PHASE_PRODUCTION_SERVER) {
+    const built = builtDeploymentId();
+    if (built !== undefined) return built;
+  }
+  return resolveBuildId();
+}
+
+const nextConfig = (phase: string): NextConfig => {
+  const buildId = resolveDeploymentId(phase);
+  return {
+    // Tie the deployment id to the deployed commit so version skew across a deploy
+    // forces clients onto fresh assets (hard reload on stale chunk fetch). Omit
+    // `deploymentId` when no SHA is resolvable; `generateBuildId` then supplies the
+    // build id (and is otherwise bypassed while `deploymentId` is set).
+    generateBuildId: () => buildId,
+    ...(buildId ? { deploymentId: buildId } : {}),
+    async redirects() {
+      return [
+        {
+          source: '/statutes-v2/:slug',
+          destination: '/statutes/:slug',
+          permanent: true,
+        },
+        {
+          // Typo alias: /ambassador (singular) -> /ambassadors
+          source: '/ambassador',
+          destination: '/ambassadors',
+          permanent: false,
+        },
+      ];
+    },
+    async rewrites() {
+      return [
+        {
+          // Serve the static ambassador landing page at the clean /ambassadors URL.
+          source: '/ambassadors',
+          destination: '/ambassadors/index.html',
+        },
+        {
+          // The face-card maker an approved ambassador is sent to, at a clean URL
+          // for the same reason as the line above: this address is printed in the
+          // welcome email and read by people, so it must not end in `.html`.
+          //
+          // It lives in `public/` rather than the app tree ON PURPOSE. The page is
+          // one self-contained file — its display font, its logo and its artwork
+          // are all embedded, and it paints the card on a canvas — so routing it
+          // through the app would buy nothing and cost it a React runtime.
+          //
+          // The backend reads this address from a setting
+          // (`LAWEXA_AMBASSADOR_FACE_CARD_URL`), so moving it later costs a config
+          // change and no deploy.
+          source: '/ambassadors/face-card',
+          destination: '/ambassadors/face-card/index.html',
+        },
+      ];
+    },
+  };
 };
 
 export default nextConfig;
