@@ -17,6 +17,12 @@ import { ShareButton } from '@/v2/features/sharing/ShareButton';
  * sits UNDER the heading block, at the weight of metadata rather than of
  * controls: the case is the page, and the actions are things you do to it.
  *
+ * FULL JUDGMENT LEADS the row (3 October 2026). It is the one action that takes
+ * the reader further into the case, and as the last of four it was the one
+ * that dropped alone onto a second line at phone width. It stays a pill, so
+ * the row keeps the weight of metadata; a firmer outline and text mark it as
+ * the way on.
+ *
  * ADD TO FOLDER landed with the phase-4 folders wave and sits beside the
  * bookmark, which is its nearest relative: both file the case somewhere the
  * reader can find it again. FEEDBACK is still absent — a whole v1 feature
@@ -40,6 +46,15 @@ export function CaseActions({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {hasFullReport ? (
+        <Link
+          href={`/cases/${slug}/report`}
+          className={cn(ACTION_PILL, 'border-primary/40 text-foreground hover:border-primary/60', FOCUS_RING)}
+        >
+          <FileText aria-hidden className="size-4 text-primary" />
+          Full judgment
+        </Link>
+      ) : null}
       <BookmarkButton
         caseId={caseId}
         isBookmarked={isBookmarked}
@@ -48,12 +63,6 @@ export function CaseActions({
       />
       <AddToFolderButton target={{ type: 'case', contentId: caseId }} />
       <ShareButton title={title} label="Share this case" />
-      {hasFullReport ? (
-        <Link href={`/cases/${slug}/report`} className={cn(ACTION_PILL, FOCUS_RING)}>
-          <FileText aria-hidden className="size-4" />
-          Full judgment
-        </Link>
-      ) : null}
     </div>
   );
 }

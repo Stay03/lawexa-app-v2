@@ -244,14 +244,12 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
         </h1>
 
         {detail.citation || detail.suit_no ? (
-          <p className="doc-citation flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          // No dot between the citation and the suit number: at phone width the
+          // line wraps there, and the dot then opened the second line on its
+          // own. The copy icon and the word "Suit" already mark the change.
+          <p className="doc-citation flex flex-wrap items-center gap-x-3 gap-y-0.5">
             {detail.citation ? (
               <CopyCitation name={name} citation={detail.citation} />
-            ) : null}
-            {detail.citation && detail.suit_no ? (
-              <span aria-hidden className="text-muted-foreground/40">
-                ·
-              </span>
             ) : null}
             {detail.suit_no ? <span>Suit {detail.suit_no}</span> : null}
           </p>
