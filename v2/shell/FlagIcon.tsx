@@ -3,6 +3,7 @@
 import 'flag-icons/css/flag-icons.min.css';
 
 import { cn } from '@/lib/utils';
+import { flagArtworkCode } from './flag-code';
 
 /**
  * FlagIcon — a country flag served from OUR origin, never a CDN and never an
@@ -56,7 +57,7 @@ export function FlagIcon({
     >
       <span
         aria-hidden
-        className={cn('fi absolute inset-0', `fi-${code.toLowerCase()}`)}
+        className={cn('fi absolute inset-0', `fi-${flagArtworkCode(code)}`)}
         // The library sizes `.fi` by em; the reserved box is the authority here.
         style={{ width: '100%', height: '100%' }}
       />
