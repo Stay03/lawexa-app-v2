@@ -99,9 +99,13 @@ export const CONTENT_FADE =
  */
 export function formatRelativeTime(
   iso: string | null | undefined,
-  now: number,
+  now: number | null,
 ): string {
-  if (!iso) return '';
+  // `now` is null until the component has mounted (see the home sections):
+  // the server and the hydrating browser read the clock seconds apart, so a
+  // row near a minute or hour edge would print "4m" on one and "5m" on the
+  // other, and React throws #418 (Stay's #15, about 1 Work load in 45).
+  if (!iso || now === null) return '';
   const then = Date.parse(iso);
   if (Number.isNaN(then)) return '';
   const minutes = Math.max(0, Math.round((now - then) / 60000));

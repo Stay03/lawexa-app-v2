@@ -7,6 +7,7 @@ import { BookText, MessageSquare, NotebookPen, Scale } from 'lucide-react';
 import { channelVisibilityIcon } from '@/lib/collab/visibility';
 
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
+import { useMounted } from '@/v2/shell/use-mounted';
 import { formatCaseName } from '@/v2/features/cases/case-name';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
@@ -49,7 +50,12 @@ import {
  * three anyway. Matching the spine's params is what makes this module free.
  */
 export function ChannelMessagesSection() {
-  const [now] = useState(() => Date.now());
+  // Null until mounted, so the relative times render only in the browser:
+  // the recents are server-prefetched, and a server-read clock would disagree
+  // with the browser's on rows near a minute edge (React #418, #15).
+  const mounted = useMounted();
+  const [clock] = useState(() => Date.now());
+  const now = mounted ? clock : null;
   // Viewer-partitioned since W5 (audit note N4): channel rows carry per-viewer
   // state (`my_role`, `my_notify_level`, both counts), so whose rows these are
   // belongs in the key rather than resting on the cache-identity guard alone.
@@ -106,7 +112,12 @@ export function ChannelMessagesSection() {
  * with the sidebar and the home strip, so it costs no request of its own.
  */
 export function ConversationsSection() {
-  const [now] = useState(() => Date.now());
+  // Null until mounted, so the relative times render only in the browser:
+  // the recents are server-prefetched, and a server-read clock would disagree
+  // with the browser's on rows near a minute edge (React #418, #15).
+  const mounted = useMounted();
+  const [clock] = useState(() => Date.now());
+  const now = mounted ? clock : null;
   const { userId: viewerId } = useV2Session();
   const query = useQuery(conversationsQueries.recents({ viewerId }));
   const conversations = (query.data?.data ?? []).slice(0, HOME_SECTION_ROWS);
@@ -180,7 +191,12 @@ function resolveViewed(row: RecentlyViewedItem) {
  * an empty-looking section.
  */
 export function RecentlyViewedSection() {
-  const [now] = useState(() => Date.now());
+  // Null until mounted, so the relative times render only in the browser:
+  // the recents are server-prefetched, and a server-read clock would disagree
+  // with the browser's on rows near a minute edge (React #418, #15).
+  const mounted = useMounted();
+  const [clock] = useState(() => Date.now());
+  const now = mounted ? clock : null;
   const query = useQuery(recentlyViewedQueries.recentsPeek());
   const rows = (query.data?.data ?? [])
     .map((row) => ({ row, resolved: resolveViewed(row) }))
