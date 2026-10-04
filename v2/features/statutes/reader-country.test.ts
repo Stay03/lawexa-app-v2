@@ -22,6 +22,11 @@ test('the live flat list becomes tab facets, All summing the counts', () => {
   assert.equal(facets.countries[1].statute_count, 150);
 });
 
+test("the flat list's All uses meta.total when sent, never below the sum", () => {
+  assert.equal(normaliseCountryFacets(live, 1023)!.total, 1023);
+  assert.equal(normaliseCountryFacets(live, 5)!.total, 947);
+});
+
 test('the documented shape passes through, and anything else is refused', () => {
   const documented = { total: 5, countries: [{ country: { id: 1, name: 'Nigeria', slug: 'nigeria', code: 'NG', abbreviation: '' }, statute_count: 5 }] };
   assert.equal(normaliseCountryFacets(documented), documented);

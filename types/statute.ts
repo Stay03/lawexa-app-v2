@@ -181,7 +181,11 @@ export interface StatuteCountriesData {
 export interface StatuteFacetsResponse {
   success: boolean;
   message: string;
+  // Documented as this shape; the live endpoint returns a flat list, which
+  // v2's facets reader (reader-country.ts) accepts too.
   data: StatuteCountriesData;
+  /** Every statute, with a country or without, beside the flat list. */
+  meta?: { total?: number };
 }
 
 // Single statute response

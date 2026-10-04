@@ -124,7 +124,7 @@ export const statutesQueries = {
           // facets — fall back to the seed exactly like a failed request.
           // Either the documented shape or the flat list the live endpoint
           // returns since 3 October 2026 (`normaliseCountryFacets`).
-          const facets = normaliseCountryFacets(res.data);
+          const facets = normaliseCountryFacets(res.data, res.meta?.total);
           if (!facets) {
             return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
           }

@@ -70,11 +70,15 @@ export function countryParamForTab(slug: string, readerSlug: string | null): str
  * The tab facets from `GET /statutes/countries`, in either shape: the
  * documented `{ total, countries: [{ country, statute_count }] }`, or the flat
  * list the live endpoint returns (3 October 2026: `[{ id, name, slug, code,
- * iso_alpha2, statutes_count }]`). The flat list has no total, so All shows
- * the sum of the countries' counts. Null for anything else, so the caller
- * keeps its seed.
+ * iso_alpha2, statutes_count }]`). With the flat list, All shows `meta.total`
+ * (every statute, with a country or without; asked of backend in 47e501aa)
+ * when the response carries it, else the sum of the countries' counts. Null
+ * for anything else, so the caller keeps its seed.
  */
-export function normaliseCountryFacets(data: unknown): StatuteCountriesData | null {
+export function normaliseCountryFacets(
+  data: unknown,
+  metaTotal?: number | null,
+): StatuteCountriesData | null {
   if (Array.isArray(data)) {
     const countries = data
       .filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
@@ -91,7 +95,8 @@ export function normaliseCountryFacets(data: unknown): StatuteCountriesData | nu
         statute_count: typeof row.statutes_count === 'number' ? row.statutes_count : 0,
       }));
     if (countries.length === 0) return null;
-    return { total: countries.reduce((sum, facet) => sum + facet.statute_count, 0), countries };
+    const sum = countries.reduce((total, facet) => total + facet.statute_count, 0);
+    return { total: typeof metaTotal === 'number' && metaTotal >= sum ? metaTotal : sum, countries };
   }
   if (data && typeof data === 'object' && Array.isArray((data as StatuteCountriesData).countries)) {
     return data as StatuteCountriesData;

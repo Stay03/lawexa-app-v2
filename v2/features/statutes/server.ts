@@ -62,7 +62,7 @@ async function fetchCountryFacets(): Promise<StatuteCountriesData> {
     const res = await apiFetch<StatuteFacetsResponse>('/statutes/countries', {
       signal: AbortSignal.timeout(PREFETCH_TIMEOUT_MS),
     });
-    return normaliseCountryFacets(res.data) ?? STATUTE_COUNTRIES_FALLBACK;
+    return normaliseCountryFacets(res.data, res.meta?.total) ?? STATUTE_COUNTRIES_FALLBACK;
   } catch {
     return STATUTE_COUNTRIES_FALLBACK;
   }
