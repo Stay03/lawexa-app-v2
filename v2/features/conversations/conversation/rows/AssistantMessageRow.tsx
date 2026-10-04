@@ -11,6 +11,7 @@ import {
 } from '@/v2/runtime/chat-engine';
 import type { ChatMessage } from '@/types/chat';
 import { ChatContent } from '../markdown/ChatContent';
+import { trimUnclosedLinkTail } from '../markdown/partial-tail';
 import { ReasoningTrace } from '../reasoning/ReasoningTrace';
 
 /**
@@ -69,6 +70,9 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   const text = isStreaming || draining ? live : message.content;
   const reasoningText = isStreaming ? liveReasoning : message.reasoning ?? '';
   const partial = (message as ChatMessage).partial;
+  // A stopped answer can end inside a link; draw it without that unclosed tail
+  // (the saved text, and what Copy copies, stay as they are).
+  const shownText = partial && !isStreaming && !draining ? trimUnclosedLinkTail(text) : text;
   // Actions wait for the landing: mid-drain `text` is a prefix, so Copy would copy a
   // truncated answer and the buttons would be pushed down as the tail arrives.
   const showActions = !isStreaming && !draining && message.content.trim().length > 0;
@@ -91,7 +95,7 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
         // the `line` stand-in bar must not — the answer is complete, so a pulsing
         // placeholder under it would promise a line that is never coming.
         <ChatContent
-          content={text}
+          content={shownText}
           isStreaming={isStreaming}
           isDraining={draining}
           isInteracted={isInteracted}
