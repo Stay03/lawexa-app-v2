@@ -12,8 +12,13 @@ test('a single entry written by the proxy is the visitor', () => {
   assert.equal(from({ 'x-forwarded-for': '102.89.33.4' }), '102.89.33.4');
 });
 
-test('X-Real-IP is the fallback, and an IPv6 address passes', () => {
+test('X-Real-IP comes first, and an IPv6 address passes', () => {
   assert.equal(from({ 'x-real-ip': '2a02:c7c::1' }), '2a02:c7c::1');
+  assert.equal(from({ 'x-real-ip': '102.89.33.4', 'x-forwarded-for': '8.8.8.8, 1.2.3.4' }), '102.89.33.4');
+});
+
+test('a malformed X-Real-IP falls back to the proxy-written entry', () => {
+  assert.equal(from({ 'x-real-ip': 'garbage', 'x-forwarded-for': '8.8.8.8, 102.89.33.4' }), '102.89.33.4');
 });
 
 test('a malformed value gives no address rather than a wrong one', () => {

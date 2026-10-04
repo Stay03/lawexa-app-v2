@@ -182,7 +182,14 @@ export async function prefetchCaseDetailState(
 
     const detail = await apiFetch<CaseDetailResponse>(
       `/cases/${encodeURIComponent(slug)}?${query.toString()}`,
-      { headers: forward, signal: AbortSignal.timeout(CASE_PREFETCH_TIMEOUT_MS) },
+      {
+        headers: forward,
+        // Stated here, not only as `apiFetch`'s default: Next's fetch cache
+        // keys on headers, so a cached copy of this request would hold the key
+        // and one reader's case (SSR review, techlead 493547a3).
+        cache: 'no-store',
+        signal: AbortSignal.timeout(CASE_PREFETCH_TIMEOUT_MS),
+      },
     );
     if (!detail?.success || !detail.data) return undefined;
 
