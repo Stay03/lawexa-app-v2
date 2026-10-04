@@ -125,6 +125,10 @@ export interface V2SessionSnapshot {
    * non-ambassador's screens stop asking `/ambassadors/code` for a 403.
    */
   readonly isAmbassador: boolean | null;
+  /** The profile's country (name and code), or null when the profile has none.
+   *  The statute library opens on it; the server prefetch reads the same value. */
+  readonly profileCountryName: string | null;
+  readonly profileCountryCode: string | null;
 }
 
 /**
@@ -156,6 +160,8 @@ export function V2SessionProvider({
   authProvider,
   canSetPrice,
   isAmbassador,
+  profileCountryName,
+  profileCountryCode,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
@@ -171,6 +177,8 @@ export function V2SessionProvider({
       authProvider,
       canSetPrice,
       isAmbassador,
+      profileCountryName,
+      profileCountryCode,
     }),
     [
       signedIn,
@@ -184,6 +192,8 @@ export function V2SessionProvider({
       authProvider,
       canSetPrice,
       isAmbassador,
+      profileCountryName,
+      profileCountryCode,
     ],
   );
 

@@ -64,6 +64,10 @@ export interface SessionUser {
    * "not known yet" and keep today's behaviour for the second.
    */
   is_ambassador: boolean | null;
+  /** The profile's country, for screens that open on the reader's own country
+   *  (the statute library). Null when the profile has none. */
+  profile_country_name: string | null;
+  profile_country_code: string | null;
 }
 
 export interface SessionDTO {
@@ -102,6 +106,8 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
         auth_provider: user.auth_provider,
         can_set_price: user.is_creator === true || user.role === 'admin',
         is_ambassador: typeof result.data?.is_ambassador === 'boolean' ? result.data.is_ambassador : null,
+        profile_country_name: user.profile?.country?.trim() || null,
+        profile_country_code: user.profile?.country_code?.trim() || null,
       },
     };
   } catch {

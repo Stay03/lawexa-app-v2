@@ -11,6 +11,7 @@ import { apiFetch } from '@/v2/runtime/api-server';
 import { verifySession } from '@/v2/runtime/session';
 import { makeQueryClient } from '@/v2/runtime/query';
 import { STATUTES_PAGE_SIZE, statutesQueries } from './queries';
+import { countryTabFromParam, normaliseCountryFacets, readerCountrySlug } from './reader-country';
 import { resolveCountryId } from './statute-row-model';
 
 /**
@@ -61,7 +62,7 @@ async function fetchCountryFacets(): Promise<StatuteCountriesData> {
     const res = await apiFetch<StatuteFacetsResponse>('/statutes/countries', {
       signal: AbortSignal.timeout(PREFETCH_TIMEOUT_MS),
     });
-    return res.data;
+    return normaliseCountryFacets(res.data) ?? STATUTE_COUNTRIES_FALLBACK;
   } catch {
     return STATUTE_COUNTRIES_FALLBACK;
   }
@@ -90,19 +91,31 @@ async function fetchCountryFacets(): Promise<StatuteCountriesData> {
  */
 export async function prefetchStatutesListState({
   search,
-  countrySlug,
+  countryParam,
 }: {
   search?: string;
-  countrySlug?: string;
+  /** The URL's raw `country` parameter (absent, a slug, or 'all'). */
+  countryParam?: string;
 }): Promise<DehydratedState | undefined> {
   try {
     const session = await verifySession();
     if (!session) return undefined;
     const viewerId = session.user.id;
 
-    const country = countrySlug
-      ? resolveCountryId(await fetchCountryFacets(), countrySlug)
-      : undefined;
+    // The tab by the client's own rule (#7): the URL's, else the reader's
+    // country, else All. Without a parameter the server knows only the
+    // profile's country; when the profile has none, the client decides from
+    // the reader's location, so prefetching All here would fill an entry the
+    // client may not read. It is skipped instead.
+    const facets = await fetchCountryFacets();
+    const hasParam = !!countryParam?.trim();
+    const profileCountry = {
+      name: session.user.profile_country_name,
+      code: session.user.profile_country_code,
+    };
+    if (!hasParam && !profileCountry.name && !profileCountry.code) return undefined;
+    const countrySlug = countryTabFromParam(countryParam, readerCountrySlug(facets, profileCountry));
+    const country = countrySlug ? resolveCountryId(facets, countrySlug) : undefined;
 
     const leaf = statutesQueries.infiniteList({ search, country, viewerId });
     // The request params are read back off the leaf's own key (segment 3 —

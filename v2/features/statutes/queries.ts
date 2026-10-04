@@ -3,6 +3,7 @@ import { statutesApi, type StatuteOutlineData } from '@/lib/api/statutes';
 import { STATUTE_COUNTRIES_FALLBACK } from '@/lib/constants/statute-countries';
 import type { StatuteCountriesData, StatuteListParams } from '@/types/statute';
 import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
+import { normaliseCountryFacets } from './reader-country';
 
 /**
  * statutes query policy — the `v2/features/cases/queries.ts` exemplar, applied
@@ -121,10 +122,13 @@ export const statutesQueries = {
           // error page or a drifted payload answering 200 would crash the
           // whole list screen. A response without a countries ARRAY is not
           // facets — fall back to the seed exactly like a failed request.
-          if (!Array.isArray(res.data?.countries)) {
+          // Either the documented shape or the flat list the live endpoint
+          // returns since 3 October 2026 (`normaliseCountryFacets`).
+          const facets = normaliseCountryFacets(res.data);
+          if (!facets) {
             return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
           }
-          return { ...res.data, source: 'live' };
+          return { ...facets, source: 'live' };
         } catch {
           return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
         }

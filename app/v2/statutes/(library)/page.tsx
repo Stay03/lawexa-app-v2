@@ -73,7 +73,7 @@ export default async function V2StatutesPage({
   // API answers with 401 anyway.
   const state = await prefetchStatutesListState({
     search: search?.trim() || undefined,
-    countrySlug: country?.trim() || undefined,
+    countryParam: country,
   });
 
   return (

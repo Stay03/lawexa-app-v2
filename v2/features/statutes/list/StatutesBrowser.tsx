@@ -17,7 +17,14 @@ import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { STATUTE_COUNTRIES_PLACEHOLDER, statutesQueries } from '../queries';
+import {
+  ALL_COUNTRIES_PARAM,
+  countryParamForTab,
+  countryTabFromParam,
+  readerCountrySlug,
+} from '../reader-country';
 import { resolveCountryId, statuteRow, type StatuteRowModel } from '../statute-row-model';
+import { useReaderCountry } from '../use-reader-country';
 import { CountryTabs } from './CountryTabs';
 import { StatuteRow } from './StatuteRow';
 import {
@@ -82,7 +89,8 @@ export function StatutesBrowser() {
   const searchAtTop = useSearchPosition() === 'top';
 
   const activeSearch = committedSearch.trim();
-  const countrySlug = searchParams.get('country')?.trim() ?? '';
+  const countryParam = searchParams.get('country');
+  const { country: readerCountry, settled: readerSettled } = useReaderCountry();
 
   const countries = useQuery({
     ...statutesQueries.countries(),
@@ -92,6 +100,9 @@ export function StatutesBrowser() {
     placeholderData: STATUTE_COUNTRIES_PLACEHOLDER,
   });
   const facets = countries.data ?? STATUTE_COUNTRIES_PLACEHOLDER;
+  // The tab: the URL's, else the reader's own country, else All (#7).
+  const readerSlug = readerCountrySlug(facets, readerCountry);
+  const countrySlug = countryTabFromParam(countryParam, readerSlug);
   const countryId = resolveCountryId(facets, countrySlug);
   const activeCountryName = countryId
     ? (facets.countries.find((facet) => facet.country.id === countryId)?.country
@@ -104,7 +115,9 @@ export function StatutesBrowser() {
       country: countryId,
       viewerId,
     }),
-    enabled: signedIn,
+    // Without a tab in the URL, wait for the reader's country, so the list
+    // opens on it rather than on All and then jumping.
+    enabled: signedIn && (!!countryParam?.trim() || readerSettled),
     // Keep the current results visible (dimmed) while a new search or a tab
     // switch resolves — neither ever flashes a skeleton over rows on screen.
     placeholderData: keepPreviousData,
@@ -126,10 +139,11 @@ export function StatutesBrowser() {
   });
 
   const setCountry = (slug: string) => {
-    replaceUrlParams({ country: slug || null });
+    replaceUrlParams({ country: countryParamForTab(slug, readerSlug) });
   };
   const clearFilters = () => {
-    replaceUrlParams({ country: null });
+    // Clearing the filters means every country.
+    replaceUrlParams({ country: ALL_COUNTRIES_PARAM });
     onClear();
   };
 
