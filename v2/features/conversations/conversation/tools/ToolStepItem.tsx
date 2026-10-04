@@ -165,6 +165,15 @@ export function formatToolMessage(
         detail: statuteName || undefined,
       };
     }
+    // The read the AI uses for a case it already found; backend sends its title
+    // as `case_title` (3212379).
+    case 'view_case': {
+      const caseId = parameters.case_id ?? parameters.id;
+      return {
+        action: isComplete ? 'Read case' : 'Reading case',
+        detail: readTitle ?? (caseId ? `#${caseId}` : undefined),
+      };
+    }
     case 'view_note':
       return {
         action: isComplete ? 'Read note' : 'Reading note',

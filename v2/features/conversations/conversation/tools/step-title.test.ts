@@ -25,7 +25,7 @@ test('a lazy note step carries the note title the transcript sends', () => {
 });
 
 test('a lazy case step carries the case title', () => {
-  const s = step([call(1, 'get_case', { case_id: 11663 }), lazyResult(2, 1, { case_title: 'Piedmount Plywoods v Goldeac' })]);
+  const s = step([call(1, 'view_case', { case_id: 11663 }), lazyResult(2, 1, { case_title: 'Piedmount Plywoods v Goldeac' })]);
   assert.equal(s.entityTitle, 'Piedmount Plywoods v Goldeac');
 });
 
