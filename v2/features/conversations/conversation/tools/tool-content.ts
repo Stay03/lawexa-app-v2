@@ -214,6 +214,21 @@ function unwrap(data: unknown): Record<string, unknown> | null {
   return (inner && typeof inner === 'object' ? (inner as Record<string, unknown>) : top);
 }
 
+/**
+ * The title of the note or case a read step returned, when its result is
+ * loaded: `{ note | case: { display_title | title } }`, possibly wrapped in
+ * `data`. Null when there is no usable title.
+ */
+export function readStepTitle(toolResult?: { data?: unknown }): string | null {
+  if (!toolResult?.data || typeof toolResult.data !== 'object') return null;
+  const data = toolResult.data as Record<string, unknown>;
+  const inner = (data.data && typeof data.data === 'object' ? data.data : data) as Record<string, unknown>;
+  const holder = inner.note ?? inner.case;
+  const node = (holder && typeof holder === 'object' ? holder : inner) as Record<string, unknown>;
+  const title = node.display_title || node.title;
+  return typeof title === 'string' && title.trim() ? title.trim() : null;
+}
+
 /** A meaningful server message on the result (e.g. "Note created"), if present. */
 export function extractResultMessage(message: ToolMessage): string | null {
   const data = message.toolResult?.data;

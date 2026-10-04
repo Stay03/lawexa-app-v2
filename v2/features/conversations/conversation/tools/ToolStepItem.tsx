@@ -23,6 +23,7 @@ import {
   extractCreatedNote,
   extractSingleEntity,
   extractStepError,
+  readStepTitle,
   extractWebResults,
   formatDuration,
   isMemoryTool,
@@ -97,7 +98,12 @@ export function formatToolMessage(
   toolResult?: { success: boolean; data: unknown; error: string | null },
   /** The statute's name from the result's metadata, when the result is not loaded. */
   statuteTitle?: string,
+  /** The note or case title from the result's metadata, likewise. */
+  entityTitle?: string,
 ): { action: string; detail?: string } {
+  // A read step names what it read: the title from the loaded result, else the
+  // one the transcript carries, else (older chats) the id it was asked for.
+  const readTitle = readStepTitle(toolResult) || entityTitle || null;
   const query = parameters.query as string | undefined;
 
   switch (toolName) {
@@ -115,13 +121,13 @@ export function formatToolMessage(
     case 'get_case_details':
       return {
         action: isComplete ? 'Retrieved case details' : 'Retrieving case details',
-        detail: parameters.case_id ? `for case #${parameters.case_id}` : undefined,
+        detail: readTitle ? `for ${readTitle}` : parameters.case_id ? `for case #${parameters.case_id}` : undefined,
       };
     case 'get_note':
     case 'get_note_details':
       return {
         action: isComplete ? 'Retrieved note' : 'Retrieving note',
-        detail: parameters.note_id ? `#${parameters.note_id}` : undefined,
+        detail: readTitle ?? (parameters.note_id ? `#${parameters.note_id}` : undefined),
       };
     case 'search_statutes':
       return {
@@ -162,7 +168,7 @@ export function formatToolMessage(
     case 'view_note':
       return {
         action: isComplete ? 'Read note' : 'Reading note',
-        detail: parameters.id ? `#${parameters.id}` : undefined,
+        detail: readTitle ?? (parameters.id ? `#${parameters.id}` : undefined),
       };
     case 'web_search':
       return {
@@ -303,6 +309,7 @@ export function ToolStepItem({
     isComplete,
     message.toolResult ?? undefined,
     message.statuteTitle,
+    message.entityTitle,
   );
   // Glance-level zero signal: a search that affirmatively returned nothing hints
   // it on the COLLAPSED line, so a user need not expand to learn it found nothing.

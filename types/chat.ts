@@ -69,6 +69,9 @@ export interface ToolMessage extends ChatMessage {
   resultRef?: { messageId: number; size: number | null };
   /** A `read_statute` step's statute name, kept for its label when the result is not loaded. */
   statuteTitle?: string;
+  /** The title of the note or case a read step opened, from the result's
+   *  metadata, so a closed step can name it without loading the result. */
+  entityTitle?: string;
 }
 
 // Handover message - when orchestrator delegates to a sub-agent
@@ -524,6 +527,9 @@ export interface ApiMessage {
     // A step's result left out of a lazy chat download: the step's label and
     // state still need these.
     statute_title?: string;
+    // The note or case a read step opened, for its label (Stay's #13).
+    note_title?: string;
+    case_title?: string;
     error?: string;
     // Error message fields
     error_code?: string;

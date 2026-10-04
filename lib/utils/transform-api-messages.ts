@@ -200,6 +200,9 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
           ? { resultRef: { messageId: toolResult.id, size: toolResult.result_bytes ?? null } }
           : {}),
         ...(toolResult?.metadata?.statute_title ? { statuteTitle: toolResult.metadata.statute_title } : {}),
+        ...(toolResult?.metadata?.note_title || toolResult?.metadata?.case_title
+          ? { entityTitle: toolResult.metadata.note_title || toolResult.metadata.case_title }
+          : {}),
       } as ToolMessage);
     }
     // Skip tool role messages (already captured via tool_call)
