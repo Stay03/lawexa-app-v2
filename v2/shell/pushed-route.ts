@@ -272,6 +272,29 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       }
       return null;
 
+    // The two legal documents. They are opened from the foot of the settings
+    // screen, so that is where "up" goes; `useBackTo` still takes the real
+    // history step when the reader came from anywhere else.
+    case 'terms':
+      if (depth === 1) {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Terms of service'),
+        };
+      }
+      return null;
+
+    case 'privacy':
+      if (depth === 1) {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Privacy policy'),
+        };
+      }
+      return null;
+
     case 'organization':
       if (depth === 1) {
         return {

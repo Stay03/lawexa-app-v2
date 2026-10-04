@@ -1,6 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
+
+import { cn } from '@/lib/utils';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 import {
   useV2Session,
@@ -88,6 +92,30 @@ export function SettingsScreen() {
           </SettingsBlock>
         ) : null}
       </div>
+
+      {/* THE LEGAL DOCUMENTS, where apps keep them: a quiet line under the last
+          block, not a row. They are documents to read, not settings to change,
+          so they take no row grammar and no icon. */}
+      <nav
+        aria-label="Legal"
+        className="mt-8 flex items-center justify-center gap-3 text-xs text-muted-foreground"
+      >
+        <Link
+          href="/terms"
+          className={cn('rounded-sm underline-offset-4 transition-colors hover:text-foreground hover:underline', FOCUS_RING)}
+        >
+          Terms of service
+        </Link>
+        <span aria-hidden className="text-muted-foreground/40">
+          ·
+        </span>
+        <Link
+          href="/privacy"
+          className={cn('rounded-sm underline-offset-4 transition-colors hover:text-foreground hover:underline', FOCUS_RING)}
+        >
+          Privacy policy
+        </Link>
+      </nav>
     </div>
   );
 }

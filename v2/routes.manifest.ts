@@ -147,6 +147,10 @@ export const V2_ROUTES = [
   '/settings/usage',
   '/settings/api',
   '/settings/verification',
+  // The Terms of Service and the Privacy Policy, inside the v2 shell. Only a
+  // reader holding the v2 cookie is rewritten here; crawlers keep the v1 page.
+  '/terms',
+  '/privacy',
   // The plans, and starting a payment for one. EXACT: v1's `/upgrade` already
   // redirects here, and the three returns below are listed one by one.
   '/pricing',
