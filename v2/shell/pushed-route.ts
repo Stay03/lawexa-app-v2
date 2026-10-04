@@ -303,6 +303,13 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Profile'),
         };
       }
+      if (depth === 2 && second === 'api') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('API keys'),
+        };
+      }
       if (depth === 2 && second === 'developer') {
         return {
           backHref: '/settings',

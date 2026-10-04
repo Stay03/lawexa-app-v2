@@ -134,6 +134,7 @@ export const V2_ROUTES = [
   '/settings/billing',
   '/settings/referrals',
   '/settings/usage',
+  '/settings/api',
   // Where the payment provider returns a v2 buyer of message packs.
   '/payg/callback',
   // Where it returns a v2 buyer of a plan, an upgrade or a free trial.

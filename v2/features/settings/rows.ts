@@ -4,6 +4,7 @@ import {
   CreditCard,
   FlaskConical,
   Gauge,
+  KeyRound,
   MessageSquarePlus,
   MonitorSmartphone,
   Paintbrush,
@@ -50,11 +51,13 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
  * A path under `/settings/` is therefore NOT a marker of "still v1" any more.
  * The list above is.
  *
- * ── THREE v1 PAGES ARE DELIBERATELY NOT LISTED ─────────────────────────────
- * `/settings/account`, `/settings/api` and `/settings/privacy` render a
- * `ComingSoonCard` and nothing else — measured 16 August 2026 in
- * `app/(main)/settings/{account,api,privacy}/page.tsx`, each of which is a
- * ten-line file with no controls in it. A row onto an empty page is the dead
+ * ── TWO v1 PAGES ARE DELIBERATELY NOT LISTED ───────────────────────────────
+ * `/settings/account` and `/settings/privacy` render a `ComingSoonCard` and
+ * nothing else — measured 16 August 2026 in
+ * `app/(main)/settings/{account,privacy}/page.tsx`, each of which is a
+ * ten-line file with no controls in it. (`/settings/api` was the third, until
+ * the owner asked for it on 4 October 2026 as an honest "coming soon": see the
+ * API keys row below.) A row onto an empty page is the dead
  * row this screen exists to avoid; it is worse than no row, because the reader
  * pays a navigation to learn that nothing is there. They arrive here when they
  * are built, and the account/privacy work is where email, password and sessions
@@ -247,6 +250,18 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     id: 'advanced',
     label: 'Advanced',
     rows: [
+      {
+        // A "COMING SOON" ROW, ON THE OWNER'S WORD (4 October 2026, Use Lawexa
+        // 25b5f81f: "do api key but make it coming soon"). It is the one row
+        // here onto a screen with no control, which the rule above calls a dead
+        // row; the owner chose to show the feature is coming. The screen says so
+        // in its first line, so the navigation costs one tap and no confusion.
+        id: 'api',
+        label: 'API keys',
+        icon: KeyRound,
+        href: '/settings/api',
+        requiresAccount: true,
+      },
       {
         id: 'developer',
         label: 'Developer',
