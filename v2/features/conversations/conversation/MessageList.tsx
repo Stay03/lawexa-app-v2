@@ -119,6 +119,13 @@ export interface MessageListProps {
   canRegenerate: boolean;
   onRegenerate: () => void;
   onRetry: () => void;
+  /**
+   * Told when the reader scrolls away from the bottom (true) and back (false),
+   * the same moments the "Latest" pill appears and leaves. The screen uses it
+   * to fold away the composer's country chip, which otherwise floats over the
+   * text the reader scrolled up to read (#16, Stay's option 2, 4 October 2026).
+   */
+  onScrolledUpChange?: (scrolledUp: boolean) => void;
 }
 
 export function MessageList({
@@ -133,6 +140,7 @@ export function MessageList({
   canRegenerate,
   onRegenerate,
   onRetry,
+  onScrolledUpChange,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -316,11 +324,13 @@ export function MessageList({
     const atBottom = distance <= BOTTOM_THRESHOLD_PX;
     atBottomRef.current = atBottom;
     if (atBottom) {
+      if (detachedAt !== null) onScrolledUpChange?.(false);
       setDetachedAt(null);
     } else if (detachedAt === null) {
       // Only the FIRST scroll away sets the mark — later scrolls while already
       // detached must not keep resetting it, or the count would never grow.
       setDetachedAt(messages.length);
+      onScrolledUpChange?.(true);
     }
   };
 

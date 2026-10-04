@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Eye, ShieldCheck } from 'lucide-react';
 import { useV2Session } from '@/v2/runtime/session-context';
 import {
@@ -147,6 +147,9 @@ export function ConversationScreen({
   // can never reserve clearance for a pill that lives below in flow.
   const screenRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
+  // Whether the reader has scrolled up from the bottom; set by MessageList's
+  // scroll handler, read by the composer's chip row (#16).
+  const [scrolledUp, setScrolledUp] = useState(false);
   useEffect(() => {
     if (externalComposer) return;
     const dock = dockRef.current;
@@ -240,6 +243,7 @@ export function ConversationScreen({
           canRegenerate={controller.canRegenerate}
           onRegenerate={controller.regenerate}
           onRetry={retryLastMessage}
+          onScrolledUpChange={setScrolledUp}
         />
 
         {/* Floating composer layer — an ABSOLUTE overlay over the transcript's bottom
@@ -276,6 +280,10 @@ export function ConversationScreen({
                   onJurisdictionChange={controller.setJurisdiction}
                   isConfidential={controller.isConfidential}
                   isRedacted={controller.isRedacted}
+                  // The country chip folds away while the reader is scrolled
+                  // up, so it never covers the text they went back to read;
+                  // "Latest" stays (#16, Stay's option 2).
+                  showMeta={!scrolledUp}
                   isStreaming={isStreaming}
                   isCancelling={isCancelling}
                   onSubmit={controller.submit}
