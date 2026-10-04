@@ -420,6 +420,8 @@ export interface BenchJudge {
   key: string;
   name: string;
   role: CoramRole | null;
+  /** Presided over the bench; independent of the coram role. */
+  presiding: boolean;
 }
 
 const ROLE_RANK: Record<CoramRole, number> = { lead: 0, concurring: 1, dissenting: 2 };
@@ -439,7 +441,7 @@ export function normalizeBench(
   for (const [index, judge] of judges.entries()) {
     if (typeof judge === 'string') {
       const name = judge.trim();
-      if (name) rows.push({ key: `name-${index}`, name, role: null });
+      if (name) rows.push({ key: `name-${index}`, name, role: null, presiding: false });
       continue;
     }
     if (judge && typeof judge.name === 'string' && judge.name.trim()) {
@@ -447,12 +449,30 @@ export function normalizeBench(
         key: `judge-${judge.id ?? index}`,
         name: judge.name.trim(),
         role: judge.role ?? null,
+        presiding: judge.presiding === true,
       });
     }
   }
   return rows.sort(
     (a, b) => (a.role ? ROLE_RANK[a.role] : 3) - (b.role ? ROLE_RANK[b.role] : 3),
   );
+}
+
+const ROLE_WORDS: Record<CoramRole, string> = {
+  lead: 'lead',
+  concurring: 'concurring',
+  dissenting: 'dissenting',
+};
+
+/**
+ * The words after a judge's name in the coram: "presiding", the coram role,
+ * or both ("presiding, lead"), since the presiding judge can also write the
+ * lead judgment. Null when there is nothing to say.
+ */
+export function benchLabel(judge: Pick<BenchJudge, 'role' | 'presiding'>): string | null {
+  const words = [judge.presiding ? 'presiding' : null, judge.role ? ROLE_WORDS[judge.role] : null]
+    .filter((word): word is string => word !== null);
+  return words.length > 0 ? words.join(', ') : null;
 }
 
 /* ── Small text helpers ──────────────────────────────────────────────────── */

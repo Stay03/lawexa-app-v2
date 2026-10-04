@@ -30,6 +30,9 @@ export interface Judge {
   // Coram role pivot — optional because pre-July payloads (and cached
   // responses) do not carry it.
   role?: CoramRole | null;
+  // The judge who presided over the bench (backend d100069, live 4 October
+  // 2026). Optional for the same reason as `role`.
+  presiding?: boolean;
   created_at: string;
   updated_at: string;
 }

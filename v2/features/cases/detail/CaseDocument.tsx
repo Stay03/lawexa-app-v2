@@ -20,6 +20,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { firstCitation, formatCaseName } from '../case-name';
 import { formatCaseDate, toAlpha2 } from '../case-row-model';
 import {
+  benchLabel,
   citedCaseRows,
   groupStatutes,
   lawTypeLabel,
@@ -456,18 +457,16 @@ function AboutThisCase({
       <dl className="flex flex-col gap-3">
         {bench.length > 0 ? (
           <AboutRow term={bench.length === 1 ? 'Judge' : 'Coram'}>
-            {bench.map((judge, index) => (
-              <span key={judge.key}>
-                {index > 0 ? ', ' : ''}
-                {formatCaseName(judge.name)}
-                {judge.role ? (
-                  <span className="text-muted-foreground">
-                    {' '}
-                    ({ROLE_LABELS[judge.role]})
-                  </span>
-                ) : null}
-              </span>
-            ))}
+            {bench.map((judge, index) => {
+              const label = benchLabel(judge);
+              return (
+                <span key={judge.key}>
+                  {index > 0 ? ', ' : ''}
+                  {formatCaseName(judge.name)}
+                  {label ? <span className="text-muted-foreground"> ({label})</span> : null}
+                </span>
+              );
+            })}
           </AboutRow>
         ) : null}
 
