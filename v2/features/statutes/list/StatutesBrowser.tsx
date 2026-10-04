@@ -182,7 +182,11 @@ export function StatutesBrowser() {
       {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
 
       <div className="mb-3">
-        <CountryTabs facets={facets} value={countrySlug} onChange={setCountry} />
+        <CountryTabs
+          facets={facets}
+          value={!countryParam?.trim() && !readerSettled ? null : countrySlug}
+          onChange={setCountry}
+        />
       </div>
 
       {showSkeleton ? (

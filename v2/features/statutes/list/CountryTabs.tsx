@@ -49,14 +49,19 @@ import { toAlpha2 } from '../statute-row-model';
  * WebView that gesture is the system back-swipe: flicking through countries
  * could navigate away from the library.
  */
+/** A tab id no tab has: the row shows no selection while it is passed. */
+const NOTHING_SELECTED = 'reader-country-pending';
+
 export function CountryTabs({
   facets,
   value,
   onChange,
 }: {
   facets: StatuteCountries;
-  /** The selected country SLUG, or '' for All. */
-  value: string;
+  /** The selected country SLUG, '' for All, or null while the reader's own
+   *  country is still being read (nothing is selected rather than All, so the
+   *  row does not jump from All to their country a moment later). */
+  value: string | null;
   onChange: (countrySlug: string) => void;
 }) {
   // COUNTS ONLY WHEN THE BACKEND SAID SO. The seed's numbers are a snapshot
@@ -83,12 +88,13 @@ export function CountryTabs({
   ];
   // An unknown slug in the URL selects nothing here — the browser resolves it
   // to no id, so the list genuinely shows All and the All tab says so.
-  const active = tabs.some((tab) => tab.id === value) ? value : '';
+  const active = value === null ? null : tabs.some((tab) => tab.id === value) ? value : '';
 
   return (
     <TabRow
       tabs={tabs}
-      value={active}
+      // TabRow keeps one tab focusable when the value matches no tab.
+      value={active ?? NOTHING_SELECTED}
       onChange={onChange}
       ariaLabel="Filter statutes by country"
       className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
