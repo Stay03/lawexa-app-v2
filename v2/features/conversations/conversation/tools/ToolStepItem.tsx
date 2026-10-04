@@ -232,15 +232,12 @@ export function formatToolMessage(
  * the fetch fails, then the body the result calls for.
  */
 function LoadedToolStepBody({
-  message,
-  open,
+  result,
   showSearchResults,
 }: {
-  message: ToolMessage;
-  open: boolean;
+  result: ReturnType<typeof useToolResult>;
   showSearchResults: boolean;
 }) {
-  const result = useToolResult(message, open);
   if (result.status === 'loading') {
     return (
       <div role="status" aria-label="Loading the step's result" className="space-y-2 pt-2">
@@ -312,11 +309,16 @@ export function ToolStepItem({
   const status = !isComplete ? 'loading' : isSuccess ? 'success' : 'error';
 
   const memory = isMemoryTool(message.toolName);
+  // The step's result, fetched the first time it opens (v2 loads chats with
+  // lazy results). Loaded HERE rather than in the body so the label can name
+  // what the step read once the result arrives (Stay's #13), and keeps the
+  // name after the step closes: the fetched result is kept for the visit.
+  const loaded = useToolResult(message, isExpanded);
   const { action, detail } = formatToolMessage(
     message.toolName,
     message.toolParameters,
     isComplete,
-    message.toolResult ?? undefined,
+    loaded.message.toolResult ?? undefined,
     message.statuteTitle,
     message.entityTitle,
   );
@@ -376,7 +378,7 @@ export function ToolStepItem({
 
         <CollapsibleContent className="v2-collapse">
           <div className="border-border ml-[9px] mt-1.5 border-l pl-4">
-            <LoadedToolStepBody message={message} open={isExpanded} showSearchResults={showSearchResults} />
+            <LoadedToolStepBody result={loaded} showSearchResults={showSearchResults} />
           </div>
         </CollapsibleContent>
       </Collapsible>
