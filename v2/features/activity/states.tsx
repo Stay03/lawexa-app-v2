@@ -3,20 +3,32 @@
 import Link from 'next/link';
 import { History, LogIn, SearchX, TriangleAlert } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { formatCount } from '@/v2/shell/pager-model';
 import { useSearchPosition } from '@/v2/search-position';
 import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
 import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
 import { SearchFieldShape } from '@/v2/shell/SearchField';
 import { SettingsState } from '@/v2/features/settings/SettingsState';
+import { STACKED_ROW_HEIGHT, TABLE_COLUMNS, TABLE_ROW_HEIGHT } from './ActivityTable';
+import { PER_PAGE } from './queries';
 
 /**
  * The `/activity` states. Empty, error and signed-out are the settings
  * family's `SettingsState` (the screen is opened from Settings, and its
  * anatomy is the one every v2 page state shares: tile, title, one sentence,
- * one action). The skeleton is shaped like the live list: a day heading, then
- * runs of a tile and a title over indented question lines.
+ * one action). The skeleton is shaped like the live table: the count line,
+ * the same header, the same columns, and rows of the same height.
  */
 
 /** The screen's one heading: in the bar below `md:` (pushed screen), in the page from `md:`. */
@@ -28,66 +40,66 @@ export function ActivityHeading() {
   );
 }
 
-/** One run, as a skeleton: the tile and title line, then `lines` indented questions. */
-function RunSkeleton({ lines }: { lines: number }) {
-  return (
-    <div>
-      <div className="flex min-h-11 items-center gap-3 px-3 py-2">
-        <Skeleton className="size-9 shrink-0 rounded-lg" />
-        <Skeleton className="h-3.5 w-1/2 rounded" />
-      </div>
-      {lines > 0 ? (
-        <div className="ml-[1.875rem] border-l border-border/70 pl-1">
-          {Array.from({ length: lines }).map((_, index) => (
-            <div key={index} className="flex min-h-11 items-center gap-3 px-3 py-2">
-              <Skeleton className="h-3 flex-1 rounded" />
-              <Skeleton className="h-3 w-12 shrink-0 rounded" />
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** A day of runs, as a skeleton. */
-function DaySkeleton({ runs }: { runs: readonly number[] }) {
-  return (
-    <div>
-      <Skeleton className="mx-3 mb-1.5 mt-1 h-3 w-16 rounded" />
-      {runs.map((lines, index) => (
-        <RunSkeleton key={index} lines={lines} />
-      ))}
-    </div>
-  );
+/** Each skeleton row a little fainter than the one above, down to a floor. */
+function rowOpacity(index: number): number {
+  return Math.max(1 - index * 0.08, 0.2);
 }
 
 /**
- * The first-load skeleton. Progressive opacity down the stack, as the
- * conversations list does, so the shape suggests a list without promising
- * exactly how many rows will land.
+ * A page of rows, as a skeleton: the count line ("35,115 questions"), then the
+ * real table header over bars in the question, chat and date columns from
+ * `md:`, or the stacked two-line rows below it. Every row is the height of a
+ * loaded row (`TABLE_ROW_HEIGHT`, `STACKED_ROW_HEIGHT`), so the rows land
+ * without moving anything.
  */
-export function ActivityListSkeleton() {
+export function ActivityTableSkeleton({ rows = PER_PAGE }: { rows?: number }) {
+  const indexes = Array.from({ length: rows }, (_, index) => index);
   return (
-    <div aria-hidden className="flex flex-col gap-5">
-      <DaySkeleton runs={[2, 0]} />
-      <div style={{ opacity: 0.6 }}>
-        <DaySkeleton runs={[3]} />
+    <div aria-hidden>
+      <div className="mb-2 flex h-4 items-center">
+        <Skeleton className="h-3 w-24 rounded" />
       </div>
-      <div style={{ opacity: 0.3 }}>
-        <DaySkeleton runs={[1]} />
-      </div>
-    </div>
-  );
-}
+      <Table className="hidden table-fixed md:table">
+        {TABLE_COLUMNS}
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="h-10 text-xs font-medium text-muted-foreground">Question</TableHead>
+            <TableHead className="h-10 text-xs font-medium text-muted-foreground">Chat</TableHead>
+            <TableHead className="h-10 text-right text-xs font-medium text-muted-foreground">Asked</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {indexes.map((index) => (
+            <TableRow
+              key={index}
+              className={cn(TABLE_ROW_HEIGHT, 'border-border/70 hover:bg-transparent')}
+              style={{ opacity: rowOpacity(index) }}
+            >
+              <TableCell className="py-0">
+                <Skeleton className={cn('h-3.5 rounded', index % 3 === 1 ? 'w-3/5' : 'w-4/5')} />
+              </TableCell>
+              <TableCell className="py-0">
+                <Skeleton className="h-3 w-3/4 rounded" />
+              </TableCell>
+              <TableCell className="py-0">
+                <Skeleton className="ml-auto h-3 w-24 rounded" />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
 
-/** The skeleton at the sentinel while the next page is in flight. */
-export function NextPageSkeleton() {
-  return (
-    <div aria-hidden className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-      <RunSkeleton lines={1} />
-      <div style={{ opacity: 0.5 }}>
-        <RunSkeleton lines={1} />
+      <div className="flex flex-col divide-y divide-border/70 border-y border-border/70 md:hidden">
+        {indexes.map((index) => (
+          <div
+            key={index}
+            className={cn(STACKED_ROW_HEIGHT, 'flex flex-col justify-center gap-2 px-1')}
+            style={{ opacity: rowOpacity(index) }}
+          >
+            <Skeleton className={cn('h-3.5 rounded', index % 3 === 1 ? 'w-3/5' : 'w-11/12')} />
+            <Skeleton className="h-3 w-2/3 rounded" />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -111,7 +123,7 @@ export function ActivityFallback() {
       <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
         <Skeleton className="mb-5 hidden h-8 w-28 rounded-lg md:block" />
         {searchAtTop ? <SearchFieldShape className="mb-4" /> : null}
-        <ActivityListSkeleton />
+        <ActivityTableSkeleton />
         {searchAtTop ? null : (
           <ScreenDock>
             <ScreenDockSearch>
@@ -151,10 +163,36 @@ export function ActivityEmptyState({
     <SettingsState
       icon={History}
       title="No questions yet"
-      description="Every question you ask Lawexa is kept here, by day."
+      description="Every question you ask Lawexa is kept here, newest first."
       action={
         <Button asChild size="sm">
           <Link href="/">Ask a question</Link>
+        </Button>
+      }
+    />
+  );
+}
+
+/**
+ * A page past the end: `?page=40` on a list of five pages, from an old link
+ * or a hand-edited URL. The server answers it with no rows and the true last
+ * page, so the way back names that page.
+ */
+export function ActivityPastEndState({
+  lastPage,
+  onGoTo,
+}: {
+  lastPage: number;
+  onGoTo: (page: number) => void;
+}) {
+  return (
+    <SettingsState
+      icon={History}
+      title="There is no page here"
+      description={`Your questions end on page ${formatCount(lastPage)}.`}
+      action={
+        <Button variant="outline" size="sm" onClick={() => onGoTo(lastPage)}>
+          Go to page {formatCount(lastPage)}
         </Button>
       }
     />

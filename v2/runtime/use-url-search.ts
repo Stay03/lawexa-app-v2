@@ -67,12 +67,22 @@ export interface UrlSearch {
   onClear: () => void;
 }
 
+/** No other parameter is cleared by a commit. */
+const NO_RESETS: readonly string[] = [];
+
 /**
  * @param param the query-string key this box owns. Every list page uses
  *              `'search'`; the argument exists so a surface with two independent
  *              text filters could not accidentally share one entry.
+ * @param resets other keys every commit deletes in the same write, such as a
+ *               paged list's `page`: a new search starts on its first page.
+ *               Pass a module-level constant; a new array each render would
+ *               rebuild the commit callback every render.
  */
-export function useUrlSearch(param = 'search'): UrlSearch {
+export function useUrlSearch(
+  param = 'search',
+  resets: readonly string[] = NO_RESETS,
+): UrlSearch {
   const searchParams = useSearchParams();
   const committedSearch = searchParams.get(param) ?? '';
 
@@ -141,7 +151,8 @@ export function useUrlSearch(param = 'search'): UrlSearch {
 
   // Write the value into the URL. Reads the LIVE URL (never a stale React snapshot)
   // to skip a redundant write, and records the write in `pending` so its echo is
-  // recognised as ours. `replaceUrlParams` preserves every other parameter.
+  // recognised as ours. `replaceUrlParams` preserves every other parameter
+  // except the `resets`, which leave in the same write.
   const commit = useCallback(
     (value: string) => {
       if (typeof window === 'undefined') return;
@@ -149,9 +160,10 @@ export function useUrlSearch(param = 'search'): UrlSearch {
         new URLSearchParams(window.location.search).get(param) ?? '';
       if (current === value) return; // already reflected
       setPending((prev) => [...prev, value]);
-      replaceUrlParams({ [param]: value || null });
+      const cleared = Object.fromEntries(resets.map((key) => [key, null]));
+      replaceUrlParams({ ...cleared, [param]: value || null });
     },
-    [param],
+    [param, resets],
   );
 
   const onInputChange = useCallback(

@@ -7,14 +7,14 @@ import { ActivityScreen } from '@/v2/features/activity/ActivityScreen';
  * because every row is the reader's own question. No canonical, no OG card.
  *
  * NO SERVER PREFETCH, deliberately, and here it is load-bearing: the rows are
- * grouped under the reader's LOCAL day and printed with the reader's LOCAL
- * time, which the server cannot know. The client query owns the rows, and the
- * list renders them only once mounted (see `ActivityList`).
+ * dated with the reader's LOCAL day ("Today") and printed with the reader's
+ * LOCAL time, which the server cannot know. The client query owns the rows,
+ * and the list renders them only once mounted (see `ActivityList`).
  */
 export function generateMetadata(): Metadata {
   return {
     title: 'Activity',
-    description: 'Every question you have asked Lawexa, by day.',
+    description: 'Every question you have asked Lawexa, newest first.',
     robots: { index: false, follow: false },
   };
 }

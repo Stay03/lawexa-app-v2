@@ -81,6 +81,30 @@ export function replaceUrlParams(
 }
 
 /**
+ * {@link replaceUrlParams}, but ADDING a history entry: Back returns to the
+ * URL as it was. For a value the reader moves through and expects Back to
+ * retrace, such as the page of a paged list (`/activity?page=3`).
+ *
+ * The same `null` state argument, for the same reasons: `useSearchParams`
+ * consumers see the change, and Next copies its internal tree onto the new
+ * entry, so Back to the previous page is a soft restore, not a reload.
+ */
+export function pushUrlParams(
+  updates: Record<string, string | null>,
+): boolean {
+  if (typeof window === 'undefined') return false;
+  const url = mergeSearch(updates);
+  if (url === null) return false;
+  window.history.pushState(
+    // MUST be null — see the docblock. Never `window.history.state`.
+    null,
+    '',
+    url,
+  );
+  return true;
+}
+
+/**
  * QUIET twins — the same guarded merge, but the write DOES NOT wake the App
  * Router. For URL state whose ONLY reader is component state (the case page's
  * side chat), never a `useSearchParams()` consumer.

@@ -2,14 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ActivityMessage } from '@/types/chat';
 import {
+  activityRow,
+  askedDate,
   attachmentMarks,
   clockTime,
   conversationTitle,
   dayKey,
-  dayLabel,
-  groupActivity,
   questionPreview,
-  titleRepeatsQuestion,
 } from './model';
 
 /* Rows shaped like GET /api/messages?role=user returns them (read 5 October
@@ -86,19 +85,6 @@ test('a title loses its tags and an empty one gets a name', () => {
   assert.equal(conversationTitle('  '), 'Untitled chat');
 });
 
-test('a cut title repeats the question it was made from', () => {
-  assert.equal(
-    titleRepeatsQuestion(
-      'What did the Supreme Court decide in EFCC v Reinl,...',
-      'What did the Supreme Court decide in EFCC v Reinl, and which earlier cases did it rely on?',
-    ),
-    true,
-  );
-  assert.equal(titleRepeatsQuestion('In one sentence, what is an offer?', 'in one sentence, what is an offer?'), true);
-  assert.equal(titleRepeatsQuestion(contract.title, 'Name one Nigerian case on offer and acceptance.'), false);
-  assert.equal(titleRepeatsQuestion('...', 'anything'), false);
-});
-
 test('the day is the reader\'s local day, not the server\'s', () => {
   // 23:39 UTC on 4 October is already 5 October in Lagos (UTC+1).
   assert.equal(dayKey('2026-10-04T23:39:10+00:00', 'UTC'), '2026-10-04');
@@ -106,13 +92,15 @@ test('the day is the reader\'s local day, not the server\'s', () => {
   assert.equal(dayKey('not a date', 'UTC'), null);
 });
 
-test('day headings: today, yesterday, weekday, date, date with year', () => {
+test('the date column: today, yesterday, day and month, then the year', () => {
   const today = '2026-10-05';
-  assert.equal(dayLabel('2026-10-05', today), 'Today');
-  assert.equal(dayLabel('2026-10-04', today), 'Yesterday');
-  assert.equal(dayLabel('2026-10-01', today), 'Thursday');
-  assert.equal(dayLabel('2026-09-28', today), '28 September');
-  assert.equal(dayLabel('2025-12-31', today), '31 December 2025');
+  assert.equal(askedDate('2026-10-05', today), 'Today');
+  assert.equal(askedDate('2026-10-04', today), 'Yesterday');
+  assert.equal(askedDate('2026-10-01', today), '1 Oct');
+  assert.equal(askedDate('2026-09-28', today), '28 Sep');
+  assert.equal(askedDate('2025-12-31', today), '31 Dec 2025');
+  // Across the new year, yesterday is still "Yesterday".
+  assert.equal(askedDate('2025-12-31', '2026-01-01'), 'Yesterday');
 });
 
 test('the time of day reads in the reader\'s zone', () => {
@@ -121,64 +109,51 @@ test('the time of day reads in the reader\'s zone', () => {
   assert.equal(clockTime('nope', 'UTC'), '');
 });
 
-test('questions fall into days, and consecutive ones in one chat share a heading', () => {
+test('a row carries the question, its chat, and when it was asked in the reader\'s zone', () => {
   const now = Date.parse('2026-10-05T12:00:00Z');
-  const days = groupActivity(
-    [
-      message(6, '2026-10-05T10:00:00Z', contract),
-      message(5, '2026-10-05T09:00:00Z', contract),
-      message(4, '2026-10-05T08:00:00Z', tenancy),
-      message(3, '2026-10-05T07:00:00Z', contract),
-      message(2, '2026-10-04T20:00:00Z', contract),
-      message(1, 'broken', contract),
-    ],
-    { now, timeZone: 'UTC' },
-  );
-
-  assert.deepEqual(
-    days.map((day) => [day.label, day.runs.map((run) => [run.conversationId, run.questions.map((q) => q.id)])]),
-    [
-      ['Today', [['c-1', [6, 5]], ['c-2', [4]], ['c-1', [3]]]],
-      ['Yesterday', [['c-1', [2]]]],
-    ],
-  );
-  assert.equal(days[0].runs[0].key, '6');
-  assert.equal(days[0].runs[0].questions[0].time, '10:00 am');
+  const row = activityRow(message(7, '2026-10-04T23:39:10+00:00', contract, 'What is consideration?'), {
+    now,
+    timeZone: 'Africa/Lagos',
+  });
+  assert.deepEqual(row, {
+    id: 7,
+    conversationId: 'c-1',
+    chatTitle: contract.title,
+    preview: { text: 'What is consideration?', pastes: 0, files: 0 },
+    marks: [],
+    // 23:39 UTC on 4 October is 00:39 on 5 October in Lagos: today, not yesterday.
+    date: 'Today',
+    time: '12:39 am',
+    createdAt: '2026-10-04T23:39:10+00:00',
+  });
+  assert.equal(activityRow(message(7, '2026-10-04T23:39:10+00:00', contract), { now, timeZone: 'UTC' }).date, 'Yesterday');
 });
 
-test('a chat\'s opener alone is one row; with follow-ups a title that repeats it is not printed', () => {
+test('a row counts what was pasted and attached, and cleans the chat title', () => {
   const now = Date.parse('2026-10-05T12:00:00Z');
-  const opener = { uuid: 'c-3', title: 'In one sentence, what is an offer in contract law?' };
-
-  const alone = groupActivity(
-    [message(1, '2026-10-05T10:00:00Z', opener, 'In one sentence, what is an offer in contract law?')],
+  const row = activityRow(
+    message(
+      8,
+      '2026-09-28T09:15:00Z',
+      { uuid: 'c-5', title: '<pasted_content>Clause 9</pasted_content>' },
+      '<pasted_content>Clause 9. The landlord may enter.</pasted_content>',
+      { files: [{ file_id: 1, file_name: 'lease.pdf', file_size: 10 }] },
+    ),
     { now, timeZone: 'UTC' },
   );
-  assert.equal(alone[0].runs[0].merged, true);
-
-  const thread = groupActivity(
-    [
-      message(2, '2026-10-05T10:05:00Z', opener, 'And acceptance?'),
-      message(1, '2026-10-05T10:00:00Z', opener, 'In one sentence, what is an offer in contract law?'),
-    ],
-    { now, timeZone: 'UTC' },
-  );
-  assert.equal(thread[0].runs[0].merged, false);
-  assert.equal(thread[0].runs[0].questions.length, 2);
-  // The title is the opener cut short, so the first question leads instead.
-  assert.equal(thread[0].runs[0].titleRepeats, true);
+  assert.equal(row.chatTitle, 'Clause 9');
+  assert.equal(row.preview.text, '');
+  assert.deepEqual(row.marks, [
+    { kind: 'pastes', label: 'Pasted text' },
+    { kind: 'files', label: '1 file' },
+  ]);
+  assert.equal(row.date, '28 Sep');
+  assert.equal(row.time, '9:15 am');
 });
 
-test('a title of its own still heads the run', () => {
-  const now = Date.parse('2026-10-05T12:00:00Z');
-  const named = { uuid: 'c-4', title: 'Offer and acceptance revision' };
-  const days = groupActivity(
-    [
-      message(2, '2026-10-05T10:05:00Z', named, 'And acceptance?'),
-      message(1, '2026-10-05T10:00:00Z', named, 'What is an offer?'),
-    ],
-    { now, timeZone: 'UTC' },
-  );
-  assert.equal(days[0].runs[0].titleRepeats, false);
-  assert.equal(days[0].runs[0].merged, false);
+test('a row with an unreadable time keeps its place with no date', () => {
+  const row = activityRow(message(9, 'broken', tenancy), { now: Date.parse('2026-10-05T12:00:00Z'), timeZone: 'UTC' });
+  assert.equal(row.date, '');
+  assert.equal(row.time, '');
+  assert.equal(row.conversationId, 'c-2');
 });
