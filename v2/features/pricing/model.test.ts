@@ -2,6 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ICurrentSubscriptionData, IPlan, IPlanLimit, ISubscription } from '@/types/subscription';
 import {
+  ENTERPRISE_EMAIL,
+  ENTERPRISE_LINES,
+  ENTERPRISE_SUBTITLE,
+  ENTERPRISE_TITLE,
+  PACK_QUANTITIES,
+  PRICING_TABS,
+  RECOMMENDED_TIER_KEY,
   accountNotices,
   actionLabel,
   buildTiers,
@@ -10,10 +17,15 @@ import {
   defaultPeriod,
   isCurrentTier,
   limitLines,
+  packLines,
+  packOptionLabel,
+  parsePricingTab,
   periodsOnSale,
   planAction,
   planFor,
   priceView,
+  pricingTabParam,
+  recommendedTierKey,
   savingHint,
   tierBenefits,
   tierKey,
@@ -250,4 +262,62 @@ test('switching to Yearly keeps the same benefits on every card', () => {
     assert.deepEqual(cardLines(tier, yearly), cardLines(tier, monthly), tier.key);
     assert.deepEqual(cardLines(tier, yearly), V1_LINES[tier.key], tier.key);
   }
+});
+
+test("the page has v1's three tabs, in v1's order and words", () => {
+  assert.deepEqual(PRICING_TABS.map((tab) => [tab.id, tab.label]), [
+    ['plans', 'Plans'],
+    ['payg', 'Pay as you go'],
+    ['enterprise', 'Enterprise'],
+  ]);
+});
+
+test('a deep link opens its tab, and anything else opens Plans', () => {
+  assert.equal(parsePricingTab('plans'), 'plans');
+  assert.equal(parsePricingTab('payg'), 'payg');
+  assert.equal(parsePricingTab('enterprise'), 'enterprise');
+  assert.equal(parsePricingTab(null), 'plans');
+  assert.equal(parsePricingTab(''), 'plans');
+  assert.equal(parsePricingTab('Enterprise'), 'plans');
+  assert.equal(parsePricingTab('team'), 'plans');
+});
+
+test('Plans is the bare URL; the other tabs write their name', () => {
+  assert.equal(pricingTabParam('plans'), null);
+  assert.equal(pricingTabParam('payg'), 'payg');
+  assert.equal(pricingTabParam('enterprise'), 'enterprise');
+  for (const tab of PRICING_TABS) {
+    assert.equal(parsePricingTab(pricingTabParam(tab.id)), tab.id);
+  }
+});
+
+test('Pro is recommended; a missing key falls back to a featured tier, else none', () => {
+  const tiers = buildTiers(LIVE, 'USD');
+  assert.equal(RECOMMENDED_TIER_KEY, 'pro');
+  assert.equal(recommendedTierKey(tiers), 'pro');
+  assert.equal(recommendedTierKey(tiers, 'plus'), 'plus');
+  const featured = buildTiers(LIVE.map((p) => (p.id === 82 ? { ...p, is_featured: true } : p)), 'USD');
+  assert.equal(recommendedTierKey(featured, 'gold'), 'plus');
+  assert.equal(recommendedTierKey(tiers, 'gold'), null);
+  assert.equal(recommendedTierKey([]), null);
+});
+
+test("the Pay as you go tab says v1's lines, with the pack size the server gives", () => {
+  assert.deepEqual(packLines(10), [
+    '10 AI messages per pack', 'Messages never expire', 'Used after plan messages run out', 'Buy more anytime',
+  ]);
+  assert.equal(packLines(25)[0], '25 AI messages per pack');
+  assert.deepEqual(PACK_QUANTITIES, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.equal(packOptionLabel(1, 10), '1 pack — 10 messages');
+  assert.equal(packOptionLabel(10, 10), '10 packs — 100 messages');
+});
+
+test("the Enterprise tab says v1's words", () => {
+  assert.equal(ENTERPRISE_TITLE, 'Enterprise');
+  assert.equal(ENTERPRISE_SUBTITLE, "Custom plans tailored to your organization's needs.");
+  assert.deepEqual(ENTERPRISE_LINES, [
+    'Custom user seats and message limits', 'Dedicated support and onboarding', 'Priority access to new features',
+    'Custom integrations and API access',
+  ]);
+  assert.equal(ENTERPRISE_EMAIL, 'enterprise@lawexa.com');
 });

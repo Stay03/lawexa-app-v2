@@ -1,0 +1,35 @@
+/**
+ * The pricing page's two serif roles, scoped to `.v2-pricing`.
+ *
+ * Everything else on the page is the UI sans and Tailwind classes. Fraunces
+ * sets only the page title and the figures a reader compares (a plan's price,
+ * a pack's price), so the numbers are the first thing the eye lands on and
+ * read like the figures in a report rather than a dashboard tile. The settings
+ * follow `case-document.css`: `WONK 0`, a low `SOFT`, `opsz` pinned per role.
+ */
+
+.v2-pricing .pricing-title {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 72;
+  font-weight: 600;
+  font-size: clamp(1.875rem, 1.5rem + 1.6vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+
+.v2-pricing .pricing-figure {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 0, 'WONK' 0, 'opsz' 72;
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.v2-pricing .pricing-heading {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 36;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}

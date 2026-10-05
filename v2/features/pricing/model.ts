@@ -278,6 +278,71 @@ export function cardLines(tier: Pick<Tier, 'key'>, plan: IPlan): CardLines {
   return tierBenefits(tier.key) ?? { highlighted: limitLines(plan), more: [] };
 }
 
+/** The page's three tabs, in the order the row lists them. */
+export const PRICING_TABS = [
+  { id: 'plans', label: 'Plans' },
+  { id: 'payg', label: 'Pay as you go' },
+  { id: 'enterprise', label: 'Enterprise' },
+] as const;
+export type PricingTab = (typeof PRICING_TABS)[number]['id'];
+
+/**
+ * The tab named by `?tab=`, as v1 read it (`plans`, `payg`, `enterprise`).
+ * Anything else, or nothing, is Plans, so an old or mistyped link still lands
+ * on the plans.
+ */
+export function parsePricingTab(raw: string | null): PricingTab {
+  return PRICING_TABS.find((tab) => tab.id === raw)?.id ?? 'plans';
+}
+
+/** The query value that shows `tab`: Plans is the bare URL. */
+export function pricingTabParam(tab: PricingTab): string | null {
+  return tab === 'plans' ? null : tab;
+}
+
+/**
+ * The tier the page recommends. Change this one key to move the highlight;
+ * a key that is not on sale falls back to a tier the server marks featured.
+ */
+export const RECOMMENDED_TIER_KEY = 'pro';
+
+export function recommendedTierKey(tiers: readonly Tier[], preferred: string = RECOMMENDED_TIER_KEY): string | null {
+  if (tiers.some((tier) => tier.key === preferred)) return preferred;
+  return tiers.find((tier) => tier.featured)?.key ?? null;
+}
+
+/**
+ * v1's Pay As You Go lines (`app/(main)/pricing/page.tsx`), word for word;
+ * the first reads the pack size from `/message-packs/pricing`.
+ */
+export function packLines(messagesPerPack: number): string[] {
+  return [
+    `${messagesPerPack} AI messages per pack`,
+    'Messages never expire',
+    'Used after plan messages run out',
+    'Buy more anytime',
+  ];
+}
+
+/** v1's pack quantities: one to ten, the limit the purchase endpoint was written against. */
+export const PACK_QUANTITIES: readonly number[] = Array.from({ length: 10 }, (_, index) => index + 1);
+
+/** v1's picker line: "1 pack — 10 messages". */
+export function packOptionLabel(quantity: number, messagesPerPack: number): string {
+  return `${quantity} ${quantity === 1 ? 'pack' : 'packs'} — ${quantity * messagesPerPack} messages`;
+}
+
+/** v1's Enterprise lines (`app/(main)/pricing/page.tsx`), word for word. */
+export const ENTERPRISE_TITLE = 'Enterprise';
+export const ENTERPRISE_SUBTITLE = "Custom plans tailored to your organization's needs.";
+export const ENTERPRISE_LINES: readonly string[] = [
+  'Custom user seats and message limits',
+  'Dedicated support and onboarding',
+  'Priority access to new features',
+  'Custom integrations and API access',
+];
+export const ENTERPRISE_EMAIL = 'enterprise@lawexa.com';
+
 /**
  * What a card's button may do, decided as v1 decided it (v1's
  * `getPlanAction`), because the backend's rules sit behind it: an upgrade is

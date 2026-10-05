@@ -7,7 +7,7 @@ import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { IPlan } from '@/types/subscription';
 import { REGISTER_HREF, actionLabel, cardLines, priceView, type PlanAction, type Tier } from './model';
@@ -19,8 +19,15 @@ import { REGISTER_HREF, actionLabel, cardLines, priceView, type PlanAction, type
  *
  * Every word comes from the plan or from `model.ts`; nothing here knows what a
  * tier is called or what it includes. The highlighted lines always show; the
- * rest open under "More features", as on v1's card. The button's state is `planAction`,
- * v1's decision, and a button that cannot be pressed says why under it.
+ * rest open under "More features", as on v1's card.
+ *
+ * ── HIERARCHY ──────────────────────────────────────────────────────────────
+ * One card leads: the recommended tier (`RECOMMENDED_TIER_KEY`) carries the
+ * gold ring, a faint gold surface and the only filled button; the others use
+ * the outline button, so the eye has one place to land. The account's own
+ * plan is marked instead of recommended, on the secondary surface. The price
+ * is set in the page's serif figure (`pricing.css`), the largest type on the
+ * card, with a rule between what a plan costs and what it includes.
  *
  * The price block is keyed by the plan, so switching Monthly and Yearly fades
  * the new price in where the old one stood rather than swapping it in a frame.
@@ -31,6 +38,7 @@ export function PlanCard({
   saving,
   action,
   isCurrent,
+  recommended,
   trialOffer,
   viewer,
   busy,
@@ -44,6 +52,8 @@ export function PlanCard({
   action: PlanAction;
   /** The account is on one of this tier's plans (any period). */
   isCurrent: boolean;
+  /** The tier the page recommends (`recommendedTierKey`). */
+  recommended: boolean;
   trialOffer: boolean;
   viewer: 'account' | 'guest';
   /** This card's own press is on its way to the provider. */
@@ -55,56 +65,55 @@ export function PlanCard({
 }) {
   const price = priceView(plan, saving);
   const lines = cardLines(tier, plan);
-  const badge = isCurrent ? 'Your plan' : trialOffer ? 'Free trial' : tier.featured ? 'Popular' : null;
-  const raised = !isCurrent && (trialOffer || tier.featured);
+  const leads = !isCurrent && (recommended || trialOffer);
+  const badge = isCurrent ? 'Your plan' : trialOffer ? 'Free trial' : recommended ? 'Recommended' : null;
 
   return (
     <Card
       className={cn(
-        'h-full gap-5 py-5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-        raised && 'ring-2 ring-primary',
-        isCurrent && 'bg-secondary',
+        'h-full gap-0 py-0',
+        leads && 'bg-primary/[0.045] ring-2 ring-primary dark:bg-primary/[0.07]',
+        isCurrent && 'bg-secondary ring-foreground/15',
       )}
     >
-      <CardHeader className="px-5 sm:px-5">
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-lg font-semibold tracking-tight">{tier.name}</CardTitle>
+      <div className="flex flex-col gap-1.5 px-5 pt-5">
+        <div className="flex min-h-6 items-center justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">{tier.name}</h2>
           {badge ? (
-            <Badge variant={isCurrent ? 'outline' : 'default'} className="shrink-0">
+            <Badge variant={leads ? 'default' : 'outline'} className="shrink-0">
               {badge}
             </Badge>
           ) : null}
         </div>
         {tier.description ? (
-          <CardDescription className="text-[13px] leading-snug">{tier.description}</CardDescription>
+          <p className="text-[13px] leading-snug text-muted-foreground @5xl/plans:min-h-[2lh]">{tier.description}</p>
         ) : null}
-      </CardHeader>
+      </div>
 
-      <CardContent className="flex flex-1 flex-col gap-4 px-5 sm:px-5">
-        <div key={plan.id} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-          <p className="flex flex-wrap items-baseline gap-x-1.5">
-            <span className="text-3xl font-semibold tracking-tight text-foreground tabular-nums">{price.amount}</span>
-            <span className="text-sm text-muted-foreground">{price.per}</span>
-          </p>
-          {trialOffer ? (
-            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-              Free during the trial, then this price.
-            </p>
-          ) : price.detail ? (
-            <p className="mt-1 text-[13px] leading-snug text-muted-foreground tabular-nums">{price.detail}</p>
-          ) : null}
-        </div>
+      <div key={plan.id} className="px-5 pt-5 pb-5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+        <p className="flex flex-wrap items-baseline gap-x-1.5">
+          <span className="pricing-figure text-[2.5rem] text-foreground">{price.amount}</span>
+          <span className="text-sm text-muted-foreground">{price.per}</span>
+        </p>
+        <p className="mt-2 min-h-[1lh] text-[13px] leading-snug text-muted-foreground tabular-nums">
+          {trialOffer ? 'Free during the trial, then this price.' : (price.detail ?? '')}
+        </p>
+      </div>
 
+      <div className="mx-5 border-t border-foreground/10" />
+
+      <div className="flex flex-1 flex-col gap-3 px-5 py-5">
         {lines.highlighted.length > 0 ? <BenefitList lines={lines.highlighted} /> : null}
         {lines.more.length > 0 ? <MoreBenefits lines={lines.more} /> : null}
-      </CardContent>
+      </div>
 
-      <CardFooter className="flex-col items-stretch gap-2 px-5 sm:px-5">
+      <div className="flex flex-col items-stretch gap-2 px-5 pb-5">
         <PlanButton
           tier={tier}
           plan={plan}
           action={action}
           isCurrent={isCurrent}
+          leads={leads}
           trialOffer={trialOffer}
           viewer={viewer}
           busy={busy}
@@ -112,7 +121,7 @@ export function PlanCard({
           onChoose={onChoose}
           onTrial={onTrial}
         />
-      </CardFooter>
+      </div>
     </Card>
   );
 }
@@ -156,6 +165,7 @@ function PlanButton({
   plan,
   action,
   isCurrent,
+  leads,
   trialOffer,
   viewer,
   busy,
@@ -167,6 +177,8 @@ function PlanButton({
   plan: IPlan;
   action: PlanAction;
   isCurrent: boolean;
+  /** The card the page leads with: the only filled button. */
+  leads: boolean;
   trialOffer: boolean;
   viewer: 'account' | 'guest';
   busy: boolean;
@@ -174,13 +186,14 @@ function PlanButton({
   onChoose: (plan: IPlan, action: PlanAction) => void;
   onTrial: (plan: IPlan) => void;
 }) {
+  const variant = leads ? 'default' : 'outline';
   const size = 'h-11 w-full text-[15px] md:h-10 md:text-sm';
 
   // A guest browses on a device session that holds no account, so a plan
   // cannot be bought on it: the button opens registration, which comes back.
   if (viewer === 'guest') {
     return (
-      <Button asChild className={size}>
+      <Button asChild variant={variant} className={size}>
         <Link href={REGISTER_HREF}>Create an account</Link>
       </Button>
     );
@@ -188,7 +201,7 @@ function PlanButton({
 
   if (trialOffer) {
     return (
-      <Button type="button" className={size} disabled={busy || locked} onClick={() => onTrial(plan)}>
+      <Button type="button" variant={variant} className={size} disabled={busy || locked} onClick={() => onTrial(plan)}>
         Start free trial
       </Button>
     );
@@ -200,6 +213,7 @@ function PlanButton({
     return (
       <Button
         type="button"
+        variant={variant}
         className={size}
         disabled={busy || locked}
         aria-busy={busy || undefined}

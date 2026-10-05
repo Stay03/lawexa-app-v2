@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Crown, Globe, MessageSquarePlus, RotateCw, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,24 +10,20 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
-import { formatMoneyMajor } from '@/lib/utils/payment-format';
-import type { IMessagePackPricingData } from '@/types/message-pack';
 import type { TCurrency } from '@/types/payment';
 import type { IPlan } from '@/types/subscription';
 import { billingQueries } from '@/v2/features/settings/billing/queries';
-import {
-  currencyName,
-  currencyOffer,
-  offerFrom,
-} from '@/v2/features/settings/message-packs/currency-offer';
-import { BuyPanel } from '@/v2/features/settings/message-packs/BuyPanel';
+import { currencyName, offerFrom } from '@/v2/features/settings/message-packs/currency-offer';
 import { messagePacksQueries } from '@/v2/features/settings/message-packs/queries';
-import { SettingsFormGroup } from '@/v2/features/settings/SettingsForm';
 import { SettingsState } from '@/v2/features/settings/SettingsState';
 import { setCurrency, useCurrency } from '@/v2/runtime/currency';
+import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { TabRow } from '@/v2/shell/TabRow';
+import { EnterprisePanel } from './EnterprisePanel';
 import {
   PERIOD_LABEL,
+  PRICING_TABS,
   REGISTER_HREF,
   SIGN_IN_HREF,
   accountNotices,
@@ -35,51 +31,143 @@ import {
   currenciesOnSale,
   defaultPeriod,
   isCurrentTier,
+  parsePricingTab,
   periodsOnSale,
   planAction,
   planFor,
+  pricingTabParam,
+  recommendedTierKey,
   savingHint,
   tierSaving,
   type Period,
   type PlanAction,
+  type PricingTab,
 } from './model';
+import { PayAsYouGoPanel } from './PayAsYouGoPanel';
 import { PlanCard } from './PlanCard';
 import { pricingQueries, useCheckout, useStartTrial } from './queries';
-import { PRICING_COLUMN, PricingFallback } from './states';
+import { SegmentedChoice } from './SegmentedChoice';
+import { PRICING_COLUMN, PacksFallback, PlansFallback, PricingFallback } from './states';
 import { TrialDialog } from './TrialDialog';
+import './pricing.css';
 
 /**
- * PricingScreen — v2 `/pricing`, which v1's `/upgrade` also lands on: the
- * plans this account is offered, one card per tier, a period switch, the
- * currency switch when there is a choice, message packs, and the way to ask
- * about a firm's plan.
+ * PricingScreen — v2 `/pricing`, which v1's `/upgrade` also lands on. One
+ * page titled Pricing with v1's three tabs: Plans (one card per tier, the
+ * period switch, the currency switch when there is a choice), Pay as you go
+ * (message packs) and Enterprise (how an organisation asks for a plan).
+ *
+ * ── THE TAB IS THE URL ─────────────────────────────────────────────────────
+ * `?tab=plans|payg|enterprise`, the values v1 used, so a v1 link opens the
+ * same tab here. Plans is the bare URL; anything unknown reads as Plans
+ * (`parsePricingTab`). The tab is written with `replaceUrlParams`, the v2
+ * write path that keeps the switch on the client.
  *
  * ── THE MONEY FLOW IS v1's ─────────────────────────────────────────────────
- * A card starts the same call v1 started with the same arguments
+ * A plan card starts the same call v1 started with the same arguments
  * (`queries.ts`): a new plan or an upgrade goes to the address the server
  * returns, an upgrade the credit already covers is confirmed and opens
- * Billing, and a trial opens Paystack's card check. The provider returns the
- * buyer to the callbacks v2 already claims. Only the page around it changed.
+ * Billing, and a trial opens Paystack's card check. A pack is bought with the
+ * call Settings' Buy panel makes (`usePurchasePacks`). The provider returns
+ * the buyer to the callbacks v2 already claims.
  *
- * ── WHAT A CARD SAYS ───────────────────────────────────────────────────────
- * A card lists v1's benefit lines for its tier, word for word, from the table
- * v1 and v2 share (`lib/constants/plan-features.ts`); a tier v1 never listed
- * shows the limits its plan counts instead (`model.ts` has the reasoning). v1's
- * Enterprise tab listed four promises nobody had made in writing; the email
- * address it pointed at stays, the promises do not.
+ * ── WHAT THE PAGE SAYS ─────────────────────────────────────────────────────
+ * A plan card lists v1's benefit lines for its tier, word for word, from the
+ * table v1 and v2 share (`lib/constants/plan-features.ts`); one tier is
+ * recommended (`RECOMMENDED_TIER_KEY`). The Pay as you go and Enterprise tabs
+ * carry v1's words for those tabs (`model.ts`).
  *
  * ── WHO SEES WHAT ──────────────────────────────────────────────────────────
- * Signed out: `/subscriptions/plans` answers 401 without a session, and v1's
- * client then sent the reader to sign-in mid-render. Here the screen asks
- * nothing and offers both doors instead, each returning here. A guest has a
- * device session and sees the plans, but buys on an account, so every card
- * offers registration. An account sees its own plan marked and the buttons
- * v1's rules allow.
+ * Signed out: `/subscriptions/plans` and `/message-packs/pricing` answer 401
+ * without a session, so Plans and Pay as you go offer sign-in and
+ * registration, each returning here; Enterprise needs no session and shows in
+ * full. A guest has a device session and sees the plans and the pack price,
+ * but buys on an account, so a card offers registration and the pack panel
+ * offers sign-in where Buy would be. An account sees its own plan marked and
+ * the buttons v1's rules allow.
  */
 export function PricingScreen() {
+  return (
+    <Suspense fallback={<PricingFallback />}>
+      <PricingPage />
+    </Suspense>
+  );
+}
+
+const PANEL_ID = 'pricing-panel';
+
+function PricingPage() {
   const { signedIn, role } = useV2Session();
-  if (!signedIn) return <SignedOut />;
-  return <Plans viewer={role === 'guest' ? 'guest' : 'account'} offersDaily={role === 'superadmin'} />;
+  const searchParams = useSearchParams();
+  const tab = parsePricingTab(searchParams.get('tab'));
+  const viewer = !signedIn ? null : role === 'guest' ? 'guest' : 'account';
+
+  return (
+    <div className={cn(PRICING_COLUMN, 'v2-pricing @container/pricing')}>
+      <h1 className="pricing-title text-foreground">Pricing</h1>
+
+      <PricingTabs value={tab} onChange={(next) => replaceUrlParams({ tab: pricingTabParam(next) })} />
+
+      <div
+        key={tab}
+        id={PANEL_ID}
+        role="tabpanel"
+        aria-labelledby={`${PANEL_ID}-tab-${tab}`}
+        className="pt-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+      >
+        {tab === 'plans' ? (
+          viewer ? (
+            <Plans viewer={viewer} offersDaily={role === 'superadmin'} />
+          ) : (
+            <SignedOut
+              title="Sign in to see plans"
+              description="The plans and prices on offer depend on your account, so they show once you sign in."
+            />
+          )
+        ) : null}
+        {tab === 'payg' ? (
+          viewer ? (
+            <Packs viewer={viewer} />
+          ) : (
+            <SignedOut
+              title="Sign in to buy message packs"
+              description="Message packs are bought on an account, and their price shows once you sign in."
+            />
+          )
+        ) : null}
+        {tab === 'enterprise' ? <EnterprisePanel /> : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The page's sections as text tabs on a rule: section navigation, drawn
+ * differently from the pill switches inside a section (period, currency) so
+ * the two levels never read as the same control. The shared `TabRow` owns the
+ * keyboard and aria contract.
+ */
+function PricingTabs({ value, onChange }: { value: PricingTab; onChange: (next: PricingTab) => void }) {
+  return (
+    <TabRow
+      tabs={PRICING_TABS}
+      value={value}
+      onChange={onChange}
+      ariaLabel="Pricing"
+      panelId={PANEL_ID}
+      className="mt-5 flex max-w-full gap-6 overflow-x-auto overscroll-x-contain border-b border-foreground/10 sm:gap-8"
+      tabClassName={(selected) =>
+        cn(
+          'v2-interactive relative -mb-px min-h-11 shrink-0 border-b-2 px-0.5 text-[15px] font-medium transition-colors duration-150 motion-reduce:transition-none',
+          selected
+            ? 'border-primary text-foreground'
+            : 'border-transparent text-muted-foreground hover:text-foreground',
+        )
+      }
+    >
+      {(item) => item.label}
+    </TabRow>
+  );
 }
 
 function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDaily: boolean }) {
@@ -87,7 +175,6 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
   const isAccount = viewer === 'account';
   const plans = useQuery(pricingQueries.plans());
   const current = useQuery({ ...billingQueries.current(), enabled: isAccount });
-  const packs = useQuery({ ...messagePacksQueries.pricing(), enabled: isAccount });
   const { currency: storedCurrency } = useCurrency();
   const { offered, currency } = offerFrom(plans.data ? currenciesOnSale(plans.data) : [], storedCurrency);
   // Trials are Paystack's, so v1 only ever offered them in Naira.
@@ -96,7 +183,6 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
   const checkout = useCheckout();
   const trial = useStartTrial();
   const [chosenPeriod, setChosenPeriod] = useState<Period | null>(null);
-  const [buyOpen, setBuyOpen] = useState(false);
   const [trialDialogOpen, setTrialDialogOpen] = useState(false);
   const [trialPlan, setTrialPlan] = useState<IPlan | null>(null);
 
@@ -109,40 +195,33 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
       ? (trial.variables?.id ?? null)
       : null;
 
-  if (
-    plans.isPending ||
-    (isAccount && (current.isPending || packs.isPending)) ||
-    (asksTrial && eligibility.isPending)
-  ) {
-    return <PricingFallback />;
+  if (plans.isPending || (isAccount && current.isPending) || (asksTrial && eligibility.isPending)) {
+    return <PlansFallback />;
   }
 
   if (plans.isError || current.isError) {
     const retrying = plans.isFetching || current.isFetching;
     return (
-      <div className={PRICING_COLUMN}>
-        <Heading />
-        <SettingsState
-          icon={TriangleAlert}
-          tone="alarm"
-          title="The plans did not load"
-          description="Check your connection and try again."
-          action={
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={retrying}
-              onClick={() => {
-                void plans.refetch();
-                if (isAccount) void current.refetch();
-              }}
-            >
-              <RotateCw aria-hidden className={cn('size-4', retrying && 'animate-spin')} />
-              Try again
-            </Button>
-          }
-        />
-      </div>
+      <SettingsState
+        icon={TriangleAlert}
+        tone="alarm"
+        title="The plans did not load"
+        description="Check your connection and try again."
+        action={
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={retrying}
+            onClick={() => {
+              void plans.refetch();
+              if (isAccount) void current.refetch();
+            }}
+          >
+            <RotateCw aria-hidden className={cn('size-4', retrying && 'animate-spin')} />
+            Try again
+          </Button>
+        }
+      />
     );
   }
 
@@ -157,6 +236,7 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
   const notices = accountNotices(account, currency);
   const trialOffered = asksTrial && !!eligibility.data?.trial_enabled && !!eligibility.data.user_eligible;
   const yearlyHint = savingHint(tiers);
+  const recommended = recommendedTierKey(tiers);
 
   const choose = (plan: IPlan, action: PlanAction) => {
     if (busyPlanId !== null) return;
@@ -194,11 +274,9 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
   };
 
   return (
-    <div className={PRICING_COLUMN}>
-      <Heading />
-
+    <>
       {periods.length > 1 || offered.length > 1 ? (
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           {periods.length > 1 && period ? (
             <SegmentedChoice
               name="pricing-period"
@@ -225,12 +303,9 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
       ) : null}
 
       {notices.length > 0 ? (
-        <div className="mb-5 flex flex-col gap-2">
+        <div className="mb-6 flex flex-col gap-2">
           {notices.map((notice) => (
-            <p
-              key={notice}
-              className="rounded-2xl bg-secondary px-4 py-3 text-[13px] leading-snug text-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
-            >
+            <p key={notice} className="rounded-2xl bg-secondary px-4 py-3 text-[13px] leading-snug text-foreground">
               {notice}
             </p>
           ))}
@@ -244,7 +319,7 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
           description="There are no plans on sale to this account at the moment. Check again later."
         />
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="@container/plans grid gap-4 @xl/pricing:grid-cols-2 @5xl/pricing:grid-cols-4">
           {cards.map(({ tier, plan }) => {
             const action = planAction(plan, account);
             return (
@@ -255,6 +330,7 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
                   saving={tierSaving(tier)}
                   action={action}
                   isCurrent={isCurrentTier(tier, account)}
+                  recommended={tier.key === recommended}
                   trialOffer={trialOffered && action === 'subscribe' && plan.trial_eligible}
                   viewer={viewer}
                   busy={busyPlanId === plan.id}
@@ -271,23 +347,8 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
         </ul>
       )}
 
-      {isAccount ? <PacksRow pricing={packs.data ?? null} onBuy={() => setBuyOpen(true)} /> : null}
+      <PriceNote />
 
-      <div className="mt-6 flex flex-col gap-1.5 px-1 text-[13px] leading-snug text-muted-foreground">
-        <p>Prices exclude taxes and bank charges.</p>
-        <p>
-          For a plan for your firm or team, email{' '}
-          <a
-            href="mailto:enterprise@lawexa.com"
-            className="font-medium text-foreground underline underline-offset-2"
-          >
-            enterprise@lawexa.com
-          </a>
-          .
-        </p>
-      </div>
-
-      {isAccount ? <BuyPanel open={buyOpen} onOpenChange={setBuyOpen} pricing={packs.data ?? null} /> : null}
       <TrialDialog
         open={trialDialogOpen}
         plan={trialPlan}
@@ -298,135 +359,63 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
         }}
         onConfirm={confirmTrial}
       />
-    </div>
+    </>
   );
 }
 
-/**
- * Message packs, one row: what a pack holds and costs, read from
- * `/message-packs/pricing`, and the same Buy panel Settings uses, so a pack
- * bought here returns through `/payg/callback` like one bought there. The
- * sentence is the one the backend checked for the Message packs screen
- * (28 September 2026): plan messages first, bought messages never expire.
- * No price for the buyer's currency means no row.
- */
-function PacksRow({
-  pricing,
-  onBuy,
-}: {
-  pricing: IMessagePackPricingData | null;
-  onBuy: () => void;
-}) {
-  const { currency: stored } = useCurrency();
-  const { currency } = currencyOffer(pricing, stored);
-  const priceRow = pricing?.prices.find((row) => row.currency === currency) ?? null;
-  if (!pricing || !priceRow) return null;
-  return (
-    <div className="mt-8">
-      <SettingsFormGroup id="pricing-packs" label="Message packs">
-        <li className="flex min-h-14 items-center gap-3.5 px-4 py-2.5">
-          <MessageSquarePlus aria-hidden className="size-5 shrink-0 text-muted-foreground" />
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[15px] leading-snug font-medium text-foreground tabular-nums">
-              {pricing.messages_per_pack} AI messages for {formatMoneyMajor(priceRow.price_major, currency)}
-            </span>
-            <span className="text-[13px] leading-snug text-muted-foreground">
-              Used after your plan&apos;s messages. Messages you buy never expire.
-            </span>
-          </span>
-          <Button size="sm" onClick={onBuy} className="shrink-0">
-            Buy
-          </Button>
-        </li>
-      </SettingsFormGroup>
-    </div>
-  );
-}
-
-/**
- * A two- or three-way choice drawn as one pill: real radio inputs, visually
- * hidden, so the group gets arrow keys, one tab stop and its name announced
- * from the browser (the reasoning in `SettingsForm`'s choice group). The chosen
- * segment is lifted on to the page colour and the change moves over 150ms.
- */
-function SegmentedChoice<T extends string>({
-  name,
-  legend,
-  value,
-  options,
-  onChange,
-}: {
-  name: string;
-  legend: string;
-  value: T;
-  options: { value: T; label: string; hint: string | null }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <fieldset className="min-w-0">
-      <legend className="sr-only">{legend}</legend>
-      <div className="inline-flex max-w-full items-center rounded-full bg-muted p-1">
-        {options.map((option) => {
-          const selected = option.value === value;
-          return (
-            <label
-              key={option.value}
-              className={cn(
-                'v2-interactive relative flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full px-4 text-sm font-medium md:min-h-9',
-                'transition-colors duration-150 motion-reduce:transition-none',
-                'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
-                selected
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <input
-                type="radio"
-                name={name}
-                value={option.value}
-                checked={selected}
-                onChange={() => onChange(option.value)}
-                className="sr-only"
-              />
-              {option.label}
-              {option.hint ? (
-                <span className="text-xs font-normal text-muted-foreground">{option.hint}</span>
-              ) : null}
-            </label>
-          );
-        })}
-      </div>
-    </fieldset>
-  );
-}
-
-function Heading() {
-  return (
-    <h1 className="sr-only md:not-sr-only md:mb-5 md:text-2xl md:font-semibold md:tracking-tight md:text-foreground">
-      Plans
-    </h1>
-  );
-}
-
-function SignedOut() {
-  return (
-    <div className={PRICING_COLUMN}>
-      <Heading />
+/** The Pay as you go tab: the pack price from `/message-packs/pricing`. */
+function Packs({ viewer }: { viewer: 'account' | 'guest' }) {
+  const packs = useQuery(messagePacksQueries.pricing());
+  if (packs.isPending) return <PacksFallback />;
+  const pricing = packs.data ?? null;
+  if (packs.isError || !pricing || pricing.prices.length === 0) {
+    return (
       <SettingsState
-        icon={Crown}
-        title="Sign in to see plans"
-        description="The plans and prices on offer depend on your account, so they show once you sign in."
+        icon={MessageSquarePlus}
+        tone={packs.isError ? 'alarm' : 'quiet'}
+        title={packs.isError ? 'The pack price did not load' : 'No message packs on sale right now'}
+        description={packs.isError ? 'Check your connection and try again.' : 'Check again later.'}
         action={
-          <div className="flex gap-2">
-            <Button asChild size="sm" variant="outline">
-              <Link href={SIGN_IN_HREF}>Sign in</Link>
+          packs.isError ? (
+            <Button size="sm" variant="outline" disabled={packs.isFetching} onClick={() => void packs.refetch()}>
+              <RotateCw aria-hidden className={cn('size-4', packs.isFetching && 'animate-spin')} />
+              Try again
             </Button>
-            <Button asChild size="sm">
-              <Link href={REGISTER_HREF}>Create an account</Link>
-            </Button>
-          </div>
+          ) : undefined
         }
       />
-    </div>
+    );
+  }
+  return (
+    <>
+      <PayAsYouGoPanel pricing={pricing} viewer={viewer} />
+      <PriceNote />
+    </>
+  );
+}
+
+function PriceNote() {
+  return (
+    <p className="mt-6 px-1 text-[13px] leading-snug text-muted-foreground">Prices exclude taxes and bank charges.</p>
+  );
+}
+
+function SignedOut({ title, description }: { title: string; description: string }) {
+  return (
+    <SettingsState
+      icon={Crown}
+      title={title}
+      description={description}
+      action={
+        <div className="flex gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href={SIGN_IN_HREF}>Sign in</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href={REGISTER_HREF}>Create an account</Link>
+          </Button>
+        </div>
+      }
+    />
   );
 }

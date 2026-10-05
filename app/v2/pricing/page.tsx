@@ -13,8 +13,8 @@ import { PricingScreen } from '@/v2/features/pricing/PricingScreen';
  */
 export function generateMetadata(): Metadata {
   return {
-    title: 'Plans',
-    description: 'Lawexa plans and prices.',
+    title: 'Pricing',
+    description: 'Lawexa plans, message packs and enterprise plans, with prices.',
     robots: { index: false, follow: false },
   };
 }
