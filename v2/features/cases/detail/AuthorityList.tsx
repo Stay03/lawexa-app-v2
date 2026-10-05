@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronDown, ChevronRight, ChevronUp, Search } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { TreatmentTone } from '@/lib/utils/related-cases';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { SectionHeading } from './SectionHeading';
@@ -34,6 +35,16 @@ import { SectionHeading } from './SectionHeading';
  * A real enriched judgment cites SIXTY-THREE cases. The first eight rows show;
  * the rest sit behind "Show all N". The fold only exists when it hides at
  * least three rows — a button hiding one row is worse than the row.
+ *
+ * ── LISTS TOO LONG FOR THE PAGE OPEN BEYOND IT ──────────────────────────────
+ * "Cited by" can run to hundreds (Nwadike v Ibekwe: 462), and the payload
+ * carries only some of them. That list passes `total` (the real size, which
+ * the heading prints) and `more` (the control that opens the full list), and
+ * then it has no fold: the caller hands over the few rows it wants shown and
+ * the control takes the reader to the rest. Those rows come from their own
+ * request, so the
+ * section can stand with its heading while they load (`loadingRows`, row
+ * skeletons at the real geometry) or fail (`notice`).
  */
 
 export interface AuthorityItem {
@@ -58,38 +69,63 @@ export function AuthorityList({
   sub,
   id,
   items,
+  total,
+  more,
+  loadingRows,
+  notice,
 }: {
   label: string;
   sub?: string;
   /** The section anchor the outline rail targets. */
   id?: string;
   items: AuthorityItem[];
+  /** The list's real size when `items` is only part of it. */
+  total?: number;
+  /** The control that opens the full list, under the rows. Replaces the fold. */
+  more?: React.ReactNode;
+  /** Skeleton rows to hold the section's place while `items` loads. */
+  loadingRows?: number;
+  /** Shown in place of the rows when there are none, e.g. a failed load. */
+  notice?: React.ReactNode;
 }) {
   const [showAll, setShowAll] = useState(false);
 
-  if (items.length === 0) return null;
+  const loading = items.length === 0 && (loadingRows ?? 0) > 0;
+  if (items.length === 0 && !loading && !notice) return null;
 
-  const foldable = items.length >= COLLAPSED_COUNT + FOLD_MIN_HIDDEN;
+  const foldable = !more && items.length >= COLLAPSED_COUNT + FOLD_MIN_HIDDEN;
   const visible = foldable && !showAll ? items.slice(0, COLLAPSED_COUNT) : items;
 
   return (
     <section id={id} aria-label={label} className="flex scroll-mt-6 flex-col gap-3">
-      <SectionHeading label={label} sub={sub} count={items.length} />
-      <ul className="flex flex-col divide-y divide-border/60">
-        {visible.map((item, index) => (
-          <li
-            key={item.key}
-            className={cn(
-              // Rows revealed by "Show all" ease in; the first page renders plain.
-              showAll &&
-                index >= COLLAPSED_COUNT &&
-                'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
-            )}
-          >
-            <AuthorityRow item={item} />
-          </li>
-        ))}
-      </ul>
+      <SectionHeading label={label} sub={sub} count={total ?? items.length} />
+      {loading ? (
+        <div aria-hidden className="flex flex-col divide-y divide-border/60">
+          {Array.from({ length: loadingRows ?? 0 }).map((_, index) => (
+            <AuthorityRowSkeleton key={index} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        notice
+      ) : (
+        // Eases in when it replaces skeleton rows; a list present from the
+        // first paint is carried by the document's own fade.
+        <ul className="flex flex-col divide-y divide-border/60 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+          {visible.map((item, index) => (
+            <li
+              key={item.key}
+              className={cn(
+                // Rows revealed by "Show all" ease in; the first page renders plain.
+                showAll &&
+                  index >= COLLAPSED_COUNT &&
+                  'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
+              )}
+            >
+              <AuthorityRow item={item} />
+            </li>
+          ))}
+        </ul>
+      )}
       {foldable ? (
         <button
           type="button"
@@ -113,11 +149,26 @@ export function AuthorityList({
           )}
         </button>
       ) : null}
+      {more && items.length > 0 ? more : null}
     </section>
   );
 }
 
-function AuthorityRow({ item }: { item: AuthorityItem }) {
+/** One row's silhouette: the name line, the reference line under it. Matches
+ *  `AuthorityRow`'s padding so the resolved row lands on it without a shift. */
+export function AuthorityRowSkeleton() {
+  return (
+    <div className="flex min-h-11 items-start gap-3 px-2 py-2.5">
+      <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+        <Skeleton className="h-4 w-3/5 rounded" />
+        <Skeleton className="h-3 w-2/5 rounded" />
+      </div>
+      <Skeleton className="mt-1 size-4 shrink-0 rounded" />
+    </div>
+  );
+}
+
+export function AuthorityRow({ item }: { item: AuthorityItem }) {
   const body = (
     <>
       <span className="min-w-0 flex-1">

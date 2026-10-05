@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, ShieldCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { formatTreatment, relatedToDisplay } from '@/lib/utils/related-cases';
+import { relatedToDisplay } from '@/lib/utils/related-cases';
 import type {
   CaseDetail,
   CaseOutcome,
@@ -18,18 +18,21 @@ import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { TabRow } from '@/v2/shell/TabRow';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { firstCitation, formatCaseName } from '../case-name';
+import { citedByTotal } from '../cited-by/model';
 import { formatCaseDate, toAlpha2 } from '../case-row-model';
 import {
   benchLabel,
   citedCaseRows,
   groupStatutes,
   lawTypeLabel,
+  meaningfulTreatment,
   normalizeBench,
   sentenceCase,
   splitPrincipleStatements,
 } from './authorities';
 import { AuthorityList, type AuthorityItem } from './AuthorityList';
 import { CaseActions } from './CaseActions';
+import { CitedBySection } from './CitedBySection';
 import { CaseText, caseTextParagraphs } from './case-text';
 import type { OutlineSection } from './CaseOutline';
 import { SectionHeading } from './SectionHeading';
@@ -127,8 +130,7 @@ export function buildCaseOutline(detail: CaseDetail): OutlineSection[] {
     sections.push({ id: SECTION.statutes, label: 'Statutes cited' });
   if (citedCaseRows(detail.cited_cases ?? []).length > 0)
     sections.push({ id: SECTION.cited, label: 'Cases cited' });
-  if ((detail.cited_by?.length ?? 0) > 0)
-    sections.push({ id: SECTION.citedBy, label: 'Cited by' });
+  if (citedByTotal(detail) > 0) sections.push({ id: SECTION.citedBy, label: 'Cited by' });
   if ((detail.similar_cases?.length ?? 0) > 0)
     sections.push({ id: SECTION.similar, label: 'Similar cases' });
   if (hasAbout(detail)) sections.push({ id: SECTION.about, label: 'About' });
@@ -332,11 +334,12 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
         sub="Authorities this judgment relied on."
         items={citedItems}
       />
-      <AuthorityList
+      <CitedBySection
         id={SECTION.citedBy}
-        label="Cited by"
-        sub="Later judgments that cite this one."
-        items={citedByItems}
+        slug={detail.slug}
+        total={citedByTotal(detail)}
+        caseName={name}
+        payloadItems={citedByItems}
       />
       <AuthorityList
         id={SECTION.similar}
@@ -349,13 +352,6 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       <AboutThisCase detail={detail} countryCode={countryCode} />
     </article>
   );
-}
-
-/** The badge earns its ink only when the treatment says more than "a citation
- *  happened" — `referred_to` is the enum's catch-all and marks nothing. */
-function meaningfulTreatment(treatment: string | null) {
-  if (!treatment || treatment === 'referred_to') return null;
-  return formatTreatment(treatment);
 }
 
 /**

@@ -5,6 +5,12 @@ import { trendingApi } from '@/lib/api/trending';
 import type { CaseListParams } from '@/types/case';
 import type { TrendingParams } from '@/types/trending';
 import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
+import {
+  CITED_BY_PAGE_SIZE,
+  CITED_BY_PREVIEW_COUNT,
+  citedByParams,
+  type CitedByQuery,
+} from './cited-by/model';
 
 /**
  * EXEMPLAR — the pattern every v2 feature copies (standards §2).
@@ -205,6 +211,53 @@ export const casesQueries = {
       staleTime: STALE_TIMES.reference,
       gcTime: GC_TIMES.reference,
     }),
+
+  /**
+   * The case page's "Cited by" section: the most-cited citing cases, one short
+   * page (`GET /cases/{slug}/cited-by?sort=most_cited`). The case payload's own
+   * `cited_by` is capped at 50 rows in no stated order, so for a case cited
+   * hundreds of times those rows are an arbitrary slice; this asks for the ones
+   * a reader most needs. Viewer-scoped because each row carries
+   * `is_bookmarked`.
+   */
+  citedByPreview: (slug: string, { viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...casesQueries.all, 'cited-by', slug, 'preview', { viewerId }] as const,
+      queryFn: () =>
+        casesApi.getCitedBy(slug, {
+          sort: 'most_cited',
+          per_page: CITED_BY_PREVIEW_COUNT,
+        }),
+      staleTime: STALE_TIMES.reference,
+      gcTime: GC_TIMES.reference,
+    }),
+
+  /**
+   * The whole reverse-citation list in the "See all" panel, 50 rows a page.
+   * Sort, search, court and year are part of the request, so each combination
+   * is its own entry; the key holds the BUILT params, so a blank search and no
+   * search are one entry. Reference tier: reopening the panel, or stepping
+   * back to the case from a citing one, is instant.
+   */
+  infiniteCitedBy: (slug: string, { viewerId, ...query }: CitedByQuery & ViewerScoped) => {
+    const params = citedByParams(query);
+    return infiniteQueryOptions({
+      queryKey: [...casesQueries.all, 'cited-by', slug, 'infinite', params, { viewerId }] as const,
+      queryFn: ({ pageParam }) =>
+        casesApi.getCitedBy(slug, {
+          ...params,
+          per_page: CITED_BY_PAGE_SIZE,
+          page: pageParam,
+        }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) => {
+        const { current_page, last_page } = lastPage.pagination;
+        return current_page < last_page ? current_page + 1 : undefined;
+      },
+      staleTime: STALE_TIMES.reference,
+      gcTime: GC_TIMES.list,
+    });
+  },
 
   /**
    * The reader's OWN conversations about this case (`GET /cases/{slug}/conversations`,

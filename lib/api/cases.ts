@@ -3,6 +3,8 @@ import type {
   CaseListResponse,
   CaseDetailResponse,
   CaseListParams,
+  CitedByListResponse,
+  CitedByParams,
 } from '@/types/case';
 
 /**
@@ -52,6 +54,28 @@ export const casesApi = {
 
     const response = await apiClient.get<CaseDetailResponse>(`/cases/${slug}`, {
       params: Object.keys(params).length > 0 ? params : undefined,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get the paged list of later cases that cite this one. The case payload
+   * caps `cited_by` at 50 rows; this is the whole list.
+   * @param slug - Slug of the cited case
+   */
+  getCitedBy: async (
+    slug: string,
+    params: CitedByParams = {}
+  ): Promise<CitedByListResponse> => {
+    const response = await apiClient.get<CitedByListResponse>(`/cases/${slug}/cited-by`, {
+      params: {
+        page: params.page ?? 1,
+        per_page: params.per_page ?? 50,
+        sort: params.sort ?? 'newest',
+        search: params.search || undefined,
+        court_id: params.court_id,
+        year: params.year,
+      },
     });
     return response.data;
   },

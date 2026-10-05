@@ -5,6 +5,7 @@ import type {
   Judge,
   StatuteCitedEdge,
 } from '@/types/case';
+import { formatTreatment, type TreatmentTone } from '@/lib/utils/related-cases';
 import { firstCitation, formatCaseName } from '../case-name';
 
 /**
@@ -666,4 +667,13 @@ export function lawTypeLabel(values: readonly string[] | null | undefined): stri
     return index === 0 ? label : label.toLowerCase();
   });
   return labels.join(' & ') + (allKnown ? ' law' : '');
+}
+
+/** The badge earns its ink only when the treatment says more than "a citation
+ *  happened" — `referred_to` is the enum's catch-all and marks nothing. */
+export function meaningfulTreatment(
+  treatment: string | null,
+): { label: string; tone: TreatmentTone } | null {
+  if (!treatment || treatment === 'referred_to') return null;
+  return formatTreatment(treatment);
 }

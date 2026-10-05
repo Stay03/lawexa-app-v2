@@ -109,6 +109,51 @@ export interface CitedByCase extends RelatedCase {
   treatment: CaseTreatment | null;
 }
 
+// One row of the paged reverse-citation list (GET /cases/{slug}/cited-by).
+// A lean listing shape: no country, no excerpt. `treatment` is how this citing
+// case treated the case being read; `cited_by_count` is how often the citing
+// case is itself cited (what "Most cited" orders by).
+export interface CitingCase {
+  id: number;
+  title: string;
+  short_title: string | null;
+  display_title: string;
+  slug: string;
+  judgment_date: string | null;
+  citation: string | null;
+  /** The court's name, or null when the case has none recorded. */
+  court: string | null;
+  cited_by_count: number;
+  treatment: CaseTreatment | null;
+  is_bookmarked: boolean;
+  bookmarks_count: number;
+  views_count: number;
+}
+
+// `newest` orders by judgment date; `most_cited` by how often each citing case
+// is itself cited.
+export type CitedBySort = 'newest' | 'most_cited';
+
+export interface CitedByParams {
+  page?: number;
+  /** 1 to 50; the endpoint rejects anything larger. */
+  per_page?: number;
+  sort?: CitedBySort;
+  /** Matches the citing case's name or citation. */
+  search?: string;
+  /** An id from `filters.courts`; an unknown id is a 422. */
+  court_id?: number;
+  /** One judgment year, 1800 to 2100; outside that is a 422. */
+  year?: number;
+}
+
+// Every court and year among ALL the citing cases, with counts, whatever the
+// request filtered on. Courts most-first, years newest-first.
+export interface CitedByFilters {
+  courts: { id: number; name: string; count: number }[];
+  years: { year: number; count: number }[];
+}
+
 // A verbatim principle extracted from the judgment (report_principles[]).
 // End users (below Researcher) receive ONLY `reviewed: true` rows — the server
 // filters the rest — so `reviewed: false` is visible to Researcher+ accounts
@@ -512,6 +557,16 @@ export interface CaseListResponse {
   success: boolean;
   message: string;
   data: Case[];
+  pagination: PaginationMeta;
+  links: PaginationLinks;
+}
+
+// Paginated reverse-citation response (GET /cases/{slug}/cited-by)
+export interface CitedByListResponse {
+  success: boolean;
+  message: string;
+  data: CitingCase[];
+  filters: CitedByFilters;
   pagination: PaginationMeta;
   links: PaginationLinks;
 }
