@@ -12,6 +12,8 @@ import {
   flattenCitingPages,
   isNarrowed,
   needsFullList,
+  panelOpenIn,
+  panelParam,
   seeAllLabel,
   visibleYears,
 } from './model';
@@ -49,6 +51,16 @@ test('the panel exists only when the preview cannot hold every citing case', () 
   assert.equal(needsFullList(CITED_BY_PREVIEW_COUNT), false);
   assert.equal(needsFullList(CITED_BY_PREVIEW_COUNT + 1), true);
   assert.equal(seeAllLabel(462), 'See all 462');
+});
+
+test('opening writes the panel into the URL and closing takes it out, so Back closes it', () => {
+  assert.deepEqual(panelParam(true), { 'cited-by': 'all' });
+  assert.deepEqual(panelParam(false), { 'cited-by': null });
+  // The entry the open pushed, then the one Back returns to.
+  assert.equal(panelOpenIn('?cited-by=all'), true);
+  assert.equal(panelOpenIn('?q=estoppel&cited-by=all'), true);
+  assert.equal(panelOpenIn(''), false);
+  assert.equal(panelOpenIn('?q=estoppel'), false);
 });
 
 test('a citing row reads name, then citation, court and year, and links to its case', () => {

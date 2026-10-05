@@ -58,6 +58,21 @@ export function seeAllLabel(total: number): string {
   return `See all ${total}`;
 }
 
+/** The URL mirror of an open panel (`?cited-by=all`). Opening pushes it, so the
+ *  phone's Back closes the panel before it leaves the page. */
+const PANEL_PARAM = 'cited-by';
+
+/** The search-param write for the panel opening (`true`) or closing (`false`). */
+export function panelParam(open: boolean): Record<string, string | null> {
+  return { [PANEL_PARAM]: open ? 'all' : null };
+}
+
+/** Whether a URL's search string says the panel is open: what Back and
+ *  Forward adopt. */
+export function panelOpenIn(search: string): boolean {
+  return new URLSearchParams(search).has(PANEL_PARAM);
+}
+
 /** Map one row of the paged endpoint to the case page's row grammar: the
  *  name, then citation · court · year. */
 export function citingCaseItem(row: CitingCase): AuthorityItem {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 
@@ -7,12 +8,15 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { quietPushUrlParams, quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { CitedByPanel } from '../cited-by/CitedByPanel';
 import {
   CITED_BY_PREVIEW_COUNT,
   citingCaseItem,
   needsFullList,
+  panelOpenIn,
+  panelParam,
   seeAllLabel,
 } from '../cited-by/model';
 import { casesQueries } from '../queries';
@@ -37,6 +41,13 @@ const SUB = 'Later judgments that cite this one.';
  * payload's rows: those are an unordered slice, and showing them under a
  * heading that promises the most-cited would hide the failure behind a wrong
  * list.
+ *
+ * BACK CLOSES THE PANEL (owner, 5 October 2026), the case chat's way
+ * (`CaseScreen`, whose comment holds the autopsy): local state is the truth,
+ * opening QUIET-pushes `?cited-by=all`, closing quiet-replaces it away, and a
+ * popstate listener adopts the URL on Back and Forward. Quiet writes never wake
+ * the router, so the rewritten `[slug]` refetch loop cannot start. The panel
+ * opens closed on every load, so the server and the first client render agree.
  */
 export function CitedBySection({
   id,
@@ -60,6 +71,18 @@ export function CitedBySection({
     enabled: paged,
   });
 
+  const [open, setOpen] = useState(false);
+  const onOpenChange = useCallback((next: boolean) => {
+    setOpen(next);
+    if (next) quietPushUrlParams(panelParam(true));
+    else quietReplaceUrlParams(panelParam(false));
+  }, []);
+  useEffect(() => {
+    const onPopState = () => setOpen(panelOpenIn(window.location.search));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
   if (!paged) {
     return <AuthorityList id={id} label={LABEL} sub={SUB} items={payloadItems} />;
   }
@@ -67,9 +90,9 @@ export function CitedBySection({
   const items = preview.data?.data.map(citingCaseItem) ?? [];
 
   return (
-    // The Sheet root draws nothing; it holds the open state, so the trigger
-    // below gets focus back when the panel closes.
-    <Sheet>
+    // The Sheet root draws nothing; it is controlled here (see the docblock),
+    // and the trigger below still gets focus back when the panel closes.
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <AuthorityList
         id={id}
         label={LABEL}
