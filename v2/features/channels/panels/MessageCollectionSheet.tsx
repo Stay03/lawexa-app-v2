@@ -340,7 +340,7 @@ function CollectionRow({
           </span>
           <span
             className={cn(
-              'mt-0.5 line-clamp-2 block text-sm break-words text-muted-foreground',
+              'mt-0.5 line-clamp-2 text-sm break-words text-muted-foreground',
               !hasText && 'italic',
             )}
           >

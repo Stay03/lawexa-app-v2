@@ -121,7 +121,7 @@ export const FolderItemRow = memo(function FolderItemRow({
         </span>
 
         {row.type === 'note' && row.preview ? (
-          <span className="mt-1.5 block line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+          <span className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
             {row.preview}
           </span>
         ) : null}

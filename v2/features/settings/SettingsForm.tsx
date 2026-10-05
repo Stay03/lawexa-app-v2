@@ -416,7 +416,7 @@ export function SettingsPickerField({
               would otherwise grow the row into a paragraph. */}
           <span
             className={cn(
-              'mt-0.5 line-clamp-2 block text-[15px] leading-snug',
+              'mt-0.5 line-clamp-2 text-[15px] leading-snug',
               value == null ? 'text-muted-foreground/60' : 'text-foreground',
             )}
           >
