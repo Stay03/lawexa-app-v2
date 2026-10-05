@@ -9,7 +9,7 @@ import { ActivityFallback } from './states';
 /**
  * ActivityScreen — the `/activity` client root (the `ConversationsScreen`
  * shape). One job, above the `useSearchParams` boundary: wrap the list, which
- * reads `?search=`, in the Suspense boundary Next requires, with the same
+ * reads `?page=`, in the Suspense boundary Next requires, with the same
  * fallback `loading.tsx` draws, so route boundary → fallback → list is one
  * shape.
  *

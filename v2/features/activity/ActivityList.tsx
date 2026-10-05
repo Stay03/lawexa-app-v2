@@ -9,13 +9,9 @@ import { Button } from '@/components/ui/button';
 import type { ActivityMessage } from '@/types/chat';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { pushUrlParams } from '@/v2/runtime/url-params';
-import { useUrlSearch } from '@/v2/runtime/use-url-search';
-import { useSearchPosition } from '@/v2/search-position';
-import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { Pager } from '@/v2/shell/Pager';
 import { formatCount, parsePageParam } from '@/v2/shell/pager-model';
-import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
-import { SearchField } from '@/v2/shell/SearchField';
 import { useMounted } from '@/v2/shell/use-mounted';
 import { ActivityTable } from './ActivityTable';
 import { activityRow } from './model';
@@ -31,9 +27,6 @@ import {
 
 /** Stable empty rows reference, so the row projection does not re-run every render. */
 const NO_ROWS: readonly ActivityMessage[] = [];
-
-/** A new search starts on its first page: the search box clears `?page=` as it commits. */
-const SEARCH_RESETS: readonly string[] = ['page'];
 
 /**
  * ActivityList — the `/activity` body: every question the reader has asked,
@@ -67,28 +60,19 @@ const SEARCH_RESETS: readonly string[] = ['page'];
  * server prefetch), so a hard load paints the skeleton on the server either
  * way. `now` is read ONCE in a lazy initializer, never in render.
  *
- * ── SEARCH ─────────────────────────────────────────────────────────────────
- * The shared URL-synced box (`useUrlSearch`), in the dock or at the top as the
- * developer switch says. The endpoint matches the question's text, and the
- * label says that. A new search drops `?page=` in the same URL write, so it
- * starts on its first page. While it resolves the previous rows stay, dimmed,
- * so typing never flashes a skeleton.
+ * ── NO SEARCH BOX ──────────────────────────────────────────────────────────
+ * The owner removed it ("remove the search your question", 5 October 2026):
+ * the page is the table and its pager, nothing docked below.
  */
 export function ActivityList({ signedIn }: { signedIn: boolean }) {
   const { userId: viewerId } = useV2Session();
   const mounted = useMounted();
   const [now] = useState(() => Date.now());
   const page = parsePageParam(useSearchParams().get('page'));
-  const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch(
-    'search',
-    SEARCH_RESETS,
-  );
-  const activeSearch = committedSearch.trim();
-  const searchAtTop = useSearchPosition() === 'top';
   const tableTopRef = useRef<HTMLDivElement>(null);
 
   const query = useQuery({
-    ...activityQueries.page({ search: committedSearch, page, viewerId }),
+    ...activityQueries.page({ page, viewerId }),
     enabled: signedIn,
     placeholderData: keepPreviousData,
   });
@@ -118,7 +102,7 @@ export function ActivityList({ signedIn }: { signedIn: boolean }) {
 
   if (!signedIn) {
     return (
-      <div className={LIST_COLUMN_DOCKED}>
+      <div className={LIST_COLUMN}>
         <ActivityHeading />
         <ActivitySignedOutState />
       </div>
@@ -135,21 +119,9 @@ export function ActivityList({ signedIn }: { signedIn: boolean }) {
   const showInlineError = query.isError && response !== undefined;
   const dim = query.isPlaceholderData && query.isFetching;
 
-  const searchField = (
-    <SearchField
-      value={inputValue}
-      onChange={onInputChange}
-      onClear={onClear}
-      busy={query.isFetching && dim}
-      placeholder="Search your questions..."
-      label="Search the text of your questions"
-    />
-  );
-
   return (
-    <div className={LIST_COLUMN_DOCKED}>
+    <div className={LIST_COLUMN}>
       <ActivityHeading />
-      {searchAtTop ? <div className="mb-4">{searchField}</div> : null}
 
       <div ref={tableTopRef} className="scroll-mt-4">
         {showSkeleton ? (
@@ -159,7 +131,7 @@ export function ActivityList({ signedIn }: { signedIn: boolean }) {
         ) : showPastEnd ? (
           <ActivityPastEndState lastPage={lastPage} onGoTo={goToPage} />
         ) : showEmpty ? (
-          <ActivityEmptyState search={activeSearch} onClear={onClear} />
+          <ActivityEmptyState />
         ) : (
           <div aria-busy={dim}>
             {showInlineError ? (
@@ -181,7 +153,6 @@ export function ActivityList({ signedIn }: { signedIn: boolean }) {
 
             <p role="status" className="mb-2 h-4 truncate text-xs text-muted-foreground tabular-nums">
               {questionCount(total)}
-              {activeSearch ? <> mention &ldquo;{activeSearch}&rdquo;</> : null}
             </p>
 
             <div
@@ -205,12 +176,6 @@ export function ActivityList({ signedIn }: { signedIn: boolean }) {
           </div>
         )}
       </div>
-
-      {searchAtTop ? null : (
-        <ScreenDock>
-          <ScreenDockSearch>{searchField}</ScreenDockSearch>
-        </ScreenDock>
-      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { History, LogIn, SearchX, TriangleAlert } from 'lucide-react';
+import { History, LogIn, TriangleAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -15,10 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatCount } from '@/v2/shell/pager-model';
-import { useSearchPosition } from '@/v2/search-position';
-import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
-import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
-import { SearchFieldShape } from '@/v2/shell/SearchField';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { SettingsState } from '@/v2/features/settings/SettingsState';
 import { STACKED_ROW_HEIGHT, TABLE_COLUMNS, TABLE_ROW_HEIGHT } from './ActivityTable';
 import { PER_PAGE } from './queries';
@@ -106,13 +103,11 @@ export function ActivityTableSkeleton({ rows = PER_PAGE }: { rows?: number }) {
 }
 
 /**
- * The route and Suspense fallback: the heading, the search field's still
- * shape WHERE IT WILL LAND (the dock by default), and the list skeleton.
+ * The route and Suspense fallback: the heading and the list skeleton.
  * `app/v2/activity/loading.tsx` renders this same component, so route
  * boundary → Suspense fallback → live list is one shape.
  */
 export function ActivityFallback() {
-  const searchAtTop = useSearchPosition() === 'top';
   return (
     <>
       <span role="status" className="sr-only">
@@ -120,45 +115,16 @@ export function ActivityFallback() {
       </span>
       {/* `aria-hidden` + `inert` (standards §8ii): a fallback is deleted, not
           reconciled, so nothing in it may hold focus. */}
-      <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
+      <div aria-hidden inert className={LIST_COLUMN}>
         <Skeleton className="mb-5 hidden h-8 w-28 rounded-lg md:block" />
-        {searchAtTop ? <SearchFieldShape className="mb-4" /> : null}
         <ActivityTableSkeleton />
-        {searchAtTop ? null : (
-          <ScreenDock>
-            <ScreenDockSearch>
-              <SearchFieldShape />
-            </ScreenDockSearch>
-          </ScreenDock>
-        )}
       </div>
     </>
   );
 }
 
-/** Nothing asked yet, or nothing matching the search. */
-export function ActivityEmptyState({
-  search,
-  onClear,
-}: {
-  /** The active (trimmed) search, or '' when unfiltered. */
-  search: string;
-  onClear: () => void;
-}) {
-  if (search) {
-    return (
-      <SettingsState
-        icon={SearchX}
-        title="No questions found"
-        description={`None of your questions mention “${search}”.`}
-        action={
-          <Button variant="outline" size="sm" onClick={onClear}>
-            Clear search
-          </Button>
-        }
-      />
-    );
-  }
+/** Nothing asked yet. */
+export function ActivityEmptyState() {
   return (
     <SettingsState
       icon={History}

@@ -16,25 +16,20 @@ import type { ViewerScoped } from '@/v2/features/conversations/queries';
  *    `per_page`, `total`, `last_page`, `from` and `to`. A page past the end
  *    answers 200 with no rows, `from` and `to` null, and the true `last_page`,
  *    which is how the screen offers the way back.
- *  - `search` is honoured and matches the MESSAGE TEXT only. "Stilk" found the
- *    one question that named Stilk v Myrick; a phrase that appears only in a
- *    conversation's title found nothing beyond the questions that contain it.
- *    The field's label says so.
  *  - `role=user` limits the feed to the reader's own questions and
  *    `exclude_errors` drops failed sends, as v1 asked.
+ *  - No search term is sent: the page has no search box (owner, 5 October
+ *    2026: "remove the search your question").
  *
  * Retention and freshness are the conversations list's, for its reasons: 30
- * minutes for each unfiltered page so a return paints instantly, the 5-minute
- * default for each search string, and a re-check on every arrival so a
- * question asked in another tab shows up on page 1.
+ * minutes for each page so a return paints instantly, and a re-check on every
+ * arrival so a question asked in another tab shows up on page 1.
  */
 
 /** v1's page size: twenty questions a page. */
 export const PER_PAGE = 20;
 
 export interface ActivityListOptions extends ViewerScoped {
-  /** Text search (`?search=`). Empty / whitespace is treated as no filter. */
-  search?: string;
   /** The page (`?page=`), from 1. */
   page: number;
 }
@@ -44,21 +39,19 @@ export const activityQueries = {
 
   lists: () => [...activityQueries.all, 'list'] as const,
 
-  page: ({ search, page, viewerId }: ActivityListOptions) => {
-    const trimmed = search?.trim();
+  page: ({ page, viewerId }: ActivityListOptions) => {
     const params: ListMessagesParams = {
       page,
       per_page: PER_PAGE,
       role: 'user',
       exclude_errors: true,
       sort_order: 'desc',
-      ...(trimmed ? { search: trimmed } : {}),
     };
     return queryOptions({
       queryKey: [...activityQueries.lists(), params, { viewerId }] as const,
       queryFn: () => chatApi.listMessages(params),
       staleTime: STALE_TIMES.standard,
-      gcTime: trimmed ? undefined : GC_TIMES.list,
+      gcTime: GC_TIMES.list,
       refetchOnMount: REFETCH_ON_VISIT,
     });
   },
