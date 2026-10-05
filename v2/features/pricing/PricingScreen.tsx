@@ -146,27 +146,38 @@ function PricingPage() {
  * differently from the pill switches inside a section (period, currency) so
  * the two levels never read as the same control. The shared `TabRow` owns the
  * keyboard and aria contract.
+ *
+ * The rule is the wrapper's border, not the tab list's, and the tabs sit on
+ * it without a negative margin. A tab list that scrolls sideways (narrow
+ * phones) cannot leave its other axis visible: CSS turns `overflow-y` into
+ * `auto` as soon as `overflow-x` is `auto`, so a tab pulled 1px past the
+ * list's bottom edge (the old `-mb-px` that laid the underline over the rule)
+ * gave the list 1px to scroll down, and Windows drew a vertical scrollbar at
+ * the end of the row. `overflow-y-hidden` keeps the list to the one axis it
+ * needs even if a tab is ever taller than the row.
  */
 function PricingTabs({ value, onChange }: { value: PricingTab; onChange: (next: PricingTab) => void }) {
   return (
-    <TabRow
-      tabs={PRICING_TABS}
-      value={value}
-      onChange={onChange}
-      ariaLabel="Pricing"
-      panelId={PANEL_ID}
-      className="mt-5 flex max-w-full gap-6 overflow-x-auto overscroll-x-contain border-b border-foreground/10 sm:gap-8"
-      tabClassName={(selected) =>
-        cn(
-          'v2-interactive relative -mb-px min-h-11 shrink-0 border-b-2 px-0.5 text-[15px] font-medium transition-colors duration-150 motion-reduce:transition-none',
-          selected
-            ? 'border-primary text-foreground'
-            : 'border-transparent text-muted-foreground hover:text-foreground',
-        )
-      }
-    >
-      {(item) => item.label}
-    </TabRow>
+    <div className="mt-5 border-b border-foreground/10">
+      <TabRow
+        tabs={PRICING_TABS}
+        value={value}
+        onChange={onChange}
+        ariaLabel="Pricing"
+        panelId={PANEL_ID}
+        className="flex max-w-full gap-6 overflow-x-auto overflow-y-hidden overscroll-x-contain sm:gap-8"
+        tabClassName={(selected) =>
+          cn(
+            'v2-interactive relative min-h-11 shrink-0 border-b-2 px-0.5 text-[15px] font-medium transition-colors duration-150 motion-reduce:transition-none',
+            selected
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
+          )
+        }
+      >
+        {(item) => item.label}
+      </TabRow>
+    </div>
   );
 }
 
