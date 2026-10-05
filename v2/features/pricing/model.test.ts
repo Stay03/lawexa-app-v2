@@ -119,7 +119,9 @@ test('a price says what is charged and how often; a year also says its month', (
 
 test('only counted limits become lines; unlimited ones are left off', () => {
   assert.deepEqual(limitLines(plan()), ['50 AI messages a month']);
-  assert.deepEqual(limitLines(plan({ interval: 'annually', limits: [counted('ai_messages', 200)] })), ['200 AI messages a year']);
+  // The server's window is one month for every interval (techlead ecd7bc57).
+  assert.deepEqual(limitLines(plan({ interval: 'annually', limits: [counted('ai_messages', 200)] })), ['200 AI messages a month']);
+  assert.deepEqual(limitLines(plan({ interval: 'monthly', limits: [counted('ai_messages', 200)] })), ['200 AI messages a month']);
   assert.deepEqual(limitLines(plan({ limits: [unlimited('ai_messages')] })), []);
   assert.deepEqual(
     limitLines(plan({ limits: [counted('bookmarks', 10, 'lifetime'), counted('note_creations', 1, 'month'), counted('ai_messages', 1000)] })),

@@ -220,16 +220,20 @@ const LIMIT_NOUN: Record<TLimitType, readonly [string, string]> = {
 
 const LIMIT_ORDER: readonly TLimitType[] = ['ai_messages', 'note_creations', 'bookmarks'];
 
-function limitWhen(limit: IPlanLimit, plan: IPlan): string {
-  if (limit.period === 'lifetime') return 'in total';
-  if (limit.period === 'month') return 'a month';
-  return perPeriod(plan);
+/**
+ * How often a counted limit resets. `billing_interval` reads like "per plan
+ * period", but the server's window is ONE MONTH from the subscription start
+ * whatever the plan's interval (`LimitService::getBillingPeriodDates`,
+ * backend origin/main lines 305-344; techlead ecd7bc57, 5 October 2026). So a
+ * yearly plan's 200 AI messages are 200 a month, and the card says so.
+ */
+function limitWhen(limit: IPlanLimit): string {
+  return limit.period === 'lifetime' ? 'in total' : 'a month';
 }
 
 /**
- * The limits the plan row counts, as lines: "200 AI messages a month". An
- * annual plan whose limit resets each billing period reads "a year", because
- * that is what the server enforces. Unlimited rows are left off (see the
+ * The limits the plan row counts, as lines: "200 AI messages a month", for a
+ * yearly plan too (see `limitWhen`). Unlimited rows are left off (see the
  * docblock).
  */
 export function limitLines(plan: IPlan): string[] {
@@ -238,7 +242,7 @@ export function limitLines(plan: IPlan): string[] {
     if (!limit || limit.is_unlimited || limit.value < 0) return [];
     const [one, many] = LIMIT_NOUN[type];
     const count = limit.value.toLocaleString('en-GB');
-    return [`${count} ${limit.value === 1 ? one : many} ${limitWhen(limit, plan)}`];
+    return [`${count} ${limit.value === 1 ? one : many} ${limitWhen(limit)}`];
   });
 }
 
