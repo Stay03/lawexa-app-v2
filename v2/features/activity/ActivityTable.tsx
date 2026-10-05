@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { formatCount } from '@/v2/shell/pager-model';
 import type { ActivityRow, AttachmentMark } from './model';
 
 /**
@@ -22,12 +23,13 @@ export const TABLE_ROW_HEIGHT = 'h-14';
 export const STACKED_ROW_HEIGHT = 'h-[4.25rem]';
 
 /**
- * The column widths, shared with the skeleton. The question takes what is
- * left; the chat a fixed share; the date and time a fixed width that fits
- * "31 Dec 2025, 12:39 pm".
+ * The column widths, shared with the skeleton. The row number a narrow fixed
+ * width that fits "35,115"; the question takes what is left; the chat a fixed
+ * share; the date and time a fixed width that fits "31 Dec 2025, 12:39 pm".
  */
 export const TABLE_COLUMNS = (
   <colgroup>
+    <col className="w-16" />
     <col />
     <col className="w-[30%]" />
     <col className="w-44" />
@@ -50,6 +52,11 @@ const MARK_ICON: Record<AttachmentMark['kind'], LucideIcon> = {
  * render and CSS shows one; `hidden` removes the other from the accessibility
  * tree too, so a screen reader meets the rows once.
  *
+ * The first column numbers the rows over the whole list, newest first, so
+ * the numbers carry on across pages (21 to 30 on page 3): `firstNumber` is
+ * the first row's number (`firstRowNumber`). On a phone the number leads the
+ * question's line.
+ *
  * Every question and every chat title links to the conversation. There is no
  * per-message anchor in the conversation screen yet, so a question opens its
  * chat at the bottom, where the conversation screen always opens.
@@ -57,20 +64,21 @@ const MARK_ICON: Record<AttachmentMark['kind'], LucideIcon> = {
  * Rows fade in on mount only (`motion-safe`), keyed by message id: a new page
  * fades its rows in, a refetch that keeps a row does not replay it.
  */
-export function ActivityTable({ rows }: { rows: readonly ActivityRow[] }) {
+export function ActivityTable({ rows, firstNumber }: { rows: readonly ActivityRow[]; firstNumber: number }) {
   return (
     <>
       <Table className="hidden table-fixed md:table">
         {TABLE_COLUMNS}
         <TableHeader>
           <TableRow className="hover:bg-transparent">
+            <NumberHead />
             <TableHead className="h-10 text-xs font-medium text-muted-foreground">Question</TableHead>
             <TableHead className="h-10 text-xs font-medium text-muted-foreground">Chat</TableHead>
             <TableHead className="h-10 text-right text-xs font-medium text-muted-foreground">Asked</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <TableRow
               key={row.id}
               className={cn(
@@ -78,6 +86,9 @@ export function ActivityTable({ rows }: { rows: readonly ActivityRow[] }) {
                 'border-border/70 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
               )}
             >
+              <TableCell className="py-0 pr-4 text-right text-xs text-muted-foreground tabular-nums">
+                {formatCount(firstNumber + index)}
+              </TableCell>
               <TableCell className="py-0">
                 <Link
                   href={`/c/${row.conversationId}`}
@@ -106,7 +117,7 @@ export function ActivityTable({ rows }: { rows: readonly ActivityRow[] }) {
       </Table>
 
       <ul className="flex flex-col divide-y divide-border/70 border-y border-border/70 md:hidden">
-        {rows.map((row) => (
+        {rows.map((row, index) => (
           <li key={row.id} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
             <Link
               href={`/c/${row.conversationId}`}
@@ -117,6 +128,9 @@ export function ActivityTable({ rows }: { rows: readonly ActivityRow[] }) {
               )}
             >
               <span className="flex min-w-0 items-center gap-2">
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {formatCount(firstNumber + index)}
+                </span>
                 <QuestionLine row={row} />
               </span>
               <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -188,5 +202,15 @@ function AskedAt({ row, className }: { row: ActivityRow; className?: string }) {
       {row.date && row.time ? ', ' : null}
       <span className="text-muted-foreground">{row.time}</span>
     </time>
+  );
+}
+
+/** The row-number column's head: "#" on screen, "Number" to a screen reader. */
+export function NumberHead() {
+  return (
+    <TableHead className="h-10 pr-4 text-right text-xs font-medium text-muted-foreground">
+      <span aria-hidden>#</span>
+      <span className="sr-only">Number</span>
+    </TableHead>
   );
 }

@@ -2,13 +2,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ActivityMessage } from '@/types/chat';
 import {
+  PER_PAGE,
+  activityPageParams,
   activityRow,
   askedDate,
   attachmentMarks,
   clockTime,
   conversationTitle,
   dayKey,
+  firstRowNumber,
+  pastEndPage,
   questionPreview,
+  rowNumbers,
 } from './model';
 
 /* Rows shaped like GET /api/messages?role=user returns them (read 5 October
@@ -156,4 +161,45 @@ test('a row with an unreadable time keeps its place with no date', () => {
   assert.equal(row.date, '');
   assert.equal(row.time, '');
   assert.equal(row.conversationId, 'c-2');
+});
+
+test('a page holds ten questions, and the request asks the server for ten', () => {
+  assert.equal(PER_PAGE, 10);
+  assert.deepEqual(activityPageParams(3), {
+    page: 3, per_page: 10, role: 'user', exclude_errors: true, sort_order: 'desc',
+  });
+});
+
+test('the first page numbers its rows 1 to 10', () => {
+  const first = firstRowNumber({ page: 1, from: 1 });
+  assert.equal(first, 1);
+  assert.deepEqual(rowNumbers(first, 10), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+});
+
+test('a middle page carries the count on: page 3 shows 21 to 30', () => {
+  const first = firstRowNumber({ page: 3, from: 21 });
+  assert.equal(first, 21);
+  assert.deepEqual(rowNumbers(first, 10), [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]);
+});
+
+test('the last page numbers only the rows it has: 35 questions end at 31 to 35', () => {
+  const first = firstRowNumber({ page: 4, from: 31 });
+  assert.deepEqual(rowNumbers(first, 5), [31, 32, 33, 34, 35]);
+});
+
+test('without the server\'s from, the page and the page size give the same number', () => {
+  assert.equal(firstRowNumber({ page: 1 }), 1);
+  assert.equal(firstRowNumber({ page: 3, from: null }), 21);
+  assert.equal(firstRowNumber({ page: 3511, from: null }), 35101);
+  assert.equal(firstRowNumber({ page: 0 }), 1);
+  assert.equal(firstRowNumber({ page: 3, from: null }, 20), 41);
+});
+
+test('a page past the new last page offers the last page; anything else offers none', () => {
+  // 35 questions at ten a page end on page 4; an old twenty-a-page link to page 5 lands past it.
+  assert.equal(pastEndPage({ rowCount: 0, total: 35, page: 5, lastPage: 4 }), 4);
+  assert.equal(pastEndPage({ rowCount: 0, total: 35, page: 40, lastPage: 4 }), 4);
+  assert.equal(pastEndPage({ rowCount: 5, total: 35, page: 4, lastPage: 4 }), null);
+  assert.equal(pastEndPage({ rowCount: 0, total: 0, page: 2, lastPage: 1 }), null);
+  assert.equal(pastEndPage({ rowCount: 0, total: 35, page: 4, lastPage: 4 }), null);
 });

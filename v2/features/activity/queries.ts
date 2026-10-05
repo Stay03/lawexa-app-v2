@@ -1,8 +1,8 @@
 import { queryOptions } from '@tanstack/react-query';
 import { chatApi } from '@/lib/api/chat';
-import type { ListMessagesParams } from '@/types/chat';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 import type { ViewerScoped } from '@/v2/features/conversations/queries';
+import { activityPageParams } from './model';
 
 /**
  * Activity query policy — one query per PAGE of `chatApi.listMessages`
@@ -26,9 +26,6 @@ import type { ViewerScoped } from '@/v2/features/conversations/queries';
  * arrival so a question asked in another tab shows up on page 1.
  */
 
-/** v1's page size: twenty questions a page. */
-export const PER_PAGE = 20;
-
 export interface ActivityListOptions extends ViewerScoped {
   /** The page (`?page=`), from 1. */
   page: number;
@@ -40,13 +37,7 @@ export const activityQueries = {
   lists: () => [...activityQueries.all, 'list'] as const,
 
   page: ({ page, viewerId }: ActivityListOptions) => {
-    const params: ListMessagesParams = {
-      page,
-      per_page: PER_PAGE,
-      role: 'user',
-      exclude_errors: true,
-      sort_order: 'desc',
-    };
+    const params = activityPageParams(page);
     return queryOptions({
       queryKey: [...activityQueries.lists(), params, { viewerId }] as const,
       queryFn: () => chatApi.listMessages(params),

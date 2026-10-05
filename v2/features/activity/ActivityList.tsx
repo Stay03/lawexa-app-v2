@@ -14,7 +14,7 @@ import { Pager } from '@/v2/shell/Pager';
 import { formatCount, parsePageParam } from '@/v2/shell/pager-model';
 import { useMounted } from '@/v2/shell/use-mounted';
 import { ActivityTable } from './ActivityTable';
-import { activityRow } from './model';
+import { activityRow, firstRowNumber, pastEndPage } from './model';
 import { activityQueries } from './queries';
 import {
   ActivityEmptyState,
@@ -41,7 +41,7 @@ const NO_ROWS: readonly ActivityMessage[] = [];
  * can. The day headings and per-chat runs went with the timeline.
  *
  * ── THE DATA ───────────────────────────────────────────────────────────────
- * `activityQueries.page` (GET /api/messages, the endpoint v1 used), twenty
+ * `activityQueries.page` (GET /api/messages, the endpoint v1 used), ten
  * questions a page. The page lives in the URL (`?page=3`): a press on the
  * pager PUSHES a history entry (`pushUrlParams`), so Back retraces the pages
  * and a reload keeps the one on screen. Page 1 has no parameter.
@@ -114,7 +114,8 @@ export function ActivityList({ signedIn }: { signedIn: boolean }) {
   const showError = query.isError && response === undefined;
   // A page past the end (an old link, a hand-edited URL): no rows, but the
   // list itself is not empty, and the server says where it ends.
-  const showPastEnd = settled && messages.length === 0 && total > 0 && page > lastPage;
+  const pastEnd = settled ? pastEndPage({ rowCount: messages.length, total, page, lastPage }) : null;
+  const showPastEnd = pastEnd !== null;
   const showEmpty = !showSkeleton && !showError && !showPastEnd && messages.length === 0;
   const showInlineError = query.isError && response !== undefined;
   const dim = query.isPlaceholderData && query.isFetching;
@@ -129,7 +130,7 @@ export function ActivityList({ signedIn }: { signedIn: boolean }) {
         ) : showError ? (
           <ActivityErrorState onRetry={() => void query.refetch()} retrying={query.isFetching} />
         ) : showPastEnd ? (
-          <ActivityPastEndState lastPage={lastPage} onGoTo={goToPage} />
+          <ActivityPastEndState lastPage={pastEnd} onGoTo={goToPage} />
         ) : showEmpty ? (
           <ActivityEmptyState />
         ) : (
@@ -161,7 +162,7 @@ export function ActivityList({ signedIn }: { signedIn: boolean }) {
                 dim && 'pointer-events-none opacity-60',
               )}
             >
-              <ActivityTable rows={rows} />
+              <ActivityTable rows={rows} firstNumber={firstRowNumber({ page, from: response?.pagination.from })} />
             </div>
 
             {lastPage > 1 ? (

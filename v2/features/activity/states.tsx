@@ -17,8 +17,8 @@ import {
 import { formatCount } from '@/v2/shell/pager-model';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { SettingsState } from '@/v2/features/settings/SettingsState';
-import { STACKED_ROW_HEIGHT, TABLE_COLUMNS, TABLE_ROW_HEIGHT } from './ActivityTable';
-import { PER_PAGE } from './queries';
+import { NumberHead, STACKED_ROW_HEIGHT, TABLE_COLUMNS, TABLE_ROW_HEIGHT } from './ActivityTable';
+import { PER_PAGE } from './model';
 
 /**
  * The `/activity` states. Empty, error and signed-out are the settings
@@ -60,6 +60,7 @@ export function ActivityTableSkeleton({ rows = PER_PAGE }: { rows?: number }) {
         {TABLE_COLUMNS}
         <TableHeader>
           <TableRow className="hover:bg-transparent">
+            <NumberHead />
             <TableHead className="h-10 text-xs font-medium text-muted-foreground">Question</TableHead>
             <TableHead className="h-10 text-xs font-medium text-muted-foreground">Chat</TableHead>
             <TableHead className="h-10 text-right text-xs font-medium text-muted-foreground">Asked</TableHead>
@@ -72,6 +73,9 @@ export function ActivityTableSkeleton({ rows = PER_PAGE }: { rows?: number }) {
               className={cn(TABLE_ROW_HEIGHT, 'border-border/70 hover:bg-transparent')}
               style={{ opacity: rowOpacity(index) }}
             >
+              <TableCell className="py-0 pr-4">
+                <Skeleton className="ml-auto h-3 w-5 rounded" />
+              </TableCell>
               <TableCell className="py-0">
                 <Skeleton className={cn('h-3.5 rounded', index % 3 === 1 ? 'w-3/5' : 'w-4/5')} />
               </TableCell>

@@ -1,5 +1,5 @@
 import { parsePastedContent, stripContextTags, stripPastedTags } from '@/lib/utils';
-import type { ActivityMessage } from '@/types/chat';
+import type { ActivityMessage, ListMessagesParams } from '@/types/chat';
 
 /**
  * activity/model — the pure half of `/activity`: what a past question reads as
@@ -22,6 +22,57 @@ import type { ActivityMessage } from '@/types/chat';
  * column of dates reads best when every date has the same shape, so the
  * weekday names the old day headings used are gone.
  */
+
+/**
+ * Ten questions a page (owner, 5 October 2026: "make it 10 per page"). v1
+ * showed twenty. The server pages by this number, so its `last_page` and each
+ * row's `from` follow it.
+ */
+export const PER_PAGE = 10;
+
+/**
+ * The `GET /api/messages` query for one page of the table: the reader's own
+ * questions (`role=user`), failed sends left out, newest first, as v1 asked.
+ */
+export function activityPageParams(page: number): ListMessagesParams {
+  return { page, per_page: PER_PAGE, role: 'user', exclude_errors: true, sort_order: 'desc' };
+}
+
+/**
+ * The number of the first row on a page, counted over the whole list, newest
+ * first: 21 on page 3 at ten a page. The server's `from` is the count it used;
+ * when it is missing (a page past the end answers `from: null`) the page and
+ * the page size give the same number.
+ */
+export function firstRowNumber({ page, from }: { page: number; from?: number | null }, perPage: number = PER_PAGE): number {
+  if (typeof from === 'number' && from > 0) return from;
+  return (Math.max(1, page) - 1) * perPage + 1;
+}
+
+/** The numbers down one page: `count` rows from `first`. */
+export function rowNumbers(first: number, count: number): number[] {
+  return Array.from({ length: count }, (_, index) => first + index);
+}
+
+/**
+ * The last page to offer when the URL names a page past the end (an old link
+ * from when pages held twenty, a hand-edited URL): the server answers such a
+ * page with no rows and the true `last_page`. `null` when the page is not past
+ * the end, or the list is empty.
+ */
+export function pastEndPage({
+  rowCount,
+  total,
+  page,
+  lastPage,
+}: {
+  rowCount: number;
+  total: number;
+  page: number;
+  lastPage: number;
+}): number | null {
+  return rowCount === 0 && total > 0 && page > lastPage && lastPage >= 1 ? lastPage : null;
+}
 
 /** The server's file marker: `<attached_image name="a.png" />`. */
 const ATTACHMENT_MARKER = /\s*<attached_(?:image|document)\b[^>]*\/>/g;
