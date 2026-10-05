@@ -20,6 +20,7 @@ import type { Notification } from '@/types/notification';
 import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { useMounted } from '@/v2/shell/use-mounted';
 import { presentNotification, type NotificationMark } from './presentation';
+import { usePreviewCut } from './use-preview-cut';
 
 /**
  * NotificationRow — one inbox row, shared by the header bell's panel and the
@@ -34,11 +35,12 @@ import { presentNotification, type NotificationMark } from './presentation';
  *  - external → an `<a target="_blank">`: an absolute URL is not ours and must
  *    not replace the app. There is no second "Open link" control; the row IS
  *    the link.
- *  - none     → a `<button>` that marks the row read and, when there is a
- *    preview, EXPANDS it in place. There is no detail page to send it to: the
- *    API stores a 140-character preview and the show endpoint returns the
- *    same text, so the row already holds everything there is.
- * A row with NOTHING to do (no destination, already read, no preview) is not a
+ *  - none     → a `<button>` that marks the row read and, when its preview is
+ *    CUT at two lines (measured, `usePreviewCut`), EXPANDS it in place. There
+ *    is no detail page to send it to: the API stores a 140-character preview
+ *    and the show endpoint returns the same text, so the row already holds
+ *    everything there is. A preview that fits offers no arrow.
+ * A row with NOTHING to do (no destination, already read, nothing cut) is not a
  * control at all: a button that answers a press with nothing is worse than
  * plain text. In every case `onActivate` runs first, which is where the row is
  * marked read and a channel transcript is warmed.
@@ -138,7 +140,11 @@ export const NotificationRow = memo(function NotificationRow({
   const presentation = presentNotification(notification);
   const { destination, preview } = presentation;
   const unread = !notification.read_at;
-  const expandable = destination.kind === 'none' && preview !== null;
+  // A link-less row's preview sits in a height-capped box, and is only
+  // EXPANDABLE when the text actually runs past that cap at this width.
+  const previewInPlace = destination.kind === 'none' && preview !== null;
+  const { ref: previewRef, cut } = usePreviewCut<HTMLSpanElement>(2, previewInPlace);
+  const expandable = previewInPlace && cut;
   const actionable = destination.kind !== 'none' || unread || expandable;
   const MarkIcon = MARK_ICONS[presentation.mark];
   const styles = DENSITY[density];
@@ -188,13 +194,16 @@ export const NotificationRow = memo(function NotificationRow({
         {/* No preview, no placeholder. A pre-deploy row carries no message and
             must not be given one; its title already states what it is. */}
         {preview !== null ? (
-          expandable ? (
+          previewInPlace ? (
             // Height, not `line-clamp`, so the reveal tweens in BOTH
-            // directions: a clamp has nothing to interpolate and snaps.
+            // directions: a clamp has nothing to interpolate and snaps. The
+            // box is the same whether or not the text is cut, so the
+            // measurement never moves the row.
             <span
+              ref={previewRef}
               className={cn(
                 'mt-0.5 block overflow-hidden text-xs text-muted-foreground transition-[max-height] duration-300 ease-out motion-reduce:transition-none',
-                expanded ? 'max-h-[8lh]' : 'max-h-[2lh]',
+                expandable && expanded ? 'max-h-[8lh]' : 'max-h-[2lh]',
               )}
             >
               {preview}
