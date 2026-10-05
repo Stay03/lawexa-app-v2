@@ -5,6 +5,7 @@ import {
   CITED_BY_PREVIEW_COUNT,
   DEFAULT_CITED_BY_QUERY,
   YEAR_CHIPS_FOLDED,
+  caseReference,
   citedByParams,
   citedBySummary,
   citedByTotal,
@@ -63,13 +64,43 @@ test('opening writes the panel into the URL and closing takes it out, so Back cl
   assert.equal(panelOpenIn('?q=estoppel'), false);
 });
 
-test('a citing row reads name, then citation, court and year, and links to its case', () => {
+test('a citing row reads name, then citation and court, and links to its case', () => {
   const item = citingCaseItem(row({ treatment: 'distinguished' }));
   assert.equal(item.key, 'case-1');
   assert.equal(item.name, 'Buhari v Obasanjo');
   assert.equal(item.href, '/cases/buhari-v-obasanjo');
-  assert.equal(item.reference, '(2005) 13 NWLR (Pt. 941) 1 · Supreme Court of Nigeria · 2005');
+  // The citation's "(2005)" already says the year; no second year after it.
+  assert.equal(item.reference, '(2005) 13 NWLR (Pt. 941) 1 · Supreme Court of Nigeria');
   assert.equal(item.badge?.label, 'Distinguished');
+});
+
+test('the judgment year shows only when the citation has none of its own', () => {
+  assert.equal(
+    citingCaseItem(row({ citation: '[1955] AC 370' })).reference,
+    '[1955] AC 370 · Supreme Court of Nigeria',
+  );
+  assert.equal(
+    citingCaseItem(row({ citation: 'LELR-20074 (NG-SC)' })).reference,
+    'LELR-20074 (NG-SC) · Supreme Court of Nigeria · 2005',
+  );
+  assert.equal(
+    citingCaseItem(row({ citation: null })).reference,
+    'Supreme Court of Nigeria · 2005',
+  );
+  // Neither a citation nor a date: the court alone, and no stray separator.
+  assert.equal(
+    citingCaseItem(row({ citation: null, judgment_date: null })).reference,
+    'Supreme Court of Nigeria',
+  );
+});
+
+test('the shared reference line holds the same rule for Similar cases and the short Cited by list', () => {
+  assert.equal(
+    caseReference('(1995) 9 NWLR (Pt. 421) 558', 'Supreme Court of Nigeria', '1995-03-10'),
+    '(1995) 9 NWLR (Pt. 421) 558 · Supreme Court of Nigeria',
+  );
+  assert.equal(caseReference(null, null, '1995-03-10'), '1995');
+  assert.equal(caseReference(null, null, null), null);
 });
 
 test('a plain "referred to" carries no badge, and a row with nothing to cite has no reference', () => {

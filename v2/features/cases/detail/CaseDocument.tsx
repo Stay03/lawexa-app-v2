@@ -17,8 +17,8 @@ import type {
 import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { TabRow } from '@/v2/shell/TabRow';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { firstCitation, formatCaseName } from '../case-name';
-import { citedByTotal } from '../cited-by/model';
+import { formatCaseName } from '../case-name';
+import { caseReference, citedByTotal } from '../cited-by/model';
 import { formatCaseDate, toAlpha2 } from '../case-row-model';
 import {
   benchLabel,
@@ -408,18 +408,11 @@ function CopyCitation({ name, citation }: { name: string; citation: string }) {
  */
 function toLibraryItem(c: RelatedCase): AuthorityItem {
   const display = relatedToDisplay(c);
-  const reference = [
-    firstCitation(display.citation),
-    display.court?.name,
-    formatCaseDate(display.judgmentDate, 'year'),
-  ]
-    .filter(Boolean)
-    .join(' · ');
   return {
     key: display.key,
     name: formatCaseName(c.display_title || c.title || display.title),
     nameTitle: display.title,
-    reference: reference || null,
+    reference: caseReference(display.citation, display.court?.name, display.judgmentDate),
     href: display.href,
     searchHref: null,
     badge: meaningfulTreatment(display.treatment),

@@ -73,16 +73,30 @@ export function panelOpenIn(search: string): boolean {
   return new URLSearchParams(search).has(PANEL_PARAM);
 }
 
+/** A report citation carries its own year: "(2024) 2 NWLR …", "[1955] AC …". */
+const CITATION_YEAR = /[([]\d{4}[)\]]/;
+
+/**
+ * A library case's reference line: citation · court, and the judgment year
+ * only when the citation has no year of its own (owner, 6 October 2026:
+ * "remove the extra year now the citation already has year"). `null` when
+ * there is nothing to say. Shared by every list of library cases on the case
+ * page (Cited by, its panel, Similar cases), so they cannot disagree.
+ */
+export function caseReference(
+  rawCitation: string | null | undefined,
+  court: string | null | undefined,
+  judgmentDate: string | null | undefined,
+): string | null {
+  const citation = firstCitation(rawCitation ?? null);
+  const year = citation && CITATION_YEAR.test(citation) ? null : formatCaseDate(judgmentDate ?? null, 'year');
+  return [citation, court, year].filter(Boolean).join(' · ') || null;
+}
+
 /** Map one row of the paged endpoint to the case page's row grammar: the
- *  name, then citation · court · year. */
+ *  name, then the reference line (`caseReference`). */
 export function citingCaseItem(row: CitingCase): AuthorityItem {
-  const reference = [
-    firstCitation(row.citation),
-    row.court,
-    formatCaseDate(row.judgment_date, 'year'),
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const reference = caseReference(row.citation, row.court, row.judgment_date);
   return {
     key: `case-${row.id}`,
     // The bare title: the display title has the citation appended, and the
