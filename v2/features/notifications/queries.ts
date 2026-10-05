@@ -1,6 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { notificationsApi } from '@/lib/api/notifications';
-import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
+import { extractApiError } from '@/lib/utils/api-error';
+import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 
 /**
  * Notifications query policy — copies the `v2/features/cases/queries.ts`
@@ -10,20 +11,44 @@ import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
  * Structure convention (mirrored from the exemplar):
  *  - `all`            the feature root key segment (a value, not a function).
  *  - `lists()`        the "all lists" invalidation handle for every list variant.
- *  - `infiniteList()` the bell panel's stream (leaf → `infiniteQueryOptions`).
+ *  - `infiniteList()` one stream per read filter (leaf → `infiniteQueryOptions`).
+ *  - `details()`      the "all single rows" handle.
+ *  - `detail(id)`     one row, for the `/notifications/{id}` resolver.
  *  - `unreadCount()`  the badge count query (leaf → `queryOptions`).
  *
  * `enabled` is intentionally NOT baked into the leaves — it's a call-site concern
  * (`useQuery({ ...notificationsQueries.unreadCount(), enabled: signedIn })`), the
  * same policy the exemplar documents.
+ *
+ * ── NO VIEWER PARTITION, KNOWINGLY ─────────────────────────────────────────
+ * Unlike `bookmarksQueries`, these keys carry no `viewerId`. A viewer change is
+ * covered by `V2CacheIdentityGuard` (`app/v2/layout.tsx`), which drops the whole
+ * cache, and adding the partition would mean threading the viewer into
+ * `settle.ts` through `channels/mark-read.ts` for no case the guard misses.
  */
 
+/** The API's own read filter. Absent means every row. */
+export type NotificationReadFilter = 'unread' | 'read';
+
 /**
- * One page of the bell panel. Small on purpose: the panel opens at ten rows and
- * grows on request, so the common open costs one small request and a reader
- * with a long history is never held behind a big one.
+ * One page, for BOTH surfaces. The header bell and `/notifications` read the
+ * same All-stream cache entry, so they must ask for the same page size: opening
+ * the page after glancing at the bell paints rows with no skeleton, and opening
+ * the bell after the page paints the page's rows. Twenty is two phone screens,
+ * and the bell's panel scrolls anyway.
  */
-const NOTIFICATIONS_PAGE_SIZE = 10;
+export const NOTIFICATIONS_PAGE_SIZE = 20;
+
+/**
+ * A 4xx is an ANSWER, not a hiccup: a 404 on the resolver means the row is gone,
+ * and retrying only delays the designed state (the `bookmarks/queries.ts`
+ * rule). Anything else gets the house's single retry.
+ */
+function retryUnlessRefused(failureCount: number, error: Error): boolean {
+  const { status } = extractApiError(error);
+  if (status >= 400 && status < 500) return false;
+  return failureCount < 1;
+}
 
 export const notificationsQueries = {
   all: ['notifications'] as const,
@@ -31,26 +56,36 @@ export const notificationsQueries = {
   lists: () => [...notificationsQueries.all, 'list'] as const,
 
   /**
-   * THE bell list — an accumulating stream rather than a fixed first page,
-   * because the panel is now the whole inbox in v2: there is no `/notifications`
-   * route in the v2 manifest, and the footer link that used to point at one sent
-   * the reader out of the v2 shell into v1's page (see `V2NotificationBell`).
+   * An accumulating stream of rows, newest first, ONE cache entry per read
+   * filter. `infiniteList()` (no filter) is the All stream the bell and the
+   * page share; `{ read: 'unread' }` is the page's Unread tab. The filter is
+   * part of the key as `{ read }` (null for All), and `cache.ts` reads it back
+   * off the key to decide what a write means for that entry: a row marked read
+   * must LEAVE an unread list and STAY, restyled, in the All list.
    *
-   * ONE cache entry, on purpose. A grow-the-page-size variant would mint a new
-   * key per size and leave the abandoned entries holding stale read state for
-   * the next panel open; with a single infinite key, every write (mark one,
-   * mark all, the spine's broadcast invalidation, the post-channel-read settle)
-   * lands on exactly the data the panel is showing.
+   * ONE entry per filter, on purpose. A grow-the-page-size variant would mint a
+   * new key per size and leave the abandoned entries holding stale read state;
+   * with one infinite key per filter, every write (mark one, mark all, delete,
+   * the spine's broadcast invalidation, the post-channel-read settle) lands on
+   * exactly the data on screen.
    *
-   * STANDARD tier — a reopen inside a minute is instant, and the socket spine
-   * invalidates this key on every `.notification` broadcast, so freshness does
-   * not depend on the staleTime.
+   * STANDARD tier + `REFETCH_ON_VISIT`. A notification always comes from
+   * SOMEONE ELSE, and whether `.notification` broadcasts reach this client in
+   * prod is unconfirmed, so an arrival must ask (the invitations and bookmarks
+   * argument). The cost, stated as those exemplars state it: every loaded page
+   * refetches on arrival, behind cached rows that paint first. On the bell that
+   * is one request per open.
    */
-  infiniteList: () =>
+  infiniteList: ({ read }: { read?: NotificationReadFilter } = {}) =>
     infiniteQueryOptions({
-      queryKey: [...notificationsQueries.lists(), 'infinite'] as const,
+      queryKey: [
+        ...notificationsQueries.lists(),
+        'infinite',
+        { read: read ?? null },
+      ] as const,
       queryFn: ({ pageParam }) =>
         notificationsApi.getList({
+          read,
           per_page: NOTIFICATIONS_PAGE_SIZE,
           page: pageParam,
         }),
@@ -61,6 +96,24 @@ export const notificationsQueries = {
       },
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+      retry: retryUnlessRefused,
+    }),
+
+  details: () => [...notificationsQueries.all, 'detail'] as const,
+
+  /**
+   * One row. `GET /notifications/{id}` is live but missing from
+   * `docs/apiDocs/notification-api.md`; it returns the list row byte for byte
+   * (the `message` is the same 140-character preview), so its only reader is
+   * the resolver, which needs the destination and the read state.
+   */
+  detail: (id: string) =>
+    queryOptions({
+      queryKey: [...notificationsQueries.details(), id] as const,
+      queryFn: () => notificationsApi.getById(id),
+      staleTime: STALE_TIMES.standard,
+      retry: retryUnlessRefused,
     }),
 
   /**

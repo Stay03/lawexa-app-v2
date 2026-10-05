@@ -378,7 +378,9 @@ export function V2Header({ user }: { user: SessionUser | null }) {
  * middle-click, long-press preview and a screen reader all still work) and
  * takes the history move ONLY when the parent really is the screen behind. A
  * reader who arrived from a notification with nothing behind them gets the push
- * they have always had, never a jump out of the app.
+ * they have always had, never a jump out of the app. A table entry with
+ * `reach: 'anywhere'` (the inbox, whose chevron means "out") takes the history
+ * move whenever any in-app screen is behind.
  *
  * The `override` is the screen's own answer where the address cannot have one
  * (a nested folder's parent, a draft note's stream). Address and label move
@@ -392,7 +394,7 @@ function PushedBack({
   screen: PushedScreen;
   override: { href: string; label: string } | null;
 }) {
-  const back = useBackTo(override?.href ?? screen.backHref);
+  const back = useBackTo(override?.href ?? screen.backHref, screen.reach ?? 'parent');
   return (
     <Button
       asChild

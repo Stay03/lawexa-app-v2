@@ -1,3 +1,5 @@
+import type { BackReach } from '@/v2/runtime/back-to';
+
 /**
  * pushed-route — which screens you PUSHED INTO, decided by the address and
  * nothing else.
@@ -104,6 +106,13 @@ export interface PushedScreen {
    */
   backLabel: string;
   title: PushedTitle;
+  /**
+   * What the chevron promises (`useBackTo`'s {@link BackReach}). Absent is
+   * `'parent'`: go back only when `backHref` is the screen behind. `'anywhere'`
+   * is for a screen whose chevron means OUT rather than a place, because it is
+   * opened from a control that exists on every screen.
+   */
+  reach?: BackReach;
 }
 
 /**
@@ -281,6 +290,31 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           backHref: '/settings',
           backLabel: 'Back to settings',
           title: fixed('Activity'),
+        };
+      }
+      return null;
+
+    // The inbox is opened from the BELL, a control on every screen, which makes
+    // it a screen you pushed into (the settings reasoning below). Its chevron
+    // promises OUT, back to wherever the bell was pressed, so it reaches
+    // `'anywhere'`: from `/cases` it returns to `/cases`, and only a cold
+    // arrival with nothing behind falls back to home. `/notifications/{id}` is
+    // a resolver that redirects on arrival; it only paints when it has to say
+    // something (a gone row, an outside link), and then up is the inbox.
+    case 'notifications':
+      if (depth === 1) {
+        return {
+          backHref: '/',
+          backLabel: 'Back to home',
+          title: fixed('Notifications'),
+          reach: 'anywhere',
+        };
+      }
+      if (depth === 2) {
+        return {
+          backHref: '/notifications',
+          backLabel: 'Back to notifications',
+          title: NO_TITLE,
         };
       }
       return null;

@@ -88,6 +88,14 @@
  * backend has stopped emitting the old paths AND v1 is gone (phase 7).
  */
 /**
+ * `/notifications/*` covers the inbox and `/notifications/{id}`. The wildcard is
+ * deliberate where `/bookmarks` is exact: v1's row sends a destination-less
+ * notification to `/notifications/{id}`, and that address is in people's
+ * history and in the v1 dropdown. In v2 it is a one-screen resolver that marks
+ * the row read and sends the reader to its destination, so an old link lands
+ * inside the shell instead of ejecting to v1. Private, noindex.
+ */
+/**
  * EVERY SETTINGS ENTRY IS EXACT, and that is the whole point of them.
  *
  * v2 claims the settings INDEX (the list of every option, in the row grammar
@@ -125,6 +133,7 @@ export const V2_ROUTES = [
   '/channels/*',
   '/invitations',
   '/organization',
+  '/notifications/*',
   // The settings index and the options rebuilt so far. Each one EXACT, never a
   // wildcard. See the block above.
   '/settings',
