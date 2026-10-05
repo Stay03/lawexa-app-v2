@@ -18,6 +18,7 @@ import {
   calculateAnnualSavingsPct,
 } from '@/lib/utils/payment-format';
 import type { IPlan, ICurrentSubscriptionData } from '@/types/subscription';
+import { TIER_FEATURES } from '@/lib/constants/plan-features';
 import TrialStartDialog from './TrialStartDialog';
 
 /******************************************************************************
@@ -67,76 +68,6 @@ const INTERVAL_LABELS: Record<TInterval, string> = {
   daily: 'Daily',
   monthly: 'Monthly',
   annually: 'Annually',
-};
-
-// AI Counsel's feature set — shared with the Plus tier, which mirrors it.
-const AI_COUNSEL_FEATURES = {
-  highlighted: [
-    'Unlimited AI Messages',
-    'Unlimited Library Access',
-    'Chat with Document (No size limit)',
-    'Chat with Statute',
-    'Legal Drafting',
-    'Deep Legal Research',
-    'Deep Contract Review',
-  ],
-  more: [
-    'Access to Case, Statute & Notes Library',
-    'Foreign & Local Cases',
-    'Multi-Jurisdiction Access',
-    'Natural Language Search',
-    'AI Tutor',
-    'Study Mode',
-    'Flashcards',
-    'Quizzes',
-    'Connect to a Lawyer',
-    'Twitter Bot for legal updates',
-  ],
-};
-
-const TIER_FEATURES: Record<string, { highlighted: string[]; more: string[] }> = {
-  basic: {
-    highlighted: [
-      '50 AI Messages',
-      'Unlimited Library Access',
-      'Chat with Document (10MB limit)',
-      'Chat with Statute',
-      'AI Tutor',
-      'Natural Language Search',
-    ],
-    more: [
-      'Access to Case, Statute & Notes Library',
-      'Foreign & Local Cases',
-      'Multi-Jurisdiction Access',
-      'Study Mode',
-      'Flashcards',
-      'Quizzes',
-      'Connect to a Lawyer',
-    ],
-  },
-  pro: {
-    highlighted: [
-      '200 AI Messages',
-      'Unlimited Library Access',
-      '50 Deep Legal Research',
-      'Chat with Document (25MB limit)',
-      'Chat with Statute',
-      'AI Tutor',
-      'Natural Language Search',
-    ],
-    more: [
-      'Access to Case, Statute & Notes Library',
-      'Foreign & Local Cases',
-      'Multi-Jurisdiction Access',
-      'Study Mode',
-      'Flashcards',
-      'Quizzes',
-      'Connect to a Lawyer',
-    ],
-  },
-  'ai-counsel': AI_COUNSEL_FEATURES,
-  // Plus mirrors AI Counsel's feature set (per product).
-  plus: AI_COUNSEL_FEATURES,
 };
 
 /******************************************************************************

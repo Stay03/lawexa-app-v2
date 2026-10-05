@@ -4,6 +4,7 @@ import {
   formatPlanAmount,
   formatPlanMonthlyFromAnnual,
 } from '@/lib/utils/payment-format';
+import { TIER_FEATURES } from '@/lib/constants/plan-features';
 import type { TCurrency } from '@/types/payment';
 import type { ICurrentSubscriptionData, IPlan, IPlanLimit, TLimitType } from '@/types/subscription';
 import { formatBillingDate } from '@/v2/features/settings/billing/model';
@@ -14,18 +15,25 @@ import { currencyName } from '@/v2/features/settings/message-packs/currency-offe
  * sit in, what each card says, and what its button may do. No React, so it is
  * tested with Node's runner.
  *
- * ── EVERY LINE ON A CARD IS A FIELD ON THE PLAN ────────────────────────────
- * v1 drew its bullets from a table in the component (`TIER_FEATURES`) and the
- * server's `features` array is empty on every paid plan, so the cards promised
- * what the plan rows did not give: "Unlimited AI Messages" over plans that
- * enforced 50 (the 21 September 2026 study). Here a card says only the plan's
- * `description`, its price, and the limits the plan row itself COUNTS.
+ * ── THE BENEFITS ARE v1's, WORD FOR WORD ───────────────────────────────────
+ * The owner asked for the benefits "as is" (5 October 2026), so a card lists
+ * v1's lines for its tier from the one table both versions read
+ * (`lib/constants/plan-features.ts`, moved there from v1's PlanCard): the
+ * highlighted lines always, the rest behind "More features". They are the
+ * product's copy, not the plan rows: the server's `features` array is empty
+ * on every paid plan, and a line such as "Unlimited AI Messages" is not
+ * checked against the limit the row counts (the 21 September 2026 study found
+ * plans enforcing 50 under it).
+ *
+ * A tier v1 has no lines for falls back to the limits its plan row COUNTS
+ * ("200 AI messages a month"). A tier with v1's lines does not also print its
+ * limits, so a card never says "Unlimited AI Messages" and a number together.
  *
  * A limit the row marks `is_unlimited` is left off. The server resolves a
  * plan's limit against a hard ceiling (LimitService::getLimitStatus), and
  * "no plan limit" has meant "capped at 999" for notes on every paid plan; the
  * plan list does not carry the ceiling, so "unlimited" cannot be printed as a
- * fact here. The Usage screen tells the truth after the purchase, from
+ * fact from the row. The Usage screen tells the truth after the purchase, from
  * `remaining`, which is resolved.
  *
  * ── THE ORDER IS THE PRICE ─────────────────────────────────────────────────
@@ -244,6 +252,30 @@ export function limitLines(plan: IPlan): string[] {
     const count = limit.value.toLocaleString('en-GB');
     return [`${count} ${limit.value === 1 ? one : many} ${limitWhen(limit)}`];
   });
+}
+
+/** The lines a card lists: `highlighted` always shows, `more` behind a toggle. */
+export interface CardLines {
+  highlighted: readonly string[];
+  more: readonly string[];
+}
+
+/**
+ * v1's benefit lines for a tier, matched on the tier key as v1 matched it
+ * ("basic", "pro", "plus", "ai-counsel"), or null for a tier v1 never listed.
+ * Own keys only, so a key such as "constructor" is not read off the prototype.
+ */
+export function tierBenefits(key: string): CardLines | null {
+  return Object.hasOwn(TIER_FEATURES, key) ? TIER_FEATURES[key] : null;
+}
+
+/**
+ * What one card lists for the plan it shows. The benefits belong to the tier,
+ * so Monthly and Yearly list the same lines; only a tier without v1's lines
+ * reads its limits off the plan shown (see the docblock).
+ */
+export function cardLines(tier: Pick<Tier, 'key'>, plan: IPlan): CardLines {
+  return tierBenefits(tier.key) ?? { highlighted: limitLines(plan), more: [] };
 }
 
 /**

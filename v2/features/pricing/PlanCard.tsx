@@ -1,22 +1,25 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { IPlan } from '@/types/subscription';
-import { REGISTER_HREF, actionLabel, limitLines, priceView, type PlanAction, type Tier } from './model';
+import { REGISTER_HREF, actionLabel, cardLines, priceView, type PlanAction, type Tier } from './model';
 
 /**
  * PlanCard — one tier at the chosen period: its name, the plan's own
- * description, the price that is charged, the limits the plan counts, and the
- * one thing the account can do with it.
+ * description, the price that is charged, v1's benefit lines for the tier,
+ * and the one thing the account can do with it.
  *
  * Every word comes from the plan or from `model.ts`; nothing here knows what a
- * tier is called or what it includes. The button's state is `planAction`,
+ * tier is called or what it includes. The highlighted lines always show; the
+ * rest open under "More features", as on v1's card. The button's state is `planAction`,
  * v1's decision, and a button that cannot be pressed says why under it.
  *
  * The price block is keyed by the plan, so switching Monthly and Yearly fades
@@ -51,7 +54,7 @@ export function PlanCard({
   onTrial: (plan: IPlan) => void;
 }) {
   const price = priceView(plan, saving);
-  const limits = limitLines(plan);
+  const lines = cardLines(tier, plan);
   const badge = isCurrent ? 'Your plan' : trialOffer ? 'Free trial' : tier.featured ? 'Popular' : null;
   const raised = !isCurrent && (trialOffer || tier.featured);
 
@@ -92,16 +95,8 @@ export function PlanCard({
           ) : null}
         </div>
 
-        {limits.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {limits.map((line) => (
-              <li key={line} className="flex items-start gap-2 text-sm leading-snug text-foreground">
-                <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
-                {line}
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {lines.highlighted.length > 0 ? <BenefitList lines={lines.highlighted} /> : null}
+        {lines.more.length > 0 ? <MoreBenefits lines={lines.more} /> : null}
       </CardContent>
 
       <CardFooter className="flex-col items-stretch gap-2 px-5 sm:px-5">
@@ -119,6 +114,40 @@ export function PlanCard({
         />
       </CardFooter>
     </Card>
+  );
+}
+
+function BenefitList({ lines }: { lines: readonly string[] }) {
+  return (
+    <ul className="flex flex-col gap-2">
+      {lines.map((line) => (
+        <li key={line} className="flex items-start gap-2 text-sm leading-snug text-foreground">
+          <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
+          {line}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The lines v1 kept under "More features", closed until the reader opens them. */
+function MoreBenefits({ lines }: { lines: readonly string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex items-center gap-1.5 rounded text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        <ChevronDown
+          aria-hidden
+          className={cn('size-4 shrink-0 transition-transform duration-200', open && 'rotate-180')}
+        />
+        {open ? 'Less' : 'More features'}
+      </CollapsibleTrigger>
+      <CollapsibleContent className="v2-collapse">
+        <div className="pt-2">
+          <BenefitList lines={lines} />
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

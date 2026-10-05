@@ -5,6 +5,7 @@ import {
   accountNotices,
   actionLabel,
   buildTiers,
+  cardLines,
   currenciesOnSale,
   defaultPeriod,
   isCurrentTier,
@@ -14,6 +15,7 @@ import {
   planFor,
   priceView,
   savingHint,
+  tierBenefits,
   tierKey,
   tierName,
   tierSaving,
@@ -175,4 +177,77 @@ test('a button names the plan, or the period when the plan is already the accoun
   assert.equal(actionLabel('current', basic, 'Basic', true), 'Your current plan');
   assert.equal(actionLabel('downgrade', basic, 'Basic', false), 'Downgrade');
   assert.equal(actionLabel('cross-currency', basic, 'Basic', false), 'Cancel your plan to switch');
+});
+
+// v1's lines, typed out from components/subscriptions/PlanCard.tsx at 7dc7c79,
+// so a changed word in the shared table fails here.
+const V1_LIBRARY = ['Access to Case, Statute & Notes Library', 'Foreign & Local Cases', 'Multi-Jurisdiction Access'];
+const V1_STUDY = ['Study Mode', 'Flashcards', 'Quizzes', 'Connect to a Lawyer'];
+const V1_COUNSEL = {
+  highlighted: [
+    'Unlimited AI Messages', 'Unlimited Library Access', 'Chat with Document (No size limit)', 'Chat with Statute',
+    'Legal Drafting', 'Deep Legal Research', 'Deep Contract Review',
+  ],
+  more: [...V1_LIBRARY, 'Natural Language Search', 'AI Tutor', ...V1_STUDY, 'Twitter Bot for legal updates'],
+};
+const V1_LINES: Record<string, { highlighted: string[]; more: string[] }> = {
+  basic: {
+    highlighted: [
+      '50 AI Messages', 'Unlimited Library Access', 'Chat with Document (10MB limit)', 'Chat with Statute', 'AI Tutor',
+      'Natural Language Search',
+    ],
+    more: [...V1_LIBRARY, ...V1_STUDY],
+  },
+  pro: {
+    highlighted: [
+      '200 AI Messages', 'Unlimited Library Access', '50 Deep Legal Research', 'Chat with Document (25MB limit)',
+      'Chat with Statute', 'AI Tutor', 'Natural Language Search',
+    ],
+    more: [...V1_LIBRARY, ...V1_STUDY],
+  },
+  plus: V1_COUNSEL,
+  'ai-counsel': V1_COUNSEL,
+};
+
+test('each of the four cards lists v1\'s lines for its tier, word for word, and not its limits', () => {
+  const tiers = buildTiers(LIVE, 'USD');
+  assert.deepEqual(tiers.map((tier) => tier.key), ['basic', 'pro', 'plus', 'ai-counsel']);
+  for (const tier of tiers) {
+    const monthly = tier.byPeriod.monthly;
+    assert.ok(monthly);
+    assert.deepEqual(cardLines(tier, monthly), V1_LINES[tier.key], tier.key);
+  }
+  assert.deepEqual(
+    tiers.map((tier) => {
+      const lines = tierBenefits(tier.key);
+      return lines ? [lines.highlighted.length, lines.more.length] : null;
+    }),
+    [[6, 7], [7, 7], [7, 10], [7, 10]],
+  );
+});
+
+test('a tier v1 never listed gets no benefits and falls back to its counted limits', () => {
+  assert.equal(tierBenefits('gold'), null);
+  assert.equal(tierBenefits('basic-international'), null);
+  assert.equal(tierBenefits('constructor'), null);
+  assert.equal(tierBenefits(''), null);
+  const [gold] = buildTiers([plan({ id: 91, name: 'Gold Monthly USD', slug_base: 'gold-monthly', limits: [counted('ai_messages', 500)] })], 'USD');
+  assert.ok(gold && gold.byPeriod.monthly);
+  assert.deepEqual(cardLines(gold, gold.byPeriod.monthly), { highlighted: ['500 AI messages a month'], more: [] });
+  const [bare] = buildTiers([plan({ id: 92, name: 'Gold Monthly USD', slug_base: 'gold-monthly', limits: [unlimited('ai_messages')] })], 'USD');
+  assert.ok(bare && bare.byPeriod.monthly);
+  assert.deepEqual(cardLines(bare, bare.byPeriod.monthly), { highlighted: [], more: [] });
+});
+
+test('switching to Yearly keeps the same benefits on every card', () => {
+  const tiers = buildTiers(LIVE, 'USD');
+  const periods = periodsOnSale(tiers, false);
+  for (const tier of tiers) {
+    const monthly = planFor(tier, 'monthly', periods);
+    const yearly = planFor(tier, 'annually', periods);
+    assert.ok(monthly && yearly && monthly.id !== yearly.id, tier.key);
+    assert.equal(yearly.interval, 'annually');
+    assert.deepEqual(cardLines(tier, yearly), cardLines(tier, monthly), tier.key);
+    assert.deepEqual(cardLines(tier, yearly), V1_LINES[tier.key], tier.key);
+  }
 });

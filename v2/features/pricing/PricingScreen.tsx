@@ -61,10 +61,10 @@ import { TrialDialog } from './TrialDialog';
  * Billing, and a trial opens Paystack's card check. The provider returns the
  * buyer to the callbacks v2 already claims. Only the page around it changed.
  *
- * ── WHAT IT DOES NOT SAY ───────────────────────────────────────────────────
- * No feature list. v1's came from a table in the component and promised what
- * the plans did not give; a card here says the plan's description, its price
- * and the limits the plan counts (`model.ts` has the reasoning). v1's
+ * ── WHAT A CARD SAYS ───────────────────────────────────────────────────────
+ * A card lists v1's benefit lines for its tier, word for word, from the table
+ * v1 and v2 share (`lib/constants/plan-features.ts`); a tier v1 never listed
+ * shows the limits its plan counts instead (`model.ts` has the reasoning). v1's
  * Enterprise tab listed four promises nobody had made in writing; the email
  * address it pointed at stays, the promises do not.
  *
