@@ -9,8 +9,15 @@ import type { AnalyticsPeriod, AnalyticsPeriodInfo, AnalyticsStatCard } from './
 export interface Notification {
   id: string;
   type: string;
+  /** Server-capped: 100 characters observed, cut without an ellipsis (2026-10-05). */
   title: string;
-  // Null on RadarReportNotification until the backend deep-link follow-up ships.
+  /**
+   * A PREVIEW, not the full text. The API truncates it to 140 characters
+   * (ending `...`) when the notification is created, and `GET
+   * /notifications/{id}` returns the same string (measured 2026-10-05), so the
+   * full text lives only at the row's destination. Null on
+   * RadarReportNotification until the backend deep-link follow-up ships.
+   */
   message: string | null;
   action_url: string | null;
   icon: string | null;

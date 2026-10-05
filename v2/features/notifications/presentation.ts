@@ -1,3 +1,4 @@
+import { getAppUrl } from '@/lib/constants/seo';
 import type { Notification } from '@/types/notification';
 
 /**
@@ -42,10 +43,30 @@ import type { Notification } from '@/types/notification';
  * link cannot be followed as sent, and {@link toAppPath} is where that one
  * rewrite lives — see its docblock for what the lobby's real address is and how
  * the channel page answers it.
+ *
+ * ── THREE MORE KEEP THEIR OLD ADDRESSES (2026-10-05) ──────────────────────
+ * Invitation rows still name the legacy inbox paths (`/channel-invitations`,
+ * `/space-invitations`), which are redirect shells onto `/invitations` (owner
+ * decision D5). The backend is moving NEW rows to `/invitations`; old rows keep
+ * their paths for good, so {@link toAppPath} maps them too and a press skips
+ * the redirect round trip.
+ *
+ * ── TWO RULES FOR LINKS THAT ARE NOT A PLAIN PATH ─────────────────────────
+ * An absolute link on this app's own origin (an admin broadcast pointing at
+ * `https://lawexa.com/cases/x`) is an INTERNAL destination, so it opens in the
+ * shell instead of a second tab — the `push/tap.ts` rule. And a radar report
+ * with no `action_url` (the backend is adding one) opens the radar list, the
+ * one place its report is reachable from, which is what v1's detail page did.
  */
 
 /** The row's visual class. One glyph per kind — never a second accent colour. */
-export type NotificationMark = 'mention' | 'reply' | 'invite' | 'quiz' | 'general';
+export type NotificationMark =
+  | 'mention'
+  | 'reply'
+  | 'invite'
+  | 'quiz'
+  | 'radar'
+  | 'general';
 
 /**
  * Where a click goes. `none` is a real answer: a row may carry no
@@ -68,6 +89,24 @@ export interface NotificationPresentation {
 
 const NO_DESTINATION: NotificationDestination = { kind: 'none' };
 
+/** Where a radar report with no link of its own opens. */
+const RADAR_FALLBACK: NotificationDestination = { kind: 'internal', href: '/radars' };
+
+/**
+ * This app's own origin, from the one place the app states its address. Null
+ * only for a malformed `NEXT_PUBLIC_APP_URL`, where no absolute link can be
+ * recognised as ours and every one stays external, which is the safe side.
+ */
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+const APP_ORIGIN = originOf(getAppUrl());
+
 /** Last resort, reachable only if `type` is empty too (no row is). */
 const UNLABELLED_TITLE = 'Notification';
 
@@ -83,6 +122,7 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   space_invite: 'Space invitation',
   organization_invite: 'Organization invitation',
   channel_quiz_live: 'A quiz is live',
+  radar_report: 'A radar report is ready',
 };
 
 function trimmedOrNull(value: string | null | undefined): string | null {
@@ -123,6 +163,7 @@ function markFromToken(token: string): NotificationMark | null {
   // `channel_quiz_live`, which is the point of reading both through one
   // function: the mark is right whichever vocabulary a row arrives in.
   if (token.includes('quiz')) return 'quiz';
+  if (token.includes('radar')) return 'radar';
   return null;
 }
 
@@ -143,15 +184,27 @@ function markFromToken(token: string): NotificationMark | null {
  * pushed `/channels/{c}?game={g}` opens the lobby exactly as pressing Join in
  * the room does, with the chat mounted behind it.
  *
- * Anything that is not that shape is returned untouched — this rewrites one
- * known path and guesses at nothing. A query string on the incoming link is
- * dropped with the path it belonged to: the destination reads `?game=` and
- * `?tab=`/`?m=`, none of which a lobby link has any reason to carry.
+ * The three LEGACY INVITATION inboxes are the other known rewrite: each is a
+ * one-line redirect shell onto `/invitations` (D5), so naming the destination
+ * directly saves the reader a server round trip on every press.
+ *
+ * Anything that is not one of those shapes is returned untouched — this
+ * rewrites known paths and guesses at nothing. A query string on the incoming
+ * link is dropped with the path it belonged to: the destination reads `?game=`
+ * and `?tab=`/`?m=`, none of which a lobby link has any reason to carry.
  */
 const BACKEND_QUIZ_GAME_PATH = /^\/channels\/([^/]+)\/quiz-games\/([^/]+)\/?$/;
 
+const LEGACY_INVITATION_PATHS: ReadonlySet<string> = new Set([
+  '/channel-invitations',
+  '/space-invitations',
+  '/organization-invitations',
+]);
+
 function toAppPath(href: string): string {
-  const match = BACKEND_QUIZ_GAME_PATH.exec(href.split(/[?#]/)[0]);
+  const path = href.split(/[?#]/)[0];
+  if (LEGACY_INVITATION_PATHS.has(path.replace(/\/$/, ''))) return '/invitations';
+  const match = BACKEND_QUIZ_GAME_PATH.exec(path);
   if (!match) return href;
   return `/channels/${match[1]}?game=${match[2]}`;
 }
@@ -164,16 +217,30 @@ function toAppPath(href: string): string {
  * Anything that is neither a rooted path nor an absolute http(s) URL is `none`
  * rather than a navigation attempt at a string we do not understand.
  *
+ * An absolute URL on `origin` (this app's own) is INTERNAL: it is cut down to
+ * its path, query and anchor, exactly as `push/tap.ts` treats a tapped link, so
+ * a broadcast that spells out our own address opens in the shell.
+ *
  * An INTERNAL path goes through {@link toAppPath} on the way out, because the
- * backend names one surface by a route this app does not have. External URLs
+ * backend names some surfaces by routes this app does not have. External URLs
  * are left exactly as they are — they are not ours to rewrite.
  */
-function resolveDestination(actionUrl: string | null): NotificationDestination {
+function resolveDestination(
+  actionUrl: string | null,
+  origin: string | null,
+): NotificationDestination {
   const href = trimmedOrNull(actionUrl);
   if (!href || href.startsWith('//')) return NO_DESTINATION;
   if (href.startsWith('/')) return { kind: 'internal', href: toAppPath(href) };
-  if (/^https?:\/\//i.test(href)) return { kind: 'external', href };
-  return NO_DESTINATION;
+  if (!/^https?:\/\//i.test(href)) return NO_DESTINATION;
+  if (origin === null || originOf(href) !== origin) {
+    return { kind: 'external', href };
+  }
+  const url = new URL(href);
+  return {
+    kind: 'internal',
+    href: toAppPath(`${url.pathname}${url.search}${url.hash}`),
+  };
 }
 
 /**
@@ -210,10 +277,11 @@ export function notificationMark(notification: Notification): NotificationMark {
  */
 export function notificationChannelUuid(
   notification: Notification,
+  origin: string | null = APP_ORIGIN,
 ): string | null {
   const stamped = trimmedOrNull(notification.channel_uuid);
   if (stamped) return stamped;
-  const destination = resolveDestination(notification.action_url);
+  const destination = resolveDestination(notification.action_url, origin);
   if (destination.kind !== 'internal') return null;
   return /^\/channels\/([^/?#]+)/.exec(destination.href)?.[1] ?? null;
 }
@@ -228,31 +296,40 @@ export function notificationChannelUuid(
  */
 export function notificationMessageUuid(
   notification: Notification,
+  origin: string | null = APP_ORIGIN,
 ): string | null {
   const stamped = trimmedOrNull(notification.message_uuid);
   if (stamped) return stamped;
-  const destination = resolveDestination(notification.action_url);
+  const destination = resolveDestination(notification.action_url, origin);
   if (destination.kind !== 'internal') return null;
   const query = destination.href.split('?')[1];
   if (!query) return null;
   return trimmedOrNull(new URLSearchParams(query).get('m'));
 }
 
-/** Present one inbox row. */
+/**
+ * Present one inbox row. `origin` is this app's own and defaults to it; the
+ * parameter exists so the same-origin rule can be checked without an
+ * environment around it.
+ */
 export function presentNotification(
   notification: Notification,
+  origin: string | null = APP_ORIGIN,
 ): NotificationPresentation {
   const typeToken = normalizeToken(notification.type);
   const serverTitle = trimmedOrNull(notification.title);
+  const mark = notificationMark(notification);
+  const destination = resolveDestination(notification.action_url, origin);
 
   return {
-    mark: notificationMark(notification),
+    mark,
     title:
       serverTitle ??
       KIND_TITLES[typeToken] ??
       humanizeToken(typeToken) ??
       UNLABELLED_TITLE,
     preview: trimmedOrNull(notification.message),
-    destination: resolveDestination(notification.action_url),
+    destination:
+      destination.kind === 'none' && mark === 'radar' ? RADAR_FALLBACK : destination,
   };
 }

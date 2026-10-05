@@ -8,6 +8,7 @@ import {
   AtSign,
   Bell,
   CheckCheck,
+  Radar,
   Reply,
   Settings2,
   Trash2,
@@ -139,6 +140,7 @@ const MARK_ICONS: Readonly<Record<NotificationMark, LucideIcon>> = {
   // the row is time-critical (a lobby self-cancels after ten minutes) but that
   // is what its own words say, not something a second colour may claim.
   quiz: Trophy,
+  radar: Radar,
   general: Bell,
 };
 
