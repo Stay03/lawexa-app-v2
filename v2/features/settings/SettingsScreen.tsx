@@ -41,13 +41,13 @@ import { SignOutRow } from './sign-out/SignOutRow';
  */
 export function SettingsScreen() {
   const session = useV2Session();
-  const { role, signedIn } = session;
+  const { role, signedIn, isLawyer } = session;
 
   // Pure and synchronous, off the snapshot the layout already resolved — the
   // right rows are on the first paint and nothing appears a moment later.
   const groups = useMemo(
-    () => visibleSettingsGroups(role, signedIn),
-    [role, signedIn],
+    () => visibleSettingsGroups(role, signedIn, isLawyer),
+    [role, signedIn, isLawyer],
   );
 
   return (

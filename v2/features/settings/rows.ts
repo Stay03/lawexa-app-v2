@@ -9,6 +9,7 @@ import {
   MessageSquarePlus,
   MonitorSmartphone,
   Paintbrush,
+  ShieldCheck,
   Ticket,
   User,
   type LucideIcon,
@@ -29,6 +30,7 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
  *
  *   Profile         /settings/profile        → V2 (rebuilt, 16 August 2026)
  *   Activity        /activity                → V2 (rebuilt, 5 October 2026)
+ *   Verification    /settings/verification   → V2 (rebuilt, 5 October 2026)
  *   Devices         /settings/devices        → V2 (new, 28 September 2026)
  *   Organization    /organization            → V2 (rebuilt, phase-5 W5)
  *   Usage           /settings/usage          → V2 (rebuilt, 29 September 2026)
@@ -107,6 +109,13 @@ export interface SettingsRow {
    * and the reason both nav surfaces cannot drift.
    */
   canAccess?: (role: UserRole | null) => boolean;
+  /**
+   * Shown only to an account whose profile type is `lawyer`. Not a role (the
+   * role is `user` for every type), so it cannot be a `canAccess` predicate;
+   * it reads the session's `isLawyer`. Not a security boundary either: the
+   * destination answers a non-lawyer with its own designed state.
+   */
+  requiresLawyer?: true;
 }
 
 /**
@@ -160,6 +169,17 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         label: 'Activity',
         icon: History,
         href: '/activity',
+      },
+      {
+        // REBUILT 5 October 2026 from v1's `/lawyer-verification`, which was a
+        // sidebar item for lawyers. It sits beside Profile because it is a fact
+        // about the same person, and v1's address redirects here in v2.
+        id: 'verification',
+        label: 'Lawyer verification',
+        icon: ShieldCheck,
+        href: '/settings/verification',
+        requiresAccount: true,
+        requiresLawyer: true,
       },
       {
         // NEW IN v2 (28 September 2026). v1 never had it: its "Privacy &
@@ -299,12 +319,14 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
 export function visibleSettingsGroups(
   role: UserRole | null,
   signedIn: boolean,
+  isLawyer: boolean,
 ): SettingsGroup[] {
   const hasAccount = signedIn && role !== 'guest';
   const groups: SettingsGroup[] = [];
   for (const group of SETTINGS_GROUPS) {
     const rows = group.rows.filter((row) => {
       if (row.requiresAccount && !hasAccount) return false;
+      if (row.requiresLawyer && !isLawyer) return false;
       return row.canAccess?.(role) ?? true;
     });
     if (rows.length > 0) groups.push({ ...group, rows });

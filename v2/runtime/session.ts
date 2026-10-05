@@ -68,6 +68,12 @@ export interface SessionUser {
    *  (the statute library). Null when the profile has none. */
   profile_country_name: string | null;
   profile_country_code: string | null;
+  /**
+   * Is the profile's account type `lawyer`? A PRESENTATION fact like
+   * `can_set_price`: it decides whether the settings screen offers the Lawyer
+   * verification row, and the verification API stays the authority.
+   */
+  is_lawyer: boolean;
 }
 
 export interface SessionDTO {
@@ -108,6 +114,7 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
         is_ambassador: typeof result.data?.is_ambassador === 'boolean' ? result.data.is_ambassador : null,
         profile_country_name: user.profile?.country?.trim() || null,
         profile_country_code: user.profile?.country_code?.trim() || null,
+        is_lawyer: user.profile?.user_type === 'lawyer',
       },
     };
   } catch {

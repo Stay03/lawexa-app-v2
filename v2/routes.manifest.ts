@@ -146,6 +146,7 @@ export const V2_ROUTES = [
   '/settings/referrals',
   '/settings/usage',
   '/settings/api',
+  '/settings/verification',
   // Where the payment provider returns a v2 buyer of message packs.
   '/payg/callback',
   // Where it returns a v2 buyer of a plan, an upgrade or a free trial.
@@ -157,6 +158,9 @@ export const V2_ROUTES = [
   '/space-invitations',
   '/organization-invitations',
   '/settings/organization',
+  // v1's lawyer verification address, a v2-only redirect shell onto
+  // `/settings/verification` (see `app/v2/lawyer-verification/page.tsx`).
+  '/lawyer-verification',
 ] as const;
 
 /**

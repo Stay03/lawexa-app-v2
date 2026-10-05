@@ -177,6 +177,10 @@ const FALLBACK_BLOCK_HEIGHTS = ['h-42', 'h-56', 'h-28', 'h-14', 'h-14'] as const
  * live screen, so the hand-off moves nothing. The row COUNTS are the signed-in
  * shape (3 / 4 / 2 / 1 / 1); a guest sees fewer rows arrive than were reserved,
  * which settles upward and is the harmless direction for a list to change in.
+ * A lawyer sees one row MORE in the first block (Lawyer verification, 5
+ * October 2026), so the blocks under it land one row lower than reserved. The
+ * fallback keeps the shape most accounts have rather than reserving a row that
+ * most people never get.
  *
  * `aria-hidden` + `inert`: a fallback is deleted rather than reconciled, so
  * nothing focusable may live in it. The one announcement lives outside it.

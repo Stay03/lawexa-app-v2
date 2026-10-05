@@ -405,6 +405,13 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Usage'),
         };
       }
+      if (depth === 2 && second === 'verification') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Lawyer verification'),
+        };
+      }
       return null;
 
     default:

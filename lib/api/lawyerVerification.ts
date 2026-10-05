@@ -1,5 +1,4 @@
 import { apiClient } from './client';
-import axios from 'axios';
 
 export interface LawyerProfileDocument {
   id: number;
@@ -58,8 +57,16 @@ export const lawyerVerificationApi = {
   /**
    * Upload a verification document
    * @param file - The file to upload (PDF, JPG, JPEG, PNG - max 10MB)
+   * @param options - Optional progress callback (bytes sent, bytes total) and
+   *   abort signal. Both are optional, so existing callers are unchanged.
    */
-  uploadDocument: async (file: File) => {
+  uploadDocument: async (
+    file: File,
+    options: {
+      onProgress?: (sent: number, total: number) => void;
+      signal?: AbortSignal;
+    } = {}
+  ) => {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -70,6 +77,14 @@ export const lawyerVerificationApi = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        signal: options.signal,
+        onUploadProgress: options.onProgress
+          ? (event) => {
+              // `event.total` is absent on some transports; the file's own
+              // size is the honest denominator.
+              options.onProgress?.(event.loaded, event.total ?? file.size);
+            }
+          : undefined,
       }
     );
     return response.data;

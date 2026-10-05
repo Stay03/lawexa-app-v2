@@ -129,6 +129,13 @@ export interface V2SessionSnapshot {
    *  The statute library opens on it; the server prefetch reads the same value. */
   readonly profileCountryName: string | null;
   readonly profileCountryCode: string | null;
+  /**
+   * Is this account a lawyer (the profile's account type)? `false` when
+   * signed out. Presentation only: it decides whether settings offers Lawyer
+   * verification. A profile save calls `router.refresh()`, which re-runs the
+   * layout, so changing the account type updates it without a reload.
+   */
+  readonly isLawyer: boolean;
 }
 
 /**
@@ -162,6 +169,7 @@ export function V2SessionProvider({
   isAmbassador,
   profileCountryName,
   profileCountryCode,
+  isLawyer,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
@@ -179,6 +187,7 @@ export function V2SessionProvider({
       isAmbassador,
       profileCountryName,
       profileCountryCode,
+      isLawyer,
     }),
     [
       signedIn,
@@ -194,6 +203,7 @@ export function V2SessionProvider({
       isAmbassador,
       profileCountryName,
       profileCountryCode,
+      isLawyer,
     ],
   );
 
