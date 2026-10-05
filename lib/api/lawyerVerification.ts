@@ -1,5 +1,12 @@
 import { apiClient } from './client';
 
+/**
+ * Which verification document a file is. The wire keys are v1 onboarding's
+ * (`app/(onboarding)/onboarding/step-8/page.tsx`): Means of ID, Call to Bar
+ * Certificate, Practicing License, CV / Resume.
+ */
+export type LawyerDocumentType = 'id' | 'certificate' | 'license' | 'cv';
+
 export interface LawyerProfileDocument {
   id: number;
   url: string;
@@ -7,6 +14,8 @@ export interface LawyerProfileDocument {
   mime_type: string;
   size: number;
   created_at: string;
+  /** `null` for a file uploaded before the type existed. */
+  document_type?: LawyerDocumentType | null;
 }
 
 export type VerificationStatus = 'draft' | 'pending' | 'approved' | 'rejected';
@@ -57,18 +66,24 @@ export const lawyerVerificationApi = {
   /**
    * Upload a verification document
    * @param file - The file to upload (PDF, JPG, JPEG, PNG - max 10MB)
-   * @param options - Optional progress callback (bytes sent, bytes total) and
-   *   abort signal. Both are optional, so existing callers are unchanged.
+   * @param options - Optional document type, progress callback (bytes sent,
+   *   bytes total) and abort signal. All optional, so existing callers are
+   *   unchanged. A second file of a type the profile already holds is refused
+   *   with a 422.
    */
   uploadDocument: async (
     file: File,
     options: {
+      documentType?: LawyerDocumentType;
       onProgress?: (sent: number, total: number) => void;
       signal?: AbortSignal;
     } = {}
   ) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (options.documentType) {
+      formData.append('document_type', options.documentType);
+    }
 
     const response = await apiClient.post<ApiResponse<LawyerProfileDocument>>(
       '/lawyer-verification/documents',

@@ -2,35 +2,41 @@
 
 import { useCallback, useRef, useState } from 'react';
 
+import type { LawyerDocumentType } from '@/lib/api/lawyerVerification';
 import { extractApiError } from '@/lib/utils/api-error';
-import { sortSelection } from './model';
+import { documentProblem, uploadFailure } from './model';
 import { useEnsureVerificationProfile, useUploadVerificationDocument } from './queries';
 
 /**
- * use-document-uploads — the files on their way to the server: how far each
- * one has got, which failed and why, and what can be done about each.
+ * use-document-uploads — the file on its way to each slot: how far it has
+ * got, whether it failed and why, and what can be done about it. At most one
+ * per slot, because a slot holds one file and the server refuses a second.
  *
  * It follows the channel upload tray (`channels/files/use-upload-queue.ts`) on
  * the three points that tray settled the hard way:
  *
  *  - `mutateAsync`, one promise per file. A mutation observer holds ONE set of
- *    per-call callbacks and drops the earlier ones, so with two files in flight
- *    only the last would ever leave its "uploading" state.
+ *    per-call callbacks and drops the earlier ones, so with two slots
+ *    uploading at once only the last would ever leave its "uploading" state.
  *  - 100 % is not done. When every byte is sent the server is still storing
- *    the file, so the row says "Finishing" and offers no Cancel, because
+ *    the file, so the slot says "Finishing" and offers no Cancel, because
  *    aborting then would drop a response for a file that is stored anyway.
- *  - Only a real attempt can be retried. A refusal before sending (wrong type,
- *    too big, no place left) carries its reason and a Dismiss.
+ *  - Only an attempt that could succeed again is retried. A refusal before
+ *    sending (wrong type, too big) or by the server (a 422: this slot already
+ *    has a file) carries its reason and a Dismiss; a dropped connection or a
+ *    server fault carries Retry (`uploadFailure` in `model.ts`).
  *
- * A file that arrives is removed from this list in the same turn its document
- * joins the cached profile, so the progress row turns into the document row
- * rather than leaving a gap.
+ * A file that arrives leaves this state in the same turn its document joins
+ * the cached profile, so the slot turns from progress into the stored file
+ * rather than flashing empty in between.
  */
 
 export type UploadStatus = 'uploading' | 'finishing' | 'failed' | 'rejected';
 
 export interface UploadEntry {
-  id: number;
+  /** New on every attempt, so a late answer to an old one is ignored. */
+  attempt: number;
+  type: LawyerDocumentType;
   name: string;
   /** Bytes to send: the progress bar's denominator. */
   total: number;
@@ -43,66 +49,61 @@ export interface UploadEntry {
   cancellable: boolean;
 }
 
+export type UploadsBySlot = Partial<Record<LawyerDocumentType, UploadEntry>>;
+
 export interface DocumentUploads {
-  entries: readonly UploadEntry[];
+  bySlot: UploadsBySlot;
   /** Uploads that will become documents if they succeed. */
   inFlight: number;
-  /** Check a selection against the rules and the places left, then send it. */
-  add: (files: readonly File[], placesLeft: number) => void;
-  cancel: (id: number) => void;
-  retry: (id: number) => void;
-  dismiss: (id: number) => void;
-}
-
-/** A failure the reader can act on, in the server's words when it has some. */
-function failureMessage(error: unknown): string {
-  const apiError = extractApiError(error);
-  if (apiError.status === 422 && apiError.errors) {
-    const first = Object.values(apiError.errors).flat()[0];
-    if (first) return first;
-  }
-  if (apiError.status >= 400 && apiError.status < 500) return apiError.message;
-  return 'The upload did not finish. Check your connection and try again.';
+  /** Check one file against the rules, then send it for `type`. */
+  add: (type: LawyerDocumentType, file: File) => void;
+  cancel: (type: LawyerDocumentType) => void;
+  retry: (type: LawyerDocumentType) => void;
+  dismiss: (type: LawyerDocumentType) => void;
 }
 
 export function useDocumentUploads(hasProfile: boolean): DocumentUploads {
   const uploadAsync = useUploadVerificationDocument().mutateAsync;
   const ensureAsync = useEnsureVerificationProfile().mutateAsync;
 
-  const [entries, setEntries] = useState<UploadEntry[]>([]);
-  const nextId = useRef(0);
+  const [bySlot, setBySlot] = useState<UploadsBySlot>({});
+  const nextAttempt = useRef(0);
   /** Refs, not state: neither is drawn, and a `File` in state would be copied
    *  on every progress tick. */
-  const files = useRef(new Map<number, File>());
-  const controllers = useRef(new Map<number, AbortController>());
-  /** One profile creation shared by every file of the first selection. */
+  const files = useRef(new Map<LawyerDocumentType, File>());
+  const controllers = useRef(new Map<LawyerDocumentType, AbortController>());
+  /** One profile creation shared by every slot of the first uploads. */
   const creating = useRef<Promise<void> | null>(null);
 
-  /** Update one entry IF IT IS STILL THERE: a cancelled upload's late
-   *  rejection must not bring its row back. */
-  const patch = useCallback((id: number, next: Partial<UploadEntry>) => {
-    setEntries((previous) => {
-      let changed = false;
-      const rows = previous.map((entry) => {
-        if (entry.id !== id) return entry;
-        changed = true;
-        return { ...entry, ...next };
+  /** Update a slot's entry IF it is still the same attempt: a cancelled
+   *  upload's late rejection must not bring its row back. */
+  const patch = useCallback(
+    (type: LawyerDocumentType, attempt: number, next: Partial<UploadEntry>) => {
+      setBySlot((previous) => {
+        const entry = previous[type];
+        if (!entry || entry.attempt !== attempt) return previous;
+        return { ...previous, [type]: { ...entry, ...next } };
       });
-      return changed ? rows : previous;
-    });
-  }, []);
+    },
+    [],
+  );
 
-  const drop = useCallback((id: number) => {
-    files.current.delete(id);
-    controllers.current.delete(id);
-    setEntries((previous) => previous.filter((entry) => entry.id !== id));
+  /** Drop a slot's entry; with `attempt`, only if it is still that attempt. */
+  const clear = useCallback((type: LawyerDocumentType, attempt?: number) => {
+    setBySlot((previous) => {
+      const entry = previous[type];
+      if (!entry || (attempt !== undefined && entry.attempt !== attempt)) return previous;
+      const next = { ...previous };
+      delete next[type];
+      return next;
+    });
   }, []);
 
   const ensureProfile = useCallback((): Promise<void> => {
     if (hasProfile) return Promise.resolve();
     if (!creating.current) {
       creating.current = ensureAsync().catch((error: unknown) => {
-        // Let the next selection try again rather than reusing a failure.
+        // Let the next upload try again rather than reusing a failure.
         creating.current = null;
         throw error;
       });
@@ -111,69 +112,17 @@ export function useDocumentUploads(hasProfile: boolean): DocumentUploads {
   }, [hasProfile, ensureAsync]);
 
   const start = useCallback(
-    async (id: number, file: File) => {
+    async (type: LawyerDocumentType, file: File) => {
+      const attempt = nextAttempt.current++;
       const controller = new AbortController();
-      controllers.current.set(id, controller);
-      patch(id, {
-        status: 'uploading',
-        sent: 0,
-        message: null,
-        retryable: false,
-        cancellable: true,
-      });
-      try {
-        await ensureProfile();
-        await uploadAsync({
-          file,
-          signal: controller.signal,
-          onProgress: (sent, total) => {
-            const finished = sent >= total;
-            patch(id, {
-              sent,
-              total,
-              status: finished ? 'finishing' : 'uploading',
-              cancellable: !finished,
-            });
-          },
-        });
-        drop(id);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        patch(id, {
-          status: 'failed',
-          message: failureMessage(error),
-          retryable: true,
-          cancellable: false,
-        });
-      }
-    },
-    [ensureProfile, uploadAsync, patch, drop],
-  );
-
-  const add = useCallback(
-    (selection: readonly File[], placesLeft: number) => {
-      const verdict = sortSelection(selection, placesLeft);
-      const added: UploadEntry[] = [];
-      const toStart: Array<[number, File]> = [];
-
-      for (const { file, reason } of verdict.rejected) {
-        added.push({
-          id: nextId.current++,
-          name: file.name,
-          total: file.size,
-          sent: 0,
-          status: 'rejected',
-          message: reason,
-          retryable: false,
-          cancellable: false,
-        });
-      }
-      for (const file of verdict.accepted) {
-        const id = nextId.current++;
-        files.current.set(id, file);
-        toStart.push([id, file]);
-        added.push({
-          id,
+      controllers.current.get(type)?.abort();
+      controllers.current.set(type, controller);
+      files.current.set(type, file);
+      setBySlot((previous) => ({
+        ...previous,
+        [type]: {
+          attempt,
+          type,
           name: file.name,
           total: file.size,
           sent: 0,
@@ -181,35 +130,91 @@ export function useDocumentUploads(hasProfile: boolean): DocumentUploads {
           message: null,
           retryable: false,
           cancellable: true,
+        },
+      }));
+      try {
+        await ensureProfile();
+        await uploadAsync({
+          file,
+          documentType: type,
+          signal: controller.signal,
+          onProgress: (sent, total) => {
+            const finished = sent >= total;
+            patch(type, attempt, {
+              sent,
+              total,
+              status: finished ? 'finishing' : 'uploading',
+              cancellable: !finished,
+            });
+          },
         });
+        files.current.delete(type);
+        controllers.current.delete(type);
+        clear(type, attempt);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const { message, retryable } = uploadFailure(extractApiError(error));
+        patch(type, attempt, { status: 'failed', message, retryable, cancellable: false });
       }
+    },
+    [ensureProfile, uploadAsync, patch, clear],
+  );
 
-      if (added.length === 0) return;
-      setEntries((previous) => [...previous, ...added]);
-      for (const [id, file] of toStart) void start(id, file);
+  const add = useCallback(
+    (type: LawyerDocumentType, file: File) => {
+      const problem = documentProblem(file);
+      if (!problem) {
+        void start(type, file);
+        return;
+      }
+      files.current.delete(type);
+      setBySlot((previous) => ({
+        ...previous,
+        [type]: {
+          attempt: nextAttempt.current++,
+          type,
+          name: file.name,
+          total: file.size,
+          sent: 0,
+          status: 'rejected',
+          message: problem,
+          retryable: false,
+          cancellable: false,
+        },
+      }));
     },
     [start],
   );
 
   const cancel = useCallback(
-    (id: number) => {
-      controllers.current.get(id)?.abort();
-      drop(id);
+    (type: LawyerDocumentType) => {
+      controllers.current.get(type)?.abort();
+      controllers.current.delete(type);
+      files.current.delete(type);
+      clear(type);
     },
-    [drop],
+    [clear],
   );
 
   const retry = useCallback(
-    (id: number) => {
-      const file = files.current.get(id);
-      if (file) void start(id, file);
+    (type: LawyerDocumentType) => {
+      const file = files.current.get(type);
+      if (file) void start(type, file);
     },
     [start],
   );
 
-  const inFlight = entries.filter(
+  const dismiss = useCallback(
+    (type: LawyerDocumentType) => {
+      files.current.delete(type);
+      clear(type);
+    },
+    [clear],
+  );
+
+  const inFlight = Object.values(bySlot).filter(
     (entry) => entry.status === 'uploading' || entry.status === 'finishing',
   ).length;
 
-  return { entries, inFlight, add, cancel, retry, dismiss: drop };
+  return { bySlot, inFlight, add, cancel, retry, dismiss };
 }

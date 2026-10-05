@@ -1,7 +1,9 @@
 import type {
+  LawyerDocumentType,
   LawyerProfile,
   LawyerProfileDocument,
 } from '@/lib/api/lawyerVerification';
+import type { ApiError } from '@/lib/utils/api-error';
 
 /**
  * Lawyer verification — the pure part: which screen a profile gets, which
@@ -13,11 +15,14 @@ import type {
  * Create one first.") for a lawyer who never reached onboarding step 8, and
  * otherwise a profile whose `verification_status` is one of `draft`,
  * `pending`, `approved` or `rejected`, with `can_resubmit` and the uploaded
- * `documents`. A document carries a name, a type, a size and a signed URL. It
- * carries NO kind: the backend does not know which file is the ID and which is
- * the licence. So the screen lists what to send and counts what was sent, and
- * never pins a file to a named slot (v1's onboarding did, by array index, and
- * the labels moved onto the wrong files as soon as one was removed).
+ * `documents`. A document carries a name, a MIME type, a size, a signed URL
+ * and a `document_type`: one of the four slot keys, or `null` for a file sent
+ * before the type existed (contract agreed 5 October 2026, tech lead fc37ee74).
+ *
+ * A file is placed in a slot BY ITS TYPE AND NOTHING ELSE. v1's onboarding
+ * placed them by array index, and the labels moved onto the wrong files as
+ * soon as one was removed. A file with no type, or a type this build does not
+ * know, goes to "Other documents" and is never guessed into a slot.
  */
 
 /** v1's rule, on both of its screens: exactly four documents are sent. */
@@ -40,17 +45,59 @@ const ALLOWED_EXTENSIONS: readonly string[] = ['pdf', 'jpg', 'jpeg', 'png'];
 /** The picker's `accept`, so the system dialog offers the right files first. */
 export const DOCUMENT_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
 
-/** What the reviewer needs, in the words v1's onboarding used. */
-export const DOCUMENTS_TO_SEND: readonly {
-  id: 'identity' | 'call' | 'licence' | 'cv';
+/**
+ * The four slots, in the order v1's onboarding asked for them. `type` is the
+ * wire key (v1's own); the label and detail are v2's words. v1 said "Call to
+ * Bar Certificate", "Practicing License" and "CV / Resume"; v2 writes sentence
+ * case and the British spelling of the noun, as the rest of the product does.
+ */
+export interface DocumentSlot {
+  type: LawyerDocumentType;
   label: string;
   detail: string;
-}[] = [
-  { id: 'identity', label: 'Means of ID', detail: 'NIN, international passport or similar' },
-  { id: 'call', label: 'Call to Bar certificate', detail: 'A scan or a clear photo' },
-  { id: 'licence', label: 'Practising licence', detail: 'Your current one' },
-  { id: 'cv', label: 'CV or résumé', detail: 'Ideally a PDF' },
+}
+
+export const DOCUMENT_SLOTS: readonly DocumentSlot[] = [
+  { type: 'id', label: 'Means of ID', detail: 'NIN, international passport or similar' },
+  { type: 'certificate', label: 'Call to Bar certificate', detail: 'A scan or a clear photo' },
+  { type: 'license', label: 'Practising licence', detail: 'Your current one' },
+  { type: 'cv', label: 'CV or résumé', detail: 'Ideally a PDF' },
 ];
+
+const SLOT_TYPES: readonly string[] = DOCUMENT_SLOTS.map((slot) => slot.type);
+
+export function isDocumentType(value: unknown): value is LawyerDocumentType {
+  return typeof value === 'string' && SLOT_TYPES.includes(value);
+}
+
+export interface ArrangedDocuments {
+  /** The file in each slot, or `null` for an empty one. */
+  slots: Record<LawyerDocumentType, LawyerProfileDocument | null>;
+  /** Files with no type, an unknown type, or a second file of a filled type. */
+  other: LawyerProfileDocument[];
+}
+
+/**
+ * Put each document in its slot by `document_type`. The server refuses a
+ * second file of a type, but a profile from before that rule may hold two;
+ * the first keeps the slot and the second is listed under Other documents, so
+ * no file the reviewer will see is ever hidden from its owner.
+ */
+export function arrangeDocuments(documents: readonly LawyerProfileDocument[]): ArrangedDocuments {
+  const slots: ArrangedDocuments['slots'] = { id: null, certificate: null, license: null, cv: null };
+  const other: LawyerProfileDocument[] = [];
+  for (const document of documents) {
+    const type = document.document_type;
+    if (isDocumentType(type) && slots[type] === null) slots[type] = document;
+    else other.push(document);
+  }
+  return { slots, other };
+}
+
+/** The slots that hold no file, in slot order. */
+export function emptySlots(arranged: ArrangedDocuments): DocumentSlot[] {
+  return DOCUMENT_SLOTS.filter((slot) => arranged.slots[slot.type] === null);
+}
 
 /**
  * Where the reader stands. One value per screen, so every answer the API can
@@ -225,61 +272,71 @@ export function documentProblem(file: FileLike): string | null {
   return null;
 }
 
-export interface SelectionVerdict<T extends FileLike> {
-  accepted: T[];
-  rejected: { file: T; reason: string }[];
-}
-
-/**
- * Split a picked or dropped selection into the files to upload and the files
- * to refuse, given how many places are left. A file that breaks a rule is
- * refused for that rule; a good file past the last free place is refused for
- * the count, so nobody uploads a fifth document only to be unable to send.
- */
-export function sortSelection<T extends FileLike>(
-  files: readonly T[],
-  placesLeft: number,
-): SelectionVerdict<T> {
-  const verdict: SelectionVerdict<T> = { accepted: [], rejected: [] };
-  let left = Math.max(0, placesLeft);
-  for (const file of files) {
-    const problem = documentProblem(file);
-    if (problem) {
-      verdict.rejected.push({ file, reason: problem });
-    } else if (left === 0) {
-      verdict.rejected.push({
-        file,
-        reason: `You already have ${REQUIRED_DOCUMENTS} documents. Remove one to add another.`,
-      });
-    } else {
-      verdict.accepted.push(file);
-      left -= 1;
-    }
-  }
-  return verdict;
-}
-
-/** Free places, counting the uploads still on their way. */
-export function placesLeft(uploaded: number, inFlight: number): number {
-  return Math.max(0, REQUIRED_DOCUMENTS - uploaded - inFlight);
+/** Sentence-joined labels: "A", "A and B", "A, B and C". */
+function joinLabels(labels: readonly string[]): string {
+  if (labels.length <= 1) return labels.join('');
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
 }
 
 /**
  * The sentence under the submit button while it cannot be pressed, or `null`
- * when it can. Uploads in flight are counted as not there yet, because they
- * are not: the server has not stored them.
+ * when it can.
+ *
+ * The rule is the server's: exactly four stored documents, counted across the
+ * slots AND Other documents, so a profile whose files predate the types can
+ * still be sent. The sentence names the empty slots, because "add one more"
+ * says how many but not which. Uploads in flight count as not there yet,
+ * because the server has not stored them.
  */
-export function submitBlocker(uploaded: number, inFlight: number): string | null {
+export function submitBlocker(arranged: ArrangedDocuments, inFlight: number): string | null {
   if (inFlight > 0) return 'Wait for your uploads to finish.';
-  if (uploaded < REQUIRED_DOCUMENTS) {
-    const missing = REQUIRED_DOCUMENTS - uploaded;
-    return `Add ${plural(missing, 'more document', 'more documents')} to send for review.`;
+  const stored = DOCUMENT_SLOTS.length - emptySlots(arranged).length + arranged.other.length;
+  if (stored < REQUIRED_DOCUMENTS) {
+    const empty = emptySlots(arranged).map((slot) => slot.label);
+    const missing = REQUIRED_DOCUMENTS - stored;
+    if (arranged.other.length === 0 || empty.length === missing) {
+      return `Add your ${joinLabels(empty)} to send for review.`;
+    }
+    return `Add ${plural(missing, 'more document', 'more documents')} to send for review. Still empty: ${joinLabels(empty)}.`;
   }
-  if (uploaded > REQUIRED_DOCUMENTS) {
-    const extra = uploaded - REQUIRED_DOCUMENTS;
-    return `Remove ${plural(extra, 'document', 'documents')}. Exactly ${REQUIRED_DOCUMENTS} are sent for review.`;
+  if (stored > REQUIRED_DOCUMENTS) {
+    const extra = stored - REQUIRED_DOCUMENTS;
+    return `Remove ${plural(extra, 'document', 'documents')} from Other documents. Exactly ${REQUIRED_DOCUMENTS} are sent for review.`;
   }
   return null;
+}
+
+/**
+ * What an upload's failure says, and whether trying the same file again could
+ * work.
+ *
+ * A 422 is the server refusing THIS file for THIS slot, so its own words are
+ * shown and Retry is not offered: it would be refused the same way. Backend
+ * 3dd1fc6 sends a second file of a held type as a bare `message` ("A
+ * Practicing License is already uploaded. Delete it before uploading
+ * another.") and a bad type as `errors.document_type`. A field error is
+ * preferred over the summary, `document_type` first because it is the slot's
+ * own refusal. Only a dropped connection or a server fault is worth retrying.
+ */
+export function uploadFailure(error: ApiError): { message: string; retryable: boolean } {
+  if (error.status === 422) {
+    const fieldMessage =
+      error.errors?.document_type?.[0] ??
+      error.errors?.file?.[0] ??
+      (error.errors ? Object.values(error.errors).flat()[0] : undefined);
+    const message = fieldMessage?.trim() || error.message.trim();
+    return {
+      message: message || 'This slot already has a file. Remove the current file first.',
+      retryable: false,
+    };
+  }
+  if (error.status >= 400 && error.status < 500) {
+    return { message: error.message, retryable: false };
+  }
+  return {
+    message: 'The upload did not finish. Check your connection and try again.',
+    retryable: true,
+  };
 }
 
 export type DocumentKind = 'pdf' | 'image' | 'other';

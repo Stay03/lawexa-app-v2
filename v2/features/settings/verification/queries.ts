@@ -7,6 +7,7 @@ import {
 
 import {
   lawyerVerificationApi,
+  type LawyerDocumentType,
   type LawyerProfile,
   type LawyerProfileDocument,
 } from '@/lib/api/lawyerVerification';
@@ -19,7 +20,7 @@ import { STALE_TIMES } from '@/v2/runtime/query';
  *
  *   GET    /lawyer-verification/my-profile        the profile, or 404 for none
  *   POST   /lawyer-verification/profile           create it (403 if it exists)
- *   POST   /lawyer-verification/documents         upload one file (`file`)
+ *   POST   /lawyer-verification/documents         upload one file (`file`, `document_type`)
  *   DELETE /lawyer-verification/documents/{id}    remove one
  *   POST   /lawyer-verification/submit            send for review; returns the profile
  *
@@ -98,6 +99,8 @@ export function useEnsureVerificationProfile() {
 
 export interface UploadVariables {
   file: File;
+  /** The slot the file is for. A second file of a type is refused (422). */
+  documentType: LawyerDocumentType;
   onProgress: (sent: number, total: number) => void;
   signal: AbortSignal;
 }
@@ -110,8 +113,8 @@ export interface UploadVariables {
 export function useUploadVerificationDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file, onProgress, signal }: UploadVariables) =>
-      (await lawyerVerificationApi.uploadDocument(file, { onProgress, signal })).data,
+    mutationFn: async ({ file, documentType, onProgress, signal }: UploadVariables) =>
+      (await lawyerVerificationApi.uploadDocument(file, { documentType, onProgress, signal })).data,
     meta: { silentError: true },
     onSuccess: (document: LawyerProfileDocument | undefined) => {
       // The same rule as `isProfile`: only a whole record joins the cache.

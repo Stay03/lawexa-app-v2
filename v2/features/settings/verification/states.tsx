@@ -4,10 +4,10 @@ import { SETTINGS_COLUMN } from '../SettingsList';
 
 /**
  * The Lawyer verification silhouette: the heading from `md:` up, the status
- * panel, then one headed block and the upload zone under it. It is the shape
- * of the screen before anything is sent, which is the state most people open
- * it in; a profile under review or verified draws the same panel and a shorter
- * list, so the hand-off only ever removes height below the panel.
+ * panel, then "Your documents" with its sentence, the count meter and the
+ * four slots. It is the editable shape, the state most people open the screen
+ * in; a profile under review or verified draws the same panel and only its
+ * filled slots, so the hand-off only ever removes height below the panel.
  *
  * Drawn by the route's `loading.tsx` and by the screen while the profile
  * loads, so both waits look the same.
@@ -31,9 +31,11 @@ export function VerificationFallback() {
         </div>
         <div className="mt-5">
           <Skeleton className="mb-2 h-4 w-28 rounded" />
-          <Skeleton className="h-56 w-full rounded-2xl" />
+          <Skeleton className="mb-2 h-3.5 w-72 max-w-full rounded" />
+          <Skeleton className="mb-2 h-1 w-full rounded-full" />
+          {/* Four two-line rows (about 58.5px each) and three hairlines. */}
+          <Skeleton className="h-[14.8rem] w-full rounded-2xl" />
         </div>
-        <Skeleton className="mt-5 h-28 w-full rounded-2xl" />
       </div>
     </>
   );

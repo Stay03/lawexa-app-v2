@@ -1,13 +1,9 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Award,
-  FileBadge,
-  FileUser,
-  IdCard,
   Loader2,
   LogIn,
   Mail,
@@ -16,24 +12,26 @@ import {
   Send,
   TriangleAlert,
   UserPlus,
-  type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { LawyerProfile, LawyerProfileDocument } from '@/lib/api/lawyerVerification';
+import type {
+  LawyerDocumentType,
+  LawyerProfile,
+  LawyerProfileDocument,
+} from '@/lib/api/lawyerVerification';
 import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { SETTINGS_COLUMN } from '../SettingsList';
-import { SettingsFormGroup } from '../SettingsForm';
+import { SETTINGS_BLOCK, SETTINGS_COLUMN } from '../SettingsList';
 import { SettingsState } from '../SettingsState';
-import { DocumentList, DropZone } from './DocumentList';
+import { OtherDocumentRow, SlotRow } from './DocumentSlots';
 import {
-  DOCUMENTS_TO_SEND,
+  DOCUMENT_SLOTS,
   REQUIRED_DOCUMENTS,
-  placesLeft as countPlacesLeft,
+  arrangeDocuments,
   reviewerNote,
   stageDates,
   stageView,
@@ -46,20 +44,12 @@ import {
 } from './queries';
 import { VerificationFallback } from './states';
 import { StatusPanel } from './StatusPanel';
-import { useDocumentUploads, type UploadEntry } from './use-document-uploads';
+import { useDocumentUploads } from './use-document-uploads';
 
-const SEND_ICON: Record<(typeof DOCUMENTS_TO_SEND)[number]['id'], LucideIcon> = {
-  identity: IdCard,
-  call: Award,
-  licence: FileBadge,
-  cv: FileUser,
-};
-
-/** Module-level, so the holdovers' `beginExit` stays referentially stable. */
+/** Module-level, so the holdover's `beginExit` stays referentially stable. */
 const documentKey = (document: LawyerProfileDocument): string => String(document.id);
-const uploadKey = (entry: UploadEntry): string => String(entry.id);
 
-/** One stable empty list for "no profile yet", so the row holdover and the
+/** One stable empty list for "no profile yet", so the arranged slots and the
  *  removal callback do not see a new array on every render. */
 const NO_DOCUMENTS: readonly LawyerProfileDocument[] = [];
 
@@ -70,8 +60,11 @@ const NO_DOCUMENTS: readonly LawyerProfileDocument[] = [];
  * ── ONE SCREEN, SIX STAGES ─────────────────────────────────────────────────
  * The status panel at the top always says where the reader stands and what
  * to do next (`model.ts` maps every API answer to exactly one stage). Below
- * it, the documents: editable while the profile is a draft or a rejection that
- * may be sent again, read-only while it is under review or verified. v1 split
+ * it, the documents in four named slots (Means of ID, Call to Bar
+ * certificate, Practising licence, CV or résumé), placed by `document_type`;
+ * files with no type are listed under Other documents. Editable while the
+ * profile is a draft or a rejection that may be sent again, read-only (filled
+ * slots only, no controls) while it is under review or verified. v1 split
  * this across a status card, a documents card and a timeline card; the
  * timeline's dates now sit under the status, where they answer "since when".
  *
@@ -81,7 +74,9 @@ const NO_DOCUMENTS: readonly LawyerProfileDocument[] = [];
  * `/lawyer-verification` address redirects here for a v2 reader.
  *
  * ── NOTHING APPEARS ABRUPTLY ───────────────────────────────────────────────
- * Rows fold in and out (`use-exiting-rows`), the parts that only an editable
+ * A slot keeps its height as it goes from empty to uploading to stored, and
+ * each new state fades in where the last one was. Other documents fold in and
+ * out (`use-exiting-rows`), the parts that only an editable
  * stage has collapse symmetrically when the stage stops being editable, and
  * the status panel replays its entrance when the stage changes. All of it is
  * `motion-safe`.
@@ -195,19 +190,20 @@ function VerificationBody({
 }) {
   const view = stageView(profile);
   const documents = profile?.documents ?? NO_DOCUMENTS;
+  const arranged = useMemo(() => arrangeDocuments(documents), [documents]);
   const uploads = useDocumentUploads(profile !== null);
   const remove = useRemoveVerificationDocument();
   const submit = useSubmitVerification();
 
   const statusHeading = useRef<HTMLHeadingElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
+  /** Each empty slot's file input, so focus can land on the slot a removal
+   *  just emptied. Written by ref callbacks, read in event handlers only. */
+  const slotInputs = useRef<Partial<Record<LawyerDocumentType, HTMLInputElement | null>>>({});
   const [removingIds, setRemovingIds] = useState<ReadonlySet<number>>(() => new Set());
 
-  const presentedDocuments = useExitingRows(documents, documentKey);
-  const presentedUploads = useExitingRows(uploads.entries, uploadKey);
+  const presentedOther = useExitingRows(arranged.other, documentKey);
 
-  const placesLeft = countPlacesLeft(documents.length, uploads.inFlight);
-  const blocker = submitBlocker(documents.length, uploads.inFlight);
+  const blocker = submitBlocker(arranged, uploads.inFlight);
   const editable = view.editable;
   const busy = submit.isPending;
 
@@ -218,25 +214,34 @@ function VerificationBody({
       : 'Your documents were not sent. Check your connection and try again.'
     : null;
 
-  const { beginExit: beginDocumentExit } = presentedDocuments;
+  const { beginExit: beginOtherExit } = presentedOther;
   const removeAsync = remove.mutateAsync;
   const resetSubmit = submit.reset;
   const handleRemove = useCallback(
     async (document: LawyerProfileDocument) => {
-      const index = documents.findIndex((d) => d.id === document.id);
+      const slotType = (Object.keys(arranged.slots) as LawyerDocumentType[]).find(
+        (type) => arranged.slots[type]?.id === document.id,
+      );
+      const otherIndex = arranged.other.findIndex((d) => d.id === document.id);
       resetSubmit();
       setRemovingIds((previous) => new Set(previous).add(document.id));
       try {
         // `mutateAsync`, one promise per removal: two quick removals must each
-        // get their own exit (see `use-document-uploads.ts`).
+        // settle on their own (see `use-document-uploads.ts`).
         await removeAsync(document.id);
-        beginDocumentExit(document, Math.max(0, index));
-        // The pressed button is leaving with its row. Focus goes to the way
-        // a replacement comes in, which is what the reader removed it for.
-        // A frame later, once the upload zone has re-opened and lost `inert`.
-        window.requestAnimationFrame(() => fileInput.current?.focus());
+        if (otherIndex !== -1) beginOtherExit(document, otherIndex);
+        // The pressed button is gone. Focus goes to the slot it emptied, or,
+        // for a file from Other documents, to the first slot still empty:
+        // either way, the place a replacement comes in. A frame later, once
+        // the emptied slot has rendered its input.
+        window.requestAnimationFrame(() => {
+          const target =
+            (slotType && slotInputs.current[slotType]) ||
+            DOCUMENT_SLOTS.map((slot) => slotInputs.current[slot.type]).find(Boolean);
+          target?.focus();
+        });
       } catch {
-        // The global toast says why; the row stays where it was.
+        // The global toast says why; the file stays where it was.
       } finally {
         setRemovingIds((previous) => {
           const next = new Set(previous);
@@ -245,18 +250,13 @@ function VerificationBody({
         });
       }
     },
-    [documents, removeAsync, resetSubmit, beginDocumentExit],
+    [arranged, removeAsync, resetSubmit, beginOtherExit],
   );
 
-  const { beginExit: beginUploadExit } = presentedUploads;
-  const leaveUpload = useCallback(
-    (entry: UploadEntry, then: (id: number) => void) => {
-      const index = uploads.entries.findIndex((e) => e.id === entry.id);
-      beginUploadExit(entry, Math.max(0, index));
-      then(entry.id);
-    },
-    [uploads.entries, beginUploadExit],
-  );
+  function handleFile(type: LawyerDocumentType, file: File) {
+    submit.reset();
+    uploads.add(type, file);
+  }
 
   function handleSubmit() {
     if (blocker || busy) return;
@@ -287,7 +287,13 @@ function VerificationBody({
       </Button>
     ) : undefined;
 
-  const hasRows = presentedDocuments.presented.length > 0 || presentedUploads.presented.length > 0;
+  // Editable: all four slots, empty ones included, because each is where its
+  // file goes. Read-only: only the filled ones, since an empty slot with no
+  // way to fill it says nothing.
+  const shownSlots = editable
+    ? DOCUMENT_SLOTS
+    : DOCUMENT_SLOTS.filter((slot) => arranged.slots[slot.type] !== null);
+  const hasOther = presentedOther.presented.length > 0;
   const hintId = 'verification-submit-hint';
   const errorId = 'verification-submit-error';
 
@@ -302,27 +308,6 @@ function VerificationBody({
         headingRef={statusHeading}
       />
 
-      <Reveal open={editable}>
-        <SettingsFormGroup
-          id="verification-what"
-          label="What to send"
-          description="One file for each, as a PDF, JPG or PNG of up to 10 MB."
-        >
-          {DOCUMENTS_TO_SEND.map((item) => {
-            const Icon = SEND_ICON[item.id];
-            return (
-              <li key={item.id} className="flex min-h-14 items-center gap-3.5 px-4 py-2.5">
-                <Icon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
-                <span className="flex min-w-0 flex-col">
-                  <span className="text-[15px] leading-snug font-medium text-foreground">{item.label}</span>
-                  <span className="text-[13px] leading-snug text-muted-foreground">{item.detail}</span>
-                </span>
-              </li>
-            );
-          })}
-        </SettingsFormGroup>
-      </Reveal>
-
       <section aria-labelledby="verification-documents" className="mt-5">
         <div className="flex items-baseline justify-between gap-3 px-1">
           <h2 id="verification-documents" className="text-[13px] leading-snug font-medium text-muted-foreground">
@@ -334,41 +319,71 @@ function VerificationBody({
             </span>
           ) : null}
         </div>
-        {editable ? <CountMeter count={documents.length} /> : null}
+        {editable ? (
+          <>
+            <p className="px-1 pt-1 text-[13px] leading-snug text-muted-foreground/80">
+              One file for each, as a PDF, JPG or PNG of up to 10 MB. Choose it, or drop it on its row.
+            </p>
+            <CountMeter count={documents.length} />
+          </>
+        ) : null}
 
-        {hasRows ? (
-          <div className="mt-2">
-            <DocumentList
-              documents={presentedDocuments.presented}
-              uploads={presentedUploads.presented}
-              editable={editable}
-              locked={busy}
-              removingIds={removingIds}
-              placesLeft={placesLeft}
-              onRemove={(document) => void handleRemove(document)}
-              onCancel={(entry) => leaveUpload(entry, uploads.cancel)}
-              onRetry={(entry) => uploads.retry(entry.id)}
-              onDismiss={(entry) => leaveUpload(entry, uploads.dismiss)}
-            />
-          </div>
-        ) : !editable ? (
+        {shownSlots.length > 0 ? (
+          <ul className={cn(SETTINGS_BLOCK, 'mt-2')}>
+            {shownSlots.map((slot) => {
+              const document = arranged.slots[slot.type];
+              return (
+                <SlotRow
+                  key={slot.type}
+                  slot={slot}
+                  document={document}
+                  upload={uploads.bySlot[slot.type]}
+                  editable={editable}
+                  locked={busy}
+                  removing={document !== null && removingIds.has(document.id)}
+                  inputRef={(element) => {
+                    slotInputs.current[slot.type] = element;
+                  }}
+                  onFile={handleFile}
+                  onRemove={(target) => void handleRemove(target)}
+                  onCancel={uploads.cancel}
+                  onRetry={uploads.retry}
+                  onDismiss={uploads.dismiss}
+                />
+              );
+            })}
+          </ul>
+        ) : !hasOther ? (
           <p className="mt-2 rounded-2xl bg-secondary px-4 py-4 text-[15px] leading-snug text-muted-foreground">
             No documents on this profile.
           </p>
         ) : null}
-
-        <Reveal open={editable && placesLeft > 0}>
-          <DropZone
-            placesLeft={placesLeft}
-            disabled={!editable || busy || placesLeft === 0}
-            onFiles={(files) => {
-              submit.reset();
-              uploads.add(files, placesLeft);
-            }}
-            inputRef={fileInput}
-          />
-        </Reveal>
       </section>
+
+      <Reveal open={hasOther}>
+        <section aria-labelledby="verification-other">
+          <h2 id="verification-other" className="px-1 text-[13px] leading-snug font-medium text-muted-foreground">
+            Other documents
+          </h2>
+          <p className="px-1 pt-1 text-[13px] leading-snug text-muted-foreground/80">
+            {editable
+              ? 'Sent before documents had a name, so they sit in no slot. They still count toward the four. To name one, remove it and upload it into its slot.'
+              : 'Sent before documents had a name, so they sit in no slot.'}
+          </p>
+          <ul className={cn(SETTINGS_BLOCK, 'mt-2')}>
+            {presentedOther.presented.map((presented) => (
+              <OtherDocumentRow
+                key={presented.row.id}
+                presented={presented}
+                editable={editable}
+                locked={busy}
+                removing={removingIds.has(presented.row.id)}
+                onRemove={(target) => void handleRemove(target)}
+              />
+            ))}
+          </ul>
+        </section>
+      </Reveal>
 
       <Reveal open={editable && view.submitLabel !== null}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -381,13 +396,9 @@ function VerificationBody({
               >
                 {submitMessage}
               </p>
-            ) : blocker ? (
-              <p id={hintId} className="text-[13px] leading-snug text-muted-foreground">
-                {blocker}
-              </p>
             ) : (
               <p id={hintId} className="text-[13px] leading-snug text-muted-foreground">
-                Once sent, your documents are locked until a reviewer has decided.
+                {blocker ?? 'Once sent, your documents are locked until a reviewer has decided.'}
               </p>
             )}
           </div>

@@ -1,19 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { LawyerProfile, LawyerProfileDocument } from '@/lib/api/lawyerVerification';
+import type { ApiError } from '@/lib/utils/api-error';
 import {
-  DOCUMENTS_TO_SEND,
+  DOCUMENT_SLOTS,
   MAX_DOCUMENT_BYTES,
   REQUIRED_DOCUMENTS,
+  arrangeDocuments,
   documentKind,
   documentProblem,
+  emptySlots,
   formatVerificationDate,
-  placesLeft,
+  isDocumentType,
   reviewerNote,
-  sortSelection,
   stageDates,
   stageView,
   submitBlocker,
+  uploadFailure,
   verificationStage,
 } from './model';
 
@@ -26,6 +29,9 @@ const doc = (id: number, over: Partial<LawyerProfileDocument> = {}): LawyerProfi
   created_at: '2026-10-01T09:00:00Z',
   ...over,
 });
+
+const typed = (id: number, document_type: LawyerProfileDocument['document_type']) =>
+  doc(id, { document_type });
 
 const profile = (over: Partial<LawyerProfile> = {}): LawyerProfile => ({
   id: 7,
@@ -43,7 +49,7 @@ const profile = (over: Partial<LawyerProfile> = {}): LawyerProfile => ({
   ...over,
 });
 
-const four = [doc(1), doc(2), doc(3), doc(4)];
+const four = [typed(1, 'id'), typed(2, 'certificate'), typed(3, 'license'), typed(4, 'cv')];
 
 // ── status → screen ─────────────────────────────────────────────────────────
 
@@ -152,41 +158,137 @@ test('an empty file is refused', () => {
   assert.equal(documentProblem({ name: 'a.png', type: 'image/png', size: 0 }), 'This file is empty.');
 });
 
-test('a selection keeps good files up to the places left and refuses the rest for the count', () => {
-  const files = [
-    { name: 'a.pdf', type: 'application/pdf', size: 10 },
-    { name: 'b.doc', type: 'application/msword', size: 10 },
-    { name: 'c.png', type: 'image/png', size: 10 },
-    { name: 'd.png', type: 'image/png', size: 10 },
-  ];
-  const verdict = sortSelection(files, 2);
-  assert.deepEqual(verdict.accepted.map((f) => f.name), ['a.pdf', 'c.png']);
-  assert.deepEqual(verdict.rejected.map((r) => r.file.name), ['b.doc', 'd.png']);
-  assert.match(verdict.rejected[0].reason, /Only PDF/);
-  assert.match(verdict.rejected[1].reason, /Remove one to add another/);
+// ── slots ───────────────────────────────────────────────────────────────────
+
+test('the slots are the four wire keys, in v1 order, with v2 labels', () => {
+  assert.deepEqual(
+    DOCUMENT_SLOTS.map((slot) => slot.type),
+    ['id', 'certificate', 'license', 'cv'],
+  );
+  assert.deepEqual(
+    DOCUMENT_SLOTS.map((slot) => slot.label),
+    ['Means of ID', 'Call to Bar certificate', 'Practising licence', 'CV or résumé'],
+  );
+  assert.equal(DOCUMENT_SLOTS.length, REQUIRED_DOCUMENTS);
 });
 
-test('places left counts uploads still on their way and never goes negative', () => {
-  assert.equal(placesLeft(1, 2), 1);
-  assert.equal(placesLeft(4, 1), 0);
-  assert.equal(placesLeft(6, 0), 0);
+test('each document goes to the slot its type names, whatever order it arrives in', () => {
+  const arranged = arrangeDocuments([typed(1, 'cv'), typed(2, 'id'), typed(3, 'license')]);
+  assert.equal(arranged.slots.id?.id, 2);
+  assert.equal(arranged.slots.certificate, null);
+  assert.equal(arranged.slots.license?.id, 3);
+  assert.equal(arranged.slots.cv?.id, 1);
+  assert.deepEqual(arranged.other, []);
+  assert.deepEqual(emptySlots(arranged).map((slot) => slot.type), ['certificate']);
+});
+
+test('a null, missing or unknown type goes to Other documents, never into a slot', () => {
+  const unknown = doc(3, { document_type: 'passport' as LawyerProfileDocument['document_type'] });
+  const arranged = arrangeDocuments([typed(1, null), doc(2), unknown]);
+  assert.deepEqual(Object.values(arranged.slots), [null, null, null, null]);
+  assert.deepEqual(arranged.other.map((d) => d.id), [1, 2, 3]);
+});
+
+test('a second file of a filled type is listed under Other documents, not hidden', () => {
+  const arranged = arrangeDocuments([typed(1, 'id'), typed(2, 'id')]);
+  assert.equal(arranged.slots.id?.id, 1);
+  assert.deepEqual(arranged.other.map((d) => d.id), [2]);
+});
+
+test('isDocumentType accepts exactly the four keys', () => {
+  for (const key of ['id', 'certificate', 'license', 'cv']) assert.equal(isDocumentType(key), true);
+  for (const key of ['ID', 'licence', '', null, undefined, 3]) assert.equal(isDocumentType(key), false);
+});
+
+// ── upload failures ─────────────────────────────────────────────────────────
+
+const apiError = (over: Partial<ApiError>): ApiError => ({
+  message: 'The given data was invalid.',
+  errors: null,
+  status: 422,
+  ...over,
+});
+
+test('a 422 on a duplicate type shows the API field message and offers no retry', () => {
+  const result = uploadFailure(
+    apiError({ errors: { document_type: ['You have already uploaded a Means of ID. Remove it first.'] } }),
+  );
+  assert.deepEqual(result, {
+    message: 'You have already uploaded a Means of ID. Remove it first.',
+    retryable: false,
+  });
+});
+
+test('the backend duplicate refusal (message only, 3dd1fc6) is shown as the API wrote it', () => {
+  const message = 'A Practicing License is already uploaded. Delete it before uploading another.';
+  assert.deepEqual(uploadFailure(apiError({ message, errors: null })), { message, retryable: false });
+});
+
+test('an invalid type shows the backend field message', () => {
+  const message = 'The document type must be one of: id, certificate, license, cv.';
+  assert.equal(uploadFailure(apiError({ errors: { document_type: [message] } })).message, message);
+});
+
+test('a 422 with no field errors falls back to the summary, then to our own sentence', () => {
+  assert.equal(uploadFailure(apiError({ message: 'Duplicate document type.' })).message, 'Duplicate document type.');
+  assert.equal(
+    uploadFailure(apiError({ message: '  ' })).message,
+    'This slot already has a file. Remove the current file first.',
+  );
+});
+
+test('a 422 on the file itself shows the file message', () => {
+  assert.equal(
+    uploadFailure(apiError({ errors: { file: ['The file must not be greater than 10240 kilobytes.'] } })).message,
+    'The file must not be greater than 10240 kilobytes.',
+  );
+});
+
+test('only a network or server failure can be retried', () => {
+  assert.equal(uploadFailure(apiError({ status: 0, message: 'Network error. Please try again.' })).retryable, true);
+  assert.equal(uploadFailure(apiError({ status: 500 })).retryable, true);
+  assert.equal(uploadFailure(apiError({ status: 403, message: 'No profile.' })).retryable, false);
 });
 
 // ── submit readiness ────────────────────────────────────────────────────────
 
-test('submit opens at exactly four stored documents', () => {
-  assert.equal(submitBlocker(REQUIRED_DOCUMENTS, 0), null);
-  assert.equal(submitBlocker(3, 0), 'Add 1 more document to send for review.');
-  assert.equal(submitBlocker(1, 0), 'Add 3 more documents to send for review.');
-  assert.equal(submitBlocker(5, 0), 'Remove 1 document. Exactly 4 are sent for review.');
+test('submit opens with four slots filled', () => {
+  assert.equal(submitBlocker(arrangeDocuments(four), 0), null);
+});
+
+test('with slots partly filled, the blocker names the empty ones', () => {
+  assert.equal(
+    submitBlocker(arrangeDocuments([typed(1, 'id'), typed(2, 'cv')]), 0),
+    'Add your Call to Bar certificate and Practising licence to send for review.',
+  );
+  assert.equal(
+    submitBlocker(arrangeDocuments([typed(1, 'id'), typed(2, 'certificate'), typed(3, 'cv')]), 0),
+    'Add your Practising licence to send for review.',
+  );
+  assert.equal(
+    submitBlocker(arrangeDocuments([]), 0),
+    'Add your Means of ID, Call to Bar certificate, Practising licence and CV or résumé to send for review.',
+  );
+});
+
+test('untyped files count toward the four, as the server counts them', () => {
+  // Three typed and one from before the types: four stored, so it may be sent.
+  const ready = arrangeDocuments([typed(1, 'id'), typed(2, 'certificate'), typed(3, 'cv'), typed(4, null)]);
+  assert.equal(submitBlocker(ready, 0), null);
+  // Two typed and one untyped: one more needed, two slots still empty.
+  assert.equal(
+    submitBlocker(arrangeDocuments([typed(1, 'id'), typed(2, 'cv'), typed(3, null)]), 0),
+    'Add 1 more document to send for review. Still empty: Call to Bar certificate and Practising licence.',
+  );
+});
+
+test('more than four stored says how many to remove from Other documents', () => {
+  const crowded = arrangeDocuments([...four, typed(5, null)]);
+  assert.equal(submitBlocker(crowded, 0), 'Remove 1 document from Other documents. Exactly 4 are sent for review.');
 });
 
 test('an upload in flight blocks submit, even with four stored', () => {
-  assert.equal(submitBlocker(4, 1), 'Wait for your uploads to finish.');
-});
-
-test('the list of what to send names exactly as many files as are required', () => {
-  assert.equal(DOCUMENTS_TO_SEND.length, REQUIRED_DOCUMENTS);
+  assert.equal(submitBlocker(arrangeDocuments(four), 1), 'Wait for your uploads to finish.');
 });
 
 // ── details ─────────────────────────────────────────────────────────────────
