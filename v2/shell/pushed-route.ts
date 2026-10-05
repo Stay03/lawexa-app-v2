@@ -273,6 +273,18 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       }
       return null;
 
+    // The reader's own questions. Opened from Settings, as v1 opened it from the
+    // account menu beside Usage, so Settings is where "up" goes.
+    case 'activity':
+      if (depth === 1) {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Activity'),
+        };
+      }
+      return null;
+
     // The settings INDEX, and the options REBUILT IN v2. Every other address
     // under `/settings/` still falls through the proxy to v1, which wears its
     // own chrome, so this table must not answer for one: an entry here for a v1

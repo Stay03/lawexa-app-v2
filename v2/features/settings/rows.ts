@@ -4,6 +4,7 @@ import {
   CreditCard,
   FlaskConical,
   Gauge,
+  History,
   KeyRound,
   MessageSquarePlus,
   MonitorSmartphone,
@@ -21,12 +22,13 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
  * settings/rows — every door on the settings screen, in one table.
  *
  * ── WHERE EACH ROW ACTUALLY GOES TODAY (READ THIS BEFORE BUILDING ONE) ─────
- * This is a screen built option by option. NINE rows already land in v2; the
+ * This is a screen built option by option. TEN rows already land in v2; the
  * rest cross into the classic app through the proxy, exactly as
  * `v2/shell/nav.config.ts` describes for an unmigrated nav row: v2 shell, v1
  * content, until the route joins `v2/routes.manifest.ts`.
  *
  *   Profile         /settings/profile        → V2 (rebuilt, 16 August 2026)
+ *   Activity        /activity                → V2 (rebuilt, 5 October 2026)
  *   Devices         /settings/devices        → V2 (new, 28 September 2026)
  *   Organization    /organization            → V2 (rebuilt, phase-5 W5)
  *   Usage           /settings/usage          → V2 (rebuilt, 29 September 2026)
@@ -148,6 +150,16 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         icon: User,
         href: '/settings/profile',
         requiresAccount: true,
+      },
+      {
+        // The reader's own questions, by day. v1 kept it in the account menu
+        // beside Usage; Settings is that menu in v2. Its address is not under
+        // `/settings/` because v1's never was, and old links keep working.
+        // Not account-only: a guest who has asked questions has a history.
+        id: 'activity',
+        label: 'Activity',
+        icon: History,
+        href: '/activity',
       },
       {
         // NEW IN v2 (28 September 2026). v1 never had it: its "Privacy &

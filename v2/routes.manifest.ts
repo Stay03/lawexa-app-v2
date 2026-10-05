@@ -116,6 +116,8 @@ export const V2_ROUTES = [
   '/statutes/*',
   '/radars/*',
   '/bookmarks',
+  // The reader's own questions, by day. EXACT: the page has no sub-routes.
+  '/activity',
   '/quiz/*',
   '/notes/*',
   '/folders/*',
