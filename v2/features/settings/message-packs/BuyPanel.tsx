@@ -9,10 +9,9 @@ import { DialogClose } from '@/components/ui/dialog';
 import { extractApiError } from '@/lib/utils/api-error';
 import { formatMoneyMajor } from '@/lib/utils/payment-format';
 import type { IMessagePackPricingData } from '@/types/message-pack';
-import type { TCurrency } from '@/types/payment';
 import { setCurrency, useCurrency } from '@/v2/runtime/currency';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
-import { currencyOffer } from './currency-offer';
+import { currencyName, currencyOffer } from './currency-offer';
 import { usePurchasePacks } from './queries';
 
 const MIN_PACKS = 1;
@@ -207,8 +206,4 @@ export function BuyPanel({
       </div>
     </ResponsiveOverlay>
   );
-}
-
-function currencyName(currency: TCurrency): string {
-  return currency === 'NGN' ? 'Naira' : 'US dollars';
 }

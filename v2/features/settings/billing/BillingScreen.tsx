@@ -32,7 +32,7 @@ import { BillingFallback } from './states';
  * `model.ts` from the server's own fields; the cancel dialog adds no promise
  * the backend has not confirmed.
  *
- * "Upgrade" and "Change plan" open `/pricing`, which is still v1's page.
+ * "Upgrade" and "Change plan" open `/pricing` (`v2/features/pricing`).
  * v1's billing page also linked to Message packs; that row sits one line away
  * in Settings, so the shortcut is not repeated here (the 21 September study).
  */

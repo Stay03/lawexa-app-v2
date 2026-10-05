@@ -319,6 +319,18 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       }
       return null;
 
+    // Opened from Billing and from Usage, so neither is its parent. Home is,
+    // on the same terms as the two above.
+    case 'pricing':
+      if (depth === 1) {
+        return {
+          backHref: '/',
+          backLabel: 'Back to home',
+          title: fixed('Plans'),
+        };
+      }
+      return null;
+
     // The settings INDEX, and the options REBUILT IN v2. Every other address
     // under `/settings/` still falls through the proxy to v1, which wears its
     // own chrome, so this table must not answer for one: an entry here for a v1

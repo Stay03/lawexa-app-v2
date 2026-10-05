@@ -147,6 +147,9 @@ export const V2_ROUTES = [
   '/settings/usage',
   '/settings/api',
   '/settings/verification',
+  // The plans, and starting a payment for one. EXACT: v1's `/upgrade` already
+  // redirects here, and the three returns below are listed one by one.
+  '/pricing',
   // Where the payment provider returns a v2 buyer of message packs.
   '/payg/callback',
   // Where it returns a v2 buyer of a plan, an upgrade or a free trial.

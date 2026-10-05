@@ -29,7 +29,24 @@ export function currencyOffer(
   stored: TCurrency,
 ): CurrencyOffer {
   if (!pricing) return { offered: [], currency: stored };
-  const offered = DISPLAY_ORDER.filter((option) => pricing.prices.some((row) => row.currency === option));
+  return offerFrom(
+    pricing.prices.map((row) => row.currency),
+    stored,
+  );
+}
+
+/**
+ * The same rule over any list of currencies on sale. The pricing page feeds
+ * it the currencies of the plans `/subscriptions/plans` returned, which the
+ * server chooses per buyer in the same way.
+ */
+export function offerFrom(onSale: readonly TCurrency[], stored: TCurrency): CurrencyOffer {
+  const offered = DISPLAY_ORDER.filter((option) => onSale.includes(option));
   const currency = offered.includes(stored) ? stored : (offered[0] ?? stored);
   return { offered, currency };
+}
+
+/** The currency's name as a switch or a sentence says it. */
+export function currencyName(currency: TCurrency): string {
+  return currency === 'NGN' ? 'Naira' : 'US dollars';
 }

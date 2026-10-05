@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { IMessagePackPricingData } from '@/types/message-pack';
-import { currencyOffer } from './currency-offer';
+import { currencyOffer, offerFrom } from './currency-offer';
 
 const pricing = (currencies: ('NGN' | 'USD')[]): IMessagePackPricingData => ({
   messages_per_pack: 10,
@@ -32,4 +32,10 @@ test('an empty price list offers nothing and keeps the stored choice', () => {
 
 test('a buyer in Nigeria who once chose dollars is priced in Naira', () => {
   assert.deepEqual(currencyOffer(pricing(['NGN']), 'USD'), { offered: ['NGN'], currency: 'NGN' });
+});
+
+test('the plan list uses the same rule: only what is on sale, the stored choice while it is', () => {
+  assert.deepEqual(offerFrom(['USD', 'NGN', 'USD'], 'NGN'), { offered: ['NGN', 'USD'], currency: 'NGN' });
+  assert.deepEqual(offerFrom(['USD'], 'NGN'), { offered: ['USD'], currency: 'USD' });
+  assert.deepEqual(offerFrom([], 'NGN'), { offered: [], currency: 'NGN' });
 });
