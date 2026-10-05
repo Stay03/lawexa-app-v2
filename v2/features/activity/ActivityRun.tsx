@@ -28,10 +28,13 @@ const MARK_ICON: Record<AttachmentMark['kind'], LucideIcon> = {
  * row anatomy (`RowIconTile`, the calm hover tint, `FOCUS_RING`, a ≥44px
  * target) so it reads as the same system as `/conversations`.
  *
- * TWO SHAPES, decided by `run.merged` (see `model.ts`):
+ * THREE SHAPES, decided by `run.merged` and `run.titleRepeats` (see `model.ts`):
  *  - A chat's opener on its own: ONE row. The tile, the question, its time.
  *    The title is not printed, because it is this question cut at fifty
  *    characters.
+ *  - Several questions in a chat named after one of them: the first question
+ *    leads beside the tile, the rest follow on the hairline. The title is not
+ *    printed, because it only repeats a question already on screen.
  *  - Anything else: the conversation's title beside the tile, and the
  *    questions under it on a hairline that drops from the tile's centre. The
  *    title says which chat; the lines say what was asked, in order.
@@ -61,14 +64,24 @@ export function ActivityRun({ run, index }: { run: Run; index: number }) {
         </Link>
       ) : (
         <>
-          <Link href={href} className={cn(ROW, 'min-h-11 items-center py-2')}>
-            <RowIconTile icon={MessageSquare} />
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-              {run.title}
-            </span>
-          </Link>
+          {/* The head of the run: the chat's title, or, when the title only
+              repeats one of these questions, the first question itself. */}
+          {run.titleRepeats ? (
+            <Link href={href} className={cn(ROW, 'min-h-14 py-2.5')}>
+              <RowIconTile icon={MessageSquare} />
+              <QuestionText preview={run.questions[0].preview} className="pt-2" />
+              <QuestionTime question={run.questions[0]} className="pt-2" />
+            </Link>
+          ) : (
+            <Link href={href} className={cn(ROW, 'min-h-11 items-center py-2')}>
+              <RowIconTile icon={MessageSquare} />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                {run.title}
+              </span>
+            </Link>
+          )}
           <ul className="ml-[1.875rem] border-l border-border/70 pl-1">
-            {run.questions.map((question) => (
+            {(run.titleRepeats ? run.questions.slice(1) : run.questions).map((question) => (
               <li key={question.id}>
                 <Link href={href} className={cn(ROW, 'min-h-11 py-2.5')}>
                   <QuestionText preview={question.preview} />

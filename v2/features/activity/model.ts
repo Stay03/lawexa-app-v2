@@ -165,6 +165,13 @@ export interface ActivityRun {
    * printed twice.
    */
   merged: boolean;
+  /**
+   * `true` when the title only repeats one of the run's questions (a chat
+   * named after its opener, with follow-ups). The title is then not printed:
+   * the first question leads the run instead, so no line says the same thing
+   * twice (techlead 191c4346, 5 October 2026).
+   */
+  titleRepeats: boolean;
   questions: ActivityQuestion[];
 }
 
@@ -207,13 +214,16 @@ export function groupActivity(
     if (run?.conversationId === message.conversation.uuid) {
       run.questions.push(question);
       run.merged = false;
+      run.titleRepeats ||= titleRepeatsQuestion(run.title, question.preview.text);
     } else {
       const title = conversationTitle(message.conversation.title);
+      const repeats = titleRepeatsQuestion(title, question.preview.text);
       day.runs.push({
         key: String(message.id),
         conversationId: message.conversation.uuid,
         title,
-        merged: titleRepeatsQuestion(title, question.preview.text),
+        merged: repeats,
+        titleRepeats: repeats,
         questions: [question],
       });
     }

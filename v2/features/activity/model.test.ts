@@ -146,7 +146,7 @@ test('questions fall into days, and consecutive ones in one chat share a heading
   assert.equal(days[0].runs[0].questions[0].time, '10:00 am');
 });
 
-test('a chat\'s opener alone is one row; with follow-ups the title heads them', () => {
+test('a chat\'s opener alone is one row; with follow-ups a title that repeats it is not printed', () => {
   const now = Date.parse('2026-10-05T12:00:00Z');
   const opener = { uuid: 'c-3', title: 'In one sentence, what is an offer in contract law?' };
 
@@ -165,4 +165,20 @@ test('a chat\'s opener alone is one row; with follow-ups the title heads them', 
   );
   assert.equal(thread[0].runs[0].merged, false);
   assert.equal(thread[0].runs[0].questions.length, 2);
+  // The title is the opener cut short, so the first question leads instead.
+  assert.equal(thread[0].runs[0].titleRepeats, true);
+});
+
+test('a title of its own still heads the run', () => {
+  const now = Date.parse('2026-10-05T12:00:00Z');
+  const named = { uuid: 'c-4', title: 'Offer and acceptance revision' };
+  const days = groupActivity(
+    [
+      message(2, '2026-10-05T10:05:00Z', named, 'And acceptance?'),
+      message(1, '2026-10-05T10:00:00Z', named, 'What is an offer?'),
+    ],
+    { now, timeZone: 'UTC' },
+  );
+  assert.equal(days[0].runs[0].titleRepeats, false);
+  assert.equal(days[0].runs[0].merged, false);
 });
