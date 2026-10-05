@@ -429,9 +429,13 @@ const ROLE_RANK: Record<CoramRole, number> = { lead: 0, concurring: 1, dissentin
 /**
  * Normalize the coram, tolerating the LEAN payload. The API sends bot user
  * agents (and some cached rows) judges as PLAIN STRINGS, not objects — the
- * first live run of the screenshot loop crashed the page on exactly that. The
- * lead judge sorts first because the lead judgment is the one the principles
- * quote.
+ * first live run of the screenshot loop crashed the page on exactly that.
+ *
+ * ORDER, AS A LAW REPORT PRINTS IT (owner, 5 October 2026: option 1): the
+ * presiding judge first, then the judge who wrote the lead judgment, then the
+ * rest by role and then as stored. A judge who both presided and wrote the lead
+ * is one row, first, labelled "presiding, lead". The sort is stable, so judges
+ * with no role keep the order the API gave.
  */
 export function normalizeBench(
   judges: readonly (Judge | string | null | undefined)[] | null | undefined,
@@ -453,9 +457,13 @@ export function normalizeBench(
       });
     }
   }
-  return rows.sort(
-    (a, b) => (a.role ? ROLE_RANK[a.role] : 3) - (b.role ? ROLE_RANK[b.role] : 3),
-  );
+  return rows.sort((a, b) => benchRank(a) - benchRank(b));
+}
+
+/** Presiding before everyone; then the coram roles; then the unmarked. */
+function benchRank(judge: Pick<BenchJudge, 'role' | 'presiding'>): number {
+  if (judge.presiding) return -1;
+  return judge.role ? ROLE_RANK[judge.role] : 3;
 }
 
 const ROLE_WORDS: Record<CoramRole, string> = {

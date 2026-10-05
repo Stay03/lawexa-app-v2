@@ -26,3 +26,35 @@ test('presiding is read only from a true value; false, absent and plain names ar
   assert.equal(isFalse.presiding, false);
   assert.equal(plain.presiding, false);
 });
+
+/* Option 1 (owner, 5 October 2026): presiding first, then the lead, then the
+ * rest as stored, the way a law report prints the panel. */
+test('the presiding judge comes first, then the lead, then the rest as stored', () => {
+  const bench = normalizeBench([
+    judge({ id: 1, name: 'Umaru Atu Kalgo JSC' }),
+    judge({ id: 2, name: 'Dennis Onyejife Edozie JCA' }),
+    judge({ id: 3, name: 'Idris Legbo Kutigi', presiding: true }),
+    judge({ id: 4, name: 'Aloysius Iyorgyer Katsina-Alu', role: 'lead' }),
+    judge({ id: 5, name: 'Samson Odemwingie Uwaifo' }),
+  ]);
+  assert.deepEqual(
+    bench.map((row) => row.name),
+    [
+      'Idris Legbo Kutigi',
+      'Aloysius Iyorgyer Katsina-Alu',
+      'Umaru Atu Kalgo JSC',
+      'Dennis Onyejife Edozie JCA',
+      'Samson Odemwingie Uwaifo',
+    ],
+  );
+});
+
+test('a judge who presided and wrote the lead is one row, first, with both labels', () => {
+  const bench = normalizeBench([
+    judge({ id: 1, name: 'Umaru Atu Kalgo JSC' }),
+    judge({ id: 2, name: 'Kudirat Kekere-Ekun JSC', presiding: true, role: 'lead' }),
+  ]);
+  assert.equal(bench.length, 2);
+  assert.equal(bench[0].name, 'Kudirat Kekere-Ekun JSC');
+  assert.equal(benchLabel(bench[0]), 'presiding, lead');
+});
