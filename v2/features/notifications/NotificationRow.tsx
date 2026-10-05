@@ -200,7 +200,10 @@ export const NotificationRow = memo(function NotificationRow({
               {preview}
             </span>
           ) : (
-            <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
+            // No `block` beside `line-clamp-2`: it overrides the clamp's own
+            // `display: -webkit-box` and the clamp is ignored (four lines on a
+            // 390px phone, measured 2026-10-05).
+            <span className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
               {preview}
             </span>
           )
