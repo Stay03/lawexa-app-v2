@@ -41,12 +41,10 @@ export async function generateMetadata({ params }: CasePageProps): Promise<Metad
   const canonical = `${appUrl}/cases/${slug}`;
   const ogImageUrl = `${appUrl}/api/og/cases/${slug}`;
 
-  // Prefer the backend's SEO fields when it supplies them; otherwise compose an
-  // honest one from what a lawyer would want to see in a preview — the case
-  // name, the court, and the year.
-  const title = detail.meta?.title || detail.displayTitle;
+  // Composed from what a lawyer would want to see in a preview: the case name,
+  // then the holding, or the court, country and citation.
+  const title = detail.displayTitle;
   const description =
-    detail.meta?.description ||
     detail.summary ||
     [detail.court, detail.country, detail.citation].filter(Boolean).join(' · ') ||
     SEO.defaultDescription;

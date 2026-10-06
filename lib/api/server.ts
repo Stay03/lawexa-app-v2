@@ -1,5 +1,4 @@
 import { getApiUrl } from '@/lib/constants/seo';
-import type { CaseDetail } from '@/types/case';
 import type {
   PublicQuizGameResults,
   PublicQuizPodiumRow,
@@ -69,7 +68,6 @@ export interface CaseMetadata {
   country: string | null;
   judgmentDate: string | null;
   summary: string;
-  meta: CaseDetail['meta'] | null;
 }
 
 /** Collapse HTML-ish text to a plain single-line blurb, capped for a card. */
@@ -83,10 +81,58 @@ function toBlurb(value: string | null | undefined, max: number): string {
   return `${text.slice(0, max).replace(/\s+\S*$/, '').trimEnd()}…`;
 }
 
+/** The fields of `GET /api/public/cases/{slug}` the metadata reads. */
+interface PublicCaseFields {
+  title: string;
+  display_title?: string | null;
+  citation?: string | null;
+  court?: { name?: string | null } | null;
+  country?: { name?: string | null } | null;
+  judgment_date?: string | null;
+  principles?: string | null;
+  excerpt?: string | null;
+}
+
+/**
+ * The metadata for one case from the public route's answer, or `null` for
+ * anything that is not a readable case. Pure, so it is tested without a server.
+ *
+ * The route also sends a `meta` block (an SEO title and description). It is
+ * NOT used, so the page title stays the case's display title, as it is today:
+ * the read this replaces returned no `meta`, `meta.title` appends the
+ * citation, and on some cases it names the wrong parties (6 Oct 2026:
+ * Nwadike v Ibekwe's reads "Ibekwe v Anaclc"). Adopting it is a separate
+ * decision.
+ */
+export function caseMetadataFrom(answer: unknown): CaseMetadata | null {
+  const envelope = answer as { success?: boolean; data?: PublicCaseFields | null } | null;
+  const data = envelope?.data;
+  if (!envelope?.success || !data?.title) return null;
+  return {
+    title: data.title,
+    displayTitle: data.display_title || data.title,
+    citation: data.citation ?? null,
+    court: data.court?.name ?? null,
+    country: data.country?.name ?? null,
+    judgmentDate: data.judgment_date ?? null,
+    // The holding is the most useful one-line description of a case; the
+    // opening of the judgment is the honest fallback when it is absent.
+    summary: toBlurb(data.principles || data.excerpt, 300),
+  };
+}
+
 /**
  * Server-side case fetcher for metadata generation — the case page's `<head>`
  * tags and its OG card both read through this one function, so an unfurl and the
  * tags beside it can never disagree.
+ *
+ * THE PUBLIC ROUTE, `GET /api/public/cases/{slug}`, built for the server
+ * renderer (`throttle:120,1`). It used to read `GET /api/cases/{slug}`
+ * without a session, which spends the GUEST content throttle of this server's
+ * address: 10 a minute and 200 an hour, shared by every page render, link
+ * preview and router prefetch on the server. When that bucket emptied, case
+ * pages fell back to the site-wide title and card (backend cba8cc21,
+ * 6 October 2026). The public route records no view either.
  *
  * DELIBERATELY UNAUTHENTICATED, and revalidated for five minutes. Both follow
  * from who it is for: the reader of a pasted link is a crawler or a signed-out
@@ -96,17 +142,12 @@ function toBlurb(value: string | null | undefined, max: number): string {
  * response cached across users would be a privacy defect, so this must never
  * grow an `Authorization` header.
  *
- * The window also bounds a cost we do not control: if `GET /cases/{slug}`
- * records a view per request, every social unfurl would otherwise inflate that
- * case's view count. Raised with the backend team
- * (`docs/v2-docs/backend-ask-2026-07-25-cases-read-endpoints.md`).
- *
  * It lives here beside `fetchConversationForMetadata` rather than under `v2/`
  * because the OG route (`app/api/og/cases/[slug]`) is outside the v2 tree and
  * the import boundary forbids it reaching in — and because this is exactly what
  * this module is: the shared server data layer for metadata.
  *
- * Returns `null` for anything that is not a readable case — 404, 401, a network
+ * Returns `null` for anything that is not a readable case — 404, 429, a network
  * failure — so callers fall back to the site-wide card rather than emitting a
  * broken one.
  */
@@ -117,7 +158,7 @@ export async function fetchCaseForMetadata(
 
   try {
     const response = await fetch(
-      `${apiUrl}/api/cases/${encodeURIComponent(slug)}`,
+      `${apiUrl}/api/public/cases/${encodeURIComponent(slug)}`,
       {
         headers: { Accept: 'application/json' },
         next: { revalidate: 300 },
@@ -131,28 +172,7 @@ export async function fetchCaseForMetadata(
       return null;
     }
 
-    const json = (await response.json()) as {
-      success?: boolean;
-      data?: CaseDetail | null;
-    };
-    const data = json?.data;
-
-    if (!json?.success || !data) {
-      return null;
-    }
-
-    return {
-      title: data.title,
-      displayTitle: data.display_title || data.title,
-      citation: data.citation,
-      court: data.court?.name ?? null,
-      country: data.country?.name ?? null,
-      judgmentDate: data.judgment_date,
-      // The holding is the most useful one-line description of a case; the
-      // excerpt and body are the honest fallbacks when it is absent.
-      summary: toBlurb(data.principles || data.excerpt || data.body, 300),
-      meta: data.meta ?? null,
-    };
+    return caseMetadataFrom(await response.json());
   } catch {
     return null;
   }
