@@ -50,6 +50,7 @@ import {
   privateModeFileError,
   privateModeOf,
 } from '../attachment-rules';
+import { TEXT_DRAFT, useDraft } from './draft-store';
 import { usePastedContent } from './usePastedContent';
 
 /**
@@ -183,30 +184,11 @@ export function ConversationComposer({
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Draft persistence per scope — lazy init + persist in the setter (React
-  // Compiler-clean, mirrors useComposerDraft).
-  const draftKey = `conversation_draft_${draftScopeId}`;
-  const [input, setInputState] = useState<string>(() => {
-    if (typeof window === 'undefined') return '';
-    try {
-      return window.localStorage.getItem(draftKey) ?? '';
-    } catch {
-      return '';
-    }
-  });
-  const setInput = useCallback(
-    (next: string) => {
-      setInputState(next);
-      if (typeof window === 'undefined') return;
-      try {
-        if (next) window.localStorage.setItem(draftKey, next);
-        else window.localStorage.removeItem(draftKey);
-      } catch {
-        // storage unavailable — in-memory only.
-      }
-    },
-    [draftKey],
-  );
+  // Draft per scope, read through `draft-store` so the server render and the
+  // hydration pass agree (Fable SSR review F2: the case page renders this
+  // composer on the server).
+  const [input, updateInput] = useDraft(`conversation_draft_${draftScopeId}`, TEXT_DRAFT);
+  const setInput = useCallback((next: string) => updateInput(() => next), [updateInput]);
 
   const { pastedItems, addPasted, removePasted, clearPasted } = usePastedContent(
     `conversation_draft_pasted_${draftScopeId}`,

@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { useDraft, type DraftCodec } from './draft-store';
 
 /**
  * usePastedContent (v2) — staging state for large pasted blocks shown as removable
@@ -8,9 +9,9 @@ import { useCallback, useState } from 'react';
  * (boundary-blocked). Same behavior: an ordered list with stable ids, persisted as
  * a plain `string[]` under `storageKey` so older singular drafts migrate on read.
  *
- * Persistence happens in the MUTATORS (not an effect), the sanctioned React
- * Compiler-clean pattern (mirrors `useComposerDraft`): the lazy initializer stays
- * pure and the setters are the only writers.
+ * Stored through `draft-store`, so the server render and the hydration pass see
+ * no cards and the stored ones appear straight after (Fable SSR review F2: the
+ * case page renders this composer on the server).
  */
 export interface PastedItem {
   id: string;
@@ -25,68 +26,41 @@ function createPastedItem(text: string): PastedItem {
   return { id: `paste-${pastedItemCounter}`, text };
 }
 
-function readInitial(storageKey?: string): PastedItem[] {
-  if (!storageKey || typeof window === 'undefined') return [];
-  let raw: string | null = null;
-  try {
-    raw = window.localStorage.getItem(storageKey);
-  } catch {
-    return [];
-  }
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed
-        .filter((entry): entry is string => typeof entry === 'string')
-        .map(createPastedItem);
-    }
-  } catch {
-    // Legacy singular format: a raw paste string saved before multi-paste.
-  }
-  return [createPastedItem(raw)];
-}
+const NO_ITEMS: PastedItem[] = [];
 
-function persist(storageKey: string | undefined, items: PastedItem[]): void {
-  if (!storageKey || typeof window === 'undefined') return;
-  try {
-    if (items.length > 0) {
-      window.localStorage.setItem(storageKey, JSON.stringify(items.map((i) => i.text)));
-    } else {
-      window.localStorage.removeItem(storageKey);
+export const PASTED_DRAFT: DraftCodec<PastedItem[]> = {
+  empty: NO_ITEMS,
+  decode(raw) {
+    if (!raw) return NO_ITEMS;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((entry): entry is string => typeof entry === 'string')
+          .map(createPastedItem);
+      }
+    } catch {
+      // Legacy singular format: a raw paste string saved before multi-paste.
     }
-  } catch {
-    // localStorage unavailable (private mode) — staging stays in-memory only.
-  }
-}
+    return [createPastedItem(raw)];
+  },
+  encode: (items) => (items.length > 0 ? JSON.stringify(items.map((item) => item.text)) : null),
+};
 
-export function usePastedContent(storageKey?: string) {
-  const [pastedItems, setPastedItems] = useState<PastedItem[]>(() => readInitial(storageKey));
+export function usePastedContent(storageKey: string) {
+  const [pastedItems, update] = useDraft(storageKey, PASTED_DRAFT);
 
   const addPasted = useCallback(
-    (text: string) =>
-      setPastedItems((prev) => {
-        const next = [...prev, createPastedItem(text)];
-        persist(storageKey, next);
-        return next;
-      }),
-    [storageKey],
+    (text: string) => update((previous) => [...previous, createPastedItem(text)]),
+    [update],
   );
 
   const removePasted = useCallback(
-    (id: string) =>
-      setPastedItems((prev) => {
-        const next = prev.filter((item) => item.id !== id);
-        persist(storageKey, next);
-        return next;
-      }),
-    [storageKey],
+    (id: string) => update((previous) => previous.filter((item) => item.id !== id)),
+    [update],
   );
 
-  const clearPasted = useCallback(() => {
-    setPastedItems([]);
-    persist(storageKey, []);
-  }, [storageKey]);
+  const clearPasted = useCallback(() => update(() => NO_ITEMS), [update]);
 
   return { pastedItems, addPasted, removePasted, clearPasted };
 }
