@@ -8,21 +8,27 @@
  * 90 KB per search, and up to 9 API reads on the server, repeated on every
  * keystroke that changed the rows. Almost none of those pages are opened.
  *
- * - Touch start and focus prefetch AT ONCE: a finger on the row is about to
- *   lift, a focused row is about to get Enter.
+ * - Keyboard focus prefetches AT ONCE: a focused row is about to get Enter.
  * - A mouse prefetches after it RESTS on the row for `restMs`, and leaving
  *   cancels it, so a pointer crossing the list on its way elsewhere costs
  *   nothing.
+ * - A finger is a TAP only if it does not move. A scroll also starts with a
+ *   touch on a row, so a touch waits `INTENT_TOUCH_MS`, any movement cancels
+ *   it, and lifting the finger without moving prefetches at once. A tap
+ *   therefore always prefetches before its click; a scroll never does.
  * - Each href is prefetched once per row; Next dedupes the rest.
  *
  * Pure (timers injected), so the rules are tested without a browser.
  */
 export interface IntentPrefetch {
-  /** Mouse entered: prefetch if it is still there after `restMs`. */
-  rest(href: string): void;
-  /** Mouse left: cancel a pending rest. */
+  /** Mouse entered or finger down: prefetch if still there after `ms`
+   *  (default `restMs`). */
+  rest(href: string, ms?: number): void;
+  /** Mouse left, finger moved, touch cancelled: drop a pending rest. */
   leave(): void;
-  /** Touch or focus: prefetch now. */
+  /** Finger lifted: if a rest is still pending (no movement), prefetch now. */
+  commit(): void;
+  /** Focus: prefetch now. */
   now(href: string): void;
 }
 
@@ -36,6 +42,10 @@ export interface IntentPrefetchOptions {
  *  enough that it lands before a click. */
 export const INTENT_REST_MS = 100;
 
+/** A touch held this long without moving counts as a tap before it lifts. A
+ *  scroll moves well inside it; a quicker tap is caught when the finger lifts. */
+export const INTENT_TOUCH_MS = 80;
+
 export function createIntentPrefetch(
   prefetch: (href: string) => void,
   {
@@ -46,11 +56,13 @@ export function createIntentPrefetch(
 ): IntentPrefetch {
   const sent = new Set<string>();
   let pending: unknown = null;
+  let pendingHref: string | null = null;
 
   const cancel = () => {
     if (pending !== null) {
       clearTimer(pending);
       pending = null;
+      pendingHref = null;
     }
   };
 
@@ -62,14 +74,19 @@ export function createIntentPrefetch(
   };
 
   return {
-    rest(href) {
+    rest(href, ms = restMs) {
       if (sent.has(href) || pending !== null) return;
+      pendingHref = href;
       pending = setTimer(() => {
         pending = null;
+        pendingHref = null;
         fire(href);
-      }, restMs);
+      }, ms);
     },
     leave: cancel,
+    commit() {
+      if (pendingHref !== null) fire(pendingHref);
+    },
     now: fire,
   };
 }

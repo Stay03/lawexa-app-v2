@@ -72,3 +72,37 @@ test('one href is prefetched once, however many times the reader returns', () =>
 test('the rest time is 100 ms', () => {
   assert.equal(INTENT_REST_MS, 100);
 });
+
+test('a finger lifted without moving is a tap: it prefetches at once', () => {
+  const { sent, intent, pending } = harness();
+  intent.rest('/cases/a', 80);
+  assert.deepEqual(sent, []);
+  intent.commit();
+  assert.deepEqual(sent, ['/cases/a']);
+  assert.equal(pending(), 0);
+});
+
+test('a finger held still past the touch delay prefetches before it lifts', () => {
+  const { sent, intent, tick } = harness();
+  intent.rest('/cases/a', 80);
+  tick();
+  assert.deepEqual(sent, ['/cases/a']);
+  intent.commit();
+  assert.deepEqual(sent, ['/cases/a']);
+});
+
+test('a finger that moves is a scroll: nothing is prefetched, even when it lifts', () => {
+  const { sent, intent, tick, pending } = harness();
+  intent.rest('/cases/a', 80);
+  intent.leave();
+  intent.commit();
+  tick();
+  assert.deepEqual(sent, []);
+  assert.equal(pending(), 0);
+});
+
+test('lifting a finger with nothing pending does nothing', () => {
+  const { sent, intent } = harness();
+  intent.commit();
+  assert.deepEqual(sent, []);
+});
