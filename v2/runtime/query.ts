@@ -4,8 +4,10 @@ import {
   defaultShouldDehydrateQuery,
   type QueryKey,
   type MutationMeta,
+  type QueryPersister,
 } from '@tanstack/react-query';
 import { cache } from 'react';
+import type { PersistMode } from './persist/policy';
 
 /**
  * v2 query-layer policy (standards §2, adopted verbatim). This module owns the
@@ -135,9 +137,23 @@ export interface V2MutationMeta extends Record<string, unknown> {
   silentError?: boolean;
 }
 
+/**
+ * The query `meta` contract, typed the same way.
+ *
+ *  - `persist`  keep this leaf's answers on the device (`runtime/persist/`).
+ *               `'list'` for reads the API does not gate; `'gated'` for reads it
+ *               gates per reader (always sent again on open, limited answers
+ *               never kept). Omit it and nothing is kept. Only a leaf in the
+ *               device-cache allowlist may carry it (`allowlist.test.ts`).
+ */
+export interface V2QueryMeta extends Record<string, unknown> {
+  persist?: PersistMode;
+}
+
 declare module '@tanstack/react-query' {
   interface Register {
     mutationMeta: V2MutationMeta;
+    queryMeta: V2QueryMeta;
   }
 }
 
@@ -149,6 +165,12 @@ export interface MakeQueryClientOptions {
    * toast; server clients omit it.
    */
   onMutationError?: (message: string, error: unknown) => void;
+  /**
+   * The device cache (`runtime/persist/device-cache.ts`). Only the browser
+   * provider passes it; server clients never persist. It acts only on queries
+   * whose leaf carries `meta.persist`.
+   */
+  persister?: QueryPersister;
 }
 
 /**
@@ -203,6 +225,7 @@ export function makeQueryClient(options?: MakeQueryClientOptions): QueryClient {
       queries: {
         staleTime: STALE_TIMES.standard,
         retry: 1,
+        persister: options?.persister,
         // `refetchOnWindowFocus` stays at its ON default (standards §2): the
         // staleTime tier is the freshness lever, never this flag.
       },

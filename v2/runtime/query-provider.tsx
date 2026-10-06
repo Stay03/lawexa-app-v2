@@ -4,6 +4,7 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { toast } from 'sonner';
 import { makeQueryClient } from './query';
+import { deviceCachePersister } from './persist/device-cache';
 
 /**
  * Browser-side owner of the v2 QueryClient. This is the ONLY place the
@@ -25,6 +26,9 @@ function getClientForProvider(): QueryClient {
   browserQueryClient ??= makeQueryClient({
     // ONE error channel for every v2 mutation (standards §2).
     onMutationError: (message) => toast.error(message),
+    // The device cache: answers of allowlisted leaves kept in IndexedDB, per
+    // viewer (`runtime/persist/`). Browser only, so the server never persists.
+    persister: deviceCachePersister(),
   });
   return browserQueryClient;
 }

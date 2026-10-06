@@ -5,6 +5,7 @@ import { HydrationBoundary } from '@tanstack/react-query';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { V2QueryProvider } from '@/v2/runtime/query-provider';
 import { V2CacheIdentityGuard } from '@/v2/runtime/cache-identity-guard';
+import { PlanCacheWatch } from '@/v2/features/subscription/PlanCacheWatch';
 import { ChannelDeviceSweep } from '@/v2/features/channels/device-sweep';
 import { prefetchRecentsState } from '@/v2/features/conversations/server';
 import { AppShell } from '@/v2/shell/AppShell';
@@ -202,6 +203,10 @@ export default async function V2Layout({
             recently-viewed and quiz scores would paint for the NEXT user on the same
             device for up to the 30-minute retention. See the file for the full trace. */}
         <V2CacheIdentityGuard userId={user?.id ?? null} />
+        {/* The pages kept on the device are dropped when the reader's plan
+            changes, so a case kept under a paid plan never paints under a free
+            one. Reads the query the account row already runs. Renders null. */}
+        <PlanCacheWatch userId={user?.id ?? null} />
         {/* THE SAME BOUNDARY, FOR THE DEVICE. The cache guard above owns what is
             in memory in the query client; this owns what the channels feature
             left on `localStorage` — the previous reader's half-written messages

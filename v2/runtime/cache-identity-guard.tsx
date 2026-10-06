@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { dropOtherDeviceCacheOwners, setDeviceCacheOwner } from './persist/device-cache';
 
 /**
  * V2CacheIdentityGuard — drops the entire v2 query cache the moment the
@@ -50,14 +51,23 @@ import { useQueryClient } from '@tanstack/react-query';
  * COST. One cold fetch per identity transition, on a transition that already
  * re-renders the whole tree. That is the correct trade against showing one user
  * another user's data.
+ *
+ * THE DEVICE CACHE FOLLOWS THE SAME EDGE. Every render names the current viewer
+ * as the device cache's owner (an idempotent module write, like the clear), so
+ * the first fetch of a session already writes under the right owner and reads
+ * see only that owner's rows. On a transition the other owners' rows are
+ * deleted too. The owner switch alone already makes them unreachable, before
+ * that async delete lands. Signed out (`null`) turns the device cache off.
  */
 export function V2CacheIdentityGuard({ userId }: { userId: number | null }) {
   const queryClient = useQueryClient();
   const [seen, setSeen] = useState<number | null>(userId);
 
+  setDeviceCacheOwner(userId);
   if (seen !== userId) {
     setSeen(userId);
     queryClient.clear();
+    void dropOtherDeviceCacheOwners();
   }
 
   return null;

@@ -78,9 +78,12 @@ Full citations live in the research transcripts; key URLs inline.
 - **Chat streaming**: in-flight stream lives outside the cache (dedicated hook state), final
   message written/invalidated into the messages query on completion — matches Vercel AI SDK
   practice; `experimental_streamedQuery` exists but isn't needed.
-- **Persistence** (if adopted): `experimental_createQueryPersister` over idb-keyval, **opt-in**
-  via `meta: { persist: true }`, `buster` = release version, cleared on logout. Never persist
-  auth-sensitive payloads.
+- **Persistence** (adopted 6 Oct 2026, `v2/runtime/persist/`): `experimental_createQueryPersister`
+  over `idb` (already a dependency), **opt-in** via `meta: { persist: 'list' | 'gated' }`, rows
+  keyed per viewer, `buster` = `PERSIST_SCHEMA_VERSION` (bumped on a key or shape change, not per
+  release), wiped at sign-out, account switch and plan change. `'gated'` reads are always sent
+  again on open and a limited answer is never kept. Never persist auth, payment or confidential
+  payloads; `allowlist.test.ts` pins which leaves may.
 - **Banned** (lint/review enforced): fetch-in-useEffect beside RQ; copying query data into
   Zustand; module-level caches; inline keys; per-callsite ad-hoc invalidation sprawl;
   hand-mutating infinite `pages`.

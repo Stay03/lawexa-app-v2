@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { clearAllTranscripts } from '@/v2/runtime/chat-engine';
+import { clearDeviceCache } from '@/v2/runtime/persist/device-cache';
 import { deactivatePushDevice } from '@/v2/runtime/push/register';
 
 /**
@@ -46,6 +47,10 @@ export async function signOutOfThisDevice(queryClient: QueryClient): Promise<voi
   } catch {
     // IndexedDB unavailable (private mode): there is nothing stored to delete.
   }
+  // The pages and lists kept on this device for this account. The identity
+  // guard deletes them again on the sign-out edge; this is for the path that
+  // leaves the page at once. It never throws.
+  await clearDeviceCache();
   useAuthStore.getState().clearAuth();
   queryClient.clear();
 
