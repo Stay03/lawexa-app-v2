@@ -5,6 +5,7 @@ import type { CaseDetailResponse, CaseListParams, CaseListResponse } from '@/typ
 import { apiFetch } from '@/v2/runtime/api-server';
 import { getSessionToken, verifySession } from '@/v2/runtime/session';
 import { makeQueryClient } from '@/v2/runtime/query';
+import { caseDetailState } from './case-prefetch-state';
 import { clientIpFrom } from './client-ip';
 import { CASES_PAGE_SIZE, casesQueries } from './queries';
 
@@ -162,8 +163,11 @@ function ssrKey(): string | null {
  * ONE VIEW PER LOAD, AS BEFORE. The hydrated entry is fresh for the detail's
  * own `reference` stale time, so the screen does not fetch again on mount.
  *
- * A fresh query client for the same reason as the list prefetch: the layout's
- * shared client would carry this case into its own boundary too.
+ * A cookie that is VALID for another account (sign-in as someone else in v1
+ * without a full page load) renders that account's view of the case until
+ * `SessionSync` refreshes and the identity guard clears the cache, the same
+ * window the layout's session and the recents prefetch already have
+ * (cross-check N1b).
  */
 export async function prefetchCaseDetailState(
   slug: string,
@@ -173,9 +177,11 @@ export async function prefetchCaseDetailState(
     const key = ssrKey();
     if (!key) return undefined;
     // Cookie PRESENCE only, the `prefetchRecentsState` rule: zero network, so
-    // nothing runs in series before the case fetch. The API authorizes the
-    // request itself, and a stale token 401s into the same `undefined` path.
-    // The detail key has no viewer segment, so the user's id is not needed.
+    // nothing runs in series before the case fetch. The case route itself
+    // has no `auth:sanctum` and would serve a dead token as a guest, so the
+    // API answers an SSR read with a dead token 401 (cross-check N1), and
+    // `caseDetailState` turns that into no hydration. The detail key has no
+    // viewer segment, so the user's id is not needed.
     const token = await getSessionToken();
     if (!token) return undefined;
 
@@ -201,22 +207,16 @@ export async function prefetchCaseDetailState(
       forward['X-Lawexa-Client-UA'] = userAgent;
     }
 
-    const detail = await apiFetch<CaseDetailResponse>(
-      `/cases/${encodeURIComponent(slug)}?${query.toString()}`,
-      {
+    return await caseDetailState(leaf.queryKey, () =>
+      apiFetch<CaseDetailResponse>(`/cases/${encodeURIComponent(slug)}?${query.toString()}`, {
         headers: forward,
         // Stated here, not only as `apiFetch`'s default: Next's fetch cache
         // keys on headers, so a cached copy of this request would hold the key
         // and one reader's case (SSR review, techlead 493547a3).
         cache: 'no-store',
         signal: AbortSignal.timeout(CASE_PREFETCH_TIMEOUT_MS),
-      },
+      }),
     );
-    if (!detail?.success || !detail.data) return undefined;
-
-    const queryClient = makeQueryClient();
-    queryClient.setQueryData(leaf.queryKey, detail);
-    return dehydrate(queryClient);
   } catch {
     return undefined;
   }
