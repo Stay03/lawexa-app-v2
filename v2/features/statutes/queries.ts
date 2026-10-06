@@ -78,6 +78,7 @@ export const statutesQueries = {
     ...params
   }: Omit<StatuteListParams, 'page' | 'per_page'> & ViewerScoped) =>
     infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [
         ...statutesQueries.lists(),
         'infinite',
@@ -113,6 +114,7 @@ export const statutesQueries = {
    */
   countries: () =>
     queryOptions({
+      meta: { persist: 'list' },
       queryKey: [...statutesQueries.all, 'countries'] as const,
       queryFn: async (): Promise<StatuteCountries> => {
         try {
@@ -142,6 +144,7 @@ export const statutesQueries = {
   /** The reader's metadata payload — header, status, node counts. */
   detail: (slug: string) =>
     queryOptions({
+      meta: { persist: 'gated' },
       queryKey: [...statutesQueries.details(), slug] as const,
       queryFn: () => statutesApi.getBySlug(slug),
       staleTime: STALE_TIMES.reference,
@@ -220,6 +223,7 @@ export const statutesQueries = {
    */
   aknOutline: (slug: string) =>
     queryOptions({
+      meta: { persist: 'list' },
       queryKey: [...statutesQueries.all, 'akn-outline', slug] as const,
       queryFn: async (): Promise<StatuteOutlineData | null> => {
         const res = await statutesApi.getAknOutline(slug);

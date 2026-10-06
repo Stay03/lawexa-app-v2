@@ -32,6 +32,7 @@ export const pricingQueries = {
 
   plans: () =>
     queryOptions({
+      meta: { persist: 'list' },
       queryKey: [...pricingQueries.all, 'plans'] as const,
       queryFn: async () => (await subscriptionsApi.getPlans()).data,
       staleTime: STALE_TIMES.reference,

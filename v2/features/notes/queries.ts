@@ -52,6 +52,7 @@ export const notesQueries = {
    */
   library: ({ viewerId, ...params }: NotesListParams & ViewerScoped) =>
     infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [
         ...notesQueries.lists(),
         'library',
@@ -78,6 +79,7 @@ export const notesQueries = {
    */
   mine: ({ viewerId, ...params }: NotesListParams & ViewerScoped) =>
     infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [
         ...notesQueries.lists(),
         'mine',
@@ -100,6 +102,7 @@ export const notesQueries = {
   /** The reader's note, by public address. */
   detail: ({ slug, viewerId }: { slug: string } & ViewerScoped) =>
     queryOptions({
+      meta: { persist: 'gated' },
       queryKey: [...notesQueries.details(), 'slug', slug, { viewerId }] as const,
       queryFn: () => notesApi.bySlug(slug),
       staleTime: STALE_TIMES.standard,
@@ -110,6 +113,7 @@ export const notesQueries = {
   /** The editor's note, by id (rename-proof). */
   byId: ({ id, viewerId }: { id: number } & ViewerScoped) =>
     queryOptions({
+      meta: { persist: 'gated' },
       queryKey: [...notesQueries.details(), 'id', id, { viewerId }] as const,
       queryFn: () => notesApi.byId(id),
       staleTime: STALE_TIMES.standard,

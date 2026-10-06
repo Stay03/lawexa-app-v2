@@ -38,6 +38,13 @@ import {
  * the same object illegal for `useSuspenseQuery`, which these leaves must also
  * serve.
  *
+ * DEVICE CACHE. A leaf with `meta: { persist: 'list' | 'gated' }` is kept in
+ * IndexedDB for the viewer (`runtime/persist/`). Only leaves in the plan's
+ * allowlist carry it (`runtime/persist/allowlist.test.ts` pins the set). When a
+ * kept leaf's KEY or the SHAPE of its answer changes, bump
+ * `PERSIST_SCHEMA_VERSION` in `runtime/persist/policy.ts`, or devices paint the
+ * old shape until it is refetched.
+ *
  * ── THREE DETAIL SHAPES, AND WHY THEY ARE SEPARATE ──────────────────────────
  * `GET /cases/{slug}` returns a different payload per `include_*` combination,
  * so the shape is part of the identity of the request and each shape is its own
@@ -97,6 +104,7 @@ export const casesQueries = {
    */
   list: ({ viewerId, ...params }: CaseListParams & ViewerScoped) =>
     queryOptions({
+      meta: { persist: 'list' },
       queryKey: [...casesQueries.lists(), params, { viewerId }] as const,
       queryFn: () => casesApi.getList(params),
       staleTime: STALE_TIMES.reference,
@@ -113,6 +121,7 @@ export const casesQueries = {
     ...params
   }: Omit<CaseListParams, 'page'> & ViewerScoped) =>
     infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [
         ...casesQueries.lists(),
         'infinite',
@@ -168,6 +177,7 @@ export const casesQueries = {
    */
   preview: (slug: string) =>
     queryOptions({
+      meta: { persist: 'gated' },
       queryKey: [...casesQueries.details(), slug, 'preview'] as const,
       queryFn: () => casesApi.getBySlug(slug),
       staleTime: STALE_TIMES.reference,
@@ -186,6 +196,7 @@ export const casesQueries = {
    */
   detail: (slug: string, searchQuery?: string) =>
     queryOptions({
+      meta: { persist: 'gated' },
       queryKey: [
         ...casesQueries.details(),
         slug,
@@ -206,6 +217,7 @@ export const casesQueries = {
   /** The FULL-JUDGMENT payload — the case plus `full_report`, nothing else. */
   report: (slug: string) =>
     queryOptions({
+      meta: { persist: 'gated' },
       queryKey: [...casesQueries.details(), slug, 'report'] as const,
       queryFn: () => casesApi.getBySlug(slug, { includeFullReport: true }),
       staleTime: STALE_TIMES.reference,
@@ -222,6 +234,7 @@ export const casesQueries = {
    */
   citedByPreview: (slug: string, { viewerId }: ViewerScoped) =>
     queryOptions({
+      meta: { persist: 'list' },
       queryKey: [...casesQueries.all, 'cited-by', slug, 'preview', { viewerId }] as const,
       queryFn: () =>
         casesApi.getCitedBy(slug, {
@@ -242,6 +255,7 @@ export const casesQueries = {
   infiniteCitedBy: (slug: string, { viewerId, ...query }: CitedByQuery & ViewerScoped) => {
     const params = citedByParams(query);
     return infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [...casesQueries.all, 'cited-by', slug, 'infinite', params, { viewerId }] as const,
       queryFn: ({ pageParam }) =>
         casesApi.getCitedBy(slug, {

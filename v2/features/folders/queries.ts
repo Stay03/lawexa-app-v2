@@ -61,6 +61,7 @@ export const foldersQueries = {
     search?: string;
   } & ViewerScoped) =>
     infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [
         ...foldersQueries.lists(),
         { parentUuid, search: search ?? null },
@@ -91,6 +92,7 @@ export const foldersQueries = {
    */
   detail: ({ uuid, viewerId }: { uuid: string } & ViewerScoped) =>
     queryOptions({
+      meta: { persist: 'gated' },
       queryKey: [...foldersQueries.details(), uuid, { viewerId }] as const,
       queryFn: () => foldersApi.byUuid(uuid),
       staleTime: STALE_TIMES.standard,
@@ -106,6 +108,7 @@ export const foldersQueries = {
     viewerId,
   }: { uuid: string; type?: string } & ViewerScoped) =>
     infiniteQueryOptions({
+      meta: { persist: 'gated' },
       queryKey: [
         ...foldersQueries.itemLists(),
         uuid,

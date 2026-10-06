@@ -26,6 +26,7 @@ export const jurisdictionsQueries = {
   /** The full jurisdiction list (name, ISO code, parent) for the picker. */
   list: () =>
     queryOptions({
+      meta: { persist: 'list' },
       queryKey: [...jurisdictionsQueries.all, 'list'] as const,
       queryFn: () => jurisdictionsApi.list(),
       staleTime: STALE_TIMES.static,

@@ -77,6 +77,7 @@ export const bookmarksQueries = {
    */
   list: ({ viewerId, ...params }: BookmarkListParams & ViewerScoped) =>
     queryOptions({
+      meta: { persist: 'list' },
       queryKey: [...bookmarksQueries.lists(), params, { viewerId }] as const,
       queryFn: () => bookmarksApi.getList(params),
       staleTime: STALE_TIMES.standard,
@@ -130,6 +131,7 @@ export const bookmarksQueries = {
    */
   infiniteList: ({ type, viewerId }: BookmarksListOptions) =>
     infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [
         ...bookmarksQueries.lists(),
         'infinite',

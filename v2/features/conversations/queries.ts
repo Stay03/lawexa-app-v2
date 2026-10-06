@@ -162,6 +162,7 @@ export const conversationsQueries = {
    */
   list: ({ viewerId, ...params }: ListConversationsParams & ViewerScoped) =>
     queryOptions({
+      meta: { persist: 'list' },
       queryKey: [...conversationsQueries.lists(), params, { viewerId }] as const,
       queryFn: () => chatApi.listConversations(params),
       staleTime: STALE_TIMES.standard,
@@ -197,6 +198,7 @@ export const conversationsQueries = {
    */
   infiniteRecents: ({ viewerId }: ViewerScoped) =>
     infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [
         ...conversationsQueries.lists(),
         'infinite',
@@ -260,6 +262,7 @@ export const conversationsQueries = {
       ...(trimmed ? { search: trimmed } : {}),
     };
     return infiniteQueryOptions({
+      meta: { persist: 'list' },
       queryKey: [
         ...conversationsQueries.lists(),
         'infinite',
@@ -353,6 +356,7 @@ export const conversationsQueries = {
    */
   detail: ({ conversationId, viewerId }: ConversationDetailOptions) =>
     queryOptions({
+      meta: { persist: 'gated' },
       queryKey: [
         ...conversationsQueries.details(),
         conversationId,
