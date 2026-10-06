@@ -49,27 +49,60 @@ const EXPECTED: Record<string, 'list' | 'gated'> = {
 
 const FEATURES = path.join(process.cwd(), 'v2', 'features');
 
+/** A comment line: `*`, `//` or `/*` after indentation. Docblocks describe the
+ *  flag (the exemplar factory does), and only code may set it. */
+const COMMENT = /^\s*(\*|\/\/|\/\*)/;
+
+/** The leaves one `queries.ts` source opts in, by leaf name. A flag in code
+ *  before any leaf declaration is an error: it cannot be attributed. */
+function optedInFrom(feature: string, source: string): Record<string, string> {
+  const found: Record<string, string> = {};
+  let leaf: string | null = null;
+  for (const line of source.split('\n')) {
+    if (COMMENT.test(line)) continue;
+    const declared = /^ {2}(\w+): /.exec(line);
+    if (declared) leaf = declared[1];
+    const persist = /meta: \{[^}]*persist: '(\w+)'/.exec(line);
+    if (persist) {
+      assert.ok(leaf, `${feature}: a persist flag before any leaf`);
+      found[`${feature}.${leaf}`] = persist[1];
+    }
+  }
+  return found;
+}
+
 function optedInLeaves(): Record<string, string> {
   const found: Record<string, string> = {};
   for (const feature of fs.readdirSync(FEATURES)) {
     const file = path.join(FEATURES, feature, 'queries.ts');
     if (!fs.existsSync(file)) continue;
-    let leaf: string | null = null;
-    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-      const declared = /^ {2}(\w+): /.exec(line);
-      if (declared) leaf = declared[1];
-      const persist = /meta: \{[^}]*persist: '(\w+)'/.exec(line);
-      if (persist) {
-        assert.ok(leaf, `${feature}: a persist flag before any leaf`);
-        found[`${feature}.${leaf}`] = persist[1];
-      }
-    }
+    Object.assign(found, optedInFrom(feature, fs.readFileSync(file, 'utf8')));
   }
   return found;
 }
 
 test('exactly the planned leaves are kept on the device, each in its planned mode', () => {
   assert.deepEqual(optedInLeaves(), EXPECTED);
+});
+
+test('the scan ignores the flag in a comment and still refuses a stray one in code', () => {
+  const documented = [
+    '/**',
+    " * A leaf with `meta: { persist: 'list' | 'gated' }` is kept on the device.",
+    ' */',
+    "// meta: { persist: 'list' } in a line comment",
+    "/* meta: { persist: 'gated' } */",
+    'export const fooQueries = {',
+    '  detail: (id: string) =>',
+    '    queryOptions({',
+    "      meta: { persist: 'gated' },",
+    '    }),',
+    '};',
+  ].join('\n');
+  assert.deepEqual(optedInFrom('foo', documented), { 'foo.detail': 'gated' });
+
+  const stray = ["const shared = { meta: { persist: 'list' } };", 'export const fooQueries = {};'].join('\n');
+  assert.throws(() => optedInFrom('foo', stray), /a persist flag before any leaf/);
 });
 
 test('the flag reaches the built options', () => {
