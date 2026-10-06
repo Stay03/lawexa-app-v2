@@ -2,6 +2,7 @@
 
 import { Fragment, memo, type ReactNode } from 'react';
 
+import { tableCellSpans } from '@/lib/utils/table-spans';
 import { aknAnchorId, childByLocal, localName, type AknBlock } from './akn';
 import { isEditorialNotesEid } from './editorial-notes';
 import { printedLines } from './printed-lines';
@@ -626,10 +627,12 @@ function TableRow({ element }: { element: Element }) {
   let index = 0;
   for (const child of element.children) {
     const tag = localName(child);
+    // The cell's own rowspan/colspan, or a merged header shifts every column
+    // under it (`lib/utils/table-spans.ts`).
     if (tag === 'th') {
-      cells.push(<th key={index}>{renderCell(child)}</th>);
+      cells.push(<th key={index} {...tableCellSpans(child)}>{renderCell(child)}</th>);
     } else if (tag === 'td') {
-      cells.push(<td key={index}>{renderCell(child)}</td>);
+      cells.push(<td key={index} {...tableCellSpans(child)}>{renderCell(child)}</td>);
     }
     index += 1;
   }

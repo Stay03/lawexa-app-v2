@@ -1,5 +1,7 @@
 'use client';
 
+import { tableCellSpans } from '@/lib/utils/table-spans';
+
 /******************************************************************************
                          AKN Element Renderer
   Recursively renders a DOM Element from parsed AKN 3.0 XML into React JSX
@@ -172,11 +174,13 @@ function AknElementRenderer({ element }: AknElementRendererProps) {
   if (tag === 'tr') {
     return <tr>{renderChildElements(element)}</tr>;
   }
+  // The cell's own rowspan/colspan, or a merged header shifts every column
+  // under it (`lib/utils/table-spans.ts`).
   if (tag === 'th') {
-    return <th dangerouslySetInnerHTML={{ __html: element.innerHTML }} />;
+    return <th {...tableCellSpans(element)} dangerouslySetInnerHTML={{ __html: element.innerHTML }} />;
   }
   if (tag === 'td') {
-    return <td dangerouslySetInnerHTML={{ __html: element.innerHTML }} />;
+    return <td {...tableCellSpans(element)} dangerouslySetInnerHTML={{ __html: element.innerHTML }} />;
   }
 
   // --- <ul> / <ol> — HTML lists (from fixed backend) ---
