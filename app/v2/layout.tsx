@@ -202,7 +202,7 @@ export default async function V2Layout({
             without this, one user's cached lists, bookmarks, spaces, radars,
             recently-viewed and quiz scores would paint for the NEXT user on the same
             device for up to the 30-minute retention. See the file for the full trace. */}
-        <V2CacheIdentityGuard userId={user?.id ?? null} />
+        <V2CacheIdentityGuard userId={user?.id ?? null} role={user?.role ?? null} />
         {/* The pages kept on the device are dropped when the reader's plan
             changes, so a case kept under a paid plan never paints under a free
             one. Reads the query the account row already runs. Renders null. */}

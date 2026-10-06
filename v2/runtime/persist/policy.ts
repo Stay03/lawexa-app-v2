@@ -35,6 +35,20 @@ export const PERSIST_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
  *  must never hold the screen). */
 export const PERSIST_READ_TIMEOUT_MS = 1500;
 
+/**
+ * Who may keep answers on this device: a signed-in account, never a guest.
+ * A guest session has a user id (the API creates a guest user), so the id
+ * alone does not decide it. `null` turns the device cache off. The query
+ * cache's identity edge still follows the id, guests included.
+ */
+export function deviceCacheOwnerOf(
+  userId: number | null,
+  role: string | null | undefined,
+): number | null {
+  if (userId === null || role === 'guest') return null;
+  return userId;
+}
+
 export function persistModeOf(meta: unknown): PersistMode | null {
   const mode = (meta as { persist?: unknown } | undefined)?.persist;
   return mode === 'list' || mode === 'gated' ? mode : null;

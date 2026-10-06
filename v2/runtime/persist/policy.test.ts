@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
+  deviceCacheOwnerOf,
   isGoneError,
   isStorableAnswer,
   PERSIST_MAX_AGE_MS,
@@ -13,12 +17,31 @@ import {
   trimPlan,
 } from './policy';
 
+const here = dirname(fileURLToPath(import.meta.url));
+
 test('the caps are the plan and its amendments: 7 days, 1 MiB a row, 200 rows, 50 MB, 1.5 s', () => {
   assert.equal(PERSIST_MAX_AGE_MS, 7 * 24 * 60 * 60 * 1000);
   assert.equal(PERSIST_MAX_ENTRY_BYTES, 1024 * 1024);
   assert.equal(PERSIST_MAX_ROWS, 200);
   assert.equal(PERSIST_MAX_TOTAL_BYTES, 50 * 1024 * 1024);
   assert.equal(PERSIST_READ_TIMEOUT_MS, 1500);
+});
+
+test('the device cache has an owner only for a signed-in account, never a guest', () => {
+  assert.equal(deviceCacheOwnerOf(7, 'user'), 7);
+  assert.equal(deviceCacheOwnerOf(7, 'researcher'), 7);
+  assert.equal(deviceCacheOwnerOf(7, 'admin'), 7);
+  assert.equal(deviceCacheOwnerOf(7, 'guest'), null);
+  assert.equal(deviceCacheOwnerOf(null, 'user'), null);
+  assert.equal(deviceCacheOwnerOf(null, null), null);
+});
+
+test('the guard sets the owner through the rule, and the layout passes the role', () => {
+  const guard = readFileSync(join(here, '..', 'cache-identity-guard.tsx'), 'utf8');
+  assert.match(guard, /setDeviceCacheOwner\(deviceCacheOwnerOf\(userId, role\)\)/);
+  assert.doesNotMatch(guard, /setDeviceCacheOwner\(userId\)/);
+  const layout = readFileSync(join(here, '..', '..', '..', 'app', 'v2', 'layout.tsx'), 'utf8');
+  assert.match(layout, /<V2CacheIdentityGuard userId=\{user\?\.id \?\? null\} role=\{user\?\.role \?\? null\} \/>/);
 });
 
 test('only an explicit list or gated flag opts a query in', () => {

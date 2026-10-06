@@ -2,6 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryBackend } from './memory-backend';
 import { createQueryStorage } from './query-storage';
+import { deviceCacheOwnerOf } from './policy';
+
+/** As `setDeviceCacheOwner` turns the owner id into the storage's owner key. */
+const ownerKey = (owner: number | null) => (owner === null ? null : String(owner));
 
 test('with no owner (signed out) nothing is read or written', async () => {
   const { backend, answers } = memoryBackend();
@@ -10,6 +14,20 @@ test('with no owner (signed out) nothing is read or written', async () => {
   assert.equal(answers.size, 0);
   assert.equal(await storage.getItem('k'), undefined);
   assert.deepEqual(await storage.entries(), []);
+});
+
+test('a guest session gets no owner, so nothing is read or written for it', async () => {
+  const { backend, answers } = memoryBackend();
+  const storage = createQueryStorage(backend);
+  // A guest has a user id; the owner rule still turns the cache off.
+  storage.setOwner(ownerKey(deviceCacheOwnerOf(42, 'guest')));
+  await storage.setItem('k', { a: 1 });
+  assert.equal(answers.size, 0);
+  assert.equal(await storage.getItem('k'), undefined);
+  // The same id signed in as an account stores under its owner.
+  storage.setOwner(ownerKey(deviceCacheOwnerOf(42, 'user')));
+  await storage.setItem('k', { a: 1 });
+  assert.deepEqual([...answers.keys()], ['42/k']);
 });
 
 test('rows are stored under the owner, and each owner reads only its own', async () => {

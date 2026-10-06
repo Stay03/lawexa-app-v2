@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { dropOtherDeviceCacheOwners, setDeviceCacheOwner } from './persist/device-cache';
+import { deviceCacheOwnerOf } from './persist/policy';
 
 /**
  * V2CacheIdentityGuard — drops the entire v2 query cache the moment the
@@ -57,13 +58,22 @@ import { dropOtherDeviceCacheOwners, setDeviceCacheOwner } from './persist/devic
  * the first fetch of a session already writes under the right owner and reads
  * see only that owner's rows. On a transition the other owners' rows are
  * deleted too. The owner switch alone already makes them unreachable, before
- * that async delete lands. Signed out (`null`) turns the device cache off.
+ * that async delete lands. Signed out (`null`) turns the device cache off, and
+ * so does a guest session: a guest has a user id, but nothing is kept on the
+ * device for a guest (`deviceCacheOwnerOf`). The clear above still runs on a
+ * guest -> guest change, because it follows the id.
  */
-export function V2CacheIdentityGuard({ userId }: { userId: number | null }) {
+export function V2CacheIdentityGuard({
+  userId,
+  role,
+}: {
+  userId: number | null;
+  role: string | null;
+}) {
   const queryClient = useQueryClient();
   const [seen, setSeen] = useState<number | null>(userId);
 
-  setDeviceCacheOwner(userId);
+  setDeviceCacheOwner(deviceCacheOwnerOf(userId, role));
   if (seen !== userId) {
     setSeen(userId);
     queryClient.clear();
