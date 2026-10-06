@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { dehydrate, type DehydratedState } from '@tanstack/react-query';
 import type { CaseDetailResponse, CaseListParams, CaseListResponse } from '@/types/case';
 import { apiFetch } from '@/v2/runtime/api-server';
-import { verifySession } from '@/v2/runtime/session';
+import { getSessionToken, verifySession } from '@/v2/runtime/session';
 import { makeQueryClient } from '@/v2/runtime/query';
 import { clientIpFrom } from './client-ip';
 import { CASES_PAGE_SIZE, casesQueries } from './queries';
@@ -114,12 +114,16 @@ export async function prefetchCasesListState(
 /* ──────────────────────────── case prefetch ─────────────────────────────── */
 
 /**
- * Bound on the case read's cost to the first byte. The API answers a case in
- * about 0.3 to 0.7 s; past this the page stops waiting and the screen fetches
- * the case itself, exactly as before, so a slow API never makes the page slower
- * than it was.
+ * Bound on the wait for the case. The API answers a case in about 0.3 to 0.7 s,
+ * and the shell is already on screen while the page waits (`loading.tsx`
+ * streams it). Past this the page stops waiting and the screen fetches the case
+ * itself. A short bound gains nothing: the screen's own fetch meets the same
+ * slow API, and each timeout costs a second request and a second hit on the
+ * API's per-reader case throttle. It does not count a second view, because the
+ * API keeps one view per reader per case for 30 minutes. 4 s sits beside the
+ * metadata fetch's 5 s (`lib/api/server.ts`).
  */
-const CASE_PREFETCH_TIMEOUT_MS = 1500;
+const CASE_PREFETCH_TIMEOUT_MS = 4000;
 
 /**
  * The server-to-server key that lets the API treat this request as the
@@ -138,13 +142,22 @@ function ssrKey(): string | null {
  * first visit at phone speed, measured on live 8aa6a90).
  *
  * WHEN IT DOES NOTHING, and the page loads exactly as before:
- * - **No session.** `GET /cases/{slug}` needs a token, and the signed-out
- *   preview is a separate plan (techlead ae7554dd point 3).
+ * - **No session cookie.** `GET /cases/{slug}` needs a token, and the
+ *   signed-out preview is a separate plan (techlead ae7554dd point 3). So no
+ *   signed-out reader and no crawler reaches this fetch: the API middleware's
+ *   handling of those cases (its docblock) has no caller from here yet, and
+ *   bot views do not change with this code.
  * - **No `LAWEXA_SSR_KEY`.** Without the trusted header the API would log
  *   every server-read view under this server's IP and location (backend
  *   a0020709). The key turns the feature on, once backend's middleware is live.
+ * - **No reader IP.** Sent without one, the key would make the API log a
+ *   refusal and still count the read under this server's address. The page
+ *   skips the fetch instead.
  * - **Any failure or a slow answer**, including the reader's view limit: the
  *   entry is simply absent and the screen fetches and explains it as today.
+ *
+ * ROLLOUT ORDER: the API gets the key in `SSR_SHARED_KEYS` first, then this
+ * server gets the same value in `LAWEXA_SSR_KEY` (`.env.example`).
  *
  * ONE VIEW PER LOAD, AS BEFORE. The hydrated entry is fresh for the detail's
  * own `reference` stale time, so the screen does not fetch again on mount.
@@ -159,8 +172,16 @@ export async function prefetchCaseDetailState(
   try {
     const key = ssrKey();
     if (!key) return undefined;
-    const session = await verifySession();
-    if (!session) return undefined;
+    // Cookie PRESENCE only, the `prefetchRecentsState` rule: zero network, so
+    // nothing runs in series before the case fetch. The API authorizes the
+    // request itself, and a stale token 401s into the same `undefined` path.
+    // The detail key has no viewer segment, so the user's id is not needed.
+    const token = await getSessionToken();
+    if (!token) return undefined;
+
+    const incoming = await headers();
+    const ip = clientIpFrom(incoming);
+    if (!ip) return undefined;
 
     const leaf = casesQueries.detail(slug, searchQuery);
     const query = new URLSearchParams({
@@ -170,15 +191,15 @@ export async function prefetchCaseDetailState(
     });
     if (searchQuery) query.set('q', searchQuery);
 
-    const incoming = await headers();
-    const forward: Record<string, string> = { 'X-Lawexa-SSR-Key': key };
+    const forward: Record<string, string> = {
+      'X-Lawexa-SSR-Key': key,
+      'X-Lawexa-Client-IP': ip,
+    };
     const userAgent = incoming.get('user-agent');
     if (userAgent) {
       forward['User-Agent'] = userAgent;
       forward['X-Lawexa-Client-UA'] = userAgent;
     }
-    const ip = clientIpFrom(incoming);
-    if (ip) forward['X-Lawexa-Client-IP'] = ip;
 
     const detail = await apiFetch<CaseDetailResponse>(
       `/cases/${encodeURIComponent(slug)}?${query.toString()}`,
