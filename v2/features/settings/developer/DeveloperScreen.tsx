@@ -5,7 +5,8 @@ import { ArrowUpToLine, FlaskConical, Gauge } from 'lucide-react';
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
 import { setSearchPosition, useSearchPosition } from '@/v2/search-position';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { canUsePerfSwitch, setPerfOff, usePerfOff } from '@/v2/runtime/perf-switch';
+import { canUsePerfSwitch, setPerfOff } from '@/v2/runtime/perf-switch';
+import { usePerfOff } from '@/v2/runtime/use-perf-off';
 import { SETTINGS_COLUMN, SettingsBlock } from '../SettingsList';
 import { SettingsToggleRow } from '../SettingsToggleRow';
 

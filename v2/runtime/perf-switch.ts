@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from 'react';
-
 /**
  * The speed-features test switch (owner, 7 October 2026): one cookie that
  * turns off, for this browser only, the parts of v2 that make pages appear
@@ -15,6 +13,10 @@ import { useSyncExternalStore } from 'react';
  * any value but `off`, means on: a browser that never touched the switch
  * behaves exactly as before. Admins set it from Settings, Developer
  * (`/settings/developer`); nobody else sees the switch.
+ *
+ * NO REACT IMPORT HERE: the case page's server code reads the cookie through
+ * this module, and Turbopack refuses a server component that imports a module
+ * using client hooks. The hook lives in `use-perf-off.ts`.
  */
 export const PERF_COOKIE = 'lawexa-perf';
 
@@ -41,17 +43,6 @@ export function setPerfOff(off: boolean): void {
   document.cookie = off
     ? `${PERF_COOKIE}=off; path=/; max-age=${PERF_COOKIE_MAX_AGE}; samesite=lax`
     : `${PERF_COOKIE}=; path=/; max-age=0; samesite=lax`;
-}
-
-const noSubscribe = () => () => undefined;
-
-/**
- * The switch for rendering: the server snapshot is "on", so the server HTML
- * and the first client render agree, then it settles to the cookie. The page
- * reloads on every change, so no live subscription is needed.
- */
-export function usePerfOff(): boolean {
-  return useSyncExternalStore(noSubscribe, perfOffInBrowser, () => false);
 }
 
 /** Who sees the switch: the server-verified admin roles only. */

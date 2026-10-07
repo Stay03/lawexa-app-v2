@@ -67,3 +67,10 @@ test('each speed feature consults the switch: server-built case, device cache, p
   const intent = read('v2', 'shell', 'use-intent-prefetch.ts');
   assert.match(intent, /if \(perfOffInBrowser\(\)\) return NO_INTENT;/);
 });
+
+test('the module the server imports has no React import (Turbopack refuses client hooks in a server component)', () => {
+  const pure = read('v2', 'runtime', 'perf-switch.ts');
+  assert.doesNotMatch(pure, /from 'react'/);
+  assert.doesNotMatch(pure, /useSyncExternalStore|useState|useEffect/);
+  assert.match(read('v2', 'runtime', 'use-perf-off.ts'), /^'use client';/);
+});
