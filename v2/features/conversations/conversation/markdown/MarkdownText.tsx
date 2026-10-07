@@ -6,6 +6,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { CaseMentionLink } from './CaseMentionLink';
+import { FencedBlock } from './FencedBlock';
 import { linkReferenceLines } from './reference-lines';
 import { rehypeStreamWords } from './rehype-stream-words';
 
@@ -59,13 +60,20 @@ const REHYPE_PLAIN: Options['rehypePlugins'] = [];
  * on pointer devices, tap popover on touch); every other anchor renders exactly
  * as react-markdown's default. {@link CaseMentionLink} holds no data hook, so a
  * token flush never fetches or re-renders beyond the block already re-parsing.
+ *
+ * `pre` routes fenced blocks through {@link FencedBlock}: a fence the AI used
+ * for a document (a court form, a letter) renders as a document block, real
+ * code keeps the code look (fence-kind.ts).
  */
-const MARKDOWN_COMPONENTS: Components = { a: CaseMentionLink };
+const MARKDOWN_COMPONENTS: Components = { a: CaseMentionLink, pre: FencedBlock };
 
 const PROSE_CLASS =
   'prose prose-sm dark:prose-invert max-w-none overflow-x-hidden break-words ' +
   '[&_a]:text-primary [&_a.case-mention]:no-underline ' +
-  '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:overflow-x-auto [&_pre]:overscroll-x-contain';
+  // `[&_pre]:text-foreground`: the typography plugin gives `pre` light text for
+  // its own dark box; with the muted background below, code was near-invisible
+  // in light mode (seen 7 October 2026).
+  '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:text-foreground [&_pre]:overflow-x-auto [&_pre]:overscroll-x-contain';
 
 /** Split markdown into independently-renderable blocks (blank-line separated),
  *  never splitting inside a fenced code block. Pure — safe to call in render. */
