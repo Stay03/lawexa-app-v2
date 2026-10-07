@@ -2,7 +2,7 @@
 
 import { useMemo, type PointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { perfOffInBrowser } from '@/v2/runtime/perf-switch';
+import { layerOffInBrowser } from '@/v2/runtime/perf-switch';
 import { createIntentPrefetch, INTENT_TOUCH_MS, type IntentSource } from './intent-prefetch';
 
 export type { IntentSource };
@@ -24,24 +24,19 @@ export interface IntentPrefetchHooks {
  * rows read the case), and `onAbandon` lets it cancel that read. Pass stable
  * callbacks (`useCallback`), or the intent state is rebuilt on every render.
  */
-/** No handlers: what a link gets while the speed features are off. */
-const NO_INTENT = {};
-
 export function useIntentPrefetch(href: string, { onIntent, onAbandon }: IntentPrefetchHooks = {}) {
   const router = useRouter();
   const intent = useMemo(
     () =>
       createIntentPrefetch((target, source) => {
-        router.prefetch(target);
+        // The route performance layer can be off in this browser
+        // (`perf-switch.ts`); the surface's own read (`onIntent`) is its
+        // own layer and decides for itself.
+        if (!layerOffInBrowser('route')) router.prefetch(target);
         onIntent?.(source);
       }),
     [router, onIntent],
   );
-
-  // The speed-features test switch is off in this browser: no prefetch at all
-  // (`perf-switch.ts`). The link then loads its page only when it is opened,
-  // and no case is read ahead.
-  if (perfOffInBrowser()) return NO_INTENT;
 
   return {
     // Mouse: rest. Pen: now. Touch is left to the touch events below, which

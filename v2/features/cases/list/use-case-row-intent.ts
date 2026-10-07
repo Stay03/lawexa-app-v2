@@ -6,6 +6,7 @@ import { useIntentPrefetch, type IntentSource } from '@/v2/shell/use-intent-pref
 import { useV2Session } from '@/v2/runtime/session-context';
 import { casesQueries } from '../queries';
 import { canPrefetchCase } from '../case-prefetch';
+import { layerOffInBrowser } from '@/v2/runtime/perf-switch';
 
 /**
  * A search row's intent handlers: the route prefetch every reader gets
@@ -29,6 +30,8 @@ export function useCaseRowIntent(href: string, slug: string, searchQuery?: strin
     // a phone's link (measured 7 October 2026: no gain, 0.3 to 0.5 s slower on
     // a Lighthouse mobile profile). Phones keep the route prefetch only.
     if (!allowed || source === 'touch') return;
+    // The case read performance layer can be off in this browser (`perf-switch.ts`).
+    if (layerOffInBrowser('read')) return;
     opened.current = false;
     void queryClient.prefetchQuery(casesQueries.prefetchDetail(slug, searchQuery));
     // The loading boundary is a client component that carries the whole case

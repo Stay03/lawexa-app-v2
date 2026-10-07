@@ -40,7 +40,7 @@ test('the guard sets the owner through the rule, and the layout passes the role'
   const guard = readFileSync(join(here, '..', 'cache-identity-guard.tsx'), 'utf8');
   // The speed-features test switch may wrap the rule (`perf-switch.ts`), but
   // the owner always comes from the rule, never from the id alone.
-  assert.match(guard, /setDeviceCacheOwner\((perfOffInBrowser\(\) \? null : )?deviceCacheOwnerOf\(userId, role\)\)/);
+  assert.match(guard, /setDeviceCacheOwner\((layerOffInBrowser\('idb'\) \? null : )?deviceCacheOwnerOf\(userId, role\)\)/);
   assert.doesNotMatch(guard, /setDeviceCacheOwner\(userId\)/);
   const layout = readFileSync(join(here, '..', '..', '..', 'app', 'v2', 'layout.tsx'), 'utf8');
   assert.match(layout, /<V2CacheIdentityGuard userId=\{user\?\.id \?\? null\} role=\{user\?\.role \?\? null\} \/>/);

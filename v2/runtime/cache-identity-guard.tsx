@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { dropOtherDeviceCacheOwners, setDeviceCacheOwner } from './persist/device-cache';
 import { deviceCacheOwnerOf } from './persist/policy';
-import { perfOffInBrowser } from './perf-switch';
+import { layerOffInBrowser } from './perf-switch';
 
 /**
  * V2CacheIdentityGuard — drops the entire v2 query cache the moment the
@@ -74,9 +74,9 @@ export function V2CacheIdentityGuard({
   const queryClient = useQueryClient();
   const [seen, setSeen] = useState<number | null>(userId);
 
-  // No owner while the speed-features test switch is off: nothing is
+  // No owner while the IndexedDB performance layer is off: nothing is
   // restored or written on this device (`perf-switch.ts`).
-  setDeviceCacheOwner(perfOffInBrowser() ? null : deviceCacheOwnerOf(userId, role));
+  setDeviceCacheOwner(layerOffInBrowser('idb') ? null : deviceCacheOwnerOf(userId, role));
   if (seen !== userId) {
     setSeen(userId);
     queryClient.clear();

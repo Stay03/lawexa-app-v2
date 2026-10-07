@@ -1,6 +1,6 @@
 import 'server-only';
 import { cookies, headers } from 'next/headers';
-import { PERF_COOKIE, perfOffValue } from '@/v2/runtime/perf-switch';
+import { PERF_COOKIE, layerOffValue } from '@/v2/runtime/perf-switch';
 import { dehydrate, type DehydratedState } from '@tanstack/react-query';
 import type { CaseDetailResponse, CaseListParams, CaseListResponse } from '@/types/case';
 import { apiFetch } from '@/v2/runtime/api-server';
@@ -177,9 +177,9 @@ export async function prefetchCaseDetailState(
   try {
     const key = ssrKey();
     if (!key) return undefined;
-    // The speed-features test switch is off in this browser: the screen loads
-    // the case itself, as before the server-built page (`perf-switch.ts`).
-    if (perfOffValue((await cookies()).get(PERF_COOKIE)?.value)) return undefined;
+    // The SSR performance layer is off in this browser: the screen loads the
+    // case itself, as before the server-built page (`perf-switch.ts`).
+    if (layerOffValue((await cookies()).get(PERF_COOKIE)?.value, 'ssr')) return undefined;
     // Cookie PRESENCE only, the `prefetchRecentsState` rule: zero network, so
     // nothing runs in series before the case fetch. The case route itself
     // has no `auth:sanctum` and would serve a dead token as a guest, so the

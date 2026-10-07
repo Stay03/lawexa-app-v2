@@ -1,14 +1,22 @@
 'use client';
 
-import { ArrowUpToLine, FlaskConical, Gauge } from 'lucide-react';
+import { ArrowUpToLine, Database, FlaskConical, Route, Server, Zap, type LucideIcon } from 'lucide-react';
 
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
 import { setSearchPosition, useSearchPosition } from '@/v2/search-position';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { canUsePerfSwitch, setPerfOff } from '@/v2/runtime/perf-switch';
-import { usePerfOff } from '@/v2/runtime/use-perf-off';
-import { SETTINGS_COLUMN, SettingsBlock } from '../SettingsList';
+import { canUsePerfSwitch, setLayerOff, type PerfLayer } from '@/v2/runtime/perf-switch';
+import { usePerfLayersOff } from '@/v2/runtime/use-perf-off';
+import { SETTINGS_BLOCK, SETTINGS_COLUMN, SettingsBlock } from '../SettingsList';
 import { SettingsToggleRow } from '../SettingsToggleRow';
+import { PERF_LAYER_COPY, PERF_LAYERS_HEADING } from './perf-layers';
+
+const PERF_LAYER_ICONS: Record<PerfLayer, LucideIcon> = {
+  ssr: Server,
+  idb: Database,
+  route: Route,
+  read: Zap,
+};
 
 /**
  * DeveloperScreen — v2 `/settings/developer`: the two switches the owner kept
@@ -33,7 +41,7 @@ import { SettingsToggleRow } from '../SettingsToggleRow';
 export function DeveloperScreen() {
   const searchPosition = useSearchPosition();
   const { role } = useV2Session();
-  const perfOff = usePerfOff();
+  const layersOff = usePerfLayersOff();
 
   return (
     <div className={SETTINGS_COLUMN}>
@@ -62,22 +70,40 @@ export function DeveloperScreen() {
         />
       </SettingsBlock>
 
-      {/* Admins only (owner, 7 October 2026): the speed features off for this
-          browser, to test with and without them (`perf-switch.ts`). The page
-          reloads, so nothing kept in memory under the old setting is shown. */}
+      {/* Admins only (owner, 7 October 2026): each performance layer on or off
+          for this browser, to test with and without it (`perf-switch.ts`). The
+          words are the owner's (`perf-layers.ts`). Every change reloads the
+          page, so nothing kept in memory under the old setting is shown. The
+          heading is drawn on screen, unlike the shared block's hidden label. */}
       {canUsePerfSwitch(role) ? (
-        <SettingsBlock id="speed" label="Testing, this browser only">
-          <SettingsToggleRow
-            icon={Gauge}
-            label="Speed features"
-            hint="Off: case pages are not built on the server, nothing is saved on this device, and links are not prefetched. The page reloads."
-            checked={!perfOff}
-            onCheckedChange={(next) => {
-              setPerfOff(!next);
-              window.location.reload();
-            }}
-          />
-        </SettingsBlock>
+        <section aria-labelledby="perf-layers-heading" className="mt-8">
+          <h2
+            id="perf-layers-heading"
+            className="mb-2 px-1 text-[13px] font-medium text-muted-foreground"
+          >
+            {PERF_LAYERS_HEADING}
+          </h2>
+          <ul className={SETTINGS_BLOCK}>
+            {PERF_LAYER_COPY.map((copy) => (
+              <SettingsToggleRow
+                key={copy.layer}
+                icon={PERF_LAYER_ICONS[copy.layer]}
+                label={copy.label}
+                hint={
+                  <>
+                    <span className="block">On: {copy.on}</span>
+                    <span className="mt-1 block">Off: {copy.off}</span>
+                  </>
+                }
+                checked={!layersOff.has(copy.layer)}
+                onCheckedChange={(next) => {
+                  setLayerOff(copy.layer, !next);
+                  window.location.reload();
+                }}
+              />
+            ))}
+          </ul>
+        </section>
       ) : null}
     </div>
   );

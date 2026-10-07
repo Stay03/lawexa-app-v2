@@ -1,18 +1,22 @@
 /**
- * The speed-features test switch (owner, 7 October 2026): one cookie that
- * turns off, for this browser only, the parts of v2 that make pages appear
- * sooner, so a tester can compare with and without them.
+ * The performance-layer test switches (owner, 7 October 2026): one cookie
+ * that turns individual speed layers off, for this browser only, so a tester
+ * can compare each layer on and off.
  *
- * Off means: no server-built case page (`prefetchCaseDetailState`), no device
- * cache (`V2CacheIdentityGuard`), and no prefetch on intent
- * (`useIntentPrefetch`, which carries both the route prefetch and the case
- * read ahead). The Router Cache, the memory cache and the API's ETag stay as
- * they are: a reload and DevTools already cover those.
+ * The layers, and where each is checked:
+ * - `ssr`   server-side rendering of case pages (`prefetchCaseDetailState`)
+ * - `idb`   the IndexedDB query cache (`V2CacheIdentityGuard`)
+ * - `route` route prefetch on hover or touch (`useIntentPrefetch`)
+ * - `read`  the case read-ahead on hover (`useCaseRowIntent`)
+ * The Router Cache, the memory cache and the API's ETag stay as they are: a
+ * reload and DevTools already cover those.
  *
- * A COOKIE, not localStorage, because the server must read it too. Absent, or
- * any value but `off`, means on: a browser that never touched the switch
- * behaves exactly as before. Admins set it from Settings, Developer
- * (`/settings/developer`); nobody else sees the switch.
+ * A COOKIE, not localStorage, because the server must read it too. Its value
+ * is the comma list of the layers that are OFF (`lawexa-perf=ssr,idb`).
+ * Absent means every layer is on: a browser that never touched the switches
+ * behaves exactly as before. The value `off` (the first, single switch of
+ * 548f2c0) means every layer is off. Admins set it from Settings, Developer
+ * (`/settings/developer`); nobody else sees the switches.
  *
  * NO REACT IMPORT HERE: the case page's server code reads the cookie through
  * this module, and Turbopack refuses a server component that imports a module
@@ -20,32 +24,58 @@
  */
 export const PERF_COOKIE = 'lawexa-perf';
 
+export const PERF_LAYERS = ['ssr', 'idb', 'route', 'read'] as const;
+export type PerfLayer = (typeof PERF_LAYERS)[number];
+
 /** One year, the same life as the v2 opt-in cookie. */
 const PERF_COOKIE_MAX_AGE = 31536000;
 
-/** Is the switch off in this cookie value (as the server reads it)? */
-export function perfOffValue(value: string | null | undefined): boolean {
-  return value === 'off';
+/** The layers a cookie value turns off. */
+export function layersOffIn(value: string | null | undefined): ReadonlySet<PerfLayer> {
+  if (!value) return new Set();
+  if (value === 'off') return new Set(PERF_LAYERS);
+  const known = new Set<string>(PERF_LAYERS);
+  return new Set(value.split(',').filter((part): part is PerfLayer => known.has(part)));
 }
 
-/** Is the switch off in a raw `document.cookie` string? Exact-entry match. */
-export function perfOffInCookieString(cookieString: string): boolean {
-  return cookieString.split('; ').some((entry) => entry === `${PERF_COOKIE}=off`);
+/** Is this layer off in this cookie value (as the server reads it)? */
+export function layerOffValue(value: string | null | undefined, layer: PerfLayer): boolean {
+  return layersOffIn(value).has(layer);
 }
 
-/** In the browser: is the switch off? Always false on the server. */
-export function perfOffInBrowser(): boolean {
-  return typeof document !== 'undefined' && perfOffInCookieString(document.cookie);
+/** The cookie's value in a raw `document.cookie` string, or ''. */
+export function perfValueInCookieString(cookieString: string): string {
+  const entry = cookieString.split('; ').find((part) => part.startsWith(`${PERF_COOKIE}=`));
+  return entry ? decodeURIComponent(entry.slice(PERF_COOKIE.length + 1)) : '';
 }
 
-/** Turn the speed features on or off for this browser. */
-export function setPerfOff(off: boolean): void {
-  document.cookie = off
-    ? `${PERF_COOKIE}=off; path=/; max-age=${PERF_COOKIE_MAX_AGE}; samesite=lax`
+/** In the browser: the cookie's value, or ''. Always '' on the server. */
+export function perfValueInBrowser(): string {
+  return typeof document === 'undefined' ? '' : perfValueInCookieString(document.cookie);
+}
+
+/** In the browser: is this layer off? Always false on the server. */
+export function layerOffInBrowser(layer: PerfLayer): boolean {
+  return layersOffIn(perfValueInBrowser()).has(layer);
+}
+
+/** The cookie value after turning one layer on or off ('' when all are on). */
+export function nextPerfValue(current: string, layer: PerfLayer, off: boolean): string {
+  const set = new Set(layersOffIn(current));
+  if (off) set.add(layer);
+  else set.delete(layer);
+  return PERF_LAYERS.filter((name) => set.has(name)).join(',');
+}
+
+/** Turn one layer on or off for this browser. All on clears the cookie. */
+export function setLayerOff(layer: PerfLayer, off: boolean): void {
+  const value = nextPerfValue(perfValueInBrowser(), layer, off);
+  document.cookie = value
+    ? `${PERF_COOKIE}=${encodeURIComponent(value)}; path=/; max-age=${PERF_COOKIE_MAX_AGE}; samesite=lax`
     : `${PERF_COOKIE}=; path=/; max-age=0; samesite=lax`;
 }
 
-/** Who sees the switch: the server-verified admin roles only. */
+/** Who sees the switches: the server-verified admin roles only. */
 export function canUsePerfSwitch(role: string | null | undefined): boolean {
   return role === 'admin' || role === 'superadmin';
 }
