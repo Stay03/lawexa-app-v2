@@ -186,7 +186,9 @@ export function ConversationScreen({
   if (error === 'confidential_transcript_lost') {
     return <ConfidentialLostState />;
   }
-  if (error === 'not_found') {
+  // `isGoneOnServer`: deleted, made private or unshared on another device while
+  // its transcript was still in memory (gone.ts).
+  if (error === 'not_found' || controller.isGoneOnServer) {
     return <NotAvailableState />;
   }
 

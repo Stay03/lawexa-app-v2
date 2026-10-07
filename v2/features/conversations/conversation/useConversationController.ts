@@ -15,6 +15,8 @@ import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context'
 import { useStreamStyle } from '@/v2/stream-style';
 import { conversationsCache } from '../cache';
 import { useSkeletonHold } from './skeleton-hold';
+import { goneOnServer } from './gone';
+import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import {
   isConfidentialMark,
@@ -185,6 +187,12 @@ export interface ConversationController {
    * device in that time paints with no skeleton before it (skeleton-hold.ts).
    */
   showHistorySkeleton: boolean;
+  /**
+   * The server no longer serves this conversation (deleted, made private or
+   * unshared elsewhere) although the screen still holds its transcript: the
+   * screen then shows "not available" (gone.ts).
+   */
+  isGoneOnServer: boolean;
   /** Confidential surface treatment (device-owned transcript). */
   isConfidential: boolean;
   /** Redacted mode (sticky) — drives the composer's locked redacted pill. */
@@ -266,7 +274,10 @@ export function useConversationController(
     () => conversationsQueries.detail({ conversationId, viewerId: serverUserId }),
     [conversationId, serverUserId],
   );
-  const detailQuery = useQuery({ ...detailOptions, enabled: !isConfidential });
+  // A conversation the server dropped during this visit is never read again
+  // (gone-marks.ts): the screen shows "not available" instead.
+  const isGoneMarked = useGoneMark(conversationId);
+  const detailQuery = useQuery({ ...detailOptions, enabled: !isConfidential && !isGoneMarked });
   const detailData = detailQuery.data ?? null;
   const detailKey = detailOptions.queryKey;
 
@@ -625,6 +636,20 @@ export function useConversationController(
   // The skeleton waits SKELETON_HOLD_MS, so a device copy read in that time
   // paints with no skeleton flashed over it (measured on live, 7 October 2026).
   const showHistorySkeleton = useSkeletonHold(isLoadingHistory, conversationId);
+  // A re-read that the server refuses (403 / 404 / 410) for a record we hold:
+  // the conversation is gone elsewhere. A confidential one never asks the server.
+  const isGoneOnServer = isGoneMarked || (!isConfidential && goneOnServer(detailQuery));
+  // Once gone: mark it FIRST (which disables the query, so dropping it cannot
+  // start a new read), then drop the transcript from memory and the row from
+  // every cached list. The copy on the device was already deleted by the
+  // persister when the re-read failed (persist/persister.ts, isGoneError).
+  useEffect(() => {
+    if (!isGoneOnServer || isGoneMarked) return;
+    markGoneOnServer(conversationId);
+    conversationsCache.remove(queryClient, conversationId);
+    void queryClient.invalidateQueries({ queryKey: conversationsQueries.lists() });
+    queryClient.removeQueries({ queryKey: [...conversationsQueries.details(), conversationId] });
+  }, [isGoneOnServer, isGoneMarked, conversationId, queryClient]);
 
   const submit = useCallback(
     async (message: string, attachments: MessageAttachment[]) => {
@@ -724,6 +749,7 @@ export function useConversationController(
     isOwnerResolved: ownerId !== null,
     isLoadingHistory,
     showHistorySkeleton,
+    isGoneOnServer,
     isConfidential,
     isRedacted,
     references,
