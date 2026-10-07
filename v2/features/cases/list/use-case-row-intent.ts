@@ -26,6 +26,10 @@ export function useCaseRowIntent(href: string, slug: string, searchQuery?: strin
     if (!allowed) return;
     opened.current = false;
     void queryClient.prefetchQuery(casesQueries.prefetchDetail(slug, searchQuery));
+    // The loading boundary is a client component that carries the whole case
+    // screen; until its code is in the browser the router holds the tap on
+    // the list (measured: about 0.4 s on a local build). Load it now.
+    void import('../detail/CaseLoading');
   }, [allowed, queryClient, slug, searchQuery]);
 
   const onAbandon = useCallback(() => {

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
+import { cn } from '@/lib/utils';
 import { extractViewLimitError, isNotFoundError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import {
@@ -161,6 +162,14 @@ function CaseBody({ slug }: { slug: string }) {
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
+  // Fade the document in only when it arrives AFTER this screen mounted (the
+  // skeleton gives way to it). A screen that mounts with the case already in
+  // hand draws it at once: the loading boundary drawing a prefetched case,
+  // and the page that replaces that boundary a moment later, which would
+  // otherwise replay the fade and blink the whole case once (measured on the
+  // option 2 prototype, 7 October 2026).
+  const [fadeOnArrival] = useState(() => query.isPending);
+  const arrive = fadeOnArrival ? 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300' : '';
 
   /**
    * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7).
@@ -237,7 +246,7 @@ function CaseBody({ slug }: { slug: string }) {
           `relative` anchors the outline rail beside the column. */}
       <div className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
         <ReadingProgress />
-        <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+        <div className={arrive}>
           <CaseDocument detail={detail} />
         </div>
         {/* The map, only when the document is long enough to need one (four or
@@ -249,7 +258,7 @@ function CaseBody({ slug }: { slug: string }) {
             stays. */}
         {outline.length >= 4 && !showDocked ? (
           <aside className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block">
-            <div className="sticky top-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+            <div className={cn('sticky top-8', arrive)}>
               <CaseOutline sections={outline} />
             </div>
           </aside>
