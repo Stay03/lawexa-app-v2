@@ -72,7 +72,8 @@ export function DeveloperScreen() {
 
       {/* Admins only (owner, 7 October 2026): each performance layer on or off
           for this browser, to test with and without it (`perf-switch.ts`). The
-          words are the owner's (`perf-layers.ts`). Every change reloads the
+          words are the owner's (`perf-layers.ts`); each switch shows only the
+          line for its current state (owner, 7 October). Every change reloads the
           page, so nothing kept in memory under the old setting is shown. The
           heading is drawn on screen, unlike the shared block's hidden label. */}
       {canUsePerfSwitch(role) ? (
@@ -89,12 +90,7 @@ export function DeveloperScreen() {
                 key={copy.layer}
                 icon={PERF_LAYER_ICONS[copy.layer]}
                 label={copy.label}
-                hint={
-                  <>
-                    <span className="block">On: {copy.on}</span>
-                    <span className="mt-1 block">Off: {copy.off}</span>
-                  </>
-                }
+                hint={layersOff.has(copy.layer) ? copy.off : copy.on}
                 checked={!layersOff.has(copy.layer)}
                 onCheckedChange={(next) => {
                   setLayerOff(copy.layer, !next);

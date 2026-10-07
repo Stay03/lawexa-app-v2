@@ -76,7 +76,7 @@ test('only an admin or a superadmin can use the switches', () => {
   }
 });
 
-test('the Developer page shows the owner\'s four switches, with On and Off lines, to an admin only', () => {
+test('the Developer page shows the owner\'s four switches, each with its current state\'s line, to an admin only', () => {
   assert.equal(isMigratedToV2('/settings/developer'), true);
   assert.equal(PERF_LAYERS_HEADING, 'Performance layers (this browser only)');
   assert.deepEqual(
@@ -91,8 +91,9 @@ test('the Developer page shows the owner\'s four switches, with On and Off lines
   for (const copy of PERF_LAYER_COPY) assert.ok(copy.on.length > 0 && copy.off.length > 0, copy.layer);
   const screen = read('v2', 'features', 'settings', 'developer', 'DeveloperScreen.tsx');
   assert.match(screen, /\{canUsePerfSwitch\(role\) \? \(/);
-  assert.match(screen, /<span className="block">On: \{copy\.on\}<\/span>/);
-  assert.match(screen, /<span className="mt-1 block">Off: \{copy\.off\}<\/span>/);
+  // Only the current state's line shows under each switch (owner, 7 October).
+  assert.match(screen, /hint=\{layersOff\.has\(copy\.layer\) \? copy\.off : copy\.on\}/);
+  assert.doesNotMatch(screen, /On: \{copy\.on\}|Off: \{copy\.off\}/);
   assert.match(screen, /setLayerOff\(copy\.layer, !next\);\s*window\.location\.reload\(\);/);
   // The heading is drawn on screen, not only the shared block's hidden label.
   assert.match(screen, /id="perf-layers-heading"\s*className="mb-2 px-1 text-\[13px\] font-medium text-muted-foreground"/);
