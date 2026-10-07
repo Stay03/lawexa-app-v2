@@ -1,11 +1,12 @@
 'use client';
 
-import { ArrowUpToLine, Database, FlaskConical, Route, Server, Zap, type LucideIcon } from 'lucide-react';
+import { ArrowUpToLine, Database, FlaskConical, HardDriveDownload, Route, Server, Zap, type LucideIcon } from 'lucide-react';
 
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
 import { setSearchPosition, useSearchPosition } from '@/v2/search-position';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { canUsePerfSwitch, setLayerOff, type PerfLayer } from '@/v2/runtime/perf-switch';
+import { removeServiceWorker } from '@/v2/runtime/sw/register';
 import { usePerfLayersOff } from '@/v2/runtime/use-perf-off';
 import { SETTINGS_BLOCK, SETTINGS_COLUMN, SettingsBlock } from '../SettingsList';
 import { SettingsToggleRow } from '../SettingsToggleRow';
@@ -16,6 +17,7 @@ const PERF_LAYER_ICONS: Record<PerfLayer, LucideIcon> = {
   idb: Database,
   route: Route,
   read: Zap,
+  sw: HardDriveDownload,
 };
 
 /**
@@ -94,7 +96,10 @@ export function DeveloperScreen() {
                 checked={!layersOff.has(copy.layer)}
                 onCheckedChange={(next) => {
                   setLayerOff(copy.layer, !next);
-                  window.location.reload();
+                  // Turning the worker off removes it first, so the reloaded
+                  // page is not served by it.
+                  const removed = copy.layer === 'sw' && !next ? removeServiceWorker() : Promise.resolve();
+                  void removed.then(() => window.location.reload());
                 }}
               />
             ))}

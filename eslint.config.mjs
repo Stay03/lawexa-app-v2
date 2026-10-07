@@ -96,9 +96,14 @@ const eslintConfig = defineConfig([
   // legitimately wires the switch) may NOT reach into v2, except the two
   // sanctioned switch touchpoints. Scoped via `ignores` so the rule runs only
   // on v1 files, letting the zone target the whole tree.
+  //
+  // `app/sw.js/**` is v2's service-worker route. It lives at the root path
+  // because a worker's scope is its script's folder and the worker must cover
+  // "/", and it is reached only by a browser that a v2 page registered. It
+  // ships in no page bundle, so importing v2 there pulls nothing toward v1.
   {
     files: ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}"],
-    ignores: ["v2/**", "app/v2/**", "proxy.ts"],
+    ignores: ["v2/**", "app/v2/**", "proxy.ts", "app/sw.js/**"],
     rules: {
       "import/no-restricted-paths": [
         "error",

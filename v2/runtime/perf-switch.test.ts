@@ -26,7 +26,7 @@ test('no cookie means every layer is on', () => {
   }
 });
 
-test('each layer turns off alone and leaves the other three on', () => {
+test('each layer turns off alone and leaves the others on', () => {
   for (const layer of PERF_LAYERS) {
     for (const other of PERF_LAYERS) {
       assert.equal(layerOffValue(layer, other), other === layer, `${layer} off: ${other}`);
@@ -45,7 +45,8 @@ test('turning one layer on or off keeps the others, in a fixed order; all on is 
   assert.equal(nextPerfValue('idb', 'ssr', true), 'ssr,idb');
   assert.equal(nextPerfValue('ssr,idb', 'ssr', false), 'idb');
   assert.equal(nextPerfValue('idb', 'idb', false), '');
-  assert.equal(nextPerfValue('off', 'read', false), 'ssr,idb,route');
+  assert.equal(nextPerfValue('off', 'read', false), 'ssr,idb,route,sw');
+  assert.equal(nextPerfValue('', 'sw', true), 'sw');
 });
 
 test('in the browser the switches read and write one cookie; all on clears it', () => {
@@ -76,7 +77,7 @@ test('only an admin or a superadmin can use the switches', () => {
   }
 });
 
-test('the Developer page shows the owner\'s four switches, each with its current state\'s line, to an admin only', () => {
+test('the Developer page shows the five switches, each with its current state\'s line, to an admin only', () => {
   assert.equal(isMigratedToV2('/settings/developer'), true);
   assert.equal(PERF_LAYERS_HEADING, 'Performance layers (this browser only)');
   assert.deepEqual(
@@ -86,6 +87,7 @@ test('the Developer page shows the owner\'s four switches, each with its current
       ['idb', 'IndexedDB query cache (lawexa-query-cache)'],
       ['route', 'Route prefetch on hover or touch (Next.js router.prefetch)'],
       ['read', 'Case prefetch on hover (X-Lawexa-Prefetch)'],
+      ['sw', 'Service worker (app code kept on this device)'],
     ],
   );
   for (const copy of PERF_LAYER_COPY) assert.ok(copy.on.length > 0 && copy.off.length > 0, copy.layer);
@@ -94,7 +96,12 @@ test('the Developer page shows the owner\'s four switches, each with its current
   // Only the current state's line shows under each switch (owner, 7 October).
   assert.match(screen, /hint=\{layersOff\.has\(copy\.layer\) \? copy\.off : copy\.on\}/);
   assert.doesNotMatch(screen, /On: \{copy\.on\}|Off: \{copy\.off\}/);
-  assert.match(screen, /setLayerOff\(copy\.layer, !next\);\s*window\.location\.reload\(\);/);
+  // Every change reloads; turning the worker off removes it before the reload.
+  assert.match(screen, /setLayerOff\(copy\.layer, !next\);/);
+  assert.match(
+    screen,
+    /const removed = copy\.layer === 'sw' && !next \? removeServiceWorker\(\) : Promise\.resolve\(\);\s*(\/\/[^\n]*\n\s*)*void removed\.then\(\(\) => window\.location\.reload\(\)\);/,
+  );
   // The heading is drawn on screen, not only the shared block's hidden label.
   assert.match(screen, /id="perf-layers-heading"\s*className="mb-2 px-1 text-\[13px\] font-medium text-muted-foreground"/);
 });
@@ -104,6 +111,10 @@ test('each layer is checked where it acts', () => {
   assert.match(read('v2', 'runtime', 'cache-identity-guard.tsx'), /setDeviceCacheOwner\(layerOffInBrowser\('idb'\) \? null : deviceCacheOwnerOf\(userId, role\)\)/);
   assert.match(read('v2', 'shell', 'use-intent-prefetch.ts'), /if \(!layerOffInBrowser\('route'\)\) router\.prefetch\(target\);\s*onIntent\?\.\(source\);/);
   assert.match(read('v2', 'features', 'cases', 'list', 'use-case-row-intent.ts'), /if \(layerOffInBrowser\('read'\)\) return;/);
+  // The worker: the page removes it when off, the route serves the one that removes itself.
+  assert.match(read('v2', 'runtime', 'sw', 'register.ts'), /if \(layerOffInBrowser\('sw'\)\) \{\s*void removeServiceWorker\(\);/);
+  assert.match(read('v2', 'runtime', 'sw', 'serve.ts'), /!layerOffValue\(gate\.perfValue, 'sw'\)/);
+  assert.match(read('app', 'sw.js', 'route.ts'), /serviceWorkerBodyFor\(/);
 });
 
 test('the module the server imports has no React import (Turbopack refuses client hooks in a server component)', () => {

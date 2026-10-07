@@ -39,4 +39,12 @@ export const PERF_LAYER_COPY: readonly PerfLayerCopy[] = [
     on: 'When you hover over a search result for 1 to 2 seconds, the browser fetches the case in advance, without counting a view. The case then shows immediately after the click. Requires route prefetch to be on.',
     off: 'The case is fetched only after the click, and the loading skeleton shows until it arrives.',
   },
+  // DRAFT, awaiting the owner's approval (7 October 2026): the four above are
+  // his approved words; this fifth switch's words are not yet.
+  {
+    layer: 'sw',
+    label: 'Service worker (app code kept on this device)',
+    on: "The app's own files (scripts, styles and fonts) are kept on this device, so opening the app does not download them again. After an update, the first open downloads them once.",
+    off: "The browser fetches the app's files from the server each time. The service worker and the files it kept are removed.",
+  },
 ];

@@ -8,6 +8,9 @@
  * - `idb`   the IndexedDB query cache (`V2CacheIdentityGuard`)
  * - `route` route prefetch on hover or touch (`useIntentPrefetch`)
  * - `read`  the case read-ahead on hover (`useCaseRowIntent`)
+ * - `sw`    the service worker that keeps the app's code on the device
+ *           (`v2/runtime/sw/register.ts` in the browser, `app/sw.js/route.ts`
+ *           on the server, which serves a worker that removes itself when off)
  * The Router Cache, the memory cache and the API's ETag stay as they are: a
  * reload and DevTools already cover those.
  *
@@ -24,7 +27,7 @@
  */
 export const PERF_COOKIE = 'lawexa-perf';
 
-export const PERF_LAYERS = ['ssr', 'idb', 'route', 'read'] as const;
+export const PERF_LAYERS = ['ssr', 'idb', 'route', 'read', 'sw'] as const;
 export type PerfLayer = (typeof PERF_LAYERS)[number];
 
 /** One year, the same life as the v2 opt-in cookie. */

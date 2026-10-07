@@ -24,6 +24,7 @@ import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
 import { V2PushLifecycle } from '@/v2/runtime/push/lifecycle';
 import { V2PushTapListener } from '@/v2/runtime/push/tap-listener';
+import { ServiceWorkerMount } from '@/v2/runtime/sw/ServiceWorkerMount';
 import { RealtimeSpine } from '@/v2/runtime/realtime/spine';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
@@ -272,6 +273,10 @@ export default async function V2Layout({
           {/* A notification tapped while the app is open: the worker posts
               the link here and this routes to it. Renders null. */}
           <V2PushTapListener />
+          {/* The service worker that keeps the app's own code on the device
+              (the `sw` performance layer). Renders null. Mounted here and
+              nowhere else, so only a v2 page registers it. */}
+          <ServiceWorkerMount />
           {/* Seed the browser query cache with the server-prefetched recents — BOTH the
               sidebar/drawer infinite list and the home's single-page peek, which are
               different query keys — so signed-in first paint is real rows rather than a
