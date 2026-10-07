@@ -84,7 +84,28 @@ export interface Statute {
    * dropped their view displays).
    */
   views_count?: number;
+  /**
+   * Where this text was taken from, and whether it is whole (backend contract,
+   * 7 October 2026, statute-source-fields; on every StatuteResource response).
+   * Optional so a payload from before that push still types. `null` source
+   * means not recorded; `incomplete_note` is always set when
+   * `incomplete_text` is true.
+   */
+  source_type?: StatuteSourceType | null;
+  /** "Official Gazette", "Official print", "Authenticated", "Unofficial reproduction". */
+  source_type_label?: string | null;
+  /** Publisher, URL or file name, and gazette number and date (up to 1,000 characters). */
+  source_note?: string | null;
+  incomplete_text?: boolean;
+  /** What is missing from the text (up to 2,000 characters). */
+  incomplete_note?: string | null;
 }
+
+export type StatuteSourceType =
+  | 'official_gazette'
+  | 'official_print'
+  | 'authenticated'
+  | 'unofficial_reproduction';
 
 // Full statute detail (from GET /api/statutes/{slug})
 export interface StatuteDetail extends Statute {

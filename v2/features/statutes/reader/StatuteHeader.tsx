@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ShieldAlert, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { StatuteDetail } from '@/types/statute';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
@@ -14,6 +15,7 @@ import {
 } from '../statute-row-model';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
 import { NotesButton } from '../notes/NotesButton';
+import { incompleteNotice, statuteSource } from './statute-source';
 
 /**
  * StatuteHeader — the reader's heading block, in the case-document header
@@ -24,7 +26,10 @@ import { NotesButton } from '../notes/NotesButton';
  *   designation  the short title ("Act 459") — a reference string, sans
  *   status       a REAL badge: a repealed Act must look repealed before a
  *                single provision is read (colour + word, never colour-only)
+ *   source       where the text was taken from (Official Gazette … Unofficial
+ *                reproduction) and the source note under it, when recorded
  *   meta         commencement date, when known
+ *   incomplete   a notice saying what is missing, when the text is not whole
  *   actions      copy-link, bookmark, add-to-folder
  *
  * The long title ("AN ACT to …") is deliberately NOT here: it opens the
@@ -51,6 +56,8 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
   const tone = statuteStatusTone(detail.status);
   const commenced = formatStatuteDate(detail.commencement_date);
   const documentType = formatDocumentType(detail.document_type);
+  const source = statuteSource(detail);
+  const incomplete = incompleteNotice(detail);
 
   return (
     <header className="flex flex-col gap-3 border-b border-border/60 pb-6">
@@ -90,6 +97,24 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
           >
             {detail.status_label || detail.status}
           </span>
+          {source ? (
+            <span
+              className={cn(
+                'inline-flex min-h-6 items-center gap-1 rounded-full border px-2.5 text-xs font-medium',
+                source.official
+                  ? 'border-border text-foreground'
+                  : 'border-amber-500/40 text-amber-700 dark:text-amber-400',
+              )}
+            >
+              {source.official ? (
+                <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
+              ) : (
+                <ShieldAlert className="size-3.5 shrink-0" aria-hidden />
+              )}
+              <span className="sr-only">Source: </span>
+              {source.label}
+            </span>
+          ) : null}
           {commenced ? (
             <span className="text-xs text-muted-foreground">
               Commenced <span className="tabular-nums">{commenced}</span>
@@ -123,7 +148,29 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
             ) : null}
           </p>
         ) : null}
+
+        {/* The source note: publisher, URL or file name, gazette number and date. */}
+        {source?.note ? (
+          <p className="text-xs text-muted-foreground">
+            Source: <span className="break-words text-foreground">{source.note}</span>
+          </p>
+        ) : null}
       </div>
+
+      {/* Said before the text, not after it: a lawyer must know what is
+          missing before relying on what is there. */}
+      {incomplete ? (
+        <div
+          role="note"
+          className="flex gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm"
+        >
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p className="font-medium text-amber-800 dark:text-amber-300">Incomplete text</p>
+            <p className="break-words text-foreground/90">{incomplete}</p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <ShareButton
