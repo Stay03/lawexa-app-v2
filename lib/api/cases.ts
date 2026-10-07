@@ -7,6 +7,9 @@ import type {
   CitedByParams,
 } from '@/types/case';
 
+/** Marks a case read as a prefetch: the API counts no view for it. */
+export const CASE_PREFETCH_HEADER = 'X-Lawexa-Prefetch';
+
 /**
  * Case API service for Phase 5 endpoints
  */
@@ -43,6 +46,13 @@ export const casesApi = {
       includeCitedCases?: boolean;
       includeCitedBy?: boolean;
       searchQuery?: string;
+      /**
+       * A read made before the reader opens the case (v2 hover prefetch). The
+       * API answers it with the same access rules, from its own rate bucket,
+       * and counts no view; the open's own read counts the view.
+       */
+      prefetch?: boolean;
+      signal?: AbortSignal;
     } = {}
   ): Promise<CaseDetailResponse> => {
     const params: Record<string, boolean | string> = {};
@@ -54,6 +64,8 @@ export const casesApi = {
 
     const response = await apiClient.get<CaseDetailResponse>(`/cases/${slug}`, {
       params: Object.keys(params).length > 0 ? params : undefined,
+      headers: options.prefetch ? { [CASE_PREFETCH_HEADER]: '1' } : undefined,
+      signal: options.signal,
     });
     return response.data;
   },

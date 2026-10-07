@@ -214,6 +214,30 @@ export const casesQueries = {
       gcTime: GC_TIMES.reference,
     }),
 
+  /**
+   * The same case page payload, read BEFORE the reader opens the case (a
+   * finger or a resting mouse on a search row). It fills `detail`'s exact key,
+   * so the case route's loading boundary can draw the case the moment the row
+   * is tapped. The request carries the prefetch header, so the API counts no
+   * view for it; the open's own server read counts the one view.
+   *
+   * NO `meta.persist`: a prefetched answer stays in memory and never reaches
+   * the device cache. `signal` lets a finger that moves on cancel the read.
+   */
+  prefetchDetail: (slug: string, searchQuery?: string) => ({
+    queryKey: casesQueries.detail(slug, searchQuery).queryKey,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      casesApi.getBySlug(slug, {
+        includeSimilarCases: true,
+        includeCitedCases: true,
+        includeCitedBy: true,
+        searchQuery,
+        prefetch: true,
+        signal,
+      }),
+    staleTime: STALE_TIMES.reference,
+  }),
+
   /** The FULL-JUDGMENT payload — the case plus `full_report`, nothing else. */
   report: (slug: string) =>
     queryOptions({

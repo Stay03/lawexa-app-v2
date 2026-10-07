@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { FLAG_W, FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { BookmarkButton } from '@/v2/features/bookmarks/BookmarkButton';
-import { useIntentPrefetch } from '@/v2/shell/use-intent-prefetch';
+import { useCaseRowIntent } from './use-case-row-intent';
 import { caseHref, formatCaseDate, type CaseRowModel } from '../case-row-model';
 
 /**
@@ -61,9 +61,10 @@ export const CaseRow = memo(function CaseRow({
   const date = formatCaseDate(row.judgmentDate);
   const href = caseHref(row.slug, searchQuery);
   // No viewport prefetch: a search showed 15 rows and fetched 32 pages nobody
-  // opened. The page is prefetched when the reader touches, focuses or rests
-  // the mouse on the row (owner, 6 October 2026; `intent-prefetch.ts`).
-  const intent = useIntentPrefetch(href);
+  // opened. The page, and for an account the case itself, is read when the
+  // reader touches, focuses or rests the mouse on the row (owner, 6 and 7
+  // October 2026; `intent-prefetch.ts`, `use-case-row-intent.ts`).
+  const intent = useCaseRowIntent(href, row.slug, searchQuery);
 
   return (
     <li
