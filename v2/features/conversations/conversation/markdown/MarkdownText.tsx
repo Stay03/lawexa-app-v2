@@ -73,7 +73,11 @@ const PROSE_CLASS =
   // `[&_pre]:text-foreground`: the typography plugin gives `pre` light text for
   // its own dark box; with the muted background below, code was near-invisible
   // in light mode (seen 7 October 2026).
-  '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:text-foreground [&_pre]:overflow-x-auto [&_pre]:overscroll-x-contain';
+  // `[&_pre]:rounded-2xl!`: the app's Card corner, the same as a document block
+  // (FencedBlock), instead of the 0.5em in globals.css, which v1 keeps. That
+  // `.prose pre` rule sits outside every CSS layer, so it beats any utility
+  // without the `!`.
+  '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:text-foreground [&_pre]:rounded-2xl! [&_pre]:overflow-x-auto [&_pre]:overscroll-x-contain';
 
 /** Split markdown into independently-renderable blocks (blank-line separated),
  *  never splitting inside a fenced code block. Pure — safe to call in render. */

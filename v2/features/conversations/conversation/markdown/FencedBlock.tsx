@@ -40,7 +40,9 @@ function textOf(node: HastNode | HastChild): string {
  * without a saved answer it is not shown. A long document opens folded with
  * "Show all" (document-view.ts); Maximize opens a full-height reader with larger type.
  * Colours come from the theme tokens (card, border, muted), so it holds in
- * light and dark.
+ * light and dark. Corners: the block uses the app's Card corner (rounded-2xl),
+ * the same as a code block in an answer (MarkdownText), and the reader keeps
+ * the app's dialog corner.
  */
 export function FencedBlock({ node, children, ...rest }: ComponentProps<'pre'> & ExtraProps) {
   const code = node?.children.find((child) => child.type === 'element' && child.tagName === 'code');
@@ -60,7 +62,7 @@ function DocumentBlock({ text }: { text: string }) {
   const readerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <figure className="not-prose my-4 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs">
+    <figure className="not-prose my-4 overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-xs">
       <figcaption className="flex items-center gap-2 border-b border-border/70 py-1 pl-3 pr-1">
         <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground" title={title}>
@@ -105,7 +107,7 @@ function DocumentBlock({ text }: { text: string }) {
             event.preventDefault();
             readerRef.current?.focus();
           }}
-          className="flex h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-3xl"
+          className="flex h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
         >
           <div className="flex items-center gap-2 border-b border-border px-4 py-2">
             <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
