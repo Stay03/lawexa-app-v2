@@ -13,6 +13,7 @@ import { ComposerSkeleton } from './skeletons';
 import { ConfidentialBanner } from './ConfidentialBanner';
 import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider } from './chat-context';
+import { DocumentExportScope } from './markdown/document-export';
 import { clearEmbeddedComposer, publishEmbeddedComposer } from './embedded-composer';
 
 /**
@@ -237,20 +238,27 @@ export function ConversationScreen({
           />
         ) : null}
 
-        <MessageList
-          messages={messages}
-          streamingText={streamingText}
-          reasoning={reasoning}
-          isStreaming={isStreaming}
-          isLoadingHistory={showHistorySkeleton}
-          error={connectionError}
-          narration={controller.narration}
-          references={controller.references}
-          canRegenerate={controller.canRegenerate}
-          onRegenerate={controller.regenerate}
-          onRetry={retryLastMessage}
-          onScrolledUpChange={setScrolledUp}
-        />
+        {/* Download as Word on a document block: the owner, never a confidential
+            chat (the export route answers 404 for both; document-export.tsx). */}
+        <DocumentExportScope
+          conversationId={conversationId}
+          enabled={controller.isOwnerResolved && controller.isOwner && !controller.isConfidential}
+        >
+          <MessageList
+            messages={messages}
+            streamingText={streamingText}
+            reasoning={reasoning}
+            isStreaming={isStreaming}
+            isLoadingHistory={showHistorySkeleton}
+            error={connectionError}
+            narration={controller.narration}
+            references={controller.references}
+            canRegenerate={controller.canRegenerate}
+            onRegenerate={controller.regenerate}
+            onRetry={retryLastMessage}
+            onScrolledUpChange={setScrolledUp}
+          />
+        </DocumentExportScope>
 
         {/* Floating composer layer — an ABSOLUTE overlay over the transcript's bottom
             (never the dock row, never `position: fixed`). `pointer-events-none` lets
