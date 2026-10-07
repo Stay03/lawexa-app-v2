@@ -45,11 +45,21 @@ export interface ReasoningTrace {
 
 /**
  * The engine's render model for a single row. It is v1's {@link ConversationMessage}
- * union widened with the optional {@link ReasoningTrace}. Because the trace fields
- * are optional, plain `ConversationMessage[]` values (e.g. from
+ * union widened with the optional {@link ReasoningTrace} and {@link SavedIdentity}.
+ * Because those fields are optional, plain `ConversationMessage[]` values (e.g. from
  * `transformApiMessages`) remain assignable to `EngineMessage[]`.
  */
-export type EngineMessage = ConversationMessage & ReasoningTrace;
+export type EngineMessage = ConversationMessage & ReasoningTrace & SavedIdentity;
+
+/**
+ * The server's `Message.id` for a row this engine drew itself, set once the
+ * turn's `completed` event names it (answer-id.ts). A row built from history
+ * carries its id in its row id (`msg_{id}`) instead. Today only the answer row
+ * gets it; the document block's Word export needs it.
+ */
+export interface SavedIdentity {
+  savedId?: number;
+}
 
 // ─── Structural snapshot (the useSyncExternalStore surface) ─────────────────
 /**

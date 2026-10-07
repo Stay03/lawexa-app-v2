@@ -1,0 +1,62 @@
+[
+  {
+    "name": "backtick fence",
+    "markdown": "Intro\n\n```\nline one\nline two\n```\n\nAfter",
+    "blocks": [
+      "line one\nline two\n"
+    ]
+  },
+  {
+    "name": "tilde fence",
+    "markdown": "Intro\n\n~~~\nline one\n~~~\n",
+    "blocks": [
+      "line one\n"
+    ]
+  },
+  {
+    "name": "fence with a language tag",
+    "markdown": "```php\necho 1;\n```\n",
+    "blocks": [
+      "echo 1;\n"
+    ]
+  },
+  {
+    "name": "4-space indented code (not a fence)",
+    "markdown": "Intro\n\n    indented line\n    second\n\nAfter",
+    "blocks": []
+  },
+  {
+    "name": "fence inside a list item",
+    "markdown": "1. Step one\n\n   ```\n   inside list\n   ```\n2. Step two\n",
+    "blocks": [
+      "inside list\n"
+    ]
+  },
+  {
+    "name": "unclosed fence at the end",
+    "markdown": "Intro\n\n```\nno closing fence\nlast line",
+    "blocks": [
+      "no closing fence\nlast line\n"
+    ]
+  },
+  {
+    "name": "4-backtick fence containing a 3-backtick line",
+    "markdown": "````\nouter\n```\nstill inside\n````\n",
+    "blocks": [
+      "outer\n```\nstill inside\n"
+    ]
+  },
+  {
+    "name": "two fences back to back",
+    "markdown": "```\nfirst\n```\n```\nsecond\n```\n",
+    "blocks": [
+      "first\n",
+      "second\n"
+    ]
+  },
+  {
+    "name": "inline triple backticks mid-line",
+    "markdown": "Use ```code``` inline here.",
+    "blocks": []
+  }
+]

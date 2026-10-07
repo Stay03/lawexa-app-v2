@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { blockIndexOf, fencedBlockTexts, savedMessageId } from './export-target';
 import { documentTitle, isLongDocument, FOLD_AFTER_CHARS, FOLD_AFTER_LINES } from './document-view';
-import { exportErrorMessage } from './download-docx';
+import { exportErrorMessage, serverReason } from './download-docx';
 import { filenameFromDisposition, DOCX_FALLBACK_NAME } from '@/lib/api/export';
 
 test('every fenced block counts from 0, code fences included', () => {
@@ -28,6 +31,27 @@ test('every fenced block counts from 0, code fences included', () => {
   assert.deepEqual(blocks, ['IN THE HIGH COURT OF LAGOS STATE\nSuit No: ____', 'print("x")', 'NOTICE OF APPEAL']);
   assert.equal(blockIndexOf(blocks, 'NOTICE OF APPEAL'), 2);
 });
+
+/**
+ * The fixtures the API's FencedCodeBlocks (league/commonmark) is tested on,
+ * copied byte for byte from the API repo (tests/Fixtures/fenced-code-blocks.json,
+ * backend e106b63). Both sides must find the same blocks in the same order, or
+ * Download asks for the wrong one. The API's text keeps the newline before the
+ * closing fence and this parser's does not; the count and order are what the
+ * route reads, so the comparison drops that one trailing newline.
+ */
+const SHARED_FIXTURES = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fenced-code-blocks.fixture.json'), 'utf8'),
+) as { name: string; markdown: string; blocks: string[] }[];
+
+for (const fixture of SHARED_FIXTURES) {
+  test(`same blocks as the API: ${fixture.name}`, () => {
+    assert.deepEqual(
+      fencedBlockTexts(fixture.markdown),
+      fixture.blocks.map((block) => block.replace(/\n$/, '')),
+    );
+  });
+}
 
 test('indented code is not a fenced block; a fence inside a list item is', () => {
   const answer = ['    indented code', '', '1. Draft:', '', '   ```', '   LETTER OF DEMAND', '   ```'].join('\n');
@@ -103,4 +127,17 @@ test('the export posts only the block number to the saved message route', async 
   } finally {
     apiClient.post = original;
   }
+});
+
+test("a 422's reason is read from the Blob body the file request gets", async () => {
+  const blobError = (body: unknown) => ({
+    response: { status: 422, data: new Blob([JSON.stringify(body)], { type: 'application/json' }) },
+  });
+  assert.equal(
+    await serverReason(blobError({ message: 'The given data was invalid.', errors: { block: ['This answer has 2 block(s), numbered from 0.'] } })),
+    'This answer has 2 block(s), numbered from 0.',
+  );
+  assert.equal(await serverReason(blobError({ message: 'Server Error' })), 'Server Error');
+  assert.equal(await serverReason({ response: { data: new Blob(['<html>']) } }), 'no readable reason in the response');
+  assert.equal(await serverReason(new Error('Network Error')), 'no readable reason in the response');
 });

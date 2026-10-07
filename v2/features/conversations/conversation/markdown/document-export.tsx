@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { blockIndexOf, fencedBlockTexts, savedMessageId, type DocumentExportTarget } from './export-target';
+import { blockIndexOf, fencedBlockTexts, type DocumentExportTarget } from './export-target';
 
 /**
  * Where a document block may offer "Download as Word". The export route reads
@@ -13,9 +13,10 @@ import { blockIndexOf, fencedBlockTexts, savedMessageId, type DocumentExportTarg
  *   viewer owns the chat and it is not confidential (the route answers 404 for
  *   both). The channel glance panel and shared views mount none.
  * - {@link MessageDocumentScope}, on an assistant row, set only once the answer
- *   is saved and has landed: a server row id (`msg_{id}`), not streaming, not
- *   draining. A row the engine drew itself (`local_…`) keeps no server id, so
- *   its blocks offer Download once the chat is next loaded from the server.
+ *   is saved and has landed: it has a server id and is not streaming or
+ *   draining. A history row carries the id in its row id (`msg_{id}`); an
+ *   answer the engine drew from the stream gets it when the turn completes
+ *   (`savedId`, chat-engine/answer-id.ts).
  *
  * With either missing, {@link useDocumentExport} returns null and the block
  * shows Copy and Maximize only.
@@ -46,12 +47,13 @@ export function DocumentExportScope({
 }
 
 export function MessageDocumentScope({
-  rowId,
+  messageId,
   content,
   landed,
   children,
 }: {
-  rowId: string;
+  /** The server's id for this answer, or null while it has none. */
+  messageId: number | null;
   /** The saved answer text, as the server holds it. */
   content: string;
   /** Not streaming and not draining: the text on screen is the whole answer. */
@@ -59,7 +61,6 @@ export function MessageDocumentScope({
   children: ReactNode;
 }) {
   const scope = useContext(ExportScopeContext);
-  const messageId = savedMessageId(rowId);
   // Parsed only for a row that can offer Download, and only when its text changes.
   const value = useMemo<MessageScope | null>(
     () =>

@@ -71,6 +71,7 @@ import type {
   StreamingSource,
   StreamSmoothingConfig,
 } from './types';
+import { answerMessageId, stampAnswerId } from './answer-id';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -1436,6 +1437,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         resetStreamingBuffers();
       } else {
         addAssistantMessage(finalText);
+      }
+      // The answer just drawn from the stream has a local row id; the event's ids
+      // name its saved copy (answer-id.ts), which the Word export asks for.
+      const savedAnswerId = answerMessageId(event.persisted_message_ids);
+      if (savedAnswerId !== null) {
+        setMessages((msgs) => stampAnswerId(msgs, savedAnswerId, (id) => id.startsWith(LOCAL_ROW_PREFIX)));
       }
       handlers.onCompleted?.(event);
     });

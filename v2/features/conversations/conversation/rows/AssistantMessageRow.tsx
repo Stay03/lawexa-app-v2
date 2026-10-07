@@ -12,6 +12,7 @@ import {
 import type { ChatMessage } from '@/types/chat';
 import { ChatContent } from '../markdown/ChatContent';
 import { MessageDocumentScope } from '../markdown/document-export';
+import { savedMessageId } from '../markdown/export-target';
 import { trimUnclosedLinkTail } from '../markdown/partial-tail';
 import { ReasoningTrace } from '../reasoning/ReasoningTrace';
 
@@ -95,7 +96,11 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
         // is still appearing; a half-revealed card tag must not flash raw XML), but
         // the `line` stand-in bar must not — the answer is complete, so a pulsing
         // placeholder under it would promise a line that is never coming.
-        <MessageDocumentScope rowId={message.id} content={message.content} landed={!isStreaming && !draining}>
+        <MessageDocumentScope
+          messageId={message.savedId ?? savedMessageId(message.id)}
+          content={message.content}
+          landed={!isStreaming && !draining}
+        >
           <ChatContent
             content={shownText}
             isStreaming={isStreaming}
