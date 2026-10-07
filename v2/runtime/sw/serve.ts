@@ -28,6 +28,8 @@ export const SW_SCOPE = '/';
 /** Every Cache Storage cache the worker owns starts with this. */
 export const SW_CACHE_PREFIX = 'lawexa-';
 export const SW_WARM_MESSAGE = 'lawexa:sw-warm';
+/** Posted before the caches are deleted, so a running warm stops and cannot reopen them. */
+export const SW_STOP_MESSAGE = 'lawexa:sw-stop';
 /** Server environment variable: `off` gives every browser the self-destruct worker. */
 export const SW_ENV = 'LAWEXA_SW';
 

@@ -1,5 +1,5 @@
 import { layerOffInBrowser } from '@/v2/runtime/perf-switch';
-import { isStaticAssetUrl, SW_CACHE_PREFIX, SW_PATH, SW_SCOPE, SW_WARM_MESSAGE } from './serve';
+import { isStaticAssetUrl, SW_CACHE_PREFIX, SW_PATH, SW_SCOPE, SW_STOP_MESSAGE, SW_WARM_MESSAGE } from './serve';
 
 /**
  * The page side of the service worker (`lawexa-sw.js`). Browser only, no
@@ -17,10 +17,10 @@ import { isStaticAssetUrl, SW_CACHE_PREFIX, SW_PATH, SW_SCOPE, SW_WARM_MESSAGE }
  * Storage without running the worker, so nothing inside the worker sees those
  * files arrive. The page tells it instead: every same-origin /_next/static/
  * file this page loaded (the browser's resource timing list, then each new
- * one) is posted to the worker in batches with the page's deploy id
- * (`<html data-dpl-id>`), and the worker copies them into its cache. This is
- * also what fills the cache on the very first visit, before the worker
- * controls the page.
+ * one) is posted to the worker in batches, and the worker copies them into its
+ * cache, reading the deploy from the files' own `?dpl=`. This is also what
+ * fills the cache on the very first visit, before the worker controls the
+ * page.
  */
 
 const noop = () => undefined;
@@ -51,12 +51,16 @@ function isOurs(registration: ServiceWorkerRegistration): boolean {
  * Unregisters this worker and deletes its caches. Never throws and never takes
  * longer than `REMOVE_TIMEOUT_MS`, so a caller can wait for it before leaving
  * the page. Firebase's push worker is left alone.
+ *
+ * The worker is told to stop warming first: a warm still running would reopen
+ * the cache just deleted (seen on live, 7 October 2026, on a slow line).
  */
 export function removeServiceWorker(): Promise<void> {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return Promise.resolve();
   const work = (async () => {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.filter(isOurs).map((registration) => registration.unregister()));
+    const registrations = (await navigator.serviceWorker.getRegistrations()).filter(isOurs);
+    for (const registration of registrations) registration.active?.postMessage({ type: SW_STOP_MESSAGE });
+    await Promise.all(registrations.map((registration) => registration.unregister()));
     if (typeof caches !== 'undefined') {
       const names = await caches.keys();
       await Promise.all(names.filter((name) => name.startsWith(SW_CACHE_PREFIX)).map((name) => caches.delete(name)));
@@ -73,7 +77,6 @@ export function removeServiceWorker(): Promise<void> {
 function startWarming(): () => void {
   if (typeof PerformanceObserver === 'undefined') return noop;
   const origin = window.location.origin;
-  const dpl = document.documentElement.dataset.dplId ?? '';
   const sent = new Set<string>();
   let pending: string[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -87,7 +90,7 @@ function startWarming(): () => void {
     void navigator.serviceWorker.ready.then((registration) => {
       const worker = registration.active;
       if (!worker || stopped) return;
-      for (const batch of inBatches(urls, WARM_BATCH)) worker.postMessage({ type: SW_WARM_MESSAGE, dpl, urls: batch });
+      for (const batch of inBatches(urls, WARM_BATCH)) worker.postMessage({ type: SW_WARM_MESSAGE, urls: batch });
     });
   };
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SW_WARM_MESSAGE } from './serve';
+import { SW_STOP_MESSAGE, SW_WARM_MESSAGE } from './serve';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const worker = readFileSync(join(here, 'lawexa-sw.js'), 'utf8');
@@ -34,6 +34,18 @@ test('only whole same-origin answers are kept, in one cache whose name the remov
   assert.match(worker, /const META = 'lawexa-sw-meta';/);
   assert.match(worker, /const WARM_MESSAGE = '([^']+)';/);
   assert.equal(worker.match(/const WARM_MESSAGE = '([^']+)';/)?.[1], SW_WARM_MESSAGE);
+});
+
+test('warming stops when the page removes the worker or a replacement waits', () => {
+  assert.equal(worker.match(/const STOP_MESSAGE = '([^']+)';/)?.[1], SW_STOP_MESSAGE);
+  assert.match(worker, /if \(data\.type === STOP_MESSAGE\) \{\s*stopped = true;\s*return;\s*\}/);
+  assert.match(worker, /return stopped \|\| !!self\.registration\.waiting \|\| !!self\.registration\.installing;/);
+  // Checked before the cache is opened and before every file.
+  assert.match(worker, /async function warm\(urls\) \{\s*if \(shouldStop\(\)\) return;/);
+  assert.match(worker, /for \(const href of urls\) \{\s*if \(shouldStop\(\)\) return;/);
+  // The deploy comes from the files' own ?dpl=, not from the page.
+  assert.match(worker, /const dpl = urls\.map\(dplOf\)\.find\(\(value\) => value !== ''\) \?\? '';/);
+  assert.doesNotMatch(repo('v2', 'runtime', 'sw', 'register.ts'), /dataset\.dplId/);
 });
 
 test('a new version takes over at once, and the real worker never removes itself', () => {

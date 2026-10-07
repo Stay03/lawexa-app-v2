@@ -32,15 +32,20 @@ test('outside a browser, registering and removing do nothing and never throw', a
   await assert.doesNotReject(removeServiceWorker());
 });
 
-test('removal resolves even when the browser refuses, and leaves other workers alone', async () => {
+test('removal tells our worker to stop, then unregisters it, and leaves other workers alone', async () => {
   const unregistered: string[] = [];
+  const steps: string[] = [];
   const reg = (scriptPath: string, scope: string) => ({
     scope: `${origin}${scope}`,
-    active: { scriptURL: `${origin}${scriptPath}` },
+    active: {
+      scriptURL: `${origin}${scriptPath}`,
+      postMessage: (message: { type: string }) => steps.push(`post ${message.type} to ${scriptPath}`),
+    },
     waiting: null,
     installing: null,
     unregister: async () => {
       unregistered.push(scriptPath);
+      steps.push(`unregister ${scriptPath}`);
       return true;
     },
   });
@@ -65,6 +70,7 @@ test('removal resolves even when the browser refuses, and leaves other workers a
       keys: async () => ['lawexa-static-v1', 'lawexa-sw-meta', 'someone-else'],
       delete: async (name: string) => {
         deleted.push(name);
+        steps.push(`delete ${name}`);
         return true;
       },
     },
@@ -72,6 +78,8 @@ test('removal resolves even when the browser refuses, and leaves other workers a
   try {
     await removeServiceWorker();
     assert.deepEqual(unregistered, ['/sw.js']);
+    assert.deepEqual(steps.slice(0, 2), ['post lawexa:sw-stop to /sw.js', 'unregister /sw.js']);
+    assert.ok(steps.every((step) => !step.includes('firebase')), steps.join(' | '));
     assert.deepEqual(deleted.sort(), ['lawexa-static-v1', 'lawexa-sw-meta']);
 
     // A browser that throws on every call: removal still resolves.

@@ -43,6 +43,7 @@ const META = 'lawexa-sw-meta';
 const META_KEY = '/__lawexa-sw-meta';
 const STATIC_PREFIX = '/_next/static/';
 const WARM_MESSAGE = 'lawexa:sw-warm';
+const STOP_MESSAGE = 'lawexa:sw-stop';
 const MAX_ENTRIES = 800;
 const MAX_URLS_PER_MESSAGE = 200;
 
@@ -115,18 +116,36 @@ async function serveStatic(request) {
 
 self.addEventListener('message', (event) => {
   const data = event.data;
-  if (!data || data.type !== WARM_MESSAGE || !Array.isArray(data.urls)) return;
-  const dpl = typeof data.dpl === 'string' ? data.dpl : '';
+  if (!data) return;
+  if (data.type === STOP_MESSAGE) {
+    stopped = true;
+    return;
+  }
+  if (data.type !== WARM_MESSAGE || !Array.isArray(data.urls)) return;
   const urls = data.urls.filter((u) => typeof u === 'string').slice(0, MAX_URLS_PER_MESSAGE);
   // One warm at a time, so two tabs cannot rotate the generations twice.
-  warming = warming.then(() => warm(dpl, urls)).catch(() => undefined);
+  warming = warming.then(() => warm(urls)).catch(() => undefined);
   event.waitUntil(warming);
 });
 
 let warming = Promise.resolve();
 
+/**
+ * Warming stops when the page is removing this worker (it posts STOP_MESSAGE
+ * before deleting the caches, which a running warm would otherwise reopen) or
+ * when a replacement is waiting. A browser does not activate the replacement
+ * (a new version, or the worker that removes this one) while this worker still
+ * has pending work, so a warm on a slow line would hold it back; measured on
+ * live 7 October 2026: removal took 15 to 20 s while a warm ran.
+ */
+let stopped = false;
+
+function shouldStop() {
+  return stopped || !!self.registration.waiting || !!self.registration.installing;
+}
+
 function dplOf(url) {
-  return new URL(url).searchParams.get('dpl') ?? '';
+  return new URL(url, self.location.origin).searchParams.get('dpl') ?? '';
 }
 
 /** Keep the current deploy and the one before it; delete the rest. */
@@ -150,11 +169,19 @@ async function rotate(cache, dpl) {
   );
 }
 
-/** Copy the files the page loaded into the cache: from an earlier deploy if present, else from the HTTP cache. */
-async function warm(dpl, urls) {
+/**
+ * Copy the files the page loaded into the cache: from an earlier deploy if
+ * present, else from the HTTP cache. The deploy is read from the files' own
+ * `?dpl=`: the page's `<html data-dpl-id>` is in the server's HTML but not in
+ * the running page (measured on live, 7 October 2026).
+ */
+async function warm(urls) {
+  if (shouldStop()) return;
+  const dpl = urls.map(dplOf).find((value) => value !== '') ?? '';
   const cache = await caches.open(CACHE);
   await rotate(cache, dpl);
   for (const href of urls) {
+    if (shouldStop()) return;
     const url = new URL(href, self.location.origin);
     if (url.origin !== self.location.origin || !url.pathname.startsWith(STATIC_PREFIX)) continue;
     const request = new Request(url.href);
