@@ -136,7 +136,11 @@ export function ConversationScreen({
   // IndexedDB load. The controller's flag is the union of both history paths AND-ed
   // with "there is nothing to show yet", so a conversation served from the
   // transcript cache never renders a skeleton over content it already has.
-  const { isLoadingHistory } = controller;
+  const { isLoadingHistory, showHistorySkeleton } = controller;
+  // The first SKELETON_HOLD_MS of a wait draw nothing, transcript and composer
+  // alike, so a copy read from the device in that time is not preceded by a
+  // skeleton flash (skeleton-hold.ts).
+  const holdingSkeleton = isLoadingHistory && !showHistorySkeleton;
 
   // Measure the floating composer's height into `--v2-conv-dock-h` so the transcript
   // (and the jump-to-latest pill) reserve exactly enough bottom clearance — and
@@ -236,7 +240,7 @@ export function ConversationScreen({
           streamingText={streamingText}
           reasoning={reasoning}
           isStreaming={isStreaming}
-          isLoadingHistory={isLoadingHistory}
+          isLoadingHistory={showHistorySkeleton}
           error={connectionError}
           narration={controller.narration}
           references={controller.references}
@@ -262,7 +266,7 @@ export function ConversationScreen({
               ref={dockRef}
               className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md"
             >
-              {!controller.isOwnerResolved || isLoadingHistory ? (
+              {holdingSkeleton ? null : !controller.isOwnerResolved || isLoadingHistory ? (
                 // Ownership/history still resolving → the composer-shaped skeleton (same
                 // geometry as the real pill). NEVER the "shared" pill here: isOwner is
                 // false while the owner id is null, so it would misleadingly flash for

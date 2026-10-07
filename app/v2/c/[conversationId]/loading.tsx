@@ -2,6 +2,7 @@ import {
   TranscriptSkeleton,
   ComposerSkeleton,
 } from '@/v2/features/conversations/conversation/skeletons';
+import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 
 /**
  * Route-level loading boundary for `/c/[conversationId]`, following the v2
@@ -33,10 +34,14 @@ import {
  * reconciled) the moment content arrives, so anything focusable or stateful in here
  * would have its focus and caret destroyed mid-interaction. A single `role="status"`
  * node outside the hidden subtree carries the announcement.
+ *
+ * `RouteSkeletonMark` tells the screen this skeleton is up, so the screen shows
+ * its own (identical) skeleton at once instead of holding it (skeleton-hold.ts).
  */
 export default function Loading() {
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      <RouteSkeletonMark />
       <span role="status" className="sr-only">
         Loading this conversation
       </span>

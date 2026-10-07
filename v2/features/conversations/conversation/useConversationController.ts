@@ -14,6 +14,7 @@ import { stripPastedTags } from '@/lib/utils';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { useStreamStyle } from '@/v2/stream-style';
 import { conversationsCache } from '../cache';
+import { useSkeletonHold } from './skeleton-hold';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import {
   isConfidentialMark,
@@ -178,6 +179,12 @@ export interface ConversationController {
    * from the very first render.
    */
   isLoadingHistory: boolean;
+  /**
+   * `isLoadingHistory` held back by `SKELETON_HOLD_MS`: the skeleton itself.
+   * While the hold runs the screen draws nothing, so a copy read from the
+   * device in that time paints with no skeleton before it (skeleton-hold.ts).
+   */
+  showHistorySkeleton: boolean;
   /** Confidential surface treatment (device-owned transcript). */
   isConfidential: boolean;
   /** Redacted mode (sticky) — drives the composer's locked redacted pill. */
@@ -615,6 +622,9 @@ export function useConversationController(
   const isLoadingHistory =
     (stream.isLoadingHistory || (!isConfidential && detailQuery.isPending)) &&
     messages.length === 0;
+  // The skeleton waits SKELETON_HOLD_MS, so a device copy read in that time
+  // paints with no skeleton flashed over it (measured on live, 7 October 2026).
+  const showHistorySkeleton = useSkeletonHold(isLoadingHistory, conversationId);
 
   const submit = useCallback(
     async (message: string, attachments: MessageAttachment[]) => {
@@ -713,6 +723,7 @@ export function useConversationController(
     isOwner,
     isOwnerResolved: ownerId !== null,
     isLoadingHistory,
+    showHistorySkeleton,
     isConfidential,
     isRedacted,
     references,

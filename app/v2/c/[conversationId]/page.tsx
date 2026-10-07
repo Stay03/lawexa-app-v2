@@ -80,8 +80,14 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
 }
 
 /**
- * KEEP THIS PAGE IN THE CLIENT ROUTER CACHE FOR 5 MINUTES. Same lever and same
+ * KEEP THIS PAGE IN THE CLIENT ROUTER CACHE FOR 30 MINUTES. Same lever and same
  * safety argument as `app/v2/conversations/page.tsx`, which carries the full note.
+ *
+ * WHY 30, NOT 5 (owner's phone test, 7 October 2026). The transcript stays in
+ * memory for 30 minutes (`GC_TIMES.list`), but at 5 minutes this payload expired
+ * first: a conversation reopened after a 6-minute detour sent the round trip and
+ * showed `loading.tsx` over a transcript the app already held (measured on live:
+ * 1 of 3 such reopens). Matching the two windows removes that.
  *
  * The transcript itself is already cached (`conversationsQueries.detail`, 30-minute
  * retention, seeded into the engine at construction), so a revisit re-painted it in
@@ -89,13 +95,23 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
  * need, with `loading.tsx` over the top of it. Re-using the payload is what lets
  * that first render actually be the first thing the user sees.
  *
- * WHAT THE PAYLOAD HOLDS. Only this route's metadata (title, canonical, OG card).
- * That is head content, invisible in-app, and `fetchConversationForMetadata` is
- * itself revalidated every 60s server-side. A conversation whose title upgrades
- * within the window shows the new title in the app immediately regardless — the
- * header reads it from the engine, not from here.
+ * WHAT THE PAYLOAD HOLDS. Only this route's metadata (title, canonical, OG card)
+ * and `<ConversationScreen conversationId>`, which carries no data: the page
+ * awaits nothing but its params. That is head content, invisible in-app, and
+ * `fetchConversationForMetadata` is itself revalidated every 60s server-side.
+ * Everything the reader sees comes from the client queries, which this window
+ * does not touch: the conversation record is re-read from the server on every
+ * arrival (`refetchOnMount: REFETCH_ON_VISIT`) and kept in memory for 30 minutes
+ * whatever this value is. So raising it changes only the head tags; the
+ * browser tab's title can lag by up to 30 minutes.
+ *
+ * Known, and not caused by this window: a conversation deleted elsewhere while
+ * its transcript is still in memory keeps showing that transcript until the
+ * page reloads. The re-read answers 404 and the device copy is deleted, but the
+ * screen does not switch to "not available" for a record it already holds.
+ * That is the same at 300 s.
  */
-export const unstable_dynamicStaleTime = 300;
+export const unstable_dynamicStaleTime = 1800;
 
 export default async function V2ConversationPage({ params }: ConversationPageProps) {
   // The only remaining await: the route params, which cost no I/O.
