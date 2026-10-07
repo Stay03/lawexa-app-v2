@@ -68,3 +68,12 @@ test('a search row reads the case on intent and cancels it when the reader moves
   assert.match(hook, /canPrefetchCase\(/);
   assert.match(read('list', 'CaseRow.tsx'), /useCaseRowIntent\(href, row\.slug, searchQuery\)/);
 });
+
+test('a case screen that mounts with the case in hand does not replay its fade (no blink at the swap)', () => {
+  const screen = read('detail', 'CaseScreen.tsx');
+  assert.match(screen, /const \[fadeOnArrival\] = useState\(\(\) => query\.isPending\)/);
+  assert.match(screen, /<div className=\{arrive\}>\s*<CaseDocument/);
+  assert.match(screen, /arrive=\{fadeOnArrival\}/);
+  assert.doesNotMatch(screen, /className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">\s*<CaseDocument/);
+  assert.match(read('detail', 'CaseAsk.tsx'), /arrive && 'motion-safe:animate-in motion-safe:fade-in/);
+});

@@ -45,11 +45,18 @@ export function CaseAskDock({
   onClose,
   onDock,
   onOpenChat,
+  arrive = true,
 }: {
   slug: string;
   signedIn: boolean;
   viewerId: number | null;
   start: CaseChatStart;
+  /**
+   * Fade the dock in as it mounts. False when the case screen mounted with
+   * the case already in hand (see `CaseScreen`), so the page replacing the
+   * loading boundary does not replay the fade on the dock.
+   */
+  arrive?: boolean;
   /** What the panel shows: nothing (closed), the new-chat view, or a
    * conversation id — the HOLDOVER value, so exits can animate. */
   view: string | null;
@@ -65,7 +72,12 @@ export function CaseAskDock({
   const stageRef = useRef<ConversationComposerHandle | null>(null);
 
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+    <div
+      className={cn(
+        'sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10',
+        arrive && 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
+      )}
+    >
       {/* The gradient dissolve — PERMANENT, whether the pill rests alone or
           the panel is up, so the bottom strip never flashes. */}
       <div

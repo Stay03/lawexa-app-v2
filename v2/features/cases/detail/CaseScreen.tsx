@@ -280,6 +280,7 @@ function CaseBody({ slug }: { slug: string }) {
             onClose={closeChat}
             onDock={() => setDockedPref(true)}
             onOpenChat={switchChat}
+            arrive={fadeOnArrival}
           />
         ) : null}
       </div>
