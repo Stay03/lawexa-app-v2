@@ -106,3 +106,36 @@ test('lifting a finger with nothing pending does nothing', () => {
   intent.commit();
   assert.deepEqual(sent, []);
 });
+
+test('the prefetch is told what showed the intent: a finger, or a mouse, pen or focus', () => {
+  const seen: Array<[string, string]> = [];
+  const timers = new Map<number, () => void>();
+  let id = 0;
+  const intent = createIntentPrefetch((href, source) => seen.push([href, source]), {
+    setTimer: (run) => {
+      id += 1;
+      timers.set(id, run);
+      return id;
+    },
+    clearTimer: (timer) => timers.delete(timer as number),
+  });
+  const tick = () => {
+    const due = [...timers.values()];
+    timers.clear();
+    for (const run of due) run();
+  };
+
+  intent.rest('/a', 80, 'touch');
+  tick(); // a finger held still
+  intent.rest('/b', 80, 'touch');
+  intent.commit(); // a quick tap lifts before the timer
+  intent.rest('/c'); // a mouse resting
+  tick();
+  intent.now('/d'); // keyboard focus
+  assert.deepEqual(seen, [
+    ['/a', 'touch'],
+    ['/b', 'touch'],
+    ['/c', 'pointer'],
+    ['/d', 'pointer'],
+  ]);
+});

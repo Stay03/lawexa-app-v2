@@ -77,3 +77,9 @@ test('a case screen that mounts with the case in hand does not replay its fade (
   assert.doesNotMatch(screen, /className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">\s*<CaseDocument/);
   assert.match(read('detail', 'CaseAsk.tsx'), /arrive && 'motion-safe:animate-in motion-safe:fade-in/);
 });
+
+test('a finger gets the route prefetch only; the case is read ahead for a mouse, pen or focus', () => {
+  const hook = read('list', 'use-case-row-intent.ts');
+  assert.match(hook, /if \(!allowed \|\| source === 'touch'\) return;/);
+  assert.match(read('..', '..', 'shell', 'use-intent-prefetch.ts'), /onTouchStart: \(\) => intent\.rest\(href, INTENT_TOUCH_MS, 'touch'\)/);
+});

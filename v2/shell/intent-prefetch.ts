@@ -20,16 +20,19 @@
  *
  * Pure (timers injected), so the rules are tested without a browser.
  */
+/** What showed the intent: a finger, or a mouse, pen or keyboard focus. */
+export type IntentSource = 'touch' | 'pointer';
+
 export interface IntentPrefetch {
   /** Mouse entered or finger down: prefetch if still there after `ms`
    *  (default `restMs`). */
-  rest(href: string, ms?: number): void;
+  rest(href: string, ms?: number, source?: IntentSource): void;
   /** Mouse left, finger moved, touch cancelled: drop a pending rest. */
   leave(): void;
   /** Finger lifted: if a rest is still pending (no movement), prefetch now. */
   commit(): void;
   /** Focus: prefetch now. */
-  now(href: string): void;
+  now(href: string, source?: IntentSource): void;
 }
 
 export interface IntentPrefetchOptions {
@@ -47,7 +50,7 @@ export const INTENT_REST_MS = 100;
 export const INTENT_TOUCH_MS = 80;
 
 export function createIntentPrefetch(
-  prefetch: (href: string) => void,
+  prefetch: (href: string, source: IntentSource) => void,
   {
     restMs = INTENT_REST_MS,
     setTimer = (run, ms) => setTimeout(run, ms),
@@ -57,6 +60,7 @@ export function createIntentPrefetch(
   const sent = new Set<string>();
   let pending: unknown = null;
   let pendingHref: string | null = null;
+  let pendingSource: IntentSource = 'pointer';
 
   const cancel = () => {
     if (pending !== null) {
@@ -66,27 +70,30 @@ export function createIntentPrefetch(
     }
   };
 
-  const fire = (href: string) => {
+  const fire = (href: string, source: IntentSource) => {
     cancel();
     if (sent.has(href)) return;
     sent.add(href);
-    prefetch(href);
+    prefetch(href, source);
   };
 
   return {
-    rest(href, ms = restMs) {
+    rest(href, ms = restMs, source = 'pointer') {
       if (sent.has(href) || pending !== null) return;
       pendingHref = href;
+      pendingSource = source;
       pending = setTimer(() => {
         pending = null;
         pendingHref = null;
-        fire(href);
+        fire(href, source);
       }, ms);
     },
     leave: cancel,
     commit() {
-      if (pendingHref !== null) fire(pendingHref);
+      if (pendingHref !== null) fire(pendingHref, pendingSource);
     },
-    now: fire,
+    now(href, source = 'pointer') {
+      fire(href, source);
+    },
   };
 }

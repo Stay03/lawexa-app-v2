@@ -2,11 +2,13 @@
 
 import { useMemo, type PointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { createIntentPrefetch, INTENT_TOUCH_MS } from './intent-prefetch';
+import { createIntentPrefetch, INTENT_TOUCH_MS, type IntentSource } from './intent-prefetch';
+
+export type { IntentSource };
 
 export interface IntentPrefetchHooks {
   /** Runs with the route prefetch, once per href: the moment intent is clear. */
-  onIntent?: () => void;
+  onIntent?: (source: IntentSource) => void;
   /** Runs when the reader moves on: the mouse leaves, the finger scrolls or lifts off elsewhere. */
   onAbandon?: () => void;
 }
@@ -25,9 +27,9 @@ export function useIntentPrefetch(href: string, { onIntent, onAbandon }: IntentP
   const router = useRouter();
   const intent = useMemo(
     () =>
-      createIntentPrefetch((target) => {
+      createIntentPrefetch((target, source) => {
         router.prefetch(target);
-        onIntent?.();
+        onIntent?.(source);
       }),
     [router, onIntent],
   );
@@ -44,7 +46,7 @@ export function useIntentPrefetch(href: string, { onIntent, onAbandon }: IntentP
       intent.leave();
       onAbandon?.();
     },
-    onTouchStart: () => intent.rest(href, INTENT_TOUCH_MS),
+    onTouchStart: () => intent.rest(href, INTENT_TOUCH_MS, 'touch'),
     onTouchMove: () => {
       intent.leave();
       onAbandon?.();
