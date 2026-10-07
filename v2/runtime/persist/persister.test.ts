@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryObserver, type QueryClient, type QueryKey } from '@tanstack/react-query';
-import { makeQueryClient, type V2QueryMeta } from '../query';
+import { makeQueryClient, REFETCH_ON_VISIT, type V2QueryMeta } from '../query';
 import { memoryBackend } from './memory-backend';
 import { makeV2Persister, PERSIST_PREFIX } from './persister';
 import { createQueryStorage, type QueryStorage } from './query-storage';
@@ -212,4 +212,50 @@ test('a server-rendered answer already in the cache wins over the device copy', 
   second.setQueryData(key, hydrated);
   const shown = await read(second, key, async () => fullCase, { persist: 'gated' }, 10 * 60_000);
   assert.deepEqual(shown, hydrated);
+});
+
+test('the kept copy is the answer the read got, not a cache edit made before the write ran', async () => {
+  const { storage, answers } = device();
+  const key = ['conversations', 'list', { viewerId: 7 }];
+  const client = tab(storage);
+  const observer = new QueryObserver(client, {
+    queryKey: key,
+    queryFn: async () => ({ success: true, data: [{ id: 'a' }, { id: 'b' }] }),
+    meta: { persist: 'list' },
+    staleTime: 60_000,
+  });
+  const unsubscribe = observer.subscribe(() => undefined);
+  await observer.refetch();
+  // The app edits its view (a row removed by conversationsCache.remove) before
+  // the delayed write has run.
+  client.setQueryData(key, { success: true, data: [{ id: 'b' }] });
+  await settle();
+  unsubscribe();
+  const kept = answers.get(rowKey(client, key)) as { state: { data: unknown } } | undefined;
+  assert.deepEqual(kept?.state.data, { success: true, data: [{ id: 'a' }, { id: 'b' }] });
+});
+
+test('a list that re-checks on every visit asks the server after a restore, even when the copy is fresh', async () => {
+  const { storage } = device();
+  const key = ['conversations', 'list', { viewerId: 7 }];
+  await read(tab(storage), key, async () => ({ success: true, data: [{ id: 'b' }] }), { persist: 'list' });
+  await settle();
+
+  let calls = 0;
+  const second = tab(storage);
+  const observer = new QueryObserver(second, {
+    queryKey: key,
+    queryFn: async () => {
+      calls += 1;
+      return { success: true, data: [{ id: 'a' }, { id: 'b' }] };
+    },
+    meta: { persist: 'list' },
+    staleTime: 60_000,
+    refetchOnMount: REFETCH_ON_VISIT,
+  });
+  const unsubscribe = observer.subscribe(() => undefined);
+  await settle();
+  unsubscribe();
+  assert.equal(calls, 1);
+  assert.deepEqual(second.getQueryData(key), { success: true, data: [{ id: 'a' }, { id: 'b' }] });
 });

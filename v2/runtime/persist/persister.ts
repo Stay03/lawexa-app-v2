@@ -17,6 +17,7 @@ import {
   persistModeOf,
 } from './policy';
 import type { QueryStorage } from './query-storage';
+import { REFETCH_ON_VISIT } from '../query';
 
 /** The storage key prefix TanStack puts before each query hash. */
 export const PERSIST_PREFIX = 'lq';
@@ -36,14 +37,17 @@ export interface V2Persister {
  * TanStack's per-query persister, with the device cache's rules around it.
  *
  * The library's own `persisterFn` restores, refetches when stale, and keeps
- * every successful answer. Ours uses the library's `retrieveQuery` and
- * `persistQuery` and adds the rules the plan's amendments require:
+ * every successful answer. Ours uses the library's `retrieveQuery`, writes the
+ * kept answer in the library's own format, and adds the rules the plan's
+ * amendments require:
  *
  * - Only leaves with `meta.persist` are touched; every other query runs as if
  *   no persister existed.
  * - RESTORE only when the query holds no data, so a server-rendered (hydrated)
  *   answer always wins over the device copy. A `'gated'` leaf refetches on
- *   EVERY restore; a `'list'` leaf refetches when the restored copy is stale.
+ *   EVERY restore; a `'list'` leaf refetches when the restored copy is stale,
+ *   or always when the leaf re-checks on every visit (REFETCH_ON_VISIT).
+ * - KEEP the answer the read received, never the cache as later edited.
  * - KEEP only a full answer (`isStorableAnswer`). A limited answer (plan limit,
  *   no access) or a chat still being answered is shown but not kept, and it
  *   DELETES the kept copy, so a lapsed plan never sees the old full text again.
@@ -62,6 +66,15 @@ export function makeV2Persister(storage: QueryStorage): V2Persister {
   });
   const keyOf = (query: Query) => `${PERSIST_PREFIX}-${query.queryHash}`;
 
+  /**
+   * A leaf that asks the server on every visit (`refetchOnMount: 'always'`,
+   * REFETCH_ON_VISIT). A restore answers the mount's fetch from the device, so
+   * without this the visit's check never went out while the copy was fresh,
+   * and a list kept with a row missing stayed that way for up to its stale time.
+   */
+  const checksOnEveryVisit = (query: Query) =>
+    'refetchOnMount' in query.options && query.options.refetchOnMount === REFETCH_ON_VISIT;
+
   async function persisterFn<T>(
     queryFn: QueryFunction<T, QueryKey, never>,
     context: QueryFunctionContext<QueryKey>,
@@ -78,7 +91,9 @@ export function makeV2Persister(storage: QueryStorage): V2Persister {
         });
         // The refetch's failure lands in the query's own error state; the
         // promise is caught so it never surfaces as an unhandled rejection.
-        if (mode === 'gated' || query.isStale()) query.fetch().catch(() => undefined);
+        if (mode === 'gated' || query.isStale() || checksOnEveryVisit(query)) {
+          query.fetch().catch(() => undefined);
+        }
       });
       if (restored !== undefined) return restored;
     }
@@ -90,11 +105,24 @@ export function makeV2Persister(storage: QueryStorage): V2Persister {
       if (isGoneError(error)) await storage.removeItem(keyOf(query));
       throw error;
     }
+    const answeredAt = Date.now();
 
     if (isStorableAnswer(answer)) {
-      // After this answer is in the query's state, as the library does.
+      // Written after this answer is in the query's state, as the library
+      // does, but it writes THIS read's answer, not whatever the cache holds by
+      // the time the write runs. A cache edit landing in between (a row removed
+      // by conversationsCache.remove, an optimistic bump) is the app's view,
+      // not the server's, and once kept it painted as the server's list on the
+      // next load (a conversation the server still listed was missing,
+      // 7 October 2026). A later read writes its own answer after this one.
       notifyManager.schedule(() => {
-        void core.persistQuery(query);
+        const kept: PersistedQuery = {
+          buster: String(PERSIST_SCHEMA_VERSION),
+          queryHash: query.queryHash,
+          queryKey: query.queryKey,
+          state: { ...query.state, data: answer, dataUpdatedAt: answeredAt },
+        };
+        void storage.setItem(keyOf(query), kept);
       });
     } else {
       await storage.removeItem(keyOf(query));
