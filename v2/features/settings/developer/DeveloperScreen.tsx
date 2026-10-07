@@ -1,9 +1,11 @@
 'use client';
 
-import { ArrowUpToLine, FlaskConical } from 'lucide-react';
+import { ArrowUpToLine, FlaskConical, Gauge } from 'lucide-react';
 
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
 import { setSearchPosition, useSearchPosition } from '@/v2/search-position';
+import { useV2Session } from '@/v2/runtime/session-context';
+import { canUsePerfSwitch, setPerfOff, usePerfOff } from '@/v2/runtime/perf-switch';
 import { SETTINGS_COLUMN, SettingsBlock } from '../SettingsList';
 import { SettingsToggleRow } from '../SettingsToggleRow';
 
@@ -29,6 +31,8 @@ import { SettingsToggleRow } from '../SettingsToggleRow';
  */
 export function DeveloperScreen() {
   const searchPosition = useSearchPosition();
+  const { role } = useV2Session();
+  const perfOff = usePerfOff();
 
   return (
     <div className={SETTINGS_COLUMN}>
@@ -56,6 +60,24 @@ export function DeveloperScreen() {
           onCheckedChange={(next) => setSearchPosition(next ? 'top' : 'bottom')}
         />
       </SettingsBlock>
+
+      {/* Admins only (owner, 7 October 2026): the speed features off for this
+          browser, to test with and without them (`perf-switch.ts`). The page
+          reloads, so nothing kept in memory under the old setting is shown. */}
+      {canUsePerfSwitch(role) ? (
+        <SettingsBlock id="speed" label="Testing, this browser only">
+          <SettingsToggleRow
+            icon={Gauge}
+            label="Speed features"
+            hint="Off: case pages are not built on the server, nothing is saved on this device, and links are not prefetched. The page reloads."
+            checked={!perfOff}
+            onCheckedChange={(next) => {
+              setPerfOff(!next);
+              window.location.reload();
+            }}
+          />
+        </SettingsBlock>
+      ) : null}
     </div>
   );
 }
