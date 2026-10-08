@@ -603,6 +603,16 @@
   line-height: 1.6;
 }
 
+/** A table of one or two columns (a fee table: item and amount; a principle
+ *  and its definition) fits a phone, so it drops the minimum and wraps in
+ *  place: Notaries Public Act 2023 and the Corporate Governance Code's
+ *  principles were 512 px in a 378 px box, one sideways scroll per row
+ *  (measured live, 8 October 2026). Three or more columns keep the minimum and
+ *  scroll in their wrapper. Without :has() a browser keeps the minimum. */
+.v2-statute-doc .akn-table:not(:has(> * > tr > :nth-child(3))) {
+  min-width: 0;
+}
+
 .v2-statute-doc .akn-table-caption {
   caption-side: top;
   padding: 0.5rem 0.75rem;
