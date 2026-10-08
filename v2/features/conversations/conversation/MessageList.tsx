@@ -3,6 +3,7 @@
 import {
   Fragment,
   memo,
+  startTransition,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -98,6 +99,31 @@ const BOTTOM_THRESHOLD_PX = 80;
 const UNVIRTUALIZED_TAIL = 3;
 
 /**
+ * How many of the newest messages the FIRST frame of an open draws.
+ *
+ * MOVE FIRST, FILL SECOND (Stay, 8 October 2026: the second tap on the same
+ * chat "seems kind of slow"). A chat already in memory used to draw every
+ * message and its markdown before the screen could move: 1.6-1.9 s on a
+ * 38-message chat against 0.3-0.4 s for the first tap, which moves to a
+ * skeleton (live, phone, CPU x4). The trace had nothing else: no network, just
+ * the whole chat drawn, plus every collapsible measuring itself and the message
+ * box reading its height, each of which lays out the page as it stands.
+ *
+ * So an open draws only the newest messages, which are the screenful the reader
+ * lands on, as real text. The rest arrive after the first frame has been
+ * painted, in a transition React can interrupt; by then the screen has moved,
+ * and the layout reads above ran against a short page. Eight messages cover
+ * more than the unvirtualized tail of groups, so the first frame is measured,
+ * not estimated.
+ *
+ * NOT useDeferredValue: a Next navigation is itself a transition, and inside a
+ * transition useDeferredValue returns the full value at once, so the whole
+ * chat still drew before the move (measured: 1.82-1.92 s became 1.48-1.56 s on
+ * the long chat, the short and medium chats unchanged).
+ */
+const OPEN_TAIL_MESSAGES = 8;
+
+/**
  * `useLayoutEffect` in the browser, `useEffect` on the server — React warns that a
  * layout effect does nothing during SSR, and the conversation screen does server-
  * render (with an empty transcript, so the browser branch is the only one that ever
@@ -129,7 +155,7 @@ export interface MessageListProps {
 }
 
 export function MessageList({
-  messages,
+  messages: latestMessages,
   streamingText,
   reasoning,
   isStreaming,
@@ -142,6 +168,25 @@ export function MessageList({
   onRetry,
   onScrolledUpChange,
 }: MessageListProps) {
+  // What this render draws (see OPEN_TAIL_MESSAGES): until the first frame has
+  // been painted, the newest messages only; from then on, all of them.
+  // Everything below reads this list, so the scroll and pill logic always
+  // describe what is on the page.
+  const [showAll, setShowAll] = useState(false);
+  const openTail = useMemo(() => latestMessages.slice(-OPEN_TAIL_MESSAGES), [latestMessages]);
+  const messages = showAll ? latestMessages : openTail;
+  useEffect(() => {
+    // Two frames: the first runs before the opening frame is painted, the
+    // second after it, so the move is always on screen before the rest draws.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => startTransition(() => setShowAll(true)));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -243,6 +288,16 @@ export function MessageList({
     const el = scrollRef.current;
     if (!el) return;
     didInitialScrollRef.current = true;
+    el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
+
+  // When the rest of an opened chat arrives above the first frame's messages, a
+  // reader still at the bottom stays there before the browser paints. Chrome's
+  // scroll anchoring would hold the place on its own; Safari has none (see
+  // UNVIRTUALIZED_TAIL), and the follower below only catches up a frame later.
+  useIsomorphicLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !didInitialScrollRef.current || !atBottomRef.current) return;
     el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
