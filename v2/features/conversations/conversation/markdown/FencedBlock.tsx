@@ -38,7 +38,7 @@ function textOf(node: HastNode | HastChild): string {
  * renders with the notes' reading styles (headings, bold, lists), while a form
  * with no markdown keeps every line, indent and signature line as typed
  * (document-markdown.ts holds the rules the Word export shares). Its header
- * carries the document's first line as a title and icon buttons (Fold, Copy,
+ * carries the document's first line as a title and icon buttons (Copy,
  * Download as Word, Maximize; labels on hover). Download asks the API for
  * this block of the SAVED answer (document-export.tsx says when a block can);
  * without a saved answer it is not shown. A long document shows folded in the
@@ -113,8 +113,11 @@ function DocumentBlock({ text }: { text: string }) {
               dialog corner. The safe-area paddings keep the bar and the last
               line clear of the notch and the home bar.
               MOTION (Stay, 8 October: "smooth and clean, it feels jumpy"): on a
-              phone it slides up from the bottom edge like a sheet; from sm up
-              it fades in with a small rise. Reduced motion keeps the fade. */}
+              phone it slides up from the bottom edge like a sheet, opaque the
+              whole way: a fade on top let the page show through mid-slide
+              (opacity 0.62 to 0.98, frame log on live, 8 October 2026). From
+              sm up it fades in with a small rise; reduced motion keeps only
+              the fade. */}
           <DialogSurface
             // Focus the text, not the first button: a focused button opens its
             // tooltip, and the first Esc then closes only the tooltip (seen in
@@ -126,10 +129,10 @@ function DocumentBlock({ text }: { text: string }) {
             className={cn(
               'fixed inset-0 z-50 flex h-dvh flex-col overflow-hidden bg-background text-sm outline-none',
               'sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl sm:ring-1 sm:ring-foreground/5',
-              'data-open:animate-in data-closed:animate-out data-open:fade-in-0 data-closed:fade-out-0 duration-300 ease-out',
+              'data-open:animate-in data-closed:animate-out duration-300 ease-out',
               'data-open:slide-in-from-bottom-[100%] data-closed:slide-out-to-bottom-[100%]',
-              'sm:duration-200 sm:data-open:slide-in-from-bottom-4 sm:data-closed:slide-out-to-bottom-4',
-              'motion-reduce:data-open:slide-in-from-bottom-0 motion-reduce:data-closed:slide-out-to-bottom-0',
+              'sm:duration-200 sm:data-open:fade-in-0 sm:data-closed:fade-out-0 sm:data-open:slide-in-from-bottom-4 sm:data-closed:slide-out-to-bottom-4',
+              'motion-reduce:data-open:fade-in-0 motion-reduce:data-closed:fade-out-0 motion-reduce:data-open:slide-in-from-bottom-0 motion-reduce:data-closed:slide-out-to-bottom-0',
             )}
           >
             <div className="flex items-center gap-2 border-b border-border px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2">
