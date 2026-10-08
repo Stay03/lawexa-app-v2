@@ -125,6 +125,16 @@ function PromptInput({
 
 export type PromptInputTextareaProps = {
   disableAutosize?: boolean
+  /**
+   * v2's composer sets this; v1 callers leave it off and keep the old
+   * behaviour. The box is measured only when its text changes and only when it
+   * has text: an empty box keeps its natural one-line height. Without it the
+   * inline ref measured on EVERY render (a new ref function each time) and the
+   * layout effect measured again on mount; each measurement reads scrollHeight,
+   * which lays out the whole page as it stands. On a long chat that was about
+   * 200 ms of an open's first frame (trace, 8 October 2026).
+   */
+  lazyAutosize?: boolean
   onLargePaste?: (text: string) => void
   /**
    * Pictures found on the clipboard. OPTIONAL, so a caller that does not pass
@@ -138,6 +148,7 @@ function PromptInputTextarea({
   className,
   onKeyDown,
   disableAutosize = false,
+  lazyAutosize = false,
   onLargePaste,
   onPasteFiles,
   ...props
@@ -147,6 +158,10 @@ function PromptInputTextarea({
 
   const adjustHeight = (el: HTMLTextAreaElement | null) => {
     if (!el || disableAutosize) return
+    if (lazyAutosize && !el.value) {
+      el.style.height = ""
+      return
+    }
 
     el.style.height = "auto"
 
@@ -159,13 +174,17 @@ function PromptInputTextarea({
 
   const handleRef = (el: HTMLTextAreaElement | null) => {
     textareaRef.current = el
-    adjustHeight(el)
+    if (!lazyAutosize) adjustHeight(el)
   }
 
   useLayoutEffect(() => {
     if (!textareaRef.current || disableAutosize) return
 
     const el = textareaRef.current
+    if (lazyAutosize && !el.value) {
+      el.style.height = ""
+      return
+    }
     el.style.height = "auto"
 
     if (typeof maxHeight === "number") {

@@ -693,6 +693,9 @@ export function ConversationComposer({
               // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
               // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
               className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
+              // Measured only when it has text: a measurement lays out the whole
+              // transcript behind it, which cost an open ~200 ms (prompt-input.tsx).
+              lazyAutosize
               onLargePaste={addPasted}
               /* A pasted picture goes down the SAME path as one chosen with the
                  attach button, so the type check, the size cap, the duplicate
