@@ -79,6 +79,15 @@ const nextConfig = (phase: string): NextConfig => {
     // build id (and is otherwise bypassed while `deploymentId` is set).
     generateBuildId: () => buildId,
     ...(buildId ? { deploymentId: buildId } : {}),
+    experimental: {
+      // How long a prefetched route shell (layout and loading state) stays usable
+      // in the browser. Next's default is 300 s; past it, a tap on a kept tab
+      // waits for the server to send the shell again before the address changes
+      // (374 to 652 ms at CPU x4, traced on live 7 October 2026). 1800 s matches
+      // the conversation page's `unstable_dynamicStaleTime`, so the shell lasts
+      // as long as the data it frames.
+      staleTimes: { static: 1800 },
+    },
     async redirects() {
       return [
         {
