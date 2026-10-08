@@ -30,14 +30,14 @@ test('the layer shows while painting or while the navigation is pending, never a
 });
 
 test('a plain click is taken over; the same page and no provider keep the default', () => {
-  assert.match(moveFirst, /if \(!navigate \|\| pathOf\(href\) === pathname\) return;\s*event\.preventDefault\(\);\s*navigate\(href, kind, title\);/);
+  assert.match(moveFirst, /if \(!navigate \|\| pathOf\(href\) === pathname\) return;\s*event\.preventDefault\(\);\s*navigate\(href, kind, title, header\);/);
 });
 
 test('the real screen does not slide in again after the layer made the move', () => {
   assert.match(moveFirst, /skipRouteEntranceFor\(pathOf\(href\)\);/);
   assert.match(motion, /export function skipRouteEntranceFor\(pathname: string\): void/);
   assert.match(motion, /if \(entrancePlayedFor === pathname\) \{/);
-  assert.match(css, /html\.v2-document-lock \.v2-move-first \{\s*animation: v2-route-enter-forward-a/);
+  assert.match(css, /html\.v2-document-lock \.v2-move-first \{\s*animation: v2-move-first-enter /);
 });
 
 test('chat rows move first with the conversation frame, under the v2 provider', () => {
@@ -62,4 +62,30 @@ test('links stop prefetching only after the paint, and start again when the laye
   assert.ok(quietOn > raf, 'quiet only after the painted frame');
   assert.match(moveFirst, /const linksQuiet = quiet && visible;/);
   assert.match(moveFirst, /prefetch=\{quiet \? false : prefetch\}/);
+});
+
+test('the layer slides in opaque: its keyframe moves, it never fades', () => {
+  const at = css.indexOf('@keyframes v2-move-first-enter');
+  assert.ok(at > 0, 'keyframe missing');
+  const body = css.slice(at, css.indexOf('html.v2-document-lock .v2-move-first', at));
+  assert.match(body, /transform: translate3d\(1rem, 0, 0\)/);
+  assert.doesNotMatch(body, /opacity/);
+});
+
+test('the layer covers the region below the bar, where the destination draws', () => {
+  assert.match(moveFirst, /const barInset = parseFloat\(getComputedStyle\(region\)\.paddingTop\) \|\| 0;/);
+  assert.match(moveFirst, /top: box\.top \+ barInset, left: box\.left, width: box\.width, height: box\.height - barInset/);
+});
+
+test('the destination header is published in the tap, before the frame', () => {
+  const header = moveFirst.indexOf('if (header) setHeaderContext(header);');
+  const flush = moveFirst.indexOf('flushSync(() => {');
+  assert.ok(header > 0 && header < flush);
+  assert.match(row, /header=\{\{ title: cleanTitle, confidential: Boolean\(is_confidential\) \}\}/);
+});
+
+test('a back move drops a pending layer, and a stale tap never pushes', () => {
+  assert.match(moveFirst, /window\.addEventListener\('popstate', drop\);/);
+  assert.match(moveFirst, /const drop = \(\) => \{\s*tapRef\.current \+= 1;\s*setPending\(null\);/);
+  assert.match(moveFirst, /if \(tapRef\.current !== tap\) return;/);
 });

@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   createContext,
   useContext,
+  useEffect,
+  useRef,
   useState,
   useTransition,
   type ComponentProps,
@@ -14,6 +16,7 @@ import {
 import { flushSync } from 'react-dom';
 import { ConversationFrame } from '@/v2/features/conversations/conversation/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { setHeaderContext, type HeaderContext } from './header-context';
 import { skipRouteEntranceFor } from './route-motion';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
 
@@ -78,7 +81,7 @@ interface PendingMove {
   phase: 'painting' | 'navigating';
 }
 
-type Navigate = (href: string, kind: MoveFirstKind, title?: string) => void;
+type Navigate = (href: string, kind: MoveFirstKind, title?: string, header?: HeaderContext) => void;
 
 const MoveFirstContext = createContext<Navigate | null>(null);
 
@@ -102,13 +105,42 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   const [quiet, setQuiet] = useState(false);
   const [navigating, startNavigation] = useTransition();
 
-  const navigate: Navigate = (href, kind, title) => {
+  // Which tap a delayed router.push belongs to: a newer tap or a history move
+  // bumps it, and the push only runs if it is still the latest.
+  const tapRef = useRef(0);
+  // A history move (the phone's back gesture) while a tap is still pending:
+  // Next drops the tap's navigation and restores the list, and the layer must
+  // go with it at once, not when the dropped transition settles. A listener's
+  // setState, not an effect's.
+  useEffect(() => {
+    const drop = () => {
+      tapRef.current += 1;
+      setPending(null);
+    };
+    window.addEventListener('popstate', drop);
+    return () => window.removeEventListener('popstate', drop);
+  }, []);
+
+  const navigate: Navigate = (href, kind, title, header) => {
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!region) {
       router.push(href);
       return;
     }
+    tapRef.current += 1;
+    const tap = tapRef.current;
+    // The destination's header is published in the tap, so its bar shows the
+    // title from its first frame instead of a shimmer that cross-fades later.
+    // A top-level screen (where the tap comes from) shows no centre title, so
+    // nothing changes on it while the layer is up.
+    if (header) setHeaderContext(header);
+    // The layer covers the region BELOW the bar. On a top-level screen the
+    // region starts under a see-through bar and pads itself down by the bar's
+    // height; the screens a tap goes to have an opaque bar above their region.
+    // Copying the raw rect put the frame 56 px too high, over the bar, and the
+    // real screen then dropped it 56 px (frame strip, 8 October 2026).
     const box = region.getBoundingClientRect();
+    const barInset = parseFloat(getComputedStyle(region).paddingTop) || 0;
     flushSync(() => {
       // Left over from the last navigation; reset here so the links do not
       // change in this commit (they go quiet after the paint, below).
@@ -117,7 +149,7 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
         href,
         kind,
         title,
-        rect: { top: box.top, left: box.left, width: box.width, height: box.height },
+        rect: { top: box.top + barInset, left: box.left, width: box.width, height: box.height - barInset },
         phase: 'painting',
       });
     });
@@ -125,6 +157,7 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     skipRouteEntranceFor(pathOf(href));
     requestAnimationFrame(() => {
       window.setTimeout(() => {
+        if (tapRef.current !== tap) return; // replaced by a newer tap or a back move
         // After the paint, not inside the flushSync above: re-rendering every
         // link to stop its prefetching is work the first frame must not wait on.
         setQuiet(true);
@@ -172,10 +205,12 @@ type MoveFirstLinkProps = Omit<ComponentProps<typeof Link>, 'href'> & {
   href: string;
   kind?: MoveFirstKind;
   title?: string;
+  /** The destination's header context (title, confidential), published at the tap. */
+  header?: HeaderContext;
 };
 
 /** A `next/link` that moves first. Outside the v2 provider it is a plain Link. */
-export function MoveFirstLink({ href, kind = 'page', title, onNavigate, prefetch, ...props }: MoveFirstLinkProps) {
+export function MoveFirstLink({ href, kind = 'page', title, header, onNavigate, prefetch, ...props }: MoveFirstLinkProps) {
   const navigate = useContext(MoveFirstContext);
   const quiet = useContext(MoveFirstQuietContext);
   const pathname = usePathname();
@@ -188,7 +223,7 @@ export function MoveFirstLink({ href, kind = 'page', title, onNavigate, prefetch
         onNavigate?.(event);
         if (!navigate || pathOf(href) === pathname) return;
         event.preventDefault();
-        navigate(href, kind, title);
+        navigate(href, kind, title, header);
       }}
     />
   );

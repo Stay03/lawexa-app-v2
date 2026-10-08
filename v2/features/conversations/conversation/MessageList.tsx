@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { ArrowDown, RotateCcw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   isErrorMessage,
   type ConversationReference,
@@ -173,6 +174,15 @@ export function MessageList({
   // Everything below reads this list, so the scroll and pill logic always
   // describe what is on the page.
   const [showAll, setShowAll] = useState(false);
+  // The transcript fades in only when this list mounted while the history was
+  // still loading (a cold open: it replaces a skeleton). Opened from memory,
+  // it fading in from 0 meant a blank page for a moment under a composer that
+  // was already solid (frame strip, 8 October 2026). Read once, at mount.
+  const [fadeIn] = useState(() => isLoadingHistory);
+  // A chat longer than the first frame's tail sits at the bottom of the
+  // scroller, so the older messages filling in above never move the text the
+  // reader is looking at. Shorter chats keep their top-down layout.
+  const anchorBottom = latestMessages.length > OPEN_TAIL_MESSAGES;
   const openTail = useMemo(() => latestMessages.slice(-OPEN_TAIL_MESSAGES), [latestMessages]);
   const messages = showAll ? latestMessages : openTail;
   useEffect(() => {
@@ -410,7 +420,10 @@ export function MessageList({
             extra 1rem is a resting gap above the pill's soft top fade. */}
         <div
           ref={contentRef}
-          className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6 pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]"
+          className={cn(
+            'mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6 pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]',
+            anchorBottom && 'min-h-full justify-end',
+          )}
         >
           {references.length > 0 && (
             <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
@@ -428,7 +441,12 @@ export function MessageList({
               Its own `gap-6` keeps the column's rhythm unchanged by the extra
               element. */}
           {groups.length > 0 && (
-            <div className="flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+            <div
+              className={cn(
+                'flex flex-col gap-6',
+                fadeIn && 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+              )}
+            >
               {groups.map((group, gi) => (
                 <Fragment key={groupKey(group, gi)}>
                   {gi === activityIndex && (

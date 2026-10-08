@@ -66,6 +66,7 @@ export function ConversationRow({
   now,
   index,
   exiting,
+  reveal = true,
   onDelete,
 }: {
   conversation: ConversationListItem;
@@ -73,6 +74,13 @@ export function ConversationRow({
   index: number;
   /** `true` while the row plays its exit after a delete. */
   exiting: boolean;
+  /**
+   * Play the staggered entrance. The list passes `false` when it mounts with
+   * its rows already loaded (coming back to it): replaying the stagger from
+   * opacity 0 on every return read as the list loading again (frame strip,
+   * 8 October 2026).
+   */
+  reveal?: boolean;
   /** Opens the list's delete confirm for this row. */
   onDelete: () => void;
 }) {
@@ -87,12 +95,12 @@ export function ConversationRow({
       className={cn(
         'grid transition-[grid-template-rows,opacity] duration-150 ease-out motion-reduce:transition-none',
         exiting ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100',
-        !exiting && cn(REVEAL, 'duration-300'),
+        !exiting && reveal && cn(REVEAL, 'duration-300'),
       )}
       // Cap the stagger at 14 rows (v1 parity) so a long list never waits on a
       // growing delay; motion-reduce drops the animation (token is motion-safe).
       // `duration-*` class + inline `animationDelay` is the module strips' idiom.
-      style={exiting ? undefined : { animationDelay: `${Math.min(index, 14) * 30}ms` }}
+      style={exiting || !reveal ? undefined : { animationDelay: `${Math.min(index, 14) * 30}ms` }}
     >
       {/* `min-w-0` lets the grid track resolve to the column's width, so the
           title truncates instead of widening the row (the `BookmarkRow` fix). */}
@@ -108,6 +116,7 @@ export function ConversationRow({
           href={`/c/${id}`}
           kind="conversation"
           title={cleanTitle}
+          header={{ title: cleanTitle, confidential: Boolean(is_confidential) }}
           aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}`}
           className={cn(
             'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60',

@@ -92,8 +92,13 @@ export function ComposerSkeleton() {
         <Skeleton className="h-8 w-28 rounded-full" />
       </div>
       {/* The pill — the PromptInput card holding ONLY the single input row, at the
-          compact v1-floating-prompt scale (size-8 controls, h-9 textarea). */}
-      <div className="border-border bg-muted/50 rounded-3xl border p-2">
+          compact v1-floating-prompt scale (size-8 controls, h-9 textarea).
+          SURFACE = the real pill's (bg-background and ConversationComposer's own
+          drop shadow), so the hand-off changes nothing but the controls. It was a
+          bg-muted/50 card: grey on a near-black page in dark, which then swapped
+          to page colour when the real pill arrived (frame strip, 8 October 2026).
+          The 1px border stands in for the real pill's 1px gold ring. */}
+      <div className="border-border bg-background rounded-3xl border p-2 shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]">
         <div className="flex items-end gap-1.5">
           <Skeleton className="size-8 shrink-0 rounded-full" />
           <Skeleton className="h-9 flex-1 rounded-2xl" />

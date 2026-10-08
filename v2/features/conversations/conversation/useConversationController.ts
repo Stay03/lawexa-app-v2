@@ -562,8 +562,13 @@ export function useConversationController(
     // Embedded, the header belongs to the HOST route (the case's title) —
     // publishing here would clobber it.
     if (embedded) return;
+    // A tap from the list already published the row's title (move-first.tsx),
+    // so the bar shows it from its first frame. Until this record's own title
+    // resolves, publishing null would wipe that and bring the shimmer back; a
+    // direct load starts from the empty store, so it still shows the shimmer.
+    if (!conversationTitle) return;
     setHeaderContext({
-      title: conversationTitle ? stripPastedTags(conversationTitle) : null,
+      title: stripPastedTags(conversationTitle),
       confidential: isConfidential,
     });
   }, [conversationTitle, isConfidential, embedded]);

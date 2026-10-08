@@ -172,6 +172,11 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
     rootMargin: '320px',
   });
 
+  // Rows fade in only when this list mounted without them (a first load). A list
+  // that mounts with its rows already in the cache (coming back to it) shows
+  // them in place; read once, at mount, so later pages do not change it.
+  const [revealRows] = useState(() => query.isPending);
+
   if (!signedIn) {
     return (
       <PageShell>
@@ -249,6 +254,7 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
                 now={now}
                 index={index}
                 exiting={exiting}
+                reveal={revealRows}
                 onDelete={() => setDeleteTarget(conversation.id)}
               />
             ))}

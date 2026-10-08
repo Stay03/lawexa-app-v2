@@ -967,8 +967,17 @@ html.v2-document-lock body {
 
   /* The move-first layer (`move-first.tsx`) is the forward entrance when a tap
      goes through it: it mounts once per tap, so one keyframe is enough, and
-     RouteMotion then skips that route's own entrance. */
+     RouteMotion then skips that route's own entrance.
+     OPAQUE FROM ITS FIRST FRAME: a slide only, no opacity. The route entrance
+     it used to share fades in from 0, which let the list show through the
+     layer's grey bars for 200 ms, a double image that read as two skeletons
+     and showed most in dark (frame strip, 8 October 2026). */
+  @keyframes v2-move-first-enter {
+    from {
+      transform: translate3d(1rem, 0, 0);
+    }
+  }
   html.v2-document-lock .v2-move-first {
-    animation: v2-route-enter-forward-a 200ms cubic-bezier(0.2, 0, 0, 1);
+    animation: v2-move-first-enter 200ms cubic-bezier(0.2, 0, 0, 1);
   }
 }
