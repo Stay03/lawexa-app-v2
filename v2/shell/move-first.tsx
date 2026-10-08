@@ -82,6 +82,15 @@ type Navigate = (href: string, kind: MoveFirstKind, title?: string) => void;
 
 const MoveFirstContext = createContext<Navigate | null>(null);
 
+/**
+ * True while a move-first navigation is under way, from the task after the
+ * frame was painted until the new screen commits. Links stop prefetching then:
+ * the list stays mounted under the layer, and its rows' viewport prefetches
+ * (8 other chats' routes on a cold reload) competed with the one route the
+ * tap needs, which then took 1.4 s instead of 0.3 s (trace, 8 October 2026).
+ */
+const MoveFirstQuietContext = createContext(false);
+
 /** The path of an in-app href, for comparing with `usePathname()`. */
 function pathOf(href: string): string {
   return new URL(href, window.location.href).pathname;
@@ -90,6 +99,7 @@ function pathOf(href: string): string {
 export function MoveFirstProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [pending, setPending] = useState<PendingMove | null>(null);
+  const [quiet, setQuiet] = useState(false);
   const [navigating, startNavigation] = useTransition();
 
   const navigate: Navigate = (href, kind, title) => {
@@ -98,8 +108,16 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
       router.push(href);
       return;
     }
+    // The route's request starts at the tap, not after the painted frame: on a
+    // cold page the frame-then-task wait sat behind the page's own startup work
+    // and started the request 156 ms late (trace, 8 October 2026). Prefetching
+    // only queues a request, so the frame below still paints first.
+    router.prefetch(href);
     const box = region.getBoundingClientRect();
     flushSync(() => {
+      // Left over from the last navigation; reset here so the links do not
+      // change in this commit (they go quiet after the paint, below).
+      setQuiet(false);
       setPending({
         href,
         kind,
@@ -112,6 +130,9 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     skipRouteEntranceFor(pathOf(href));
     requestAnimationFrame(() => {
       window.setTimeout(() => {
+        // After the paint, not inside the flushSync above: re-rendering every
+        // link to stop its prefetching is work the first frame must not wait on.
+        setQuiet(true);
         startNavigation(() => {
           setPending((current) =>
             current && current.href === href ? { ...current, phase: 'navigating' } : current,
@@ -123,11 +144,16 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   };
 
   const visible = pending !== null && (pending.phase === 'painting' || navigating);
+  // Derived, so prefetching comes back by itself when the layer goes, whether
+  // the navigation landed, failed or was replaced.
+  const linksQuiet = quiet && visible;
 
   return (
     <MoveFirstContext.Provider value={navigate}>
-      {children}
-      {visible && pending ? <PendingScreen move={pending} /> : null}
+      <MoveFirstQuietContext.Provider value={linksQuiet}>
+        {children}
+        {visible && pending ? <PendingScreen move={pending} /> : null}
+      </MoveFirstQuietContext.Provider>
     </MoveFirstContext.Provider>
   );
 }
@@ -154,13 +180,15 @@ type MoveFirstLinkProps = Omit<ComponentProps<typeof Link>, 'href'> & {
 };
 
 /** A `next/link` that moves first. Outside the v2 provider it is a plain Link. */
-export function MoveFirstLink({ href, kind = 'page', title, onNavigate, ...props }: MoveFirstLinkProps) {
+export function MoveFirstLink({ href, kind = 'page', title, onNavigate, prefetch, ...props }: MoveFirstLinkProps) {
   const navigate = useContext(MoveFirstContext);
+  const quiet = useContext(MoveFirstQuietContext);
   const pathname = usePathname();
   return (
     <Link
       href={href}
       {...props}
+      prefetch={quiet ? false : prefetch}
       onNavigate={(event) => {
         onNavigate?.(event);
         if (!navigate || pathOf(href) === pathname) return;

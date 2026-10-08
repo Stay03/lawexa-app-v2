@@ -45,3 +45,20 @@ test('chat rows move first with the conversation frame, under the v2 provider', 
   assert.match(layout, /<MoveFirstProvider>/);
   assert.match(moveFirst, /conversation: ConversationFrame,/);
 });
+
+test('the route request starts at the tap, before the frame is drawn', () => {
+  const prefetch = moveFirst.indexOf('router.prefetch(href);');
+  const flush = moveFirst.indexOf('flushSync(() => {');
+  assert.ok(prefetch > 0 && prefetch < flush, 'prefetch before flushSync');
+});
+
+test('links stop prefetching only after the paint, and start again when the layer goes', () => {
+  const flush = moveFirst.indexOf('flushSync(() => {');
+  const reset = moveFirst.indexOf('setQuiet(false);', flush);
+  const raf = moveFirst.indexOf('requestAnimationFrame(() => {', flush);
+  const quietOn = moveFirst.indexOf('setQuiet(true);', raf);
+  assert.ok(reset > flush && reset < raf, 'reset inside the flushSync commit');
+  assert.ok(quietOn > raf, 'quiet only after the painted frame');
+  assert.match(moveFirst, /const linksQuiet = quiet && visible;/);
+  assert.match(moveFirst, /prefetch=\{quiet \? false : prefetch\}/);
+});
