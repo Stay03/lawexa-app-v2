@@ -19,6 +19,7 @@ import { SystemBarColour } from '@/v2/shell/SystemBarColour';
 import { TouchPress } from '@/v2/shell/touch-press';
 import { RouteTrail } from '@/v2/shell/route-trail';
 import { RouteMotion } from '@/v2/shell/route-motion';
+import { MoveFirstProvider } from '@/v2/shell/move-first';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { verifySession } from '@/v2/runtime/session';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
@@ -289,6 +290,9 @@ export default async function V2Layout({
                 — see v2/shell/Dock.tsx. Wraps the whole shell so both the dock host
                 (in the dock slot) and the page (in content) share one provider. When
                 no route portals anything, the dock stays empty and its row collapses. */}
+            {/* MoveFirstProvider: a tap through `MoveFirstLink` paints the
+                destination's light frame before any route work (move-first.tsx). */}
+            <MoveFirstProvider>
             <DockProvider>
               <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
                 <V2Sidebar user={user} />
@@ -338,6 +342,7 @@ export default async function V2Layout({
                 <V2Drawer user={user} />
               </SidebarProvider>
             </DockProvider>
+            </MoveFirstProvider>
           </HydrationBoundary>
         </V2SessionProvider>
       </V2QueryProvider>

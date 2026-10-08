@@ -1,7 +1,4 @@
-import {
-  TranscriptSkeleton,
-  ComposerSkeleton,
-} from '@/v2/features/conversations/conversation/skeletons';
+import { ConversationFrame } from '@/v2/features/conversations/conversation/skeletons';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 
 /**
@@ -45,16 +42,7 @@ export default function Loading() {
       <span role="status" className="sr-only">
         Loading this conversation
       </span>
-      <div aria-hidden inert className="min-h-0 flex-1 overflow-hidden">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6 pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]">
-          <TranscriptSkeleton />
-        </div>
-      </div>
-      <div aria-hidden inert className="absolute inset-x-0 bottom-0 z-10">
-        <div className="v2-safe-bottom">
-          <ComposerSkeleton />
-        </div>
-      </div>
+      <ConversationFrame />
     </div>
   );
 }

@@ -103,3 +103,32 @@ export function ComposerSkeleton() {
     </div>
   );
 }
+
+/**
+ * The whole conversation screen as a light frame: the transcript in the reading
+ * column and the composer as the absolute bottom layer, in the screen's own
+ * geometry (`max-w-2xl`, `px-4 pt-6`, the dock-height bottom padding with
+ * MessageList's `7rem` fallback, `v2-safe-bottom`), so nothing shifts when the
+ * real screen replaces it.
+ *
+ * Two consumers: the route boundary (`loading.tsx`) and the move-first pending
+ * screen (`v2/shell/move-first.tsx`), which paints this in the frame of the tap
+ * before any route work starts. `aria-hidden` + `inert`: each consumer carries
+ * its own `role="status"` announcement outside this subtree.
+ */
+export function ConversationFrame() {
+  return (
+    <>
+      <div aria-hidden inert className="min-h-0 flex-1 overflow-hidden">
+        <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6 pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]">
+          <TranscriptSkeleton />
+        </div>
+      </div>
+      <div aria-hidden inert className="absolute inset-x-0 bottom-0 z-10">
+        <div className="v2-safe-bottom">
+          <ComposerSkeleton />
+        </div>
+      </div>
+    </>
+  );
+}

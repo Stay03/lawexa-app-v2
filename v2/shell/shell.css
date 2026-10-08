@@ -964,4 +964,11 @@ html.v2-document-lock body {
   html.v2-document-lock .v2-shell__content[data-v2-route-enter='back-b'] {
     animation-name: v2-route-enter-back-b;
   }
+
+  /* The move-first layer (`move-first.tsx`) is the forward entrance when a tap
+     goes through it: it mounts once per tap, so one keyframe is enough, and
+     RouteMotion then skips that route's own entrance. */
+  html.v2-document-lock .v2-move-first {
+    animation: v2-route-enter-forward-a 200ms cubic-bezier(0.2, 0, 0, 1);
+  }
 }

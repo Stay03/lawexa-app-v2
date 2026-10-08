@@ -156,6 +156,20 @@ const POPSTATE_CLAIM_MS = 500;
  */
 let pendingDirection: Direction = 'forward';
 
+/**
+ * A pathname whose entrance has already been played by the move-first layer
+ * (`move-first.tsx`), which slid in at the tap. When the router then commits
+ * that screen under the layer, sliding it in again would be a second move.
+ * Keyed on the destination, so a navigation that never lands there (failed,
+ * replaced) cannot swallow the next real entrance.
+ */
+let entrancePlayedFor: string | null = null;
+
+/** Called by the move-first layer at the tap, before the navigation starts. */
+export function skipRouteEntranceFor(pathname: string): void {
+  entrancePlayedFor = pathname;
+}
+
 /** The slice of the Navigation API this module reads. Observation only:
  *  `intercept()` is never called, and nothing here writes history state. */
 interface NavigationDestinationLike {
@@ -274,6 +288,12 @@ export function RouteMotion(): null {
     const first = played.current === null;
     played.current = pathname;
     if (first) return;
+    if (entrancePlayedFor === pathname) {
+      entrancePlayedFor = null;
+      pendingDirection = 'forward';
+      return;
+    }
+    entrancePlayedFor = null;
 
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!region) return;
