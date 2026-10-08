@@ -107,9 +107,15 @@ function DocumentBlock({ text }: { text: string }) {
             event.preventDefault();
             readerRef.current?.focus();
           }}
-          className="flex h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+          // A phone gets the whole screen, edge to edge, no corners (Stay,
+          // 8 October); from sm up it stays a centred dialog with the app's
+          // dialog corner. `max-h-dvh` lifts the dialog's own 100dvh-2rem
+          // ceiling (components/ui/dialog.tsx), which left a band above and
+          // below. The safe-area paddings keep the bar and the last line
+          // clear of the notch and the home bar.
+          className="flex h-dvh max-h-dvh max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 ring-0 sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:max-w-3xl sm:rounded-4xl sm:ring-1"
         >
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+          <div className="flex items-center gap-2 border-b border-border px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2">
             <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             <DialogTitle className="min-w-0 flex-1 truncate text-sm font-medium">{title}</DialogTitle>
             <DialogDescription className="sr-only">The full document from this answer.</DialogDescription>
@@ -120,7 +126,9 @@ function DocumentBlock({ text }: { text: string }) {
             </IconAction>
           </div>
           <div ref={readerRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none">
-            <div className="mx-auto max-w-2xl whitespace-pre-wrap break-words px-6 py-6 text-base leading-relaxed">{text}</div>
+            <div className="mx-auto max-w-2xl whitespace-pre-wrap break-words px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 text-base leading-relaxed sm:px-6 sm:pb-6">
+              {text}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
