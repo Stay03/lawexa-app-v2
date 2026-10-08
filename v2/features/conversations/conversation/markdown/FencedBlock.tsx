@@ -1,10 +1,10 @@
 'use client';
 
-import { useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { useDeferredValue, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import ReactMarkdown, { type ExtraProps } from 'react-markdown';
-import { Check, ChevronsDownUp, ChevronsUpDown, Copy, Download, FileText, Loader2, Maximize2, X } from 'lucide-react';
+import { Check, Copy, Download, FileText, Loader2, Maximize2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogDescription, DialogOverlay, DialogPortal, DialogSurface, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { copyText } from './copy-text';
@@ -41,8 +41,9 @@ function textOf(node: HastNode | HastChild): string {
  * carries the document's first line as a title and icon buttons (Fold, Copy,
  * Download as Word, Maximize; labels on hover). Download asks the API for
  * this block of the SAVED answer (document-export.tsx says when a block can);
- * without a saved answer it is not shown. A long document opens folded with
- * "Show all" (document-view.ts); Maximize opens a full-height reader with larger type.
+ * without a saved answer it is not shown. A long document shows folded in the
+ * answer (document-view.ts) and its "Show all" opens the full-screen reader,
+ * the same as Maximize: it never unrolls in place (Stay, 8 October).
  * Colours come from the theme tokens (card, border, muted), so it holds in
  * light and dark. Corners: the block uses the app's Card corner (rounded-2xl),
  * the same as a code block in an answer (MarkdownText), and the reader keeps
@@ -59,9 +60,14 @@ export function FencedBlock({ node, children, ...rest }: ComponentProps<'pre'> &
 
 function DocumentBlock({ text }: { text: string }) {
   const title = documentTitle(text) || 'Document';
-  const long = isLongDocument(text);
-  const [folded, setFolded] = useState(long);
+  const folded = isLongDocument(text);
   const [maximized, setMaximized] = useState(false);
+  // The reader opens as a light frame and the document fills it one render
+  // later. Drawing the whole document in the opening frame took longer than
+  // the open animation, so it ended before the first paint and the reader
+  // popped in (frame log on live, 8 October 2026). On close the deferred value
+  // keeps the document in place until the fade has run.
+  const readerFilled = useDeferredValue(maximized);
   const exportTarget = useDocumentExport(text);
   const readerRef = useRef<HTMLDivElement>(null);
 
@@ -73,11 +79,6 @@ function DocumentBlock({ text }: { text: string }) {
           {title}
         </span>
         <div className="flex shrink-0 items-center">
-          {long ? (
-            <IconAction label={folded ? 'Show all' : 'Fold'} onClick={() => setFolded((f) => !f)}>
-              {folded ? <ChevronsUpDown className="size-3.5" /> : <ChevronsDownUp className="size-3.5" />}
-            </IconAction>
-          ) : null}
           <CopyAction text={text} />
           {exportTarget ? <DownloadAction target={exportTarget} /> : null}
           <IconAction label="Maximize" onClick={() => setMaximized(true)}>
@@ -92,7 +93,7 @@ function DocumentBlock({ text }: { text: string }) {
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-center bg-gradient-to-t from-card via-card/90 to-transparent pb-3 pt-16">
             <button
               type="button"
-              onClick={() => setFolded(false)}
+              onClick={() => setMaximized(true)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Show all
@@ -102,41 +103,56 @@ function DocumentBlock({ text }: { text: string }) {
       </div>
 
       <Dialog open={maximized} onOpenChange={setMaximized}>
-        <DialogContent
-          showCloseButton={false}
-          // Focus the text, not the first button: a focused button opens its
-          // tooltip, and the first Esc then closes only the tooltip (seen in
-          // the 7 October pictures). Focused text also scrolls with the keys.
-          onOpenAutoFocus={(event) => {
-            event.preventDefault();
-            readerRef.current?.focus();
-          }}
-          // A phone gets the whole screen, edge to edge, no corners (Stay,
-          // 8 October); from sm up it stays a centred dialog with the app's
-          // dialog corner. `max-h-dvh` lifts the dialog's own 100dvh-2rem
-          // ceiling (components/ui/dialog.tsx), which left a band above and
-          // below. The safe-area paddings keep the bar and the last line
-          // clear of the notch and the home bar.
-          className="flex h-dvh max-h-dvh max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 ring-0 sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:max-w-3xl sm:rounded-4xl sm:ring-1"
-        >
-          <div className="flex items-center gap-2 border-b border-border px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2">
-            <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <DialogTitle className="min-w-0 flex-1 truncate text-sm font-medium">{title}</DialogTitle>
-            <DialogDescription className="sr-only">The full document from this answer.</DialogDescription>
-            <CopyAction text={text} />
-            {exportTarget ? <DownloadAction target={exportTarget} /> : null}
-            <IconAction label="Close" onClick={() => setMaximized(false)}>
-              <X className="size-4" />
-            </IconAction>
-          </div>
-          <div ref={readerRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none">
-            <DocumentBody
-              text={text}
-              reader
-              className="px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-6 sm:pb-6"
-            />
-          </div>
-        </DialogContent>
+        <DialogPortal>
+          <DialogOverlay className="duration-200" />
+          {/* DialogSurface, not DialogContent: the reader is not a centred card,
+              so it owns its whole class list (components/ui/dialog.tsx says
+              why) and carries no card zoom to unpick.
+              SHAPE: a phone gets the whole screen, edge to edge, no corners
+              (Stay, 8 October); from sm up a centred panel with the app's
+              dialog corner. The safe-area paddings keep the bar and the last
+              line clear of the notch and the home bar.
+              MOTION (Stay, 8 October: "smooth and clean, it feels jumpy"): on a
+              phone it slides up from the bottom edge like a sheet; from sm up
+              it fades in with a small rise. Reduced motion keeps the fade. */}
+          <DialogSurface
+            // Focus the text, not the first button: a focused button opens its
+            // tooltip, and the first Esc then closes only the tooltip (seen in
+            // the 7 October pictures). Focused text also scrolls with the keys.
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              readerRef.current?.focus();
+            }}
+            className={cn(
+              'fixed inset-0 z-50 flex h-dvh flex-col overflow-hidden bg-background text-sm outline-none',
+              'sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl sm:ring-1 sm:ring-foreground/5',
+              'data-open:animate-in data-closed:animate-out data-open:fade-in-0 data-closed:fade-out-0 duration-300 ease-out',
+              'data-open:slide-in-from-bottom-[100%] data-closed:slide-out-to-bottom-[100%]',
+              'sm:duration-200 sm:data-open:slide-in-from-bottom-4 sm:data-closed:slide-out-to-bottom-4',
+              'motion-reduce:data-open:slide-in-from-bottom-0 motion-reduce:data-closed:slide-out-to-bottom-0',
+            )}
+          >
+            <div className="flex items-center gap-2 border-b border-border px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2">
+              <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <DialogTitle className="min-w-0 flex-1 truncate text-sm font-medium">{title}</DialogTitle>
+              <DialogDescription className="sr-only">The full document from this answer.</DialogDescription>
+              <CopyAction text={text} />
+              {exportTarget ? <DownloadAction target={exportTarget} /> : null}
+              <IconAction label="Close" onClick={() => setMaximized(false)}>
+                <X className="size-4" />
+              </IconAction>
+            </div>
+            <div ref={readerRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none">
+              {readerFilled ? (
+                <DocumentBody
+                  text={text}
+                  reader
+                  className="px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-6 sm:pb-6"
+                />
+              ) : null}
+            </div>
+          </DialogSurface>
+        </DialogPortal>
       </Dialog>
     </figure>
   );
