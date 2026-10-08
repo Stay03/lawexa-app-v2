@@ -111,6 +111,8 @@ test('the chat renders fences through FencedBlock, and the Copy button copies th
   // Theme tokens only, so light and dark both hold.
   assert.match(block, /border-border bg-card text-card-foreground/);
   assert.doesNotMatch(block, /#[0-9a-f]{3,6}\b|bg-white|bg-black|text-black|text-white/);
-  // Wrapped lines that keep the AI's breaks and indents.
-  assert.match(block, /whitespace-pre-wrap break-words/);
+  // The body renders as a note through the shared document rules, which keep
+  // the AI's breaks and indents (document-markdown.test.ts pins them).
+  assert.match(block, /remarkPlugins=\{DOCUMENT_REMARK_PLUGINS\} components=\{DOCUMENT_COMPONENTS\}/);
+  assert.match(block, /\{documentMarkdown\(text\)\}/);
 });

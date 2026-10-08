@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import type { ExtraProps } from 'react-markdown';
+import ReactMarkdown, { type ExtraProps } from 'react-markdown';
 import { Check, ChevronsDownUp, ChevronsUpDown, Copy, Download, FileText, Loader2, Maximize2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -12,6 +12,9 @@ import { useDocumentExport } from './document-export';
 import type { DocumentExportTarget } from './export-target';
 import { downloadDocx } from './download-docx';
 import { documentTitle, isLongDocument } from './document-view';
+import { DOCUMENT_COMPONENTS, DOCUMENT_REMARK_PLUGINS, documentMarkdown } from './document-markdown';
+import '@/v2/features/notes/reader/note-document.css';
+import './document-block.css';
 import { fenceKind, fenceLanguage } from './fence-kind';
 
 type HastNode = NonNullable<ExtraProps['node']>;
@@ -31,9 +34,10 @@ function textOf(node: HastNode | HastChild): string {
  * look exactly as before (fence-kind.ts holds the rule and the prose-vs-code
  * test).
  *
- * The document block reads like the answer around it: the chat's font, lines
- * that wrap on a phone, and the AI's line breaks and indents kept
- * (`whitespace-pre-wrap`) for form headings and signature lines. Its header
+ * The document block reads like a note (Stay, 8 October 2026): its markdown
+ * renders with the notes' reading styles (headings, bold, lists), while a form
+ * with no markdown keeps every line, indent and signature line as typed
+ * (document-markdown.ts holds the rules the Word export shares). Its header
  * carries the document's first line as a title and icon buttons (Fold, Copy,
  * Download as Word, Maximize; labels on hover). Download asks the API for
  * this block of the SAVED answer (document-export.tsx says when a block can);
@@ -83,7 +87,7 @@ function DocumentBlock({ text }: { text: string }) {
       </figcaption>
 
       <div className={cn('relative', folded && 'max-h-80 overflow-hidden')}>
-        <div className="whitespace-pre-wrap break-words px-5 py-4 text-sm leading-relaxed">{text}</div>
+        <DocumentBody text={text} className="px-5 py-4" />
         {folded ? (
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-center bg-gradient-to-t from-card via-card/90 to-transparent pb-3 pt-16">
             <button
@@ -126,13 +130,31 @@ function DocumentBlock({ text }: { text: string }) {
             </IconAction>
           </div>
           <div ref={readerRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none">
-            <div className="mx-auto max-w-2xl whitespace-pre-wrap break-words px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 text-base leading-relaxed sm:px-6 sm:pb-6">
-              {text}
-            </div>
+            <DocumentBody
+              text={text}
+              reader
+              className="px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-6 sm:pb-6"
+            />
           </div>
         </DialogContent>
       </Dialog>
     </figure>
+  );
+}
+
+/**
+ * The document's text, rendered as a note body. In the answer it is set at the
+ * chat's size; in the reader (`reader`) at the notes' own size and measure.
+ */
+function DocumentBody({ text, reader = false, className }: { text: string; reader?: boolean; className?: string }) {
+  return (
+    <div className={cn('v2-note-doc v2-doc-block', reader && 'v2-doc-reader', className)}>
+      <div className="v2-note-body">
+        <ReactMarkdown remarkPlugins={DOCUMENT_REMARK_PLUGINS} components={DOCUMENT_COMPONENTS}>
+          {documentMarkdown(text)}
+        </ReactMarkdown>
+      </div>
+    </div>
   );
 }
 

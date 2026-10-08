@@ -1,0 +1,34 @@
+/**
+ * The document block reads like a note (Stay, 8 October 2026): the body uses
+ * the notes' reading styles (`.v2-note-doc .v2-note-body`, note-document.css),
+ * and this file only fits them to a chat answer. In the answer the type comes
+ * down to sit with the chat's text and the measure follows the block; the
+ * full-screen reader (`.v2-doc-reader`) keeps the notes' own size.
+ */
+
+.v2-doc-block .v2-note-body {
+  max-width: none;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+@media (min-width: 768px) {
+  .v2-doc-block .v2-note-body {
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+}
+
+.v2-doc-block.v2-doc-reader .v2-note-body {
+  max-width: var(--doc-measure);
+  margin-inline: auto;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+@media (min-width: 768px) {
+  .v2-doc-block.v2-doc-reader .v2-note-body {
+    font-size: 1.125rem;
+    line-height: 1.8;
+  }
+}

@@ -7,10 +7,20 @@
 export const FOLD_AFTER_LINES = 16;
 export const FOLD_AFTER_CHARS = 1400;
 
-/** The header's title: the document's first non-empty line, collapsed spaces. '' when there is none. */
+/**
+ * The header's title: the document's first non-empty line, collapsed spaces,
+ * without the markdown marks that line may carry (a heading's `#`, `**bold**`,
+ * `*italic*`, backticks). Underscores stay: a form uses them as blanks.
+ * '' when there is none.
+ */
 export function documentTitle(text: string): string {
   const first = text.split('\n').find((line) => line.trim() !== '') ?? '';
-  return first.replace(/\s+/g, ' ').trim();
+  return first
+    .replace(/^\s{0,3}#{1,6}\s+/, '')
+    .replace(/(\*\*|\*)(\S(?:.*?\S)?)\1/g, '$2')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Whether the document is long enough to open folded. A short one shows in full, with no fold control. */
