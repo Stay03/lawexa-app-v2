@@ -108,11 +108,6 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
       router.push(href);
       return;
     }
-    // The route's request starts at the tap, not after the painted frame: on a
-    // cold page the frame-then-task wait sat behind the page's own startup work
-    // and started the request 156 ms late (trace, 8 October 2026). Prefetching
-    // only queues a request, so the frame below still paints first.
-    router.prefetch(href);
     const box = region.getBoundingClientRect();
     flushSync(() => {
       // Left over from the last navigation; reset here so the links do not

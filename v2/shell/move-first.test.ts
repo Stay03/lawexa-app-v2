@@ -46,10 +46,11 @@ test('chat rows move first with the conversation frame, under the v2 provider', 
   assert.match(moveFirst, /conversation: ConversationFrame,/);
 });
 
-test('the route request starts at the tap, before the frame is drawn', () => {
-  const prefetch = moveFirst.indexOf('router.prefetch(href);');
-  const flush = moveFirst.indexOf('flushSync(() => {');
-  assert.ok(prefetch > 0 && prefetch < flush, 'prefetch before flushSync');
+test('no prefetch call in the click: Next queues it for a later task, so it starts nothing at the tap', () => {
+  // Measured 8 October 2026: with router.prefetch(href) in the click the route
+  // request still started at 232 ms on a cold tap. Code must not claim a head
+  // start it does not give.
+  assert.doesNotMatch(moveFirst, /router\.prefetch\(/);
 });
 
 test('links stop prefetching only after the paint, and start again when the layer goes', () => {
