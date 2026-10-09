@@ -43,7 +43,7 @@ test('the real screen does not slide in again after the layer made the move', ()
 test('chat rows move first with the conversation frame, under the v2 provider', () => {
   assert.match(row, /<MoveFirstLink\s+href=\{`\/c\/\$\{id\}`\}\s+kind="conversation"/);
   assert.match(layout, /<MoveFirstProvider>/);
-  assert.match(moveFirst, /conversation: ConversationFrame,/);
+  assert.match(moveFirst, /conversation: ConversationMoveFrame,/);
 });
 
 test('no prefetch call in the click: Next queues it for a later task, so it starts nothing at the tap', () => {
@@ -158,4 +158,18 @@ test('the back entrance slides in opaque: its keyframes move, they never fade', 
   assert.ok(body.includes('@keyframes v2-route-enter-back-b'), 'both parities in the slice');
   assert.equal((body.match(/transform: translate3d\(-1rem, 0, 0\)/g) ?? []).length, 2);
   assert.doesNotMatch(body, /opacity/);
+});
+
+test('the conversation frame counts as a skeleton on screen, so the screen draws its own in the same commit', () => {
+  // Film, 9 October 2026: after the layer went, the region under the chat's
+  // bar was page colour for 150-200 ms while the screen held its skeleton
+  // (skeleton-hold.ts). The screen reads the mark in its first render, while
+  // the layer is still mounted; the layer leaves in the commit that mounts it.
+  assert.match(moveFirst, /import \{ RouteSkeletonMark \} from '@\/v2\/features\/conversations\/conversation\/route-skeleton-mark';/);
+  assert.match(moveFirst, /function ConversationMoveFrame\(\) \{\s*return \(\s*<>\s*<RouteSkeletonMark \/>\s*<ConversationFrame \/>\s*<\/>\s*\);\s*\}/);
+  assert.match(moveFirst, /conversation: ConversationMoveFrame,/);
+  // Kind-specific: only the conversation screen reads the counter.
+  const pageFrame = moveFirst.slice(moveFirst.indexOf('function PageFrame()'), moveFirst.indexOf('function ConversationMoveFrame()'));
+  assert.doesNotMatch(pageFrame, /RouteSkeletonMark/);
+  assert.doesNotMatch(moveFirst.slice(moveFirst.indexOf('function PendingScreen(')), /RouteSkeletonMark/);
 });

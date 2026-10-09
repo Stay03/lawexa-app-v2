@@ -15,6 +15,7 @@ import {
   type ReactNode,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { ConversationFrame } from '@/v2/features/conversations/conversation/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { clearHeaderContext, setHeaderContext, type HeaderContext } from './header-context';
@@ -64,8 +65,24 @@ function PageFrame() {
   );
 }
 
+/**
+ * The conversation frame also counts as a conversation skeleton on screen
+ * (route-skeleton-state.ts), so the screen that commits under it draws its own
+ * skeleton in that same commit instead of holding it for SKELETON_HOLD_MS: the
+ * region under the bar was page colour for 150-200 ms after the layer went
+ * (film, 9 October 2026). The mark is the one loading.tsx renders.
+ */
+function ConversationMoveFrame() {
+  return (
+    <>
+      <RouteSkeletonMark />
+      <ConversationFrame />
+    </>
+  );
+}
+
 const MOVE_FIRST_FRAMES = {
-  conversation: ConversationFrame,
+  conversation: ConversationMoveFrame,
   page: PageFrame,
 } satisfies Record<string, MoveFirstFrame>;
 

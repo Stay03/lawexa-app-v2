@@ -1,6 +1,7 @@
 /**
- * Whether the conversation route's own skeleton (`app/v2/c/[conversationId]/
- * loading.tsx`) is on screen. The route skeleton and the screen's skeleton are
+ * Whether a conversation skeleton is on screen: the route's own
+ * (`app/v2/c/[conversationId]/loading.tsx`) or the move-first layer's frame
+ * (`v2/shell/move-first.tsx`). The route skeleton and the screen's skeleton are
  * the same picture, so when the route skeleton is showing, the screen must take
  * over with its skeleton AT ONCE: holding it (skeleton-hold.ts) there would put
  * a blank gap between two identical skeletons. The hold is only for a screen
