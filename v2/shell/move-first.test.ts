@@ -148,3 +148,14 @@ test('a screen the browser already slid in (its own back swipe) does not slide i
   assert.ok(effect > 0 && play > effect, 'checked before the entrance is written');
   assert.match(motion, /if \(browserAnimated\) \{[^}]*browserAnimated = false;[^}]*return;/);
 });
+
+test('the back entrance slides in opaque: its keyframes move, they never fade', () => {
+  // Film, 9 October 2026: the frame at 1,363 ms was empty dark with the list
+  // already in the DOM (1,321 ms); back-a and back-b started at opacity 0.
+  const at = css.indexOf('@keyframes v2-route-enter-back-a');
+  assert.ok(at > 0, 'back keyframes missing');
+  const body = css.slice(at, css.indexOf('html.v2-document-lock .v2-shell__content[data-v2-route-enter]', at));
+  assert.ok(body.includes('@keyframes v2-route-enter-back-b'), 'both parities in the slice');
+  assert.equal((body.match(/transform: translate3d\(-1rem, 0, 0\)/g) ?? []).length, 2);
+  assert.doesNotMatch(body, /opacity/);
+});

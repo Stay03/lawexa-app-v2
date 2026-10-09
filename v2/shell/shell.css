@@ -901,7 +901,8 @@ html.v2-document-lock body {
    and nothing else is. There is deliberately no `animation: none` override to
    keep in step with anything.
 
-   TRANSFORM AND OPACITY ONLY. Both are compositor properties: no reflow, no
+   TRANSFORM AND OPACITY ONLY (the back entrance uses transform alone, see its
+   keyframes). Both are compositor properties: no reflow, no
    layout shift, no effect on `scrollTop`, and the header and dock rows do not
    move because they are separate grid items. `.v2-shell` is `overflow: hidden`,
    so the translated region is clipped by the shell and cannot produce a
@@ -935,15 +936,18 @@ html.v2-document-lock body {
       transform: translate3d(1rem, 0, 0);
     }
   }
+  /* BACK SLIDES ONLY, OPAQUE FROM THE FIRST FRAME. With a fade from 0 the
+     first frames of a back were an empty region over the page colour although
+     the screen was already in the DOM (film, 9 October 2026: empty at
+     1,363 ms, list rows present at 1,321 ms). The 1rem the slide uncovers on
+     the right is the page background, as under the move-first layer. */
   @keyframes v2-route-enter-back-a {
     from {
-      opacity: 0;
       transform: translate3d(-1rem, 0, 0);
     }
   }
   @keyframes v2-route-enter-back-b {
     from {
-      opacity: 0;
       transform: translate3d(-1rem, 0, 0);
     }
   }

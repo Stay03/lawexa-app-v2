@@ -100,8 +100,9 @@ import { V2_SHELL_CONTENT_ID } from './shell-content';
  * ── WHY THE ENTRANCE IS A LAYOUT EFFECT ────────────────────────────────────
  * `useEffect` runs AFTER the browser has painted. Writing the attribute there
  * would let the new screen paint once at its final position, and only then
- * throw it back to transparent and 1rem off: an entrance that begins with the
- * flash it exists to remove. A layout effect runs after the DOM mutation and
+ * throw it back 1rem off (and, going forward, to transparent): an entrance that
+ * begins with the flash it exists to remove. The back entrance no longer fades
+ * (shell.css): fading from 0 made its first frames an empty region. A layout effect runs after the DOM mutation and
  * before that paint, so the first frame the reader ever sees is the animation's
  * first frame. The local isomorphic wrapper is the same one `ChannelComposer`,
  * `ChannelFeed` and `MessageList` each keep, for the same reason: React warns
