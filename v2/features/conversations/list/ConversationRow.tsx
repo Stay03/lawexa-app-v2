@@ -117,6 +117,7 @@ export function ConversationRow({
           kind="conversation"
           title={cleanTitle}
           header={{ title: cleanTitle, confidential: Boolean(is_confidential) }}
+          headerOwner={id}
           aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}`}
           className={cn(
             'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60',

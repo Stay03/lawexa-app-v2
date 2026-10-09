@@ -3,6 +3,8 @@ import { ChevronRight, type LucideIcon } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import type { HeaderContext } from '@/v2/shell/header-context';
+import { MoveFirstLink, type MoveFirstKind } from '@/v2/shell/move-first';
 
 /**
  * =============================================================================
@@ -115,6 +117,7 @@ export function HomeSectionRow({
   secondary,
   meta,
   unread = false,
+  move,
 }: {
   href: string;
   icon: LucideIcon;
@@ -124,16 +127,16 @@ export function HomeSectionRow({
   secondary?: React.ReactNode;
   meta?: string | null;
   unread?: boolean;
+  /** Set for rows whose destination has a move-first frame (move-first.tsx): the
+   *  tap paints that frame before any route work. Other rows stay plain links. */
+  move?: { kind: MoveFirstKind; header: HeaderContext; owner: string };
 }) {
-  return (
-    <li>
-      <Link
-        href={href}
-        className={cn(
-          'v2-interactive group flex min-h-11 items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60',
-          FOCUS_RING,
-        )}
-      >
+  const className = cn(
+    'v2-interactive group flex min-h-11 items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60',
+    FOCUS_RING,
+  );
+  const content = (
+    <>
         <Icon
           aria-hidden
           className="size-4 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-foreground"
@@ -165,7 +168,26 @@ export function HomeSectionRow({
             {meta}
           </span>
         ) : null}
-      </Link>
+    </>
+  );
+  return (
+    <li>
+      {move ? (
+        <MoveFirstLink
+          href={href}
+          kind={move.kind}
+          title={title}
+          header={move.header}
+          headerOwner={move.owner}
+          className={className}
+        >
+          {content}
+        </MoveFirstLink>
+      ) : (
+        <Link href={href} className={className}>
+          {content}
+        </Link>
+      )}
     </li>
   );
 }

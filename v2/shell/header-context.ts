@@ -50,8 +50,23 @@ function getServerSnapshot(): HeaderContext {
   return EMPTY;
 }
 
-/** Publish the active route's header context. Idempotent — equal values are a no-op. */
-export function setHeaderContext(next: HeaderContext): void {
+/**
+ * Who published the current context, when the publisher named itself (a
+ * conversation id). A move-first tap publishes the destination's title while
+ * the screen it came from is still mounted, and that screen then unmounts when
+ * the destination commits: an owned clear lets the old screen's cleanup leave
+ * the new title alone. Unnamed publishers keep the old rule (their clear always
+ * clears).
+ */
+let owner: string | null = null;
+
+/**
+ * Publish the active route's header context. Idempotent — equal values are a
+ * no-op for subscribers. `publisher` names who owns it from now on, even when
+ * the value is unchanged (a chat taking over the title its tap published).
+ */
+export function setHeaderContext(next: HeaderContext, publisher?: string): void {
+  owner = publisher ?? null;
   if (next.title === context.title && next.confidential === context.confidential) {
     return;
   }
@@ -60,11 +75,30 @@ export function setHeaderContext(next: HeaderContext): void {
   emit();
 }
 
-/** Reset to empty — call from the publisher's unmount cleanup. */
-export function clearHeaderContext(): void {
+/**
+ * Reset to empty — call from the publisher's unmount cleanup. With
+ * `publisher`, only when it still owns the context.
+ */
+export function clearHeaderContext(publisher?: string): void {
+  if (publisher !== undefined && publisher !== owner) return;
+  owner = null;
   if (context === EMPTY) return;
   context = EMPTY;
   emit();
+}
+
+/** The current context and its owner, to put back after a cancelled move. */
+export interface HeaderSnapshot {
+  context: HeaderContext;
+  owner: string | null;
+}
+
+export function snapshotHeaderContext(): HeaderSnapshot {
+  return { context, owner };
+}
+
+export function restoreHeaderContext(snapshot: HeaderSnapshot): void {
+  setHeaderContext(snapshot.context, snapshot.owner ?? undefined);
 }
 
 /** Subscribe the header to the published route context. */

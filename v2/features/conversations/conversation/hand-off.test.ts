@@ -31,7 +31,7 @@ test('the composer skeleton has the real pill surface, not a muted card', () => 
 });
 
 test('the screen never publishes a null title over the one the tap set', () => {
-  assert.match(controller, /if \(!conversationTitle\) return;\s*setHeaderContext\(\{\s*title: stripPastedTags\(conversationTitle\),/);
+  assert.match(controller, /if \(!conversationTitle\) return;\s*setHeaderContext\(\s*\{\s*title: stripPastedTags\(conversationTitle\),/);
 });
 
 test('list rows replay their entrance only on a first load', () => {

@@ -567,11 +567,14 @@ export function useConversationController(
     // resolves, publishing null would wipe that and bring the shimmer back; a
     // direct load starts from the empty store, so it still shows the shimmer.
     if (!conversationTitle) return;
-    setHeaderContext({
-      title: stripPastedTags(conversationTitle),
-      confidential: isConfidential,
-    });
-  }, [conversationTitle, isConfidential, embedded]);
+    setHeaderContext(
+      {
+        title: stripPastedTags(conversationTitle),
+        confidential: isConfidential,
+      },
+      conversationId,
+    );
+  }, [conversationTitle, isConfidential, embedded, conversationId]);
 
   // ── Title upgrade → sidebar, no list refetch (wave-4 acceptance c). ──
   // When this conversation's title resolves or upgrades (the async AI-name generation,
@@ -594,10 +597,14 @@ export function useConversationController(
   // republishes without a transient empty flash), so the next route never inherits
   // this conversation's context. Embedded, nothing was published — and clearing
   // would wipe the HOST's title the moment the panel closes.
+  //
+  // Owned: a tap from this chat to another (sidebar, drawer) has already
+  // published the other chat's title by the time this one unmounts, and this
+  // cleanup must not wipe it.
   useEffect(() => {
     if (embedded) return;
-    return () => clearHeaderContext();
-  }, [embedded]);
+    return () => clearHeaderContext(conversationId);
+  }, [embedded, conversationId]);
 
   // ── Title arrival for the fresh-create handoff (mirrors v1 first-hand). ──
   // A brand-new conversation reaches the screen via the streaming handoff with NO

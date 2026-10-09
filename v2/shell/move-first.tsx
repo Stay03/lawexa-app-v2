@@ -18,7 +18,14 @@ import { flushSync } from 'react-dom';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { ConversationFrame } from '@/v2/features/conversations/conversation/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { clearHeaderContext, setHeaderContext, type HeaderContext } from './header-context';
+import {
+  clearHeaderContext,
+  restoreHeaderContext,
+  setHeaderContext,
+  snapshotHeaderContext,
+  type HeaderContext,
+  type HeaderSnapshot,
+} from './header-context';
 import { skipRouteEntranceFor } from './route-motion';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
 import { isTopLevelRoute } from './top-level-route';
@@ -98,9 +105,18 @@ interface PendingMove {
    *  the new screen moves it to `navigating`, so the layer's last frame is the
    *  frame before the new screen's first. */
   phase: 'painting' | 'navigating';
+  /** The header as it was before the tap published the destination's, to put
+   *  back when the move is cancelled by a history move. */
+  restore?: HeaderSnapshot;
 }
 
-type Navigate = (href: string, kind: MoveFirstKind, title?: string, header?: HeaderContext) => void;
+type Navigate = (
+  href: string,
+  kind: MoveFirstKind,
+  title?: string,
+  header?: HeaderContext,
+  headerOwner?: string,
+) => void;
 
 const MoveFirstContext = createContext<Navigate | null>(null);
 
@@ -199,12 +215,18 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   const linksQuiet = quiet && visible;
 
   /** Commit the destination's frame now, in this task, before any route work. */
-  const raise = (href: string, kind: MoveFirstKind, title: string | undefined, region: HTMLElement) => {
+  const raise = (
+    href: string,
+    kind: MoveFirstKind,
+    title: string | undefined,
+    region: HTMLElement,
+    restore?: HeaderSnapshot,
+  ) => {
     flushSync(() => {
       // Left over from the last navigation; reset here so the links do not
       // change in this commit (they go quiet after the paint, below).
       setQuiet(false);
-      setPending({ href, kind, title, rect: layerRect(region), phase: 'painting' });
+      setPending({ href, kind, title, rect: layerRect(region), phase: 'painting', restore });
     });
     // The layer already made the move; the real screen must not slide in again.
     skipRouteEntranceFor(pathOf(href));
@@ -248,11 +270,13 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     const state = event.state as Record<string, unknown> | null;
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!state?.[PENDING_MOVE_KEY] || !region) {
-      // A tap cancelled while its layer is up: the router never left the list,
-      // so its pathname does not change and the clear below does not run. The
-      // title the tap published goes here (taps come from top-level screens,
-      // which publish none).
-      if (visible) clearHeaderContext();
+      // A tap cancelled while its layer is up: the router never left the
+      // origin, so the origin does not publish again and the pathname clear
+      // below does not run. Its header goes back as it was before the tap.
+      if (visible) {
+        if (pending?.restore) restoreHeaderContext(pending.restore);
+        else clearHeaderContext();
+      }
       setPending(null);
       return;
     }
@@ -269,7 +293,7 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('popstate', listener);
   }, []);
 
-  const navigate: Navigate = (href, kind, title, header) => {
+  const navigate: Navigate = (href, kind, title, header, headerOwner) => {
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!region) {
       router.push(href);
@@ -279,10 +303,11 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     const tap = tapRef.current;
     // The destination's header is published in the tap, so its bar shows the
     // title from its first frame instead of a shimmer that cross-fades later.
-    // A top-level screen (where the tap comes from) shows no centre title, so
-    // nothing changes on it while the layer is up.
-    if (header) setHeaderContext(header);
-    raise(href, kind, title, region);
+    // The origin's header is kept first (a second tap inside the window keeps
+    // the first tap's copy), for a back move that cancels the tap.
+    const restore = visible && pending?.restore ? pending.restore : snapshotHeaderContext();
+    if (header) setHeaderContext(header, headerOwner);
+    raise(href, kind, title, region, restore);
     pushPendingEntry(href, kind);
     navigateAfterPaint(href, tap);
   };
@@ -327,10 +352,21 @@ type MoveFirstLinkProps = Omit<ComponentProps<typeof Link>, 'href'> & {
   title?: string;
   /** The destination's header context (title, confidential), published at the tap. */
   header?: HeaderContext;
+  /** Who owns that header once the destination mounts (its conversation id). */
+  headerOwner?: string;
 };
 
 /** A `next/link` that moves first. Outside the v2 provider it is a plain Link. */
-export function MoveFirstLink({ href, kind = 'page', title, header, onNavigate, prefetch, ...props }: MoveFirstLinkProps) {
+export function MoveFirstLink({
+  href,
+  kind = 'page',
+  title,
+  header,
+  headerOwner,
+  onNavigate,
+  prefetch,
+  ...props
+}: MoveFirstLinkProps) {
   const navigate = useContext(MoveFirstContext);
   const quiet = useContext(MoveFirstQuietContext);
   const pathname = usePathname();
@@ -343,7 +379,7 @@ export function MoveFirstLink({ href, kind = 'page', title, header, onNavigate, 
         onNavigate?.(event);
         if (!navigate || pathOf(href) === pathname) return;
         event.preventDefault();
-        navigate(href, kind, title, header);
+        navigate(href, kind, title, header, headerOwner);
       }}
     />
   );

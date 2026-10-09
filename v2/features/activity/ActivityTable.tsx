@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { ClipboardPaste, Paperclip, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -11,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { MoveFirstLink } from '@/v2/shell/move-first';
 import { formatCount } from '@/v2/shell/pager-model';
 import type { ActivityRow, AttachmentMark } from './model';
 
@@ -64,6 +64,21 @@ const MARK_ICON: Record<AttachmentMark['kind'], LucideIcon> = {
  * Rows fade in on mount only (`motion-safe`), keyed by message id: a new page
  * fades its rows in, a refetch that keeps a row does not replay it.
  */
+/**
+ * A row's chat link moves first (move-first.tsx): the chat's frame paints at
+ * the tap. The activity feed carries no confidential flag; a confidential chat
+ * keeps no server messages, so it does not appear here.
+ */
+function chatMove(row: ActivityRow) {
+  return {
+    href: `/c/${row.conversationId}`,
+    kind: 'conversation' as const,
+    title: row.chatTitle,
+    header: { title: row.chatTitle || null, confidential: false },
+    headerOwner: row.conversationId,
+  };
+}
+
 export function ActivityTable({ rows, firstNumber }: { rows: readonly ActivityRow[]; firstNumber: number }) {
   return (
     <>
@@ -90,23 +105,23 @@ export function ActivityTable({ rows, firstNumber }: { rows: readonly ActivityRo
                 {formatCount(firstNumber + index)}
               </TableCell>
               <TableCell className="py-0">
-                <Link
-                  href={`/c/${row.conversationId}`}
+                <MoveFirstLink
+                  {...chatMove(row)}
                   className={cn('flex min-w-0 items-center gap-2 rounded-md', FOCUS_RING)}
                 >
                   <QuestionLine row={row} />
-                </Link>
+                </MoveFirstLink>
               </TableCell>
               <TableCell className="py-0">
-                <Link
-                  href={`/c/${row.conversationId}`}
+                <MoveFirstLink
+                  {...chatMove(row)}
                   className={cn(
                     'block truncate rounded-md text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline',
                     FOCUS_RING,
                   )}
                 >
                   {row.chatTitle}
-                </Link>
+                </MoveFirstLink>
               </TableCell>
               <TableCell className="py-0 text-right">
                 <AskedAt row={row} />
@@ -119,8 +134,8 @@ export function ActivityTable({ rows, firstNumber }: { rows: readonly ActivityRo
       <ul className="flex flex-col divide-y divide-border/70 border-y border-border/70 md:hidden">
         {rows.map((row, index) => (
           <li key={row.id} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-            <Link
-              href={`/c/${row.conversationId}`}
+            <MoveFirstLink
+              {...chatMove(row)}
               className={cn(
                 STACKED_ROW_HEIGHT,
                 'v2-interactive flex flex-col justify-center gap-1 px-1 transition-colors active:bg-secondary/60',
@@ -138,7 +153,7 @@ export function ActivityTable({ rows, firstNumber }: { rows: readonly ActivityRo
                 <span aria-hidden className="shrink-0">&middot;</span>
                 <AskedAt row={row} className="shrink-0" />
               </span>
-            </Link>
+            </MoveFirstLink>
           </li>
         ))}
       </ul>

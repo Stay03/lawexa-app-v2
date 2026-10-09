@@ -41,6 +41,7 @@ import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
 import { v2NewChat, visibleNavItems, type V2NavItem } from './nav.config';
+import { MoveFirstLink } from './move-first';
 
 /**
  * V2Sidebar — the desktop navigation rail, built on the shadcn sidebar
@@ -313,10 +314,16 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                           active && ACTIVE_ROW,
                         )}
                       >
-                        <Link href={`/c/${conversation.id}`}>
+                        <MoveFirstLink
+                          href={`/c/${conversation.id}`}
+                          kind="conversation"
+                          title={title}
+                          header={{ title: title || null, confidential: Boolean(conversation.is_confidential) }}
+                          headerOwner={conversation.id}
+                        >
                           <MessageSquare />
                           <span className="truncate">{title}</span>
-                        </Link>
+                        </MoveFirstLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );

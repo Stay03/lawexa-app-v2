@@ -34,6 +34,7 @@ import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
 import { v2NewChat, visibleNavItems, type V2NavItem } from './nav.config';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
+import { MoveFirstLink } from './move-first';
 
 /**
  * V2Drawer — the mobile navigation drawer (Nav D, locked). ChatGPT-style
@@ -315,9 +316,13 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                     const title = stripPastedTags(conversation.title);
                     const active = isActive(`/c/${conversation.id}`);
                     return (
-                      <Link
+                      <MoveFirstLink
                         key={conversation.id}
                         href={`/c/${conversation.id}`}
+                        kind="conversation"
+                        title={title}
+                        header={{ title: title || null, confidential: Boolean(conversation.is_confidential) }}
+                        headerOwner={conversation.id}
                         onClick={close}
                         className={cn(
                           ROW_BASE,
@@ -329,7 +334,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                       >
                         <MessageSquare className="size-4 shrink-0" />
                         <span className="truncate">{title}</span>
-                      </Link>
+                      </MoveFirstLink>
                     );
                   })
                 )}

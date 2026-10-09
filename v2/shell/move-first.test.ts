@@ -30,7 +30,7 @@ test('the layer shows while painting or while the navigation is pending, never a
 });
 
 test('a plain click is taken over; the same page and no provider keep the default', () => {
-  assert.match(moveFirst, /if \(!navigate \|\| pathOf\(href\) === pathname\) return;\s*event\.preventDefault\(\);\s*navigate\(href, kind, title, header\);/);
+  assert.match(moveFirst, /if \(!navigate \|\| pathOf\(href\) === pathname\) return;\s*event\.preventDefault\(\);\s*navigate\(href, kind, title, header, headerOwner\);/);
 });
 
 test('the real screen does not slide in again after the layer made the move', () => {
@@ -79,8 +79,8 @@ test('the layer covers the region below the bar, where the destination draws', (
 
 test('the destination header is published in the tap, before the frame', () => {
   const tapBody = moveFirst.slice(moveFirst.indexOf('const navigate: Navigate = '));
-  const header = tapBody.indexOf('if (header) setHeaderContext(header);');
-  const raise = tapBody.indexOf('raise(href, kind, title, region);');
+  const header = tapBody.indexOf('if (header) setHeaderContext(header, headerOwner);');
+  const raise = tapBody.indexOf('raise(href, kind, title, region, restore);');
   assert.ok(header > 0 && raise > header);
   assert.match(row, /header=\{\{ title: cleanTitle, confidential: Boolean\(is_confidential\) \}\}/);
 });
@@ -88,7 +88,7 @@ test('the destination header is published in the tap, before the frame', () => {
 test('a back move drops a pending layer, and a stale tap never pushes', () => {
   assert.match(moveFirst, /const listener = \(event: PopStateEvent\) => onPopState\(event\);\s*window\.addEventListener\('popstate', listener\);/);
   assert.match(moveFirst, /const onPopState = useEffectEvent\(\(event: PopStateEvent\) => \{\s*tapRef\.current \+= 1;\s*const tap = tapRef\.current;/);
-  assert.match(moveFirst, /if \(!state\?\.\[PENDING_MOVE_KEY\] \|\| !region\) \{[^}]*if \(visible\) clearHeaderContext\(\);\s*setPending\(null\);\s*return;\s*\}/);
+  assert.match(moveFirst, /if \(visible\) \{\s*if \(pending\?\.restore\) restoreHeaderContext\(pending\.restore\);\s*else clearHeaderContext\(\);\s*\}\s*setPending\(null\);\s*return;/);
   assert.match(moveFirst, /if \(tapRef\.current !== tap\) return;/);
 });
 
@@ -96,7 +96,7 @@ test('the tap adds the history entry, so a back gesture in the wait returns to t
   // Film, 9 October 2026: with the list as the first page opened, a back
   // 350 ms after the tap left the app. Next adds the entry only at commit.
   const tapBody = moveFirst.slice(moveFirst.indexOf('const navigate: Navigate = '));
-  const raise = tapBody.indexOf('raise(href, kind, title, region);');
+  const raise = tapBody.indexOf('raise(href, kind, title, region, restore);');
   const entry = tapBody.indexOf('pushPendingEntry(href, kind);');
   const later = tapBody.indexOf('navigateAfterPaint(href, tap);');
   assert.ok(raise > 0 && entry > raise && later > entry, 'entry pushed in the click, after the frame commits');

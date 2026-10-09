@@ -145,6 +145,16 @@ export function ConversationsSection() {
               icon={MessageSquare}
               title={stripPastedTags(conversation.title) || 'Untitled conversation'}
               meta={formatRelativeTime(conversation.updated_at, now)}
+              move={{
+                kind: 'conversation',
+                // The real title only: the chat publishes nothing until its own
+                // title is known, so a placeholder would stay in the bar.
+                header: {
+                  title: stripPastedTags(conversation.title) || null,
+                  confidential: Boolean(conversation.is_confidential),
+                },
+                owner: conversation.id,
+              }}
             />
           ))}
         </HomeSectionList>
