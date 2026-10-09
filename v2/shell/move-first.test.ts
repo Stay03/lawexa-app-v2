@@ -173,3 +173,10 @@ test('the conversation frame counts as a skeleton on screen, so the screen draws
   assert.doesNotMatch(pageFrame, /RouteSkeletonMark/);
   assert.doesNotMatch(moveFirst.slice(moveFirst.indexOf('function PendingScreen(')), /RouteSkeletonMark/);
 });
+
+test('a closed sheet holds its exit end state, so the drawer does not snap back open', () => {
+  // Fable trace and film, 9 October 2026: the sheet's exit ended at fill-mode
+  // none, and the drawer showed fully open again until the chat's route
+  // committed (up to about 1 s on a slow chat, live links included).
+  assert.match(css, /html\.v2-document-lock \[data-slot='sheet-overlay'\]\[data-state='closed'\],\s*html\.v2-document-lock \[data-slot='sheet-content'\]\[data-state='closed'\] \{\s*animation-fill-mode: forwards;\s*\}/);
+});

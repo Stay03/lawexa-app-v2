@@ -985,3 +985,20 @@ html.v2-document-lock body {
     animation: v2-move-first-enter 200ms cubic-bezier(0.2, 0, 0, 1);
   }
 }
+
+/* --------------------------------------------------------------------------
+   A CLOSED SHEET STAYS CLOSED UNTIL IT UNMOUNTS.
+   A sheet's exit animation ends at opacity 0 and off-screen, but tw-animate's
+   exit runs with fill-mode none, so the sheet falls back to its open style
+   the moment the animation ends. Radix removes it on `animationend`, and React
+   gives that removal default priority, which does not interrupt a transition
+   render in progress. Tapping a chat in the drawer starts exactly such a
+   render (the chat's route), so the drawer slid out, snapped back fully open
+   and stayed there until the chat committed, about 0.7 s (Fable trace and
+   film, 9 October 2026). Holding the end state keeps it gone in that window.
+   v2 only; the shared sheet component (components/ui/sheet.tsx) is untouched.
+   -------------------------------------------------------------------------- */
+html.v2-document-lock [data-slot='sheet-overlay'][data-state='closed'],
+html.v2-document-lock [data-slot='sheet-content'][data-state='closed'] {
+  animation-fill-mode: forwards;
+}
