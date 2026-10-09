@@ -16,7 +16,7 @@ import {
 import { flushSync } from 'react-dom';
 import { ConversationFrame } from '@/v2/features/conversations/conversation/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { setHeaderContext, type HeaderContext } from './header-context';
+import { clearHeaderContext, setHeaderContext, type HeaderContext } from './header-context';
 import { skipRouteEntranceFor } from './route-motion';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
 
@@ -109,18 +109,41 @@ const PENDING_MOVE_KEY = '__v2PendingMove';
  * the layer already showing the chat, went to the page before the list, and
  * left the app when the list was the first page opened (film, 9 October 2026).
  *
- * The entry carries the list's own state with `__NA`, so Next's patched
+ * The entry carries `__NA` and the list's router tree, so Next's patched
  * pushState passes it through without touching the router, and a back move
  * pops to the list's entry, where Next restores the list and drops the pending
  * navigation. The navigation then runs as a replace, and Next's commit writes
  * the chat's state onto this entry. A second tap inside the window replaces
  * the first tap's entry instead of stacking another.
+ *
+ * Only Next's two fields are copied. The list's scroll key (scroll-memory.tsx)
+ * must not travel: a reload or a forward onto this entry keeps custom state,
+ * and the chat would then adopt the list's key and its offset.
  */
 function pushPendingEntry(href: string): void {
   const state = (window.history.state ?? {}) as Record<string, unknown>;
-  const entry = { ...state, __NA: true, [PENDING_MOVE_KEY]: true };
+  const entry = {
+    __NA: true,
+    __PRIVATE_NEXTJS_INTERNALS_TREE: state.__PRIVATE_NEXTJS_INTERNALS_TREE,
+    [PENDING_MOVE_KEY]: true,
+  };
   if (state[PENDING_MOVE_KEY]) window.history.replaceState(entry, '', href);
   else window.history.pushState(entry, '', href);
+}
+
+/**
+ * A reload while a tap's entry was current loads the chat cold, and Next's
+ * first history write keeps custom state, so the marker would stay on the
+ * chat's entry and send every later forward onto it back through a re-fetch.
+ * Removed once, when the provider mounts. `__NA` stays, so Next's patched
+ * replaceState passes the write through.
+ */
+function dropLeftoverMarker(): void {
+  const state = window.history.state as Record<string, unknown> | null;
+  if (!state?.[PENDING_MOVE_KEY]) return;
+  const rest = { ...state };
+  delete rest[PENDING_MOVE_KEY];
+  window.history.replaceState(rest, '', window.location.href);
 }
 
 export function MoveFirstProvider({ children }: { children: ReactNode }) {
@@ -129,22 +152,30 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   const [quiet, setQuiet] = useState(false);
   const [navigating, startNavigation] = useTransition();
 
-  // Which tap a delayed router.push belongs to: a newer tap or a history move
-  // bumps it, and the push only runs if it is still the latest.
+  // Which tap a delayed router.replace belongs to: a newer tap or a history move
+  // bumps it, and the replace only runs if it is still the latest.
   const tapRef = useRef(0);
   // A history move (the phone's back gesture) while a tap is still pending:
   // Next drops the tap's navigation and restores the list, and the layer must
   // go with it at once, not when the dropped transition settles. A listener's
   // setState, not an effect's.
   useEffect(() => {
+    dropLeftoverMarker();
     const drop = (event: PopStateEvent) => {
       tapRef.current += 1;
+      const tap = tapRef.current;
       setPending(null);
       // Forward onto an entry a tap pushed but whose navigation was dropped by a
       // back move: it still holds the list's tree under the destination's URL,
-      // so Next restores the list there. Ask for the real route instead.
+      // so Next restores the list there. Ask for the real route instead, in a
+      // task: this listener runs before Next's own, and a navigation dispatched
+      // now would be discarded by the RESTORE Next dispatches next
+      // (app-router-instance.js). By the next task the RESTORE has completed.
       if ((event.state as { [PENDING_MOVE_KEY]?: boolean } | null)?.[PENDING_MOVE_KEY]) {
-        router.replace(window.location.pathname + window.location.search);
+        window.setTimeout(() => {
+          if (tapRef.current !== tap) return; // another history move or tap since
+          router.replace(window.location.pathname + window.location.search);
+        }, 0);
       }
     };
     window.addEventListener('popstate', drop);
@@ -207,6 +238,18 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   // Derived, so prefetching comes back by itself when the layer goes, whether
   // the navigation landed, failed or was replaced.
   const linksQuiet = quiet && visible;
+
+  // The tap published the destination's title; only the destination's screen
+  // clears it, when it unmounts. A back move before that screen mounts left the
+  // title in the store for whatever screen came next. So a history move while
+  // the layer is up clears it. Taps come only from top-level screens, which
+  // publish no title, so there is nothing of theirs to restore.
+  useEffect(() => {
+    if (!visible) return;
+    const clear = () => clearHeaderContext();
+    window.addEventListener('popstate', clear);
+    return () => window.removeEventListener('popstate', clear);
+  }, [visible]);
 
   return (
     <MoveFirstContext.Provider value={navigate}>

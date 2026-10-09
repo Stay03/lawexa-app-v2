@@ -86,7 +86,7 @@ test('the destination header is published in the tap, before the frame', () => {
 
 test('a back move drops a pending layer, and a stale tap never pushes', () => {
   assert.match(moveFirst, /window\.addEventListener\('popstate', drop\);/);
-  assert.match(moveFirst, /const drop = \(event: PopStateEvent\) => \{\s*tapRef\.current \+= 1;\s*setPending\(null\);/);
+  assert.match(moveFirst, /const drop = \(event: PopStateEvent\) => \{\s*tapRef\.current \+= 1;\s*const tap = tapRef\.current;\s*setPending\(null\);/);
   assert.match(moveFirst, /if \(tapRef\.current !== tap\) return;/);
 });
 
@@ -97,11 +97,25 @@ test('the tap adds the history entry, so a back gesture in the wait returns to t
   const entry = moveFirst.indexOf('pushPendingEntry(href);', flush);
   const raf = moveFirst.indexOf('requestAnimationFrame(() => {', flush);
   assert.ok(entry > flush && entry < raf, 'entry pushed in the click, after the frame commits');
-  assert.match(moveFirst, /const entry = \{ \.\.\.state, __NA: true, \[PENDING_MOVE_KEY\]: true \};/);
+  // Only Next's two fields: the list's scroll key must not reach the chat's entry.
+  assert.match(moveFirst, /const entry = \{\s*__NA: true,\s*__PRIVATE_NEXTJS_INTERNALS_TREE: state\.__PRIVATE_NEXTJS_INTERNALS_TREE,\s*\[PENDING_MOVE_KEY\]: true,\s*\};/);
+  assert.doesNotMatch(moveFirst, /\{ \.\.\.state, __NA: true/);
   assert.match(moveFirst, /if \(state\[PENDING_MOVE_KEY\]\) window\.history\.replaceState\(entry, '', href\);\s*else window\.history\.pushState\(entry, '', href\);/);
   assert.doesNotMatch(moveFirst.slice(moveFirst.indexOf('startNavigation(() => {')), /router\.push\(href\)/);
 });
 
-test('forward onto a dropped tap entry asks for the real route', () => {
-  assert.match(moveFirst, /\?\.\[PENDING_MOVE_KEY\]\) \{\s*router\.replace\(window\.location\.pathname \+ window\.location\.search\);/);
+test('forward onto a dropped tap entry asks for the real route, after Next has restored', () => {
+  // The listener runs before Next's; a navigation dispatched in it would be
+  // discarded by Next's RESTORE. A task later the RESTORE has completed.
+  assert.match(moveFirst, /\?\.\[PENDING_MOVE_KEY\]\) \{\s*window\.setTimeout\(\(\) => \{\s*if \(tapRef\.current !== tap\) return;[^\n]*\s*router\.replace\(window\.location\.pathname \+ window\.location\.search\);\s*\}, 0\);/);
+  assert.doesNotMatch(moveFirst, /queueMicrotask/);
+});
+
+test('a back move while the layer is up clears the title the tap published', () => {
+  assert.match(moveFirst, /useEffect\(\(\) => \{\s*if \(!visible\) return;\s*const clear = \(\) => clearHeaderContext\(\);\s*window\.addEventListener\('popstate', clear\);\s*return \(\) => window\.removeEventListener\('popstate', clear\);\s*\}, \[visible\]\);/);
+});
+
+test('a reload onto a tap entry does not keep the pending marker', () => {
+  assert.match(moveFirst, /useEffect\(\(\) => \{\s*dropLeftoverMarker\(\);/);
+  assert.match(moveFirst, /delete rest\[PENDING_MOVE_KEY\];\s*window\.history\.replaceState\(rest, '', window\.location\.href\);/);
 });
