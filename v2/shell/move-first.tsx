@@ -6,6 +6,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   useTransition,
@@ -19,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { clearHeaderContext, setHeaderContext, type HeaderContext } from './header-context';
 import { skipRouteEntranceFor } from './route-motion';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
+import { isTopLevelRoute } from './top-level-route';
 
 /**
  * MOVE FIRST: a tap paints the destination's light frame BEFORE any route work
@@ -101,6 +103,21 @@ function pathOf(href: string): string {
 
 /** Marks a history entry a tap pushed whose navigation has not committed yet. */
 const PENDING_MOVE_KEY = '__v2PendingMove';
+/** The frame kind of that tap, so a forward onto the entry draws the same frame. */
+const PENDING_KIND_KEY = '__v2PendingKind';
+
+/**
+ * Where the layer goes: the content region BELOW the bar. On a top-level screen
+ * the region starts under a see-through bar and pads itself down by the bar's
+ * height; the screens a tap goes to have an opaque bar above their region.
+ * Copying the raw rect put the frame 56 px too high, over the bar, and the real
+ * screen then dropped it 56 px (frame strip, 8 October 2026).
+ */
+function layerRect(region: HTMLElement): PendingMove['rect'] {
+  const box = region.getBoundingClientRect();
+  const barInset = parseFloat(getComputedStyle(region).paddingTop) || 0;
+  return { top: box.top + barInset, left: box.left, width: box.width, height: box.height - barInset };
+}
 
 /**
  * Adds the destination's history entry in the tap. Next adds it only when the
@@ -120,12 +137,13 @@ const PENDING_MOVE_KEY = '__v2PendingMove';
  * must not travel: a reload or a forward onto this entry keeps custom state,
  * and the chat would then adopt the list's key and its offset.
  */
-function pushPendingEntry(href: string): void {
+function pushPendingEntry(href: string, kind: MoveFirstKind): void {
   const state = (window.history.state ?? {}) as Record<string, unknown>;
   const entry = {
     __NA: true,
     __PRIVATE_NEXTJS_INTERNALS_TREE: state.__PRIVATE_NEXTJS_INTERNALS_TREE,
     [PENDING_MOVE_KEY]: true,
+    [PENDING_KIND_KEY]: kind,
   };
   if (state[PENDING_MOVE_KEY]) window.history.replaceState(entry, '', href);
   else window.history.pushState(entry, '', href);
@@ -143,6 +161,7 @@ function dropLeftoverMarker(): void {
   if (!state?.[PENDING_MOVE_KEY]) return;
   const rest = { ...state };
   delete rest[PENDING_MOVE_KEY];
+  delete rest[PENDING_KIND_KEY];
   window.history.replaceState(rest, '', window.location.href);
 }
 
@@ -155,71 +174,25 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   // Which tap a delayed router.replace belongs to: a newer tap or a history move
   // bumps it, and the replace only runs if it is still the latest.
   const tapRef = useRef(0);
-  // A history move (the phone's back gesture) while a tap is still pending:
-  // Next drops the tap's navigation and restores the list, and the layer must
-  // go with it at once, not when the dropped transition settles. A listener's
-  // setState, not an effect's.
-  useEffect(() => {
-    dropLeftoverMarker();
-    const drop = (event: PopStateEvent) => {
-      tapRef.current += 1;
-      const tap = tapRef.current;
-      setPending(null);
-      // Forward onto an entry a tap pushed but whose navigation was dropped by a
-      // back move: it still holds the list's tree under the destination's URL,
-      // so Next restores the list there. Ask for the real route instead, in a
-      // task: this listener runs before Next's own, and a navigation dispatched
-      // now would be discarded by the RESTORE Next dispatches next
-      // (app-router-instance.js). By the next task the RESTORE has completed.
-      if ((event.state as { [PENDING_MOVE_KEY]?: boolean } | null)?.[PENDING_MOVE_KEY]) {
-        window.setTimeout(() => {
-          if (tapRef.current !== tap) return; // another history move or tap since
-          router.replace(window.location.pathname + window.location.search);
-        }, 0);
-      }
-    };
-    window.addEventListener('popstate', drop);
-    return () => window.removeEventListener('popstate', drop);
-  }, [router]);
+  const pathname = usePathname();
 
-  const navigate: Navigate = (href, kind, title, header) => {
-    const region = document.getElementById(V2_SHELL_CONTENT_ID);
-    if (!region) {
-      router.push(href);
-      return;
-    }
-    tapRef.current += 1;
-    const tap = tapRef.current;
-    // The destination's header is published in the tap, so its bar shows the
-    // title from its first frame instead of a shimmer that cross-fades later.
-    // A top-level screen (where the tap comes from) shows no centre title, so
-    // nothing changes on it while the layer is up.
-    if (header) setHeaderContext(header);
-    // The layer covers the region BELOW the bar. On a top-level screen the
-    // region starts under a see-through bar and pads itself down by the bar's
-    // height; the screens a tap goes to have an opaque bar above their region.
-    // Copying the raw rect put the frame 56 px too high, over the bar, and the
-    // real screen then dropped it 56 px (frame strip, 8 October 2026).
-    const box = region.getBoundingClientRect();
-    const barInset = parseFloat(getComputedStyle(region).paddingTop) || 0;
+  /** Commit the destination's frame now, in this task, before any route work. */
+  const raise = (href: string, kind: MoveFirstKind, title: string | undefined, region: HTMLElement) => {
     flushSync(() => {
       // Left over from the last navigation; reset here so the links do not
       // change in this commit (they go quiet after the paint, below).
       setQuiet(false);
-      setPending({
-        href,
-        kind,
-        title,
-        rect: { top: box.top + barInset, left: box.left, width: box.width, height: box.height - barInset },
-        phase: 'painting',
-      });
+      setPending({ href, kind, title, rect: layerRect(region), phase: 'painting' });
     });
-    pushPendingEntry(href);
     // The layer already made the move; the real screen must not slide in again.
     skipRouteEntranceFor(pathOf(href));
+  };
+
+  /** Start the navigation once the frame has been painted (a frame, then a task). */
+  const navigateAfterPaint = (href: string, tap: number) => {
     requestAnimationFrame(() => {
       window.setTimeout(() => {
-        if (tapRef.current !== tap) return; // replaced by a newer tap or a back move
+        if (tapRef.current !== tap) return; // replaced by a newer tap or a history move
         // After the paint, not inside the flushSync above: re-rendering every
         // link to stop its prefetching is work the first frame must not wait on.
         setQuiet(true);
@@ -234,22 +207,72 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  // Every history move bumps the tap, so a pending replace from before it never
+  // runs. A back move while a tap is pending: Next drops the tap's navigation
+  // and restores the list, and the layer must go with it at once, not when the
+  // dropped transition settles (a listener's setState, not an effect's).
+  //
+  // A move onto an entry a tap pushed but whose navigation was dropped (forward
+  // after a back): the entry still holds the list's tree under the destination's
+  // URL, so Next would restore the list there and paint a blank region under the
+  // destination's bar (film, 9 October 2026). The frame is raised in this
+  // listener, which runs before Next's own, so the first paint is the frame. The
+  // real route is then asked for after a painted frame and a task: a navigation
+  // dispatched now would be discarded by the RESTORE Next dispatches next
+  // (app-router-instance.js), and by then the RESTORE has completed.
+  const onPopState = useEffectEvent((event: PopStateEvent) => {
+    tapRef.current += 1;
+    const tap = tapRef.current;
+    const state = event.state as Record<string, unknown> | null;
+    const region = document.getElementById(V2_SHELL_CONTENT_ID);
+    if (!state?.[PENDING_MOVE_KEY] || !region) {
+      setPending(null);
+      return;
+    }
+    const kind = state[PENDING_KIND_KEY];
+    const href = window.location.pathname + window.location.search;
+    raise(href, typeof kind === 'string' && kind in MOVE_FIRST_FRAMES ? (kind as MoveFirstKind) : 'page', undefined, region);
+    navigateAfterPaint(href, tap);
+  });
+
+  useEffect(() => {
+    dropLeftoverMarker();
+    const listener = (event: PopStateEvent) => onPopState(event);
+    window.addEventListener('popstate', listener);
+    return () => window.removeEventListener('popstate', listener);
+  }, []);
+
+  const navigate: Navigate = (href, kind, title, header) => {
+    const region = document.getElementById(V2_SHELL_CONTENT_ID);
+    if (!region) {
+      router.push(href);
+      return;
+    }
+    tapRef.current += 1;
+    const tap = tapRef.current;
+    // The destination's header is published in the tap, so its bar shows the
+    // title from its first frame instead of a shimmer that cross-fades later.
+    // A top-level screen (where the tap comes from) shows no centre title, so
+    // nothing changes on it while the layer is up.
+    if (header) setHeaderContext(header);
+    raise(href, kind, title, region);
+    pushPendingEntry(href, kind);
+    navigateAfterPaint(href, tap);
+  };
+
   const visible = pending !== null && (pending.phase === 'painting' || navigating);
   // Derived, so prefetching comes back by itself when the layer goes, whether
   // the navigation landed, failed or was replaced.
   const linksQuiet = quiet && visible;
 
-  // The tap published the destination's title; only the destination's screen
-  // clears it, when it unmounts. A back move before that screen mounts left the
-  // title in the store for whatever screen came next. So a history move while
-  // the layer is up clears it. Taps come only from top-level screens, which
-  // publish no title, so there is nothing of theirs to restore.
+  // The tap published the destination's title, and only the destination's
+  // screen clears it, when it unmounts. A back move before that screen mounted
+  // (during the layer, or after the route's loading screen replaced it) left
+  // the title in the store for the next screen. Top-level screens publish no
+  // title, so whatever the store holds when one becomes current is stale.
   useEffect(() => {
-    if (!visible) return;
-    const clear = () => clearHeaderContext();
-    window.addEventListener('popstate', clear);
-    return () => window.removeEventListener('popstate', clear);
-  }, [visible]);
+    if (isTopLevelRoute(pathname)) clearHeaderContext();
+  }, [pathname]);
 
   return (
     <MoveFirstContext.Provider value={navigate}>

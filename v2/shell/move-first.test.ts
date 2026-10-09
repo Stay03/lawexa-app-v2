@@ -78,46 +78,61 @@ test('the layer covers the region below the bar, where the destination draws', (
 });
 
 test('the destination header is published in the tap, before the frame', () => {
-  const header = moveFirst.indexOf('if (header) setHeaderContext(header);');
-  const flush = moveFirst.indexOf('flushSync(() => {');
-  assert.ok(header > 0 && header < flush);
+  const tapBody = moveFirst.slice(moveFirst.indexOf('const navigate: Navigate = '));
+  const header = tapBody.indexOf('if (header) setHeaderContext(header);');
+  const raise = tapBody.indexOf('raise(href, kind, title, region);');
+  assert.ok(header > 0 && raise > header);
   assert.match(row, /header=\{\{ title: cleanTitle, confidential: Boolean\(is_confidential\) \}\}/);
 });
 
 test('a back move drops a pending layer, and a stale tap never pushes', () => {
-  assert.match(moveFirst, /window\.addEventListener\('popstate', drop\);/);
-  assert.match(moveFirst, /const drop = \(event: PopStateEvent\) => \{\s*tapRef\.current \+= 1;\s*const tap = tapRef\.current;\s*setPending\(null\);/);
+  assert.match(moveFirst, /const listener = \(event: PopStateEvent\) => onPopState\(event\);\s*window\.addEventListener\('popstate', listener\);/);
+  assert.match(moveFirst, /const onPopState = useEffectEvent\(\(event: PopStateEvent\) => \{\s*tapRef\.current \+= 1;\s*const tap = tapRef\.current;/);
+  assert.match(moveFirst, /if \(!state\?\.\[PENDING_MOVE_KEY\] \|\| !region\) \{\s*setPending\(null\);\s*return;\s*\}/);
   assert.match(moveFirst, /if \(tapRef\.current !== tap\) return;/);
 });
 
 test('the tap adds the history entry, so a back gesture in the wait returns to the list', () => {
   // Film, 9 October 2026: with the list as the first page opened, a back
   // 350 ms after the tap left the app. Next adds the entry only at commit.
-  const flush = moveFirst.indexOf('flushSync(() => {');
-  const entry = moveFirst.indexOf('pushPendingEntry(href);', flush);
-  const raf = moveFirst.indexOf('requestAnimationFrame(() => {', flush);
-  assert.ok(entry > flush && entry < raf, 'entry pushed in the click, after the frame commits');
+  const tapBody = moveFirst.slice(moveFirst.indexOf('const navigate: Navigate = '));
+  const raise = tapBody.indexOf('raise(href, kind, title, region);');
+  const entry = tapBody.indexOf('pushPendingEntry(href, kind);');
+  const later = tapBody.indexOf('navigateAfterPaint(href, tap);');
+  assert.ok(raise > 0 && entry > raise && later > entry, 'entry pushed in the click, after the frame commits');
   // Only Next's two fields: the list's scroll key must not reach the chat's entry.
-  assert.match(moveFirst, /const entry = \{\s*__NA: true,\s*__PRIVATE_NEXTJS_INTERNALS_TREE: state\.__PRIVATE_NEXTJS_INTERNALS_TREE,\s*\[PENDING_MOVE_KEY\]: true,\s*\};/);
+  assert.match(moveFirst, /const entry = \{\s*__NA: true,\s*__PRIVATE_NEXTJS_INTERNALS_TREE: state\.__PRIVATE_NEXTJS_INTERNALS_TREE,\s*\[PENDING_MOVE_KEY\]: true,\s*\[PENDING_KIND_KEY\]: kind,\s*\};/);
   assert.doesNotMatch(moveFirst, /\{ \.\.\.state, __NA: true/);
   assert.match(moveFirst, /if \(state\[PENDING_MOVE_KEY\]\) window\.history\.replaceState\(entry, '', href\);\s*else window\.history\.pushState\(entry, '', href\);/);
-  assert.doesNotMatch(moveFirst.slice(moveFirst.indexOf('startNavigation(() => {')), /router\.push\(href\)/);
+  const afterPaint = moveFirst.slice(moveFirst.indexOf('const navigateAfterPaint = '), moveFirst.indexOf('const onPopState = '));
+  assert.match(afterPaint, /router\.replace\(href\);/);
+  assert.doesNotMatch(afterPaint, /router\.push\(href\)/);
 });
 
-test('forward onto a dropped tap entry asks for the real route, after Next has restored', () => {
-  // The listener runs before Next's; a navigation dispatched in it would be
-  // discarded by Next's RESTORE. A task later the RESTORE has completed.
-  assert.match(moveFirst, /\?\.\[PENDING_MOVE_KEY\]\) \{\s*window\.setTimeout\(\(\) => \{\s*if \(tapRef\.current !== tap\) return;[^\n]*\s*router\.replace\(window\.location\.pathname \+ window\.location\.search\);\s*\}, 0\);/);
+test('forward onto a dropped tap entry raises the frame first, then asks for the real route', () => {
+  // Film, 9 October 2026: the forward painted a blank region under the chat's
+  // bar before the skeleton. The frame is raised in the popstate listener,
+  // which runs before Next's, and the route is asked for after a painted frame
+  // and a task, when Next's RESTORE has completed (a navigation dispatched in
+  // the listener would be discarded by it).
+  const handler = moveFirst.slice(moveFirst.indexOf('const onPopState = useEffectEvent('));
+  const raise = handler.indexOf('raise(href, ');
+  const later = handler.indexOf('navigateAfterPaint(href, tap);');
+  assert.ok(raise > 0 && later > raise);
+  assert.match(handler, /const href = window\.location\.pathname \+ window\.location\.search;/);
   assert.doesNotMatch(moveFirst, /queueMicrotask/);
 });
 
-test('a back move while the layer is up clears the title the tap published', () => {
-  assert.match(moveFirst, /useEffect\(\(\) => \{\s*if \(!visible\) return;\s*const clear = \(\) => clearHeaderContext\(\);\s*window\.addEventListener\('popstate', clear\);\s*return \(\) => window\.removeEventListener\('popstate', clear\);\s*\}, \[visible\]\);/);
+test('the title a dropped tap left behind is cleared when a top-level screen becomes current', () => {
+  // A back after the route's loading screen replaced the layer, with the chat
+  // never mounted, kept the tap's title in the store (film log, 9 October 2026).
+  assert.match(moveFirst, /useEffect\(\(\) => \{\s*if \(isTopLevelRoute\(pathname\)\) clearHeaderContext\(\);\s*\}, \[pathname\]\);/);
+  assert.doesNotMatch(moveFirst, /window\.addEventListener\('popstate', clear\)/);
 });
 
 test('a reload onto a tap entry does not keep the pending marker', () => {
   assert.match(moveFirst, /useEffect\(\(\) => \{\s*dropLeftoverMarker\(\);/);
-  assert.match(moveFirst, /delete rest\[PENDING_MOVE_KEY\];\s*window\.history\.replaceState\(rest, '', window\.location\.href\);/);
+  assert.match(moveFirst, /delete rest\[PENDING_MOVE_KEY\];\s*delete rest\[PENDING_KIND_KEY\];\s*window\.history\.replaceState\(rest, '', window\.location\.href\);/);
 });
 
 test('a screen the browser already slid in (its own back swipe) does not slide in again', () => {
