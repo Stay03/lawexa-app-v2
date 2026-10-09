@@ -88,7 +88,7 @@ test('the destination header is published in the tap, before the frame', () => {
 test('a back move drops a pending layer, and a stale tap never pushes', () => {
   assert.match(moveFirst, /const listener = \(event: PopStateEvent\) => onPopState\(event\);\s*window\.addEventListener\('popstate', listener\);/);
   assert.match(moveFirst, /const onPopState = useEffectEvent\(\(event: PopStateEvent\) => \{\s*tapRef\.current \+= 1;\s*const tap = tapRef\.current;/);
-  assert.match(moveFirst, /if \(!state\?\.\[PENDING_MOVE_KEY\] \|\| !region\) \{\s*setPending\(null\);\s*return;\s*\}/);
+  assert.match(moveFirst, /if \(!state\?\.\[PENDING_MOVE_KEY\] \|\| !region\) \{[^}]*if \(visible\) clearHeaderContext\(\);\s*setPending\(null\);\s*return;\s*\}/);
   assert.match(moveFirst, /if \(tapRef\.current !== tap\) return;/);
 });
 

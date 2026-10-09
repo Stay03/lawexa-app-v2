@@ -176,6 +176,11 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   const tapRef = useRef(0);
   const pathname = usePathname();
 
+  const visible = pending !== null && (pending.phase === 'painting' || navigating);
+  // Derived, so prefetching comes back by itself when the layer goes, whether
+  // the navigation landed, failed or was replaced.
+  const linksQuiet = quiet && visible;
+
   /** Commit the destination's frame now, in this task, before any route work. */
   const raise = (href: string, kind: MoveFirstKind, title: string | undefined, region: HTMLElement) => {
     flushSync(() => {
@@ -226,6 +231,11 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     const state = event.state as Record<string, unknown> | null;
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!state?.[PENDING_MOVE_KEY] || !region) {
+      // A tap cancelled while its layer is up: the router never left the list,
+      // so its pathname does not change and the clear below does not run. The
+      // title the tap published goes here (taps come from top-level screens,
+      // which publish none).
+      if (visible) clearHeaderContext();
       setPending(null);
       return;
     }
@@ -259,11 +269,6 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     pushPendingEntry(href, kind);
     navigateAfterPaint(href, tap);
   };
-
-  const visible = pending !== null && (pending.phase === 'painting' || navigating);
-  // Derived, so prefetching comes back by itself when the layer goes, whether
-  // the navigation landed, failed or was replaced.
-  const linksQuiet = quiet && visible;
 
   // The tap published the destination's title, and only the destination's
   // screen clears it, when it unmounts. A back move before that screen mounted
