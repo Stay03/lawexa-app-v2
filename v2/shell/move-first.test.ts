@@ -119,3 +119,17 @@ test('a reload onto a tap entry does not keep the pending marker', () => {
   assert.match(moveFirst, /useEffect\(\(\) => \{\s*dropLeftoverMarker\(\);/);
   assert.match(moveFirst, /delete rest\[PENDING_MOVE_KEY\];\s*window\.history\.replaceState\(rest, '', window\.location\.href\);/);
 });
+
+test('a screen the browser already slid in (its own back swipe) does not slide in again', () => {
+  // Chrome on Android animates a left-edge back swipe itself; our back entrance
+  // after it moved the list twice (Fable review, 9 October 2026).
+  assert.match(motion, /browserAnimated = event\.hasUAVisualTransition === true;/);
+  const reset = motion.indexOf("if (event.navigationType === 'replace') return;");
+  const read = motion.indexOf('browserAnimated = event.hasUAVisualTransition === true;');
+  const traverse = motion.indexOf("if (event.navigationType === 'traverse') {");
+  assert.ok(reset > 0 && read > reset && traverse > read, 'set for every non-replace navigation, before the traverse branch');
+  const effect = motion.indexOf('if (browserAnimated) {');
+  const play = motion.indexOf('region.setAttribute(ENTER_ATTR');
+  assert.ok(effect > 0 && play > effect, 'checked before the entrance is written');
+  assert.match(motion, /if \(browserAnimated\) \{[^}]*browserAnimated = false;[^}]*return;/);
+});

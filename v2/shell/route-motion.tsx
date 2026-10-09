@@ -165,6 +165,16 @@ let pendingDirection: Direction = 'forward';
  */
 let entrancePlayedFor: string | null = null;
 
+/**
+ * True when the browser itself animated the traversal now under way. Chrome on
+ * Android slides the page away under the reader's finger on a left-edge back
+ * swipe, showing a saved picture of the page underneath, and then swaps in the
+ * live page. Playing our own back entrance after that moved the list a second
+ * time (Fable review, 9 October 2026). Set from every navigate event, so the
+ * next navigation always overwrites it.
+ */
+let browserAnimated = false;
+
 /** Called by the move-first layer at the tap, before the navigation starts. */
 export function skipRouteEntranceFor(pathname: string): void {
   entrancePlayedFor = pathname;
@@ -179,6 +189,8 @@ interface NavigateEventLike extends Event {
   readonly hashChange?: boolean;
   readonly navigationType?: 'push' | 'replace' | 'traverse' | 'reload';
   readonly destination?: NavigationDestinationLike;
+  /** True when the browser played its own transition for this navigation. */
+  readonly hasUAVisualTransition?: boolean;
 }
 interface NavigationLike {
   readonly currentEntry: { readonly index: number } | null;
@@ -225,6 +237,7 @@ export function RouteMotion(): null {
       // is a reader going anywhere, so none of them may overwrite the direction
       // a real navigation has already recorded.
       if (event.navigationType === 'replace') return;
+      browserAnimated = event.hasUAVisualTransition === true;
       if (event.navigationType === 'traverse') {
         const from = navigation?.currentEntry?.index ?? -1;
         const to = event.destination?.index ?? -1;
@@ -294,6 +307,13 @@ export function RouteMotion(): null {
       return;
     }
     entrancePlayedFor = null;
+    if (browserAnimated) {
+      // The browser already moved this screen in (its back swipe); a second
+      // slide would be a second move.
+      browserAnimated = false;
+      pendingDirection = 'forward';
+      return;
+    }
 
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!region) return;
