@@ -20,7 +20,7 @@ test('the frame commits in the click, the navigation starts after a painted fram
   const raf = moveFirst.indexOf('requestAnimationFrame(() => {', flush);
   const task = moveFirst.indexOf('window.setTimeout(() => {', raf);
   const start = moveFirst.indexOf('startNavigation(() => {', task);
-  const push = moveFirst.indexOf('router.push(href);', start);
+  const push = moveFirst.indexOf('router.replace(href);', start);
   assert.ok(flush > 0 && raf > flush && task > raf && start > task && push > start, 'order');
 });
 
@@ -86,6 +86,22 @@ test('the destination header is published in the tap, before the frame', () => {
 
 test('a back move drops a pending layer, and a stale tap never pushes', () => {
   assert.match(moveFirst, /window\.addEventListener\('popstate', drop\);/);
-  assert.match(moveFirst, /const drop = \(\) => \{\s*tapRef\.current \+= 1;\s*setPending\(null\);/);
+  assert.match(moveFirst, /const drop = \(event: PopStateEvent\) => \{\s*tapRef\.current \+= 1;\s*setPending\(null\);/);
   assert.match(moveFirst, /if \(tapRef\.current !== tap\) return;/);
+});
+
+test('the tap adds the history entry, so a back gesture in the wait returns to the list', () => {
+  // Film, 9 October 2026: with the list as the first page opened, a back
+  // 350 ms after the tap left the app. Next adds the entry only at commit.
+  const flush = moveFirst.indexOf('flushSync(() => {');
+  const entry = moveFirst.indexOf('pushPendingEntry(href);', flush);
+  const raf = moveFirst.indexOf('requestAnimationFrame(() => {', flush);
+  assert.ok(entry > flush && entry < raf, 'entry pushed in the click, after the frame commits');
+  assert.match(moveFirst, /const entry = \{ \.\.\.state, __NA: true, \[PENDING_MOVE_KEY\]: true \};/);
+  assert.match(moveFirst, /if \(state\[PENDING_MOVE_KEY\]\) window\.history\.replaceState\(entry, '', href\);\s*else window\.history\.pushState\(entry, '', href\);/);
+  assert.doesNotMatch(moveFirst.slice(moveFirst.indexOf('startNavigation(() => {')), /router\.push\(href\)/);
+});
+
+test('forward onto a dropped tap entry asks for the real route', () => {
+  assert.match(moveFirst, /\?\.\[PENDING_MOVE_KEY\]\) \{\s*router\.replace\(window\.location\.pathname \+ window\.location\.search\);/);
 });

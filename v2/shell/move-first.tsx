@@ -99,6 +99,30 @@ function pathOf(href: string): string {
   return new URL(href, window.location.href).pathname;
 }
 
+/** Marks a history entry a tap pushed whose navigation has not committed yet. */
+const PENDING_MOVE_KEY = '__v2PendingMove';
+
+/**
+ * Adds the destination's history entry in the tap. Next adds it only when the
+ * new screen commits (HistoryUpdater's insertion effect, app-router.js), which
+ * on a chat is 0.7 s or more after the tap. A back gesture in that window, with
+ * the layer already showing the chat, went to the page before the list, and
+ * left the app when the list was the first page opened (film, 9 October 2026).
+ *
+ * The entry carries the list's own state with `__NA`, so Next's patched
+ * pushState passes it through without touching the router, and a back move
+ * pops to the list's entry, where Next restores the list and drops the pending
+ * navigation. The navigation then runs as a replace, and Next's commit writes
+ * the chat's state onto this entry. A second tap inside the window replaces
+ * the first tap's entry instead of stacking another.
+ */
+function pushPendingEntry(href: string): void {
+  const state = (window.history.state ?? {}) as Record<string, unknown>;
+  const entry = { ...state, __NA: true, [PENDING_MOVE_KEY]: true };
+  if (state[PENDING_MOVE_KEY]) window.history.replaceState(entry, '', href);
+  else window.history.pushState(entry, '', href);
+}
+
 export function MoveFirstProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [pending, setPending] = useState<PendingMove | null>(null);
@@ -113,13 +137,19 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   // go with it at once, not when the dropped transition settles. A listener's
   // setState, not an effect's.
   useEffect(() => {
-    const drop = () => {
+    const drop = (event: PopStateEvent) => {
       tapRef.current += 1;
       setPending(null);
+      // Forward onto an entry a tap pushed but whose navigation was dropped by a
+      // back move: it still holds the list's tree under the destination's URL,
+      // so Next restores the list there. Ask for the real route instead.
+      if ((event.state as { [PENDING_MOVE_KEY]?: boolean } | null)?.[PENDING_MOVE_KEY]) {
+        router.replace(window.location.pathname + window.location.search);
+      }
     };
     window.addEventListener('popstate', drop);
     return () => window.removeEventListener('popstate', drop);
-  }, []);
+  }, [router]);
 
   const navigate: Navigate = (href, kind, title, header) => {
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
@@ -153,6 +183,7 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
         phase: 'painting',
       });
     });
+    pushPendingEntry(href);
     // The layer already made the move; the real screen must not slide in again.
     skipRouteEntranceFor(pathOf(href));
     requestAnimationFrame(() => {
@@ -165,7 +196,8 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
           setPending((current) =>
             current && current.href === href ? { ...current, phase: 'navigating' } : current,
           );
-          router.push(href);
+          // Replace, not push: the tap already added the history entry.
+          router.replace(href);
         });
       }, 0);
     });
