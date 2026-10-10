@@ -116,7 +116,22 @@ type Navigate = (
   title?: string,
   header?: HeaderContext,
   headerOwner?: string,
+  onMove?: () => void,
 ) => void;
+
+/**
+ * A SHEET A TAP CAME FROM IS CUT, NOT CLOSED, IN THE TAP. A chat tapped in the
+ * side drawer closed the drawer in the click, so the click task rendered the
+ * whole drawer (twenty recent rows) and Radix measured its exit animations
+ * before the frame could paint, and the closing sheet then covered the frame:
+ * the frame came 155-218 ms after the tap against 60-100 ms from the list
+ * (film, 10 October 2026). Now the tap sets this attribute on <html>, a v2 rule
+ * in shell.css hides every sheet while it is set, and the link's `onMove`
+ * (the drawer's close) runs in the task after the frame has painted. Radix sees
+ * `display: none` and unmounts with no exit. The attribute lives for that one
+ * task, so a sheet opened later in the move is untouched.
+ */
+const SHEET_CUT_ATTR = 'data-v2-sheet-cut';
 
 const MoveFirstContext = createContext<Navigate | null>(null);
 
@@ -232,21 +247,29 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     skipRouteEntranceFor(pathOf(href));
   };
 
-  /** Start the navigation once the frame has been painted (a frame, then a task). */
-  const navigateAfterPaint = (href: string, tap: number) => {
+  /**
+   * Start the navigation once the frame has been painted (a frame, then a task).
+   * `settle` (the cut sheet's close) runs in the same task, after the route is
+   * asked for, and whatever became of the tap: a sheet hidden in the tap must
+   * close even when a history move replaced it.
+   */
+  const navigateAfterPaint = (href: string, tap: number, settle?: () => void) => {
     requestAnimationFrame(() => {
       window.setTimeout(() => {
-        if (tapRef.current !== tap) return; // replaced by a newer tap or a history move
-        // After the paint, not inside the flushSync above: re-rendering every
-        // link to stop its prefetching is work the first frame must not wait on.
-        setQuiet(true);
-        startNavigation(() => {
-          setPending((current) =>
-            current && current.href === href ? { ...current, phase: 'navigating' } : current,
-          );
-          // Replace, not push: the tap already added the history entry.
-          router.replace(href);
-        });
+        // Skipped when replaced by a newer tap or a history move.
+        if (tapRef.current === tap) {
+          // After the paint, not inside the flushSync above: re-rendering every
+          // link to stop its prefetching is work the first frame must not wait on.
+          setQuiet(true);
+          startNavigation(() => {
+            setPending((current) =>
+              current && current.href === href ? { ...current, phase: 'navigating' } : current,
+            );
+            // Replace, not push: the tap already added the history entry.
+            router.replace(href);
+          });
+        }
+        settle?.();
       }, 0);
     });
   };
@@ -293,9 +316,10 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('popstate', listener);
   }, []);
 
-  const navigate: Navigate = (href, kind, title, header, headerOwner) => {
+  const navigate: Navigate = (href, kind, title, header, headerOwner, onMove) => {
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!region) {
+      onMove?.();
       router.push(href);
       return;
     }
@@ -307,9 +331,21 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     // the first tap's copy), for a back move that cancels the tap.
     const restore = visible && pending?.restore ? pending.restore : snapshotHeaderContext();
     if (header) setHeaderContext(header, headerOwner);
+    // Before the flush, so the frame that paints the layer has no sheet.
+    if (onMove) document.documentElement.setAttribute(SHEET_CUT_ATTR, '');
     raise(href, kind, title, region, restore);
     pushPendingEntry(href, kind);
-    navigateAfterPaint(href, tap);
+    navigateAfterPaint(
+      href,
+      tap,
+      onMove &&
+        (() => {
+          // Synchronously, so the unmount and its cleanups land before the
+          // attribute goes and the sheet could show for a frame.
+          flushSync(onMove);
+          document.documentElement.removeAttribute(SHEET_CUT_ATTR);
+        }),
+    );
   };
 
   // The tap published the destination's title, and only the destination's
@@ -354,6 +390,10 @@ type MoveFirstLinkProps = Omit<ComponentProps<typeof Link>, 'href'> & {
   header?: HeaderContext;
   /** Who owns that header once the destination mounts (its conversation id). */
   headerOwner?: string;
+  /** The sheet this link sits in closes after the frame has painted, with its
+   *  exit cut (see SHEET_CUT_ATTR). On the current page, or outside the
+   *  provider, it closes at once, as a plain link's onClick would. */
+  onMove?: () => void;
 };
 
 /** A `next/link` that moves first. Outside the v2 provider it is a plain Link. */
@@ -363,6 +403,7 @@ export function MoveFirstLink({
   title,
   header,
   headerOwner,
+  onMove,
   onNavigate,
   prefetch,
   ...props
@@ -377,9 +418,12 @@ export function MoveFirstLink({
       prefetch={quiet ? false : prefetch}
       onNavigate={(event) => {
         onNavigate?.(event);
-        if (!navigate || pathOf(href) === pathname) return;
+        if (!navigate || pathOf(href) === pathname) {
+          onMove?.();
+          return;
+        }
         event.preventDefault();
-        navigate(href, kind, title, header, headerOwner);
+        navigate(href, kind, title, header, headerOwner, onMove);
       }}
     />
   );

@@ -328,7 +328,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                         title={title}
                         header={{ title: title || null, confidential: Boolean(conversation.is_confidential) }}
                         headerOwner={conversation.id}
-                        onClick={close}
+                        // Not onClick: the drawer is hidden in the tap's own
+                        // frame and closed after the chat's frame has painted
+                        // (move-first.tsx, `onMove`), so the click task stays
+                        // as light as a list tap's.
+                        onMove={close}
                         className={cn(
                           ROW_BASE,
                           'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',

@@ -30,7 +30,7 @@ test('the layer shows while painting or while the navigation is pending, never a
 });
 
 test('a plain click is taken over; the same page and no provider keep the default', () => {
-  assert.match(moveFirst, /if \(!navigate \|\| pathOf\(href\) === pathname\) return;\s*event\.preventDefault\(\);\s*navigate\(href, kind, title, header, headerOwner\);/);
+  assert.match(moveFirst, /if \(!navigate \|\| pathOf\(href\) === pathname\) \{\s*onMove\?\.\(\);\s*return;\s*\}\s*event\.preventDefault\(\);\s*navigate\(href, kind, title, header, headerOwner, onMove\);/);
 });
 
 test('the real screen does not slide in again after the layer made the move', () => {
@@ -89,7 +89,7 @@ test('a back move drops a pending layer, and a stale tap never pushes', () => {
   assert.match(moveFirst, /const listener = \(event: PopStateEvent\) => onPopState\(event\);\s*window\.addEventListener\('popstate', listener\);/);
   assert.match(moveFirst, /const onPopState = useEffectEvent\(\(event: PopStateEvent\) => \{\s*tapRef\.current \+= 1;\s*const tap = tapRef\.current;/);
   assert.match(moveFirst, /if \(visible\) \{\s*if \(pending\?\.restore\) restoreHeaderContext\(pending\.restore\);\s*else clearHeaderContext\(\);\s*\}\s*setPending\(null\);\s*return;/);
-  assert.match(moveFirst, /if \(tapRef\.current !== tap\) return;/);
+  assert.match(moveFirst, /if \(tapRef\.current === tap\) \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*setQuiet\(true\);/);
 });
 
 test('the tap adds the history entry, so a back gesture in the wait returns to the list', () => {
@@ -98,7 +98,7 @@ test('the tap adds the history entry, so a back gesture in the wait returns to t
   const tapBody = moveFirst.slice(moveFirst.indexOf('const navigate: Navigate = '));
   const raise = tapBody.indexOf('raise(href, kind, title, region, restore);');
   const entry = tapBody.indexOf('pushPendingEntry(href, kind);');
-  const later = tapBody.indexOf('navigateAfterPaint(href, tap);');
+  const later = tapBody.indexOf('navigateAfterPaint(');
   assert.ok(raise > 0 && entry > raise && later > entry, 'entry pushed in the click, after the frame commits');
   // Only Next's two fields: the list's scroll key must not reach the chat's entry.
   assert.match(moveFirst, /const entry = \{\s*__NA: true,\s*__PRIVATE_NEXTJS_INTERNALS_TREE: state\.__PRIVATE_NEXTJS_INTERNALS_TREE,\s*\[PENDING_MOVE_KEY\]: true,\s*\[PENDING_KIND_KEY\]: kind,\s*\};/);

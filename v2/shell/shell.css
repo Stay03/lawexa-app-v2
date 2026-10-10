@@ -1024,3 +1024,17 @@ html.v2-document-lock [data-slot='sheet-content'][data-state='closed'] {
   animation-fill-mode: forwards;
   pointer-events: none;
 }
+
+/* --------------------------------------------------------------------------
+   A SHEET A MOVE-FIRST TAP CAME FROM IS HIDDEN IN THE TAP'S OWN FRAME.
+   move-first.tsx sets the attribute in the click, before the frame commits,
+   and closes the sheet in the task after the frame has painted; Radix then
+   reads `display: none` and unmounts with no exit animation. So the drawer is
+   gone in the same frame the chat's frame appears, with no exit over it and no
+   snap-back (film, 10 October 2026). The attribute lives for one task, so a
+   sheet opened later during the move is not hidden.
+   -------------------------------------------------------------------------- */
+html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-overlay'],
+html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-content'] {
+  display: none;
+}
