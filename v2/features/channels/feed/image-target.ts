@@ -74,8 +74,14 @@ export function parseImageTarget(value: string): ImageTarget | null {
  * be empty there, because the chat payload carries no link: the frame then
  * fails its first paint and mints one through `GET /files/{id}/download`,
  * exactly as it does for a channel link that expired.
+ *
+ * `caption` is the print notes' (10 October 2026): when a picture has one,
+ * the viewer names the picture by it. Channel files never carry one, so
+ * their viewer reads exactly as before.
  */
-export type ViewerImage = Pick<MessageAttachment, 'id' | 'url' | 'original_name' | 'size'>;
+export type ViewerImage = Pick<MessageAttachment, 'id' | 'url' | 'original_name' | 'size'> & {
+  caption?: string | null;
+};
 
 /** What the viewer shows: the message's pictures, and where in them to start. */
 export interface ImageSet {

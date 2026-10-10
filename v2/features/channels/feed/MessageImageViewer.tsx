@@ -32,7 +32,8 @@ import {
   type ImageSet,
   type ViewerImage,
 } from './image-target';
-import { useFreshFileUrl, useOpenFileInNewTab } from './use-file-url';
+import { CHANNEL_FILE_SOURCE, type PictureSource } from './picture-source';
+import { useOpenUrlInNewTab } from './use-file-url';
 
 /**
  * MessageImageViewer — a picture opens IN the conversation, over it.
@@ -286,6 +287,7 @@ export function PictureViewer({
   resolving,
   onSelect,
   onClose,
+  source = CHANNEL_FILE_SOURCE,
 }: {
   open: boolean;
   /** The pictures and the place in them; `null` when nothing resolves. Hold
@@ -295,6 +297,10 @@ export function PictureViewer({
   resolving: boolean;
   onSelect: (next: string) => void;
   onClose: () => void;
+  /** Where a fresh link comes from, and how the viewer names the set. Channel
+   *  files when omitted, so the channel and the AI chat read as before; the
+   *  print notes pass their own (see `./picture-source.ts`). */
+  source?: PictureSource;
 }) {
   /**
    * THE URLS THAT HAVE BEEN MINTED, KEPT ABOVE THE FRAMES THAT MINTED THEM.
@@ -340,6 +346,7 @@ export function PictureViewer({
           onMintedUrl={rememberMintedUrl}
           onSelect={onSelect}
           onClose={onClose}
+          source={source}
         />
       </DialogPortal>
     </Dialog>
@@ -367,6 +374,7 @@ function ViewerStage({
   onMintedUrl,
   onSelect,
   onClose,
+  source,
 }: {
   /** The message's pictures and the place in them; `null` when the value on
    *  screen names nothing we hold. */
@@ -376,6 +384,7 @@ function ViewerStage({
   onMintedUrl: (id: number, url: string) => void;
   onSelect: (next: string) => void;
   onClose: () => void;
+  source: PictureSource;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -588,11 +597,12 @@ function ViewerStage({
         pressedId={pressedId}
         onPress={setPressedId}
         onClose={onClose}
+        source={source}
       />
 
       <div className="relative min-h-0 flex-1">
         {set === null ? (
-          <ViewerAbsence resolving={resolving} onClose={onClose} />
+          <ViewerAbsence resolving={resolving} onClose={onClose} words={source.words} />
         ) : (
           <>
             <div
@@ -636,6 +646,7 @@ function ViewerStage({
                       image={image}
                       mintedUrls={mintedUrls}
                       onMintedUrl={onMintedUrl}
+                      source={source}
                     />
                   )}
                 </div>
@@ -675,8 +686,8 @@ function ViewerStage({
 
       <DialogDescription className="sr-only">
         {images.length > 1
-          ? `Picture ${index + 1} of ${images.length} in this message. Swipe, or use the left and right arrow keys, to see the others. Press Escape or Back to return to the conversation.`
-          : 'Press Escape or Back to return to the conversation.'}
+          ? `Picture ${index + 1} of ${images.length} in this ${source.words.set}. Swipe, or use the left and right arrow keys, to see the others. Press Escape or Back to return to ${source.words.returnTo}.`
+          : `Press Escape or Back to return to ${source.words.returnTo}.`}
       </DialogDescription>
     </DialogSurface>
   );
@@ -692,7 +703,8 @@ const EMPTY_IMAGES: readonly ViewerImage[] = [];
  * The file's NAME is the dialog's accessible name, because a picture viewer is
  * about exactly one file and its name is the only thing that identifies it. It
  * is also what the reader sees, so the announced name and the visible one
- * cannot drift.
+ * cannot drift. A print note's picture with a caption is named by its caption,
+ * which says more than a file name does; channel files carry none.
  */
 function ViewerChrome({
   image,
@@ -701,6 +713,7 @@ function ViewerChrome({
   pressedId,
   onPress,
   onClose,
+  source,
 }: {
   image: ViewerImage | null;
   index: number;
@@ -711,9 +724,10 @@ function ViewerChrome({
   pressedId: number | null;
   onPress: (id: number) => void;
   onClose: () => void;
+  source: PictureSource;
 }) {
   const download = usePictureDownload();
-  const openOriginal = useOpenFileInNewTab();
+  const openOriginal = useOpenUrlInNewTab(source.freshUrl);
   /** Comparing ids is a derivation; clearing the mutations from an effect would
    *  be a state write in a place that cannot have one. */
   const pressedHere = image !== null && pressedId === image.id;
@@ -736,7 +750,7 @@ function ViewerChrome({
 
         <div className="min-w-0 flex-1 px-1">
           <DialogTitle className="truncate text-sm font-medium text-white">
-            {image?.original_name ?? 'Picture'}
+            {image ? image.caption || image.original_name : 'Picture'}
           </DialogTitle>
           <p className="truncate text-xs text-white/60">
             {count > 1 && (
@@ -751,28 +765,30 @@ function ViewerChrome({
 
         {image && (
           <>
+            {source.download && (
+              <button
+                type="button"
+                onClick={() => {
+                  onPress(image.id);
+                  download.save(image);
+                }}
+                disabled={saving}
+                aria-label={`Download ${image.original_name}`}
+                title="Download"
+                className={VIEWER_BUTTON}
+              >
+                {saving ? (
+                  <Loader2 aria-hidden className="size-5 animate-spin" />
+                ) : (
+                  <Download aria-hidden className="size-5" />
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
                 onPress(image.id);
-                download.save(image);
-              }}
-              disabled={saving}
-              aria-label={`Download ${image.original_name}`}
-              title="Download"
-              className={VIEWER_BUTTON}
-            >
-              {saving ? (
-                <Loader2 aria-hidden className="size-5 animate-spin" />
-              ) : (
-                <Download aria-hidden className="size-5" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onPress(image.id);
-                openOriginal.open(image.id);
+                openOriginal.open(image);
               }}
               disabled={opening}
               aria-label={`Open ${image.original_name} in a new tab`}
@@ -876,13 +892,15 @@ function ViewerFrame({
   image,
   mintedUrls,
   onMintedUrl,
+  source,
 }: {
   image: ViewerImage;
   mintedUrls: ReadonlyMap<number, string>;
   onMintedUrl: (id: number, url: string) => void;
+  source: PictureSource;
 }) {
-  const refresh = useFreshFileUrl();
-  const openOriginal = useOpenFileInNewTab();
+  const refresh = useMutation({ mutationFn: source.freshUrl, meta: { silentError: true } });
+  const openOriginal = useOpenUrlInNewTab(source.freshUrl);
   /** Seeded from whatever this viewer has already minted for the file, or from
    *  the row, and thereafter owned by the refresh — deliberately NOT following
    *  a later `image.url`, which a background refetch can serve as the very URL
@@ -901,9 +919,8 @@ function ViewerFrame({
       return;
     }
     refreshedRef.current = true;
-    refresh.mutate(image.id, {
-      onSuccess: (response) => {
-        const url = response.data?.url;
+    refresh.mutate(image, {
+      onSuccess: (url) => {
         if (!url) {
           setPaint('failed');
           return;
@@ -942,7 +959,7 @@ function ViewerFrame({
         <p className="text-xs break-all text-white/60">{image.original_name}</p>
         <button
           type="button"
-          onClick={() => openOriginal.open(image.id)}
+          onClick={() => openOriginal.open(image)}
           disabled={openOriginal.opening}
           className={cn(
             'v2-interactive min-h-9 rounded-full border border-white/20 px-4 text-sm font-medium text-white',
@@ -984,7 +1001,7 @@ function ViewerFrame({
       <img
         key={src}
         src={src}
-        alt={image.original_name}
+        alt={image.caption || image.original_name}
         draggable={false}
         decoding="async"
         onLoad={() => {
@@ -1111,9 +1128,11 @@ function ViewerDots({
 function ViewerAbsence({
   resolving,
   onClose,
+  words,
 }: {
   resolving: boolean;
   onClose: () => void;
+  words: PictureSource['words'];
 }) {
   if (resolving) {
     return (
@@ -1142,9 +1161,7 @@ function ViewerAbsence({
           This picture isn&rsquo;t here any more
         </p>
         <p className="mx-auto max-w-sm text-sm leading-relaxed text-white/60">
-          It may have been removed from the message, or it belongs further back
-          in the conversation than we&rsquo;ve loaded. Go back to the
-          conversation and scroll up to look for it.
+          {words.missing}
         </p>
       </div>
       <button
@@ -1156,7 +1173,7 @@ function ViewerAbsence({
           VIEWER_FOCUS,
         )}
       >
-        Back to the conversation
+        {words.back}
       </button>
     </div>
   );

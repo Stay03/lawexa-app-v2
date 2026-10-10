@@ -23,6 +23,8 @@ import type { PrintNoteKind, StatuteAnnotation, StatuteAnnotationType } from '@/
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { partLabel } from './labels';
 import { useDecideNote, useDeleteNote, useUpdateNote } from './mutations';
+import { NoteImages } from './NoteImages';
+import { NoteImagesForm } from './NoteImagesForm';
 
 /**
  * One note in the panel: what it says, where it sits, and what a researcher
@@ -30,6 +32,10 @@ import { useDecideNote, useDeleteNote, useUpdateNote } from './mutations';
  * Edit, Decide and Delete sit under it, so a tap meant for the text never
  * lands on an action. Edit and Decide open in the row itself, where the note
  * they change is still in view; Delete asks first.
+ *
+ * The pictures of the print sit between the note and its actions: page
+ * thumbnails that open full size. "Add images" (or "Edit images") opens their
+ * form in the row, in place of the thumbnails (10 October 2026).
  */
 
 export const NOTE_TYPES: readonly { value: StatuteAnnotationType; label: string }[] = [
@@ -81,7 +87,7 @@ function ComparedSide({ label, text, empty }: { label: string; text: string | nu
 const BODY_MAX = 5000;
 const DECISION_MAX = 2000;
 
-type Mode = 'view' | 'edit' | 'decide';
+type Mode = 'view' | 'edit' | 'decide' | 'images';
 
 export function NoteRow({
   note,
@@ -138,15 +144,22 @@ export function NoteRow({
         <div className="flex flex-col gap-1.5 py-1.5">{content}</div>
       )}
 
+      {mode !== 'images' ? <NoteImages note={note} slug={slug} /> : null}
+
       {mode === 'edit' ? (
         <EditForm note={note} slug={slug} onDone={() => setMode('view')} />
       ) : mode === 'decide' ? (
         <DecideForm note={note} slug={slug} onDone={() => setMode('view')} />
+      ) : mode === 'images' ? (
+        <NoteImagesForm note={note} slug={slug} onDone={() => setMode('view')} />
       ) : (
-        <div className="flex gap-1 text-xs">
+        <div className="flex flex-wrap gap-1 text-xs">
           <RowAction onClick={() => setMode('edit')}>Edit</RowAction>
           <RowAction onClick={() => setMode('decide')}>
             {note.status === 'decided' ? 'Change decision' : 'Decide'}
+          </RowAction>
+          <RowAction onClick={() => setMode('images')}>
+            {note.images && note.images.length > 0 ? 'Edit images' : 'Add images'}
           </RowAction>
           <RowAction onClick={() => setConfirmDelete(true)} tone="destructive">
             Delete

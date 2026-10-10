@@ -40,8 +40,8 @@ export function useFreshFileUrl() {
   });
 }
 
-export interface OpenInNewTab {
-  open: (id: number) => void;
+export interface OpenInNewTab<T = number> {
+  open: (target: T) => void;
   opening: boolean;
   /** The last attempt was refused or blocked. Say so where it was pressed. */
   failed: boolean;
@@ -70,15 +70,28 @@ export interface OpenInNewTab {
  * the engine will honour.
  */
 export function useOpenFileInNewTab(): OpenInNewTab {
-  const fresh = useFreshFileUrl();
+  return useOpenUrlInNewTab(mintFileUrl);
+}
+
+async function mintFileUrl(id: number): Promise<string | null> {
+  return (await filesApi.getDownloadUrl(id)).data?.url ?? null;
+}
+
+/**
+ * The same open, for anything that can mint its own fresh URL: a channel file
+ * through `GET /files/{id}/download`, a print note's picture by fetching the
+ * notes again (10 October 2026). An empty answer is a failure, exactly as a
+ * file mint that came back without a link always was.
+ */
+export function useOpenUrlInNewTab<T>(mint: (target: T) => Promise<string | null>): OpenInNewTab<T> {
+  const fresh = useMutation({ mutationFn: mint, meta: { silentError: true } });
   const [failed, setFailed] = useState(false);
   const [gone, setGone] = useState(false);
-  const open = (id: number) => {
+  const open = (target: T) => {
     setFailed(false);
     setGone(false);
-    fresh.mutate(id, {
-      onSuccess: (response) => {
-        const url = response.data?.url;
+    fresh.mutate(target, {
+      onSuccess: (url) => {
         if (!url) {
           setFailed(true);
           return;

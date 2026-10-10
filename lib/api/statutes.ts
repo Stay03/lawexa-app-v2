@@ -272,4 +272,51 @@ export const statutesApi = {
   deleteAnnotation: async (uuid: string): Promise<void> => {
     await apiClient.delete(`/statute-annotations/${uuid}`);
   },
+
+  /** Add pictures of the print to a note (1 to 10 files, 10 per note in all).
+   *  Answers the note with its pictures. */
+  addAnnotationImages: async (
+    uuid: string,
+    files: readonly File[],
+    options: { onProgress?: (sent: number, total: number) => void } = {},
+  ): Promise<StatuteAnnotationResponse> => {
+    const formData = new FormData();
+    for (const file of files) formData.append('images[]', file);
+    // `event.total` is absent on some transports; the files' own sizes are
+    // the honest denominator.
+    const total = files.reduce((sum, file) => sum + file.size, 0);
+    const response = await apiClient.post<StatuteAnnotationResponse>(
+      `/statute-annotations/${uuid}/images`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: options.onProgress
+          ? (event) => options.onProgress?.(event.loaded, event.total ?? total)
+          : undefined,
+      },
+    );
+    return response.data;
+  },
+
+  /** Change a picture's caption (null clears it) or its place (1-based; past
+   *  the end means last). Answers the note. */
+  updateAnnotationImage: async (
+    uuid: string,
+    imageId: number,
+    changes: { caption?: string | null; position?: number },
+  ): Promise<StatuteAnnotationResponse> => {
+    const response = await apiClient.patch<StatuteAnnotationResponse>(
+      `/statute-annotations/${uuid}/images/${imageId}`,
+      changes,
+    );
+    return response.data;
+  },
+
+  /** Delete a picture. Answers the note, its pictures renumbered. */
+  deleteAnnotationImage: async (uuid: string, imageId: number): Promise<StatuteAnnotationResponse> => {
+    const response = await apiClient.delete<StatuteAnnotationResponse>(
+      `/statute-annotations/${uuid}/images/${imageId}`,
+    );
+    return response.data;
+  },
 };

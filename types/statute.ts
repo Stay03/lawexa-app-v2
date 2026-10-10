@@ -284,8 +284,31 @@ export interface StatuteAnnotation {
   created_by?: { id: number; name: string } | null;
   decided_by?: { id: number; name: string } | null;
   decided_at: string | null;
+  /** Pictures of the printed page the note was taken from, in their order.
+   *  Absent on a payload from before images existed. */
+  images?: StatuteAnnotationImage[];
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * One picture on a print note: a screenshot of the printed page, so a
+ * researcher can check what the print shows. `url` is signed for one hour;
+ * the notes list is fetched again for a fresh one.
+ */
+export interface StatuteAnnotationImage {
+  id: number;
+  url: string;
+  original_name: string;
+  mime_type: string;
+  size_bytes: number;
+  width: number | null;
+  height: number | null;
+  caption: string | null;
+  /** 1-based, in the order the note shows them. */
+  position: number;
+  uploaded_by: { id: number; name: string } | null;
+  created_at: string;
 }
 
 export type StatuteAnnotationType = 'print_error' | 'typo' | 'doubt' | 'note';
