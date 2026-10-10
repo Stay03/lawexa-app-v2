@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { restoreDocumentScroll } from './document-scroll';
 
 /**
  * Keyboard-inset sync for the overlay case (docs/v2-docs/foundation-standards.md §4).
@@ -82,19 +83,6 @@ export function useKeyboardInset(): void {
     if (!viewport) return;
 
     const root = document.documentElement;
-
-    /**
-     * Undo a document scroll the browser performed and did not put back.
-     *
-     * A non-zero offset here cannot be a reader's scroll: the document is locked
-     * and they have no way to make one. Both spellings are reset because the
-     * scrolling element differs by engine, and both are cheap no-ops at zero.
-     */
-    const restoreDocumentScroll = (): void => {
-      const scroller = document.scrollingElement;
-      if (scroller && scroller.scrollTop !== 0) scroller.scrollTop = 0;
-      if (window.scrollY !== 0) window.scrollTo(0, 0);
-    };
 
     /**
      * Has the viewport actually come to rest, or is it panned under a keyboard?

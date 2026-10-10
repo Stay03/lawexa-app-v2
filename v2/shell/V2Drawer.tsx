@@ -184,12 +184,17 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         // region is the honest second choice: it is already `tabIndex={-1}`
         // for exactly this kind of hand-off, and it puts the reader at the top
         // of what they just navigated to rather than on <body>.
+        //
+        // `preventScroll`: a plain focus() may scroll the document to reveal its
+        // target, and the locked document must never move. iOS then hit-tests
+        // the next sheet against that offset, one row above the finger (Arthur's
+        // iPhone, 10 October 2026). Radix's own focus moves already pass it.
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           const target =
             document.getElementById('v2-nav-trigger') ??
             document.getElementById(V2_SHELL_CONTENT_ID);
-          target?.focus();
+          target?.focus({ preventScroll: true });
         }}
       >
         <SheetHeader className="sr-only">
