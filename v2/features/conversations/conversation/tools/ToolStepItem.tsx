@@ -1,15 +1,12 @@
 'use client';
 
+import { useId } from 'react';
 import { Brain, Check, ChevronDown, Loader2, X, type LucideIcon } from 'lucide-react';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToolCallDetails } from './ToolCallDetails';
 import { useToolResult } from './use-tool-result';
+import { StepCollapse } from './step-collapse';
 import {
   EntityResultCard,
   SearchResultsList,
@@ -325,6 +322,7 @@ export function ToolStepItem({
   // Glance-level zero signal: a search that affirmatively returned nothing hints
   // it on the COLLAPSED line, so a user need not expand to learn it found nothing.
   const zeroHint = isSuccess && isSearchLikeTool(message.toolName) && detectEmptyResult(message);
+  const bodyId = useId();
 
   return (
     <div className={cn('relative pb-1', className)}>
@@ -333,55 +331,57 @@ export function ToolStepItem({
         <span className="bg-border absolute bottom-0 left-[9px] top-6 w-px" aria-hidden />
       )}
 
-      <Collapsible open={isExpanded} onOpenChange={() => isComplete && onToggle()}>
-        <div className="flex items-start gap-2">
-          <ToolStepMarker
-            status={status}
-            icon={memory ? Brain : undefined}
-            spin={!memory}
-          />
-          <CollapsibleTrigger asChild disabled={!isComplete}>
-            <button
-              type="button"
-              disabled={!isComplete}
+      {/* No Radix Collapsible here: its closed content stays mounted and measures
+          itself on mount (see step-collapse.tsx). The button and region below keep
+          what it gave: aria-expanded, aria-controls, keyboard by native button. */}
+      <div className="flex items-start gap-2">
+        <ToolStepMarker
+          status={status}
+          icon={memory ? Brain : undefined}
+          spin={!memory}
+        />
+        <button
+          type="button"
+          disabled={!isComplete}
+          aria-expanded={isExpanded}
+          aria-controls={bodyId}
+          onClick={() => isComplete && onToggle()}
+          className={cn(
+            'flex min-h-6 flex-1 items-center gap-1.5 rounded-md py-0.5 pr-1 text-left transition-colors',
+            isComplete
+              ? 'v2-interactive hover:bg-secondary/50 -mx-1.5 cursor-pointer px-1.5'
+              : 'cursor-default',
+          )}
+        >
+          <span className="min-w-0 flex-1 text-sm leading-snug">
+            <span className="text-foreground font-medium">{action}</span>
+            {detail && <span className="text-muted-foreground font-normal"> {detail}</span>}
+            {zeroHint && (
+              <span className="text-muted-foreground/70 font-normal"> · no matches</span>
+            )}
+          </span>
+          {isComplete && message.latencyMs != null && (
+            <span className="text-muted-foreground/60 shrink-0 text-xs tabular-nums">
+              {formatDuration(message.latencyMs)}
+            </span>
+          )}
+          {isComplete && (
+            <ChevronDown
+              aria-hidden
               className={cn(
-                'flex min-h-6 flex-1 items-center gap-1.5 rounded-md py-0.5 pr-1 text-left transition-colors',
-                isComplete
-                  ? 'v2-interactive hover:bg-secondary/50 -mx-1.5 cursor-pointer px-1.5'
-                  : 'cursor-default',
+                'text-muted-foreground size-3.5 shrink-0 transition-transform duration-200 motion-reduce:transition-none',
+                isExpanded && 'rotate-180',
               )}
-            >
-              <span className="min-w-0 flex-1 text-sm leading-snug">
-                <span className="text-foreground font-medium">{action}</span>
-                {detail && <span className="text-muted-foreground font-normal"> {detail}</span>}
-                {zeroHint && (
-                  <span className="text-muted-foreground/70 font-normal"> · no matches</span>
-                )}
-              </span>
-              {isComplete && message.latencyMs != null && (
-                <span className="text-muted-foreground/60 shrink-0 text-xs tabular-nums">
-                  {formatDuration(message.latencyMs)}
-                </span>
-              )}
-              {isComplete && (
-                <ChevronDown
-                  aria-hidden
-                  className={cn(
-                    'text-muted-foreground size-3.5 shrink-0 transition-transform duration-200 motion-reduce:transition-none',
-                    isExpanded && 'rotate-180',
-                  )}
-                />
-              )}
-            </button>
-          </CollapsibleTrigger>
-        </div>
+            />
+          )}
+        </button>
+      </div>
 
-        <CollapsibleContent className="v2-collapse">
-          <div className="border-border ml-[9px] mt-1.5 border-l pl-4">
-            <LoadedToolStepBody result={loaded} showSearchResults={showSearchResults} />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+      <StepCollapse id={bodyId} open={isExpanded}>
+        <div className="border-border ml-[9px] mt-1.5 border-l pl-4">
+          <LoadedToolStepBody result={loaded} showSearchResults={showSearchResults} />
+        </div>
+      </StepCollapse>
 
       {isError && !isExpanded && (
         <p className="text-destructive ml-7 mt-1 text-sm">
