@@ -759,7 +759,7 @@ function ViewerChrome({
                 {image ? ' · ' : ''}
               </span>
             )}
-            {image ? formatBytes(image.size) : ''}
+            {image ? (source.detail ? source.detail(image) : formatBytes(image.size)) : ''}
           </p>
         </div>
 

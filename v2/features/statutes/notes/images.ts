@@ -1,4 +1,5 @@
 import type { StatuteAnnotation, StatuteAnnotationImage } from '@/types/statute';
+import { formatBytes } from '@/lib/utils/format-bytes';
 import type { ViewerImage } from '@/v2/features/channels/feed/image-target';
 
 /**
@@ -155,7 +156,19 @@ export function toViewerImages(images: readonly StatuteAnnotationImage[]): Viewe
     original_name: image.original_name,
     size: image.size_bytes,
     caption: image.caption,
+    added_by: image.uploaded_by?.name ?? null,
   }));
+}
+
+/**
+ * The viewer's line under the title for a print note's picture, after
+ * "1 of 3 · ": who added it, then its size. The line is cut with an
+ * ellipsis when it runs out of room, so the size goes first and the name
+ * stays. With no uploader on record, the size alone.
+ */
+export function noteImageDetail(image: Pick<ViewerImage, 'size' | 'added_by'>): string {
+  const size = formatBytes(image.size);
+  return image.added_by ? `added by ${image.added_by} · ${size}` : size;
 }
 
 /** Where an open viewer is: the picture on screen, and its place in the note. */

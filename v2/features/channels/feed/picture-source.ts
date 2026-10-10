@@ -17,6 +17,9 @@ export interface PictureSource {
   freshUrl: (image: ViewerImage) => Promise<string | null>;
   /** Offer Download in the bar. */
   download: boolean;
+  /** The bar's line under the title, after "2 of 3 · ". The file's size when
+   *  omitted, as channel files have always shown it. */
+  detail?: (image: ViewerImage) => string;
   /** The viewer's sentences about where the pictures come from. */
   words: {
     /** "Picture 2 of 3 in this {set}." */

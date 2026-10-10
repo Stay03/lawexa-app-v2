@@ -11,6 +11,7 @@ import {
   isCaptionChanged,
   isCaptionTooLong,
   moveImage,
+  noteImageDetail,
   normalizeCaption,
   orderImages,
   placeInImages,
@@ -154,8 +155,15 @@ test('a picture is named by its caption, or else by its file name', () => {
 
 test('the viewer reads the size and caption from a note picture', () => {
   assert.deepEqual(toViewerImages([image(5, 'https://files.test/5', 'Page B41')]), [
-    { id: 5, url: 'https://files.test/5', original_name: 'page-5.png', size: 1000, caption: 'Page B41' },
+    { id: 5, url: 'https://files.test/5', original_name: 'page-5.png', size: 1000, caption: 'Page B41', added_by: 'A researcher' },
   ]);
+  assert.equal(toViewerImages([{ ...image(6, 'u6'), uploaded_by: null }])[0].added_by, null);
+});
+
+test('the viewer line says who added the picture, then its size; the size alone with no uploader', () => {
+  assert.equal(noteImageDetail({ size: 1153434, added_by: 'A researcher' }), 'added by A researcher · 1.1 MB');
+  assert.equal(noteImageDetail({ size: 1153434, added_by: null }), '1.1 MB');
+  assert.equal(noteImageDetail({ size: 1153434 }), '1.1 MB');
 });
 
 /* ── The one retry ────────────────────────────────────────────────────────── */

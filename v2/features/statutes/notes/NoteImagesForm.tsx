@@ -309,7 +309,9 @@ function ImageItem({
           <NoteThumb image={image} freshUrl={freshUrl} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-px">
-          <span className="line-clamp-2 break-all text-[13px] font-medium leading-snug">{image.original_name}</span>
+          <span title={image.original_name} className="truncate text-[13px] font-medium leading-snug">
+            {image.original_name}
+          </span>
           <span className="text-xs text-muted-foreground">{formatBytes(image.size_bytes)}</span>
         </span>
         {!confirming ? (

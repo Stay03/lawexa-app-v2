@@ -75,12 +75,14 @@ export function parseImageTarget(value: string): ImageTarget | null {
  * fails its first paint and mints one through `GET /files/{id}/download`,
  * exactly as it does for a channel link that expired.
  *
- * `caption` is the print notes' (10 October 2026): when a picture has one,
- * the viewer names the picture by it. Channel files never carry one, so
- * their viewer reads exactly as before.
+ * `caption` and `added_by` are the print notes' (10 October 2026): when a
+ * picture has a caption, the viewer names the picture by it, and the bar says
+ * who added it. Channel files carry neither, so their viewer reads exactly as
+ * before.
  */
 export type ViewerImage = Pick<MessageAttachment, 'id' | 'url' | 'original_name' | 'size'> & {
   caption?: string | null;
+  added_by?: string | null;
 };
 
 /** What the viewer shows: the message's pictures, and where in them to start. */

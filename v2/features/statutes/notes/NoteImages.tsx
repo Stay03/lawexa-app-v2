@@ -15,6 +15,7 @@ import {
   freshImageUrl,
   imageAlt,
   initialThumbPaint,
+  noteImageDetail,
   placeInImages,
   thumbFailed,
   thumbLoaded,
@@ -71,6 +72,7 @@ export function NoteImages({ note, slug }: { note: StatuteAnnotation; slug: stri
   const source: PictureSource = {
     freshUrl: (image) => freshUrl(image.id),
     download: false,
+    detail: noteImageDetail,
     words: VIEWER_WORDS,
   };
 
