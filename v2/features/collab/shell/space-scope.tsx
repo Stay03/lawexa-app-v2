@@ -78,6 +78,16 @@ export interface CollabSpaceScope {
   canManage: boolean;
   isOwner: boolean;
 
+  /**
+   * Whether this place shows its channels to this viewer (Spaces F2, 11
+   * October 2026): a TEAM space, for someone who may open Team Channels. When
+   * `false` the frame has no rail, no drawer, no create-channel dialog and
+   * asks for no channel, and the page has no Channels tab. On a space route it
+   * is `false` until the space's kind is known (the detail, or the cached list
+   * row), so nothing is reserved for a rail that may never come.
+   */
+  showsChannels: boolean;
+
   /** Opens the one create-channel dialog (`?create=channel`). */
   openCreateChannel: () => void;
   /**

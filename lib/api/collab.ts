@@ -57,6 +57,12 @@ import type {
   SavedMessageListResponse,
   SendMessagePayload,
   SendMessageResponse,
+  SpaceConversationListParams,
+  SpaceConversationListResponse,
+  SpaceFileListParams,
+  SpaceFileListResponse,
+  SpaceFolderListParams,
+  SpaceFolderListResponse,
   SpaceInvitationListResponse,
   SpaceListParams,
   SpaceListResponse,
@@ -167,6 +173,71 @@ export const spacesApi = {
       `/spaces/${spaceUuid}/threads`,
       {
         params: {
+          per_page: params.per_page ?? 20,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * ── A SPACE'S CONTENTS (backend B3, built before it is live) ──────────────
+   * Three listings every member may read, Viewer included: the space's chats
+   * (personal and never confidential, with their owner and last message), its
+   * folders (the root, or the children of `parent_id`), and its files (with
+   * the uploader). Routes, params and the envelope (the usual `pagination` +
+   * `links` one) were confirmed by backend on 11 October 2026; each row also
+   * carries `space {uuid, name}`. A non-member is refused the space itself
+   * first, which is why the space page asks for these only once the space has
+   * loaded.
+   */
+  getConversations: async (
+    spaceUuid: string,
+    params: SpaceConversationListParams = {}
+  ): Promise<SpaceConversationListResponse> => {
+    const response = await apiClient.get<SpaceConversationListResponse>(
+      `/spaces/${spaceUuid}/conversations`,
+      {
+        params: {
+          search: params.search || undefined,
+          sort_by: params.sort_by || undefined,
+          sort_order: params.sort_order || undefined,
+          per_page: params.per_page ?? 15,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  getFolders: async (
+    spaceUuid: string,
+    params: SpaceFolderListParams = {}
+  ): Promise<SpaceFolderListResponse> => {
+    const response = await apiClient.get<SpaceFolderListResponse>(
+      `/spaces/${spaceUuid}/folders`,
+      {
+        params: {
+          parent_id: params.parent_id || undefined,
+          per_page: params.per_page ?? 20,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  getFiles: async (
+    spaceUuid: string,
+    params: SpaceFileListParams = {}
+  ): Promise<SpaceFileListResponse> => {
+    const response = await apiClient.get<SpaceFileListResponse>(
+      `/spaces/${spaceUuid}/files`,
+      {
+        params: {
+          category: params.category || undefined,
+          name: params.name || undefined,
           per_page: params.per_page ?? 20,
           page: params.page ?? 1,
         },

@@ -104,6 +104,9 @@ export function useDeleteSpace(spaceUuid: string) {
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: spacesQueries.detailsOf(spaceUuid) });
       queryClient.removeQueries({ queryKey: spacesQueries.membersOf(spaceUuid) });
+      // Its chats, folders and files lists too (Spaces F2): a deleted space's
+      // contents must not paint from cache if its uuid is ever visited again.
+      queryClient.removeQueries({ queryKey: spacesQueries.contentsOf(spaceUuid) });
       void queryClient.invalidateQueries({ queryKey: spacesQueries.lists() });
       void queryClient.invalidateQueries({ queryKey: channelsQueries.lists() });
     },
@@ -177,6 +180,9 @@ export function useLeaveSpace(spaceUuid: string) {
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: spacesQueries.detailsOf(spaceUuid) });
       queryClient.removeQueries({ queryKey: spacesQueries.membersOf(spaceUuid) });
+      // A leaver loses read access to the space's contents (design 2.5), so
+      // the cached chats, folders and files lists go with the membership.
+      queryClient.removeQueries({ queryKey: spacesQueries.contentsOf(spaceUuid) });
       void queryClient.invalidateQueries({ queryKey: spacesQueries.lists() });
       void queryClient.invalidateQueries({ queryKey: channelsQueries.lists() });
     },

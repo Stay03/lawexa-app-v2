@@ -1,8 +1,16 @@
-import type { Member, Space, SpaceType } from '@/types/collab';
+import type {
+  Member,
+  Space,
+  SpaceContentAuthor,
+  SpaceKind,
+  SpaceType,
+} from '@/types/collab';
+import { canOpenTeamChannels } from '@/v2/features/collab/model';
 import {
   QUIET_GRAMMAR,
   type UnreadGrammar,
 } from '@/v2/features/collab/unread-grammar';
+import type { V2SessionSnapshot } from '@/v2/runtime/session-context';
 
 /**
  * spaces model — the pure vocabulary of the W4 spaces surfaces: the type
@@ -32,6 +40,195 @@ export function parseSpaceFilter(raw: string | null | undefined): SpaceFilter {
     default:
       return 'all';
   }
+}
+
+/* ── One Space, two kinds (Spaces F2, 11 October 2026) ────────────────────── */
+
+/**
+ * The space's kind, read ONE way everywhere. Stay decided on 11 October 2026
+ * that one Space holds chats, folders and files for every member, and that
+ * channels stay with the old team spaces, for researchers and above. The
+ * backend stamps `kind` from B1; until that deploy the field is absent, and an
+ * absent kind is `team` because that is what every space was before it. So the
+ * app behaves exactly as it did until B1 lands, and nothing else here reads
+ * `space.kind` directly.
+ */
+export function spaceKind(space: Pick<Space, 'kind'>): SpaceKind {
+  return space.kind === 'shared' ? 'shared' : 'team';
+}
+
+/** A `shared` space: the new Space. Always private, never has channels. */
+export function isSharedSpace(space: Pick<Space, 'kind'>): boolean {
+  return spaceKind(space) === 'shared';
+}
+
+/**
+ * Whether the viewer may add to the space's contents: start a chat, upload a
+ * file, make a folder (design 2.4). Owner and Editor; a Viewer only reads.
+ *
+ * Reads `my_content_role` ONLY, never the old `my_role`. The two are separate
+ * columns on purpose (a team space's admin is not thereby a content Owner),
+ * and the server derives the content role for old team members itself. An
+ * absent role (an API before B1, or a non-member) is "no": a button that only
+ * 403s is worse than none.
+ */
+export function canAddContent(space: Pick<Space, 'my_content_role'>): boolean {
+  return space.my_content_role === 'owner' || space.my_content_role === 'editor';
+}
+
+/**
+ * Whether this space shows its channels to this viewer: the Channels tab, the
+ * channel rail and drawer, the lobby digest, and every channel request behind
+ * them. A TEAM space, seen by someone who may open Team Channels. A shared
+ * space has no channels at all, and below researcher the backend refuses every
+ * channel route (B0), so either half failing means no channel surface and no
+ * channel request.
+ */
+export function spaceShowsChannels(
+  space: Pick<Space, 'kind'>,
+  session: V2SessionSnapshot,
+): boolean {
+  return spaceKind(space) === 'team' && canOpenTeamChannels(session);
+}
+
+/**
+ * Whether a space of this kind may be open to anyone. A shared space is always
+ * private (the backend refuses `is_private: false` on it with a 422), so the
+ * forms do not offer the choice there.
+ */
+export function canSpaceBeOpen(kind: SpaceKind): boolean {
+  return kind === 'team';
+}
+
+/**
+ * The `kind` a create sends. Only a viewer who may open Team Channels chooses;
+ * everyone else sends NOTHING and the server makes a shared space (it refuses
+ * `team` below researcher, so sending `shared` explicitly would only be a
+ * second place to keep that rule).
+ */
+export function createSpaceKind(
+  chosen: SpaceKind,
+  canChooseKind: boolean,
+): SpaceKind | undefined {
+  return canChooseKind ? chosen : undefined;
+}
+
+/* ── The space page's tabs (?tab=) ────────────────────────────────────────── */
+
+/** The space page's tab ids. `channels` holds the old lobby (about, the
+ *  activity digest, people); the other three are the space's contents. */
+export type SpaceTab = 'channels' | 'chats' | 'folders' | 'files';
+
+const CONTENT_TABS: readonly SpaceTab[] = ['chats', 'folders', 'files'];
+const TEAM_TABS: readonly SpaceTab[] = ['channels', ...CONTENT_TABS];
+
+export const SPACE_TAB_LABELS: Readonly<Record<SpaceTab, string>> = {
+  channels: 'Channels',
+  chats: 'Chats',
+  folders: 'Folders',
+  files: 'Files',
+};
+
+/** The tabs this viewer gets: the contents for every member, and Channels
+ *  first when the space shows its channels ({@link spaceShowsChannels}). */
+export function spaceTabs(showsChannels: boolean): readonly SpaceTab[] {
+  return showsChannels ? TEAM_TABS : CONTENT_TABS;
+}
+
+/**
+ * The tab a bare `/spaces/{uuid}` opens on. A team space seen by a researcher
+ * keeps the lobby it always opened on, so nothing changes for the team;
+ * everyone else lands on the chats.
+ */
+export function defaultSpaceTab(showsChannels: boolean): SpaceTab {
+  return showsChannels ? 'channels' : 'chats';
+}
+
+/**
+ * Read `?tab=` against the tabs this viewer actually has. Anything else, a
+ * hand-edited value or `channels` on a space that shows none, resolves to the
+ * default, so a copied link never lands on a tab that is not there.
+ */
+export function parseSpaceTab(
+  raw: string | null | undefined,
+  showsChannels: boolean,
+): SpaceTab {
+  const tabs = spaceTabs(showsChannels);
+  return tabs.find((tab) => tab === raw) ?? defaultSpaceTab(showsChannels);
+}
+
+/**
+ * "3 chats · 1 folder · 2 files": what a space holds, for its row in the
+ * list. Zeros are left out, so a space with only files says only that.
+ * `"Nothing added yet"` when every count is known and zero, and `null` when
+ * the payload carries none of them (an API before B1), so the row falls back
+ * to what it showed before rather than claiming an empty space.
+ */
+export function spaceContentCountsLabel(
+  space: Pick<Space, 'conversations_count' | 'folders_count' | 'files_count'>,
+): string | null {
+  const counts: readonly [number | undefined, string, string][] = [
+    [space.conversations_count, 'chat', 'chats'],
+    [space.folders_count, 'folder', 'folders'],
+    [space.files_count, 'file', 'files'],
+  ];
+  if (counts.every(([count]) => count === undefined)) return null;
+  const parts = counts
+    .filter(([count]) => (count ?? 0) > 0)
+    .map(([count, one, many]) => `${count} ${count === 1 ? one : many}`);
+  return parts.length > 0 ? parts.join(' · ') : 'Nothing added yet';
+}
+
+/**
+ * Whose chat a space's Chats row is: the owner's name, or "You" for the
+ * viewer's own. `null` when the row carries no author, so the row simply has
+ * no second line rather than a placeholder.
+ */
+export function spaceChatByline(
+  author: SpaceContentAuthor | null | undefined,
+  viewerId: number | null,
+): string | null {
+  if (!author) return null;
+  if (viewerId !== null && author.id === viewerId) return 'You';
+  return author.name.trim() || null;
+}
+
+/**
+ * Whether a spaces-list row wears the quiet "Team" mark: the row SAYS it is a
+ * team space (an absent kind, every row before B1, is not enough), and the
+ * viewer may open Team Channels. Below researcher a team space shows no
+ * channels, so the word would name something they cannot open.
+ */
+export function showsTeamMark(
+  space: Pick<Space, 'kind'>,
+  canOpenTeamChannels: boolean,
+): boolean {
+  return space.kind === 'team' && canOpenTeamChannels;
+}
+
+/**
+ * The loaded pages of a space's list as ONE run of rows, each row once, the
+ * FIRST copy kept. The three content lists page by offset while other
+ * members add to the space, so an insert between two page reads shifts a row
+ * from page 1 onto page 2 and it arrives twice: a doubled row on screen and a
+ * duplicate React key (fix after review, 11 October 2026). The first copy is
+ * the one already on screen, so keeping it moves nothing.
+ */
+export function uniqueRowsById<Row, Id>(
+  pages: readonly { data: readonly Row[] }[],
+  idOf: (row: Row) => Id,
+): Row[] {
+  const seen = new Set<Id>();
+  const rows: Row[] = [];
+  for (const page of pages) {
+    for (const row of page.data) {
+      const id = idOf(row);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      rows.push(row);
+    }
+  }
+  return rows;
 }
 
 /* ── The unread grammar (DIRECTION 2, backend Ruling A) ───────────────────── */

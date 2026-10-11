@@ -134,13 +134,15 @@ export function SpacesBrowser() {
   });
 
   // Same params as the spine's mount (`spine.tsx`), so this resolves to that
-  // entry rather than minting a second one.
+  // entry rather than minting a second one. And the spine's gate: below
+  // researcher every channel route is refused (Spaces F1/F2, 11 October 2026),
+  // so the lanes show what each space holds instead of channel chips.
   const myChannels = useQuery({
     ...channelsQueries.mine({ viewerId }),
-    // Team Channels only (11 October 2026): without the server flag this list
-    // is refused, so the lanes simply show no channel chips.
     enabled: canOpenTeamChannels(session),
   });
+  // The same answer, for the rows' "Team" mark (`showsTeamMark`).
+  const teamChannelsOpen = canOpenTeamChannels(session);
 
   const pendingInvitations = usePendingInvitationCount({ viewerId, enabled: eligible });
 
@@ -236,6 +238,7 @@ export function SpacesBrowser() {
                   activity={activityBySpace.get(space.uuid) ?? NO_SPACE_ACTIVITY}
                   now={now}
                   index={index}
+                  canOpenTeamChannels={teamChannelsOpen}
                 />
               ))}
             </ul>

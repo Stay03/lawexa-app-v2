@@ -83,8 +83,9 @@ export function CollabHeaderBack({ context }: { context: CollabHeaderContext }) 
  * Below `md:` the space lobby's own "All channels" button opens the drawer; at
  * `lg:` the rail is docked and nothing needs opening at all.
  *
- * NOTHING AT ALL where there is no drawer (`openRail` is `null`, a viewer
- * without Team Channels): a live control that opens nothing is worse than none.
+ * NOTHING AT ALL where the place has no drawer (`openRail` is `null`): a space
+ * that shows no channels to this viewer has no rail to open, and a live
+ * control that opens nothing is worse than none.
  */
 export function CollabHeaderRailToggle({
   context,

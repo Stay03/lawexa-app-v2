@@ -18,7 +18,12 @@ import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/mod
 import { useCachedSpaceIdentity } from '@/v2/features/spaces/detail/cached-identity';
 import { ChannelFormDialog } from '@/v2/features/spaces/dialogs/ChannelFormDialog';
 import { SpaceMembersSheet } from '@/v2/features/spaces/detail/SpaceMembersSheet';
-import { canManageSpace, isSpaceOwner, roleInRoster } from '@/v2/features/spaces/model';
+import {
+  canManageSpace,
+  isSpaceOwner,
+  roleInRoster,
+  spaceShowsChannels,
+} from '@/v2/features/spaces/model';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
@@ -84,17 +89,33 @@ import {
  * designed refusal in the pane is the whole screen, which is what a refusal
  * should be.
  *
- * ── NO TEAM CHANNELS, NO CHANNEL CHROME (Spaces F1, 12 October 2026) ───────
- * Channels are for accounts the server flags for Team Channels (researchers
- * and above), and backend B0 refuses every channel route to anyone else. A
- * space's own page stays open to every member, so on `/spaces/{uuid}` without
- * the flag (`showsChannels` below) this frame asks for no channel list and
- * draws no rail, no reserved width, no drawer, no header drawer toggle and no
- * create-channel dialog, and it strips `?rail=1` and `?create=channel`. The
- * answer is the session's, so it is known on the first frame and nothing
- * jumps. A channel route never gets here without the flag: the collab gate
- * above this frame refuses it first. With the flag, everything below is as it
- * was.
+ * ── A SPACE WITHOUT CHANNELS HAS NO CHANNEL CHROME (Spaces F2) ─────────────
+ * Stay, 11 October 2026: one Space holds chats, folders and files for every
+ * member; channels stay with TEAM spaces, for researchers and above. So the
+ * rail, its reserved width, the drawer, the header's drawer toggle, the
+ * create-channel dialog and every channel request here exist only when the
+ * space shows its channels to this viewer (`showsChannels`). A shared space,
+ * or any space seen by someone below researcher, gets none of them and sends
+ * no `GET /spaces/{uuid}/channels`: the backend would refuse it below
+ * researcher (B0), and a shared space has no channels to list.
+ *
+ * On a CHANNEL route the answer is yes before anything resolves: the collab
+ * gate above this frame already turned away everyone below researcher there
+ * (F1), and a channel always lives in a team space. On a SPACE route the kind
+ * is a fact about the space, known from the detail or from the list row the
+ * reader tapped when it is still cached.
+ *
+ * TWO ANSWERS, KEPT APART (fix after review, 11 October 2026). The rail's
+ * PRESENCE (the aside and its 240px, the drawer, the header's drawer toggle)
+ * may GUESS while the kind is unknown, and guesses exactly as the page's
+ * silhouette does (`CachedSpaceFrame`): no cached row reads as a team space,
+ * because every space before shared ones is one. Reserving nothing on a hard
+ * load (a refresh, a notification tap, an outside link) made the rail pop in
+ * with the detail and re-centre the column under the reader for every team
+ * space. With the guess, only a researcher cold-arriving on a SHARED space
+ * sees the rail stand down, and nobody else sees a jump. Every REQUEST, and
+ * the scope the page reads, waits for the KNOWN kind (`showsChannels`): a
+ * guess may draw a skeleton, never spend a request the server might refuse.
  *
  * ── THREE URL-OWNED OVERLAYS, ALL QUIET, ALL SINGLY OWNED ──────────────────
  * `?rail=1` (the mobile drawer), `?create=channel` (the one create-channel
@@ -158,10 +179,6 @@ function CollabPlaceFrame({
 
   const isSpaceRoute = route.kind === 'space';
   const channelUuid = route.kind === 'channel' ? route.channelUuid : null;
-  // Whether this viewer gets any channel surface or channel request here (see
-  // "No Team Channels" in the docblock). The server's flag, read off the
-  // session, so it never waits on a query.
-  const showsChannels = canOpenTeamChannels(session);
 
   /* ── The space this frame is standing in ───────────────────────────────── */
 
@@ -185,12 +202,35 @@ function CollabPlaceFrame({
   const space = spaceQuery.data?.data ?? null;
 
   /**
+   * Whether this place shows its channels to this viewer (see "A space
+   * without channels" in the docblock). The cached row is read here, ahead of
+   * the identity derivation below, because the channel requests are gated on
+   * the answer.
+   */
+  const cachedSpace = useCachedSpaceIdentity(isSpaceRoute ? route.spaceUuid : null);
+  const showsChannels = isSpaceRoute
+    ? space !== null
+      ? spaceShowsChannels(space, session)
+      : cachedSpace !== null && spaceShowsChannels(cachedSpace, session)
+    : canOpenTeamChannels(session);
+  /**
+   * Whether the rail is DRAWN: the known answer once there is one, otherwise
+   * the page silhouette's guess (an unknown kind reads as team). Chrome only;
+   * no request reads this (see "Two answers" in the docblock).
+   */
+  const railShown = isSpaceRoute
+    ? space !== null
+      ? spaceShowsChannels(space, session)
+      : spaceShowsChannels({ kind: cachedSpace?.kind ?? 'team' }, session)
+    : canOpenTeamChannels(session);
+
+  /**
    * The channel list. On the SPACE route it waits for the space to succeed —
    * a 403 there means the reader is not a member, and the blocked read must
    * not be requested. On a CHANNEL route no such gate is needed or wanted: the
    * channel detail having resolved is already proof of access, so the two run
-   * in parallel and the rail paints a beat sooner. Never without Team Channels:
-   * the backend refuses it (B0).
+   * in parallel and the rail paints a beat sooner. And on either route, only
+   * where the place shows its channels.
    */
   const channelsQuery = useQuery({
     ...channelsQueries.bySpace({
@@ -221,13 +261,13 @@ function CollabPlaceFrame({
    * The last-message previews, from the caller's cross-space channel page —
    * the ONE route that stamps `last_message`. The realtime spine already
    * mounts this exact key app-wide, so it resolves to that entry: no request,
-   * no skeleton, and previews that move with the spine's writers.
+   * no skeleton, and previews that move with the spine's writers. Gated like
+   * the rail it feeds: below researcher the spine never fetches it (F1), and
+   * this mount must not be the one that does.
    */
   const myChannelsQuery = useQuery({
     ...channelsQueries.mine({ viewerId }),
-    // Team Channels only (11 October 2026): without the server flag this list
-    // is refused, so it is never asked for.
-    enabled: canOpenTeamChannels(session),
+    enabled: eligible && showsChannels,
   });
 
   /* ── Derivations ───────────────────────────────────────────────────────── */
@@ -294,7 +334,6 @@ function CollabPlaceFrame({
    * uuid, a name and a type — none of which can have changed between the tap
    * and the paint, and none of which is a permission.
    */
-  const cachedSpace = useCachedSpaceIdentity(isSpaceRoute ? route.spaceUuid : null);
   const cachedChannel = useCachedChannelIdentity(channelUuid);
 
   const identity: CollabSpaceIdentity | null = useMemo(
@@ -327,8 +366,16 @@ function CollabPlaceFrame({
 
   /* ── The three URL-owned overlays ──────────────────────────────────────── */
 
-  // No drawer without Team Channels, so a copied `?rail=1` is stripped there.
-  const rail = useUrlOverlay('rail', { canOpen: showsChannels });
+  // A place with no channels has no drawer, so a copied `?rail=1` is stripped
+  // there; `undefined` while a space route's kind is still unknown, so the
+  // param survives until the answer lands (the `roleSettled` rule below).
+  // Without Team Channels the answer is no from the first frame, whatever the
+  // kind (the F1 gate, 12 October 2026).
+  const teamChannelsOpen = canOpenTeamChannels(session);
+  const kindSettled = !isSpaceRoute || space !== null || spaceQuery.isError;
+  const rail = useUrlOverlay('rail', {
+    canOpen: !teamChannelsOpen ? false : kindSettled ? showsChannels : undefined,
+  });
   // Space-route only, so the `?invite=` param nested inside the sheet has
   // exactly one owner at every address (see the docblock). A refused value is
   // stripped, so a copied `/channels/{uuid}?roster=1` degrades to the channel.
@@ -338,10 +385,10 @@ function CollabPlaceFrame({
     // `?create=channel` link cannot hand a plain member a form that would 403.
     // `undefined` ONLY while the role is genuinely unknown — see `roleSettled`.
     // Without Team Channels the answer is no at once, whatever the role.
-    canOpen: !showsChannels
+    canOpen: !teamChannelsOpen
       ? { channel: false }
       : roleSettled
-        ? { channel: canManage }
+        ? { channel: canManage && showsChannels }
         : undefined,
   });
 
@@ -354,7 +401,7 @@ function CollabPlaceFrame({
 
   const openRail = useCallback(() => showRail(), [showRail]);
   // What the header gets: the opener, or nothing where there is no drawer.
-  const headerOpenRail = showsChannels ? openRail : null;
+  const headerOpenRail = railShown ? openRail : null;
   const openRoster = useCallback(() => showRoster(), [showRoster]);
   const openCreateChannel = useCallback(() => showCreate('channel'), [showCreate]);
 
@@ -468,6 +515,7 @@ function CollabPlaceFrame({
       isMembersPending,
       canManage,
       isOwner,
+      showsChannels,
       openCreateChannel,
       openRoster,
       openRail,
@@ -489,15 +537,17 @@ function CollabPlaceFrame({
       isMembersPending,
       canManage,
       isOwner,
+      showsChannels,
       openCreateChannel,
       openRoster,
       openRail,
     ],
   );
 
-  /** The rail and its drawer: a place that was not refused, for a viewer with
-   *  Team Channels. */
-  const hasRail = !placeRefused && showsChannels;
+  /** The rail and its drawer: a place that was not refused, and shows (or,
+   *  while its kind is unknown, is expected to show) its channels. Until the
+   *  channel list is allowed to load, the rail draws its skeleton. */
+  const hasRail = !placeRefused && railShown;
 
   return (
     <CollabSpaceScopeProvider scope={scope}>
@@ -510,7 +560,7 @@ function CollabPlaceFrame({
               switch. Between `md:` and `lg:` the drawer IS the channel list,
               opened from the header's panel toggle. Hidden in CSS, never by a
               hook, so the right chrome paints before hydration. Absent, with
-              its width, without Team Channels. ─────────────────────────── */}
+              its width, where the place shows no channels. ─────────────── */}
         {hasRail ? (
           <aside
             aria-label="Space"
@@ -556,8 +606,8 @@ function CollabPlaceFrame({
             Mounted from the first frame — NOT gated on the space having
             resolved — because the header's opener exists from the first frame
             too, and a live control that opens nothing is worse than a
-            skeleton. It stands down when the place was refused or the viewer
-            has no Team Channels, where the opener is gone as well. ──────── */}
+            skeleton. It stands down when the place was refused or shows no
+            channels, where the opener is gone as well. ─────────────────── */}
       {hasRail ? (
         <SpaceDrawer
           scope={scope}

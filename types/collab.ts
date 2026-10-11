@@ -14,6 +14,8 @@
  */
 
 import type { PaginationLinks, PaginationMeta } from '@/types/case';
+import type { ConversationListItem, ListConversationsParams } from '@/types/chat';
+import type { FileCategory, UserFile } from '@/types/file';
 import type { IBlockedReason } from '@/types/message-pack';
 
 /******************************************************************************
@@ -48,6 +50,20 @@ export type SpaceType = 'work' | 'study';
  *  this must decide about `hidden` explicitly — see `channelVisibilityFace`. */
 export type ChannelVisibility = 'space_public' | 'private' | 'hidden';
 export type MemberRole = 'owner' | 'admin' | 'member';
+/**
+ * ONE SPACE, TWO KINDS (Stay, 11 October 2026; backend B1). `team` is every
+ * space that existed before that day: it carries channels, which only
+ * researchers and above can open (Team Channels). `shared` is the new Space:
+ * chats, folders and files shared with invited people, always private, no
+ * channels.
+ */
+export type SpaceKind = 'team' | 'shared';
+/**
+ * The viewer's role over a space's CONTENTS (chats, folders, files): a separate
+ * column from {@link MemberRole}, which keeps deciding channels and space
+ * settings. Owner and Editor add and continue; Viewer only reads (design 2.4).
+ */
+export type ContentRole = 'owner' | 'editor' | 'viewer';
 export type NotifyLevel = 'all' | 'mentions_only' | 'muted';
 
 /******************************************************************************
@@ -217,6 +233,20 @@ export interface Space {
    */
   unread_channels_count?: number;
   mention_count?: number;
+  /**
+   * `team` or `shared` (backend B1). OPTIONAL because the app ships before B1
+   * is live: an absent kind is read as `team`, which is what every space was
+   * until then (`spaceKind` in `v2/features/spaces/model.ts` is the one reader).
+   */
+  kind?: SpaceKind;
+  /** The viewer's content role (chats, folders, files); `null` for a non-member.
+   *  Distinct from {@link Space.my_role}, which governs channels and settings. */
+  my_content_role?: ContentRole | null;
+  /** How many chats, folders and files the space holds (backend B1). Absent on
+   *  an API that predates it; never read as zero when absent. */
+  conversations_count?: number;
+  folders_count?: number;
+  files_count?: number;
   /** Roster present on `show`. */
   members?: Member[];
   /**
@@ -1081,6 +1111,30 @@ export interface MemberListParams {
   page?: number;
 }
 
+/**
+ * A space's chats (`GET /spaces/{uuid}/conversations`, backend B3). The
+ * conversations list's own params, handled the same way (confirmed by backend
+ * on 11 October 2026); `status` is not among them.
+ */
+export type SpaceConversationListParams = Omit<ListConversationsParams, 'status'>;
+
+/** A space's folders (`GET /spaces/{uuid}/folders`, backend B3): the root
+ *  folders, or the children of `parent_id` (a folder uuid). */
+export interface SpaceFolderListParams {
+  page?: number;
+  per_page?: number;
+  parent_id?: string;
+}
+
+/** A space's files (`GET /spaces/{uuid}/files`, backend B3), filtered by
+ *  category and by name like the viewer's own file list. */
+export interface SpaceFileListParams {
+  page?: number;
+  per_page?: number;
+  category?: FileCategory;
+  name?: string;
+}
+
 /******************************************************************************
                               Write payloads
 ******************************************************************************/
@@ -1161,6 +1215,12 @@ export interface TransferOwnershipPayload {
 export interface CreateSpacePayload {
   name: string;
   type: SpaceType;
+  /**
+   * OMITTED for an account below researcher: the server then makes a `shared`
+   * space, and refuses `team` for that account. Researcher and above choose
+   * (omitted = `team` for them).
+   */
+  kind?: SpaceKind;
   description?: string;
   organization_uuid?: string;
   is_private?: boolean;
@@ -1414,6 +1474,73 @@ export interface ReorderListItemsPayload {
 
 export type SpaceListResponse = LengthAwareResponse<Space>;
 export type SpaceResponse = ItemResponse<Space>;
+
+/******************************************************************************
+                    Space contents (backend B3, built to design 4.2)
+******************************************************************************/
+
+/**
+ * The space an item is in, stamped on every row of the three listings (and,
+ * from B3, on the item's own resource). The usual paginated envelope carries
+ * the rows: `LengthAwareResponse`, confirmed by backend on 11 October 2026.
+ */
+export interface SpaceRef {
+  uuid: string;
+  name: string;
+}
+
+/**
+ * The person a space chat belongs to. Design 4.2 says the space listing comes
+ * "with author", and `ConversationResource.author` is the chat's OWNER (not the
+ * writer of one turn, which is `MessageResource.author`). Only `name` is read,
+ * so only `name` is required: the rest is typed loosely until B3 is measured.
+ */
+export interface SpaceContentAuthor {
+  id?: number;
+  uuid?: string;
+  name: string;
+  avatar_url?: string | null;
+}
+
+/** One chat in a space: the conversations-list row, plus its owner. */
+export interface SpaceConversation extends ConversationListItem {
+  author?: SpaceContentAuthor | null;
+  space?: SpaceRef | null;
+}
+
+/**
+ * One folder in a space: the `FolderResource` the viewer's own folder list
+ * already returns (the v2 folders contract, `v2/features/folders/types.ts`
+ * `FolderRecord`, restated here because `types/` never imports from `v2/`).
+ * Structurally a `FolderNode`, so the folders row model reads it unchanged.
+ */
+export interface SpaceFolder {
+  id: number;
+  uuid: string;
+  name: string;
+  slug: string;
+  slug_path: string;
+  icon: string | null;
+  color: string | null;
+  is_private: boolean;
+  children_count: number;
+  items_count: number;
+  is_bookmarked: boolean;
+  created_at: string;
+  updated_at?: string;
+  user?: { id: number; name: string; avatar_url: string | null };
+  space?: SpaceRef | null;
+}
+
+/** One file in a space: the `FileResource`, with its uploader (design 4.2). */
+export interface SpaceFile extends UserFile {
+  uploader: FileUploader;
+  space?: SpaceRef | null;
+}
+
+export type SpaceConversationListResponse = LengthAwareResponse<SpaceConversation>;
+export type SpaceFolderListResponse = LengthAwareResponse<SpaceFolder>;
+export type SpaceFileListResponse = LengthAwareResponse<SpaceFile>;
 export type ChannelListResponse = LengthAwareResponse<Channel>;
 export type ChannelResponse = ItemResponse<Channel>;
 export type ChannelMemberListResponse = LengthAwareResponse<Member>;

@@ -60,6 +60,13 @@ import {
  * THE EXIT is the bookmarks list's grid collapse (`useExitingRows`): the list
  * holds a deleted row for `ROW_EXIT_MS` with `exiting` set, and the row folds
  * instead of vanishing between frames.
+ *
+ * ── THE SAME ROW IN A SPACE (Spaces F2, 11 October 2026) ───────────────────
+ * A space's Chats tab lists chats that are often SOMEONE ELSE'S, so it passes
+ * a `byline` (whose chat it is) and no `onDelete`: deleting is the chat
+ * owner's alone, from their own list, and the space list is read-only until
+ * F3. With no `onDelete` there is no menu and no spacer, because no row in
+ * that column has a menu to line up with.
  */
 export function ConversationRow({
   conversation,
@@ -67,6 +74,7 @@ export function ConversationRow({
   index,
   exiting,
   reveal = true,
+  byline = null,
   onDelete,
 }: {
   conversation: ConversationListItem;
@@ -81,8 +89,10 @@ export function ConversationRow({
    * 8 October 2026).
    */
   reveal?: boolean;
-  /** Opens the list's delete confirm for this row. */
-  onDelete: () => void;
+  /** A quiet second line naming whose chat this is (a space's list). */
+  byline?: string | null;
+  /** Opens the list's delete confirm for this row. Absent = no actions menu. */
+  onDelete?: () => void;
 }) {
   const { id, title, status, updated_at, is_confidential } = conversation;
   const cleanTitle = stripPastedTags(title);
@@ -118,7 +128,7 @@ export function ConversationRow({
           title={cleanTitle}
           header={{ title: cleanTitle, confidential: Boolean(is_confidential) }}
           headerOwner={id}
-          aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}`}
+          aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}${byline && !is_confidential ? `, ${byline}` : ''}`}
           className={cn(
             'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60',
             FOCUS_RING,
@@ -143,6 +153,10 @@ export function ConversationRow({
               <span className="truncate text-xs text-emerald-700 dark:text-emerald-400">
                 Confidential
               </span>
+            ) : byline ? (
+              <span className="truncate text-xs text-muted-foreground">
+                {byline}
+              </span>
             ) : null}
           </span>
 
@@ -162,7 +176,7 @@ export function ConversationRow({
           </span>
         </MoveFirstLink>
 
-        {is_confidential ? (
+        {onDelete === undefined ? null : is_confidential ? (
           <span aria-hidden className="size-9 shrink-0" />
         ) : (
           <ConversationRowMenu title={cleanTitle} onDelete={onDelete} />

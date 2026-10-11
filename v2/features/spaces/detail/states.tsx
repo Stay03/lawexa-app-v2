@@ -6,19 +6,23 @@ import { Hash, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { SpaceType } from '@/types/collab';
+import type { SpaceKind, SpaceType } from '@/types/collab';
 import { CrestSkeleton, SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import type { SpaceTab } from '../model';
+import { SpaceContentSkeleton } from './content/states';
 import {
   LobbyFactsSkeleton,
   LobbyPeopleSkeleton,
   SPACE_LOBBY_COLUMN,
   SPACE_LOBBY_GRID,
-  SPACE_LOBBY_SOLO,
+  SPACE_TAB_PANEL,
+  SPACE_TABS_ROW,
 } from './lobby-parts';
+import { SpaceTabsSkeleton } from './SpaceTabs';
 
 /**
  * The `/spaces/[spaceId]` states — the loading silhouettes and the designed
@@ -84,6 +88,8 @@ export interface SpaceFrameIdentity {
   /** The row's own description, or `null`. NOT "not yet loaded" — a space with
    *  no description prints nothing here, and so does this. */
   description: string | null;
+  /** `team` or `shared` (an absent kind on the row reads as `team`). */
+  kind: SpaceKind;
 }
 
 /**
@@ -104,38 +110,27 @@ export interface SpaceFrameIdentity {
  * ruling off `my_role`, and the presence stack needs a roster that arrives on
  * its own request. Those keep their shapes, which is what a shape is for.
  *
- * WITHOUT TEAM CHANNELS (`showsChannels` false; Spaces F1, 12 October 2026)
- * the live lobby has no channel digest and no "New channel", so neither does
- * this: the People and About regions stand alone in one column, as they will
- * when the page lands. The answer is the session's, so it is right from the
- * first frame.
+ * ── THE TABS, AND THE PANEL OF THE TAB THAT WILL OPEN (Spaces F2) ──────────
+ * Since 11 October 2026 the page is a tab strip under the identity block, and
+ * the panel below it is the lobby only on the Channels tab. So the silhouette
+ * draws the strip and the panel of the tab the page is about to open: the
+ * lobby's grid for `channels`, the rows of the list otherwise. `showsChannels`
+ * is the caller's best answer before the detail lands (the cached row's kind,
+ * and whether this viewer may open Team Channels at all); it also decides
+ * whether a "New channel" button's place is reserved.
  */
 export function SpaceScreenFrame({
   identity = null,
   showsChannels,
+  tab,
 }: {
   /** The tapped row's identity; `null` on a cold arrival keeps the silhouette. */
   identity?: SpaceFrameIdentity | null;
-  /** Whether the viewer has Team Channels: the digest and "New channel". */
+  /** Whether the page will show its channels (the Channels tab, the button). */
   showsChannels: boolean;
+  /** The tab the page will open on. */
+  tab: SpaceTab;
 }) {
-  // The side regions, shared by both layouts so their shapes cannot drift.
-  const sideRegions = (
-    <>
-      <div>
-        <Skeleton className="mb-2 h-4 w-20 rounded" />
-        {/* The SAME component the live People block draws while its roster
-            is in flight, so the fallback reserves the rows and the button
-            that are actually coming. */}
-        <LobbyPeopleSkeleton />
-      </div>
-      <div>
-        <Skeleton className="mb-2 h-4 w-16 rounded" />
-        <LobbyFactsSkeleton />
-      </div>
-    </>
-  );
-
   return (
     <div className={SPACE_LOBBY_COLUMN}>
       <div className="border-b pb-5">
@@ -201,17 +196,35 @@ export function SpaceScreenFrame({
         </div>
       </div>
 
-      {showsChannels ? (
-        <div className={SPACE_LOBBY_GRID}>
-          <div className="min-w-0">
-            <Skeleton className="mb-2 h-4 w-28 rounded" />
-            <ChannelListSkeleton />
+      <div className={SPACE_TABS_ROW}>
+        <SpaceTabsSkeleton showsChannels={showsChannels} />
+      </div>
+
+      <div className={SPACE_TAB_PANEL}>
+        {tab === 'channels' ? (
+          <div className={SPACE_LOBBY_GRID}>
+            <div className="min-w-0">
+              <Skeleton className="mb-2 h-4 w-28 rounded" />
+              <ChannelListSkeleton />
+            </div>
+            <div className="flex min-w-0 flex-col gap-6">
+              <div>
+                <Skeleton className="mb-2 h-4 w-20 rounded" />
+                {/* The SAME component the live People block draws while its
+                    roster is in flight, so the fallback reserves the rows and
+                    the button that are actually coming. */}
+                <LobbyPeopleSkeleton />
+              </div>
+              <div>
+                <Skeleton className="mb-2 h-4 w-16 rounded" />
+                <LobbyFactsSkeleton />
+              </div>
+            </div>
           </div>
-          <div className="flex min-w-0 flex-col gap-6">{sideRegions}</div>
-        </div>
-      ) : (
-        <div className={SPACE_LOBBY_SOLO}>{sideRegions}</div>
-      )}
+        ) : (
+          <SpaceContentSkeleton tab={tab} />
+        )}
+      </div>
     </div>
   );
 }

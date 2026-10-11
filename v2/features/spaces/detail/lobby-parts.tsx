@@ -20,17 +20,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 export const SPACE_LOBBY_COLUMN =
   'mx-auto w-full max-w-5xl px-4 pb-16 pt-5 sm:pt-6';
 
-/** The lobby's two-column grid: the digest, then the facts about the place. */
+/** The lobby's two-column grid: the digest, then the facts about the place.
+ *  Since Spaces F2 it is the Channels TAB's panel, so the gap above it is the
+ *  panel's ({@link SPACE_TAB_PANEL}), the same for every tab. */
 export const SPACE_LOBBY_GRID =
-  'mt-6 grid gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,1fr)_18rem]';
+  'grid gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,1fr)_18rem]';
 
-/**
- * The lobby WITHOUT the channel digest: one column of People and About, for a
- * viewer without Team Channels (Spaces F1, 12 October 2026). Capped at a
- * reading width, because the side regions were drawn for 18rem and stretched
- * across the whole column they would be a few short lines lost in space.
- */
-export const SPACE_LOBBY_SOLO = 'mt-6 flex min-w-0 max-w-xl flex-col gap-6';
+/** The tab strip under the identity block, and the panel under the strip.
+ *  Shared by the live page and its silhouette, so the hand-off moves nothing. */
+export const SPACE_TABS_ROW = 'mt-5';
+export const SPACE_TAB_PANEL = 'mt-5';
 
 /**
  * One region of the lobby. The heading is a real `h2` and the count beside it

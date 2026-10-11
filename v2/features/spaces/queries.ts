@@ -1,7 +1,24 @@
-import { queryOptions } from '@tanstack/react-query';
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { spacesApi } from '@/lib/api/collab';
-import type { MemberListParams, SpaceListParams } from '@/types/collab';
+import type {
+  LengthAwareResponse,
+  MemberListParams,
+  SpaceConversationListParams,
+  SpaceFileListParams,
+  SpaceFolderListParams,
+  SpaceListParams,
+} from '@/types/collab';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
+
+/** One page of a space's chats, folders or files. Twenty fills a phone twice
+ *  over, so the sentinel has a page in hand before the reader reaches it. */
+const SPACE_CONTENT_PER_PAGE = 20;
+
+/** The next page off the length-aware envelope, or `undefined` at the end. */
+function nextPageOf<T>(lastPage: LengthAwareResponse<T>): number | undefined {
+  const { current_page, last_page } = lastPage.pagination;
+  return current_page < last_page ? current_page + 1 : undefined;
+}
 
 /**
  * Spaces query factory (the `v2/features/cases/queries.ts` exemplar pattern) —
@@ -100,6 +117,90 @@ export const spacesQueries = {
       gcTime: GC_TIMES.list,
       refetchOnMount: REFETCH_ON_VISIT,
     }),
+
+  /**
+   * ── A SPACE'S CONTENTS: chats, folders, files (backend B3, design 4.2) ────
+   * Spaces F2, 11 October 2026. Three paginated lists every member may read,
+   * each an infinite query paged on the API's `pagination` envelope, the way
+   * the conversations and folders lists page.
+   *
+   * THEY LIVE UNDER `['spaces']`, NOT UNDER THE FEATURES THEY LIST. The chats
+   * leaf in particular must stay OUT of `conversationsQueries.lists()`: every
+   * `conversationsCache` writer fans over that prefix and treats what it finds
+   * as the VIEWER'S OWN list (a send bumps a row to the top, a create upserts
+   * one), which a space's list of other people's chats is not. Same for the
+   * folders family. One handle per space ({@link contentsOf}) invalidates all
+   * three when F3/F4 move or add something.
+   *
+   * Standard tier, 30-minute retention, `REFETCH_ON_VISIT`: other members add
+   * to a space while the reader is away, so an arrival must ask (the
+   * conversations list's reasoning, word for word).
+   */
+  contentsOf: (spaceUuid: string) =>
+    [...spacesQueries.all, 'contents', spaceUuid] as const,
+
+  conversations: (spaceUuid: string, { viewerId }: ViewerScoped) => {
+    const params: SpaceConversationListParams = {
+      per_page: SPACE_CONTENT_PER_PAGE,
+      sort_by: 'updated_at',
+      sort_order: 'desc',
+    };
+    return infiniteQueryOptions({
+      queryKey: [
+        ...spacesQueries.contentsOf(spaceUuid),
+        'conversations',
+        params,
+        { viewerId },
+      ] as const,
+      queryFn: ({ pageParam }) =>
+        spacesApi.getConversations(spaceUuid, { ...params, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: nextPageOf,
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    });
+  },
+
+  /** The space's ROOT folders. A folder opens on its own page (`/folders/{uuid}`),
+   *  which lists its children, so the space page never sends `parent_id`. */
+  folders: (spaceUuid: string, { viewerId }: ViewerScoped) => {
+    const params: SpaceFolderListParams = { per_page: SPACE_CONTENT_PER_PAGE };
+    return infiniteQueryOptions({
+      queryKey: [
+        ...spacesQueries.contentsOf(spaceUuid),
+        'folders',
+        params,
+        { viewerId },
+      ] as const,
+      queryFn: ({ pageParam }) =>
+        spacesApi.getFolders(spaceUuid, { ...params, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: nextPageOf,
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    });
+  },
+
+  files: (spaceUuid: string, { viewerId }: ViewerScoped) => {
+    const params: SpaceFileListParams = { per_page: SPACE_CONTENT_PER_PAGE };
+    return infiniteQueryOptions({
+      queryKey: [
+        ...spacesQueries.contentsOf(spaceUuid),
+        'files',
+        params,
+        { viewerId },
+      ] as const,
+      queryFn: ({ pageParam }) =>
+        spacesApi.getFiles(spaceUuid, { ...params, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: nextPageOf,
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    });
+  },
 
   /** Invalidation handle for one space's member roster (all params variants). */
   membersOf: (spaceUuid: string) =>

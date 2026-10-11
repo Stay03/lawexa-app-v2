@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Link2, Loader2, Pencil, Trash2, UserPlus } from 'lucide-react';
 
@@ -18,9 +18,10 @@ import {
 import { extractApiError } from '@/lib/utils/api-error';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
-import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
+import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
   clearScreenContext,
@@ -37,14 +38,25 @@ import {
 import { InviteLinksPanel } from '@/v2/features/invites/InviteLinksPanel';
 import { SpaceJoinRequestsPanel } from '@/v2/features/invites/JoinRequestsPanel';
 import { SpaceFormDialog } from '../dialogs/SpaceFormDialog';
+import {
+  defaultSpaceTab,
+  isSharedSpace,
+  parseSpaceTab,
+  spaceShowsChannels,
+  type SpaceTab,
+} from '../model';
 import { useDeleteSpace } from '../mutations';
 import { NO_SPACE_THREADS } from './activity-digest';
+import { CachedSpaceFrame } from './CachedSpaceFrame';
+import { SpaceContentPanel } from './content/SpaceContentPanel';
 import {
   SPACE_LOBBY_COLUMN,
   SPACE_LOBBY_GRID,
-  SPACE_LOBBY_SOLO,
+  SPACE_TAB_PANEL,
+  SPACE_TABS_ROW,
 } from './lobby-parts';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
+import { SpaceTabs } from './SpaceTabs';
 import {
   SpaceAboutBlock,
   SpaceActivityBlock,
@@ -80,11 +92,42 @@ import {
  * because a shareable, refresh-surviving link that re-opens "Delete this
  * space?" is an armed trigger, and this dialog carries the server's sentence
  * from the last failed attempt, which a restored URL cannot reproduce.
+ *
+ * ── ONE SPACE, FOUR TABS (Spaces F2, 11 October 2026) ──────────────────────
+ * Stay decided that one Space holds chats, folders and files for every
+ * member, and that channels stay with team spaces, for researchers and above.
+ * So under the identity block the page is a tab strip: Chats, Folders and
+ * Files for every member, read-only lists until F3 and F4 add to them, and
+ * first of all a Channels tab holding the lobby above (the activity digest,
+ * the people, the facts) wherever the space shows its channels to this viewer
+ * (`scope.showsChannels`, the frame's answer, so the tab and the rail can
+ * never disagree). A team space seen by a researcher opens on Channels, so
+ * nothing changes for the team; everyone else opens on Chats.
+ *
+ * THE TAB IS IN THE URL, QUIETLY (`?tab=`, the radar screen's idiom): read
+ * once from the address, then held here and written back with a quiet
+ * replace, so switching tabs costs no history entry and no router round trip,
+ * and a copied link opens the same tab. The default tab writes nothing, and a
+ * value this viewer does not have (`channels` on a shared space) resolves to
+ * the default rather than to an empty strip.
  */
 /** Stable empty reference — a fresh `[]` per render would churn the publish. */
 const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
 
+/** The one tab panel's id; `TabRow` mints the tab ids from it. */
+const PANEL_ID = 'space-tab-panel';
+
 export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
+  // `useSearchParams` (the tab) needs a boundary; its fallback is the route's
+  // own silhouette, so the boundary cannot show a second shape.
+  return (
+    <Suspense fallback={<CachedSpaceFrame />}>
+      <SpaceScreenBody spaceUuid={spaceUuid} />
+    </Suspense>
+  );
+}
+
+function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   const scope = useCollabSpaceScope();
   /* What the spaces list already knew about this space — crest, kicker, name,
      description. It fills the frame below so the silhouette the route boundary
@@ -103,6 +146,44 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
 
   const space = scope?.space ?? null;
   const canManage = scope?.canManage ?? false;
+  const showsChannels = scope?.showsChannels ?? false;
+
+  /* ── The tab (see the docblock) ──────────────────────────────────────────
+     The raw `?tab=` value, read once, then owned here. Held RAW rather than
+     resolved, because which tabs exist is only known once the space has
+     loaded: a `?tab=channels` link must survive the pending render. */
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const [tabParam, setTabParam] = useState<string | null>(urlTab);
+  // A soft navigation to this same space with another `?tab=` (a link from
+  // elsewhere in the app) changes the router's search params without
+  // remounting this page, so the tab follows it. Adjusted during render, keyed
+  // on the previous value, which is React's sanctioned way to reset state from
+  // a changed input. The quiet writes below never reach the router, so they
+  // can never trigger this.
+  const [seenUrlTab, setSeenUrlTab] = useState<string | null>(urlTab);
+  if (urlTab !== seenUrlTab) {
+    setSeenUrlTab(urlTab);
+    setTabParam(urlTab);
+  }
+  const tab = parseSpaceTab(tabParam, showsChannels);
+  const setTab = useCallback(
+    (next: SpaceTab) => {
+      const value = next === defaultSpaceTab(showsChannels) ? null : next;
+      setTabParam(value);
+      quietReplaceUrlParams({ tab: value });
+    },
+    [showsChannels],
+  );
+  // Back and Forward restore the address but not this state (the quiet write
+  // never told the router), so the tab is re-read from the address on each.
+  useEffect(() => {
+    const onPopState = () => {
+      setTabParam(new URLSearchParams(window.location.search).get('tab'));
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   /**
    * ── THE SPACE'S THREADS, THE LOBBY'S OWN READ ─────────────────────────────
@@ -131,19 +212,19 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
    * heading's "N threads" is a page count in the same way "N channels" already
    * is.
    *
-   * AND NEVER WITHOUT TEAM CHANNELS (Spaces F1, 12 October 2026). Threads are
-   * channels, the backend refuses them to an account without the flag (B0), and
-   * such a reader's lobby has no digest to put them in.
+   * AND ONLY WHERE THE DIGEST IS ON SCREEN (Spaces F2): the space shows its
+   * channels to this viewer, and the Channels tab is the one open. Threads are
+   * channels, so below researcher the backend refuses the route (B0), and a
+   * shared space has none.
    */
   const eligible = collabAccessState(session) === 'eligible';
-  const showsChannels = canOpenTeamChannels(session);
   const threadsQuery = useQuery({
     ...channelsQueries.threadsBySpace({
       spaceUuid,
       viewerId: session.userId,
       per_page: 50,
     }),
-    enabled: eligible && showsChannels && space !== null,
+    enabled: eligible && space !== null && showsChannels && tab === 'channels',
   });
   /* The frozen empty default while the list is pending, refused or ungated:
      a fresh `[]` here would give `SpaceActivityBlock`'s digest memo a new
@@ -254,16 +335,28 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   }, [pathname, actions]);
   useEffect(() => () => clearScreenContext(), []);
 
+  // Before the detail lands, the silhouette draws the tab the page is most
+  // likely to open: the cached row's kind (a cold arrival reads as a team
+  // space, which every space before shared ones is), the `CachedSpaceFrame`
+  // rule, plus whatever `?tab=` asked for.
+  const pendingShowsChannels = spaceShowsChannels(
+    { kind: cachedIdentity?.kind ?? 'team' },
+    session,
+  );
+  const pendingFrame = (
+    <SpaceScreenFrame
+      identity={cachedIdentity}
+      showsChannels={pendingShowsChannels}
+      tab={parseSpaceTab(tabParam, pendingShowsChannels)}
+    />
+  );
+
   // Defensive, and never expected: this page is a child of the `(collab)`
   // layout, which always provides the scope. Drawing the silhouette is the
   // honest answer if that ever stops being true — never a crash, never a lie.
-  if (scope === null) {
-    return <SpaceScreenFrame identity={cachedIdentity} showsChannels={showsChannels} />;
-  }
+  if (scope === null) return pendingFrame;
 
-  if (scope.isSpacePending) {
-    return <SpaceScreenFrame identity={cachedIdentity} showsChannels={showsChannels} />;
-  }
+  if (scope.isSpacePending) return pendingFrame;
 
   if (scope.isSpaceError || space === null) {
     const status = scope.spaceErrorStatus ?? 0;
@@ -294,20 +387,6 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
     });
   };
 
-  // The People and About regions, in either layout below.
-  const lobbySide = (
-    <>
-      <SpacePeopleBlock
-        space={space}
-        members={scope.members}
-        isPending={scope.isMembersPending}
-        canManage={canManage}
-        onOpenRoster={scope.openRoster}
-      />
-      <SpaceAboutBlock space={space} />
-    </>
-  );
-
   return (
     <div className={SPACE_LOBBY_COLUMN}>
       <SpacePlaceHeader
@@ -318,33 +397,58 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
         onOpenRoster={scope.openRoster}
       />
 
-      {/* WITHOUT TEAM CHANNELS there is no digest (its requests are refused,
-          and a block waiting on a disabled query would pulse forever), so the
-          People and About regions stand alone in one column. */}
-      {showsChannels ? (
-        <div className={SPACE_LOBBY_GRID}>
-          <SpaceActivityBlock
-            sections={scope.sections}
-            // THE ONE WIRING POINT for the space's threads, live since
-            // 2026-08-16 (`GET /spaces/{uuid}/threads`). The digest merges
-            // these with the channel rows so the space's mention badge has
-            // rows to land on; see the query mount above for the gate and the
-            // page size.
-            threads={threads}
-            isPending={scope.isChannelsPending || threadsQuery.isPending}
-            isError={scope.isChannelsError || threadsQuery.isError}
-            onRetry={retryActivity}
-            canCreate={canManage}
-            onCreateChannel={scope.openCreateChannel}
-            onOpenRail={scope.openRail}
-            now={now}
-          />
+      <div className={SPACE_TABS_ROW}>
+        <SpaceTabs
+          showsChannels={showsChannels}
+          value={tab}
+          onChange={setTab}
+          panelId={PANEL_ID}
+        />
+      </div>
 
-          <div className="flex min-w-0 flex-col gap-6">{lobbySide}</div>
-        </div>
-      ) : (
-        <div className={SPACE_LOBBY_SOLO}>{lobbySide}</div>
-      )}
+      <div
+        id={PANEL_ID}
+        role="tabpanel"
+        aria-labelledby={`${PANEL_ID}-tab-${tab}`}
+        className={SPACE_TAB_PANEL}
+      >
+        {tab === 'channels' ? (
+          <div className={SPACE_LOBBY_GRID}>
+            <SpaceActivityBlock
+              sections={scope.sections}
+              // THE ONE WIRING POINT for the space's threads, live since
+              // 2026-08-16 (`GET /spaces/{uuid}/threads`). The digest merges
+              // these with the channel rows so the space's mention badge has
+              // rows to land on; see the query mount above for the gate and
+              // the page size.
+              threads={threads}
+              isPending={scope.isChannelsPending || threadsQuery.isPending}
+              isError={scope.isChannelsError || threadsQuery.isError}
+              onRetry={retryActivity}
+              canCreate={canManage}
+              onCreateChannel={scope.openCreateChannel}
+              onOpenRail={scope.openRail}
+              now={now}
+            />
+
+            <div className="flex min-w-0 flex-col gap-6">
+              <SpacePeopleBlock
+                space={space}
+                members={scope.members}
+                isPending={scope.isMembersPending}
+                canManage={canManage}
+                onOpenRoster={scope.openRoster}
+              />
+              <SpaceAboutBlock space={space} />
+            </div>
+          </div>
+        ) : (
+          // `key` per tab: each list is its own query and its own frozen
+          // clock, so a switch is a fresh mount, never one list's rows
+          // briefly under another tab's name.
+          <SpaceContentPanel key={tab} tab={tab} spaceUuid={space.uuid} />
+        )}
+      </div>
 
       {/* INVITE LINKS AND THE WAITING LIST — admin surfaces, on the same
           url-overlay mechanism as Edit so Back closes them (W1 rule). */}
@@ -405,8 +509,11 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {space.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This deletes the space and every channel in it, for everyone. It
-              can&rsquo;t be undone.
+              {/* A shared space has no channels, so it does not promise to
+                  delete any (Spaces F2). */}
+              {isSharedSpace(space)
+                ? 'This deletes the space for everyone. It can’t be undone.'
+                : 'This deletes the space and every channel in it, for everyone. It can’t be undone.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError ? (

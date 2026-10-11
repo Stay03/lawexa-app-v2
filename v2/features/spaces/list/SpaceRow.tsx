@@ -15,7 +15,14 @@ import {
   UnreadDot,
   formatRelativeTime,
 } from '@/v2/shell/designs/modules';
-import { memberCountLabel, spaceOwnerLabel, spaceUnreadGrammar } from '../model';
+import {
+  isSharedSpace,
+  memberCountLabel,
+  showsTeamMark,
+  spaceContentCountsLabel,
+  spaceOwnerLabel,
+  spaceUnreadGrammar,
+} from '../model';
 import type { SpaceActivity } from './space-activity';
 
 /**
@@ -79,6 +86,21 @@ import type { SpaceActivity } from './space-activity';
  * `memo` still earns its place: a rollup change in one space re-renders that
  * lane and leaves the others alone. It does yield when the channel cache
  * moves, because that is precisely when the chips must change.
+ *
+ * ── THE KIND, QUIETLY (Spaces F2, 11 October 2026) ─────────────────────────
+ * One Space now comes in two kinds, and the list says which only where it
+ * matters: a small "Team" mark beside the name of a team space (the old kind,
+ * the one with channels). A shared space, the new default, needs no mark. Its
+ * second line, when it has no channel chips, says what it HOLDS ("3 chats ·
+ * 1 file") from the counts the backend stamps from B1, which is the question
+ * a shared space's lane answers; an API without the counts keeps the line it
+ * had. The starter Work and Study spaces are rows like any other.
+ *
+ * THE MARK NEEDS AN EXPLICIT `team`, AND A VIEWER WHO HAS TEAM CHANNELS (fix
+ * after review, 11 October 2026; `showsTeamMark`). Before B1 every row comes
+ * without a kind, and a regular user must never see "Team" on their own Work
+ * or Study space: below researcher a team space shows no channels, so the
+ * word would name something they cannot open.
  */
 
 /** One frozen empty roster. `GET /api/spaces` attaches `members` only on
@@ -91,6 +113,7 @@ export const SpaceRow = memo(function SpaceRow({
   activity,
   now,
   index,
+  canOpenTeamChannels,
 }: {
   space: Space;
   /** The viewer's channels in this space — chips, overflow, latest activity. */
@@ -99,10 +122,14 @@ export const SpaceRow = memo(function SpaceRow({
   now: number;
   /** Staggers the entrance for the first screenful only. */
   index: number;
+  /** Whether this viewer may open Team Channels (the screen's one answer). */
+  canOpenTeamChannels: boolean;
 }) {
   const { unread, mentions } = spaceUnreadGrammar(space);
   const age = formatRelativeTime(activity.lastMessageAt, now);
   const hasChips = activity.chips.length > 0;
+  const shared = isSharedSpace(space);
+  const holds = shared ? spaceContentCountsLabel(space) : null;
   const memberWords = memberCountLabel(space.active_members_count);
   const faces = space.members
     ? space.members.filter((member) => member.is_active).map((member) => member.user)
@@ -140,6 +167,11 @@ export const SpaceRow = memo(function SpaceRow({
               {space.name}
             </span>
             {unread ? <UnreadDot /> : null}
+            {showsTeamMark(space, canOpenTeamChannels) ? (
+              <span className="shrink-0 rounded-md border border-border px-1.5 text-[10px] font-medium leading-4 text-muted-foreground">
+                Team
+              </span>
+            ) : null}
             {space.is_private ? (
               <Lock
                 aria-label="Private space"
@@ -156,7 +188,7 @@ export const SpaceRow = memo(function SpaceRow({
                     <ChannelChips key="chips" activity={activity} />,
                     space.organization?.name ?? null,
                   ]
-                : [space.type_label, spaceOwnerLabel(space)]
+                : [holds ?? space.type_label, spaceOwnerLabel(space)]
             }
             trail={[
               <PresenceStack

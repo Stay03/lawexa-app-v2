@@ -50,8 +50,8 @@ export function SpacePlaceHeader({
 }: {
   space: Space;
   members: readonly Member[];
-  /** May manage the space AND has Team Channels (Spaces F1, 12 October 2026):
-   *  without the flag there is no channel to create. */
+  /** May manage the space AND the space shows its channels to this viewer
+   *  (Spaces F2): a shared space has no channels to add one to. */
   canCreateChannel: boolean;
   onCreateChannel: () => void;
   onOpenRoster: () => void;

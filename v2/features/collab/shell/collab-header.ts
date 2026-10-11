@@ -94,8 +94,9 @@ export interface CollabHeaderContext {
   backLabel: string;
   /**
    * Opens the space drawer. MUST be referentially stable (see the docblock).
-   * `null` where there is no drawer: a viewer without Team Channels (Spaces
-   * F1, 12 October 2026), so the header draws no opener for it.
+   * `null` where the place has no drawer: a space that shows no channels to
+   * this viewer (a shared space, or a viewer without Team Channels; Spaces F2, 11
+   * October 2026), so the header draws no opener for a drawer that is not there.
    */
   openRail: (() => void) | null;
 }

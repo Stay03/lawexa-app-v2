@@ -2,19 +2,37 @@
 
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Briefcase, Building2, Globe, GraduationCap, Loader2, Lock, User } from 'lucide-react';
+import {
+  Briefcase,
+  Building2,
+  FolderOpen,
+  Globe,
+  GraduationCap,
+  Loader2,
+  Lock,
+  MessagesSquare,
+  User,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { Space, SpaceType } from '@/types/collab';
+import type { Space, SpaceKind, SpaceType } from '@/types/collab';
 import { ChoiceCards, type Choice } from '@/v2/features/collab/kit/ChoiceCards';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
+import { canOpenTeamChannels } from '@/v2/features/collab/model';
 import { organizationsQueries } from '@/v2/features/organizations/queries';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
-import { SPACE_DESCRIPTION_MAX, SPACE_NAME_MAX } from '../model';
+import {
+  SPACE_DESCRIPTION_MAX,
+  SPACE_NAME_MAX,
+  canSpaceBeOpen,
+  createSpaceKind,
+  spaceKind,
+} from '../model';
 import { useCreateSpace, useUpdateSpace } from '../mutations';
 
 /**
@@ -83,6 +101,18 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * `onCreated` therefore carries BOTH halves of the destination — the space and
  * its starter channel — and {@link spaceCreationHref} turns them into the one
  * URL a host should push, so no caller has to re-derive the fallback rule.
+ *
+ * ── SHARED OR TEAM (Spaces F2, 11 October 2026) ────────────────────────────
+ * One Space now comes in two kinds. Below researcher there is nothing to
+ * choose: the dialog sends NO kind and the server makes a shared space (it
+ * refuses `team` there), which has no starter channel, so the creator lands
+ * on the space page. A researcher or above chooses Shared space or Team space
+ * and the choice is sent (`createSpaceKind`). The kind is fixed once made, so
+ * the edit form does not offer it.
+ *
+ * A SHARED SPACE IS ALWAYS PRIVATE: the backend refuses `is_private: false` on
+ * one (422). So "Who can join" is not offered for a shared space, in either
+ * mode, and the form sends `is_private: true` for it.
  */
 
 type Privacy = 'private' | 'open';
@@ -127,6 +157,21 @@ const TYPE_CHOICES: readonly Choice<SpaceType>[] = [
   },
 ];
 
+const KIND_CHOICES: readonly Choice<SpaceKind>[] = [
+  {
+    value: 'shared',
+    icon: FolderOpen,
+    title: 'Shared space',
+    description: 'Chats, folders and files you share with the people you invite. Always private.',
+  },
+  {
+    value: 'team',
+    icon: MessagesSquare,
+    title: 'Team space',
+    description: 'Adds Team Channels for discussion. Only researchers and above see channels.',
+  },
+];
+
 const PRIVACY_CHOICES: readonly Choice<Privacy>[] = [
   {
     value: 'private',
@@ -166,6 +211,9 @@ export function SpaceFormDialog({
 }) {
   const isEdit = !!space;
   const uid = useId();
+  const session = useV2Session();
+  // Only a create, and only for an account that may open Team Channels.
+  const canChooseKind = !isEdit && canOpenTeamChannels(session);
 
   const createSpace = useCreateSpace();
   const updateSpace = useUpdateSpace(space?.uuid ?? '');
@@ -185,9 +233,20 @@ export function SpaceFormDialog({
     (space?.is_private ?? true) ? 'private' : 'open',
   );
   const [owner, setOwner] = useState<string>(space?.organization?.uuid ?? 'personal');
+  // A researcher's create starts on Team, the kind the server would make for
+  // them unasked, so nothing changes for anyone who does not touch it.
+  const [chosenKind, setChosenKind] = useState<SpaceKind>('team');
   const [error, setError] = useState<string | null>(null);
 
-  const isPrivate = privacy === 'private';
+  // The kind this form is about: the space's own in edit; the choice when
+  // there is one; otherwise shared, which is what the server makes.
+  const kind: SpaceKind = space
+    ? spaceKind(space)
+    : canChooseKind
+      ? chosenKind
+      : 'shared';
+  const canBeOpen = canSpaceBeOpen(kind);
+  const isPrivate = !canBeOpen || privacy === 'private';
   const submitting = createSpace.isPending || updateSpace.isPending;
 
   // An untouched edit form must not fire a PUT. Compared against the values the
@@ -247,6 +306,7 @@ export function SpaceFormDialog({
       {
         name: trimmedName,
         type,
+        kind: createSpaceKind(chosenKind, canChooseKind),
         description: trimmedDescription || undefined,
         is_private: isPrivate,
         organization_uuid: owner === 'personal' ? undefined : owner,
@@ -286,7 +346,7 @@ export function SpaceFormDialog({
       description={
         isEdit
           ? 'Update this space’s details. Everyone in it sees the change.'
-          : 'A space groups channels for one team, one matter or one subject.'
+          : 'A space holds chats, folders and files for the people you invite.'
       }
       className="md:max-w-2xl"
       footer={
@@ -327,6 +387,15 @@ export function SpaceFormDialog({
             />
           </div>
 
+          {canChooseKind ? (
+            <ChoiceCards
+              legend="Kind"
+              choices={KIND_CHOICES}
+              value={chosenKind}
+              onChange={setChosenKind}
+            />
+          ) : null}
+
           <ChoiceCards
             legend="Type"
             choices={TYPE_CHOICES}
@@ -355,12 +424,14 @@ export function SpaceFormDialog({
             />
           </div>
 
-          <ChoiceCards
-            legend="Who can join"
-            choices={PRIVACY_CHOICES}
-            value={privacy}
-            onChange={setPrivacy}
-          />
+          {canBeOpen ? (
+            <ChoiceCards
+              legend="Who can join"
+              choices={PRIVACY_CHOICES}
+              value={privacy}
+              onChange={setPrivacy}
+            />
+          ) : null}
         </div>
 
         <div className="order-1 sm:order-2">
@@ -368,6 +439,7 @@ export function SpaceFormDialog({
             uuid={space?.uuid ?? null}
             name={name}
             type={type}
+            kind={kind}
             isPrivate={isPrivate}
             ownerLabel={ownerLabel}
           />
@@ -393,6 +465,7 @@ function SpacePreview({
   uuid,
   name,
   type,
+  kind,
   isPrivate,
   ownerLabel,
 }: {
@@ -400,6 +473,7 @@ function SpacePreview({
   uuid: string | null;
   name: string;
   type: SpaceType;
+  kind: SpaceKind;
   isPrivate: boolean;
   ownerLabel: string;
 }) {
@@ -426,6 +500,7 @@ function SpacePreview({
       </span>
 
       <span className="flex flex-wrap items-center justify-center gap-1">
+        <PreviewChip>{kind === 'team' ? 'Team' : 'Shared'}</PreviewChip>
         <PreviewChip>{type === 'study' ? 'Study' : 'Work'}</PreviewChip>
         <PreviewChip>{isPrivate ? 'Private' : 'Open'}</PreviewChip>
         <PreviewChip>{ownerLabel}</PreviewChip>

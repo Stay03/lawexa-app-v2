@@ -97,14 +97,14 @@ test('the gate, the spine, both homes and discover all read the flag, never the 
   const spine = read('v2', 'runtime', 'realtime', 'spine.tsx');
   assert.match(spine, /channelsQueries\.mine\(\{ viewerId \}\), enabled: canOpenTeamChannels\(session\)/);
   // The two other mounts of the channel list ask for it only with the flag too:
-  // the collab frame on a space route and the Spaces list's channel chips.
-  for (const file of [
-    ['v2', 'features', 'collab', 'shell', 'CollabFrame.tsx'],
-    ['v2', 'features', 'spaces', 'list', 'SpacesBrowser.tsx'],
-  ]) {
-    const source = read(...file);
-    assert.match(source, /channelsQueries\.mine\(\{ viewerId \}\),[\s\S]{0,200}?enabled: canOpenTeamChannels\(session\),/, file.join('/'));
-  }
+  // the Spaces list's channel chips directly, and the collab frame through
+  // `showsChannels` (Spaces F2: the flag AND a team space on a space route,
+  // the flag itself on a channel route).
+  const browser = read('v2', 'features', 'spaces', 'list', 'SpacesBrowser.tsx');
+  assert.match(browser, /channelsQueries\.mine\(\{ viewerId \}\),[\s\S]{0,200}?enabled: canOpenTeamChannels\(session\),/);
+  const frame = read('v2', 'features', 'collab', 'shell', 'CollabFrame.tsx');
+  assert.match(frame, /channelsQueries\.mine\(\{ viewerId \}\),\s*enabled: eligible && showsChannels,/);
+  assert.match(frame, /const showsChannels = isSpaceRoute[\s\S]{0,200}?: canOpenTeamChannels\(session\);/);
   for (const home of ['WorkHome.tsx', 'StudyHome.tsx']) {
     const source = read('v2', 'shell', 'designs', home);
     assert.match(source, /const \{ canAccessTeamChannels \} = useV2Session\(\);/, home);

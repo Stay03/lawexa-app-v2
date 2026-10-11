@@ -35,6 +35,11 @@ import { folderCountsLabel, type FolderRowModel } from '../folder-row-model';
  *
  * `memo` holds because every prop is either a value or a callback the browser
  * memoises at the list level.
+ *
+ * A SPACE'S FOLDERS TAB (Spaces F2, 11 October 2026) draws the same row with
+ * no `onRename`: those folders may belong to other members, renaming and
+ * deleting stay with each folder's owner, and the space list is read-only
+ * until F3. No `onRename`, no actions menu.
  */
 export const FolderRow = memo(function FolderRow({
   row,
@@ -49,8 +54,8 @@ export const FolderRow = memo(function FolderRow({
    *  `useState` so no `Date.now()` runs in render (React Compiler lint). */
   now: number;
   /** Opens the list's rename dialog for this folder. MUST be stable, or the
-   *  `memo` above stops holding. */
-  onRename: (row: FolderRowModel) => void;
+   *  `memo` above stops holding. Absent = no actions menu. */
+  onRename?: (row: FolderRowModel) => void;
 }) {
   const trail = formatRelativeTime(row.trailAt, now);
 
@@ -113,16 +118,18 @@ export const FolderRow = memo(function FolderRow({
             `mt-0.5`, so the trigger and the tile sit on the same baseline and
             the row reads as one bar between two anchors (the arithmetic
             `BookmarkRow` and `NoteRow` both document). */}
-        <FolderActionsMenu
-          folder={{
-            uuid: row.uuid,
-            name: row.name,
-            itemsCount: row.itemsCount,
-            childrenCount: row.childrenCount,
-          }}
-          onRename={() => onRename(row)}
-          className="mt-3.5"
-        />
+        {onRename ? (
+          <FolderActionsMenu
+            folder={{
+              uuid: row.uuid,
+              name: row.name,
+              itemsCount: row.itemsCount,
+              childrenCount: row.childrenCount,
+            }}
+            onRename={() => onRename(row)}
+            className="mt-3.5"
+          />
+        ) : null}
       </div>
     </li>
   );

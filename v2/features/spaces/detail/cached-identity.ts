@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import type { Space } from '@/types/collab';
 import { findCachedRow } from '@/v2/runtime/seed-detail';
-import { spaceOwnerLabel } from '../model';
+import { spaceKind, spaceOwnerLabel } from '../model';
 import { spacesQueries } from '../queries';
 import type { SpaceFrameIdentity } from './states';
 
@@ -42,5 +42,9 @@ export function useCachedSpaceIdentity(
     ownerLabel: spaceOwnerLabel(row),
     isPrivate: row.is_private,
     description: row.description?.trim() || null,
+    // A settled fact about the space, not a permission, so the frame may act
+    // on it before the detail lands: it decides whether a team space's rail
+    // width is reserved from the first frame (`CollabFrame`).
+    kind: spaceKind(row),
   };
 }
