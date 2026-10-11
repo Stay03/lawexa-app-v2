@@ -156,7 +156,10 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   const recents = recentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
   // Same filter, same source, same server-verified role as the rail — see
   // `visibleNavItems`. The two surfaces cannot drift on what exists.
-  const navItems = visibleNavItems(user?.role ?? null);
+  const navItems = visibleNavItems({
+    role: user?.role ?? null,
+    canAccessTeamChannels: user?.can_access_team_channels ?? false,
+  });
   // The Channels row's live unread signal. Read UNCONDITIONALLY (a hook may
   // not be called behind a branch) and off the cache entry the realtime spine
   // already mounts, so it costs an observer and never a request; it resolves

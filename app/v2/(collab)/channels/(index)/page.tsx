@@ -29,7 +29,7 @@ import { MyChannelsScreen } from '@/v2/features/channels/my-channels/MyChannelsS
  */
 export function generateMetadata(): Metadata {
   return {
-    title: 'My channels',
+    title: 'Team Channels',
     description: 'Every channel you belong to, newest activity first.',
     robots: { index: false, follow: false },
   };

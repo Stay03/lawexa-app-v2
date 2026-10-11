@@ -1,10 +1,16 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
+
 import type { Channel } from '@/types/collab';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { collabAccessState } from './model';
-import { CollabCreateAccountState, CollabSignedOutState } from './ui/states';
+import { canOpenTeamChannels, collabAccessState, isTeamChannelsPath } from './model';
+import {
+  CollabCreateAccountState,
+  CollabSignedOutState,
+  TeamChannelsClosedState,
+} from './ui/states';
 import { CollabVerifyEmailState } from './ui/VerifyEmailState';
 
 /**
@@ -24,12 +30,15 @@ import { CollabVerifyEmailState } from './ui/VerifyEmailState';
  * state ending in a silent bounce, both DROPPED by the study (A0). No
  * skeleton, no flash, no redirect: refusals are designed states.
  *
- * THE THREE REFUSALS ARE DIFFERENT ANSWERS:
+ * THE FOUR REFUSALS ARE DIFFERENT ANSWERS:
  *  - signed out → "sign in" (the door opens once you do);
  *  - guest → the create-an-account panel (registering IS the door);
  *  - unverified email → the verify panel, the one gate the backend actually
  *    enforces on collab (queries below stay `enabled: false` in this state —
- *    the collab model's `eligible` check is the same predicate everywhere).
+ *    the collab model's `eligible` check is the same predicate everywhere);
+ *  - below researcher at a Team Channels address → the Team Channels panel,
+ *    pointing at their own Spaces (the backend refuses every channel route
+ *    below researcher, 11 October 2026).
  *
  * NOT a security boundary: the backend gates on membership + verified email,
  * not on role, and does not block guest tokens (study §1 item 6). The
@@ -38,6 +47,7 @@ import { CollabVerifyEmailState } from './ui/VerifyEmailState';
  */
 export function CollabAccessGate({ children }: { children: React.ReactNode }) {
   const session = useV2Session();
+  const pathname = usePathname();
 
   switch (collabAccessState(session)) {
     case 'signed-out':
@@ -59,6 +69,20 @@ export function CollabAccessGate({ children }: { children: React.ReactNode }) {
         </div>
       );
     case 'eligible':
+      // The second door, inside the first (Stay, 11 October 2026): a channel
+      // or the channels index, for an account below researcher, is the Team
+      // Channels panel. Decided HERE, above the collab frame, so the frame
+      // never mounts and never asks the server for a channel it would refuse.
+      // This layout is not re-rendered by its own data, but the pathname hook
+      // re-renders it on every navigation, so a move from a space to a
+      // channel is still decided.
+      if (isTeamChannelsPath(pathname) && !canOpenTeamChannels(session)) {
+        return (
+          <div className={LIST_COLUMN}>
+            <TeamChannelsClosedState />
+          </div>
+        );
+      }
       return <>{children}</>;
   }
 }

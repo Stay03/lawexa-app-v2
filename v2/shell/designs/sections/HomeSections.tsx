@@ -64,7 +64,8 @@ export function ChannelMessagesSection() {
   const channels = (query.data?.data ?? []).slice(0, HOME_SECTION_ROWS);
 
   return (
-    <HomeSection title="Jump back in" action={{ href: '/spaces', label: 'All' }}>
+    // "All" is every channel: the Team Channels index, not the Spaces list.
+    <HomeSection title="Jump back in" action={{ href: '/channels', label: 'All' }}>
       {query.isPending ? (
         <HomeSectionSkeleton />
       ) : query.isError ? (

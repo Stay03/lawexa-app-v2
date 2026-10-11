@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 
-import { canAccessCollab } from '@/lib/utils/collab-audience';
+import { useV2Session } from '@/v2/runtime/session-context';
 import type { UserRole } from '@/types/auth';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
@@ -50,11 +50,11 @@ import { ChannelMessagesSection, ConversationsSection } from './sections/HomeSec
  * GUESTS get the honest minimum — greeting, composer, prompts. The sections need a
  * session and are never rendered, so they never fetch.
  *
- * THE CHANNELS SECTION follows the v2 collab audience (`canAccessCollab`) — every
- * registered account since the phase-5 ship (owner decision D1). It previously
- * carried v1's soft-launch role rule, which would now hide the section from the
- * same people the nav invites into Spaces. Guests and bots still see nothing,
- * because they cannot belong to a channel at all. Conversations are for everyone.
+ * THE CHANNELS SECTION follows Team Channels: the server's `canAccessTeamChannels` flag (researchers
+ * and above today; Stay, 11 October 2026). Channels are the research team's tool, the
+ * backend refuses their list below researcher, and the nav row has the same rule,
+ * so the home never shows a section that could only fail. Conversations are for
+ * everyone.
  */
 export function WorkHome({
   name,
@@ -66,6 +66,7 @@ export function WorkHome({
   role?: UserRole;
 }) {
   const [input, setInput] = useComposerDraft();
+  const { canAccessTeamChannels } = useV2Session();
   const [confidential, setConfidential] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
 
@@ -124,7 +125,7 @@ export function WorkHome({
 
       {signedIn ? (
         <div className={HOME_SECTIONS}>
-          {canAccessCollab(role) ? <ChannelMessagesSection /> : null}
+          {canAccessTeamChannels ? <ChannelMessagesSection /> : null}
           <ConversationsSection />
         </div>
       ) : null}

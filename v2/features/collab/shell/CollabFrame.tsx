@@ -14,7 +14,7 @@ import {
   threadParentHref,
 } from '@/v2/features/channels/thread-model';
 import { useCachedChannelIdentity } from '@/v2/features/channels/screen/cached-identity';
-import { collabAccessState } from '@/v2/features/collab/model';
+import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { useCachedSpaceIdentity } from '@/v2/features/spaces/detail/cached-identity';
 import { ChannelFormDialog } from '@/v2/features/spaces/dialogs/ChannelFormDialog';
 import { SpaceMembersSheet } from '@/v2/features/spaces/detail/SpaceMembersSheet';
@@ -84,6 +84,18 @@ import {
  * designed refusal in the pane is the whole screen, which is what a refusal
  * should be.
  *
+ * ── NO TEAM CHANNELS, NO CHANNEL CHROME (Spaces F1, 12 October 2026) ───────
+ * Channels are for accounts the server flags for Team Channels (researchers
+ * and above), and backend B0 refuses every channel route to anyone else. A
+ * space's own page stays open to every member, so on `/spaces/{uuid}` without
+ * the flag (`showsChannels` below) this frame asks for no channel list and
+ * draws no rail, no reserved width, no drawer, no header drawer toggle and no
+ * create-channel dialog, and it strips `?rail=1` and `?create=channel`. The
+ * answer is the session's, so it is known on the first frame and nothing
+ * jumps. A channel route never gets here without the flag: the collab gate
+ * above this frame refuses it first. With the flag, everything below is as it
+ * was.
+ *
  * ── THREE URL-OWNED OVERLAYS, ALL QUIET, ALL SINGLY OWNED ──────────────────
  * `?rail=1` (the mobile drawer), `?create=channel` (the one create-channel
  * dialog in the product) and `?roster=1` (the SPACE roster). They live here
@@ -146,6 +158,10 @@ function CollabPlaceFrame({
 
   const isSpaceRoute = route.kind === 'space';
   const channelUuid = route.kind === 'channel' ? route.channelUuid : null;
+  // Whether this viewer gets any channel surface or channel request here (see
+  // "No Team Channels" in the docblock). The server's flag, read off the
+  // session, so it never waits on a query.
+  const showsChannels = canOpenTeamChannels(session);
 
   /* ── The space this frame is standing in ───────────────────────────────── */
 
@@ -173,7 +189,8 @@ function CollabPlaceFrame({
    * a 403 there means the reader is not a member, and the blocked read must
    * not be requested. On a CHANNEL route no such gate is needed or wanted: the
    * channel detail having resolved is already proof of access, so the two run
-   * in parallel and the rail paints a beat sooner.
+   * in parallel and the rail paints a beat sooner. Never without Team Channels:
+   * the backend refuses it (B0).
    */
   const channelsQuery = useQuery({
     ...channelsQueries.bySpace({
@@ -182,7 +199,10 @@ function CollabPlaceFrame({
       per_page: 50,
     }),
     enabled:
-      eligible && spaceUuid !== null && (!isSpaceRoute || spaceQuery.isSuccess),
+      eligible &&
+      showsChannels &&
+      spaceUuid !== null &&
+      (!isSpaceRoute || spaceQuery.isSuccess),
   });
 
   /**
@@ -205,7 +225,9 @@ function CollabPlaceFrame({
    */
   const myChannelsQuery = useQuery({
     ...channelsQueries.mine({ viewerId }),
-    enabled: eligible,
+    // Team Channels only (11 October 2026): without the server flag this list
+    // is refused, so it is never asked for.
+    enabled: canOpenTeamChannels(session),
   });
 
   /* ── Derivations ───────────────────────────────────────────────────────── */
@@ -305,7 +327,8 @@ function CollabPlaceFrame({
 
   /* ── The three URL-owned overlays ──────────────────────────────────────── */
 
-  const rail = useUrlOverlay('rail');
+  // No drawer without Team Channels, so a copied `?rail=1` is stripped there.
+  const rail = useUrlOverlay('rail', { canOpen: showsChannels });
   // Space-route only, so the `?invite=` param nested inside the sheet has
   // exactly one owner at every address (see the docblock). A refused value is
   // stripped, so a copied `/channels/{uuid}?roster=1` degrades to the channel.
@@ -314,7 +337,12 @@ function CollabPlaceFrame({
     // The same `canManage` the affordances are gated on, so a copied
     // `?create=channel` link cannot hand a plain member a form that would 403.
     // `undefined` ONLY while the role is genuinely unknown — see `roleSettled`.
-    canOpen: roleSettled ? { channel: canManage } : undefined,
+    // Without Team Channels the answer is no at once, whatever the role.
+    canOpen: !showsChannels
+      ? { channel: false }
+      : roleSettled
+        ? { channel: canManage }
+        : undefined,
   });
 
   // The hooks' dispatchers are stable; the hook OBJECTS are not, so the
@@ -325,6 +353,8 @@ function CollabPlaceFrame({
   const { show: showCreate, closeInPlace: closeCreateInPlace } = create;
 
   const openRail = useCallback(() => showRail(), [showRail]);
+  // What the header gets: the opener, or nothing where there is no drawer.
+  const headerOpenRail = showsChannels ? openRail : null;
   const openRoster = useCallback(() => showRoster(), [showRoster]);
   const openCreateChannel = useCallback(() => showCreate('channel'), [showCreate]);
 
@@ -399,7 +429,7 @@ function CollabPlaceFrame({
       channelName,
       backHref,
       backLabel,
-      openRail,
+      openRail: headerOpenRail,
     });
     return () => clearCollabHeader();
   }, [
@@ -410,7 +440,7 @@ function CollabPlaceFrame({
     channelName,
     backHref,
     backLabel,
-    openRail,
+    headerOpenRail,
   ]);
 
   /* ── The scope handed to the page ──────────────────────────────────────── */
@@ -465,6 +495,10 @@ function CollabPlaceFrame({
     ],
   );
 
+  /** The rail and its drawer: a place that was not refused, for a viewer with
+   *  Team Channels. */
+  const hasRail = !placeRefused && showsChannels;
+
   return (
     <CollabSpaceScopeProvider scope={scope}>
       <div className="flex h-full min-h-0">
@@ -475,8 +509,9 @@ function CollabPlaceFrame({
               which the channel's own header gains its breadcrumb and section
               switch. Between `md:` and `lg:` the drawer IS the channel list,
               opened from the header's panel toggle. Hidden in CSS, never by a
-              hook, so the right chrome paints before hydration. ────────── */}
-        {placeRefused ? null : (
+              hook, so the right chrome paints before hydration. Absent, with
+              its width, without Team Channels. ─────────────────────────── */}
+        {hasRail ? (
           <aside
             aria-label="Space"
             className={cn(
@@ -501,7 +536,7 @@ function CollabPlaceFrame({
               />
             )}
           </aside>
-        )}
+        ) : null}
 
         {/* ── The pane. It owns the scroll inside a place (see the docblock);
               `overscroll-contain` keeps a rubber-band from leaking out to the
@@ -521,9 +556,9 @@ function CollabPlaceFrame({
             Mounted from the first frame — NOT gated on the space having
             resolved — because the header's opener exists from the first frame
             too, and a live control that opens nothing is worse than a
-            skeleton. It stands down only when the place was refused, where the
-            opener is gone as well. ──────────────────────────────────────── */}
-      {placeRefused ? null : (
+            skeleton. It stands down when the place was refused or the viewer
+            has no Team Channels, where the opener is gone as well. ──────── */}
+      {hasRail ? (
         <SpaceDrawer
           scope={scope}
           open={rail.open}
@@ -532,7 +567,7 @@ function CollabPlaceFrame({
           activeChannelUuid={railChannelUuid}
           atLobby={isSpaceRoute}
         />
-      )}
+      ) : null}
 
       {/* ── The ONE create-channel dialog, mounted only for a reader who may
             actually create. The `canOpen` gate above strips the param for
@@ -541,7 +576,7 @@ function CollabPlaceFrame({
             POST into a 403. `keyFor` makes every ARRIVAL a fresh mount (fields
             re-derived) while every DEPARTURE is the same instance playing its
             exit. ───────────────────────────────────────────────────────── */}
-      {spaceUuid !== null && space !== null && canManage ? (
+      {spaceUuid !== null && space !== null && canManage && showsChannels ? (
         <ChannelFormDialog
           key={create.keyFor('channel')}
           spaceUuid={spaceUuid}

@@ -44,13 +44,15 @@ import { memberCountLabel, spaceOwnerLabel } from '../model';
 export function SpacePlaceHeader({
   space,
   members,
-  canManage,
+  canCreateChannel,
   onCreateChannel,
   onOpenRoster,
 }: {
   space: Space;
   members: readonly Member[];
-  canManage: boolean;
+  /** May manage the space AND has Team Channels (Spaces F1, 12 October 2026):
+   *  without the flag there is no channel to create. */
+  canCreateChannel: boolean;
   onCreateChannel: () => void;
   onOpenRoster: () => void;
 }) {
@@ -101,7 +103,7 @@ export function SpacePlaceHeader({
           size="md"
           onClick={onOpenRoster}
         />
-        {canManage ? (
+        {canCreateChannel ? (
           <Button size="sm" className="v2-interactive" onClick={onCreateChannel}>
             <Plus aria-hidden className="size-4" />
             New channel

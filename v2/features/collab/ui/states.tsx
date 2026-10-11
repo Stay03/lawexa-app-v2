@@ -62,3 +62,25 @@ export function CollabCreateAccountState() {
     />
   );
 }
+
+/**
+ * TEAM CHANNELS ARE CLOSED TO THIS ACCOUNT — a signed-in, eligible reader below
+ * researcher at a `/channels/*` or discover URL (Stay, 11 October 2026: Team
+ * Channels for researchers and above). Not an error and not a dead end: their
+ * own Spaces are one tap away, and an old link from a notification lands here
+ * rather than on a refused request.
+ */
+export function TeamChannelsClosedState() {
+  return (
+    <CollabMessage
+      icon={MessagesSquare}
+      title="Team Channels are for researchers"
+      description="Channels and threads belong to Lawexa's research team. Your Spaces hold your chats, folders and files, and you can invite people into them."
+      action={
+        <Button asChild size="sm">
+          <Link href="/spaces">Go to your Spaces</Link>
+        </Button>
+      }
+    />
+  );
+}

@@ -96,7 +96,8 @@ const TOP_LEVEL: ReadonlyMap<string, TopLevelScreen> = new Map([
   // Collab. `/spaces/{uuid}` and `/channels/{uuid}` are pushed screens with a
   // published context of their own; only the two indexes are here.
   ['/spaces', { title: 'Spaces' }],
-  ['/channels', { title: 'My channels' }],
+  // Team Channels (researcher+), the name the nav row carries.
+  ['/channels', { title: 'Team Channels' }],
 
   // The quiz hub opens on its own hero sentence, which IS its heading.
   ['/quiz', OWN_HEADING],

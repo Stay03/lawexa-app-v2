@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
-import { canAccessCollab } from '@/lib/utils/collab-audience';
+import { useV2Session } from '@/v2/runtime/session-context';
 import type { UserRole } from '@/types/auth';
 import { useMounted } from '@/v2/shell/use-mounted';
 import { HomeGreeting } from './HomeGreeting';
@@ -64,6 +64,7 @@ export function StudyHome({
   role?: UserRole;
 }) {
   const [input, setInput] = useComposerDraft();
+  const { canAccessTeamChannels } = useV2Session();
   const [confidential, setConfidential] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
@@ -129,7 +130,7 @@ export function StudyHome({
           {isStudent ? (
             <StudyModeRow checked={studyMode} onCheckedChange={setStudyMode} />
           ) : null}
-          {canAccessCollab(role) ? <ChannelMessagesSection /> : null}
+          {canAccessTeamChannels ? <ChannelMessagesSection /> : null}
           <ConversationsSection />
           <RecentlyViewedSection />
         </div>

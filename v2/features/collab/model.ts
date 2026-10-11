@@ -62,3 +62,26 @@ export function collabAccessState(session: V2SessionSnapshot): CollabAccessState
   if (needsEmailVerification(session)) return 'verify-email';
   return 'eligible';
 }
+
+/**
+ * TEAM CHANNELS ARE A SECOND DOOR INSIDE THE FIRST (Stay, 11 October 2026).
+ * Every eligible account may use Spaces; channels and threads are for the
+ * accounts the SERVER flags (`can_access_team_channels`, researchers and above
+ * today). The app reads the flag, never the role, so who gets Team Channels
+ * can change on the server alone (techlead's decision). Also a FETCH gate:
+ * the spine's channel list and anything else that would only collect a 403
+ * runs `enabled` on this.
+ */
+export function canOpenTeamChannels(session: V2SessionSnapshot): boolean {
+  return collabAccessState(session) === 'eligible' && session.canAccessTeamChannels;
+}
+
+/**
+ * Whether `pathname` is a Team Channels address: the `/channels` index or a
+ * channel (and so a thread, which is a channel). Accepts the clean path and
+ * the internal `/v2` one, as `parseCollabRoute` does. Pure.
+ */
+export function isTeamChannelsPath(pathname: string): boolean {
+  const path = pathname.startsWith('/v2/') ? pathname.slice(3) : pathname;
+  return path === '/channels' || path.startsWith('/channels/');
+}

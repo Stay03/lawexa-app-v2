@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
-import { collabAccessState } from '@/v2/features/collab/model';
+import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { usePendingInvitationCount } from '@/v2/features/invitations/use-pending-count';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
@@ -137,7 +137,9 @@ export function SpacesBrowser() {
   // entry rather than minting a second one.
   const myChannels = useQuery({
     ...channelsQueries.mine({ viewerId }),
-    enabled: eligible,
+    // Team Channels only (11 October 2026): without the server flag this list
+    // is refused, so the lanes simply show no channel chips.
+    enabled: canOpenTeamChannels(session),
   });
 
   const pendingInvitations = usePendingInvitationCount({ viewerId, enabled: eligible });

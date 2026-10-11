@@ -76,8 +76,21 @@ export interface V2NavItem extends V2NavLeaf {
    * signed out). Omitted ⇒ visible to everyone. See the module docblock.
    */
   canAccess?: (role: UserRole | null) => boolean;
+  /**
+   * The row is a Team Channels door: shown only when the SERVER says this
+   * account may open Team Channels (`can_access_team_channels`), never by
+   * role. Takes the place of `canAccess` on that row.
+   */
+  teamChannels?: true;
   /** Optional live unread signal on this row. See {@link V2NavSignalId}. */
   signalId?: V2NavSignalId;
+}
+
+/** What the nav needs to know about the viewer: the server-verified role and
+ *  the server's Team Channels flag. */
+export interface V2NavViewer {
+  role: UserRole | null;
+  canAccessTeamChannels: boolean;
 }
 
 /** The gold primary action pinned at the top of the sidebar / bottom of the drawer. */
@@ -126,12 +139,16 @@ export const v2NavItems: V2NavItem[] = [
     // because triage comes before navigation: you open a channel far more
     // often than you go looking for the space it belongs to.
     //
-    // Same audience predicate as Spaces, from the same shared helper — the two
-    // collab doors can never drift apart on who may see them.
-    label: 'Channels',
+    // TEAM CHANNELS (Stay, 11 October 2026). The new Spaces hold chats,
+    // folders and files for every registered account; the channels and
+    // threads the old team spaces hold are the research team's tool. The row
+    // follows the SERVER's flag, the same one that opens the channel routes,
+    // so it never offers a door the server shuts, and who gets it can change
+    // on the server alone.
+    label: 'Team Channels',
     href: '/channels',
     icon: MessagesSquare,
-    canAccess: canAccessCollab,
+    teamChannels: true,
     signalId: 'channels',
   },
   {
@@ -162,9 +179,11 @@ export const v2NavItems: V2NavItem[] = [
 ];
 
 /**
- * The nav rows THIS viewer may see. Both surfaces call it with the role the v2
- * layout resolved, so the desktop rail and the mobile drawer always agree.
+ * The nav rows THIS viewer may see. Both surfaces call it with the session the
+ * v2 layout resolved, so the desktop rail and the mobile drawer always agree.
  */
-export function visibleNavItems(role: UserRole | null): V2NavItem[] {
-  return v2NavItems.filter((item) => item.canAccess?.(role) ?? true);
+export function visibleNavItems(viewer: V2NavViewer): V2NavItem[] {
+  return v2NavItems.filter((item) =>
+    item.teamChannels ? viewer.canAccessTeamChannels : (item.canAccess?.(viewer.role) ?? true),
+  );
 }

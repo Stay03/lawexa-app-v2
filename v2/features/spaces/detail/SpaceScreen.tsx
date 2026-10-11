@@ -18,7 +18,7 @@ import {
 import { extractApiError } from '@/lib/utils/api-error';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
-import { collabAccessState } from '@/v2/features/collab/model';
+import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
@@ -39,7 +39,11 @@ import { SpaceJoinRequestsPanel } from '@/v2/features/invites/JoinRequestsPanel'
 import { SpaceFormDialog } from '../dialogs/SpaceFormDialog';
 import { useDeleteSpace } from '../mutations';
 import { NO_SPACE_THREADS } from './activity-digest';
-import { SPACE_LOBBY_COLUMN, SPACE_LOBBY_GRID } from './lobby-parts';
+import {
+  SPACE_LOBBY_COLUMN,
+  SPACE_LOBBY_GRID,
+  SPACE_LOBBY_SOLO,
+} from './lobby-parts';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import {
   SpaceAboutBlock,
@@ -126,15 +130,20 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
    * halves of one merged list are therefore cut off at the same depth, and the
    * heading's "N threads" is a page count in the same way "N channels" already
    * is.
+   *
+   * AND NEVER WITHOUT TEAM CHANNELS (Spaces F1, 12 October 2026). Threads are
+   * channels, the backend refuses them to an account without the flag (B0), and
+   * such a reader's lobby has no digest to put them in.
    */
   const eligible = collabAccessState(session) === 'eligible';
+  const showsChannels = canOpenTeamChannels(session);
   const threadsQuery = useQuery({
     ...channelsQueries.threadsBySpace({
       spaceUuid,
       viewerId: session.userId,
       per_page: 50,
     }),
-    enabled: eligible && space !== null,
+    enabled: eligible && showsChannels && space !== null,
   });
   /* The frozen empty default while the list is pending, refused or ungated:
      a fresh `[]` here would give `SpaceActivityBlock`'s digest memo a new
@@ -248,9 +257,13 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   // Defensive, and never expected: this page is a child of the `(collab)`
   // layout, which always provides the scope. Drawing the silhouette is the
   // honest answer if that ever stops being true — never a crash, never a lie.
-  if (scope === null) return <SpaceScreenFrame identity={cachedIdentity} />;
+  if (scope === null) {
+    return <SpaceScreenFrame identity={cachedIdentity} showsChannels={showsChannels} />;
+  }
 
-  if (scope.isSpacePending) return <SpaceScreenFrame identity={cachedIdentity} />;
+  if (scope.isSpacePending) {
+    return <SpaceScreenFrame identity={cachedIdentity} showsChannels={showsChannels} />;
+  }
 
   if (scope.isSpaceError || space === null) {
     const status = scope.spaceErrorStatus ?? 0;
@@ -281,44 +294,57 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
     });
   };
 
+  // The People and About regions, in either layout below.
+  const lobbySide = (
+    <>
+      <SpacePeopleBlock
+        space={space}
+        members={scope.members}
+        isPending={scope.isMembersPending}
+        canManage={canManage}
+        onOpenRoster={scope.openRoster}
+      />
+      <SpaceAboutBlock space={space} />
+    </>
+  );
+
   return (
     <div className={SPACE_LOBBY_COLUMN}>
       <SpacePlaceHeader
         space={space}
         members={scope.members}
-        canManage={canManage}
+        canCreateChannel={canManage && showsChannels}
         onCreateChannel={scope.openCreateChannel}
         onOpenRoster={scope.openRoster}
       />
 
-      <div className={SPACE_LOBBY_GRID}>
-        <SpaceActivityBlock
-          sections={scope.sections}
-          // THE ONE WIRING POINT for the space's threads, live since
-          // 2026-08-16 (`GET /spaces/{uuid}/threads`). The digest merges these
-          // with the channel rows so the space's mention badge has rows to land
-          // on; see the query mount above for the gate and the page size.
-          threads={threads}
-          isPending={scope.isChannelsPending || threadsQuery.isPending}
-          isError={scope.isChannelsError || threadsQuery.isError}
-          onRetry={retryActivity}
-          canCreate={canManage}
-          onCreateChannel={scope.openCreateChannel}
-          onOpenRail={scope.openRail}
-          now={now}
-        />
-
-        <div className="flex min-w-0 flex-col gap-6">
-          <SpacePeopleBlock
-            space={space}
-            members={scope.members}
-            isPending={scope.isMembersPending}
-            canManage={canManage}
-            onOpenRoster={scope.openRoster}
+      {/* WITHOUT TEAM CHANNELS there is no digest (its requests are refused,
+          and a block waiting on a disabled query would pulse forever), so the
+          People and About regions stand alone in one column. */}
+      {showsChannels ? (
+        <div className={SPACE_LOBBY_GRID}>
+          <SpaceActivityBlock
+            sections={scope.sections}
+            // THE ONE WIRING POINT for the space's threads, live since
+            // 2026-08-16 (`GET /spaces/{uuid}/threads`). The digest merges
+            // these with the channel rows so the space's mention badge has
+            // rows to land on; see the query mount above for the gate and the
+            // page size.
+            threads={threads}
+            isPending={scope.isChannelsPending || threadsQuery.isPending}
+            isError={scope.isChannelsError || threadsQuery.isError}
+            onRetry={retryActivity}
+            canCreate={canManage}
+            onCreateChannel={scope.openCreateChannel}
+            onOpenRail={scope.openRail}
+            now={now}
           />
-          <SpaceAboutBlock space={space} />
+
+          <div className="flex min-w-0 flex-col gap-6">{lobbySide}</div>
         </div>
-      </div>
+      ) : (
+        <div className={SPACE_LOBBY_SOLO}>{lobbySide}</div>
+      )}
 
       {/* INVITE LINKS AND THE WAITING LIST — admin surfaces, on the same
           url-overlay mechanism as Edit so Back closes them (W1 rule). */}

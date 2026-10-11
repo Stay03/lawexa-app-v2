@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 
 import { DiscoverScreen } from '@/v2/features/spaces/discover/DiscoverScreen';
 
-/** `/spaces/discover` — browse the spaces anybody may join. Guests may read it;
- *  joining needs an account, and the refusal says so rather than failing quietly. */
+/** `/spaces/discover` — browse the public TEAM spaces. Researchers and above
+ *  (Stay, 11 October 2026); everyone else meets the Team Channels panel inside
+ *  `DiscoverScreen`. New Spaces are private and never listed here. */
 export const metadata: Metadata = {
   title: 'Find a space',
   robots: { index: false, follow: false },

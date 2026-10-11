@@ -178,7 +178,10 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
   // Role-gated rows (Quiz's research-account soft launch) are filtered from the
   // ONE config, with the SERVER-verified role the layout already threaded in —
   // so the rail and the drawer can never disagree about what exists.
-  const navItems = visibleNavItems(user?.role ?? null);
+  const navItems = visibleNavItems({
+    role: user?.role ?? null,
+    canAccessTeamChannels: user?.can_access_team_channels ?? false,
+  });
 
   return (
     <Sidebar

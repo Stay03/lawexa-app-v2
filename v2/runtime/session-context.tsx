@@ -136,6 +136,13 @@ export interface V2SessionSnapshot {
    * layout, so changing the account type updates it without a reload.
    */
   readonly isLawyer: boolean;
+  /**
+   * May this account open Team Channels? The SERVER's flag from `/auth/me`
+   * (backend B0, 11 October 2026; researchers and above today). Every Team
+   * Channels door in the app reads this, never the role, so the server alone
+   * decides who gets them. `false` when signed out or not sent.
+   */
+  readonly canAccessTeamChannels: boolean;
 }
 
 /**
@@ -170,6 +177,7 @@ export function V2SessionProvider({
   profileCountryName,
   profileCountryCode,
   isLawyer,
+  canAccessTeamChannels,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
@@ -188,6 +196,7 @@ export function V2SessionProvider({
       profileCountryName,
       profileCountryCode,
       isLawyer,
+      canAccessTeamChannels,
     }),
     [
       signedIn,
@@ -204,6 +213,7 @@ export function V2SessionProvider({
       profileCountryName,
       profileCountryCode,
       isLawyer,
+      canAccessTeamChannels,
     ],
   );
 

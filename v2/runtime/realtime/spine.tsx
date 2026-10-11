@@ -17,7 +17,7 @@ import {
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { warmChannelHistory } from '@/v2/features/channels/warm';
 import { channelDisplayName } from '@/v2/features/channels/thread-model';
-import { collabAccessState } from '@/v2/features/collab/model';
+import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { invitationsQueries } from '@/v2/features/invitations/queries';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
 import {
@@ -245,8 +245,10 @@ export function RealtimeSpine() {
   });
 
   // Baseline 2 — pre-warmed channel rows for transitions + mute lookups (and
-  // the `/channels` index key, warm before the user ever visits it).
-  useQuery({ ...channelsQueries.mine({ viewerId }), enabled: eligible });
+  // the `/channels` index key, warm before the user ever visits it). Team
+  // Channels only: below researcher the server refuses this list (11 October
+  // 2026), so asking would only spend a request on a 403.
+  useQuery({ ...channelsQueries.mine({ viewerId }), enabled: canOpenTeamChannels(session) });
 
   const mentionTotal = eligible ? (badgeQuery.data ?? 0) : 0;
 

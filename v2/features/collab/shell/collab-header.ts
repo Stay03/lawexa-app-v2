@@ -92,8 +92,12 @@ export interface CollabHeaderContext {
    *  labelled "Back to the space" that leads to a channel is a lie told only to
    *  the readers who cannot see where it points. */
   backLabel: string;
-  /** Opens the space drawer. MUST be referentially stable (see the docblock). */
-  openRail: () => void;
+  /**
+   * Opens the space drawer. MUST be referentially stable (see the docblock).
+   * `null` where there is no drawer: a viewer without Team Channels (Spaces
+   * F1, 12 October 2026), so the header draws no opener for it.
+   */
+  openRail: (() => void) | null;
 }
 
 /**

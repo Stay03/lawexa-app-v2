@@ -74,6 +74,15 @@ export interface SessionUser {
    * verification row, and the verification API stays the authority.
    */
   is_lawyer: boolean;
+  /**
+   * May this account open Team Channels (channels, threads, the team spaces'
+   * lobby)? The SERVER's answer, from `/auth/me` (backend B0, 11 October
+   * 2026): researchers and above today. The app reads only this flag, never
+   * the role, so the server can change who gets Team Channels without an app
+   * release (techlead's decision). `false` when the server does not send it:
+   * no flag, no door, the same as the routes the server then refuses.
+   */
+  can_access_team_channels: boolean;
 }
 
 export interface SessionDTO {
@@ -95,7 +104,9 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
     const token = await getSessionToken();
     if (!token) return null;
 
-    const result = await apiFetch<ApiResponse<{ user: User; is_ambassador?: boolean }>>('/auth/me');
+    const result = await apiFetch<
+      ApiResponse<{ user: User; is_ambassador?: boolean; can_access_team_channels?: boolean }>
+    >('/auth/me');
     const user = result.data?.user;
     if (!user) return null;
 
@@ -115,6 +126,9 @@ export const verifySession = cache(async (): Promise<SessionDTO | null> => {
         profile_country_name: user.profile?.country?.trim() || null,
         profile_country_code: user.profile?.country_code?.trim() || null,
         is_lawyer: user.profile?.user_type === 'lawyer',
+        // Beside the user, like `is_ambassador`, never inside it: the user
+        // resource also describes other people (backend, 11 October 2026).
+        can_access_team_channels: result.data?.can_access_team_channels === true,
       },
     };
   } catch {

@@ -82,12 +82,16 @@ export function CollabHeaderBack({ context }: { context: CollabHeaderContext }) 
  * sidebar trigger whose idiom it borrows, and now the ONLY opener in this bar.
  * Below `md:` the space lobby's own "All channels" button opens the drawer; at
  * `lg:` the rail is docked and nothing needs opening at all.
+ *
+ * NOTHING AT ALL where there is no drawer (`openRail` is `null`, a viewer
+ * without Team Channels): a live control that opens nothing is worse than none.
  */
 export function CollabHeaderRailToggle({
   context,
 }: {
   context: CollabHeaderContext;
 }) {
+  if (context.openRail === null) return null;
   return (
     <Button
       id={SPACE_DRAWER_TRIGGER_ID}

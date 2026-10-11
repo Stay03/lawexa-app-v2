@@ -17,6 +17,7 @@ import {
   LobbyPeopleSkeleton,
   SPACE_LOBBY_COLUMN,
   SPACE_LOBBY_GRID,
+  SPACE_LOBBY_SOLO,
 } from './lobby-parts';
 
 /**
@@ -102,13 +103,39 @@ export interface SpaceFrameIdentity {
  * THE ACTION ROW IS NEVER SEEDED. Whether this reader may create a channel is a
  * ruling off `my_role`, and the presence stack needs a roster that arrives on
  * its own request. Those keep their shapes, which is what a shape is for.
+ *
+ * WITHOUT TEAM CHANNELS (`showsChannels` false; Spaces F1, 12 October 2026)
+ * the live lobby has no channel digest and no "New channel", so neither does
+ * this: the People and About regions stand alone in one column, as they will
+ * when the page lands. The answer is the session's, so it is right from the
+ * first frame.
  */
 export function SpaceScreenFrame({
   identity = null,
+  showsChannels,
 }: {
   /** The tapped row's identity; `null` on a cold arrival keeps the silhouette. */
   identity?: SpaceFrameIdentity | null;
+  /** Whether the viewer has Team Channels: the digest and "New channel". */
+  showsChannels: boolean;
 }) {
+  // The side regions, shared by both layouts so their shapes cannot drift.
+  const sideRegions = (
+    <>
+      <div>
+        <Skeleton className="mb-2 h-4 w-20 rounded" />
+        {/* The SAME component the live People block draws while its roster
+            is in flight, so the fallback reserves the rows and the button
+            that are actually coming. */}
+        <LobbyPeopleSkeleton />
+      </div>
+      <div>
+        <Skeleton className="mb-2 h-4 w-16 rounded" />
+        <LobbyFactsSkeleton />
+      </div>
+    </>
+  );
+
   return (
     <div className={SPACE_LOBBY_COLUMN}>
       <div className="border-b pb-5">
@@ -170,29 +197,21 @@ export function SpaceScreenFrame({
             2026. The `New channel` button beside it is the shorter 32px. */}
         <div className="mt-4 flex items-center gap-3">
           <Skeleton className="h-9 w-24 rounded-full" />
-          <Skeleton className="h-8 w-32 rounded-md" />
+          {showsChannels ? <Skeleton className="h-8 w-32 rounded-md" /> : null}
         </div>
       </div>
 
-      <div className={SPACE_LOBBY_GRID}>
-        <div className="min-w-0">
-          <Skeleton className="mb-2 h-4 w-28 rounded" />
-          <ChannelListSkeleton />
-        </div>
-        <div className="flex min-w-0 flex-col gap-6">
-          <div>
-            <Skeleton className="mb-2 h-4 w-20 rounded" />
-            {/* The SAME component the live People block draws while its roster
-                is in flight, so the fallback reserves the rows and the button
-                that are actually coming. */}
-            <LobbyPeopleSkeleton />
+      {showsChannels ? (
+        <div className={SPACE_LOBBY_GRID}>
+          <div className="min-w-0">
+            <Skeleton className="mb-2 h-4 w-28 rounded" />
+            <ChannelListSkeleton />
           </div>
-          <div>
-            <Skeleton className="mb-2 h-4 w-16 rounded" />
-            <LobbyFactsSkeleton />
-          </div>
+          <div className="flex min-w-0 flex-col gap-6">{sideRegions}</div>
         </div>
-      </div>
+      ) : (
+        <div className={SPACE_LOBBY_SOLO}>{sideRegions}</div>
+      )}
     </div>
   );
 }

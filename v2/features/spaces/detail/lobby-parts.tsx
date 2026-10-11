@@ -25,6 +25,14 @@ export const SPACE_LOBBY_GRID =
   'mt-6 grid gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,1fr)_18rem]';
 
 /**
+ * The lobby WITHOUT the channel digest: one column of People and About, for a
+ * viewer without Team Channels (Spaces F1, 12 October 2026). Capped at a
+ * reading width, because the side regions were drawn for 18rem and stretched
+ * across the whole column they would be a few short lines lost in space.
+ */
+export const SPACE_LOBBY_SOLO = 'mt-6 flex min-w-0 max-w-xl flex-col gap-6';
+
+/**
  * One region of the lobby. The heading is a real `h2` and the count beside it
  * is a WORDED fact ("12 channels"), never a bare numeral — in this product a
  * loose number next to a gold badge would be read as a second badge, and a

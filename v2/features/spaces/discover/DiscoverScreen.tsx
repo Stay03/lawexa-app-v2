@@ -12,6 +12,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import type { DiscoverableSpace } from '@/types/collab';
 import { useDiscoverSpaces, useJoinPublicSpace } from '@/v2/features/invites/queries';
+import { TeamChannelsClosedState } from '@/v2/features/collab/ui/states';
+import { useV2Session } from '@/v2/runtime/session-context';
+import { LIST_COLUMN } from '@/v2/shell/page-columns';
 
 /**
  * DiscoverScreen — the public spaces anybody can find, and the way in.
@@ -206,7 +209,25 @@ export function DiscoverFallback() {
   );
 }
 
+/**
+ * DISCOVER LISTS PUBLIC TEAM SPACES, so it is Team Channels' (researchers and
+ * above, Stay, 11 October 2026). The new Spaces are private and invitation-only
+ * and never appear here; the backend refuses this list below researcher. Any
+ * other account meets the Team Channels panel, pointing at its own Spaces.
+ */
 export function DiscoverScreen() {
+  const { canAccessTeamChannels } = useV2Session();
+  if (!canAccessTeamChannels) {
+    return (
+      <div className={LIST_COLUMN}>
+        <TeamChannelsClosedState />
+      </div>
+    );
+  }
+  return <DiscoverBody />;
+}
+
+function DiscoverBody() {
   const [term, setTerm] = useState('');
   const query = useDiscoverSpaces({ search: term.trim() || undefined });
   const rows = query.data?.data ?? [];

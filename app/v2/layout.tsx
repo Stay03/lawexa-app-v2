@@ -252,6 +252,8 @@ export default async function V2Layout({
           profileCountryCode={user?.profile_country_code ?? null}
           // Whether settings offers Lawyer verification (a lawyer only).
           isLawyer={user?.is_lawyer ?? false}
+          // Whether Team Channels open (the server's flag, researchers and up).
+          canAccessTeamChannels={user?.can_access_team_channels ?? false}
         >
           {/* THE NOTIFICATION SPINE (phase-5 W1) — v2's one app-wide realtime
               mount: the users.{uuid} socket, the `.channel.unread` writers, the
