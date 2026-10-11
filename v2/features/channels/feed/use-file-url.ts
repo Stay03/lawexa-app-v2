@@ -56,18 +56,20 @@ export interface OpenInNewTab<T = number> {
 /**
  * Open a file in a new tab through a freshly minted URL.
  *
- * `window.open` runs after the round trip rather than in the click itself,
- * which is how the Files tab has always opened a file. That is deliberate
- * consistency, not an oversight: the same operation must not behave one way in
- * the library and another in the feed.
+ * THE TAB OPENS IN THE TAP, THE URL ARRIVES AFTER (11 October 2026). Opening
+ * after the mint's round trip made `window.open` a popup, outside the click's
+ * own frame, and an iPhone home-screen app refuses popups without a word:
+ * Arthur's zips spun, then said "Couldn't open it", and nothing downloaded,
+ * while Safari let the same tap through. So the empty tab is opened
+ * synchronously, inside the gesture every engine honours, and pointed at the
+ * fresh URL once it is minted.
  *
- * IT IS ALSO THE ONE CASE THAT FAILS WITHOUT FAILING. A `window.open` outside
- * the click's own synchronous frame is a popup by every engine's rules, and iOS
- * Safari in particular simply returns `null` — no exception, no navigation.
- * Tapping would then do NOTHING AT ALL, which on touch is the whole feature. So
- * the return value is read, and a blocked open lands in {@link
- * OpenInNewTab.failed}: the reader is told, and "Try again" is a fresh gesture
- * the engine will honour.
+ * `noopener` IS NOT PASSED. With it, `window.open` returns `null` whether or
+ * not a tab opened, so a null check reported every open as a failure. Without
+ * it the handle is real: `null` now means the engine refused, which is the only
+ * case "Try again" is for. The handle's `opener` is cleared before it navigates,
+ * which is what `noopener` was there to do. A failed mint closes the empty tab,
+ * so a refusal never leaves a blank page behind.
  */
 export function useOpenFileInNewTab(): OpenInNewTab {
   return useOpenUrlInNewTab(mintFileUrl);
@@ -90,15 +92,23 @@ export function useOpenUrlInNewTab<T>(mint: (target: T) => Promise<string | null
   const open = (target: T) => {
     setFailed(false);
     setGone(false);
+    const tab = window.open('', '_blank');
+    if (!tab) {
+      setFailed(true);
+      return;
+    }
     fresh.mutate(target, {
       onSuccess: (url) => {
         if (!url) {
+          tab.close();
           setFailed(true);
           return;
         }
-        if (!window.open(url, '_blank', 'noopener')) setFailed(true);
+        tab.opener = null;
+        tab.location.href = url;
       },
       onError: (error) => {
+        tab.close();
         setFailed(true);
         setGone(isNotFoundError(error));
       },
