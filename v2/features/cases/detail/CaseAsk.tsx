@@ -42,6 +42,7 @@ export function CaseAskDock({
   view,
   panelOpen,
   onEngage,
+  engageWithoutKeyboard = false,
   onClose,
   onDock,
   onOpenChat,
@@ -64,6 +65,8 @@ export function CaseAskDock({
   panelOpen: boolean;
   /** Open the chat for this width (sheet below xl, panel at xl). */
   onEngage: () => void;
+  /** Below xl the pill only opens the sheet: tapping it raises no keyboard. */
+  engageWithoutKeyboard?: boolean;
   onClose: () => void;
   onDock: () => void;
   onOpenChat: (conversationId: string) => void;
@@ -150,6 +153,7 @@ export function CaseAskDock({
           start={start}
           showMeta={panelMounted && panelOpen}
           onEngage={onEngage}
+          engageWithoutKeyboard={engageWithoutKeyboard}
           stageRef={stageRef}
         />
       </div>

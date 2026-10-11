@@ -386,6 +386,7 @@ export function CaseChatComposerDock({
   showMeta = true,
   autoFocus = false,
   onEngage,
+  engageWithoutKeyboard = false,
   stageRef,
 }: {
   /** null = the closed dock pill; `'new'` = list state; else a conversation id. */
@@ -395,10 +396,13 @@ export function CaseChatComposerDock({
   start: CaseChatStart;
   /** False collapses the jurisdiction row — the closed resting pill. */
   showMeta?: boolean;
-  /** The sheet focuses its composer as it rises. */
+  /** Focus the composer on mount. No caller sets it now: the sheet no longer
+   *  raises the keyboard as it rises (11 October 2026). */
   autoFocus?: boolean;
   /** Closed-pill interactions open the panel (the floating card's dock). */
   onEngage?: () => void;
+  /** The pill only opens the sheet, with no keyboard (below xl). */
+  engageWithoutKeyboard?: boolean;
   /** OBJECT ref (not a callback): the dock reads it back to restore a failed
    *  create's message into the draft — the composer clears optimistically. */
   stageRef?: React.RefObject<ConversationComposerHandle | null>;
@@ -463,6 +467,7 @@ export function CaseChatComposerDock({
             showMeta={showMeta}
             autoFocus={autoFocus}
             onEngage={onEngage}
+            engageWithoutKeyboard={engageWithoutKeyboard}
             stageRef={stageRef}
             disabled={conversationPending}
             jurisdiction={surface ? surface.jurisdiction : start.jurisdiction}

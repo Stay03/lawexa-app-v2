@@ -160,6 +160,13 @@ export interface ConversationComposerProps {
   autoFocus?: boolean;
   /** Interactions that should open the host's panel (focus / click / typing). */
   onEngage?: () => void;
+  /**
+   * The box only opens the host's panel and must not raise the keyboard: it is
+   * read-only, so a tap, Tab or screen-reader activation still focuses it (and
+   * engages) while no on-screen keyboard appears. Off by default; the case page
+   * sets it below xl, where its box opens the chat sheet (11 October 2026).
+   */
+  engageWithoutKeyboard?: boolean;
   /** The staging handle — see {@link ConversationComposerHandle}. */
   stageRef?: React.Ref<ConversationComposerHandle>;
 }
@@ -180,6 +187,7 @@ export function ConversationComposer({
   disabled = false,
   autoFocus = false,
   onEngage,
+  engageWithoutKeyboard = false,
   stageRef,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -690,6 +698,7 @@ export function ConversationComposer({
               placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
               autoFocus={autoFocus}
               onFocus={onEngage}
+              readOnly={engageWithoutKeyboard || undefined}
               // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
               // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
               className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"

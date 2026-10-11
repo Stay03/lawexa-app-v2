@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { PanelRightClose } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -74,6 +74,15 @@ const CASE_CHAT_SHEET_HEIGHT =
 
 export function CaseChatSheet(props: CaseChatCommonProps) {
   const state = props.closing ? 'closed' : 'open';
+  // FOCUS MOVES INTO THE SHEET, NOT INTO ITS BOX (11 October 2026). The sheet
+  // used to focus its composer as it rose, so the keyboard came up mid-slide:
+  // the jump Stay saw on Samsung, and the header pushed off Arthur's iPhone.
+  // Focusing the sheet itself raises no keyboard, yet Tab and screen readers
+  // land inside it, one step from the box.
+  const sheetRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    sheetRef.current?.focus({ preventScroll: true });
+  }, []);
   return (
     <>
       {/* The scrim — the page stays visible behind the sheet, dimmed. A tap
@@ -89,10 +98,12 @@ export function CaseChatSheet(props: CaseChatCommonProps) {
         )}
       />
       <aside
+        ref={sheetRef}
+        tabIndex={-1}
         aria-label="Chat about this case"
         data-state={state}
         className={cn(
-          'fixed inset-x-0 z-40 flex flex-col overflow-hidden rounded-t-2xl border-t border-border/60 bg-popover shadow-[0_-24px_60px_-24px_rgba(0,0,0,0.65)]',
+          'fixed inset-x-0 z-40 flex flex-col overflow-hidden rounded-t-2xl outline-none border-t border-border/60 bg-popover shadow-[0_-24px_60px_-24px_rgba(0,0,0,0.65)]',
           'motion-safe:animate-in motion-safe:slide-in-from-bottom-full motion-safe:duration-300',
           'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-full data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:hidden',
         )}
@@ -201,14 +212,13 @@ function CaseChatBody({
         onClose={onClose}
         onStage={(text) => stageRef.current?.stage(text)}
       />
-      {/* THE composer — pinned to the frame's bottom; the sheet raises the
-          keyboard with it as it opens. */}
+      {/* THE composer — pinned to the frame's bottom. Nothing focuses it on
+          open: the keyboard comes up only when the reader taps it. */}
       <CaseChatComposerDock
         view={chatId}
         slug={slug}
         signedIn={signedIn}
         start={start}
-        autoFocus={mode === 'sheet' && chatId === 'new'}
         stageRef={stageRef}
       />
     </div>

@@ -277,6 +277,10 @@ function CaseBody({ slug }: { slug: string }) {
             onEngage={() => {
               if (chat === null) openChat('new');
             }}
+            // Below xl the pill opens the sheet and raises no keyboard: the
+            // keyboard opens only when the reader taps the sheet's own box
+            // (Stay and Arthur, 11 October 2026).
+            engageWithoutKeyboard={isDesktopPanel === false}
             onClose={closeChat}
             onDock={() => setDockedPref(true)}
             onOpenChat={switchChat}
