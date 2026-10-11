@@ -151,7 +151,12 @@ export function CaseAskDock({
     <div
       ref={wrapperRef}
       className={cn(
-        'sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10',
+        // `sticky` with a z-index makes this wrapper a stacking context, so
+        // the open phone card's own z-index only counts inside it: the
+        // wrapper itself rises above the page (the reading-progress line is
+        // z-20, the bar z-30) while the card covers the screen.
+        'sticky bottom-0 -mx-4 mt-auto px-4 pb-3 pt-10',
+        screenMounted ? 'z-40' : 'z-10',
         // `arrive` animates `transform`, and a transformed ancestor would
         // become the containing block of the fixed phone screen.
         arrive && !screenMounted && 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',

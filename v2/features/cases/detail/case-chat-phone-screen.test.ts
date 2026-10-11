@@ -56,6 +56,11 @@ test('the open phone card is the visible viewport, with no slide', () => {
   assert.match(ask, /arrive && !screenMounted/);
 });
 
+test('the open phone card stacks above the page (reading line z-20, bar z-30)', () => {
+  // The sticky wrapper is a stacking context, so it is the wrapper that rises.
+  assert.match(ask, /screenMounted \? 'z-40' : 'z-10'/);
+});
+
 test('the page keeps its length while the card is out of the flow', () => {
   assert.match(ask, /setProperty\('--v2-case-dock-h'/);
   assert.match(ask, /minHeight: 'var\(--v2-case-dock-h, auto\)'/);
