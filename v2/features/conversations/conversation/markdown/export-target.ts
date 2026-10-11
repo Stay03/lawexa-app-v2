@@ -35,6 +35,17 @@ export function fencedBlockTexts(markdown: string): string[] {
   return texts;
 }
 
+/**
+ * {@link fencedBlockTexts} on the first call, and the same list on every later
+ * one. A landed answer with a fence used to be parsed in full when its row
+ * mounted, although only a document block asking for its Download needs the
+ * list; a code fence, or a document block that has not drawn yet, never asks.
+ */
+export function lazyFencedBlockTexts(markdown: string): () => readonly string[] {
+  let texts: string[] | null = null;
+  return () => (texts ??= fencedBlockTexts(markdown));
+}
+
 function isFenced(node: Code, markdown: string): boolean {
   const start = node.position?.start.offset;
   if (start === undefined) return false;

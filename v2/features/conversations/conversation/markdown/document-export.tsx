@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { blockIndexOf, fencedBlockTexts, type DocumentExportTarget } from './export-target';
+import { blockIndexOf, lazyFencedBlockTexts, type DocumentExportTarget } from './export-target';
 
 /**
  * Where a document block may offer "Download as Word". The export route reads
@@ -27,7 +27,8 @@ interface ExportScope {
 
 interface MessageScope extends ExportScope {
   messageId: number;
-  blocks: readonly string[];
+  /** The saved answer's fenced blocks, parsed on the first ask. */
+  blocks: () => readonly string[];
 }
 
 const ExportScopeContext = createContext<ExportScope | null>(null);
@@ -61,11 +62,12 @@ export function MessageDocumentScope({
   children: ReactNode;
 }) {
   const scope = useContext(ExportScopeContext);
-  // Parsed only for a row that can offer Download, and only when its text changes.
+  // Parsed only for a row that can offer Download, only when a document block
+  // asks (useDocumentExport), and again only when the text changes.
   const value = useMemo<MessageScope | null>(
     () =>
       scope && landed && messageId !== null && (content.includes('```') || content.includes('~~~'))
-        ? { conversationId: scope.conversationId, messageId, blocks: fencedBlockTexts(content) }
+        ? { conversationId: scope.conversationId, messageId, blocks: lazyFencedBlockTexts(content) }
         : null,
     [scope, landed, messageId, content],
   );
@@ -76,7 +78,7 @@ export function MessageDocumentScope({
 export function useDocumentExport(text: string): DocumentExportTarget | null {
   const scope = useContext(MessageScopeContext);
   if (!scope) return null;
-  const block = blockIndexOf(scope.blocks, text);
+  const block = blockIndexOf(scope.blocks(), text);
   if (block === null) return null;
   return { conversationId: scope.conversationId, messageId: scope.messageId, block };
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { blockIndexOf, fencedBlockTexts, savedMessageId } from './export-target';
+import { blockIndexOf, fencedBlockTexts, lazyFencedBlockTexts, savedMessageId } from './export-target';
 import { documentTitle, isLongDocument, FOLD_AFTER_CHARS, FOLD_AFTER_LINES } from './document-view';
 import { exportErrorMessage, serverReason } from './download-docx';
 import { filenameFromDisposition, DOCX_FALLBACK_NAME } from '@/lib/api/export';
@@ -71,6 +71,22 @@ test('the same text twice gives the first index; text not in the message gives n
   const blocks = fencedBlockTexts('```\nA\n```\n\n```\nA\n```');
   assert.equal(blockIndexOf(blocks, 'A'), 0);
   assert.equal(blockIndexOf(blocks, 'B'), null);
+});
+
+test('the lazy list is the same list, parsed once on the first ask', () => {
+  const answer = ['Intro', '', '```', 'NOTICE OF APPEAL', '```', '', '```python', 'print(1)', '```'].join('\n');
+  const blocks = lazyFencedBlockTexts(answer);
+  const first = blocks();
+  assert.deepEqual(first, fencedBlockTexts(answer));
+  assert.equal(blocks(), first);
+  assert.deepEqual(lazyFencedBlockTexts('no fence here')(), []);
+});
+
+test('a landed row parses its fences only when a document block asks', () => {
+  const scope = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'document-export.tsx'), 'utf8');
+  assert.match(scope, /blocks: lazyFencedBlockTexts\(content\)/);
+  assert.match(scope, /blockIndexOf\(scope\.blocks\(\), text\)/);
+  assert.doesNotMatch(scope, /\bfencedBlockTexts\(/);
 });
 
 test('only a server row id is a saved message id', () => {
