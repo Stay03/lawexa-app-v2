@@ -30,6 +30,8 @@ import { CompactToolChain } from './tools/CompactToolChain';
 import { ActivityStatus } from './ActivityStatus';
 import { ReferenceChips } from './ReferenceChips';
 import { TranscriptSkeleton } from './skeletons';
+import { openDefersBlocks } from './markdown/defer-plan';
+import { ScrollKeepContext, type ScrollKeep } from './markdown/scroll-keep-context';
 
 /**
  * MessageList — the natively-virtualized, memoized transcript with chat scroll
@@ -197,6 +199,18 @@ export function MessageList({
       cancelAnimationFrame(second);
     };
   }, []);
+  // The open is over one frame after the commit that drew the whole chat
+  // with its messages in it (on a cold open, the history arriving). Until
+  // then a long answer that mounts may parse its last blocks first and the
+  // rest right after (markdown/defer-plan.ts); a row that mounts later, where
+  // the reader may be looking, parses whole.
+  const [opened, setOpened] = useState(false);
+  const hasMessages = latestMessages.length > 0;
+  useEffect(() => {
+    if (!showAll || !hasMessages) return;
+    const frame = requestAnimationFrame(() => setOpened(true));
+    return () => cancelAnimationFrame(frame);
+  }, [showAll, hasMessages]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -232,6 +246,32 @@ export function MessageList({
   /** Off-screen groups are only estimated where the browser can keep the
    *  reader's place while the estimate is corrected. See the module. */
   const canAnchor = useScrollAnchoring();
+  /**
+   * What the answers need to defer blocks on this open and keep the reader's
+   * place when they swap (markdown/scroll-keep-context.ts). The open lands at
+   * the bottom (the layout effect below); a reader who has scrolled away
+   * before a row mounts, or a turn still running, means that row parses whole.
+   */
+  const landsAtBottom = openDefersBlocks({
+    opened,
+    scrolledUp: detachedAt !== null,
+    turnRunning: isStreaming,
+  });
+  const scrollKeep = useMemo<ScrollKeep>(
+    () => ({
+      scrollerRef: scrollRef,
+      atBottomRef,
+      anchoring: canAnchor,
+      landsAtBottom,
+      keepPlace: (fix) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        if (fix === 'bottom') el.scrollTop = el.scrollHeight;
+        else el.scrollTop += fix;
+      },
+    }),
+    [canAnchor, landsAtBottom],
+  );
   /**
    * WHILE A TURN IS RUNNING, THIS ROW IS ALWAYS ON (owner, July 25: "as long as it's
    * still streaming that part should always show").
@@ -441,48 +481,50 @@ export function MessageList({
               Its own `gap-6` keeps the column's rhythm unchanged by the extra
               element. */}
           {groups.length > 0 && (
-            <div
-              className={cn(
-                'flex flex-col gap-6',
-                fadeIn && 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-              )}
-            >
-              {groups.map((group, gi) => (
-                <Fragment key={groupKey(group, gi)}>
-                  {gi === activityIndex && (
-                    <ActivityRow startTime={streamStartTime} narration={narration} />
-                  )}
-                  <GroupRow
-                    group={group}
-                    // The last few groups are never virtualized — see
-                    // UNVIRTUALIZED_TAIL. They are the screenful the reader lands
-                    // on, so they must be MEASURED, not estimated, or the view
-                    // settles under them after the first paint.
-                    virtualize={canAnchor && gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
-                    isLastGroup={gi === lastGroupIndex}
-                    hasLaterUserTurn={
-                      group.type === 'single' &&
-                      group.message.role === 'assistant' &&
-                      groups
-                        .slice(gi + 1)
-                        .some((g) => g.type === 'single' && g.message.role === 'user')
-                    }
-                    streamingText={streamingText}
-                    reasoning={reasoning}
-                    isStreaming={isStreaming}
-                    canRegenerate={canRegenerate}
-                    onRegenerate={onRegenerate}
-                    onRetry={onRetry}
-                  />
-                </Fragment>
-              ))}
-              {/* `activityIndex === groups.length` — nothing is being written yet, so
-                  the row sits after the last group, which is still immediately above
-                  where the answer will appear. */}
-              {activityIndex === groups.length && (
-                <ActivityRow startTime={streamStartTime} narration={narration} />
-              )}
-            </div>
+            <ScrollKeepContext.Provider value={scrollKeep}>
+              <div
+                className={cn(
+                  'flex flex-col gap-6',
+                  fadeIn && 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+                )}
+              >
+                {groups.map((group, gi) => (
+                  <Fragment key={groupKey(group, gi)}>
+                    {gi === activityIndex && (
+                      <ActivityRow startTime={streamStartTime} narration={narration} />
+                    )}
+                    <GroupRow
+                      group={group}
+                      // The last few groups are never virtualized — see
+                      // UNVIRTUALIZED_TAIL. They are the screenful the reader lands
+                      // on, so they must be MEASURED, not estimated, or the view
+                      // settles under them after the first paint.
+                      virtualize={canAnchor && gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
+                      isLastGroup={gi === lastGroupIndex}
+                      hasLaterUserTurn={
+                        group.type === 'single' &&
+                        group.message.role === 'assistant' &&
+                        groups
+                          .slice(gi + 1)
+                          .some((g) => g.type === 'single' && g.message.role === 'user')
+                      }
+                      streamingText={streamingText}
+                      reasoning={reasoning}
+                      isStreaming={isStreaming}
+                      canRegenerate={canRegenerate}
+                      onRegenerate={onRegenerate}
+                      onRetry={onRetry}
+                    />
+                  </Fragment>
+                ))}
+                {/* `activityIndex === groups.length` — nothing is being written yet, so
+                    the row sits after the last group, which is still immediately above
+                    where the answer will appear. */}
+                {activityIndex === groups.length && (
+                  <ActivityRow startTime={streamStartTime} narration={narration} />
+                )}
+              </div>
+            </ScrollKeepContext.Provider>
           )}
 
           {/* The one case the in-list placements cannot cover: activity with no

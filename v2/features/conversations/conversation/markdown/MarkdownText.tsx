@@ -1,14 +1,27 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import {
+  memo,
+  startTransition,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import ReactMarkdown, { type Components, type Options } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { CaseMentionLink } from './CaseMentionLink';
 import { FencedBlock } from './FencedBlock';
+import { eagerStart, scheduleSwap, type FrameTimers } from './defer-plan';
 import { linkReferenceLines } from './reference-lines';
 import { rehypeStreamWords } from './rehype-stream-words';
+import { ScrollKeepContext } from './scroll-keep-context';
+import { scrollCorrection, type PendingRegion } from './scroll-keep';
+import { splitMarkdownBlocks } from './split-blocks';
 
 /**
  * MarkdownText — the streaming-safe markdown renderer (foundation-standards §5).
@@ -33,6 +46,14 @@ import { rehypeStreamWords } from './rehype-stream-words';
  * module-level constants and are passed to `MarkdownBlock` as a PROP, so the
  * per-block memo still holds within a mode and still invalidates when the mode flips
  * — which is what guarantees a finished message ends up with zero span overhead.
+ *
+ * DEFERRED BLOCKS ON AN OPEN (defer-plan.ts). A long landed answer drawn by an
+ * open that lands at the bottom parses only its last blocks in the opening
+ * frame; the blocks above draw as muted raw text (`.v2-md-pending`, shell.css)
+ * and all swap to parsed markdown in one transition two frames later, or at
+ * the 1 s deadline at the latest. Where the browser has no scroll anchoring
+ * the swap's layout effect keeps the reader's place (scroll-keep.ts). Streaming
+ * text never defers.
  */
 
 // Stable module-level plugin list — a fresh array each render would defeat memo.
@@ -79,44 +100,36 @@ const PROSE_CLASS =
   // without the `!`.
   '[&_code]:bg-muted [&_pre]:bg-muted [&_pre]:text-foreground [&_pre]:rounded-2xl! [&_pre]:overflow-x-auto [&_pre]:overscroll-x-contain';
 
-/** Split markdown into independently-renderable blocks (blank-line separated),
- *  never splitting inside a fenced code block. Pure — safe to call in render. */
-function splitMarkdownBlocks(text: string): string[] {
-  const lines = text.split('\n');
-  const blocks: string[] = [];
-  let current: string[] = [];
-  let inFence = false;
-  let fenceChar = '';
+/** The browser's frames and timers for {@link scheduleSwap}; only called from effects. */
+const BROWSER_FRAMES: FrameTimers = {
+  requestAnimationFrame: (run) => window.requestAnimationFrame(run),
+  cancelAnimationFrame: (id) => window.cancelAnimationFrame(id),
+  setTimeout: (run, ms) => window.setTimeout(run, ms),
+  clearTimeout: (id) => window.clearTimeout(id),
+};
 
-  const flush = () => {
-    if (current.length > 0) {
-      blocks.push(current.join('\n'));
-      current = [];
-    }
-  };
-
-  for (const line of lines) {
-    const fenceMatch = line.match(/^\s*(```+|~~~+)/);
-    if (fenceMatch) {
-      const marker = fenceMatch[1][0];
-      if (!inFence) {
-        inFence = true;
-        fenceChar = marker;
-      } else if (marker === fenceChar) {
-        inFence = false;
-      }
-      current.push(line);
-      continue;
-    }
-    if (!inFence && line.trim() === '') {
-      flush();
-    } else {
-      current.push(line);
-    }
-  }
-  flush();
-  return blocks.length > 0 ? blocks : [text];
+/**
+ * The height of the deferred region: from the prose container's top to the
+ * first element the eager blocks drew (the container's bottom if they drew
+ * none). The eager blocks' elements are the last `eagerElements` children,
+ * before and after the swap alike, so the same count finds the edge on both
+ * sides.
+ */
+function regionHeight(container: HTMLElement, eagerElements: number): number {
+  const top = container.getBoundingClientRect().top;
+  const edge = eagerElements > 0 ? container.children[container.children.length - eagerElements] : null;
+  return (edge ? edge.getBoundingClientRect().top : container.getBoundingClientRect().bottom) - top;
 }
+
+/**
+ * A deferred block before the swap: its raw markdown, muted so the marks are
+ * not read as the answer, in the prose paragraph's font and margins so its
+ * height is close to the parsed block's. One element, always: the swap counts
+ * on it (regionHeight).
+ */
+const PendingBlock = memo(function PendingBlock({ content }: { content: string }) {
+  return <p className="v2-md-pending">{content}</p>;
+});
 
 const MarkdownBlock = memo(function MarkdownBlock({
   content,
@@ -152,11 +165,79 @@ export const MarkdownText = memo(function MarkdownText({
   // (reference-lines.ts), so they cannot run off a phone screen.
   const blocks = useMemo(() => splitMarkdownBlocks(linkReferenceLines(content)), [content]);
   const rehypePlugins = animate ? REHYPE_ANIMATED : REHYPE_PLAIN;
+
+  // The deferral plan, read once at mount (defer-plan.ts). No MessageList
+  // above (no context): nothing defers. A row mounted streaming, or empty as a
+  // streaming row starts, defers nothing and never will.
+  const keep = useContext(ScrollKeepContext);
+  const [plan] = useState(() => ({
+    content,
+    eagerFrom: keep
+      ? eagerStart(blocks, { streaming: animate || content === '', landsAtBottom: keep.landsAtBottom })
+      : 0,
+  }));
+  const [swapped, setSwapped] = useState(false);
+  // How many leading blocks draw as placeholders in this render. A changed
+  // text or a turn to streaming drops the plan: every block parses.
+  const pendingCount =
+    swapped || animate || plan.content !== content ? 0 : Math.min(plan.eagerFrom, blocks.length);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const regionRef = useRef<{ region: PendingRegion; eagerElements: number } | null>(null);
+  const scrollerRef = keep?.scrollerRef;
+  const atBottomRef = keep?.atBottomRef;
+  const keepPlace = keep?.keepPlace;
+  const anchoring = keep?.anchoring ?? true;
+
+  // The swap: a transition two frames after mount, an urgent render at the
+  // deadline (scheduleSwap). Where the browser has no scroll anchoring, the
+  // region is measured first, while it still holds the placeholders. The swap
+  // committing sets pendingCount to 0, whose cleanup drops the deadline.
+  useEffect(() => {
+    if (pendingCount === 0) return;
+    return scheduleSwap(BROWSER_FRAMES, (urgent) => {
+      const scroller = scrollerRef?.current;
+      const container = containerRef.current;
+      if (!anchoring && scroller && container) {
+        const eagerElements = container.children.length - pendingCount;
+        regionRef.current = {
+          region: {
+            top: container.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop,
+            height: regionHeight(container, eagerElements),
+            scrollTop: scroller.scrollTop,
+          },
+          eagerElements,
+        };
+      }
+      if (urgent) setSwapped(true);
+      else startTransition(() => setSwapped(true));
+    });
+  }, [pendingCount, scrollerRef, anchoring]);
+
+  // Safari keeps the reader's place in the swap's own commit, before paint
+  // (scroll-keep.ts). Chrome and Firefox never measured, so never get here.
+  useLayoutEffect(() => {
+    if (!swapped) return;
+    const measured = regionRef.current;
+    const container = containerRef.current;
+    regionRef.current = null;
+    if (!measured || !container || !keepPlace) return;
+    const fix = scrollCorrection(measured.region, regionHeight(container, measured.eagerElements), {
+      atBottom: atBottomRef?.current ?? false,
+      anchoring,
+    });
+    if (fix !== 0) keepPlace(fix);
+  }, [swapped, atBottomRef, keepPlace, anchoring]);
+
   return (
-    <div className={cn(PROSE_CLASS, className)}>
-      {blocks.map((block, index) => (
-        <MarkdownBlock key={index} content={block} rehypePlugins={rehypePlugins} />
-      ))}
+    <div ref={containerRef} className={cn(PROSE_CLASS, className)}>
+      {blocks.map((block, index) =>
+        index < pendingCount ? (
+          <PendingBlock key={index} content={block} />
+        ) : (
+          <MarkdownBlock key={index} content={block} rehypePlugins={rehypePlugins} />
+        ),
+      )}
     </div>
   );
 });

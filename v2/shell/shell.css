@@ -1038,3 +1038,18 @@ html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-overlay'],
 html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-content'] {
   display: none;
 }
+
+/* --------------------------------------------------------------------------
+   A DEFERRED ANSWER BLOCK BEFORE IT PARSES.
+   On an open, a long answer parses its last blocks first and draws the ones
+   above as their raw markdown until the swap, two frames later or 1 s at the
+   latest (markdown/defer-plan.ts). `pre-wrap` keeps the raw text's line
+   breaks, so the paragraph is close to the parsed block's height. The muted,
+   lower-contrast colour reads as text still arriving, so a late swap never
+   shows `**` or `|` marks as if they were the answer. Unlayered, so it beats
+   the prose body colour without `!important`.
+   -------------------------------------------------------------------------- */
+.v2-md-pending {
+  white-space: pre-wrap;
+  color: color-mix(in oklab, var(--muted-foreground) 60%, transparent);
+}
