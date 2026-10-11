@@ -22,7 +22,7 @@ import { BookmarksScreen } from '@/v2/features/bookmarks/list/BookmarksScreen';
  */
 export function generateMetadata(): Metadata {
   return {
-    title: 'Bookmarks',
+    title: 'Saved',
     description:
       'Your saved cases, statutes, notes and folders, newest first.',
     robots: { index: false, follow: false },

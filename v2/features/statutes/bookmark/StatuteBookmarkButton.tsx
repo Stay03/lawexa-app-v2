@@ -37,7 +37,7 @@ export function StatuteBookmarkButton({
     toggle.mutate({ next: !isBookmarked });
   };
 
-  const label = isBookmarked ? 'Remove bookmark' : 'Save statute';
+  const label = isBookmarked ? 'Remove from Saved' : 'Save statute';
 
   if (variant === 'icon') {
     return (

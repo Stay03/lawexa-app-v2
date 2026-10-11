@@ -75,7 +75,7 @@ export function TypeTabs({
       tabs={TYPE_TABS}
       value={value}
       onChange={onChange}
-      ariaLabel="Filter bookmarks by type"
+      ariaLabel="Filter saved items by type"
       panelId={panelId}
       className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
       tabClassName={(selected) =>

@@ -89,7 +89,7 @@ const TOP_LEVEL: ReadonlyMap<string, TopLevelScreen> = new Map([
   ['/statutes', { title: 'Statutes' }],
   ['/notes', { title: 'Notes' }],
   ['/folders', { title: 'Folders' }],
-  ['/bookmarks', { title: 'Bookmarks' }],
+  ['/bookmarks', { title: 'Saved' }],
   ['/radars', { title: 'Radar' }],
   ['/conversations', { title: 'Conversations' }],
 

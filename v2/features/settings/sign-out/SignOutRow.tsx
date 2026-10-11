@@ -62,7 +62,7 @@ export function SignOutRow() {
             <AlertDialogTitle>Sign out of Lawexa on this device?</AlertDialogTitle>
             <AlertDialogDescription>
               Confidential chats saved on this device are deleted. Your other chats, notes and
-              bookmarks stay in your account.
+              saved items stay in your account.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

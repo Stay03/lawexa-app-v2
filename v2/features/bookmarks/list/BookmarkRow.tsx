@@ -342,7 +342,7 @@ function UnsaveButton({
       // taken it away by unmounting. The guard above is what actually stops the
       // second write.
       aria-disabled={exiting}
-      aria-label={`Remove ${BOOKMARK_TYPE_NOUN[row.type]} bookmark: ${row.title}`}
+      aria-label={`Remove ${BOOKMARK_TYPE_NOUN[row.type]} from Saved: ${row.title}`}
       className={cn(
         // `mt-3.5` = the link's `py-3` plus the tile's `mt-0.5`, so the star and
         // the type tile sit on exactly the same baseline and the row reads as

@@ -116,7 +116,7 @@ export const v2NavItems: V2NavItem[] = [
       // at a v1 page in the meantime would only teach people the app is broken.
     ],
   },
-  { label: 'Bookmarks', href: '/bookmarks', icon: Bookmark },
+  { label: 'Saved', href: '/bookmarks', icon: Bookmark },
   {
     // THE CONVERSATIONS YOU ARE IN, above the places they live (redesign
     // wave, Aug 5). `/channels` was the best-built row in the collab feature —

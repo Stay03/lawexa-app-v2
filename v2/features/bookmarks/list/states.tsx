@@ -199,7 +199,7 @@ export function BookmarksEmptyState({
           ) : null}
           {onShowAll ? (
             <Button variant="ghost" size="sm" onClick={onShowAll}>
-              View all bookmarks
+              View all saved items
             </Button>
           ) : null}
         </div>
@@ -217,7 +217,7 @@ export function BookmarksSignedOutState() {
   return (
     <PageState
       icon={Bookmark}
-      title="Sign in to see your bookmarks"
+      title="Sign in to see your saved items"
       description="Your saved cases, statutes, notes and folders travel with your account."
       action={
         <Button asChild size="sm">
@@ -248,7 +248,7 @@ export function BookmarksVerifyEmailState({ message }: { message: string }) {
   return (
     <PageState
       icon={MailCheck}
-      title="Verify your email to use bookmarks"
+      title="Verify your email to save items"
       description={
         message.trim() ||
         'Your email address is not verified. Please verify your email to continue.'
@@ -280,7 +280,7 @@ export function BookmarksErrorState({
   return (
     <PageState
       icon={WifiOff}
-      title="Couldn't load your bookmarks"
+      title="Couldn't load your saved items"
       description={
         message?.trim() ||
         'Something went wrong while loading your saved items. Please try again.'

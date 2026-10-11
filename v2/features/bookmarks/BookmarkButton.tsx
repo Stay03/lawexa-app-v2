@@ -47,7 +47,7 @@ export function BookmarkButton({
     toggle.mutate({ next: !isBookmarked });
   };
 
-  const label = isBookmarked ? 'Remove bookmark' : 'Save case';
+  const label = isBookmarked ? 'Remove from Saved' : 'Save case';
 
   if (variant === 'icon') {
     return (

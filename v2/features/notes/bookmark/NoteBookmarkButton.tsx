@@ -40,7 +40,7 @@ export function NoteBookmarkButton({
     toggle.mutate({ next: !isBookmarked });
   };
 
-  const label = isBookmarked ? 'Remove bookmark' : 'Save note';
+  const label = isBookmarked ? 'Remove from Saved' : 'Save note';
 
   if (variant === 'icon') {
     return (

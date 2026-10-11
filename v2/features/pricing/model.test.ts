@@ -139,7 +139,7 @@ test('only counted limits become lines; unlimited ones are left off', () => {
   assert.deepEqual(limitLines(plan({ limits: [unlimited('ai_messages')] })), []);
   assert.deepEqual(
     limitLines(plan({ limits: [counted('bookmarks', 10, 'lifetime'), counted('note_creations', 1, 'month'), counted('ai_messages', 1000)] })),
-    ['1,000 AI messages a month', '1 note a month', '10 bookmarks in total'],
+    ['1,000 AI messages a month', '1 note a month', '10 saved items in total'],
   );
 });
 

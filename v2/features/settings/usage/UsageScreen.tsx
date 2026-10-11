@@ -111,7 +111,7 @@ export function UsageScreen() {
 
         <SettingsFormGroup id="usage-other" label="Other limits">
           <LimitRow icon={NotebookPen} label="Notes you create" view={limitView(data.note_creations)} />
-          <LimitRow icon={Bookmark} label="Bookmarks" view={limitView(data.bookmarks)} />
+          <LimitRow icon={Bookmark} label="Saved items" view={limitView(data.bookmarks)} />
         </SettingsFormGroup>
 
         {data.ai_messages.reset_message ? (

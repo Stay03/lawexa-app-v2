@@ -90,11 +90,11 @@ const rowKey = (row: BookmarkRowModel): string => String(row.bookmarkId);
  * global mutation-error toast, and the row comes back.
  */
 function liveStatus(loading: boolean, removing: number): string {
-  if (loading) return 'Loading your bookmarks';
+  if (loading) return 'Loading your saved items';
   if (removing === 0) return '';
   return removing === 1
-    ? 'Removed from your bookmarks'
-    : `Removed ${removing} items from your bookmarks`;
+    ? 'Removed from Saved'
+    : `Removed ${removing} items from Saved`;
 }
 
 /**
@@ -243,7 +243,7 @@ export function BookmarksBrowser() {
                 role="alert"
                 className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
               >
-                <span>Couldn&rsquo;t refresh your bookmarks — showing your last ones.</span>
+                <span>Couldn&rsquo;t refresh your saved items. Showing your last ones.</span>
                 <Button
                   variant="outline"
                   size="sm"

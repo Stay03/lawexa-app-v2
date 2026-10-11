@@ -223,7 +223,7 @@ export function priceView(plan: IPlan, saving: number): PriceView {
 const LIMIT_NOUN: Record<TLimitType, readonly [string, string]> = {
   ai_messages: ['AI message', 'AI messages'],
   note_creations: ['note', 'notes'],
-  bookmarks: ['bookmark', 'bookmarks'],
+  bookmarks: ['saved item', 'saved items'],
 };
 
 const LIMIT_ORDER: readonly TLimitType[] = ['ai_messages', 'note_creations', 'bookmarks'];
