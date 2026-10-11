@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { PanelRightClose } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -14,14 +14,9 @@ import {
 } from './CaseChatCore';
 
 /**
- * The case chat's other two presentations. Both render the SAME one screen
- * (`CaseChatCore`: bar · middle · the one composer) — they only own their
- * frames:
+ * The case chat's docked presentation. It renders the SAME one screen
+ * (`CaseChatCore`: bar · middle · the one composer) and only owns its frame:
  *
- *   SHEET     below xl. A bottom sheet at ~65% of the viewport over a scrim —
- *             the judgment stays visible, dimmed, behind it (owner, July 30:
- *             "just like 60% and some of the page show"), and tapping the
- *             scrim closes. Rides `--keyboard-inset`.
  *   DOCKED    ≥xl after the reader chooses the sidebar: the SIDE PEEK — an
  *             in-flow rail holding a rounded inset panel that stands clear of
  *             the header, the screen edge, and the bottom (no seam, near-no
@@ -30,8 +25,10 @@ import {
  *             persists (localStorage) so the chat reopens the way this
  *             reader likes it.
  *
- * The xl-floating presentation is `CaseAskDock` (CaseAsk.tsx) — same screen,
- * grown out of the resting pill.
+ * The xl-floating presentation and the phone's full-screen one are both
+ * `CaseAskDock` (CaseAsk.tsx) — same screen, grown out of the resting pill
+ * around the one composer (11 October 2026: the phone's old bottom sheet
+ * mounted a second box, so its keyboard took a second tap).
  *
  * Every presentation is an ELEVATED LAYER, visibly apart from the page:
  * `bg-popover` (a step lighter than the page in dark mode), a border, and a
@@ -64,62 +61,6 @@ interface CaseChatCommonProps {
   start: CaseChatStart;
   onClose: () => void;
   onSwitchChat: (chatId: string) => void;
-}
-
-/* ── Sheet (below xl) ────────────────────────────────────────────────────── */
-
-/** 65% of the screen, but never taller than the space above the keyboard. */
-const CASE_CHAT_SHEET_HEIGHT =
-  'min(65dvh, calc(var(--visual-height, 100dvh) - env(safe-area-inset-top, 0px) - 0.75rem))';
-
-export function CaseChatSheet(props: CaseChatCommonProps) {
-  const state = props.closing ? 'closed' : 'open';
-  // FOCUS MOVES INTO THE SHEET, NOT INTO ITS BOX (11 October 2026). The sheet
-  // used to focus its composer as it rose, so the keyboard came up mid-slide:
-  // the jump Stay saw on Samsung, and the header pushed off Arthur's iPhone.
-  // Focusing the sheet itself raises no keyboard, yet Tab and screen readers
-  // land inside it, one step from the box.
-  const sheetRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    sheetRef.current?.focus({ preventScroll: true });
-  }, []);
-  return (
-    <>
-      {/* The scrim — the page stays visible behind the sheet, dimmed. A tap
-          on it closes, the standard sheet contract. */}
-      <div
-        aria-hidden
-        data-state={state}
-        onClick={props.onClose}
-        className={cn(
-          'fixed inset-0 z-30 bg-black/50',
-          'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:hidden',
-        )}
-      />
-      <aside
-        ref={sheetRef}
-        tabIndex={-1}
-        aria-label="Chat about this case"
-        data-state={state}
-        className={cn(
-          'fixed inset-x-0 z-40 flex flex-col overflow-hidden rounded-t-2xl outline-none border-t border-border/60 bg-popover shadow-[0_-24px_60px_-24px_rgba(0,0,0,0.65)]',
-          'motion-safe:animate-in motion-safe:slide-in-from-bottom-full motion-safe:duration-300',
-          'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-full data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:hidden',
-        )}
-        // THE HEIGHT IS CAPPED TO WHAT THE KEYBOARD LEAVES (Arthur, 11 October
-        // 2026). The sheet rides the keyboard by `bottom`, and a fixed 65dvh
-        // (with a 20rem floor) is taller than the space an iPhone keyboard
-        // leaves: in Safari and the home-screen app the header and its close
-        // button went above the screen. It is now never taller than the visible
-        // viewport (`--visual-height`, published beside `--keyboard-inset`),
-        // less the status bar and a small gap; the middle scrolls.
-        style={{ bottom: 'var(--keyboard-inset, 0px)', height: CASE_CHAT_SHEET_HEIGHT }}
-      >
-        <CaseChatBody {...props} mode="sheet" />
-      </aside>
-    </>
-  );
 }
 
 /* ── Docked column (≥xl, by choice) ──────────────────────────────────────── */
@@ -155,7 +96,7 @@ export function CaseChatDocked({
           lands on the right. Panel stays 26rem — the family width — so the
           pill inside matches the floating card's to the pixel. */}
       <div className="sticky top-3 flex h-[calc(100dvh-5rem)] w-[26rem] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-[0_18px_48px_-24px_rgba(0,0,0,0.35)]">
-        <CaseChatBody {...props} mode="docked" onFloat={onFloat} />
+        <CaseChatBody {...props} onFloat={onFloat} />
       </div>
     </aside>
   );
@@ -171,11 +112,9 @@ function CaseChatBody({
   start,
   onClose,
   onSwitchChat,
-  mode,
   onFloat,
 }: CaseChatCommonProps & {
-  mode: 'sheet' | 'docked';
-  onFloat?: () => void;
+  onFloat: () => void;
 }) {
   const stageRef = useRef<ConversationComposerHandle | null>(null);
 
@@ -187,20 +126,18 @@ function CaseChatBody({
         onClose={onClose}
         tall
         presentationAction={
-          mode === 'docked' && onFloat ? (
-            <button
-              type="button"
-              onClick={onFloat}
-              aria-label="Float the chat over the page"
-              title="Float over the page"
-              className={cn(
-                'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-                FOCUS_RING,
-              )}
-            >
-              <PanelRightClose aria-hidden className="size-4" />
-            </button>
-          ) : undefined
+          <button
+            type="button"
+            onClick={onFloat}
+            aria-label="Float the chat over the page"
+            title="Float over the page"
+            className={cn(
+              'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+              FOCUS_RING,
+            )}
+          >
+            <PanelRightClose aria-hidden className="size-4" />
+          </button>
         }
       />
       <CaseChatMiddle

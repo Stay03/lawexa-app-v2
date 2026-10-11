@@ -156,17 +156,14 @@ export interface ConversationComposerProps {
   showMeta?: boolean;
   /** Extra hard-disable from the host (e.g. a conversation still wiring up). */
   disabled?: boolean;
-  /** Focus the textarea on mount (the mobile sheet's opening gesture). */
-  autoFocus?: boolean;
-  /** Interactions that should open the host's panel (focus / click / typing). */
-  onEngage?: () => void;
   /**
-   * The box only opens the host's panel and must not raise the keyboard: it is
-   * read-only, so a tap, Tab or screen-reader activation still focuses it (and
-   * engages) while no on-screen keyboard appears. Off by default; the case page
-   * sets it below xl, where its box opens the chat sheet (11 October 2026).
+   * Interactions that should open the host's panel (focus / click / typing).
+   * The host grows its panel AROUND this box, never mounts another one, so the
+   * focus the reader's tap gave it is the focus the open chat keeps: on an
+   * iPhone that is the only way one tap can raise the keyboard (WebKit opens
+   * it only for a focus inside the gesture; 11 October 2026).
    */
-  engageWithoutKeyboard?: boolean;
+  onEngage?: () => void;
   /** The staging handle — see {@link ConversationComposerHandle}. */
   stageRef?: React.Ref<ConversationComposerHandle>;
 }
@@ -185,9 +182,7 @@ export function ConversationComposer({
   signedIn = true,
   showMeta = true,
   disabled = false,
-  autoFocus = false,
   onEngage,
-  engageWithoutKeyboard = false,
   stageRef,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -696,9 +691,7 @@ export function ConversationComposer({
 
             <PromptInputTextarea
               placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
-              autoFocus={autoFocus}
               onFocus={onEngage}
-              readOnly={engageWithoutKeyboard || undefined}
               // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
               // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
               className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"

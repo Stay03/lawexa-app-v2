@@ -15,7 +15,7 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { casesQueries } from '../queries';
 import { CaseAskDock } from './CaseAsk';
 import { useStartCaseChat, type CaseChatStart } from './CaseChatCore';
-import { CaseChatDocked, CaseChatSheet } from './CaseChatPanel';
+import { CaseChatDocked } from './CaseChatPanel';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
 import { ReadingProgress } from './ReadingProgress';
@@ -126,8 +126,8 @@ function CaseBody({ slug }: { slug: string }) {
     return () => window.clearTimeout(timer);
   }, [chatClosing]);
 
-  // Which presentation: sheet below xl; floating card (default) or the docked
-  // column (the reader's persisted choice) at xl. A JS decision, not a CSS
+  // Which presentation: the dock's full-screen card below xl; the floating
+  // card (default) or the docked column (the reader's persisted choice) at xl. A JS decision, not a CSS
   // one — exactly ONE container may mount, or one conversation would run two
   // live controllers.
   const isDesktopPanel = usePanelBreakpoint();
@@ -221,16 +221,21 @@ function CaseBody({ slug }: { slug: string }) {
 
   const outline = buildCaseOutline(detail);
 
-  // At xl-floating, the DOCK is the whole chat: closed pill, new-chat panel,
-  // and the embedded conversation are three states of ONE card. The separate
-  // presentations remain only where geometry demands them (sheet below xl,
-  // the docked column by choice).
+  // The DOCK is the whole chat on a phone and at xl-floating: closed pill,
+  // new-chat panel and the embedded conversation are three states of ONE
+  // card (full screen below xl). Only the docked column, by choice at xl, is
+  // a separate presentation.
+  const phone = isDesktopPanel === false;
   const floatingContext = isDesktopPanel === true && !docked;
+  const dockOwnsChat = phone || floatingContext;
   const showDocked = renderedChat !== null && isDesktopPanel === true && docked;
-  const showSheet = renderedChat !== null && isDesktopPanel === false;
-  // The dock stays mounted through every floating state so the composer
-  // element is never remounted across closed ⇄ open (focus survives).
-  const showDock = floatingContext || renderedChat === null;
+  // The dock stays mounted through every state it owns so the composer
+  // element is never remounted across closed ⇄ open: focus survives, and on
+  // a phone the tap's own focus is what raises the keyboard.
+  const showDock = dockOwnsChat || renderedChat === null;
+  // While the phone chat covers the screen the page under it leaves the tab
+  // order and the accessibility tree (the shell's bars: see CaseAskDock).
+  const pageUnderChat = phone && renderedChat !== null;
 
   return (
     // With the side chat open (≥xl) this is a row: the reading column centres
@@ -246,7 +251,7 @@ function CaseBody({ slug }: { slug: string }) {
           `relative` anchors the outline rail beside the column. */}
       <div className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
         <ReadingProgress />
-        <div className={arrive}>
+        <div className={arrive} inert={pageUnderChat}>
           <CaseDocument detail={detail} />
         </div>
         {/* The map, only when the document is long enough to need one (four or
@@ -257,30 +262,30 @@ function CaseBody({ slug }: { slug: string }) {
             floating card leaves the page's geometry alone, so the rail
             stays. */}
         {outline.length >= 4 && !showDocked ? (
-          <aside className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block">
+          <aside
+            inert={pageUnderChat}
+            className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block"
+          >
             <div className={cn('sticky top-8', arrive)}>
               <CaseOutline sections={outline} />
             </div>
           </aside>
         ) : null}
-        {/* THE composer's dock — at xl-floating it is the entire chat (one
-            card, three states). It hides only while another surface owns the
-            composer (the sheet below xl, the docked column by choice). */}
+        {/* THE composer's dock — on a phone and at xl-floating it is the
+            entire chat (one card, three states). It hides only while the
+            docked column, chosen at xl, owns the composer. */}
         {showDock ? (
           <CaseAskDock
             slug={slug}
             signedIn={signedIn}
             viewerId={userId}
             start={start}
-            view={floatingContext ? renderedChat : null}
-            panelOpen={chat !== null && floatingContext}
+            view={dockOwnsChat ? renderedChat : null}
+            panelOpen={chat !== null && dockOwnsChat}
+            screen={phone}
             onEngage={() => {
               if (chat === null) openChat('new');
             }}
-            // Below xl the pill opens the sheet and raises no keyboard: the
-            // keyboard opens only when the reader taps the sheet's own box
-            // (Stay and Arthur, 11 October 2026).
-            engageWithoutKeyboard={isDesktopPanel === false}
             onClose={closeChat}
             onDock={() => setDockedPref(true)}
             onOpenChat={switchChat}
@@ -300,18 +305,6 @@ function CaseBody({ slug }: { slug: string }) {
           onClose={closeChat}
           onSwitchChat={switchChat}
           onFloat={() => setDockedPref(false)}
-        />
-      ) : null}
-      {showSheet && renderedChat !== null ? (
-        <CaseChatSheet
-          chatId={renderedChat}
-          closing={chatClosing}
-          slug={slug}
-          signedIn={signedIn}
-          viewerId={userId}
-          start={start}
-          onClose={closeChat}
-          onSwitchChat={switchChat}
         />
       ) : null}
     </div>
