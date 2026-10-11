@@ -68,6 +68,10 @@ interface CaseChatCommonProps {
 
 /* ── Sheet (below xl) ────────────────────────────────────────────────────── */
 
+/** 65% of the screen, but never taller than the space above the keyboard. */
+const CASE_CHAT_SHEET_HEIGHT =
+  'min(65dvh, calc(var(--visual-height, 100dvh) - env(safe-area-inset-top, 0px) - 0.75rem))';
+
 export function CaseChatSheet(props: CaseChatCommonProps) {
   const state = props.closing ? 'closed' : 'open';
   return (
@@ -88,11 +92,18 @@ export function CaseChatSheet(props: CaseChatCommonProps) {
         aria-label="Chat about this case"
         data-state={state}
         className={cn(
-          'fixed inset-x-0 z-40 flex h-[65dvh] min-h-80 flex-col overflow-hidden rounded-t-2xl border-t border-border/60 bg-popover shadow-[0_-24px_60px_-24px_rgba(0,0,0,0.65)]',
+          'fixed inset-x-0 z-40 flex flex-col overflow-hidden rounded-t-2xl border-t border-border/60 bg-popover shadow-[0_-24px_60px_-24px_rgba(0,0,0,0.65)]',
           'motion-safe:animate-in motion-safe:slide-in-from-bottom-full motion-safe:duration-300',
           'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-full data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:hidden',
         )}
-        style={{ bottom: 'var(--keyboard-inset, 0px)' }}
+        // THE HEIGHT IS CAPPED TO WHAT THE KEYBOARD LEAVES (Arthur, 11 October
+        // 2026). The sheet rides the keyboard by `bottom`, and a fixed 65dvh
+        // (with a 20rem floor) is taller than the space an iPhone keyboard
+        // leaves: in Safari and the home-screen app the header and its close
+        // button went above the screen. It is now never taller than the visible
+        // viewport (`--visual-height`, published beside `--keyboard-inset`),
+        // less the status bar and a small gap; the middle scrolls.
+        style={{ bottom: 'var(--keyboard-inset, 0px)', height: CASE_CHAT_SHEET_HEIGHT }}
       >
         <CaseChatBody {...props} mode="sheet" />
       </aside>

@@ -128,6 +128,11 @@ export function useKeyboardInset(): void {
         window.innerHeight - viewport.height - viewport.offsetTop,
       );
       root.style.setProperty('--keyboard-inset', `${occlusion}px`);
+      // The visible viewport (11 October 2026): its height caps a sheet riding
+      // the keyboard, so nothing sized from it can grow past the top, and its
+      // offset says how far iOS has panned the page under the keyboard.
+      root.style.setProperty('--visual-height', `${viewport.height}px`);
+      root.style.setProperty('--visual-top', `${viewport.offsetTop}px`);
       // Zero occlusion AND an unpanned visual viewport. The second term is what
       // separates "the keyboard has gone" from "the keyboard is up and the pan
       // has run to the bottom" — see `settled`.
@@ -153,6 +158,8 @@ export function useKeyboardInset(): void {
           window.innerHeight - viewport.height - viewport.offsetTop,
         );
         root.style.setProperty('--keyboard-inset', `${occlusion}px`);
+        root.style.setProperty('--visual-height', `${viewport.height}px`);
+        root.style.setProperty('--visual-top', `${viewport.offsetTop}px`);
         if (occlusion === 0) restoreDocumentScroll();
       });
     };
@@ -167,6 +174,8 @@ export function useKeyboardInset(): void {
       viewport.removeEventListener('scroll', update);
       document.removeEventListener('focusout', onFocusOut);
       root.style.removeProperty('--keyboard-inset');
+      root.style.removeProperty('--visual-height');
+      root.style.removeProperty('--visual-top');
     };
   }, []);
 }
