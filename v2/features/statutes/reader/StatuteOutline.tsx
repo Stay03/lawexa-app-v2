@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sheet';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
-import type { AknOutlineDivision } from './akn';
+import type { AknOutlineDivision, SpyTarget } from './akn';
 
 /**
  * StatuteOutline — the reader's wayfinding, in the outline grammar the case
@@ -94,18 +94,23 @@ function LockMark({ className }: { className?: string }) {
 /* ── The spy hook (owned by the document host, shared by rail + sheet) ───── */
 
 /**
- * Track which anchored block is under the reading band. `version` bumps as
+ * Track which anchored block is under the reading band and answer the outline
+ * id it stands for (see `spyTargetsOf`: an entry's own block answers itself, a
+ * division's opening blocks answer the division). `version` bumps as
  * progressive mounting lands more blocks, so newly-mounted anchors join the
  * observation set (a handful of rebuilds per document, then it settles).
  */
-export function useStatuteScrollSpy(ids: readonly string[], version: number): string | null {
+export function useStatuteScrollSpy(
+  spyTargets: readonly SpyTarget[],
+  version: number,
+): string | null {
   const [active, setActive] = useState<string | null>(null);
   const crossingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (ids.length === 0) return;
-    const targets = ids
-      .map((id) => document.getElementById(id))
+    if (spyTargets.length === 0) return;
+    const targets = spyTargets
+      .map((target) => document.getElementById(target.id))
       .filter((el): el is HTMLElement => el !== null);
     if (targets.length === 0) return;
 
@@ -124,11 +129,11 @@ export function useStatuteScrollSpy(ids: readonly string[], version: number): st
         root.scrollTop > 0 &&
         root.scrollTop + root.clientHeight >= root.scrollHeight - 4
       ) {
-        setActive(ids[ids.length - 1]);
+        setActive(spyTargets[spyTargets.length - 1].answer);
         return;
       }
-      const current = ids.find((id) => crossingRef.current.has(id));
-      if (current) setActive(current);
+      const current = spyTargets.find((target) => crossingRef.current.has(target.id));
+      if (current) setActive(current.answer);
     };
 
     const observer = new IntersectionObserver(
@@ -166,7 +171,7 @@ export function useStatuteScrollSpy(ids: readonly string[], version: number): st
       if (frame) cancelAnimationFrame(frame);
     };
     // `version` is the re-observe trigger: same ids, more of them mounted.
-  }, [ids, version]);
+  }, [spyTargets, version]);
 
   return active;
 }

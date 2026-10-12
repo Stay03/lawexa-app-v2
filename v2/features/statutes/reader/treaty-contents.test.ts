@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseAkn, type AknDocumentModel } from './akn';
+import { parseAkn, scheduleLabel, spyTargetsOf, type AknDocumentModel } from './akn';
 import { buildServerOutline } from './server-outline';
 import type { StatuteOutlineEntry } from '@/lib/api/statutes';
 
@@ -265,8 +265,35 @@ test("an ordinary Act's blocks and outline are exactly what they were before the
       sections: [{ id: 'akn-chp-1__part-2__sec-3', label: "3. Magistrates' courts" }],
     },
     { id: 'akn-sec-4', label: '4. Short title', sections: [] },
-    { id: 'akn-att-1', label: 'FIRST SCHEDULE — Section 1.', depth: 0, sections: [] },
+    {
+      id: 'akn-att-1',
+      label: 'FIRST SCHEDULE — CONSEQUENTIAL AMENDMENTS',
+      depth: 0,
+      sections: [],
+    },
   ]);
+});
+
+test("the treaty's schedule entry reads its heading, without the enabling-section note", () => {
+  const model = parseFixture('treaty-schedule.fixture.xml');
+  const schedule = model.outline.find((division) => division.id === 'akn-att-1');
+  assert.equal(
+    schedule?.label,
+    'TREATY BETWEEN THE GOVERNMENT OF THE FEDERAL REPUBLIC OF NIGERIA AND THE GOVERNMENT ' +
+      'OF THE REPUBLIC OF SOUTH AFRICA ON MUTUAL LEGAL ASSISTANCE IN CRIMINAL MATTERS',
+  );
+});
+
+test('a schedule label drops only a trailing enabling-section note', () => {
+  assert.equal(scheduleLabel('SCHEDULE — Section 1.'), 'SCHEDULE');
+  assert.equal(scheduleLabel('FIRST SCHEDULE - Sections 2 and 3'), 'FIRST SCHEDULE');
+  assert.equal(scheduleLabel('SECOND SCHEDULE – Section 14A.'), 'SECOND SCHEDULE');
+  assert.equal(
+    scheduleLabel('FIRST SCHEDULE — CONSEQUENTIAL AMENDMENTS'),
+    'FIRST SCHEDULE — CONSEQUENTIAL AMENDMENTS',
+  );
+  assert.equal(scheduleLabel('Forms under section 5 of the Act'), 'Forms under section 5 of the Act');
+  assert.equal(scheduleLabel('Section 1.'), 'Section 1.');
 });
 
 test("the treaty's blocks are exactly what they were before the rule", () => {
@@ -311,7 +338,7 @@ test('the server outline lists the same Articles the walk does', () => {
     outline: [
       entry(0, 0, 'section', 'sec-1', '1.', 'Enforcement of the Treaty'),
       entry(1, 0, 'section', 'sec-2', '2.', 'Short title'),
-      entry(2, 0, 'schedule', 'att-1', 'SCHEDULE', 'TREATY BETWEEN THE GOVERNMENTS'),
+      entry(2, 0, 'schedule', 'att-1', 'SCHEDULE', 'TREATY BETWEEN THE GOVERNMENTS — Section 1.'),
       entry(3, 1, 'hcontainer', 'att-1__list-1', null, 'Table of Contents'),
       entry(4, 1, 'hcontainer', 'att-1__group-treaty', null, 'TREATY BETWEEN THE GOVERNMENTS'),
       entry(5, 1, 'paragraph', 'att-1__spara-t1', 'Article 1', 'Scope of Assistance'),
@@ -328,6 +355,9 @@ test('the server outline lists the same Articles the walk does', () => {
   });
   const schedule = divisions.find((division) => division.id === 'akn-att-1');
   assert.ok(schedule, 'the schedule is not in the server outline');
+  // The live entry has number "SCHEDULE" that the XML export does not carry;
+  // the label is the heading alone, the same as the walk's.
+  assert.equal(schedule.label, 'TREATY BETWEEN THE GOVERNMENTS');
   assert.deepEqual(schedule.sections, [
     { id: 'akn-att-1__spara-t1', label: 'Article 1 Scope of Assistance' },
     { id: 'akn-att-1__spara-t2', label: 'Article 2 Central Authorities' },
@@ -339,7 +369,7 @@ test('the server outline still ignores a schedule paragraph that is not an Artic
   const { divisions } = buildServerOutline({
     outline: [
       entry(0, 0, 'section', 'sec-1', '1.', 'Short title'),
-      entry(1, 0, 'schedule', 'att-1', 'FIRST SCHEDULE', 'Fees'),
+      entry(1, 0, 'schedule', 'att-1', null, 'FIRST SCHEDULE — CONSEQUENTIAL AMENDMENTS'),
       entry(2, 1, 'paragraph', 'att-1__para-1', '1.', 'Fees'),
       entry(3, 1, 'paragraph', 'att-1__para-2', 'Article 2', ''),
       entry(4, 0, 'section', 'sec-2', '2.', 'Commencement'),
@@ -350,7 +380,78 @@ test('the server outline still ignores a schedule paragraph that is not an Artic
   });
   assert.deepEqual(divisions, [
     { id: 'akn-sec-1', label: '1. Short title', sections: [] },
-    { id: 'akn-att-1', label: 'FIRST SCHEDULE — Fees', depth: 0, sections: [] },
+    {
+      id: 'akn-att-1',
+      label: 'FIRST SCHEDULE — CONSEQUENTIAL AMENDMENTS',
+      depth: 0,
+      sections: [],
+    },
     { id: 'akn-sec-2', label: '2. Commencement', sections: [] },
   ]);
+});
+
+/* ── The scroll spy ──────────────────────────────────────────────────────── */
+
+test("a treaty schedule's opening blocks keep the schedule active", () => {
+  // The rail expands the active division's sections. Reading the table of
+  // contents or the preamble (two hcontainers before Article 1) must make the
+  // schedule active, not leave section 2 active with the Articles collapsed.
+  const model = parseFixture('treaty-schedule.fixture.xml');
+  assert.deepEqual(
+    spyTargetsOf(model.blocks, model.outline).map((target) => `${target.id} > ${target.answer}`),
+    [
+      'akn-sec-1 > akn-sec-1',
+      'akn-sec-2 > akn-sec-2',
+      'akn-att-1 > akn-att-1',
+      'akn-att-1__list-1 > akn-att-1',
+      'akn-att-1__group-treaty > akn-att-1',
+      'akn-att-1__spara-t1 > akn-att-1__spara-t1',
+      'akn-att-1__spara-t2 > akn-att-1__spara-t2',
+      'akn-att-1__spara-t3 > akn-att-1__spara-t3',
+      'akn-att-1__spara-t4 > akn-att-1__spara-t4',
+    ],
+  );
+});
+
+test("an Act's Parts give the spy exactly the outline's own ids", () => {
+  // Before this change the spy watched the outline ids, each answering
+  // itself. In the Act's body that is still all it watches; only the
+  // schedule's opening blocks (no sections follow them) answer the schedule.
+  const model = parseFixture('ordinary-act.fixture.xml');
+  const outlineIds = model.outline.flatMap((division) => [
+    division.id,
+    ...division.sections.map((section) => section.id),
+  ]);
+  const targets = spyTargetsOf(model.blocks, model.outline);
+  const own = targets.filter((target) => target.answer === target.id);
+  assert.deepEqual(
+    own.map((target) => target.id),
+    outlineIds,
+  );
+  assert.deepEqual(
+    targets.filter((target) => target.answer !== target.id).map((target) => `${target.id} > ${target.answer}`),
+    [
+      'akn-att-1__hcontainer-1 > akn-att-1',
+      'akn-att-1__para-1 > akn-att-1',
+      'akn-att-1__para-2 > akn-att-1',
+    ],
+  );
+});
+
+test("a Part's opening crossheading and unlabelled subpart do not change the spy", () => {
+  // The Courts Act's Part I shape: an unlabelled subpart, a crossheading,
+  // then the first section.
+  const model = parseAkn(`<akomaNtoso><act><body>
+    <part eId="part-i"><num>Part I</num><heading>Superior Courts</heading>
+      <subpart eId="part-i__subpart-nn-1">
+        <crossHeading eId="part-i__subpart-nn-1__crossheading-1">The Supreme Court</crossHeading>
+        <section eId="sec-1"><num>1.</num><heading>Composition</heading><content><p>Text.</p></content></section>
+      </subpart>
+    </part>
+  </body></act></akomaNtoso>`);
+  assert.ok(model);
+  assert.deepEqual(
+    spyTargetsOf(model.blocks, model.outline).map((target) => `${target.id} > ${target.answer}`),
+    ['akn-part-i > akn-part-i', 'akn-sec-1 > akn-sec-1'],
+  );
 });

@@ -29,6 +29,7 @@ import {
   SECTION_GRADE,
   STRUCTURAL,
   isTreatyArticle,
+  scheduleLabel,
   type AknOutlineDivision,
 } from './akn';
 import {
@@ -130,7 +131,12 @@ export function buildServerOutline(data: StatuteOutlineData): ServerOutlineModel
     if (DIVISION_GRADE.has(entry.node_type)) {
       const inSchedule =
         entry.node_type === 'schedule' || (stack[stack.length - 1]?.inSchedule ?? false);
-      const label = joinLabel(entry.number, entry.title, ' — ');
+      // A schedule is labelled by its heading alone, as in the walk (see
+      // `scheduleLabel`); the outline's number for it has no XML twin.
+      const label =
+        entry.node_type === 'schedule'
+          ? scheduleLabel(entry.title ?? '')
+          : joinLabel(entry.number, entry.title, ' — ');
       if (label) {
         const division: AknOutlineDivision = {
           id: anchorIdOf(entry),

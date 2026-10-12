@@ -181,6 +181,26 @@ export function isTreatyArticle(num: string, heading: string): boolean {
   return /^article\b/i.test(num.trim()) && heading.trim() !== '';
 }
 
+/**
+ * The enabling-section note a schedule heading ends with: "SCHEDULE — Section
+ * 1." means "the Schedule that section 1 refers to". It is part of the printed
+ * heading, so the document keeps it; a contents row drops it.
+ */
+const ENABLING_SECTION_NOTE = /\s*[—–-]\s*sections?\s+\d+[a-z]*(?:\s*(?:,|and|&|to)\s*\d+[a-z]*)*\.?$/i;
+
+/**
+ * A schedule's contents label: its heading as given, without the
+ * enabling-section note. The export never carries a `num` on an `attachment`
+ * (checked on the Courts Act and both treaties), while the outline endpoint
+ * sometimes has one ("SCHEDULE" on the South Africa treaty), so both sides
+ * label a schedule by its heading alone and agree. Exported for
+ * `server-outline.ts`, which applies it to the outline's `title`.
+ */
+export function scheduleLabel(heading: string): string {
+  const text = heading.replace(/\s+/g, ' ').trim();
+  return text.replace(ENABLING_SECTION_NOTE, '') || text;
+}
+
 /* ── Parsing ─────────────────────────────────────────────────────────────── */
 
 /**
@@ -294,7 +314,15 @@ class ModelBuilder {
       }
 
       if (STRUCTURAL.has(name)) {
-        this.division(child, depth);
+        this.division(
+          child,
+          depth,
+          joinNumHeading(
+            collapsedText(childByLocal(child, 'num')),
+            collapsedText(childByLocal(child, 'heading')),
+            ' — ',
+          ),
+        );
         continue;
       }
 
@@ -302,7 +330,7 @@ class ModelBuilder {
         // A schedule/appendix: its heading is a top-level division, its
         // nested doc/mainBody continues the flat sequence.
         this.attachmentDepth += 1;
-        this.division(child, 0);
+        this.division(child, 0, scheduleLabel(collapsedText(childByLocal(child, 'heading'))));
         this.attachmentDepth -= 1;
         continue;
       }
@@ -373,14 +401,10 @@ class ModelBuilder {
     }
   }
 
-  /** Emit a division heading block + outline entry, then continue inside. */
-  private division(el: Element, depth: number): void {
+  /** Emit a division heading block + outline entry (labelled `label`, the
+   *  caller's join for its kind), then continue inside. */
+  private division(el: Element, depth: number, label: string): void {
     const id = this.anchorId(el);
-    const label = joinNumHeading(
-      collapsedText(childByLocal(el, 'num')),
-      collapsedText(childByLocal(el, 'heading')),
-      ' — ',
-    );
 
     this.push({ id, kind: 'division', element: el, depth });
 
@@ -403,4 +427,52 @@ class ModelBuilder {
 
     this.walk(el, depth + 1, true);
   }
+}
+
+/* ── Scroll-spy targets ──────────────────────────────────────────────────── */
+
+/**
+ * One block the scroll spy watches, and the outline id it answers when that
+ * block is under the reading band.
+ */
+export interface SpyTarget {
+  id: string;
+  answer: string;
+}
+
+/**
+ * The scroll spy's targets, in document order: every outline entry's own
+ * block, answering itself, plus the body blocks between a division heading
+ * and the division's first entry, answering the division. Without those, a
+ * reader in a schedule's opening text (a treaty's table of contents and
+ * preamble) would leave the previous division active, its sections expanded
+ * in the rail and this one's collapsed. Only body blocks: a Part's opening
+ * crossheading or unlabelled subpart keeps the spy exactly as it was. Blocks
+ * after an entry are not targets: between targets the spy holds its last
+ * answer, which is already the right one.
+ */
+export function spyTargetsOf(
+  blocks: readonly AknBlock[],
+  outline: readonly AknOutlineDivision[],
+): SpyTarget[] {
+  const divisionIds = new Set(outline.map((division) => division.id));
+  const entryIds = new Set(divisionIds);
+  for (const division of outline) {
+    for (const section of division.sections) entryIds.add(section.id);
+  }
+
+  const targets: SpyTarget[] = [];
+  /** The division heading whose opening blocks are being read, if any. */
+  let opening: string | null = null;
+  for (const block of blocks) {
+    if (!block.id) continue;
+    if (entryIds.has(block.id)) {
+      targets.push({ id: block.id, answer: block.id });
+      opening =
+        block.kind === 'division' && divisionIds.has(block.id) ? block.id : null;
+    } else if (opening && block.kind === 'body') {
+      targets.push({ id: block.id, answer: opening });
+    }
+  }
+  return targets;
 }

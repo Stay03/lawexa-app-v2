@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 import { statutesQueries } from '../queries';
-import { parseAkn, type AknBlock, type AknOutlineDivision } from './akn';
+import { parseAkn, spyTargetsOf, type AknBlock, type AknOutlineDivision } from './akn';
 import { AknBlockView } from './AknNode';
 import { buildServerOutline, findLockedCitation } from './server-outline';
 import { STATUTE_PAYWALL_ID, StatutePaywall } from './StatutePaywall';
@@ -260,7 +260,8 @@ export function StatuteDocument({
     }
     return ids;
   }, [outline]);
-  const activeId = useStatuteScrollSpy(spyIds, visibleCount);
+  const spyTargets = useMemo(() => spyTargetsOf(blocks, outline), [blocks, outline]);
+  const activeId = useStatuteScrollSpy(spyTargets, visibleCount);
 
   /**
    * Jump to an anchor. Mounts THROUGH the target first (never the whole
