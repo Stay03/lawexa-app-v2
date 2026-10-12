@@ -15,8 +15,11 @@ import {
   type ReactNode,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { ConversationFrame } from '@/v2/features/conversations/conversation/skeletons';
+import { conversationIdOf, warmConversation } from '@/v2/features/conversations/warm';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   clearHeaderContext,
@@ -223,6 +226,20 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   // bumps it, and the replace only runs if it is still the latest.
   const tapRef = useRef(0);
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+  const { userId } = useV2Session();
+
+  /**
+   * A chat's transcript is read from the click that raises its frame, not from
+   * the screen's mount 2 s later (conversations/warm.ts). Only from a click or a
+   * history move, never from a hover or a pointerdown: every read logs a view on
+   * the server, and a finger that lands on a row to scroll fires no click.
+   */
+  const readAhead = (href: string, kind: MoveFirstKind, confidential?: boolean) => {
+    if (kind !== 'conversation') return;
+    const conversationId = conversationIdOf(href);
+    if (conversationId) warmConversation(queryClient, { conversationId, viewerId: userId, confidential });
+  };
 
   const visible = pending !== null && (pending.phase === 'painting' || navigating);
   // Derived, so prefetching comes back by itself when the layer goes, whether
@@ -304,8 +321,10 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
       return;
     }
     const kind = state[PENDING_KIND_KEY];
+    const frame = typeof kind === 'string' && kind in MOVE_FIRST_FRAMES ? (kind as MoveFirstKind) : 'page';
     const href = window.location.pathname + window.location.search;
-    raise(href, typeof kind === 'string' && kind in MOVE_FIRST_FRAMES ? (kind as MoveFirstKind) : 'page', undefined, region);
+    raise(href, frame, undefined, region);
+    readAhead(href, frame);
     navigateAfterPaint(href, tap);
   });
 
@@ -335,6 +354,9 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
     if (onMove) document.documentElement.setAttribute(SHEET_CUT_ATTR, '');
     raise(href, kind, title, region, restore);
     pushPendingEntry(href, kind);
+    // After the entry is pushed: a 401 on this read then sees the chat's URL and
+    // does not redirect the list to /login (lib/api/client.ts).
+    readAhead(href, kind, header?.confidential);
     navigateAfterPaint(
       href,
       tap,

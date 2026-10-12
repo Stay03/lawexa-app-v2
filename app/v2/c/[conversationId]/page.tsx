@@ -101,8 +101,8 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
  * `fetchConversationForMetadata` is itself revalidated every 60s server-side.
  * Everything the reader sees comes from the client queries, which this window
  * does not touch: the conversation record is re-read from the server on every
- * arrival (`refetchOnMount: REFETCH_ON_VISIT`) and kept in memory for 30 minutes
- * whatever this value is. So raising it changes only the head tags; the
+ * arrival (at the tap, or on mount: `checkOnArrival`) and kept in memory for
+ * 30 minutes whatever this value is. So raising it changes only the head tags; the
  * browser tab's title can lag by up to 30 minutes.
  *
  * Known, and not caused by this window: a conversation deleted elsewhere while

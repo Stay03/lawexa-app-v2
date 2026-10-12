@@ -1,6 +1,7 @@
 'use client';
 
 import { useV2Session } from '@/v2/runtime/session-context';
+import { usePreloadConversationScreen } from '@/v2/features/conversations/preload-conversation-screen';
 import type { HomeTab } from '@/v2/shell/home-tabs';
 import { ChatHome } from '@/v2/shell/designs/ChatHome';
 import { WorkHome } from '@/v2/shell/designs/WorkHome';
@@ -55,6 +56,9 @@ import { StudyHome } from '@/v2/shell/designs/StudyHome';
  */
 export function V2Home({ tab }: { tab: HomeTab }) {
   const { name, signedIn, role, userId } = useV2Session();
+  // Every tab opens chats (its recents, the rail and the drawer over it), so the
+  // chat screen's code loads while the home sits idle (preload-conversation-screen.ts).
+  usePreloadConversationScreen(signedIn);
 
   // v1 parity: the greeting engine takes the FIRST name only. A pure string
   // derivation of an already-resolved value — no clock, no randomness, nothing

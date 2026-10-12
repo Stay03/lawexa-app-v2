@@ -22,6 +22,7 @@ import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
 import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
 import { groupMessages, type MessageGroup } from './message-groups';
 import { computeStreamStart } from './stream-start';
+import { splitOpenTail } from './open-tail';
 import { UserMessageRow } from './rows/UserMessageRow';
 import { AssistantMessageRow } from './rows/AssistantMessageRow';
 import { HandoverRow } from './rows/HandoverRow';
@@ -123,6 +124,16 @@ const UNVIRTUALIZED_TAIL = 3;
  * transition useDeferredValue returns the full value at once, so the whole
  * chat still drew before the move (measured: 1.82-1.92 s became 1.48-1.56 s on
  * the long chat, the short and medium chats unchanged).
+ *
+ * THE OPEN STARTS WITH THE FIRST MESSAGES, NOT THE MOUNT. A cold open mounts
+ * this list over a skeleton, before the transcript is here. The rest used to
+ * follow two frames after the mount, so by the time the history landed the
+ * list was already drawing everything, and the whole chat drew in the frame the
+ * skeleton went. The two frames now count from the commit that first has
+ * messages, so a cold open draws the newest first as well.
+ *
+ * The cut never falls inside a tool chain or a handover group (open-tail.ts),
+ * so every row of the first frame stays mounted when the rest arrives.
  */
 const OPEN_TAIL_MESSAGES = 8;
 
@@ -185,9 +196,12 @@ export function MessageList({
   // scroller, so the older messages filling in above never move the text the
   // reader is looking at. Shorter chats keep their top-down layout.
   const anchorBottom = latestMessages.length > OPEN_TAIL_MESSAGES;
-  const openTail = useMemo(() => latestMessages.slice(-OPEN_TAIL_MESSAGES), [latestMessages]);
+  const openTail = useMemo(() => splitOpenTail(latestMessages, OPEN_TAIL_MESSAGES).newest, [latestMessages]);
   const messages = showAll ? latestMessages : openTail;
+  const hasMessages = latestMessages.length > 0;
   useEffect(() => {
+    // Counted from the first commit with messages (see OPEN_TAIL_MESSAGES).
+    if (!hasMessages) return;
     // Two frames: the first runs before the opening frame is painted, the
     // second after it, so the move is always on screen before the rest draws.
     let second = 0;
@@ -198,14 +212,13 @@ export function MessageList({
       cancelAnimationFrame(first);
       cancelAnimationFrame(second);
     };
-  }, []);
+  }, [hasMessages]);
   // The open is over one frame after the commit that drew the whole chat
   // with its messages in it (on a cold open, the history arriving). Until
   // then a long answer that mounts may parse its last blocks first and the
   // rest right after (markdown/defer-plan.ts); a row that mounts later, where
   // the reader may be looking, parses whole.
   const [opened, setOpened] = useState(false);
-  const hasMessages = latestMessages.length > 0;
   useEffect(() => {
     if (!showAll || !hasMessages) return;
     const frame = requestAnimationFrame(() => setOpened(true));

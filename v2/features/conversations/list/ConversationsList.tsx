@@ -18,6 +18,7 @@ import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import { DeleteConversationDialog } from '@/v2/features/conversations/DeleteConversationDialog';
 import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
+import { usePreloadConversationScreen } from '@/v2/features/conversations/preload-conversation-screen';
 import { useConversationsSearch } from './useConversationsSearch';
 import { ConversationsSearchBar } from './ConversationsSearchBar';
 import { ConversationRow } from './ConversationRow';
@@ -94,6 +95,9 @@ const conversationSortKey = (row: ConversationListItem): number =>
 export function ConversationsList({ signedIn }: { signedIn: boolean }) {
   // The cache PARTITION — see `ViewerScoped`. Not a request parameter.
   const { userId: viewerId } = useV2Session();
+  // The screen a row opens is loaded while the list sits idle, so a tap after
+  // the page was reloaded does not wait for its code (preload-conversation-screen.ts).
+  usePreloadConversationScreen(signedIn);
   // Captured ONCE (lazy init) so no clock read runs in render (React Compiler
   // purity); every row's relative time is measured against this fixed anchor.
   const [now] = useState(() => Date.now());

@@ -127,6 +127,29 @@ function httpStatusOf(error: unknown): number | undefined {
 }
 
 /**
+ * How recent a read of a conversation must be to count as this arrival's check.
+ * A tap starts the read about 2 s before the screen mounts on a first open, and
+ * about 3 s on a reload of a discarded tab; 10 s covers both. A longer window
+ * only delays the "continued in another tab" check for a reopen inside it.
+ * The tap's prefetch uses it as its `staleTime`, so a tap on a chat read within
+ * the window sends nothing.
+ */
+export const VISIT_CHECK_WINDOW_MS = 10_000;
+
+/**
+ * `refetchOnMount` for the transcript, from its entry's `dataUpdatedAt`: the
+ * visit check (`REFETCH_ON_VISIT`), except when a read landed within
+ * {@link VISIT_CHECK_WINDOW_MS}, which is then this arrival's check. `true` there
+ * is TanStack's normal rule (refetch only when stale), which never fires on data
+ * younger than the 60 s stale time.
+ */
+export function checkOnArrival(dataUpdatedAt: number): boolean | typeof REFETCH_ON_VISIT {
+  return dataUpdatedAt > 0 && Date.now() - dataUpdatedAt < VISIT_CHECK_WINDOW_MS
+    ? true
+    : REFETCH_ON_VISIT;
+}
+
+/**
  * Identity of a conversation-detail cache entry. `viewerId` is NOT a request
  * parameter — the request is authorized by the bearer token — it is a CACHE
  * PARTITION (see the `detail()` docblock).
@@ -339,6 +362,17 @@ export const conversationsQueries = {
    * with `ensureQueryData`, which returns the cached record without waiting, so the
    * engine is seeded and painted before this refetch is even issued.
    *
+   * ONE CHECK PER ARRIVAL, SENT AT THE TAP WHEN THERE IS ONE. A tap on a chat link
+   * starts this read in the click (`warm.ts`, from the move-first provider), about
+   * 2 s before the screen mounts on a first open (trace, 9 October 2026). The
+   * answer lands in about 0.3 s, so a plain `'always'` would send the same read
+   * again on mount. `refetchOnMount` is therefore {@link checkOnArrival}: no mount
+   * read when a read landed within {@link VISIT_CHECK_WINDOW_MS}, the visit check
+   * otherwise. A mount that finds the tap's read still in flight joins it
+   * (TanStack returns the running promise to a fetch without `cancelRefetch`). A
+   * copy restored from the device keeps its old `dataUpdatedAt`, so it still gets
+   * its check, and the persister re-reads every `'gated'` restore on its own.
+   *
    * FRESHNESS. `STALE_TIMES.standard` (60s): a conversation the viewer is not
    * actively driving changes only from another tab/device, and the mount +
    * window-focus refetches then reconcile it. What keeps it from being
@@ -376,7 +410,7 @@ export const conversationsQueries = {
       },
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
-      refetchOnMount: REFETCH_ON_VISIT,
+      refetchOnMount: (query) => checkOnArrival(query.state.dataUpdatedAt),
       // A missing / forbidden / device-owned conversation is a settled answer, not
       // a blip: retrying it only delays the "not available" screen. Everything else
       // keeps the client's default single retry.
