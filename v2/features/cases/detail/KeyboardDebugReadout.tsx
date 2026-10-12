@@ -58,7 +58,6 @@ export function KeyboardDebugReadout() {
         `header display ${bar ? getComputedStyle(bar).display : 'none'}`,
         `X ${rectOf(close)}`,
         `composer focused ${composerFocused ? 'yes' : 'no'}`,
-        `keyboard up ${document.documentElement.getAttribute('data-v2-keyboard') === 'up' ? 'yes' : 'no'}`,
       ].join('\n');
     };
 

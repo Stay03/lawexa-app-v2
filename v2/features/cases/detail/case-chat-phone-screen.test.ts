@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -175,7 +175,7 @@ test('the keyboard inset itself is unchanged for every other screen', () => {
 /* Arthur's iPhone on d720169 (12 October 2026): with the keyboard up the page's bar
  * painted over the chat's own bar, so nothing on screen closed the chat. The card's
  * position stays as on d720169 (pinned above); what is new is the hidden page
- * chrome, the composer's X and the debug readout.
+ * chrome and the debug readout (and a composer X, since removed: see below).
  *
  * His recordings after Done (12 October 2026): the card's top 56 px, its bar and X,
  * were cut. iOS clips the fixed card to the shell's content region, its DOM
@@ -287,11 +287,11 @@ test('the bars come back on every way out: each close, a route change, an unmoun
     chrome,
     /return \(\) => \{\s*window\.removeEventListener\('pagehide', restore\);\s*window\.removeEventListener\('pageshow', onPageShow\);\s*restore\(\);\s*\};\s*\}, \[screenMounted\]\);$/,
   );
-  // Every close ends the open screen: the bar's X, the composer's X and Escape call
-  // `onClose`, which is CaseScreen's `closeChat`; Back adopts the URL without `chat`.
+  // Every close ends the open screen: the bar's X and Escape call `onClose`, which
+  // is CaseScreen's `closeChat`; Back adopts the URL without `chat`. (The composer's
+  // X that also called it is gone; see the tests at the end.)
   assert.match(ask, /if \(event\.key === 'Escape'\) \{\s*event\.stopPropagation\(\);\s*onClose\(\);/);
   assert.match(ask, /<CaseChatBar\s+view=\{view\}\s+onBack=\{\(\) => onOpenChat\('new'\)\}\s+onClose=\{onClose\}\s+tall/);
-  assert.match(ask, /onClose=\{screenMounted \? onClose : undefined\}/);
   assert.match(screen, /onClose=\{closeChat\}/);
   assert.match(screen, /const closeChat = useCallback\(\(\) => \{\s*setChat\(null\);/);
   assert.match(screen, /setChat\(new URLSearchParams\(window\.location\.search\)\.get\('chat'\)\);/);
@@ -305,8 +305,8 @@ test('the bars come back on every way out: each close, a route change, an unmoun
   assert.match(chrome, /window\.addEventListener\('pageshow', onPageShow\);/);
 });
 
-test('the bar X is always there in the open chat; the composer X is only an extra', () => {
-  // The bar renders its close unconditionally, and nothing in it reads the keyboard flag.
+test("the bar X is the open chat's one close, always there", () => {
+  // The bar renders its close unconditionally, and nothing in it reads the keyboard.
   const bar = core.slice(core.indexOf('export function CaseChatBar'), core.indexOf('export function CaseChatMiddle'));
   assert.ok(bar.length > 0);
   assert.match(bar, /\) : null\}\s*<button\s+type="button"\s+onClick=\{onClose\}\s+aria-label="Close the chat"/);
@@ -316,58 +316,41 @@ test('the bar X is always there in the open chat; the composer X is only an extr
   assert.doesNotMatch(ask, /v2-keyboard/);
 });
 
-test('the hook says when the keyboard is up: a typing field focused and the visible height a keyboard short', () => {
-  assert.match(keyboard, /const keyboardUp = editableFocused\(\) && fullHeight - viewport\.height >= KEYBOARD_MIN_HEIGHT;/);
-  assert.match(keyboard, /if \(keyboardUp\) root\.setAttribute\('data-v2-keyboard', 'up'\);\s*else root\.removeAttribute\('data-v2-keyboard'\);/);
-  assert.match(keyboard, /fullHeight = Math\.max\(fullHeight, viewport\.height\);/);
-  assert.match(keyboard, /const KEYBOARD_MIN_HEIGHT = 150;/);
-  assert.match(keyboard, /root\.removeAttribute\('data-v2-keyboard'\);\s*\};\s*\}, \[\]\);/, 'cleared on unmount');
-  // Read on focusin too, so the card's first frame is sized from the tap.
-  assert.match(keyboard, /document\.addEventListener\('focusin', publishVisible\);/);
-  assert.match(keyboard, /document\.removeEventListener\('focusin', publishVisible\);/);
+/* Arthur's iPhone on da7be8d (12 October 2026). The composer's X is removed, so the
+ * bar's X is the one close: the pins for that X, for the hook's keyboard-up flag and
+ * for the composer's leading row are replaced by the absence pins below, and the
+ * composer is back to its d720169 shape. Closing became one fade of a still card. */
+
+/** Files under v2 and app (tests aside) that mention any of the patterns. */
+const sourcesMentioning = (...patterns: string[]): string[] =>
+  spawnSync('git', ['grep', '-l', ...patterns.flatMap((p) => ['-e', p]), '--', 'v2', 'app'], {
+    encoding: 'utf8',
+  })
+    .stdout.trim()
+    .split('\n')
+    .filter((f) => f && !f.endsWith('.test.ts'));
+
+test('the composer X and its keyboard-up flag are gone', () => {
+  assert.doesNotMatch(core, /ComposerCloseButton|aria-label="Close chat"|leadingAction/);
+  assert.doesNotMatch(composer, /leadingAction/);
+  // The dock takes no close; the phone chat closes from the bar, Escape and Back.
+  const dockProps = core.slice(core.indexOf('export function CaseChatComposerDock'));
+  assert.doesNotMatch(dockProps.slice(0, dockProps.indexOf('}) {')), /onClose/);
+  assert.match(ask, /onEngage=\{onEngage\}\s+stageRef=\{stageRef\}\s+\/>/);
+  // The hook no longer says whether the keyboard is up, and nothing reads that flag.
+  assert.doesNotMatch(keyboard, /data-v2-keyboard|KEYBOARD_MIN_HEIGHT|editableFocused/);
+  assert.deepEqual(sourcesMentioning('v2-keyboard'), []);
 });
 
-test('the composer row carries a "Close chat" X while the keyboard is up, on the bar X\'s close path', () => {
-  const button = core.match(/function ComposerCloseButton[\s\S]*?\n\}/)?.[0];
-  assert.ok(button, 'the close button has its own component');
-  assert.match(button, /aria-label="Close chat"/);
-  assert.match(button, /onClick=\{onClose\}/);
-  // At least 44x44 CSS px.
-  assert.match(button, /\bsize-11\b/);
-  // Hidden unless the hook says the keyboard is up.
-  assert.match(button, /'v2-interactive hidden size-11 [^']*in-data-\[v2-keyboard=up\]:flex'/);
-  // The press keeps focus in the box, so the keyboard and the button stay until the click.
-  assert.match(button, /onMouseDown=\{\(event\) => event\.preventDefault\(\)\}/);
-  // Only the phone full screen passes a close, and it is the same `onClose` as the bar's X.
-  assert.match(ask, /onClose=\{screenMounted \? onClose : undefined\}/);
-  assert.match(ask, /<CaseChatBar\s+view=\{view\}\s+onBack=\{\(\) => onOpenChat\('new'\)\}\s+onClose=\{onClose\}\s+tall/);
-  assert.match(core, /leadingAction=\{onClose \? <ComposerCloseButton onClose=\{onClose\} \/> : null\}/);
-});
-
-test("the composer's leading slot sits outside the pill, in a row that is always there", () => {
-  // The row is unconditional, so the slot coming and going never remounts the box.
-  // (`strip` leaves a JSX comment as `{}`.)
-  assert.match(
-    composer,
-    /<div className="flex items-end gap-1">\s*\{leadingAction\}\s*(?:\{\}\s*)?<div className="min-w-0 flex-1">\s*<PromptInput\b/,
-  );
+test("the composer is back to d720169's shape: the pill is the composer's own child, full width", () => {
+  // No row and no wrapper around the pill (da7be8d added both for the X). The pill's
+  // className is the one it has always had. Line ends match \r?\n for a Windows
+  // checkout (autocrlf).
+  assert.doesNotMatch(composer, /<div className="flex items-end gap-1">/);
+  assert.doesNotMatch(composer, /<div className="min-w-0 flex-1">\s*<PromptInput\b/);
+  assert.match(composer, /\r?\n\s*className="shadow-\[0_6px_16px_-8px_rgba\(0,0,0,0\.28\)\]"\r?\n/);
   assert.equal(composer.match(/<PromptInputTextarea/g)?.length, 1);
 });
-
-test('with no leading control every composer host keeps the full-width pill it had on d720169', () => {
-  // PromptInput's className lands on its INNER box; the flex item is its outer
-  // shimmer box, which shrank to its content when the row was added (pixel compare
-  // of 9237bf3: /c/{id} pill 416 px to 207 px at 1280). The box around the pill is
-  // the flex item and takes the row's free width, and the pill's own className is
-  // unchanged from d720169. Line ends match \r?\n: a Windows checkout (autocrlf)
-  // gives this file CRLF endings, and a bare \n never matches there.
-  assert.match(composer, /<div className="min-w-0 flex-1">\s*<PromptInput\b/);
-  assert.match(composer, /\r?\n\s*className="shadow-\[0_6px_16px_-8px_rgba\(0,0,0,0\.28\)\]"\r?\n/);
-  assert.doesNotMatch(composer, /className="min-w-0 flex-1 shadow-/);
-});
-
-/* Arthur's iPhone on da7be8d (12 October 2026): closing became one fade of a still
- * card, from either X, Escape or Back. */
 
 /** The close effect: freezes the card, then puts the keyboard away. */
 const closeEffect = () => {
@@ -388,10 +371,7 @@ test('a close freezes the card at its measured top and height before the keyboar
     effect,
     /return \(\) => \{\s*card\.style\.removeProperty\('--v2-case-chat-closing-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-closing-height'\);\s*\};\s*\}, \[screenOpen, screenMounted\]\);$/,
   );
-  // Every close path runs it, the composer's X included: each one ends `panelOpen`
-  // (`chat` null) first, through the same `onClose`.
-  assert.match(core, /leadingAction=\{onClose \? <ComposerCloseButton onClose=\{onClose\} \/> : null\}/);
-  assert.match(ask, /onClose=\{screenMounted \? onClose : undefined\}/);
+  // Every close path runs it: each one ends `panelOpen` (`chat` null) first.
   assert.match(ask, /const screenOpen = screen && panelOpen;/);
   assert.match(screen, /panelOpen=\{chat !== null && dockOwnsChat\}/);
 });

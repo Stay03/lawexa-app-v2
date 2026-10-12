@@ -39,8 +39,7 @@ const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
  *     its top at the visual viewport's top and its height the visual
  *     viewport's height, so its last child, the composer, sits on the
  *     keyboard (Arthur, 11 October 2026: "a single tap should open the chat
- *     and bring up the keyboard"). With the keyboard up the composer row also
- *     carries a close button, because the bar's X can be hidden then.
+ *     and bring up the keyboard"). The bar's X is its one close button.
  *
  * ONE TAP RAISES THE KEYBOARD BECAUSE NOTHING IS REMOUNTED. WebKit opens the
  * keyboard only for a focus made inside the reader's gesture. The reader taps
@@ -148,7 +147,7 @@ export function CaseAskDock({
   // keeps its length, so the offset is never clamped and the reading place
   // is the same one when the bars come back.
   //
-  // THE BARS COME BACK ON EVERY WAY OUT. Every close (either X, Escape,
+  // THE BARS COME BACK ON EVERY WAY OUT. Every close (the bar's X, Escape,
   // Back) ends the open screen once its fade is done, and a route change or
   // an unmount ends this component: all of them run the cleanup. Leaving the
   // page (`pagehide`) gives them back too, so a page frozen in the
@@ -220,7 +219,7 @@ export function CaseAskDock({
   }, [screenMounted]);
 
   // CLOSING ON A PHONE puts the keyboard away. The box still has focus when
-  // the chat closes (either X, Escape, Back), and a focused box keeps the
+  // the chat closes (the X, Escape, Back), and a focused box keeps the
   // keyboard up over a page with no chat on it. Focus moves to the card, one
   // Tab from the box; not back to the box itself, which would raise the
   // keyboard again.
@@ -436,7 +435,6 @@ export function CaseAskDock({
           showMeta={screen ? screenMounted : panelMounted && panelOpen}
           animateMeta={!screen || screenMounted}
           onEngage={onEngage}
-          onClose={screenMounted ? onClose : undefined}
           stageRef={stageRef}
         />
       </div>

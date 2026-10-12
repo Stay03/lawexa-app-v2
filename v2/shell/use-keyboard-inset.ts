@@ -145,16 +145,6 @@ export function useKeyboardInset(): void {
      * tallest visible height at this width does not move with the keyboard in
      * either mode, so it is the limit in both.
      *
-     * THE KEYBOARD IS UP when a field the keyboard types into has focus AND
-     * the visible height is at least {@link KEYBOARD_MIN_HEIGHT} short of the
-     * full height (12 October 2026). Focus alone is wrong: Done puts the iOS
-     * keyboard away and keeps the box focused. Height alone is wrong too: a
-     * pinch zoom shrinks the visible viewport with no keyboard. The full
-     * height is the measure for the reason above. Published as
-     * `data-v2-keyboard="up"` on the root, so CSS can show what only makes
-     * sense with the keyboard up (the case chat's close button beside its box)
-     * without a render.
-     *
      * It is also read on `focusin`. The reader's tap on the chat's box is a
      * focus, so the card's first frame is sized from the viewport as it is at
      * the tap, never from whatever a keyboard before it left behind.
@@ -168,9 +158,6 @@ export function useKeyboardInset(): void {
       const top = visibleTop(viewport.offsetTop, viewport.height, fullHeight);
       root.style.setProperty('--visual-height', `${viewport.height}px`);
       root.style.setProperty('--visual-top', `${top}px`);
-      const keyboardUp = editableFocused() && fullHeight - viewport.height >= KEYBOARD_MIN_HEIGHT;
-      if (keyboardUp) root.setAttribute('data-v2-keyboard', 'up');
-      else root.removeAttribute('data-v2-keyboard');
     };
 
     const update = (): void => {
@@ -232,7 +219,6 @@ export function useKeyboardInset(): void {
       root.style.removeProperty('--keyboard-inset');
       root.style.removeProperty('--visual-height');
       root.style.removeProperty('--visual-top');
-      root.removeAttribute('data-v2-keyboard');
     };
   }, []);
 }
@@ -244,23 +230,6 @@ export function useKeyboardInset(): void {
  */
 export function visibleTop(offsetTop: number, height: number, fullHeight: number): number {
   return Math.max(0, Math.min(offsetTop, fullHeight - height));
-}
-
-/**
- * The least a keyboard takes from the visible height, in CSS px. The smallest
- * iPhone keyboard is about 260 tall with its suggestion row; Safari's own bars
- * move the visible height by well under 150.
- */
-const KEYBOARD_MIN_HEIGHT = 150;
-
-/** A field the on-screen keyboard types into has focus. */
-function editableFocused(): boolean {
-  const active = document.activeElement;
-  return (
-    active instanceof HTMLTextAreaElement ||
-    active instanceof HTMLInputElement ||
-    (active instanceof HTMLElement && active.isContentEditable)
-  );
 }
 
 /**
