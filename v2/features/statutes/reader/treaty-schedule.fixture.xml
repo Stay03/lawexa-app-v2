@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <preface>
+      <longTitle>
+        <p>An Act to enable effect to be given in the Federal Republic of Nigeria to the Treaty between the Federal Republic of Nigeria and the Republic of South Africa on mutual legal assistance in criminal matters; and for related purposes.</p>
+      </longTitle>
+    </preface>
+    <body>
+      <section eId="sec-1">
+        <num>1.</num>
+        <heading>Enforcement of the Treaty on Mutual Legal Assistance in Criminal Matters between the Federal Republic of Nigeria and the Republic of South Africa</heading>
+        <content>
+          <p>As from the commencement of this Act, the provisions of the Treaty on Mutual Legal Assistance in Criminal Matters between the Federal Republic of Nigeria and the Republic of South Africa on Mutual Legal Assistance in Criminal Matters which are set out in the Schedule to this Act shall, subject as thereunder provided, have the force of law in Nigeria and shall be given full recognition and effect and be applied by all authorities and persons exercising legislative, executive or judicial powers in Nigeria.</p>
+          <p>[Schedule.]</p>
+        </content>
+      </section>
+      <section eId="sec-2">
+        <num>2.</num>
+        <heading>Short title</heading>
+        <content>
+          <p>This Act may be cited as the Treaty on Mutual Legal Assistance in Criminal Matters between the Government of the Federal Republic of Nigeria and the Government of the Republic of South Africa (Ratification and Enforcement) Act, 2004.</p>
+        </content>
+      </section>
+    </body>
+    <attachments>
+      <attachment eId="att-1">
+        <heading>TREATY BETWEEN THE GOVERNMENT OF THE FEDERAL REPUBLIC OF NIGERIA AND THE GOVERNMENT OF THE REPUBLIC OF SOUTH AFRICA ON MUTUAL LEGAL ASSISTANCE IN CRIMINAL MATTERS — Section 1.</heading>
+        <doc name="schedule">
+          <mainBody>
+            <hcontainer eId="att-1__list-1" name="hcontainer">
+              <heading>Table of Contents</heading>
+              <content>
+                <p>Article I: Scope of Assistance</p>
+                <p>Article 2: Central Authorities</p>
+                <p>Article 3: Limitations on Assistance</p>
+                <p>Article 4: Form and Contents of Requests</p>
+              </content>
+            </hcontainer>
+            <hcontainer eId="att-1__group-treaty" name="hcontainer">
+              <heading>TREATY BETWEEN THE GOVERNMENT OF THE FEDERAL REPUBLIC OF NIGERJA AND THE GOVERNMENT OF THE REPUBLIC OF SOUTH AFRICA ON MUTUAL LEGAL ASSISTANCE IN CRIMINAL MATTERS</heading>
+              <content>
+                <p>The Government of the Federal Republic of Nigeria and the Government of the Republic of South Africa:</p>
+                <p>DESIRING to improve the effectiveness of the law enforcement authorities of both countries in the investigation, prosecution, and prevention of crime through co-operation and mutual legal assistance in criminal matters;</p>
+                <p>CONSIDERING in particular the need to fight against the illicit production of any trafficking in narcotic drugs and other controlled substances;</p>
+                <p>HAVE AGREED as follows-</p>
+              </content>
+            </hcontainer>
+            <paragraph eId="att-1__spara-t1">
+              <num>Article 1</num>
+              <heading>Scope of Assistance</heading>
+              <item eId="att-1__spara-t1__item-1">
+                <num>1.</num>
+                <content>
+                  <p>The Contracting States shall provide mutual assistance, in accordance with the provisions of this Treaty, in connection with the investigation, prosecution and prevention of crimes, and in proceedings related to criminal matters.</p>
+                </content>
+              </item>
+              <item eId="att-1__spara-t1__item-2">
+                <num>2.</num>
+                <intro>
+                  <p>Such assistance shall include-</p>
+                </intro>
+                <paragraph eId="att-1__spara-t1__item-2__para-a">
+                  <num>(a)</num>
+                  <content>
+                    <p>taking the testimony or statements of persons;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t1__item-2__para-b">
+                  <num>(b)</num>
+                  <content>
+                    <p>providing documents, records and articles of evidence;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t1__item-2__para-c">
+                  <num>(c)</num>
+                  <content>
+                    <p>serving documents;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t1__item-2__para-d">
+                  <num>(d)</num>
+                  <content>
+                    <p>locating and identifying persons;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t1__item-2__para-e">
+                  <num>(e)</num>
+                  <content>
+                    <p>transferring persons in custody for testimony or other purposes;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t1__item-2__para-f">
+                  <num>(f)</num>
+                  <content>
+                    <p>executing requests for searches and seizures;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t1__item-2__para-g">
+                  <num>(g)</num>
+                  <content>
+                    <p>tracing, identifying, restraining or immobilising criminally obtained asset;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t1__item-2__para-h">
+                  <num>(h)</num>
+                  <content>
+                    <p>assisting in proceedings related to forfeiture, restitution and recovery or collection offines; and</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t1__item-2__para-i">
+                  <num>(i)</num>
+                  <content>
+                    <p>any other form of assistance not prohibited by the laws of the Requested State.</p>
+                  </content>
+                </paragraph>
+              </item>
+              <item eId="att-1__spara-t1__item-3">
+                <num>3.</num>
+                <content>
+                  <p>Assistance shall be provided without regard to whether the conduct which the subject of the investigation, prosecution, or proceedings in the Requesting Slate would constitute a crime under the laws of the Requested State.</p>
+                </content>
+              </item>
+              <item eId="att-1__spara-t1__item-4">
+                <num>4.</num>
+                <content>
+                  <p>This Treaty is intended solely for mutual legal assistance between the Contracting States. The provisions of this Treaty shall not give rise to a right on the part of any private person to obtain, suppress or exclude any evidence or to impede the execution of a request.</p>
+                </content>
+              </item>
+            </paragraph>
+            <paragraph eId="att-1__spara-t2">
+              <num>Article 2</num>
+              <heading>Central Authorities</heading>
+              <item eId="att-1__spara-t2__item-1">
+                <num>1.</num>
+                <content>
+                  <p>Each Contracting State shall designate a Central Authority to make and receive requests pursuant to this Treaty.</p>
+                </content>
+              </item>
+              <item eId="att-1__spara-t2__item-2">
+                <num>2.</num>
+                <content>
+                  <p>For the Government of the Republic of South Africa, the Central Authority shall be the Director-General, Department of Justice and Constitutional Development or a person designated by the Director-General. For the Government of the Federal Republic of Nigeria, the Central Authority shall be the Attorney-General of the Federation and the Minister of Justice or a person designated by the Attorney-General of the Federation and the Minister of Justice.</p>
+                </content>
+              </item>
+              <item eId="att-1__spara-t2__item-3">
+                <num>3.</num>
+                <content>
+                  <p>The Central Authorities shall communicate directly with one another for the purposes of this Treaty. Such communication may, in exceptional circumstances, be effected through the diplomatic channel or through the International Criminal Police Organisation (INTERPOL).</p>
+                </content>
+              </item>
+            </paragraph>
+            <paragraph eId="att-1__spara-t3">
+              <num>Article 3</num>
+              <heading>Limitations on Assistance</heading>
+              <item eId="att-1__spara-t3__item-1">
+                <num>1.</num>
+                <intro>
+                  <p>The Central Authority of the Requested State may deny assistance if-</p>
+                </intro>
+                <paragraph eId="att-1__spara-t3__item-1__para-a">
+                  <num>(a)</num>
+                  <content>
+                    <p>the request relates to a political offence;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t3__item-1__para-b">
+                  <num>(b)</num>
+                  <content>
+                    <p>the request relates to an offence under military law which would not be an offence under ordinary criminal law;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t3__item-1__para-c">
+                  <num>(c)</num>
+                  <content>
+                    <p>the execution of the request would prejudice the national security or any other essential interests of the Requested State; or</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t3__item-1__para-d">
+                  <num>(d)</num>
+                  <content>
+                    <p>the request is not made in conformity with the Treaty.</p>
+                  </content>
+                </paragraph>
+              </item>
+              <item eId="att-1__spara-t3__item-2">
+                <num>2.</num>
+                <intro>
+                  <p>For the purposes of paragraph 1 (a) of this Article, the following offences shall not be considered political offences-</p>
+                </intro>
+                <paragraph eId="att-1__spara-t3__item-2__para-a">
+                  <num>(a)</num>
+                  <content>
+                    <p>the murder of, or other violent crime against, a Head of State or Deputy Head of State of the Requesting or Requested State or against a member of such person's family;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t3__item-2__para-b">
+                  <num>(b)</num>
+                  <content>
+                    <p>an offence for which both the Requesting or Requested State have an obligation pursuant to a multilateral international agreement to extradite the person sought or to submit the case to their respective competent authorities for decision as to prosecution;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t3__item-2__para-c">
+                  <num>(c)</num>
+                  <content>
+                    <p>murder;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t3__item-2__para-d">
+                  <num>(d)</num>
+                  <content>
+                    <p>an offence involving kidnapping, abduction, or any other form of unlawful detention, including the taking of hostages; and</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t3__item-2__para-e">
+                  <num>(e)</num>
+                  <content>
+                    <p>attempting or conspiring to commit, aiding, abetting, inducing, counselling or procuring commission of, or being an accessory before or after the fact to such offences.</p>
+                  </content>
+                </paragraph>
+              </item>
+              <item eId="att-1__spara-t3__item-3">
+                <num>3.</num>
+                <content>
+                  <p>Before denying assistance pursuant to this Article, the Central Authority of the Requested State shall consult with the Central Authority of the Requesting State to consider whether assistance can be given subject to such conditions as it deems necessary. If the Requesting State accepts assistance subject to those conditions, it shall comply with the conditions.</p>
+                </content>
+              </item>
+              <item eId="att-1__spara-t3__item-4">
+                <num>4.</num>
+                <content>
+                  <p>If the Central Authority of the Requested State determines the execution of a request would interfere with an ongoing criminal investigation or proceeding in that State, it may postpone execution or make execution subject to conditions determined necessary after consultation with the Central Authority of the Requesting State. If the Requesting State accepts the assistance subject to the conditions, it shall comply with the conditions.</p>
+                </content>
+              </item>
+              <item eId="att-1__spara-t3__item-5">
+                <num>5.</num>
+                <content>
+                  <p>If the Central Authority of the Requested State denies assistance, it shall inform the Central Authority of the Requesting State of the reasons for the partial or total denial or postponement of assistance.</p>
+                </content>
+              </item>
+            </paragraph>
+            <paragraph eId="att-1__spara-t4">
+              <num>Article 4</num>
+              <heading>Form and Contents of Requests</heading>
+              <item eId="att-1__spara-t4__item-1">
+                <num>1.</num>
+                <content>
+                  <p>A request for assistance shall be in writing except that the Central Authority of the Requested State may accept a request in another form in emergency situations. In any such case, the request shall be confirmed in writing within ten (10) days thereafter unless the Central Authority of the Requested State agrees otherwise. The request shall be in English.</p>
+                </content>
+              </item>
+              <item eId="att-1__spara-t4__item-2">
+                <num>2.</num>
+                <intro>
+                  <p>The request shall include the following-</p>
+                </intro>
+                <paragraph eId="att-1__spara-t4__item-2__para-a">
+                  <num>(a)</num>
+                  <content>
+                    <p>the name of the authority conducting the investigation, prosecution or proceedings to which the request relates;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-2__para-b">
+                  <num>(b)</num>
+                  <content>
+                    <p>a description of the subject matter and nature of the investigation, prosecution, or proceedings, including the specific crimes which relate to the matter, the stage reached in the proceedings and any dates for further proceedings;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-2__para-c">
+                  <num>(c)</num>
+                  <content>
+                    <p>a description of the evidence, information or other assistance sought; and</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-2__para-d">
+                  <num>(d)</num>
+                  <content>
+                    <p>a statement of the purpose for which the evidence, information or other assistance is sought.</p>
+                  </content>
+                </paragraph>
+              </item>
+              <item eId="att-1__spara-t4__item-3">
+                <num>3.</num>
+                <intro>
+                  <p>To the extent necessary and possible, a request shall also include the following-</p>
+                </intro>
+                <paragraph eId="att-1__spara-t4__item-3__para-a">
+                  <num>(a)</num>
+                  <content>
+                    <p>information on the identity and location of any person from whom evidence is sought;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-b">
+                  <num>(b)</num>
+                  <content>
+                    <p>information on the identity and location of a person to be served, that person's relationship to the investigation, prosecution or proceedings, and the manner in which service is to be effected;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-c">
+                  <num>(c)</num>
+                  <content>
+                    <p>information on the identity and whereabouts of the person to be located;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-d">
+                  <num>(d)</num>
+                  <content>
+                    <p>a precise description of the place or person to be searched and of the articles to be seized;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-e">
+                  <num>(e)</num>
+                  <content>
+                    <p>description of the manner in which any testimony or statement is to be taken and recorded, including any special requirements of the law of the Requesting State as to the manner of taking evidence relevant to its admissibility in that State;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-f">
+                  <num>(f)</num>
+                  <content>
+                    <p>list of questions to be asked of a witness;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-g">
+                  <num>(g)</num>
+                  <content>
+                    <p>description of any particular procedure to be followed in executing the request;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-h">
+                  <num>(h)</num>
+                  <content>
+                    <p>information as to the allowances and expenses to which a person asked to in the Requesting State in connection with the request will be entitled;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-i">
+                  <num>(i)</num>
+                  <content>
+                    <p>court order, if any, or a certified copy thereof, which is to be enforced and a statement that such order is final; and</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="att-1__spara-t4__item-3__para-j">
+                  <num>(j)</num>
+                  <content>
+                    <p>any other information which may be brought to the attention of the Requested State to facilitate its execution of the request.</p>
+                  </content>
+                </paragraph>
+              </item>
+            </paragraph>
+          </mainBody>
+        </doc>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

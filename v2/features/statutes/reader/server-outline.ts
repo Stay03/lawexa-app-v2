@@ -14,8 +14,9 @@
  * THE MAPPING MIRRORS `akn.ts`'s ModelBuilder EXACTLY — same division
  * vocabulary ({@link STRUCTURAL} plus `schedule`, the outline's name for what
  * the XML walk meets as `attachment`), same section vocabulary
- * ({@link SECTION_GRADE}), same label joins, same "only labelled divisions
- * earn an entry; sections attach to the nearest labelled ancestor" rule, and
+ * ({@link SECTION_GRADE}, plus a schedule's treaty Articles), same label
+ * joins, same "only labelled divisions earn an entry; sections attach to the
+ * nearest labelled ancestor" rule, and
  * the same `akn-{eId}` anchors — so on the rendered excerpt the two outlines
  * agree entry for entry, and a swap from one to the other moves nothing.
  *
@@ -24,7 +25,12 @@
  */
 
 import type { StatuteOutlineData, StatuteOutlineEntry } from '@/lib/api/statutes';
-import { SECTION_GRADE, STRUCTURAL, type AknOutlineDivision } from './akn';
+import {
+  SECTION_GRADE,
+  STRUCTURAL,
+  isTreatyArticle,
+  type AknOutlineDivision,
+} from './akn';
 import {
   formatProvisionLabel,
   isCitableNum,
@@ -67,6 +73,28 @@ function joinLabel(
   return num || text;
 }
 
+/** An open structural container while the mapping runs. */
+interface Frame {
+  depth: number;
+  /** `null` marks an UNLABELLED container. */
+  division: AknOutlineDivision | null;
+  /** True for a schedule and for every container inside one. */
+  inSchedule: boolean;
+}
+
+/** A treaty Article as the walk lists it (see {@link isTreatyArticle}): a
+ *  paragraph inside a schedule that sits directly in its innermost open
+ *  container, which is where the walk meets it at hierarchy level. Nested
+ *  paragraphs sit deeper and stay inside their Article. `stack` depths only
+ *  increase, so the last frame above the entry is its container. */
+function isScheduleArticle(entry: StatuteOutlineEntry, stack: readonly Frame[]): boolean {
+  if (entry.node_type !== 'paragraph') return false;
+  if (!isTreatyArticle(entry.number ?? '', entry.title ?? '')) return false;
+  const above = stack.filter((frame) => frame.depth < entry.depth);
+  const container = above[above.length - 1];
+  return container !== undefined && container.inSchedule && container.depth === entry.depth - 1;
+}
+
 /** The entry's `akn-{eId}` anchor — the same id the rendered document stamps
  *  (eIds are unchanged between the outline and the XML export). The position
  *  fallback keeps an eId-less entry keyable; it can never match a DOM anchor,
@@ -83,20 +111,25 @@ export function buildServerOutline(data: StatuteOutlineData): ServerOutlineModel
   /** Open structural containers, outermost first — `division: null` marks an
    *  UNLABELLED one (kept on the stack purely so depths stay honest; exactly
    *  the walk's "sections attach to the nearest labelled ancestor"). */
-  const stack: Array<{ depth: number; division: AknOutlineDivision | null }> = [];
+  const stack: Frame[] = [];
 
   for (const entry of data.outline) {
     if (entry.locked) lockedAnchorIds.add(anchorIdOf(entry));
 
+    const sectionGrade =
+      SECTION_GRADE.has(entry.node_type) || isScheduleArticle(entry, stack);
+
     // Structural containers cannot nest inside sections, so any frame at this
     // depth or deeper is finished the moment an entry at this depth arrives.
-    if (DIVISION_GRADE.has(entry.node_type) || SECTION_GRADE.has(entry.node_type)) {
+    if (DIVISION_GRADE.has(entry.node_type) || sectionGrade) {
       while (stack.length > 0 && stack[stack.length - 1].depth >= entry.depth) {
         stack.pop();
       }
     }
 
     if (DIVISION_GRADE.has(entry.node_type)) {
+      const inSchedule =
+        entry.node_type === 'schedule' || (stack[stack.length - 1]?.inSchedule ?? false);
       const label = joinLabel(entry.number, entry.title, ' — ');
       if (label) {
         const division: AknOutlineDivision = {
@@ -108,16 +141,16 @@ export function buildServerOutline(data: StatuteOutlineData): ServerOutlineModel
           ...(entry.locked ? { locked: true } : {}),
         };
         divisions.push(division);
-        stack.push({ depth: entry.depth, division });
+        stack.push({ depth: entry.depth, division, inSchedule });
       } else {
         // Anonymous subpart — no rail row, but its frame keeps sections
         // attaching to the nearest LABELLED ancestor, as in the walk.
-        stack.push({ depth: entry.depth, division: null });
+        stack.push({ depth: entry.depth, division: null, inSchedule });
       }
       continue;
     }
 
-    if (SECTION_GRADE.has(entry.node_type)) {
+    if (sectionGrade) {
       const label = joinLabel(entry.number, entry.title, ' ');
       if (!label) continue; // the walk skips unlabelled sections too
       const section = {

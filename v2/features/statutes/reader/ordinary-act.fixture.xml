@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <identification source="#lawexa"/>
+    </meta>
+    <preface>
+      <longTitle>
+        <p>An Act to provide for the establishment of courts and for related matters.</p>
+      </longTitle>
+    </preface>
+    <preamble>
+      <heading>Preamble</heading>
+      <p>ENACTED by the National Assembly of the Federal Republic of Nigeria.</p>
+    </preamble>
+    <body>
+      <chapter eId="chp-1">
+        <num>Chapter I</num>
+        <heading>Establishment</heading>
+        <part eId="chp-1__part-1">
+          <num>Part I</num>
+          <heading>Superior Courts</heading>
+          <section eId="chp-1__part-1__sec-1">
+            <num>1.</num>
+            <heading>Composition of the Court</heading>
+            <subsection eId="chp-1__part-1__sec-1__subsec-1">
+              <num>(1)</num>
+              <content>
+                <p>The Court shall consist of a Chief Judge and such number of Judges as may be prescribed.</p>
+              </content>
+            </subsection>
+            <subsection eId="chp-1__part-1__sec-1__subsec-2">
+              <num>(2)</num>
+              <intro>
+                <p>A person shall not be appointed a Judge unless he is—</p>
+              </intro>
+              <paragraph eId="chp-1__part-1__sec-1__subsec-2__para-a">
+                <num>(a)</num>
+                <content>
+                  <p>qualified to practise as a legal practitioner; and</p>
+                </content>
+              </paragraph>
+              <paragraph eId="chp-1__part-1__sec-1__subsec-2__para-b">
+                <num>(b)</num>
+                <content>
+                  <p>has been so qualified for not less than ten years.</p>
+                </content>
+              </paragraph>
+            </subsection>
+          </section>
+          <crossheading eId="chp-1__part-1__crossheading-1">
+            <heading>Jurisdiction</heading>
+          </crossheading>
+          <section eId="chp-1__part-1__sec-2">
+            <num>2.</num>
+            <heading>Original jurisdiction</heading>
+            <content>
+              <p>The Court shall have original jurisdiction in civil and criminal matters.</p>
+            </content>
+          </section>
+        </part>
+        <part eId="chp-1__part-2">
+          <num>Part II</num>
+          <heading>Lower Courts</heading>
+          <hcontainer eId="chp-1__part-2__hcontainer-1" name="hcontainer">
+            <num>II-A</num>
+            <heading>Magistrates</heading>
+          </hcontainer>
+          <section eId="chp-1__part-2__sec-3">
+            <num>3.</num>
+            <heading>Magistrates' courts</heading>
+            <content>
+              <p>There shall be magistrates' courts in every State.</p>
+            </content>
+          </section>
+        </part>
+      </chapter>
+      <section eId="sec-4">
+        <num>4.</num>
+        <heading>Short title</heading>
+        <content>
+          <p>This Act may be cited as the Courts Act.</p>
+        </content>
+      </section>
+    </body>
+    <attachments>
+      <attachment eId="att-1">
+        <heading>FIRST SCHEDULE — Section 1.</heading>
+        <doc name="schedule">
+          <mainBody>
+            <hcontainer eId="att-1__hcontainer-1" name="hcontainer">
+              <heading>Oath of Office</heading>
+              <content>
+                <p>I do solemnly swear that I will discharge my duties faithfully.</p>
+              </content>
+            </hcontainer>
+            <paragraph eId="att-1__para-1">
+              <num>1.</num>
+              <heading>Fees</heading>
+              <content>
+                <p>The fees payable shall be those prescribed by the Chief Judge.</p>
+              </content>
+            </paragraph>
+            <paragraph eId="att-1__para-2">
+              <num>2.</num>
+              <content>
+                <p>Any fee unpaid is a debt due to the Government.</p>
+              </content>
+            </paragraph>
+          </mainBody>
+        </doc>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

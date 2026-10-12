@@ -165,6 +165,22 @@ export const SECTION_GRADE = new Set([
   'clause',
 ]);
 
+/**
+ * A treaty Article as our "(Ratification and Enforcement) Acts" store it: the
+ * treaty sits in a schedule, and each Article is a `paragraph` whose num reads
+ * "Article 1" and which carries its own heading ("Scope of Assistance"). The
+ * walk gives such a paragraph a section-grade outline entry when it surfaces
+ * at hierarchy level inside an attachment; its nested "(a)" paragraphs are
+ * inside its block and never reach the walk. Its body block and anchor are
+ * unchanged. Exported for `server-outline.ts`, which applies the same test to
+ * the outline endpoint's `number`/`title`. `provision.ts` leaves Articles out
+ * of its section index on purpose: "Article 1" is not a citable num, and a
+ * `section-1` link means the Act's own section 1.
+ */
+export function isTreatyArticle(num: string, heading: string): boolean {
+  return /^article\b/i.test(num.trim()) && heading.trim() !== '';
+}
+
 /* ── Parsing ─────────────────────────────────────────────────────────────── */
 
 /**
@@ -229,6 +245,8 @@ class ModelBuilder {
   private serial = 0;
   /** The open outline division sections attach to (labelled ancestors only). */
   private divisionStack: AknOutlineDivision[] = [];
+  /** How many attachments the walk is inside — treaty Articles count only there. */
+  private attachmentDepth = 0;
 
   /** Anchor id from the backend's stable `eId`, or a per-parse serial. */
   private anchorId(el: Element): string {
@@ -283,7 +301,9 @@ class ModelBuilder {
       if (name === 'attachment') {
         // A schedule/appendix: its heading is a top-level division, its
         // nested doc/mainBody continues the flat sequence.
+        this.attachmentDepth += 1;
         this.division(child, 0);
+        this.attachmentDepth -= 1;
         continue;
       }
 
@@ -305,16 +325,7 @@ class ModelBuilder {
           collapsedText(childByLocal(child, 'heading')),
           ' ',
         );
-        if (label) {
-          const division = group ?? this.divisionStack[this.divisionStack.length - 1];
-          if (division) {
-            division.sections.push({ id, label });
-          } else {
-            // A flat act (sections straight under <body>, no parts): the
-            // sections ARE the outline's top level.
-            this.outline.push({ id, label, sections: [] });
-          }
-        }
+        if (label) this.section(id, label, group);
         continue;
       }
 
@@ -322,6 +333,16 @@ class ModelBuilder {
       // paragraph, an unknown future element) is one body block.
       const id = this.anchorId(child);
       this.push({ id, kind: 'body', element: child, depth });
+
+      // A treaty Article in a schedule is a paragraph, but it is the
+      // schedule's section-grade unit, so it earns a contents entry.
+      if (this.attachmentDepth > 0 && name === 'paragraph') {
+        const num = collapsedText(childByLocal(child, 'num'));
+        const heading = collapsedText(childByLocal(child, 'heading'));
+        if (isTreatyArticle(num, heading)) {
+          this.section(id, joinNumHeading(num, heading, ' '), group);
+        }
+      }
 
       // A sub-division marker also opens a contents entry one level down,
       // which the sections after it attach to until the next marker.
@@ -336,6 +357,19 @@ class ModelBuilder {
           this.outline.push(group);
         }
       }
+    }
+  }
+
+  /** Attach a section-grade outline entry to its sub-division marker or the
+   *  nearest labelled division. */
+  private section(id: string, label: string, group: AknOutlineDivision | null): void {
+    const division = group ?? this.divisionStack[this.divisionStack.length - 1];
+    if (division) {
+      division.sections.push({ id, label });
+    } else {
+      // A flat act (sections straight under <body>, no parts): the
+      // sections ARE the outline's top level.
+      this.outline.push({ id, label, sections: [] });
     }
   }
 
