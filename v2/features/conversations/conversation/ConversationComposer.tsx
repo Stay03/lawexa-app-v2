@@ -166,6 +166,13 @@ export interface ConversationComposerProps {
   onEngage?: () => void;
   /** The staging handle — see {@link ConversationComposerHandle}. */
   stageRef?: React.Ref<ConversationComposerHandle>;
+  /**
+   * A host's control to the left of the pill, outside it, so a press on it
+   * never focuses the box (the case chat's phone close button). The row
+   * around the pill is always there, so a host that adds or drops this never
+   * remounts the pill or the box the reader is typing in.
+   */
+  leadingAction?: React.ReactNode;
 }
 
 export function ConversationComposer({
@@ -184,6 +191,7 @@ export function ConversationComposer({
   disabled = false,
   onEngage,
   stageRef,
+  leadingAction,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -603,147 +611,156 @@ export function ConversationComposer({
           </div>
         )}
 
-        {/* ── The pill: the PromptInput card holds ONLY the single input row. ── */}
-        <PromptInput
-          value={input}
-          onValueChange={(next) => {
-            setInput(next);
-            if (errorOpen) hideError();
-            onEngage?.();
-          }}
-          onSubmit={handleSubmit}
-          disabled={isStreaming || isSubmitting || disabled}
-          maxHeight={150}
-          variant={isConfidential ? 'confidential' : 'default'}
-          onClick={onEngage}
-          // Downward-biased soft drop (not shadow-lg) so the floating pill casts NO
-          // visible shade band UP into the transcript / jurisdiction chip (owner).
-          className="shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]"
-        >
-          {/* ── The single input row: + menu | textarea | Send/Stop. ── */}
-          <div className="flex items-end gap-1.5">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Attach files and privacy options"
-                  onClick={(event) => {
-                    stop(event);
-                    onEngage?.();
-                  }}
-                  disabled={isStreaming || isSubmitting || disabled}
-                  className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Plus className="size-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-72" onClick={stop}>
-                <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
-                  <Paperclip className="text-muted-foreground" />
-                  <span className="flex-1">Attach files</span>
-                  {/* THE LIMIT IS STATED WHERE THE CHOICE IS MADE. A person who
-                      picks an 8MB photo should learn it here, not from a 422
-                      after watching it upload. Two numbers because the caps
-                      genuinely differ, and one of them would be a lie. */}
-                  <span className="text-muted-foreground text-xs">
-                    {attachmentHintFor(privateMode)}
-                  </span>
-                </DropdownMenuItem>
+        {/* ── The pill: the PromptInput card holds ONLY the single input row,
+            with the host's leading control, if any, beside it. ── */}
+        <div className="flex items-end gap-1">
+          {leadingAction}
+          {/* The pill's own box takes the row's free width, so with no
+              leading control it is exactly the full width it always had
+              (PromptInput's className lands on an inner box, not this one). */}
+          <div className="min-w-0 flex-1">
+            <PromptInput
+              value={input}
+              onValueChange={(next) => {
+                setInput(next);
+                if (errorOpen) hideError();
+                onEngage?.();
+              }}
+              onSubmit={handleSubmit}
+              disabled={isStreaming || isSubmitting || disabled}
+              maxHeight={150}
+              variant={isConfidential ? 'confidential' : 'default'}
+              onClick={onEngage}
+              // Downward-biased soft drop (not shadow-lg) so the floating pill casts NO
+              // visible shade band UP into the transcript / jurisdiction chip (owner).
+              className="shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]"
+            >
+              {/* ── The single input row: + menu | textarea | Send/Stop. ── */}
+              <div className="flex items-end gap-1.5">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Attach files and privacy options"
+                      onClick={(event) => {
+                        stop(event);
+                        onEngage?.();
+                      }}
+                      disabled={isStreaming || isSubmitting || disabled}
+                      className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Plus className="size-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-72" onClick={stop}>
+                    <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+                      <Paperclip className="text-muted-foreground" />
+                      <span className="flex-1">Attach files</span>
+                      {/* THE LIMIT IS STATED WHERE THE CHOICE IS MADE. A person who
+                          picks an 8MB photo should learn it here, not from a 422
+                          after watching it upload. Two numbers because the caps
+                          genuinely differ, and one of them would be a lie. */}
+                      <span className="text-muted-foreground text-xs">
+                        {attachmentHintFor(privateMode)}
+                      </span>
+                    </DropdownMenuItem>
 
-                {(isRedacted || isConfidential) && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Privacy (locked for this chat)</DropdownMenuLabel>
-                    {isRedacted && (
-                      <DropdownMenuCheckboxItem
-                        checked
-                        disabled
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        <VenetianMask className="text-indigo-500" />
-                        <span className="flex flex-col">
-                          <span className="font-medium leading-tight">Redacted mode</span>
-                          <span className="text-muted-foreground text-xs">
-                            Names, addresses &amp; IDs hidden from the model
-                          </span>
-                        </span>
-                      </DropdownMenuCheckboxItem>
+                    {(isRedacted || isConfidential) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Privacy (locked for this chat)</DropdownMenuLabel>
+                        {isRedacted && (
+                          <DropdownMenuCheckboxItem
+                            checked
+                            disabled
+                            onSelect={(e) => e.preventDefault()}
+                          >
+                            <VenetianMask className="text-indigo-500" />
+                            <span className="flex flex-col">
+                              <span className="font-medium leading-tight">Redacted mode</span>
+                              <span className="text-muted-foreground text-xs">
+                                Names, addresses &amp; IDs hidden from the model
+                              </span>
+                            </span>
+                          </DropdownMenuCheckboxItem>
+                        )}
+                        {isConfidential && (
+                          <DropdownMenuCheckboxItem
+                            checked
+                            disabled
+                            onSelect={(e) => e.preventDefault()}
+                          >
+                            <ShieldCheck className="text-emerald-600 dark:text-emerald-500" />
+                            <span className="flex flex-col">
+                              <span className="font-medium leading-tight">Confidential mode</span>
+                              <span className="text-muted-foreground text-xs">
+                                Stored only on this device until you delete it
+                              </span>
+                            </span>
+                          </DropdownMenuCheckboxItem>
+                        )}
+                      </>
                     )}
-                    {isConfidential && (
-                      <DropdownMenuCheckboxItem
-                        checked
-                        disabled
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        <ShieldCheck className="text-emerald-600 dark:text-emerald-500" />
-                        <span className="flex flex-col">
-                          <span className="font-medium leading-tight">Confidential mode</span>
-                          <span className="text-muted-foreground text-xs">
-                            Stored only on this device until you delete it
-                          </span>
-                        </span>
-                      </DropdownMenuCheckboxItem>
-                    )}
-                  </>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <PromptInputTextarea
+                  placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
+                  onFocus={onEngage}
+                  // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
+                  // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
+                  className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
+                  // Measured only when it has text: a measurement lays out the whole
+                  // transcript behind it, which cost an open ~200 ms (prompt-input.tsx).
+                  lazyAutosize
+                  onLargePaste={addPasted}
+                  /* A pasted picture goes down the SAME path as one chosen with the
+                     attach button, so the type check, the size cap, the duplicate
+                     check and the chip are all one implementation rather than two
+                     that can drift. */
+                  onPasteFiles={(files) => void handleFilesAdded(files)}
+                />
+
+                {isStreaming ? (
+                  <PromptInputAction tooltip={isCancelling ? 'Cancelling' : 'Stop generating'}>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="destructive"
+                      className="v2-interactive size-8 shrink-0 rounded-full disabled:opacity-70"
+                      onClick={onStop}
+                      disabled={isCancelling}
+                      aria-label={isCancelling ? 'Cancelling' : 'Stop generating'}
+                    >
+                      {isCancelling ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Square className="size-4" />
+                      )}
+                    </Button>
+                  </PromptInputAction>
+                ) : (
+                  <PromptInputAction tooltip="Send message">
+                    <Button
+                      type="button"
+                      size="icon"
+                      className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
+                      onClick={handleSubmit}
+                      disabled={!canSend}
+                      aria-label="Send message"
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <ArrowUp className="size-4" />
+                      )}
+                    </Button>
+                  </PromptInputAction>
                 )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <PromptInputTextarea
-              placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
-              onFocus={onEngage}
-              // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
-              // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
-              className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
-              // Measured only when it has text: a measurement lays out the whole
-              // transcript behind it, which cost an open ~200 ms (prompt-input.tsx).
-              lazyAutosize
-              onLargePaste={addPasted}
-              /* A pasted picture goes down the SAME path as one chosen with the
-                 attach button, so the type check, the size cap, the duplicate
-                 check and the chip are all one implementation rather than two
-                 that can drift. */
-              onPasteFiles={(files) => void handleFilesAdded(files)}
-            />
-
-            {isStreaming ? (
-              <PromptInputAction tooltip={isCancelling ? 'Cancelling' : 'Stop generating'}>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="destructive"
-                  className="v2-interactive size-8 shrink-0 rounded-full disabled:opacity-70"
-                  onClick={onStop}
-                  disabled={isCancelling}
-                  aria-label={isCancelling ? 'Cancelling' : 'Stop generating'}
-                >
-                  {isCancelling ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Square className="size-4" />
-                  )}
-                </Button>
-              </PromptInputAction>
-            ) : (
-              <PromptInputAction tooltip="Send message">
-                <Button
-                  type="button"
-                  size="icon"
-                  className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
-                  onClick={handleSubmit}
-                  disabled={!canSend}
-                  aria-label="Send message"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <ArrowUp className="size-4" />
-                  )}
-                </Button>
-              </PromptInputAction>
-            )}
+              </div>
+            </PromptInput>
           </div>
-        </PromptInput>
+        </div>
 
         <FileUploadContent>
           <div className="flex min-h-[200px] w-full items-center justify-center">

@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
@@ -30,6 +31,13 @@ import {
   CaseHardLimitState,
   CaseNotFoundState,
 } from './states';
+
+// TEMPORARY, with its file: live viewport numbers for an iPhone recording,
+// loaded only with `?kbdebug=1` on the address (see KeyboardDebugReadout).
+const KeyboardDebugReadout = dynamic(
+  () => import('./KeyboardDebugReadout').then((module) => module.KeyboardDebugReadout),
+  { ssr: false },
+);
 
 /**
  * CaseScreen — the `/cases/[slug]` client root.
@@ -63,6 +71,7 @@ function CaseBody({ slug }: { slug: string }) {
   const { signedIn, userId } = useV2Session();
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get('q')?.trim() || undefined;
+  const keyboardDebug = searchParams.get('kbdebug') === '1';
 
   // ── The side chat: LOCAL STATE is the source of truth; the URL is a
   // mirror and an entry point, written QUIETLY. ──
@@ -307,6 +316,8 @@ function CaseBody({ slug }: { slug: string }) {
           onFloat={() => setDockedPref(false)}
         />
       ) : null}
+
+      {keyboardDebug ? <KeyboardDebugReadout /> : null}
     </div>
   );
 }

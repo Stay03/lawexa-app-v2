@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { PanelRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -15,9 +15,10 @@ import {
 } from './CaseChatCore';
 
 /**
- * The shell's own bars, made inert while the phone chat covers the screen so
- * Tab and a screen reader stay inside it. The case page's own regions take
- * `inert` as props in `CaseScreen`; these sit outside it.
+ * The shell's own bars, made inert and hidden while the phone chat covers the
+ * screen, so Tab and a screen reader stay inside it and neither bar can paint
+ * over it. The case page's own regions take `inert` as props in `CaseScreen`;
+ * these sit outside it.
  */
 const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
 
@@ -36,7 +37,8 @@ const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
  *     its top at the visual viewport's top and its height the visual
  *     viewport's height, so its last child, the composer, sits on the
  *     keyboard (Arthur, 11 October 2026: "a single tap should open the chat
- *     and bring up the keyboard").
+ *     and bring up the keyboard"). With the keyboard up the composer row also
+ *     carries a close button, because the bar's X can be hidden then.
  *
  * ONE TAP RAISES THE KEYBOARD BECAUSE NOTHING IS REMOUNTED. WebKit opens the
  * keyboard only for a focus made inside the reader's gesture. The reader taps
@@ -119,14 +121,51 @@ export function CaseAskDock({
   }, []);
 
   // WHILE THE PHONE CHAT IS OPEN the shell's bars leave the tab order and the
-  // accessibility tree (the page's own regions take `inert` in CaseScreen).
-  useEffect(() => {
+  // accessibility tree (the page's own regions take `inert` in CaseScreen),
+  // and they are not painted at all. With the keyboard up on Arthur's iPhone
+  // the page's bar showed over the card's top band, hiding the chat's own bar
+  // and its X, while the bar's back arrow, inert, did nothing (12 October
+  // 2026). The card is a fixed box inside the shell's scroll region, so where
+  // it paints against that bar rests on how WebKit layers those ancestors
+  // while iOS moves fixed boxes for the keyboard, not on the card's z-index.
+  // A bar that is `visibility: hidden` paints in no order at all. Layout is
+  // untouched, so nothing under the card moves. A layout effect, so the bar
+  // is gone in the card's first frame.
+  //
+  // THE BARS COME BACK ON EVERY WAY OUT. Every close (the bar's X, the
+  // composer's X, Escape, Back) ends the open screen, and a route change or
+  // an unmount ends this component: all of them run the cleanup. Leaving the
+  // page (`pagehide`) gives them back too, so a page frozen in the
+  // back-forward cache never holds hidden bars; if it comes back from that
+  // cache (`pageshow`, persisted) with the chat still open, they hide again.
+  // While hidden, `inert` keeps every control under them out of Tab's reach.
+  useLayoutEffect(() => {
     if (!screenMounted) return;
     const chrome = SHELL_CHROME.flatMap((selector) =>
       Array.from(document.querySelectorAll<HTMLElement>(selector)),
     );
-    chrome.forEach((element) => element.setAttribute('inert', ''));
-    return () => chrome.forEach((element) => element.removeAttribute('inert'));
+    const visibility = chrome.map((element) => element.style.visibility);
+    const hide = (): void =>
+      chrome.forEach((element) => {
+        element.setAttribute('inert', '');
+        element.style.visibility = 'hidden';
+      });
+    const restore = (): void =>
+      chrome.forEach((element, index) => {
+        element.removeAttribute('inert');
+        element.style.visibility = visibility[index];
+      });
+    const onPageShow = (event: PageTransitionEvent): void => {
+      if (event.persisted) hide();
+    };
+    hide();
+    window.addEventListener('pagehide', restore);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      window.removeEventListener('pagehide', restore);
+      window.removeEventListener('pageshow', onPageShow);
+      restore();
+    };
   }, [screenMounted]);
 
   // WHILE THE PHONE CHAT IS OPEN THE PAGE UNDER IT CANNOT SCROLL. The card is
@@ -151,9 +190,10 @@ export function CaseAskDock({
   }, [screenMounted]);
 
   // CLOSING ON A PHONE puts the keyboard away. The box still has focus when
-  // the chat closes (X, Escape, Back), and a focused box keeps the keyboard up
-  // over a page with no chat on it. Focus moves to the card, one Tab from the
-  // box; not back to the box itself, which would raise the keyboard again.
+  // the chat closes (either X, Escape, Back), and a focused box keeps the
+  // keyboard up over a page with no chat on it. Focus moves to the card, one
+  // Tab from the box; not back to the box itself, which would raise the
+  // keyboard again.
   // `preventScroll` because a focus must never move the judgment.
   const screenOpen = screen && panelOpen;
   const wasScreenOpen = useRef(screenOpen);
@@ -324,6 +364,7 @@ export function CaseAskDock({
           start={start}
           showMeta={panelMounted && panelOpen}
           onEngage={onEngage}
+          onClose={screenMounted ? onClose : undefined}
           stageRef={stageRef}
         />
       </div>

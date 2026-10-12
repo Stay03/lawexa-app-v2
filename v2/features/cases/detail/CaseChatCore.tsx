@@ -369,6 +369,38 @@ export function RecentCaseChats({
 /* ── The composer dock — ONE element, two wirings ────────────────────────── */
 
 /**
+ * The phone chat's close button beside its box, for while the keyboard is up.
+ *
+ * With the keyboard up the chat's bar, and its X, can be off the screen or
+ * under the page's bar (Arthur's iPhone, 12 October 2026). iOS always keeps
+ * the focused box on screen, so an X beside it is on screen by construction.
+ * It is shown only while the keyboard is up (`data-v2-keyboard="up"` on the
+ * root, published by use-keyboard-inset); with the keyboard down the bar's X
+ * is the way out, as before. CSS decides, so the keyboard re-renders nothing.
+ *
+ * The press keeps focus in the box (`preventDefault` on mousedown), so the
+ * keyboard, and with it this button, stays until the click lands. The click
+ * is the bar's own close: blur, focus to the card, `?chat` cleared, page
+ * unlocked (CaseAskDock).
+ */
+function ComposerCloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClose}
+      aria-label="Close chat"
+      className={cn(
+        'v2-interactive hidden size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground in-data-[v2-keyboard=up]:flex',
+        FOCUS_RING,
+      )}
+    >
+      <X aria-hidden className="size-5" />
+    </button>
+  );
+}
+
+/**
  * The bottom of the one screen: the create-error strip, the view-only strip
  * (a shared conversation someone linked), and THE composer. The composer
  * element is permanent — the dock only rewires its props:
@@ -385,6 +417,7 @@ export function CaseChatComposerDock({
   start,
   showMeta = true,
   onEngage,
+  onClose,
   stageRef,
 }: {
   /** null = the closed dock pill; `'new'` = list state; else a conversation id. */
@@ -396,6 +429,9 @@ export function CaseChatComposerDock({
   showMeta?: boolean;
   /** Closed-pill interactions open the panel (the floating card's dock). */
   onEngage?: () => void;
+  /** The phone full screen's close: given, an X sits beside the box while
+   *  the keyboard is up (see {@link ComposerCloseButton}). */
+  onClose?: () => void;
   /** OBJECT ref (not a callback): the dock reads it back to restore a failed
    *  create's message into the draft — the composer clears optimistically. */
   stageRef?: React.RefObject<ConversationComposerHandle | null>;
@@ -456,6 +492,7 @@ export function CaseChatComposerDock({
           <ConversationComposer
             draftScopeId={`case:${slug}`}
             placeholder="Ask about this case"
+            leadingAction={onClose ? <ComposerCloseButton onClose={onClose} /> : null}
             signedIn={signedIn}
             showMeta={showMeta}
             onEngage={onEngage}
