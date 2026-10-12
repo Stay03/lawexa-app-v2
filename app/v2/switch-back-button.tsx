@@ -22,7 +22,7 @@ export function switchBackToV1() {
 export function SwitchBackButton() {
   return (
     <Button variant="outline" onClick={switchBackToV1}>
-      Switch back to v1
+      Switch to classic Lawexa
     </Button>
   );
 }

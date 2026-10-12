@@ -67,3 +67,14 @@ test('the waiting list draws its face with MemberAvatar', () => {
   assert.doesNotMatch(requests, /slice\(0, 1\)/);
   assert.doesNotMatch(requests, /@\/components\/ui\/avatar/);
 });
+
+/* ── NICE 3: one name for the exit to the old app ────────────────────────── */
+
+test('the sidebar footer and the header menu name the exit the same way', () => {
+  const footer = read('app', 'v2', 'switch-back-button.tsx');
+  const menu = read('v2', 'shell', 'V2HeaderMenu.tsx');
+  assert.match(footer, /<Button variant="outline" onClick=\{switchBackToV1\}>\s*Switch to classic Lawexa\s*<\/Button>/);
+  assert.match(menu, /<span>Switch to classic Lawexa<\/span>/);
+  // "v1" is the team's word; the reader never sees it.
+  assert.doesNotMatch(footer, />\s*[^<{]*\bv1\b[^<{]*\s*</);
+});
