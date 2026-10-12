@@ -481,6 +481,7 @@ export function CaseChatComposerDock({
   signedIn,
   start,
   showMeta = true,
+  animateMeta = true,
   onEngage,
   onClose,
   stageRef,
@@ -492,6 +493,9 @@ export function CaseChatComposerDock({
   start: CaseChatStart;
   /** False collapses the jurisdiction row — the closed resting pill. */
   showMeta?: boolean;
+  /** False changes that row at once, with no fold — the phone card leaving
+   *  the screen (see `CaseAskDock`). */
+  animateMeta?: boolean;
   /** Closed-pill interactions open the panel (the floating card's dock). */
   onEngage?: () => void;
   /** The phone full screen's close: given, an X sits beside the box while
@@ -560,6 +564,7 @@ export function CaseChatComposerDock({
             leadingAction={onClose ? <ComposerCloseButton onClose={onClose} /> : null}
             signedIn={signedIn}
             showMeta={showMeta}
+            animateMeta={animateMeta}
             onEngage={onEngage}
             stageRef={stageRef}
             disabled={conversationPending}

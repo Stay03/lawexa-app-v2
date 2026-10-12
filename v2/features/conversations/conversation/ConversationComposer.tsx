@@ -154,6 +154,13 @@ export interface ConversationComposerProps {
    * pill shows. Staged attachments/pastes stay visible: armed state is honest.
    */
   showMeta?: boolean;
+  /**
+   * False changes the meta row at once instead of folding or growing it. The
+   * case dock's phone card leaves the screen with the row up (it held still
+   * through the closing fade), and the dock must come back with the row
+   * already down, not folding. Default true.
+   */
+  animateMeta?: boolean;
   /** Extra hard-disable from the host (e.g. a conversation still wiring up). */
   disabled?: boolean;
   /**
@@ -188,6 +195,7 @@ export function ConversationComposer({
   placeholder = 'Ask a follow-up',
   signedIn = true,
   showMeta = true,
+  animateMeta = true,
   disabled = false,
   onEngage,
   stageRef,
@@ -434,19 +442,24 @@ export function ConversationComposer({
             no jurisdictions query). `showMeta` collapses it with the same
             grid-collapse every staged row uses — the case dock's closed state,
             where the resting pill stands alone; `inert` keeps the collapsed
-            chip out of the tab order. */}
+            chip out of the tab order. `animateMeta` false drops both
+            transitions, the row's and the chip's, so that change lands in
+            one frame. */}
         {signedIn ? (
           <div
             inert={!showMeta}
             className={cn(
-              'grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+              'grid',
+              animateMeta &&
+                'transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
               showMeta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
             )}
           >
             <div className="overflow-hidden">
               <div
                 className={cn(
-                  'mb-2 flex flex-wrap items-center gap-2 px-1 transition-opacity duration-200 motion-reduce:transition-none',
+                  'mb-2 flex flex-wrap items-center gap-2 px-1',
+                  animateMeta && 'transition-opacity duration-200 motion-reduce:transition-none',
                   showMeta ? 'opacity-100' : 'opacity-0',
                 )}
               >

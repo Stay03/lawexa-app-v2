@@ -52,6 +52,12 @@ const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
  * NO SLIDE ON THE PHONE. The open card does not move: the bar and middle fade
  * in above a composer that stays where the reader's finger left it. A box
  * whose height changes while it slides was the jump Stay saw on Samsung.
+ *
+ * CLOSING ON THE PHONE IS ONE FADE OF A STILL CARD. The card keeps the top
+ * and height it had at the close while the keyboard goes down, the whole
+ * card (its colour too) fades out once, and only then does it return to the
+ * docked pill and give the page back its bars and its scroll (see the close
+ * effect below).
  */
 export function CaseAskDock({
   slug,
@@ -132,8 +138,8 @@ export function CaseAskDock({
   // untouched, so nothing under the card moves. A layout effect, so the bar
   // is gone in the card's first frame.
   //
-  // THE BARS COME BACK ON EVERY WAY OUT. Every close (the bar's X, the
-  // composer's X, Escape, Back) ends the open screen, and a route change or
+  // THE BARS COME BACK ON EVERY WAY OUT. Every close (either X, Escape,
+  // Back) ends the open screen once its fade is done, and a route change or
   // an unmount ends this component: all of them run the cleanup. Leaving the
   // page (`pagehide`) gives them back too, so a page frozen in the
   // back-forward cache never holds hidden bars; if it comes back from that
@@ -175,8 +181,13 @@ export function CaseAskDock({
   // (Arthur's iPhone, after 16b19dd). `overflow: hidden` on a scroller that
   // is not the document stops iOS too, and it keeps the offset, so closing
   // returns to the same paragraph; the offset is put back only if something
-  // moved it meanwhile.
-  useEffect(() => {
+  // moved it meanwhile. A layout effect, so the lock is on in the card's
+  // first frame and, when the screen ends, comes off in the frame that
+  // returns the card to the pill, the offset already back. The screen ends
+  // from a timeout (CaseScreen's holdover), and a passive cleanup ran after
+  // that frame had painted: with the offset reset under the open chat, the
+  // judgment's top showed for one frame before it jumped back.
+  useLayoutEffect(() => {
     if (!screenMounted) return;
     const scroller = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!scroller) return;
@@ -195,19 +206,38 @@ export function CaseAskDock({
   // Tab from the box; not back to the box itself, which would raise the
   // keyboard again.
   // `preventScroll` because a focus must never move the judgment.
+  //
+  // THE CARD HOLDS STILL WHILE IT FADES. The card's top and height follow the
+  // visible viewport, so as the keyboard went down under the closing fade the
+  // card grew and moved with it (Arthur's iPhone, 12 October 2026). Before
+  // the blur, the card's measured top and height are written to two
+  // variables its style reads first, so the keyboard's retreat cannot move
+  // it; the fade then runs once on the whole card. They are dropped when the
+  // card leaves the screen (after the fade) or the reader opens it again
+  // mid-fade. A layout effect, so the card is frozen in the close's first
+  // frame, before the blur can resize anything.
   const screenOpen = screen && panelOpen;
   const wasScreenOpen = useRef(screenOpen);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const closed = wasScreenOpen.current && !screenOpen;
     wasScreenOpen.current = screenOpen;
-    if (!closed) return;
     const card = cardRef.current;
+    if (!closed || !card) return;
+    if (screenMounted) {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--v2-case-chat-closing-top', `${rect.top}px`);
+      card.style.setProperty('--v2-case-chat-closing-height', `${rect.height}px`);
+    }
     const active = document.activeElement;
-    if (card && active instanceof HTMLElement && card.contains(active)) {
+    if (active instanceof HTMLElement && card.contains(active)) {
       active.blur();
       card.focus({ preventScroll: true });
     }
-  }, [screenOpen]);
+    return () => {
+      card.style.removeProperty('--v2-case-chat-closing-top');
+      card.style.removeProperty('--v2-case-chat-closing-height');
+    };
+  }, [screenOpen, screenMounted]);
 
   return (
     <div
@@ -244,6 +274,7 @@ export function CaseAskDock({
         role={screenMounted ? 'dialog' : panelMounted ? 'complementary' : undefined}
         aria-modal={screenMounted ? true : undefined}
         aria-label={panelMounted ? 'Chat about this case' : undefined}
+        data-state={screenMounted ? (panelOpen ? 'open' : 'closed') : undefined}
         onKeyDown={
           screenMounted
             ? (event) => {
@@ -262,7 +293,14 @@ export function CaseAskDock({
               // page show through the opening card, which read as a card part
               // way open over the judgment. The status bar's inset pads the
               // bar, not the card, so the card's colour reaches the top edge.
-              'fixed inset-x-0 z-40 flex flex-col bg-popover pt-[env(safe-area-inset-top,0px)]'
+              cn(
+                'fixed inset-x-0 z-40 flex flex-col bg-popover pt-[env(safe-area-inset-top,0px)]',
+                // Closing, the whole card fades out once, colour and all, and
+                // takes no tap on the way; its last frame is held until it
+                // leaves the screen (CaseScreen's holdover, a shade past
+                // 200ms). Reduced motion: it is gone at once.
+                'data-[state=closed]:pointer-events-none data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:invisible',
+              )
             : cn(
                 'mx-auto w-full max-w-[26rem] rounded-2xl border transition-[background-color,box-shadow,border-color] duration-300 motion-reduce:transition-none',
                 panelMounted
@@ -277,9 +315,10 @@ export function CaseAskDock({
                 // page to reveal the box, `--visual-top` follows the pan, so
                 // the card never hangs above the screen; with the keyboard
                 // down it is 0, so the card's own bar is the top of the
-                // screen (use-keyboard-inset).
-                top: 'var(--visual-top, 0px)',
-                height: 'var(--visual-height, 100dvh)',
+                // screen (use-keyboard-inset). While it fades out, the size
+                // it had at the close (the close effect).
+                top: 'var(--v2-case-chat-closing-top, var(--visual-top, 0px))',
+                height: 'var(--v2-case-chat-closing-height, var(--visual-height, 100dvh))',
               }
             : undefined
         }
@@ -287,14 +326,9 @@ export function CaseAskDock({
         {/* The panel slot — `null` keeps the composer's tree position stable
             so opening never remounts it. */}
         {screenMounted ? (
-          <div
-            data-state={panelOpen ? 'open' : 'closed'}
-            className={cn(
-              'flex min-h-0 flex-1 flex-col',
-              'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
-              'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200 data-[state=closed]:fill-mode-forwards data-[state=closed]:motion-reduce:invisible',
-            )}
-          >
+          // Opening, the bar and middle fade in on the opaque card; closing,
+          // the card fades as a whole, so this slot has no exit of its own.
+          <div className="flex min-h-0 flex-1 flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
             <CaseChatBar
               view={view}
               onBack={() => onOpenChat('new')}
@@ -356,13 +390,18 @@ export function CaseAskDock({
         ) : null}
 
         {/* THE composer — permanent in every state. Closed, the jurisdiction
-            row folds away and only the pill shows over the page. */}
+            row folds away and only the pill shows over the page. On the phone
+            the row is up for as long as the card covers the screen, so the
+            close starts no fold inside the fading card, and it moves only
+            inside that card: when the card leaves, the row is down at once,
+            so the dock comes back with the row already collapsed. */}
         <CaseChatComposerDock
           view={view}
           slug={slug}
           signedIn={signedIn}
           start={start}
-          showMeta={panelMounted && panelOpen}
+          showMeta={screen ? screenMounted : panelMounted && panelOpen}
+          animateMeta={!screen || screenMounted}
           onEngage={onEngage}
           onClose={screenMounted ? onClose : undefined}
           stageRef={stageRef}

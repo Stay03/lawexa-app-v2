@@ -49,8 +49,10 @@ test('the phone sheet is gone; the dock owns the chat on a phone, with one compo
 });
 
 test('the open phone card is the visible viewport, with no slide', () => {
-  assert.match(ask, /top: 'var\(--visual-top, 0px\)'/);
-  assert.match(ask, /height: 'var\(--visual-height, 100dvh\)'/);
+  // The closing variables come first, and exist only while the card fades out
+  // (the close tests below); open, the card reads the visible viewport alone.
+  assert.match(ask, /top: 'var\(--v2-case-chat-closing-top, var\(--visual-top, 0px\)\)'/);
+  assert.match(ask, /height: 'var\(--v2-case-chat-closing-height, var\(--visual-height, 100dvh\)\)'/);
   assert.doesNotMatch(ask, /--keyboard-inset/);
   assert.doesNotMatch(ask, /slide-in-from-bottom|slide-out-to-bottom/);
   assert.match(ask, /arrive && !screenMounted/);
@@ -121,8 +123,11 @@ test('the open card is full size and opaque from its first frame, whatever is lo
   assert.ok(card, 'the fixed card has a style of its own');
   const keys = [...card.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]);
   assert.deepEqual(keys, ['top', 'height']);
-  assert.match(card, /top: 'var\(--visual-top, 0px\)'/);
-  assert.match(card, /height: 'var\(--visual-height, 100dvh\)'/);
+  assert.match(card, /top: 'var\(--v2-case-chat-closing-top, var\(--visual-top, 0px\)\)'/);
+  assert.match(card, /height: 'var\(--v2-case-chat-closing-height, var\(--visual-height, 100dvh\)\)'/);
+  // The closing variables are written only by the close effect, never on open.
+  assert.equal(ask.match(/setProperty\('--v2-case-chat-closing-top'/g)?.length, 1);
+  assert.equal(ask.match(/setProperty\('--v2-case-chat-closing-height'/g)?.length, 1);
   assert.doesNotMatch(ask, /isPending|isLoading|isFetching/);
   // The loading rows sit in the middle, which fills the card and scrolls by itself.
   assert.match(core, /className="min-h-0 flex-1 motion-safe:animate-in/);
@@ -135,11 +140,18 @@ test('the open card is full size and opaque from its first frame, whatever is lo
 
 test('while the phone chat is open the page under it cannot scroll, and closing keeps the reading place', () => {
   assert.match(ask, /import \{ V2_SHELL_CONTENT_ID \} from '@\/v2\/shell\/shell-content';/);
-  const lock = ask.match(/useEffect\(\(\) => \{\s*if \(!screenMounted\) return;\s*const scroller = document\.getElementById\(V2_SHELL_CONTENT_ID\);[\s\S]*?\}, \[screenMounted\]\);/)?.[0];
-  assert.ok(lock, 'an effect keyed on the open screen locks the shell scroller');
+  // A layout effect, not a passive one: the screen ends from a timeout (CaseScreen's
+  // holdover), so a passive cleanup ran after that commit had painted, and an offset
+  // iOS had reset under the open chat showed the page's top for one frame before it
+  // jumped back. The layout cleanup clears the overflow and puts the offset back
+  // before the paint of the commit that returns the card to the pill.
+  const lock = ask.match(/useLayoutEffect\(\(\) => \{\s*if \(!screenMounted\) return;\s*const scroller = document\.getElementById\(V2_SHELL_CONTENT_ID\);[\s\S]*?\}, \[screenMounted\]\);/)?.[0];
+  assert.ok(lock, 'a layout effect keyed on the open screen locks the shell scroller');
+  assert.doesNotMatch(ask, /useEffect\(\(\) => \{\s*if \(!screenMounted\) return;\s*const scroller/);
   assert.match(lock, /const readingTop = scroller\.scrollTop;/);
   assert.match(lock, /scroller\.style\.overflowY = 'hidden';/);
-  // Removed on close (the effect's cleanup) and the offset is the one the reader left.
+  // Removed on close (the effect's cleanup): overflow-y cleared, and the offset is the
+  // one the reader left.
   assert.match(
     lock,
     /return \(\) => \{\s*scroller\.style\.overflowY = previousOverflow;\s*if \(scroller\.scrollTop !== readingTop\) scroller\.scrollTop = readingTop;\s*\};\s*\}, \[screenMounted\]\);/,
@@ -267,6 +279,114 @@ test('with no leading control every composer host keeps the full-width pill it h
   assert.match(composer, /<div className="min-w-0 flex-1">\s*<PromptInput\b/);
   assert.match(composer, /\r?\n\s*className="shadow-\[0_6px_16px_-8px_rgba\(0,0,0,0\.28\)\]"\r?\n/);
   assert.doesNotMatch(composer, /className="min-w-0 flex-1 shadow-/);
+});
+
+/* Arthur's iPhone on da7be8d (12 October 2026): closing became one fade of a still
+ * card, from either X, Escape or Back. */
+
+/** The close effect: freezes the card, then puts the keyboard away. */
+const closeEffect = () => {
+  const effect = ask.match(/useLayoutEffect\(\(\) => \{\s*const closed = wasScreenOpen\.current && !screenOpen;[\s\S]*?\}, \[screenOpen, screenMounted\]\);/)?.[0];
+  assert.ok(effect, 'a layout effect on the open state handles the close');
+  return effect;
+};
+
+test('a close freezes the card at its measured top and height before the keyboard goes down', () => {
+  const effect = closeEffect();
+  // Measured, written, then the blur: the order is the point.
+  assert.match(
+    effect,
+    /if \(screenMounted\) \{\s*const rect = card\.getBoundingClientRect\(\);\s*card\.style\.setProperty\('--v2-case-chat-closing-top', `\$\{rect\.top\}px`\);\s*card\.style\.setProperty\('--v2-case-chat-closing-height', `\$\{rect\.height\}px`\);\s*\}\s*const active = document\.activeElement;\s*if \(active instanceof HTMLElement && card\.contains\(active\)\) \{\s*active\.blur\(\);/,
+  );
+  // Dropped when the card leaves the screen or opens again mid-fade (the deps).
+  assert.match(
+    effect,
+    /return \(\) => \{\s*card\.style\.removeProperty\('--v2-case-chat-closing-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-closing-height'\);\s*\};\s*\}, \[screenOpen, screenMounted\]\);$/,
+  );
+  // Every close path runs it, the composer's X included: each one ends `panelOpen`
+  // (`chat` null) first, through the same `onClose`.
+  assert.match(core, /leadingAction=\{onClose \? <ComposerCloseButton onClose=\{onClose\} \/> : null\}/);
+  assert.match(ask, /onClose=\{screenMounted \? onClose : undefined\}/);
+  assert.match(ask, /const screenOpen = screen && panelOpen;/);
+  assert.match(screen, /panelOpen=\{chat !== null && dockOwnsChat\}/);
+});
+
+test('the dock, the page bars and the scroll lock come back only after the fade', () => {
+  // The screen stays mounted through the fade: it is keyed on the held-over chat,
+  // which drops 240 ms after the close, past the 200 ms fade.
+  assert.match(ask, /const panelMounted = view !== null;/);
+  assert.match(ask, /const screenMounted = screen && panelMounted;/);
+  assert.match(screen, /view=\{dockOwnsChat \? renderedChat : null\}/);
+  assert.match(screen, /window\.setTimeout\(\(\) => setRenderedChat\(null\), 240\)/);
+  // The fixed card, the bars' hiding and the scroll lock all hang on screenMounted,
+  // never on panelOpen, so none of them changes when the fade starts.
+  assert.match(ask, /className=\{cn\(\s*'outline-none',\s*screenMounted\s*\?/);
+  chromeEffect();
+  assert.match(ask, /useLayoutEffect\(\(\) => \{\s*if \(!screenMounted\) return;\s*const scroller = document\.getElementById\(V2_SHELL_CONTENT_ID\);/);
+  assert.doesNotMatch(ask, /if \(!screenOpen\) return;|if \(!panelOpen\) return;/);
+});
+
+test('the whole card fades out once, colour included; reduced motion skips the fade', () => {
+  assert.match(ask, /data-state=\{screenMounted \? \(panelOpen \? 'open' : 'closed'\) : undefined\}/);
+  // The exit sits on the card itself (the element with bg-popover), so the colour
+  // fades with the contents.
+  assert.match(
+    ask,
+    /'fixed inset-x-0 z-40 flex flex-col bg-popover pt-\[env\(safe-area-inset-top,0px\)\]',\s*'data-\[state=closed\]:pointer-events-none data-\[state=closed\]:motion-safe:animate-out data-\[state=closed\]:motion-safe:fade-out data-\[state=closed\]:motion-safe:duration-200 data-\[state=closed\]:fill-mode-forwards data-\[state=closed\]:motion-reduce:invisible',/,
+  );
+  // Once: the panel slot inside has no exit of its own, only the opening fade.
+  assert.equal(ask.match(/animate-out/g)?.length, 1);
+  assert.match(ask, /<div className="flex min-h-0 flex-1 flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">/);
+  // The opening is as it was: the card's colour is on from the first frame.
+  assert.doesNotMatch(ask, /data-\[state=open\]/);
+});
+
+test('nothing inside the fading card moves: the jurisdiction row holds, and is down with no fold when the dock comes back', () => {
+  // WebKit at iPhone 14 size (12 October 2026): the row's 300 ms grid-rows and
+  // 200 ms opacity transitions started with the fade, because the row followed
+  // `panelOpen`. On the phone it now follows the screen, which outlives the
+  // fade; the floating card at xl keeps its fold with the panel.
+  assert.match(ask, /showMeta=\{screen \? screenMounted : panelMounted && panelOpen\}/);
+  // The row changes only with the screen, and that change has no transition:
+  // the dock reappears with the row already collapsed. Inside the card
+  // (opening) the transition is as it was.
+  assert.match(ask, /animateMeta=\{!screen \|\| screenMounted\}/);
+  assert.match(core, /animateMeta = true,/);
+  assert.match(core, /showMeta=\{showMeta\}\s+animateMeta=\{animateMeta\}/);
+  // False drops both transitions, the row's and the chip's; the classes are
+  // otherwise the ones the row has always had, reduced motion included.
+  assert.match(composer, /animateMeta = true,/);
+  assert.match(
+    composer,
+    /inert=\{!showMeta\}\s+className=\{cn\(\s*'grid',\s*animateMeta &&\s*'transition-\[grid-template-rows\] duration-300 ease-\[cubic-bezier\(0\.32,0\.72,0,1\)\] motion-reduce:transition-none',\s*showMeta \? 'grid-rows-\[1fr\]' : 'grid-rows-\[0fr\]',/,
+  );
+  assert.match(
+    composer,
+    /'mb-2 flex flex-wrap items-center gap-2 px-1',\s*animateMeta && 'transition-opacity duration-200 motion-reduce:transition-none',\s*showMeta \? 'opacity-100' : 'opacity-0',/,
+  );
+  // Every other host leaves it at its default, so their rows are unchanged.
+  assert.doesNotMatch(panel, /animateMeta/);
+  assert.doesNotMatch(
+    strip(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx')),
+    /animateMeta/,
+  );
+});
+
+test('the composer is never remounted: one node, at a fixed place in the card', () => {
+  // The card's children are the panel slot (one expression, `null` when closed) and
+  // then the composer dock, unconditional and unkeyed. (`strip` leaves a JSX
+  // comment as `{}`.)
+  assert.match(
+    ask,
+    /\{screenMounted \? \(\s*<div className=\"flex min-h-0 flex-1 flex-col[\s\S]*?\) : panelMounted \? \([\s\S]*?\) : null\}\s*(?:\{\}\s*)?<CaseChatComposerDock\s+view=\{view\}/,
+  );
+  assert.equal(ask.match(/<CaseChatComposerDock/g)?.length, 1);
+  const dock = ask.slice(ask.indexOf('<CaseChatComposerDock'), ask.indexOf('/>', ask.indexOf('<CaseChatComposerDock')));
+  assert.doesNotMatch(dock, /\bkey=/);
+  // Inside the dock the composer is rendered once, unkeyed, whatever the state.
+  assert.equal(core.match(/<ConversationComposer\b/g)?.length, 1);
+  const composerProps = core.slice(core.indexOf('<ConversationComposer'), core.indexOf('onSubmit=', core.indexOf('<ConversationComposer')));
+  assert.doesNotMatch(composerProps, /\bkey=/);
 });
 
 test('the keyboard readout loads only with ?kbdebug=1 and listens only while mounted', () => {
