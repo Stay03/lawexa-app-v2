@@ -189,7 +189,7 @@ export function useStartCaseChat(
 /* ── The bar ─────────────────────────────────────────────────────────────── */
 
 const BAR_BUTTON =
-  'v2-interactive flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
+  'v2-interactive flex items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
 
 /**
  * The one bar every presentation renders: back (conversation only) · label ·
@@ -202,6 +202,7 @@ export function CaseChatBar({
   onClose,
   presentationAction,
   tall = false,
+  screen = false,
 }: {
   /** `'new'` or a conversation id — the bar is only rendered while open. */
   view: string;
@@ -211,8 +212,15 @@ export function CaseChatBar({
   presentationAction?: React.ReactNode;
   /** Phone full screen/docked use the roomier min-h-12 bar; the floating card min-h-10. */
   tall?: boolean;
+  /**
+   * The phone's full screen: every control is a 44 px target (size-11), the
+   * size a finger needs, inside the 48 px bar. Elsewhere a pointer's 32 px.
+   */
+  screen?: boolean;
 }) {
   const isConversation = view !== 'new';
+  const target = screen ? 'size-11' : 'size-8';
+  const button = cn(BAR_BUTTON, target, FOCUS_RING);
   return (
     <div
       className={cn(
@@ -225,12 +233,12 @@ export function CaseChatBar({
           type="button"
           onClick={onBack}
           aria-label="Back to your chats about this case"
-          className={cn(BAR_BUTTON, FOCUS_RING)}
+          className={button}
         >
           <ArrowLeft aria-hidden className="size-4" />
         </button>
       ) : (
-        <span aria-hidden className="size-8" />
+        <span aria-hidden className={target} />
       )}
       <p className="flex-1 truncate px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
         Chat · this case
@@ -241,7 +249,7 @@ export function CaseChatBar({
           href={`/c/${view}`}
           aria-label="Open this chat in full"
           title="Open in full"
-          className={cn(BAR_BUTTON, FOCUS_RING)}
+          className={button}
         >
           <Maximize2 aria-hidden className="size-4" />
         </Link>
@@ -250,7 +258,7 @@ export function CaseChatBar({
         type="button"
         onClick={onClose}
         aria-label="Close the chat"
-        className={cn(BAR_BUTTON, FOCUS_RING)}
+        className={button}
       >
         <X aria-hidden className="size-4" />
       </button>

@@ -19,8 +19,9 @@ import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
  * no listener exists. It shows numbers and booleans only: no names, no text
  * and no ids. Portalled to `body` so the readout is above the shell and the
  * chat card whatever their stacking; `pointer-events: none`, so it never takes
- * a tap. The text is written to the DOM, never to state, so it re-renders
- * nothing.
+ * a tap. Its top is the visible viewport's (`--visual-top`), so it stays on
+ * screen while iOS pans the page for the keyboard. The text is written to the
+ * DOM, never to state, so it re-renders nothing.
  */
 export function KeyboardDebugReadout() {
   const outputRef = useRef<HTMLPreElement | null>(null);
@@ -40,6 +41,7 @@ export function KeyboardDebugReadout() {
       const card = document.querySelector('[role="dialog"][aria-label="Chat about this case"]');
       const bar = document.querySelector('.v2-shell__header');
       const content = document.getElementById(V2_SHELL_CONTENT_ID);
+      const close = card?.querySelector('[aria-label="Close the chat"]') ?? null;
       const active = document.activeElement;
       const composerFocused =
         card !== null && active instanceof HTMLTextAreaElement && card.contains(active);
@@ -52,6 +54,9 @@ export function KeyboardDebugReadout() {
         `content.scrollTop ${content ? Math.round(content.scrollTop) : 'none'}`,
         `card ${rectOf(card)}`,
         `bar ${rectOf(bar)}`,
+        `content ${rectOf(content)}`,
+        `header display ${bar ? getComputedStyle(bar).display : 'none'}`,
+        `X ${rectOf(close)}`,
         `composer focused ${composerFocused ? 'yes' : 'no'}`,
         `keyboard up ${document.documentElement.getAttribute('data-v2-keyboard') === 'up' ? 'yes' : 'no'}`,
       ].join('\n');
@@ -90,7 +95,7 @@ export function KeyboardDebugReadout() {
     <pre
       ref={outputRef}
       aria-hidden
-      className="pointer-events-none fixed left-0 top-[env(safe-area-inset-top,0px)] z-[2147483647] m-0 bg-black/70 px-1 py-0.5 font-mono text-[9px] leading-tight text-white"
+      className="pointer-events-none fixed left-0 top-[var(--visual-top,0px)] z-[2147483647] m-0 bg-black/70 px-1 py-0.5 font-mono text-[9px] leading-tight text-white"
     />,
     document.body,
   );

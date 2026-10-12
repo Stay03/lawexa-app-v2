@@ -82,7 +82,9 @@ test('the phone chat is a modal dialog that Escape closes and a status line anno
   assert.match(ask, /aria-modal=\{screenMounted \? true : undefined\}/);
   assert.match(ask, /event\.key === 'Escape'/);
   assert.match(ask, /role="status"/);
-  assert.match(ask, /setAttribute\('inert', ''\)/);
+  // The shell's bars leave the tab order by `display: none` (pinned below), the
+  // page's own regions by `inert`.
+  assert.match(ask, /element\.style\.display = 'none';/);
   assert.match(screen, /inert=\{pageUnderChat\}/);
 });
 
@@ -173,7 +175,12 @@ test('the keyboard inset itself is unchanged for every other screen', () => {
 /* Arthur's iPhone on d720169 (12 October 2026): with the keyboard up the page's bar
  * painted over the chat's own bar, so nothing on screen closed the chat. The card's
  * position stays as on d720169 (pinned above); what is new is the hidden page
- * chrome, the composer's X and the debug readout. */
+ * chrome, the composer's X and the debug readout.
+ *
+ * His recordings after Done (12 October 2026): the card's top 56 px, its bar and X,
+ * were cut. iOS clips the fixed card to the shell's content region, its DOM
+ * ancestor, and the unpainted header still held the 56 px row above that region.
+ * The header now takes no row while the phone chat is open. */
 
 const chromeEffect = () => {
   const effect = ask.match(/useLayoutEffect\(\(\) => \{\s*if \(!screenMounted\) return;\s*const chrome = SHELL_CHROME[\s\S]*?\}, \[screenMounted\]\);/)?.[0];
@@ -181,17 +188,95 @@ const chromeEffect = () => {
   return effect;
 };
 
-test('while the phone chat is open the shell bars are inert and not painted, from its first frame', () => {
+test('while the phone chat is open the shell bars take no row, from its first frame', () => {
   const chrome = chromeEffect();
   assert.match(ask, /const SHELL_CHROME = \['\.v2-shell__header', '\.v2-shell__dock'\] as const;/);
-  // Hidden from paint and, through `inert`, from Tab and the accessibility tree.
-  assert.match(chrome, /element\.setAttribute\('inert', ''\);\s*element\.style\.visibility = 'hidden';/);
+  // `display: none`, which also takes them out of Tab and the accessibility tree.
+  assert.match(chrome, /const display = chrome\.map\(\(element\) => element\.style\.display\);/);
+  assert.match(chrome, /chrome\.forEach\(\(element\) => \{\s*element\.style\.display = 'none';\s*\}\);/);
   assert.match(chrome, /hide\(\);\s*window\.addEventListener\('pagehide', restore\);/, 'hidden at once, in the layout effect');
-  // Restoring gives back whatever visibility each bar had and drops `inert`.
-  assert.match(chrome, /element\.removeAttribute\('inert'\);\s*element\.style\.visibility = visibility\[index\];/);
+  // Restoring gives back whatever inline display each bar had.
+  assert.match(chrome, /chrome\.forEach\(\(element, index\) => \{\s*element\.style\.display = display\[index\];\s*\}\);/);
   // No scroll is undone while the chat is open (the coordinator's review: iOS's own
   // scroll with the keyboard up is left alone, as on d720169).
   assert.doesNotMatch(ask, /restoreDocumentScroll/);
+});
+
+test('the bars must take no row, not merely no paint: the card is clipped to the content region', () => {
+  // The fixed card is a DOM descendant of the content region (the dock renders in
+  // the page, the page in the region), and iOS WebKit clips it to that region's
+  // box. The region is grid row 2, under the header's `auto` row; a bar that is
+  // only unpainted keeps its row, and the card's top 56 px were cut.
+  const shellCss = read('v2', 'shell', 'shell.css');
+  assert.match(shellCss, /\.v2-shell \{\s*display: grid;\s*grid-template-rows: auto 1fr auto;/);
+  assert.match(shellCss, /\.v2-shell__content \{\s*grid-row: 2;\s*min-height: 0;\s*overflow-y: auto;/);
+  assert.match(
+    strip(read('v2', 'shell', 'AppShell.tsx')),
+    /<div id=\{V2_SHELL_CONTENT_ID\} tabIndex=\{-1\} className="v2-shell__content">\s*\{children\}/,
+  );
+  const chrome = chromeEffect();
+  assert.doesNotMatch(chrome, /visibility/);
+  assert.doesNotMatch(chrome, /inert/);
+});
+
+test('nothing on the page moves with the bars: the region takes the rows they gave up as padding', () => {
+  const chrome = chromeEffect();
+  // The region's box is measured across the change and the difference, top and
+  // bottom, is added to its padding, so every line keeps its pixel (the closing
+  // fade shows the page) and the scroll range keeps its length (the offset is never
+  // clamped, so the reading place is the same when the bars come back).
+  assert.match(chrome, /const scroller = document\.getElementById\(V2_SHELL_CONTENT_ID\);\s*if \(!scroller\) return;/);
+  assert.match(chrome, /const \{ paddingTop, paddingBottom \} = scroller\.style;/);
+  assert.match(
+    chrome,
+    /const before = scroller\.getBoundingClientRect\(\);\s*chrome\.forEach\(\(element\) => \{\s*element\.style\.display = 'none';\s*\}\);\s*const after = scroller\.getBoundingClientRect\(\);/,
+  );
+  assert.match(chrome, /scroller\.style\.paddingTop = `\$\{parseFloat\(padding\.paddingTop\) \+ before\.top - after\.top\}px`;/);
+  assert.match(chrome, /scroller\.style\.paddingBottom = `\$\{parseFloat\(padding\.paddingBottom\) \+ after\.bottom - before\.bottom\}px`;/);
+  // Put back with the bars, in the same function, so `pagehide` restores both.
+  assert.match(
+    chrome,
+    /element\.style\.display = display\[index\];\s*\}\);\s*scroller\.style\.paddingTop = paddingTop;\s*scroller\.style\.paddingBottom = paddingBottom;/,
+  );
+  // The reading line divides by the same range, so it holds too.
+  assert.match(
+    strip(read('v2', 'features', 'cases', 'detail', 'ReadingProgress.tsx')),
+    /const max = scroller\.scrollHeight - scroller\.clientHeight;/,
+  );
+});
+
+test('nothing in the bar replays or re-measures when it comes back', () => {
+  // `display: none` to its old value restarts an element's CSS animations and wakes
+  // any observer of its size. The bar and what it renders have neither.
+  for (const file of ['V2Header.tsx', 'TunedHeader.tsx', 'V2NotificationBell.tsx', 'V2HeaderMenu.tsx', 'HomeTabs.tsx', 'Logo.tsx']) {
+    const source = strip(read('v2', 'shell', file));
+    assert.doesNotMatch(source, /animate-in|animate-\[|ResizeObserver|IntersectionObserver|getBoundingClientRect/, file);
+  }
+  const headerRule = read('v2', 'shell', 'shell.css').match(/\n\.v2-shell__header \{[^}]*\}/)?.[0];
+  assert.ok(headerRule);
+  assert.doesNotMatch(headerRule, /animation|transition/);
+});
+
+test("the phone bar's controls are 44 px targets; every other bar keeps its 32 px", () => {
+  const bar = core.slice(core.indexOf('export function CaseChatBar'), core.indexOf('export function CaseChatMiddle'));
+  assert.doesNotMatch(core.match(/const BAR_BUTTON =[^;]*;/)?.[0] ?? '', /size-/);
+  assert.match(bar, /const target = screen \? 'size-11' : 'size-8';/);
+  assert.match(bar, /const button = cn\(BAR_BUTTON, target, FOCUS_RING\);/);
+  assert.equal(bar.match(/className=\{button\}/g)?.length, 3, 'back, open in full, close');
+  // The 48 px bar holds them; the back button's spacer is the same size, so the
+  // label stays centred.
+  assert.match(bar, /tall \? 'min-h-12 px-2' : 'min-h-10 px-1\.5'/);
+  // A conversation shows the back button; the new-chat view its spacer.
+  assert.match(
+    bar,
+    /\{isConversation \? \(\s*<button\s+type="button"\s+onClick=\{onBack\}\s+aria-label="Back to your chats about this case"\s+className=\{button\}\s*>[\s\S]*?<\/button>\s*\) : \(\s*<span aria-hidden className=\{target\} \/>\s*\)\}/,
+  );
+  // Only the phone screen asks for them; the floating card and the docked column
+  // keep the pointer size.
+  assert.match(ask, /onClose=\{onClose\}\s+tall\s+screen\s*\/>/);
+  assert.equal(ask.match(/<CaseChatBar/g)?.length, 2);
+  assert.match(ask, /onClose=\{onClose\}\s+presentationAction=/);
+  assert.match(panel, /onClose=\{onClose\}\s+tall\s+presentationAction=/);
 });
 
 test('the bars come back on every way out: each close, a route change, an unmount, leaving the page', () => {

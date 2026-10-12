@@ -16,10 +16,11 @@ import {
 import { guardChatDrags } from './case-chat-drag-guard';
 
 /**
- * The shell's own bars, made inert and hidden while the phone chat covers the
- * screen, so Tab and a screen reader stay inside it and neither bar can paint
- * over it. The case page's own regions take `inert` as props in `CaseScreen`;
- * these sit outside it.
+ * The shell's own bars, taken out of the layout (`display: none`) while the
+ * phone chat covers the screen: they take no grid row, so the content region,
+ * and the fixed card inside it, starts at the screen's top, and Tab and a
+ * screen reader stay inside the chat. The case page's own regions take `inert`
+ * as props in `CaseScreen`; these sit outside it.
  */
 const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
 
@@ -127,17 +128,25 @@ export function CaseAskDock({
     return () => observer.disconnect();
   }, []);
 
-  // WHILE THE PHONE CHAT IS OPEN the shell's bars leave the tab order and the
-  // accessibility tree (the page's own regions take `inert` in CaseScreen),
-  // and they are not painted at all. With the keyboard up on Arthur's iPhone
-  // the page's bar showed over the card's top band, hiding the chat's own bar
-  // and its X, while the bar's back arrow, inert, did nothing (12 October
-  // 2026). The card is a fixed box inside the shell's scroll region, so where
-  // it paints against that bar rests on how WebKit layers those ancestors
-  // while iOS moves fixed boxes for the keyboard, not on the card's z-index.
-  // A bar that is `visibility: hidden` paints in no order at all. Layout is
-  // untouched, so nothing under the card moves. A layout effect, so the bar
-  // is gone in the card's first frame.
+  // WHILE THE PHONE CHAT IS OPEN THE SHELL'S BARS TAKE NO ROW. The card is
+  // fixed but a DOM child of the shell's scroll region, and iOS WebKit clips
+  // it to that region's box. With the bar only unpainted (`visibility:
+  // hidden`, 12 October 2026) its 56 px row stayed, the region started under
+  // it, and the card's top 56 px, its own bar and X, were cut whenever the
+  // card's top was at the screen's top: with the keyboard down after Done,
+  // and in the open's first frame (Arthur's recordings, 12 October 2026).
+  // `display: none` gives the row up, so the region starts at the screen's
+  // top and the card is inside its box in every state; it also takes the
+  // bars out of the tab order and the accessibility tree (the page's own
+  // regions take `inert` in CaseScreen). A layout effect, so the bar is gone
+  // in the card's first frame.
+  //
+  // NOTHING ON THE PAGE MOVES WITH THE BARS. The region grows by the rows
+  // they gave up, and it takes the same amount as padding, top and bottom,
+  // measured across the change. Every line of the judgment stays at the
+  // pixel it had, which shows through the closing fade, and the scroll range
+  // keeps its length, so the offset is never clamped and the reading place
+  // is the same one when the bars come back.
   //
   // THE BARS COME BACK ON EVERY WAY OUT. Every close (either X, Escape,
   // Back) ends the open screen once its fade is done, and a route change or
@@ -145,23 +154,32 @@ export function CaseAskDock({
   // page (`pagehide`) gives them back too, so a page frozen in the
   // back-forward cache never holds hidden bars; if it comes back from that
   // cache (`pageshow`, persisted) with the chat still open, they hide again.
-  // While hidden, `inert` keeps every control under them out of Tab's reach.
   useLayoutEffect(() => {
     if (!screenMounted) return;
     const chrome = SHELL_CHROME.flatMap((selector) =>
       Array.from(document.querySelectorAll<HTMLElement>(selector)),
     );
-    const visibility = chrome.map((element) => element.style.visibility);
-    const hide = (): void =>
+    const scroller = document.getElementById(V2_SHELL_CONTENT_ID);
+    if (!scroller) return;
+    const display = chrome.map((element) => element.style.display);
+    const { paddingTop, paddingBottom } = scroller.style;
+    const hide = (): void => {
+      const before = scroller.getBoundingClientRect();
       chrome.forEach((element) => {
-        element.setAttribute('inert', '');
-        element.style.visibility = 'hidden';
+        element.style.display = 'none';
       });
-    const restore = (): void =>
+      const after = scroller.getBoundingClientRect();
+      const padding = getComputedStyle(scroller);
+      scroller.style.paddingTop = `${parseFloat(padding.paddingTop) + before.top - after.top}px`;
+      scroller.style.paddingBottom = `${parseFloat(padding.paddingBottom) + after.bottom - before.bottom}px`;
+    };
+    const restore = (): void => {
       chrome.forEach((element, index) => {
-        element.removeAttribute('inert');
-        element.style.visibility = visibility[index];
+        element.style.display = display[index];
       });
+      scroller.style.paddingTop = paddingTop;
+      scroller.style.paddingBottom = paddingBottom;
+    };
     const onPageShow = (event: PageTransitionEvent): void => {
       if (event.persisted) hide();
     };
@@ -348,6 +366,7 @@ export function CaseAskDock({
               onBack={() => onOpenChat('new')}
               onClose={onClose}
               tall
+              screen
             />
             <CaseChatMiddle
               view={view}
