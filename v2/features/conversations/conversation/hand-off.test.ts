@@ -20,8 +20,8 @@ test('a cached open does not fade the transcript in from blank', () => {
   assert.match(list, /fadeIn && 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300'/);
 });
 
-test('a chat longer than the first frame is anchored to the bottom', () => {
-  assert.match(list, /const anchorBottom = latestMessages\.length > OPEN_TAIL_MESSAGES;/);
+test('a chat with messages left to fill in above the first frame is anchored to the bottom', () => {
+  assert.match(list, /const anchorBottom = openTail\.older\.length > 0;/);
   assert.match(list, /anchorBottom && 'min-h-full justify-end'/);
 });
 

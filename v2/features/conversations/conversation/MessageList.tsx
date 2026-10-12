@@ -22,7 +22,7 @@ import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
 import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
 import { groupMessages, type MessageGroup } from './message-groups';
 import { computeStreamStart } from './stream-start';
-import { splitOpenTail } from './open-tail';
+import { splitOpenTail, type OpenTailLimit } from './open-tail';
 import { UserMessageRow } from './rows/UserMessageRow';
 import { AssistantMessageRow } from './rows/AssistantMessageRow';
 import { HandoverRow } from './rows/HandoverRow';
@@ -103,7 +103,9 @@ const BOTTOM_THRESHOLD_PX = 80;
 const UNVIRTUALIZED_TAIL = 3;
 
 /**
- * How many of the newest messages the FIRST frame of an open draws.
+ * How much of the chat the FIRST frame of an open draws: the newest messages,
+ * until the text they draw is about two phone screens (OPEN_TAIL_CHARS), and
+ * never more than OPEN_TAIL_MESSAGES of them.
  *
  * MOVE FIRST, FILL SECOND (Stay, 8 October 2026: the second tap on the same
  * chat "seems kind of slow"). A chat already in memory used to draw every
@@ -116,9 +118,19 @@ const UNVIRTUALIZED_TAIL = 3;
  * So an open draws only the newest messages, which are the screenful the reader
  * lands on, as real text. The rest arrive after the first frame has been
  * painted, in a transition React can interrupt; by then the screen has moved,
- * and the layout reads above ran against a short page. Eight messages cover
- * more than the unvirtualized tail of groups, so the first frame is measured,
- * not estimated.
+ * and the layout reads above ran against a short page.
+ *
+ * TWO SCREENS OF TEXT, NOT EIGHT MESSAGES (speed step 3). The cut was a count,
+ * and eight messages are four answers, every block of each parsed before the
+ * first paint where the screen shows the end of the last one: on a chat of
+ * long answers the opening frame drew four times the text it showed. The cut
+ * now stops once the text drawn covers about two screens, the one the reader
+ * lands on and the one a first scroll up reaches (open-tail.ts; a tool chain
+ * or a handover draws its titles and counts no text), so the opening frame's
+ * parse is bounded by the screen and not by the chat. A chat of short
+ * messages still draws up to eight. The groups the first frame draws are the
+ * newest, so they are never virtualized (UNVIRTUALIZED_TAIL) and the frame is
+ * measured, not estimated, whatever its size.
  *
  * NOT useDeferredValue: a Next navigation is itself a transition, and inside a
  * transition useDeferredValue returns the full value at once, so the whole
@@ -136,6 +148,9 @@ const UNVIRTUALIZED_TAIL = 3;
  * so every row of the first frame stays mounted when the rest arrives.
  */
 const OPEN_TAIL_MESSAGES = 8;
+/** About two phone screens of prose: a screen holds about 1,500 characters. */
+const OPEN_TAIL_CHARS = 3_000;
+const OPEN_TAIL: OpenTailLimit = { messages: OPEN_TAIL_MESSAGES, chars: OPEN_TAIL_CHARS };
 
 /**
  * `useLayoutEffect` in the browser, `useEffect` on the server — React warns that a
@@ -182,25 +197,26 @@ export function MessageList({
   onRetry,
   onScrolledUpChange,
 }: MessageListProps) {
-  // What this render draws (see OPEN_TAIL_MESSAGES): until the first frame has
-  // been painted, the newest messages only; from then on, all of them.
-  // Everything below reads this list, so the scroll and pill logic always
-  // describe what is on the page.
+  // What this render draws (see OPEN_TAIL): until the first frame has been
+  // painted, the newest messages only; from then on, all of them. Everything
+  // below reads this list, so the scroll and pill logic always describe what
+  // is on the page.
   const [showAll, setShowAll] = useState(false);
   // The transcript fades in only when this list mounted while the history was
   // still loading (a cold open: it replaces a skeleton). Opened from memory,
   // it fading in from 0 meant a blank page for a moment under a composer that
   // was already solid (frame strip, 8 October 2026). Read once, at mount.
   const [fadeIn] = useState(() => isLoadingHistory);
-  // A chat longer than the first frame's tail sits at the bottom of the
-  // scroller, so the older messages filling in above never move the text the
-  // reader is looking at. Shorter chats keep their top-down layout.
-  const anchorBottom = latestMessages.length > OPEN_TAIL_MESSAGES;
-  const openTail = useMemo(() => splitOpenTail(latestMessages, OPEN_TAIL_MESSAGES).newest, [latestMessages]);
-  const messages = showAll ? latestMessages : openTail;
+  const openTail = useMemo(() => splitOpenTail(latestMessages, OPEN_TAIL), [latestMessages]);
+  const messages = showAll ? latestMessages : openTail.newest;
+  // A chat with messages left to fill in above the first frame sits at the
+  // bottom of the scroller, so the older messages arriving above never move
+  // the text the reader is looking at. A chat drawn whole in its first frame
+  // keeps its top-down layout.
+  const anchorBottom = openTail.older.length > 0;
   const hasMessages = latestMessages.length > 0;
   useEffect(() => {
-    // Counted from the first commit with messages (see OPEN_TAIL_MESSAGES).
+    // Counted from the first commit with messages (see OPEN_TAIL).
     if (!hasMessages) return;
     // Two frames: the first runs before the opening frame is painted, the
     // second after it, so the move is always on screen before the rest draws.

@@ -133,9 +133,10 @@ test('MarkdownText reads the plan once at mount, and streaming or no list means 
   assert.match(markdownText, /import \{ splitMarkdownBlocks \} from '\.\/split-blocks';/);
   assert.doesNotMatch(markdownText, /function splitMarkdownBlocks/);
   assert.match(markdownText, /const keep = useContext\(ScrollKeepContext\);/);
+  // An answer whose blocks are all kept defers none (prepared-blocks.test.ts).
   assert.match(
     markdownText,
-    /eagerFrom: keep\s*\? eagerStart\(blocks, \{ streaming: animate \|\| content === '', landsAtBottom: keep\.landsAtBottom \}\)\s*: 0,/,
+    /eagerFrom:\s*keep && !blocks\.every\(\(block\) => preparedBlocks\.has\(block\)\)\s*\? eagerStart\(blocks, \{ streaming: animate \|\| content === '', landsAtBottom: keep\.landsAtBottom \}\)\s*: 0,/,
   );
   assert.match(markdownText, /swapped \|\| animate \|\| plan\.content !== content \? 0 : Math\.min\(plan\.eagerFrom, blocks\.length\)/);
   assert.match(markdownText, /index < pendingCount \? \(\s*<PendingBlock key=\{index\} content=\{block\} \/>/);

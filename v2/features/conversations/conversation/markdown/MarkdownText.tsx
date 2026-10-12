@@ -9,14 +9,16 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactElement,
 } from 'react';
-import ReactMarkdown, { type Components, type Options } from 'react-markdown';
+import Markdown, { type Components, type Options } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { CaseMentionLink } from './CaseMentionLink';
 import { FencedBlock } from './FencedBlock';
 import { eagerStart, scheduleSwap, type FrameTimers } from './defer-plan';
+import { PREPARED_CHARS_CAP, createPreparedBlocks } from './prepared-blocks';
 import { linkReferenceLines } from './reference-lines';
 import { rehypeStreamWords } from './rehype-stream-words';
 import { ScrollKeepContext } from './scroll-keep-context';
@@ -35,17 +37,17 @@ import { splitMarkdownBlocks } from './split-blocks';
  * subscription and the list's row memoization, a token never re-parses the whole
  * message (v1's defect) nor touches any other row.
  *
- * Each `<ReactMarkdown>` renders its block elements as direct children (react-markdown
- * v10 renders a fragment, no wrapper), so all blocks are direct children of the one
+ * Each block's parse renders its elements as direct children (react-markdown v10
+ * renders a fragment, no wrapper), so all blocks are direct children of the one
  * prose container and prose vertical rhythm is preserved across block boundaries.
  *
  * WORD FADE (`animate`). Live streaming text is released in whole WORDS by the
  * smoother, which cuts the publish rate from ~60/s to ~23/s; the sub-word smoothness
  * that buys back is supplied by a compositor-only opacity fade on each newly-mounted
- * word, injected by the {@link rehypeStreamWords} rehype plugin. Both pipelines are
- * module-level constants and are passed to `MarkdownBlock` as a PROP, so the
- * per-block memo still holds within a mode and still invalidates when the mode flips
- * — which is what guarantees a finished message ends up with zero span overhead.
+ * word, injected by the {@link rehypeStreamWords} rehype plugin. `animate` reaches
+ * `MarkdownBlock` as a PROP, so the per-block memo still holds within a mode and
+ * still invalidates when the mode flips — which is what guarantees a finished
+ * message ends up with zero span overhead.
  *
  * DEFERRED BLOCKS ON AN OPEN (defer-plan.ts). A long landed answer drawn by an
  * open that lands at the bottom parses only its last blocks in the opening
@@ -54,39 +56,63 @@ import { splitMarkdownBlocks } from './split-blocks';
  * the 1 s deadline at the latest. Where the browser has no scroll anchoring
  * the swap's layout effect keeps the reader's place (scroll-keep.ts). Streaming
  * text never defers.
+ *
+ * PREPARED BLOCKS (prepared-blocks.ts). A landed block's parsed elements are
+ * kept in a module-level cache keyed by the block's text, so the second open
+ * of a chat draws its answers without parsing them, and so does the fill of
+ * the older messages behind the first frame. An answer whose blocks are all
+ * kept defers none of them: there is nothing left to spread over frames.
  */
 
 // Stable module-level plugin list — a fresh array each render would defeat memo.
 const REMARK_PLUGINS = [remarkBreaks, remarkGfm];
 
 /**
- * The two rehype pipelines, BOTH module-level constants (the memo constraint: a
- * fresh array per render gives every `MarkdownBlock` a new prop identity and
- * silently defeats the per-block `React.memo`, turning the streaming pipeline's
- * biggest win into a large regression).
- *
- * `animate` selects between them, and because the choice is a stable REFERENCE the
- * memo still holds within a mode AND correctly invalidates on the mode change — so
- * a finished message re-renders exactly once, with zero word spans left in its DOM
- * ({@link rehypeStreamWords}).
+ * The two rehype pipelines, both module-level constants: `animate` selects
+ * between them per block, and only the plain one's output is ever kept
+ * (preparedBlocks), so a finished message renders exactly once more, with zero
+ * word spans left in its DOM ({@link rehypeStreamWords}).
  */
 const REHYPE_ANIMATED: Options['rehypePlugins'] = [rehypeStreamWords];
 const REHYPE_PLAIN: Options['rehypePlugins'] = [];
 
 /**
- * Stable module-level component overrides. MUST be defined once at module scope —
- * a fresh `components` object per render would give every `MarkdownBlock` a new
- * prop identity and defeat the per-block `React.memo` streaming pipeline. It
- * overrides only `a`, routing case-mention links through the preview (hover-card
- * on pointer devices, tap popover on touch); every other anchor renders exactly
- * as react-markdown's default. {@link CaseMentionLink} holds no data hook, so a
- * token flush never fetches or re-renders beyond the block already re-parsing.
+ * Stable module-level component overrides, defined once so every kept block's
+ * elements reference the same components. It overrides only `a`, routing
+ * case-mention links through the preview (hover-card on pointer devices, tap
+ * popover on touch); every other anchor renders exactly as react-markdown's
+ * default. {@link CaseMentionLink} holds no data hook, so a token flush never
+ * fetches or re-renders beyond the block already re-parsing.
  *
  * `pre` routes fenced blocks through {@link FencedBlock}: a fence the AI used
  * for a document (a court form, a letter) renders as a document block, real
  * code keeps the code look (fence-kind.ts).
  */
 const MARKDOWN_COMPONENTS: Components = { a: CaseMentionLink, pre: FencedBlock };
+
+/**
+ * The parsed blocks of landed answers, kept across opens (prepared-blocks.ts).
+ * Only the plain pipeline's output goes in: the animated one's carries word
+ * spans and changes with every flush.
+ */
+const preparedBlocks = createPreparedBlocks<ReactElement>(PREPARED_CHARS_CAP);
+
+/**
+ * One block's markdown as React elements. react-markdown's synchronous
+ * renderer is a plain function of its props, with no hook and no context, so
+ * it is called as one here: its result for a block can then be kept
+ * (preparedBlocks) and drawn again on a later open. Rendered as an element in
+ * the tree, as it was, its parse ran inside its own render on every mount, and
+ * nothing outside could keep the result.
+ */
+function parseBlock(content: string, rehypePlugins: Options['rehypePlugins']): ReactElement {
+  return Markdown({
+    children: content,
+    remarkPlugins: REMARK_PLUGINS,
+    rehypePlugins,
+    components: MARKDOWN_COMPONENTS,
+  });
+}
 
 const PROSE_CLASS =
   'prose prose-sm dark:prose-invert max-w-none overflow-x-hidden break-words ' +
@@ -133,20 +159,21 @@ const PendingBlock = memo(function PendingBlock({ content }: { content: string }
 
 const MarkdownBlock = memo(function MarkdownBlock({
   content,
-  rehypePlugins,
+  animate,
 }: {
   content: string;
-  rehypePlugins: Options['rehypePlugins'];
+  animate: boolean;
 }) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={REMARK_PLUGINS}
-      rehypePlugins={rehypePlugins}
-      components={MARKDOWN_COMPONENTS}
-    >
-      {content}
-    </ReactMarkdown>
-  );
+  // Streaming text: parsed on every flush, through the animated pipeline, never kept.
+  if (animate) return parseBlock(content, REHYPE_ANIMATED);
+  const kept = preparedBlocks.get(content);
+  if (kept) return kept;
+  const parsed = parseBlock(content, REHYPE_PLAIN);
+  // Kept during render: the parse is a pure function of the text, so a render
+  // React throws away leaves an entry that is right for its text, and a second
+  // render of the same block (StrictMode) reads it instead of parsing twice.
+  preparedBlocks.set(content, parsed);
+  return parsed;
 });
 
 export const MarkdownText = memo(function MarkdownText({
@@ -164,17 +191,19 @@ export const MarkdownText = memo(function MarkdownText({
   // The reference list's raw addresses become linked case names first
   // (reference-lines.ts), so they cannot run off a phone screen.
   const blocks = useMemo(() => splitMarkdownBlocks(linkReferenceLines(content)), [content]);
-  const rehypePlugins = animate ? REHYPE_ANIMATED : REHYPE_PLAIN;
 
   // The deferral plan, read once at mount (defer-plan.ts). No MessageList
   // above (no context): nothing defers. A row mounted streaming, or empty as a
-  // streaming row starts, defers nothing and never will.
+  // streaming row starts, defers nothing and never will. Nor does an answer
+  // whose blocks are all kept (preparedBlocks): they draw parsed at the cost
+  // of a lookup, and a deferral would only add the swap.
   const keep = useContext(ScrollKeepContext);
   const [plan] = useState(() => ({
     content,
-    eagerFrom: keep
-      ? eagerStart(blocks, { streaming: animate || content === '', landsAtBottom: keep.landsAtBottom })
-      : 0,
+    eagerFrom:
+      keep && !blocks.every((block) => preparedBlocks.has(block))
+        ? eagerStart(blocks, { streaming: animate || content === '', landsAtBottom: keep.landsAtBottom })
+        : 0,
   }));
   const [swapped, setSwapped] = useState(false);
   // How many leading blocks draw as placeholders in this render. A changed
@@ -235,7 +264,7 @@ export const MarkdownText = memo(function MarkdownText({
         index < pendingCount ? (
           <PendingBlock key={index} content={block} />
         ) : (
-          <MarkdownBlock key={index} content={block} rehypePlugins={rehypePlugins} />
+          <MarkdownBlock key={index} content={block} animate={animate} />
         ),
       )}
     </div>

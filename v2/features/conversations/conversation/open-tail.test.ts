@@ -10,14 +10,15 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const list = readFileSync(join(here, 'MessageList.tsx'), 'utf8');
 
-const constant = (name: string) => Number(new RegExp(`const ${name} = (\\d+);`).exec(list)?.[1]);
+const constant = (name: string) =>
+  Number(new RegExp(`const ${name} = ([\\d_]+);`).exec(list)?.[1]?.replace(/_/g, ''));
 
 test('an open draws the newest messages first, the rest after the first painted frame', () => {
   assert.match(list, /messages: latestMessages,/);
-  // The newest OPEN_TAIL_MESSAGES, cut at a group's start (open-tail.ts, pinned
-  // in open-tail-split.test.ts); it was a plain slice(-OPEN_TAIL_MESSAGES).
-  assert.match(list, /const openTail = useMemo\(\(\) => splitOpenTail\(latestMessages, OPEN_TAIL_MESSAGES\)\.newest, \[latestMessages\]\);/);
-  assert.match(list, /const messages = showAll \? latestMessages : openTail;/);
+  // The newest messages within OPEN_TAIL, cut at a group's start (open-tail.ts,
+  // pinned in open-tail-split.test.ts); it was a plain slice(-OPEN_TAIL_MESSAGES).
+  assert.match(list, /const openTail = useMemo\(\(\) => splitOpenTail\(latestMessages, OPEN_TAIL\), \[latestMessages\]\);/);
+  assert.match(list, /const messages = showAll \? latestMessages : openTail\.newest;/);
   // Two animation frames, so the opening frame is painted before the rest draws,
   // and a transition, so drawing the rest can be interrupted.
   assert.match(list, /requestAnimationFrame\(\(\) => \{\s*second = requestAnimationFrame\(\(\) => startTransition\(\(\) => setShowAll\(true\)\)\);/);
@@ -31,9 +32,10 @@ test('a cold open draws the newest first too: the two frames count from the firs
     list,
     /useEffect\(\(\) => \{\s*\/\/[^\n]*\n\s*if \(!hasMessages\) return;[\s\S]*?setShowAll\(true\)[\s\S]*?\}, \[hasMessages\]\);/,
   );
-  // Short chats keep their layout; longer ones sit at the bottom, so the older
-  // messages filling in above never move the text the reader is looking at.
-  assert.match(list, /const anchorBottom = latestMessages\.length > OPEN_TAIL_MESSAGES;/);
+  // A chat with messages left to fill in sits at the bottom, so the older
+  // messages filling in above never move the text the reader is looking at;
+  // a chat drawn whole in its first frame keeps its layout.
+  assert.match(list, /const anchorBottom = openTail\.older\.length > 0;/);
   assert.match(list, /anchorBottom && 'min-h-full justify-end'/);
 });
 
@@ -44,11 +46,10 @@ test('the first scroll lands at the bottom before the browser paints', () => {
   );
 });
 
-test('the first frame covers more than the unvirtualized tail, so it is measured', () => {
-  const tail = constant('OPEN_TAIL_MESSAGES');
-  const unvirtualized = constant('UNVIRTUALIZED_TAIL');
-  assert.ok(Number.isFinite(tail) && Number.isFinite(unvirtualized));
-  assert.ok(tail > unvirtualized + 1, `${tail} messages for ${unvirtualized + 1} measured groups`);
+test('the first frame is a text budget of about two phone screens, and at most eight messages', () => {
+  assert.equal(constant('OPEN_TAIL_MESSAGES'), 8);
+  assert.equal(constant('OPEN_TAIL_CHARS'), 3_000);
+  assert.match(list, /const OPEN_TAIL: OpenTailLimit = \{ messages: OPEN_TAIL_MESSAGES, chars: OPEN_TAIL_CHARS \};/);
 });
 
 test('a reader at the bottom stays there when the rest of the chat arrives', () => {
