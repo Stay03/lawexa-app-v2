@@ -25,6 +25,13 @@ import { guardChatDrags } from './case-chat-drag-guard';
 const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
 
 /**
+ * How long the opening phone card holds its rising geometry after the tap.
+ * iOS animates the keyboard over about 250 ms; the rest covers the latency of
+ * its first viewport event.
+ */
+const KEYBOARD_RISE_MS = 350;
+
+/**
  * CaseAskDock — the case chat's one screen (`CaseChatCore`) as a dock at the
  * bottom of the case page: closed pill, new-chat view, and open conversation
  * are three states of the SAME card, and the middle is the only part that ever
@@ -53,6 +60,9 @@ const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
  * NO SLIDE ON THE PHONE. The open card does not move: the bar and middle fade
  * in above a composer that stays where the reader's finger left it. A box
  * whose height changes while it slides was the jump Stay saw on Samsung.
+ * Opened by a tap, the card covers the page from the screen's top while the
+ * keyboard rises and shows its bar and middle once it has stopped (see the
+ * open effect below).
  *
  * CLOSING ON THE PHONE IS ONE FADE OF A STILL CARD. The card keeps the top
  * and height it had at the close while the keyboard goes down, the whole
@@ -228,10 +238,10 @@ export function CaseAskDock({
   // THE CARD HOLDS STILL WHILE IT FADES. The card's top and height follow the
   // visible viewport, so as the keyboard went down under the closing fade the
   // card grew and moved with it (Arthur's iPhone, 12 October 2026). Before
-  // the blur, the card's measured top and height are written to two
-  // variables its style reads first, so the keyboard's retreat cannot move
-  // it; the fade then runs once on the whole card. They are dropped when the
-  // card leaves the screen (after the fade) or the reader opens it again
+  // the blur, the card's measured top and height are written to the held
+  // pair its style reads first, so the keyboard's retreat cannot move it; the
+  // fade then runs once on the whole card. They are dropped when the card
+  // leaves the screen (after the fade) or the reader opens it again
   // mid-fade. A layout effect, so the card is frozen in the close's first
   // frame, before the blur can resize anything.
   const screenOpen = screen && panelOpen;
@@ -243,8 +253,8 @@ export function CaseAskDock({
     if (!closed || !card) return;
     if (screenMounted) {
       const rect = card.getBoundingClientRect();
-      card.style.setProperty('--v2-case-chat-closing-top', `${rect.top}px`);
-      card.style.setProperty('--v2-case-chat-closing-height', `${rect.height}px`);
+      card.style.setProperty('--v2-case-chat-held-top', `${rect.top}px`);
+      card.style.setProperty('--v2-case-chat-held-height', `${rect.height}px`);
     }
     const active = document.activeElement;
     if (active instanceof HTMLElement && card.contains(active)) {
@@ -252,10 +262,63 @@ export function CaseAskDock({
       card.focus({ preventScroll: true });
     }
     return () => {
-      card.style.removeProperty('--v2-case-chat-closing-top');
-      card.style.removeProperty('--v2-case-chat-closing-height');
+      card.style.removeProperty('--v2-case-chat-held-top');
+      card.style.removeProperty('--v2-case-chat-held-height');
     };
   }, [screenOpen, screenMounted]);
+
+  // OPENING ON A PHONE HOLDS STILL WHILE THE KEYBOARD RISES. iOS reports the
+  // keyboard's end geometry at its first viewport event and then pans the
+  // page for about 250 ms, so a card at `--visual-top` was drawn where it
+  // would end: low on the screen with the judgment above it, sliding up as
+  // the pan finished (Arthur's recordings, 12 October 2026). No event reports
+  // the pan's progress. So for KEYBOARD_RISE_MS after a tap the card's top
+  // is the layout viewport's top, where it covers the page in every frame of
+  // the pan, and its bottom is the visible bottom, where the composer rides
+  // the keyboard; its bar and middle are transparent (`data-keyboard`). Then
+  // the card takes the visible geometry: its bottom edge is the same, so the
+  // composer does not move, and the bar and middle fade in once. A deep link
+  // (`?chat=` at load) focuses nothing and opens as before.
+  //
+  // THE HOLD ENDS EARLY IF THE KEYBOARD STOPS RISING: the composer losing
+  // focus (the keyboard goes down) or the visible width changing (a rotation,
+  // where the keyboard's geometry starts again). A close during the hold
+  // ends it too, but leaves the held pair on the card: the close effect
+  // measures the card as it is on screen and freezes it there. Every way to
+  // the end leaves the card on the visible viewport or frozen by the close.
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!screenOpen || !card) return;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLTextAreaElement) || !card.contains(active)) return;
+    const viewport = window.visualViewport;
+    const width = viewport?.width;
+    card.style.setProperty('--v2-case-chat-held-top', '0px');
+    card.style.setProperty(
+      '--v2-case-chat-held-height',
+      'calc(var(--visual-top, 0px) + var(--visual-height, 100dvh))',
+    );
+    card.setAttribute('data-keyboard', 'rising');
+    let timer = 0;
+    const onResize = (): void => {
+      if (viewport?.width !== width) release();
+    };
+    const stop = (): void => {
+      window.clearTimeout(timer);
+      active.removeEventListener('focusout', release);
+      viewport?.removeEventListener('resize', onResize);
+      card.removeAttribute('data-keyboard');
+    };
+    const release = (): void => {
+      stop();
+      card.style.removeProperty('--v2-case-chat-held-top');
+      card.style.removeProperty('--v2-case-chat-held-height');
+    };
+    timer = window.setTimeout(release, KEYBOARD_RISE_MS);
+    active.addEventListener('focusout', release);
+    viewport?.addEventListener('resize', onResize);
+    return stop;
+  }, [screenOpen]);
 
   // WHILE THE PHONE CHAT IS OPEN A DRAG IN IT NEVER PANS THE SCREEN. With the
   // keyboard up, iOS scrolls the visible viewport inside the taller layout
@@ -346,10 +409,11 @@ export function CaseAskDock({
                 // page to reveal the box, `--visual-top` follows the pan, so
                 // the card never hangs above the screen; with the keyboard
                 // down it is 0, so the card's own bar is the top of the
-                // screen (use-keyboard-inset). While it fades out, the size
-                // it had at the close (the close effect).
-                top: 'var(--v2-case-chat-closing-top, var(--visual-top, 0px))',
-                height: 'var(--v2-case-chat-closing-height, var(--visual-height, 100dvh))',
+                // screen (use-keyboard-inset). While the keyboard rises after
+                // a tap, and while it fades out, the held pair (the open and
+                // close effects).
+                top: 'var(--v2-case-chat-held-top, var(--visual-top, 0px))',
+                height: 'var(--v2-case-chat-held-height, var(--visual-height, 100dvh))',
               }
             : undefined
         }
@@ -359,7 +423,11 @@ export function CaseAskDock({
         {screenMounted ? (
           // Opening, the bar and middle fade in on the opaque card; closing,
           // the card fades as a whole, so this slot has no exit of its own.
-          <div className="flex min-h-0 flex-1 flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+          // Opened by a tap, the slot is transparent, and takes no tap, while
+          // the keyboard rises, and fades in once when it stops; a deep link
+          // has no hold, so the mount fade shows it. Reduced motion: it
+          // appears at the switch.
+          <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-[keyboard=rising]:pointer-events-none in-data-[keyboard=rising]:opacity-0">
             <CaseChatBar
               view={view}
               onBack={() => onOpenChat('new')}
