@@ -98,11 +98,13 @@ test('the keyboard hook publishes the visible height and offset beside the inset
 
 test('with the keyboard down the published top is 0, so the chat covers the page bar', () => {
   // iOS can report the full height while offsetTop still holds the keyboard's pan;
-  // the published top is clamped to where a visible rectangle can be.
-  assert.match(
-    keyboard,
-    /const top = Math\.max\(\s*0,\s*Math\.min\(viewport\.offsetTop, window\.innerHeight - viewport\.height\),\s*\);/,
-  );
+  // the published top is clamped to where a visible rectangle can be. The limit is
+  // the tallest visible height at this width, never innerHeight, which shrinks with
+  // the keyboard in the home-screen app (Arthur's IMG_4108, 12 October 2026). The
+  // arithmetic itself is pinned by behaviour in v2/shell/keyboard-visible-top.test.ts.
+  assert.match(keyboard, /const top = visibleTop\(viewport\.offsetTop, viewport\.height, fullHeight\);/);
+  assert.match(keyboard, /fullHeight = Math\.max\(fullHeight, viewport\.height\);/);
+  assert.doesNotMatch(keyboard, /Math\.min\(viewport\.offsetTop, window\.innerHeight/);
   assert.doesNotMatch(keyboard, /setProperty\('--visual-top', `\$\{viewport\.offsetTop\}px`\)/);
   // The tap is a focus: the card's first frame is sized from the viewport at the tap.
   assert.match(keyboard, /document\.addEventListener\('focusin', publishVisible\);/);

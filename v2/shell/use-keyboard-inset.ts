@@ -118,27 +118,44 @@ export function useKeyboardInset(): void {
     const settled = (): boolean => viewport.offsetTop === 0;
 
     /**
+     * The tallest the visible viewport has been at this width: the screen
+     * with no keyboard. Reset when the width changes, which is a rotation.
+     */
+    let fullHeight = viewport.height;
+    let fullWidth = viewport.width;
+
+    /**
      * The visible rectangle, for a screen fixed to it (the phone case chat).
      *
-     * THE TOP IS CLAMPED TO WHERE A VISIBLE RECTANGLE CAN BE. The visual
-     * viewport lies inside the layout viewport, so its offset is never more
-     * than `innerHeight - height`. iOS breaks that when the keyboard goes
-     * down: the resize reports the full height while `offsetTop` still holds
-     * the keyboard's pan, and no later event corrects it. Published raw, that
-     * stale pan pushed the full-screen chat down the screen with the page's
-     * own bar above it (Arthur's iPhone, after 16b19dd), and the next open
-     * started from it: the card drew part way down the page and snapped up
-     * when the keyboard's events came in.
+     * THE TOP IS CLAMPED TO WHERE A VISIBLE RECTANGLE CAN BE. While the
+     * keyboard is up, iOS pans the page and `offsetTop` says by how much; the
+     * screen must follow it. The pan can never be more than the keyboard
+     * takes, `fullHeight - height`, so with the keyboard down the top is 0.
+     * iOS breaks that when the keyboard goes down: the resize reports the full
+     * height while `offsetTop` still holds the keyboard's pan, and no later
+     * event corrects it. Published raw, that stale pan pushed the full-screen
+     * chat down the screen with the page's own bar above it (Arthur's iPhone,
+     * after 16b19dd).
+     *
+     * THE LIMIT IS NOT `innerHeight`. That was the first version (6023bb9),
+     * and in the iPhone home-screen app `innerHeight` shrinks with the
+     * keyboard, so the limit read 0 while iOS had panned the page: the
+     * full-height chat sat a keyboard's height above the screen, and only its
+     * composer showed, at the top (Arthur's IMG_4108, 12 October 2026). The
+     * tallest visible height at this width does not move with the keyboard in
+     * either mode, so it is the limit in both.
      *
      * It is also read on `focusin`. The reader's tap on the chat's box is a
      * focus, so the card's first frame is sized from the viewport as it is at
      * the tap, never from whatever a keyboard before it left behind.
      */
     const publishVisible = (): void => {
-      const top = Math.max(
-        0,
-        Math.min(viewport.offsetTop, window.innerHeight - viewport.height),
-      );
+      if (viewport.width !== fullWidth) {
+        fullWidth = viewport.width;
+        fullHeight = viewport.height;
+      }
+      fullHeight = Math.max(fullHeight, viewport.height);
+      const top = visibleTop(viewport.offsetTop, viewport.height, fullHeight);
       root.style.setProperty('--visual-height', `${viewport.height}px`);
       root.style.setProperty('--visual-top', `${top}px`);
     };
@@ -204,6 +221,15 @@ export function useKeyboardInset(): void {
       root.style.removeProperty('--visual-top');
     };
   }, []);
+}
+
+/**
+ * Where the visible rectangle's top sits on the layout viewport: iOS's pan
+ * while the keyboard is up, 0 once the visible height is back to full. Pure,
+ * so both of iOS's `innerHeight` behaviours can be pinned in a test.
+ */
+export function visibleTop(offsetTop: number, height: number, fullHeight: number): number {
+  return Math.max(0, Math.min(offsetTop, fullHeight - height));
 }
 
 /**
