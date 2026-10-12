@@ -59,13 +59,16 @@ test('the role line says who you are, by content role on a shared space', () => 
   assert.equal(shared(null), null);
 });
 
-test('a team space keeps its own roles in the role line', () => {
-  const team = (my_role: 'owner' | 'admin' | 'member' | null) =>
-    spaceRoleLabel({ kind: 'team', my_role, my_content_role: 'editor' });
-  assert.equal(team('owner'), 'You’re the owner');
-  assert.equal(team('admin'), 'You’re an admin');
-  assert.equal(team('member'), 'You’re a member');
-  assert.equal(team(null), null);
+test('a team space speaks the content roles too (design round 2, NICE 3)', () => {
+  // The server's content role leads, whatever the old role says.
+  assert.equal(
+    spaceRoleLabel({ kind: 'team', my_role: 'member', my_content_role: 'editor' }),
+    'You’re a contributor',
+  );
+  assert.equal(
+    spaceRoleLabel({ kind: 'team', my_role: 'owner', my_content_role: 'owner' }),
+    'You’re the owner',
+  );
   // An absent kind is a team space (every space before B1).
   assert.equal(spaceRoleLabel({ my_role: 'owner', my_content_role: null }), 'You’re the owner');
 });

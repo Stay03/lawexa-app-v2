@@ -19,7 +19,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Space } from '@/types/collab';
-import { CONTENT_ROLE_LABELS } from '@/v2/features/collab/membership/content-role';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
@@ -36,7 +35,7 @@ import {
   SPACE_ITEM_NOUN,
   type SpaceItemTarget,
 } from '../content-model';
-import { spaceKindMark, spaceOwnerLabel } from '../model';
+import { spaceKindMark, spaceOwnerLabel, spaceRoleWord } from '../model';
 import { SPACES_BASELINE_PARAMS, spacesQueries } from '../queries';
 import { useServerSearch } from '../use-server-search';
 
@@ -205,9 +204,8 @@ export function MoveToSpaceDialog({
               {targets.map((space) => {
                 const isCurrent = space.uuid === currentUuid;
                 const isSending = move.isPending && pickedUuid === space.uuid;
-                const role = space.my_content_role
-                  ? CONTENT_ROLE_LABELS[space.my_content_role]
-                  : null;
+                // The list's word for the same person (`spaceRoleWord`).
+                const role = spaceRoleWord(space);
                 const kind = spaceKindMark(space, teamChannelsOpen);
                 return (
                   <li key={space.uuid}>

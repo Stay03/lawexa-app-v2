@@ -271,12 +271,13 @@ test('the spaces list marks team spaces and asks for channels only for researche
   // `[holds ?? space.type_label, spaceOwnerLabel(space)]`).
   // Design round 2: the facts after the role are one list, shared by the
   // phone's second line and the single line from sm: up (was
-  // `[role, holds ?? space.type_label, spaceOwnerLabel(space)]`).
+  // `[role, holds ?? space.type_label, spaceOwnerLabel(space)]`), built by
+  // `inside(max)` so the phone can cap its chips (round 2, NICE 4).
   assert.match(
     row,
-    /hasChips \? <ChannelChips key="chips" activity=\{activity\} \/> : \(holds \?\? space\.type_label\),\s*spaceOwnerLabel\(space\),/,
+    /hasChips \? \(\s*<ChannelChips key="chips" activity=\{activity\} max=\{maxChips\} \/>\s*\) : \(\s*holds \?\? space\.type_label\s*\),\s*spaceOwnerLabel\(space\),/,
   );
-  assert.match(row, /lead=\{\[role, \.\.\.inside\]\}/);
+  assert.match(row, /lead=\{\[role, \.\.\.inside\(\)\]\}/);
   const browser = read('v2', 'features', 'spaces', 'list', 'SpacesBrowser.tsx');
   assert.match(
     browser,

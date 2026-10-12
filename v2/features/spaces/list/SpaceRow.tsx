@@ -57,6 +57,9 @@ import type { SpaceActivity } from './space-activity';
  * gold dots and "more"), so below `sm:` the meta runs on two lines: the role
  * with the members and age, then the chips or counts with the owner (design
  * round 2, 12 October 2026). The lane grows by one 16px line on phones only.
+ * A team space speaks the same three words as a shared one, so the move
+ * picker's "Contributor" and this line's "You're a contributor" name one
+ * person one way (`viewerContentRole`, design round 2).
  * The lock appears only where it can differ
  * (`showsPrivateMark`): a shared space is always private.
  *
@@ -123,6 +126,11 @@ import type { SpaceActivity } from './space-activity';
  *  reference keeps the memo from churning on a value that is always absent. */
 const NO_FACES: readonly SlimUser[] = [];
 
+/** The channel names a phone's second meta line shows. Three shared its 270px
+ *  lane and cut each to about ten letters (design round 2); two read about
+ *  sixteen each. From `sm:` up the line shows every chip it has. */
+const PHONE_CHIP_LIMIT = 2;
+
 export const SpaceRow = memo(function SpaceRow({
   space,
   activity,
@@ -158,9 +166,14 @@ export const SpaceRow = memo(function SpaceRow({
     ? space.members.filter((member) => member.is_active).map((member) => member.user)
     : NO_FACES;
   // What is inside, then whose it is: the chips when the viewer has channels
-  // here, else what the space holds or what it is.
-  const inside = [
-    hasChips ? <ChannelChips key="chips" activity={activity} /> : (holds ?? space.type_label),
+  // here, else what the space holds or what it is. The phone's line has room
+  // for two names read whole, so it shows two and says "more" for the rest.
+  const inside = (maxChips?: number) => [
+    hasChips ? (
+      <ChannelChips key="chips" activity={activity} max={maxChips} />
+    ) : (
+      holds ?? space.type_label
+    ),
     spaceOwnerLabel(space),
   ];
   const trail = [
@@ -226,12 +239,12 @@ export const SpaceRow = memo(function SpaceRow({
           {role ? (
             <div className="sm:hidden">
               <MetaLine className="mt-1.5" lead={[role]} trail={trail} />
-              <MetaLine className="mt-0.5" lead={inside} />
+              <MetaLine className="mt-0.5" lead={inside(PHONE_CHIP_LIMIT)} />
             </div>
           ) : null}
           <MetaLine
             className={cn('mt-1.5', role && 'hidden sm:flex')}
-            lead={[role, ...inside]}
+            lead={[role, ...inside()]}
             trail={trail}
           />
         </div>
@@ -248,8 +261,10 @@ export const SpaceRow = memo(function SpaceRow({
 });
 
 /**
- * The live second line: up to three channel names, unread ones marked with the
- * house gold dot, then the honest word for "there are others".
+ * The live second line: up to three channel names (`max` fewer), unread ones
+ * marked with the house gold dot, then the honest word for "there are others",
+ * which also covers the names `max` held back. The chips arrive unread first,
+ * so a cut drops quiet channels before an unread one.
  *
  * NO PLINTH BEHIND THE CHIPS. A tinted ground looked tidier and cost contrast
  * it could not pay for: `bg-secondary/70` moves the page by 1.07:1 in light —
@@ -258,10 +273,12 @@ export const SpaceRow = memo(function SpaceRow({
  * chip at 4.73:1 / 7.63:1 and the gold dot at 4.33:1 / 7.31:1, and `#` is a
  * strong enough token boundary that the ground was never doing the separating.
  */
-function ChannelChips({ activity }: { activity: SpaceActivity }) {
+function ChannelChips({ activity, max }: { activity: SpaceActivity; max?: number }) {
+  const chips = max === undefined ? activity.chips : activity.chips.slice(0, max);
+  const hasMore = activity.hasMore || chips.length < activity.chips.length;
   return (
     <span className="flex min-w-0 items-center gap-2">
-      {activity.chips.map((chip) => (
+      {chips.map((chip) => (
         <span
           key={chip.uuid}
           className={cn(
@@ -278,7 +295,7 @@ function ChannelChips({ activity }: { activity: SpaceActivity }) {
           <span className="min-w-0 truncate">{`#${chip.name}`}</span>
         </span>
       ))}
-      {activity.hasMore ? (
+      {hasMore ? (
         <span className="shrink-0 text-[11px] text-muted-foreground">more</span>
       ) : null}
     </span>

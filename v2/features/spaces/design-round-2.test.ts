@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import type { LucideIcon } from 'lucide-react';
 import { ruledAbove, type ScreenAction } from '@/v2/shell/screen-context';
-import { spaceMenuItems } from './model';
+import { spaceMenuItems, spaceRoleLabel, spaceRoleWord, viewerContentRole } from './model';
 
 /* Spaces design round 2 (12 October 2026): the fixes to the round 1
  * critique (results/spaces-r1/critique-fable.md). Pure rules first, then the
@@ -43,11 +43,11 @@ test('below sm the list row splits its meta; from sm up it is one line', () => {
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
   assert.match(
     row,
-    /<div className="sm:hidden">\s*<MetaLine className="mt-1\.5" lead=\{\[role\]\} trail=\{trail\} \/>\s*<MetaLine className="mt-0\.5" lead=\{inside\} \/>\s*<\/div>/,
+    /<div className="sm:hidden">\s*<MetaLine className="mt-1\.5" lead=\{\[role\]\} trail=\{trail\} \/>\s*<MetaLine className="mt-0\.5" lead=\{inside\(PHONE_CHIP_LIMIT\)\} \/>\s*<\/div>/,
   );
   assert.match(
     row,
-    /<MetaLine\s+className=\{cn\('mt-1\.5', role && 'hidden sm:flex'\)\}\s+lead=\{\[role, \.\.\.inside\]\}\s+trail=\{trail\}/,
+    /<MetaLine\s+className=\{cn\('mt-1\.5', role && 'hidden sm:flex'\)\}\s+lead=\{\[role, \.\.\.inside\(\)\]\}\s+trail=\{trail\}/,
   );
   // A row with no role keeps the one line at every width.
   assert.match(row, /\{role \? \(\s*<div className="sm:hidden">/);
@@ -234,4 +234,69 @@ test('the add pill is 44px on the folders screen as on a space tab', () => {
   // Its skeleton reserves the same height, so nothing jumps when it lands.
   const fallback = read('v2', 'features', 'folders', 'list', 'FoldersFallback.tsx');
   assert.match(fallback, /<div className="h-11 w-11 rounded-full bg-primary\/60 sm:w-32" \/>/);
+});
+
+/* ── Round 2 critique NICE 3: one set of role words ──────────────────────── */
+
+test('a team space maps its old role to the content role the server derives', () => {
+  const team = (my_role: 'owner' | 'admin' | 'member' | null) =>
+    viewerContentRole({ kind: 'team', my_role, my_content_role: null });
+  assert.equal(team('owner'), 'owner');
+  assert.equal(team('admin'), 'editor');
+  assert.equal(team('member'), 'editor');
+  assert.equal(team(null), null);
+  // A stated content role wins over the old one.
+  assert.equal(
+    viewerContentRole({ kind: 'team', my_role: 'member', my_content_role: 'viewer' }),
+    'viewer',
+  );
+});
+
+test('a shared space never guesses its content role from the old role', () => {
+  // Its Viewer has `my_role: member`; a guess would read "Contributor".
+  assert.equal(viewerContentRole({ kind: 'shared', my_role: 'member', my_content_role: null }), null);
+  assert.equal(spaceRoleWord({ kind: 'shared', my_role: 'member', my_content_role: null }), null);
+});
+
+test('the picker word and the list line name one person the same way', () => {
+  const cases = [
+    { kind: 'team', my_role: 'member', my_content_role: 'editor' },
+    { kind: 'team', my_role: 'admin', my_content_role: null },
+    { kind: 'team', my_role: 'owner', my_content_role: 'owner' },
+    { kind: 'shared', my_role: 'member', my_content_role: 'viewer' },
+    { kind: 'shared', my_role: 'member', my_content_role: 'editor' },
+    { kind: 'shared', my_role: 'owner', my_content_role: 'owner' },
+  ] as const;
+  for (const space of cases) {
+    const word = spaceRoleWord(space);
+    assert.ok(word === 'Owner' || word === 'Contributor' || word === 'Viewer', word ?? 'null');
+    const line = spaceRoleLabel(space);
+    assert.ok(line?.endsWith(word.toLowerCase()), `${line} / ${word}`);
+  }
+  // Lawexa HQ in the round 2 shots: a team member, "Contributor" in both.
+  assert.equal(spaceRoleWord(cases[0]), 'Contributor');
+  assert.equal(spaceRoleLabel(cases[0]), 'You’re a contributor');
+});
+
+test('the move picker reads its role word from the spaces model', () => {
+  const dialog = read('v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx');
+  assert.match(dialog, /const role = spaceRoleWord\(space\);/);
+  assert.doesNotMatch(dialog, /CONTENT_ROLE_LABELS/);
+  assert.doesNotMatch(dialog, /my_content_role\]/);
+});
+
+/* ── Round 2 critique NICE 4: two whole channel names on a phone ─────────── */
+
+test('the phone meta line shows two channel chips and says more for the rest', () => {
+  const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
+  assert.match(row, /const PHONE_CHIP_LIMIT = 2;/);
+  assert.match(row, /function ChannelChips\(\{ activity, max \}: \{ activity: SpaceActivity; max\?: number \}\)/);
+  assert.match(
+    row,
+    /const chips = max === undefined \? activity\.chips : activity\.chips\.slice\(0, max\);/,
+  );
+  // "more" covers the names the cap held back, not only the server's overflow.
+  assert.match(row, /const hasMore = activity\.hasMore \|\| chips\.length < activity\.chips\.length;/);
+  assert.match(row, /\{hasMore \? \(/);
+  assert.doesNotMatch(row, /activity\.chips\.map/);
 });

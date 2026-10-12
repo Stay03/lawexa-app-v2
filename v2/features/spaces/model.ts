@@ -1,4 +1,5 @@
 import type {
+  ContentRole,
   CreateInviteLinkPayload,
   InviteMemberPayload,
   Member,
@@ -9,6 +10,7 @@ import type {
   UpdateSpaceMemberRolePayload,
 } from '@/types/collab';
 import {
+  CONTENT_ROLE_LABELS,
   contentRoleOf,
   isInvitableContentRole,
   type InvitableContentRole,
@@ -349,35 +351,45 @@ export function showsPrivateMark(space: Pick<Space, 'kind' | 'is_private'>): boo
 }
 
 /**
+ * The viewer's content role in any kind of space, the one reading every role
+ * word below comes from. A shared space states it (`my_content_role`) and is
+ * never guessed: its Viewer has the old `my_role` "member", which would read as
+ * a Contributor. A team space states it too from B1, the server deriving it
+ * from the old role; on a row without it, it is derived here the same way
+ * (`contentRoleOf`: the owner is the Owner, an admin or member a Contributor).
+ * `null` when neither column is known.
+ */
+export function viewerContentRole(space: MembershipSubject): ContentRole | null {
+  if (space.my_content_role) return space.my_content_role;
+  if (isSharedSpace(space) || !space.my_role) return null;
+  return contentRoleOf({ role: space.my_role });
+}
+
+/**
+ * The viewer's role as one word, "Owner", "Contributor" or "Viewer", for the
+ * move picker. Every kind of space speaks the content roles, so the picker and
+ * the list name the same person the same way (design round 2: the picker said
+ * "Contributor" where the list said "You're a member" for one team space).
+ */
+export function spaceRoleWord(space: MembershipSubject): string | null {
+  const role = viewerContentRole(space);
+  return role ? CONTENT_ROLE_LABELS[role] : null;
+}
+
+/**
  * The viewer's place in a space, in words, for the list row and the space
  * header (design round 1: the approved row carries "your role", and a Viewer
- * should not learn they cannot add only by trying). A SHARED space speaks its
- * content roles; a TEAM space the roles it has always had. `null` when the
- * role is not known, so the line says nothing rather than guessing.
+ * should not learn they cannot add only by trying): "You're the owner",
+ * "You're a contributor", "You're a viewer", built on `spaceRoleWord`'s word.
+ * The role on a team space's channels and settings (admin, member) is the
+ * members sheet's to show, not this line's. `null` when the role is not known,
+ * so the line says nothing rather than guessing.
  */
 export function spaceRoleLabel(space: MembershipSubject): string | null {
-  if (isSharedSpace(space)) {
-    switch (space.my_content_role) {
-      case 'owner':
-        return 'You’re the owner';
-      case 'editor':
-        return 'You’re a contributor';
-      case 'viewer':
-        return 'You’re a viewer';
-      default:
-        return null;
-    }
-  }
-  switch (space.my_role) {
-    case 'owner':
-      return 'You’re the owner';
-    case 'admin':
-      return 'You’re an admin';
-    case 'member':
-      return 'You’re a member';
-    default:
-      return null;
-  }
+  const role = viewerContentRole(space);
+  if (!role) return null;
+  const word = CONTENT_ROLE_LABELS[role].toLowerCase();
+  return role === 'owner' ? `You’re the ${word}` : `You’re a ${word}`;
 }
 
 /**
