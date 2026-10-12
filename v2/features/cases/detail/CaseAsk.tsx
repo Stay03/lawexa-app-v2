@@ -13,6 +13,7 @@ import {
   CaseChatMiddle,
   type CaseChatStart,
 } from './CaseChatCore';
+import { guardChatDrags } from './case-chat-drag-guard';
 
 /**
  * The shell's own bars, made inert and hidden while the phone chat covers the
@@ -238,6 +239,19 @@ export function CaseAskDock({
       card.style.removeProperty('--v2-case-chat-closing-height');
     };
   }, [screenOpen, screenMounted]);
+
+  // WHILE THE PHONE CHAT IS OPEN A DRAG IN IT NEVER PANS THE SCREEN. With the
+  // keyboard up, iOS scrolls the visible viewport inside the taller layout
+  // viewport on any drag the page does not use, and the fixed card lagged
+  // behind it: the chat's bar left the top and the page showed under the
+  // composer (Arthur's Safari recording, 12 October 2026). The guard cancels
+  // only drags that no scroller in the chat can take (case-chat-drag-guard).
+  // Added on the card while the chat is open, removed on close.
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!screenOpen || !card) return;
+    return guardChatDrags(card);
+  }, [screenOpen]);
 
   return (
     <div
