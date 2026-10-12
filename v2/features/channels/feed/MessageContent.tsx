@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
+import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 import { isSelfMention, parseMessageContent } from '@/lib/utils/collab';
 import type { MessageMetadata } from '@/types/collab';
+import { inAppPath } from './in-app-link';
 
 /**
  * MessageContent — message text with resolved @mentions highlighted. Only
@@ -55,7 +57,6 @@ export function MessageContent({
     () => parseMessageContent(content, metadata),
     [content, metadata],
   );
-
   return (
     <div className={BODY_CLASS}>
       {segments.map((segment, index) =>
@@ -92,21 +93,39 @@ export function MessageContent({
           // asking for a new tab as well leaves an empty one behind on several
           // browsers. `rel` goes with it, since there is no document to reach
           // back through.
-          <a
-            key={index}
-            href={segment.href}
-            {...(segment.href.startsWith('mailto:')
-              ? {}
-              : { target: '_blank', rel: 'noopener noreferrer nofollow' })}
-            className="break-all text-primary underline underline-offset-2 hover:text-primary/80"
-          >
-            {segment.value}
-          </a>
+          <MessageLink key={index} href={segment.href} text={segment.value} />
         ) : (
           <span key={index}>{segment.value}</span>
         ),
       )}
     </div>
+  );
+}
+
+const LINK_CLASS = 'break-all text-primary underline underline-offset-2 hover:text-primary/80';
+
+/**
+ * One link in a message. A LAWEXA LINK STAYS IN LAWEXA (in-app-link.ts): it
+ * navigates in place with its query and hash, so the home-screen app never
+ * hands it to Safari. Every other link keeps the new tab.
+ */
+function MessageLink({ href, text }: { href: string; text: string }) {
+  const path = inAppPath(href);
+  if (path !== null) {
+    return (
+      <Link href={path} prefetch={false} className={LINK_CLASS}>
+        {text}
+      </Link>
+    );
+  }
+  return (
+    <a
+      href={href}
+      {...(href.startsWith('mailto:') ? {} : { target: '_blank', rel: 'noopener noreferrer nofollow' })}
+      className={LINK_CLASS}
+    >
+      {text}
+    </a>
   );
 }
 
