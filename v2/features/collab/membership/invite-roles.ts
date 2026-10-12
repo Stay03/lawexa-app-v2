@@ -24,5 +24,5 @@ export const TEAM_INVITE_ROLES: readonly InviteRoleOption<'member' | 'admin'>[] 
  */
 export const SHARED_INVITE_ROLES: readonly InviteRoleOption<InvitableContentRole>[] = [
   { value: 'viewer', label: 'Viewer, can read everything in the space' },
-  { value: 'editor', label: 'Editor, can also add and continue chats' },
+  { value: 'editor', label: 'Contributor, can also add and continue chats' },
 ];

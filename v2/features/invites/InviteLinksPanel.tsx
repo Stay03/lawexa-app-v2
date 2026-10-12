@@ -116,7 +116,7 @@ function LinkRow({
 
 /**
  * ON A SHARED SPACE (`contentRoles`; Spaces F7, 12 October 2026) the form also
- * asks which role the link gives, Viewer or Editor, and each row says it. The
+ * asks which role the link gives, Viewer or Contributor, and each row says it. The
  * request names that role and never a channel (`inviteLinkPayload`; backend B2
  * refuses a channel on a shared space with a 422).
  */

@@ -151,7 +151,7 @@ export function organizationInvitationRow(
 /**
  * The role a space invitation names. A SHARED space speaks in content roles
  * (Spaces F7, 12 October 2026; backend B2), so it shows `content_role_label`
- * ("Editor", "Viewer"); a team space keeps the old role label it always
+ * ("Contributor", "Viewer"); a team space keeps the old role label it always
  * showed, even though B2 also derives a content role for it. The one `space`
  * row kind stays: a shared space's invitation is still a space invitation.
  */

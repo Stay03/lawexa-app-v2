@@ -61,7 +61,7 @@ export type SpaceKind = 'team' | 'shared';
 /**
  * The viewer's role over a space's CONTENTS (chats, folders, files): a separate
  * column from {@link MemberRole}, which keeps deciding channels and space
- * settings. Owner and Editor add and continue; Viewer only reads (design 2.4).
+ * settings. Owner and Contributor add and continue; Viewer only reads (design 2.4).
  */
 export type ContentRole = 'owner' | 'editor' | 'viewer';
 export type NotifyLevel = 'all' | 'mentions_only' | 'muted';

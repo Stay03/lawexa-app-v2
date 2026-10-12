@@ -25,7 +25,7 @@ import {
 } from './model';
 
 /* Spaces F7 (12 October 2026; backend B2): a SHARED space's members are Owner,
- * Editor and Viewer, and only the content Owner manages them. A team space
+ * Contributor and Viewer, and only the content Owner manages them. A team space
  * keeps today's owner, admin and member rules exactly. Pure rules first, then
  * the wiring pinned by source. */
 
@@ -63,7 +63,7 @@ test('a shared space is managed by its content Owner only; a team space by owner
   assert.equal(isMembershipOwner({ kind: 'team', my_role: 'admin', my_content_role: 'owner' }), false);
 });
 
-test('role options: Viewer and Editor on a shared space, Member and Admin on a team space', () => {
+test('role options: Viewer and Contributor on a shared space, Member and Admin on a team space', () => {
   assert.deepEqual(inviteRoleOptions('shared').map((option) => option.value), ['viewer', 'editor']);
   assert.deepEqual(inviteRoleOptions('team').map((option) => option.value), ['member', 'admin']);
   assert.equal(inviteRoleOptions('shared'), SHARED_INVITE_ROLES);
@@ -137,11 +137,11 @@ test('the inbox shows the content role for a shared space and the old role for a
     role: 'member',
     role_label: 'Member',
     content_role: 'editor',
-    content_role_label: 'Editor',
+    content_role_label: 'Contributor',
     invited_by: null,
     created_at: '2026-10-12T00:00:00Z',
   });
-  assert.equal(spaceInvitationRoleLabel(invitation('shared')), 'Editor');
+  assert.equal(spaceInvitationRoleLabel(invitation('shared')), 'Contributor');
   assert.equal(spaceInvitationRoleLabel(invitation('team')), 'Member');
   assert.equal(spaceInvitationRoleLabel(invitation(undefined)), 'Member');
 });
@@ -169,7 +169,7 @@ test('the members sheet reads content roles on a shared space and keeps team rul
   // The designed message leads with transferring ownership (backend B2).
   assert.match(sheet, /Transfer ownership first: open another member's menu/);
   // What the sheet promises on a shared space.
-  assert.match(sheet, /and you become an Editor\./);
+  assert.match(sheet, /and you become a Contributor\./);
   assert.match(sheet, /The chats, folders and files you added stay in it for the other members\./);
 });
 

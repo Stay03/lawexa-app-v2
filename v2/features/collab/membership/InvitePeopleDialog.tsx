@@ -39,7 +39,7 @@ import { isInvitableContentRole } from './content-role';
  *
  * THE ROLES ARE THE CALLER'S (Spaces F7, 12 October 2026). A team space and an
  * organization offer Member and Admin; a SHARED space offers Viewer and
- * Editor (backend B2). The dialog draws whichever list it is given, opens on
+ * Contributor (backend B2). The dialog draws whichever list it is given, opens on
  * its first entry, and hands back the chosen value; the caller turns it into
  * the request (`invitePayload` for spaces), so this file never decides which
  * field a role travels in. On a shared space the link half follows the same

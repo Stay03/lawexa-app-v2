@@ -77,7 +77,7 @@ export function isSharedSpace(space: Pick<Space, 'kind'>): boolean {
 
 /**
  * Whether the viewer may add to the space's contents: start a chat, upload a
- * file, make a folder (design 2.4). Owner and Editor; a Viewer only reads.
+ * file, make a folder (design 2.4). Owner and Contributor; a Viewer only reads.
  *
  * Reads `my_content_role` ONLY, never the old `my_role`. The two are separate
  * columns on purpose (a team space's admin is not thereby a content Owner),
@@ -341,7 +341,7 @@ export type MembershipSubject = Pick<Space, 'kind' | 'my_role' | 'my_content_rol
 /**
  * Who may invite, change roles, make invite links, see the waiting list and
  * remove members. On a SHARED space only the content Owner (backend B2: an
- * Editor or Viewer gets 403), read off `my_content_role`. On a TEAM space,
+ * Contributor or Viewer gets 403), read off `my_content_role`. On a TEAM space,
  * exactly today's rule: owner or admin off the old `my_role`.
  */
 export function canManageMembership(space: MembershipSubject): boolean {
@@ -376,7 +376,7 @@ export function inviteRoleOptions(kind: SpaceKind): readonly InviteRoleOption[] 
 
 /**
  * The invite request for a chosen role. A SHARED space sends `content_role`
- * beside `role: 'member'`, the old column the backend writes for an Editor or
+ * beside `role: 'member'`, the old column the backend writes for a Contributor or
  * a Viewer (design 2.1); a TEAM space sends today's `role` and nothing else.
  * Returns `null` for a role this kind of space does not have, so a stale form
  * value can never send a mixed request.

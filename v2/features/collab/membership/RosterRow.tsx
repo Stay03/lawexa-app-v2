@@ -48,8 +48,8 @@ import { MemberAvatar } from './MemberAvatar';
  *
  * ── A SHARED SPACE SPEAKS IN CONTENT ROLES (Spaces F7, 12 October 2026) ─────
  * With `contentRoles`, the row reads the member's content role (Owner,
- * Editor, Viewer; `content-role.ts`) for the crown, the label and who may be
- * managed, and its role actions are "Change to Editor" and "Change to Viewer"
+ * Contributor, Viewer; `content-role.ts`) for the crown, the label and who may be
+ * managed, and its role actions are "Change to Contributor" and "Change to Viewer"
  * through `onSetContentRole`. Without it, everything is exactly as before:
  * team spaces and organizations keep owner, admin and member.
  */
@@ -69,7 +69,7 @@ export function RosterRow({
   contentRoles?: boolean;
   onPromote?: (member: Member) => void;
   onDemote?: (member: Member) => void;
-  /** Shared spaces only: give this member the Editor or Viewer role. */
+  /** Shared spaces only: give this member the Contributor or Viewer role. */
   onSetContentRole?: (member: Member, role: InvitableContentRole) => void;
   /** Space rosters only — organizations have no ownership-transfer route. */
   onTransferOwnership?: (member: Member) => void;

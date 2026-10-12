@@ -44,11 +44,11 @@ import { useCreateInviteLink, useInviteLinks } from './queries';
  * half is unaffected, which is the half they can actually use.
  *
  * ── ON A SHARED SPACE THE LINK CARRIES THE CHOSEN ROLE (Spaces F7) ─────────
- * With `contentRole` (the Editor or Viewer picked in the dialog above), the
+ * With `contentRole` (the Contributor or Viewer picked in the dialog above), the
  * link shown is the usable one that gives THAT role, and a new one is made
  * with it and with no channel ever (backend B2 refuses a channel on a shared
  * space with a 422; `inviteLinkPayload`). Switching the role in the dialog
- * switches the link, so nobody copies a Viewer link thinking it makes Editors.
+ * switches the link, so nobody copies a Viewer link thinking it makes Contributors.
  */
 
 /** The usable link for this scope, or `null`. A channel-scoped dialog wants the

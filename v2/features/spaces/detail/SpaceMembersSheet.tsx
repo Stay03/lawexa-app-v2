@@ -85,11 +85,11 @@ import { spacesQueries } from '../queries';
  * Phase-5 W4, 2026-08-04.
  *
  * ── A SHARED SPACE (Spaces F7, 12 October 2026; backend B2) ────────────────
- * Its people are Owner, Editor and Viewer, and only the Owner manages them:
- * invites (as Editor or Viewer), role changes, removals and links, all read
+ * Its people are Owner, Contributor and Viewer, and only the Owner manages them:
+ * invites (as Contributor or Viewer), role changes, removals and links, all read
  * off the CONTENT role (`canManageMembership`), never the old `my_role`. A
  * team space keeps everything above exactly. Two things change in what the
- * sheet SAYS: transferring a shared space makes the old Owner an Editor, and
+ * sheet SAYS: transferring a shared space makes the old Owner a Contributor, and
  * leaving keeps what the leaver added in the space (design 2.5), so the leave
  * confirmation promises nothing goes with them. The LAST Owner cannot leave a
  * shared space (the backend answers 409: delete the space or transfer first),
@@ -175,7 +175,7 @@ export function SpaceMembersSheet({
   const invitePanel = useUrlOverlay('invite', { canOpen: canManage });
 
   // The roles this space speaks in, and the request each one becomes: Viewer
-  // or Editor as `content_role` on a shared space, today's role on a team one.
+  // or Contributor as `content_role` on a shared space, today's role on a team one.
   const kind = spaceKind(space);
   const inviteRoles = inviteRoleOptions(kind);
   const handleInvite = ({ email, role }: { email: string; role: string }) =>
@@ -359,7 +359,7 @@ export function SpaceMembersSheet({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {shared
-                ? `They take over ${space.name}, and you become an Editor. Only the new owner can hand it back.`
+                ? `They take over ${space.name}, and you become a Contributor. Only the new owner can hand it back.`
                 : `They take over ${space.name}, and you become an admin. Only the new owner can hand it back.`}
             </AlertDialogDescription>
           </AlertDialogHeader>

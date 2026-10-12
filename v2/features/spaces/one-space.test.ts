@@ -82,7 +82,7 @@ test('channels show only on a team space, to someone who may open Team Channels'
   }
 });
 
-test('only an Owner or an Editor may add content; the old my_role does not count', () => {
+test('only an Owner or a Contributor may add content; the old my_role does not count', () => {
   const cases: readonly [ContentRole | null | undefined, boolean][] = [
     ['owner', true],
     ['editor', true],
