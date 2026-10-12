@@ -1,6 +1,7 @@
 'use client';
 
-import { Folder, MessageSquare, Paperclip, type LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Folder, MessageSquare, Paperclip, SearchX, type LucideIcon } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { FileMarkSkeleton } from '@/v2/features/channels/files/FileMark';
@@ -14,7 +15,7 @@ import {
   FoldersListSkeleton,
   FoldersNextPageSkeleton,
 } from '@/v2/features/folders/list/states';
-import type { SpaceTab } from '../../model';
+import { spaceEmptyCopy, type SpaceContentTab } from '../../content-model';
 
 /**
  * The states of a space's three content tabs (Spaces F2, 11 October 2026):
@@ -23,14 +24,15 @@ import type { SpaceTab } from '../../model';
  * chats and folders skeletons ARE the source lists' own, because the rows are
  * the source lists' own.
  *
- * EMPTY IS NOT A FAILURE, AND NEITHER OFFERS AN ACTION YET. Adding to a space
- * (start a chat, upload a file, make a folder, move something in) arrives in
- * F3 and F4; until then an empty tab says, in plain words, what will appear
- * there and who puts it there. A failure keeps its retry.
+ * EMPTY IS NOT A FAILURE, AND IT TEACHES (Spaces F3, design round 0, 12
+ * October 2026). An Owner or Contributor reads Stay's lines, adapted per tab,
+ * with the way to add right under them (the host passes it as `action`). A
+ * Viewer cannot add, so they read who fills the tab instead, and get no
+ * button. The words are `spaceEmptyCopy`'s, where the tests pin them. A
+ * failure keeps its retry.
  */
 
-/** The tabs that list contents; `channels` is the lobby and has its own. */
-export type SpaceContentTab = Exclude<SpaceTab, 'channels'>;
+export type { SpaceContentTab };
 
 /** One row at `SpaceFileRow`'s exact geometry: mark, name, meta, the button. */
 function FileRowSkeleton() {
@@ -96,29 +98,64 @@ export function SpaceContentNextPageSkeleton({ tab }: { tab: SpaceContentTab }) 
   }
 }
 
-const EMPTY: Readonly<
-  Record<SpaceContentTab, { icon: LucideIcon; title: string; description: string }>
-> = {
-  chats: {
-    icon: MessageSquare,
-    title: 'No chats in this space yet',
-    description: 'Chats that members add to this space show up here, for everyone in it to read.',
-  },
-  folders: {
-    icon: Folder,
-    title: 'No folders in this space yet',
-    description: 'Folders that members add to this space show up here, for everyone in it to open.',
-  },
-  files: {
-    icon: Paperclip,
-    title: 'No files in this space yet',
-    description: 'Files that members add to this space show up here, for everyone in it to open.',
-  },
+const EMPTY_ICON: Readonly<Record<SpaceContentTab, LucideIcon>> = {
+  chats: MessageSquare,
+  folders: Folder,
+  files: Paperclip,
 };
 
-export function SpaceContentEmptyState({ tab }: { tab: SpaceContentTab }) {
-  const { icon, title, description } = EMPTY[tab];
-  return <CollabEmpty icon={icon} title={title} description={description} />;
+/** A tab with nothing in it. `action` is the way to add, passed only for a
+ *  viewer who may add (see the docblock). */
+export function SpaceContentEmptyState({
+  tab,
+  canAdd,
+  action,
+}: {
+  tab: SpaceContentTab;
+  canAdd: boolean;
+  action?: ReactNode;
+}) {
+  const { title, description } = spaceEmptyCopy(tab, canAdd);
+  return (
+    <CollabEmpty
+      icon={EMPTY_ICON[tab]}
+      title={title}
+      description={description}
+      action={canAdd ? action : undefined}
+    />
+  );
+}
+
+/** A search that found nothing: says so, and offers the way back. */
+export function SpaceContentNoMatchState({
+  query,
+  action,
+}: {
+  query: string;
+  /** The clear-search control. */
+  action: ReactNode;
+}) {
+  return (
+    <CollabEmpty
+      icon={SearchX}
+      title={`Nothing matches “${query}”`}
+      description="Try another word, or clear the search to see everything here."
+      action={action}
+    />
+  );
+}
+
+/** A folder level with no folders inside it. Its items (cases, notes, files
+ *  filed in it) live on the folder's own page, which `action` opens. */
+export function SpaceFolderLevelEmptyState({ action }: { action: ReactNode }) {
+  return (
+    <CollabEmpty
+      icon={Folder}
+      title="No folders inside"
+      description="What is filed in this folder is on its own page."
+      action={action}
+    />
+  );
 }
 
 const FAILURE_TITLE: Readonly<Record<SpaceContentTab, string>> = {

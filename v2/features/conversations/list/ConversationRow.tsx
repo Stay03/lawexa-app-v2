@@ -2,7 +2,9 @@
 
 import { MoveFirstLink } from '@/v2/shell/move-first';
 import {
+  Boxes,
   ChevronRight,
+  FolderOutput,
   MessageSquare,
   MoreHorizontal,
   ShieldCheck,
@@ -15,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { ConversationListItem } from '@/types/chat';
@@ -64,9 +67,20 @@ import {
  * ── THE SAME ROW IN A SPACE (Spaces F2, 11 October 2026) ───────────────────
  * A space's Chats tab lists chats that are often SOMEONE ELSE'S, so it passes
  * a `byline` (whose chat it is) and no `onDelete`: deleting is the chat
- * owner's alone, from their own list, and the space list is read-only until
- * F3. With no `onDelete` there is no menu and no spacer, because no row in
- * that column has a menu to line up with.
+ * owner's alone, from their own list. With no actions there is no menu and no
+ * spacer, because no row in that column has a menu to line up with.
+ *
+ * ── MOVING AND TAKING OUT (Spaces F3, 12 October 2026) ─────────────────────
+ * Two more rows join the menu, each only when its host passes it: "Move to
+ * space" (`onMove`, the chat's owner: their own list, and their own rows in a
+ * space's tab) and "Remove from space" (`onRemoveFromSpace`, the space's
+ * Owner, in its tab). A confidential chat never gets either: it cannot go
+ * into a space (the server answers 422), so its row keeps the spacer.
+ *
+ * `showSpace` puts the space the chat is in under its title, in the reader's
+ * own list. It is text inside the row's link, not a second link: a link
+ * inside a link is invalid and would split the row's one target in two. The
+ * open chat's header carries the same name as a link to the space.
  */
 export function ConversationRow({
   conversation,
@@ -75,7 +89,10 @@ export function ConversationRow({
   exiting,
   reveal = true,
   byline = null,
+  showSpace = false,
   onDelete,
+  onMove,
+  onRemoveFromSpace,
 }: {
   conversation: ConversationListItem;
   now: number;
@@ -91,12 +108,21 @@ export function ConversationRow({
   reveal?: boolean;
   /** A quiet second line naming whose chat this is (a space's list). */
   byline?: string | null;
-  /** Opens the list's delete confirm for this row. Absent = no actions menu. */
+  /** Name the space the chat is in under its title (the reader's own list). */
+  showSpace?: boolean;
+  /** Opens the list's delete confirm for this row. */
   onDelete?: () => void;
+  /** Opens the move-to-space dialog for this row (the chat's owner). */
+  onMove?: () => void;
+  /** Opens the Remove from Space confirm (the space's Owner, in its tab). */
+  onRemoveFromSpace?: () => void;
 }) {
   const { id, title, status, updated_at, is_confidential } = conversation;
   const cleanTitle = stripPastedTags(title);
   const isArchived = status === 'archived';
+  const spaceName = showSpace && !is_confidential ? (conversation.space?.name ?? null) : null;
+  const hasMenu =
+    onDelete !== undefined || onMove !== undefined || onRemoveFromSpace !== undefined;
 
   return (
     <li
@@ -128,7 +154,7 @@ export function ConversationRow({
           title={cleanTitle}
           header={{ title: cleanTitle, confidential: Boolean(is_confidential) }}
           headerOwner={id}
-          aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}${byline && !is_confidential ? `, ${byline}` : ''}`}
+          aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}${byline && !is_confidential ? `, ${byline}` : ''}${spaceName ? `, in ${spaceName}` : ''}`}
           className={cn(
             'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60',
             FOCUS_RING,
@@ -157,6 +183,11 @@ export function ConversationRow({
               <span className="truncate text-xs text-muted-foreground">
                 {byline}
               </span>
+            ) : spaceName ? (
+              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                <Boxes aria-hidden className="size-3 shrink-0" />
+                <span className="truncate">{spaceName}</span>
+              </span>
             ) : null}
           </span>
 
@@ -176,10 +207,15 @@ export function ConversationRow({
           </span>
         </MoveFirstLink>
 
-        {onDelete === undefined ? null : is_confidential ? (
+        {!hasMenu ? null : is_confidential ? (
           <span aria-hidden className="size-9 shrink-0" />
         ) : (
-          <ConversationRowMenu title={cleanTitle} onDelete={onDelete} />
+          <ConversationRowMenu
+            title={cleanTitle}
+            onDelete={onDelete}
+            onMove={onMove}
+            onRemoveFromSpace={onRemoveFromSpace}
+          />
         )}
       </div>
     </li>
@@ -187,14 +223,20 @@ export function ConversationRow({
 }
 
 /** The row's actions menu. The trigger is `FolderActionsMenu`'s, so every v2
- *  list row's menu looks and behaves the same. */
+ *  list row's menu looks and behaves the same. The space rows come first and
+ *  the destructive one last, below a separator. */
 function ConversationRowMenu({
   title,
   onDelete,
+  onMove,
+  onRemoveFromSpace,
 }: {
   title: string;
-  onDelete: () => void;
+  onDelete?: () => void;
+  onMove?: () => void;
+  onRemoveFromSpace?: () => void;
 }) {
+  const hasSpaceRows = onMove !== undefined || onRemoveFromSpace !== undefined;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -210,10 +252,27 @@ function ConversationRowMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end">
-        <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-          <Trash2 />
-          Delete chat
-        </DropdownMenuItem>
+        {onMove ? (
+          <DropdownMenuItem onSelect={onMove}>
+            <Boxes />
+            Move to space
+          </DropdownMenuItem>
+        ) : null}
+        {onRemoveFromSpace ? (
+          <DropdownMenuItem onSelect={onRemoveFromSpace}>
+            <FolderOutput />
+            Remove from space
+          </DropdownMenuItem>
+        ) : null}
+        {onDelete ? (
+          <>
+            {hasSpaceRows ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+              <Trash2 />
+              Delete chat
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

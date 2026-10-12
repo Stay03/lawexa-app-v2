@@ -136,9 +136,11 @@ export type SpaceTab = 'channels' | 'chats' | 'folders' | 'files';
 const CONTENT_TABS: readonly SpaceTab[] = ['chats', 'folders', 'files'];
 const TEAM_TABS: readonly SpaceTab[] = ['channels', ...CONTENT_TABS];
 
+/** The `chats` id stays (it is in copied `?tab=` links); the label is the
+ *  approved name, the one the sidebar uses (design round 0, 12 October 2026). */
 export const SPACE_TAB_LABELS: Readonly<Record<SpaceTab, string>> = {
   channels: 'Channels',
-  chats: 'Chats',
+  chats: 'Conversations',
   folders: 'Folders',
   files: 'Files',
 };

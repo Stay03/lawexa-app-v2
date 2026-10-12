@@ -136,14 +136,26 @@ export const spacesQueries = {
    * to a space while the reader is away, so an arrival must ask (the
    * conversations list's reasoning, word for word).
    */
-  contentsOf: (spaceUuid: string) =>
-    [...spacesQueries.all, 'contents', spaceUuid] as const,
+  /** Every space's contents at once: what a MOVE dirties (Spaces F3), since
+   *  an item leaves one space and enters another, and the client may know
+   *  only one of the two. */
+  contents: () => [...spacesQueries.all, 'contents'] as const,
 
-  conversations: (spaceUuid: string, { viewerId }: ViewerScoped) => {
+  contentsOf: (spaceUuid: string) =>
+    [...spacesQueries.contents(), spaceUuid] as const,
+
+  /** The space's chats, newest activity first; `search` filters by title on
+   *  the server (Spaces F3). An empty search is not sent, so it shares the
+   *  unfiltered entry. */
+  conversations: (
+    spaceUuid: string,
+    { viewerId, search = '' }: ViewerScoped & { search?: string },
+  ) => {
     const params: SpaceConversationListParams = {
       per_page: SPACE_CONTENT_PER_PAGE,
       sort_by: 'updated_at',
       sort_order: 'desc',
+      ...(search ? { search } : {}),
     };
     return infiniteQueryOptions({
       queryKey: [
@@ -162,10 +174,24 @@ export const spacesQueries = {
     });
   },
 
-  /** The space's ROOT folders. A folder opens on its own page (`/folders/{uuid}`),
-   *  which lists its children, so the space page never sends `parent_id`. */
-  folders: (spaceUuid: string, { viewerId }: ViewerScoped) => {
-    const params: SpaceFolderListParams = { per_page: SPACE_CONTENT_PER_PAGE };
+  /**
+   * The space's folders at one level: the root, or the children of `parentId`
+   * (Spaces F3 drills down inside the tab, so the level is part of the key),
+   * filtered by `search`.
+   */
+  folders: (
+    spaceUuid: string,
+    {
+      viewerId,
+      parentId = null,
+      search = '',
+    }: ViewerScoped & { parentId?: string | null; search?: string },
+  ) => {
+    const params: SpaceFolderListParams = {
+      per_page: SPACE_CONTENT_PER_PAGE,
+      ...(parentId ? { parent_id: parentId } : {}),
+      ...(search ? { search } : {}),
+    };
     return infiniteQueryOptions({
       queryKey: [
         ...spacesQueries.contentsOf(spaceUuid),
@@ -183,8 +209,15 @@ export const spacesQueries = {
     });
   },
 
-  files: (spaceUuid: string, { viewerId }: ViewerScoped) => {
-    const params: SpaceFileListParams = { per_page: SPACE_CONTENT_PER_PAGE };
+  /** The space's files; `name` filters by file name on the server. */
+  files: (
+    spaceUuid: string,
+    { viewerId, name = '' }: ViewerScoped & { name?: string },
+  ) => {
+    const params: SpaceFileListParams = {
+      per_page: SPACE_CONTENT_PER_PAGE,
+      ...(name ? { name } : {}),
+    };
     return infiniteQueryOptions({
       queryKey: [
         ...spacesQueries.contentsOf(spaceUuid),

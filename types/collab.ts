@@ -1124,17 +1124,21 @@ export interface MemberListParams {
 
 /**
  * A space's chats (`GET /spaces/{uuid}/conversations`, backend B3). The
- * conversations list's own params, handled the same way (confirmed by backend
- * on 11 October 2026); `status` is not among them.
+ * conversations list's own params, handled the same way: page, per_page,
+ * search, status, sort_by and sort_order (B3 contract, 12 October 2026).
  */
-export type SpaceConversationListParams = Omit<ListConversationsParams, 'status'>;
+export type SpaceConversationListParams = ListConversationsParams;
 
 /** A space's folders (`GET /spaces/{uuid}/folders`, backend B3): the root
- *  folders, or the children of `parent_id` (a folder uuid). */
+ *  folders, or the children of `parent_id` (a folder uuid; one outside the
+ *  space answers 404), filtered by `search`. */
 export interface SpaceFolderListParams {
   page?: number;
   per_page?: number;
   parent_id?: string;
+  search?: string;
+  sort?: 'name' | 'created_at' | 'updated_at';
+  order?: 'asc' | 'desc';
 }
 
 /** A space's files (`GET /spaces/{uuid}/files`, backend B3), filtered by
@@ -1580,6 +1584,51 @@ export interface SpaceFile extends UserFile {
 export type SpaceConversationListResponse = LengthAwareResponse<SpaceConversation>;
 export type SpaceFolderListResponse = LengthAwareResponse<SpaceFolder>;
 export type SpaceFileListResponse = LengthAwareResponse<SpaceFile>;
+export type SpaceFileResponse = ItemResponse<SpaceFile>;
+export type SpaceFolderResponse = ItemResponse<SpaceFolder>;
+
+/**
+ * ── WRITING TO A SPACE'S CONTENTS (backend B3, cb0fae8) ────────────────────
+ * Spaces F3, 12 October 2026. Each body below carries exactly the keys the B3
+ * contract documents and nothing else; `content-model.ts` builds them and the
+ * tests pin them key by key.
+ */
+
+/** Body for `POST /spaces/{uuid}/folders`. The contract also takes
+ *  `description`, `icon` and `color`; v2 mints none of them (the folders
+ *  feature's decision 2), so they are not typed here. `is_private` defaults to
+ *  true on the server and is sent anyway, as every v2 folder create does. */
+export interface CreateSpaceFolderPayload {
+  name: string;
+  is_private: true;
+  /** A folder uuid in the same space, or omitted for a root folder. A parent
+   *  in another space answers 422. */
+  parent_id?: string;
+}
+
+/** What `DELETE /spaces/{uuid}/items` takes out of the space: a chat by its
+ *  uuid, a folder by its uuid, a file by its integer id. It never deletes the
+ *  item itself. */
+export type SpaceItemRef =
+  | { type: 'conversation'; id: string }
+  | { type: 'folder'; id: string }
+  | { type: 'file'; id: number };
+
+/**
+ * The body of every move (`PATCH /conversations/{uuid}`, `PUT /folders/{uuid}`,
+ * `PATCH /files/{id}`): the space to go into, or `null` to come back out to
+ * the owner's own items. Required on the file route, so it is always sent.
+ */
+export interface MoveToSpacePayload {
+  space_uuid: string | null;
+}
+
+/** What a move answers with: the item, of which the client reads only the
+ *  space block it now sits in (`null` once it is back out). */
+export interface MovedItem {
+  space?: ContentSpaceStub | null;
+}
+export type MoveToSpaceResponse = ItemResponse<MovedItem>;
 export type ChannelListResponse = LengthAwareResponse<Channel>;
 export type ChannelResponse = ItemResponse<Channel>;
 export type ChannelMemberListResponse = LengthAwareResponse<Member>;

@@ -1,10 +1,16 @@
 'use client';
 
 import { memo } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Boxes, Download, FolderOutput, Loader2, MoreHorizontal } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import type { SpaceFile } from '@/types/collab';
 import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
@@ -12,6 +18,7 @@ import { FileMark } from '@/v2/features/channels/files/FileMark';
 import { RelativeTime } from '@/v2/features/channels/ui/RelativeTime';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { fileTypeLabel } from '../../content-model';
 
 /**
  * SpaceFileRow — one file in a space's Files tab (Spaces F2, 11 October 2026).
@@ -26,9 +33,12 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * of those, and `FilesTab.tsx`, which owns that row, says it must not be
  * mounted anywhere else.
  *
- * ── READ-ONLY, EXCEPT FOR OPENING IT ───────────────────────────────────────
- * F2 lists; adding, moving and removing come in F3 and F4. Opening stays,
- * because a file row that cannot open its file is not a list of files.
+ * ── OPENING, AND THE SPACE ROWS (Spaces F3, 12 October 2026) ──────────────
+ * Opening is always there, because a file row that cannot open its file is
+ * not a list of files. Beside it, a menu when the host passes an action:
+ * "Move to space" for the file's uploader (its owner), "Remove from space"
+ * for the space's Owner. The meta line names the file's type, size and
+ * uploader, then its age.
  *
  * IT OPENS THROUGH THE TAP-FIRST OPENER (`useOpenFileInNewTab`, fix after
  * review, 11 October 2026). The first cut reused the channel library's
@@ -48,10 +58,16 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 export const SpaceFileRow = memo(function SpaceFileRow({
   file,
   index,
+  onMove,
+  onRemoveFromSpace,
 }: {
   file: SpaceFile;
   /** Staggers the entrance for the first screenful only. */
   index: number;
+  /** Opens the move-to-space dialog (the uploader). MUST be stable for `memo`. */
+  onMove?: (file: SpaceFile) => void;
+  /** Opens the Remove from Space confirm (the space's Owner). Stable, likewise. */
+  onRemoveFromSpace?: (file: SpaceFile) => void;
 }) {
   // Per row, deliberately: one instance shared by the list would put every
   // row's spinner on at once the moment any row was opened.
@@ -79,7 +95,7 @@ export const SpaceFileRow = memo(function SpaceFileRow({
 
           <MetaLine
             className="mt-0.5"
-            lead={[formatBytes(file.size), file.uploader.name]}
+            lead={[fileTypeLabel(file), formatBytes(file.size), file.uploader.name]}
             trail={[<RelativeTime key="age" iso={file.created_at} />]}
           />
 
@@ -129,6 +145,34 @@ export const SpaceFileRow = memo(function SpaceFileRow({
             )}
           </Button>
         )}
+
+        {onMove || onRemoveFromSpace ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                'v2-interactive flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground data-[state=open]:bg-secondary data-[state=open]:text-foreground',
+                FOCUS_RING,
+              )}
+              aria-label={`Actions for ${file.original_name}`}
+            >
+              <MoreHorizontal aria-hidden className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {onMove ? (
+                <DropdownMenuItem onSelect={() => onMove(file)}>
+                  <Boxes />
+                  Move to space
+                </DropdownMenuItem>
+              ) : null}
+              {onRemoveFromSpace ? (
+                <DropdownMenuItem onSelect={() => onRemoveFromSpace(file)}>
+                  <FolderOutput />
+                  Remove from space
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
     </li>
   );

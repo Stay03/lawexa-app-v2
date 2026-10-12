@@ -28,7 +28,7 @@ export function generateMetadata(): Metadata {
   return {
     title: 'Spaces',
     description:
-      'Your shared workrooms — channels, task lists, files and Lawexa on call.',
+      'Shared spaces for your team: conversations, folders and files.',
     robots: { index: false, follow: false },
   };
 }

@@ -17,6 +17,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { extractApiError } from '@/lib/utils/api-error';
+import { useCreateSpaceFolder } from '@/v2/features/spaces/content-mutations';
+import {
+  createFolderRefusal,
+  spaceFolderPayload,
+} from '@/v2/features/spaces/content-model';
 import { useCreateFolder, useRenameFolder } from './folder-mutations';
 import { FOLDER_DEPTH_ENCOURAGED, folderHref } from './folder-row-model';
 
@@ -43,6 +48,14 @@ import { FOLDER_DEPTH_ENCOURAGED, folderHref } from './folder-row-model';
  * The API nests without limit (eight levels probed) and filing practice says
  * three is where a tree stops helping. So a fourth level gets a quiet sentence
  * and the same working button — a warning, not a wall (decision 1).
+ *
+ * ── A FOLDER IN A SPACE (Spaces F3, 12 October 2026) ───────────────────────
+ * A create with `space` goes to `POST /spaces/{uuid}/folders` instead of
+ * `POST /folders`, with the same one field (`spaceFolderPayload`), and says
+ * who will see it: everyone in the space, not "only you". Its refusals (a
+ * Viewer's 403, a parent in another space's 422) are worded by
+ * `createFolderRefusal`. Same dialog, so making a folder reads the same
+ * wherever it happens.
  */
 
 export type FolderNameDialogIntent =
@@ -50,6 +63,8 @@ export type FolderNameDialogIntent =
       mode: 'create';
       /** The folder this one is created inside, or omitted for a root folder. */
       parent?: { uuid: string; name: string; depth: number };
+      /** The space the folder is made in, or omitted for a folder of your own. */
+      space?: { uuid: string; name: string };
     }
   | { mode: 'rename'; folder: { uuid: string; name: string } };
 
@@ -73,13 +88,18 @@ export function FolderNameDialog({
   const renameFolder = useRenameFolder(
     intent.mode === 'rename' ? intent.folder.uuid : '',
   );
+  // The same rule for the space create: always called, only fired when the
+  // intent names a space.
+  const space = intent.mode === 'create' ? intent.space : undefined;
+  const createSpaceFolder = useCreateSpaceFolder(space?.uuid ?? '');
 
   const [name, setName] = useState(
     intent.mode === 'rename' ? intent.folder.name : '',
   );
   const [error, setError] = useState<string | null>(null);
 
-  const submitting = createFolder.isPending || renameFolder.isPending;
+  const submitting =
+    createFolder.isPending || renameFolder.isPending || createSpaceFolder.isPending;
   const trimmed = name.trim();
   const unchanged = intent.mode === 'rename' && trimmed === intent.folder.name.trim();
   const canSubmit = trimmed.length > 0 && !submitting && !unchanged;
@@ -103,6 +123,22 @@ export function FolderNameDialog({
         { name: trimmed },
         { onSuccess: () => onOpenChange(false), onError },
       );
+      return;
+    }
+
+    if (space) {
+      createSpaceFolder.mutate(spaceFolderPayload(trimmed, intent.parent?.uuid ?? null), {
+        onSuccess: (envelope) => {
+          onOpenChange(false);
+          toast.success('Folder created', {
+            description: `“${envelope.data.name}” is in ${space.name}.`,
+          });
+        },
+        onError: (mutationError) => {
+          const apiError = extractApiError(mutationError);
+          setError(createFolderRefusal(apiError.status, apiError.message));
+        },
+      });
       return;
     }
 
@@ -145,9 +181,13 @@ export function FolderNameDialog({
             <DialogDescription>
               {isRename
                 ? 'Everything filed inside stays where it is.'
-                : parentName
-                  ? `Inside “${parentName}”. Only you can see it.`
-                  : 'Group the cases, statutes and notes for one matter in one place. Only you can see it.'}
+                : space
+                  ? parentName
+                    ? `Inside “${parentName}”. Everyone in ${space.name} can open it.`
+                    : `Everyone in ${space.name} can open it.`
+                  : parentName
+                    ? `Inside “${parentName}”. Only you can see it.`
+                    : 'Group the cases, statutes and notes for one matter in one place. Only you can see it.'}
             </DialogDescription>
           </DialogHeader>
 

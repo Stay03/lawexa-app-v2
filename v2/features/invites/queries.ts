@@ -12,6 +12,8 @@ import type {
   CreateInviteLinkPayload,
   DiscoverSpacesParams,
 } from '@/types/collab';
+import { channelsQueries } from '@/v2/features/channels/queries';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 
 /**
  * Queries and mutations for invite links, the two waiting lists, and browsing
@@ -84,6 +86,13 @@ export function useChannelJoinRequests(channelUuid: string, enabled = true) {
  * list still showing the old count beside a queue that just shrank reads as a
  * failure. Approving a request that carries `also_joins_channel` adds them to
  * that channel as well, so its roster goes with it.
+ *
+ * THROUGH THE QUERY FACTORIES' OWN HANDLES (fix, Spaces F3, 12 October 2026).
+ * This used to invalidate `['space', uuid]` and `['channel', uuid]`, keys no
+ * query has: the space's detail and roster live under `['spaces', 'detail' |
+ * 'members', uuid]` and the channel's under `['channels', …]`, so an approval
+ * refreshed the queue and left the roster and the member count stale. The
+ * spaces list goes too, since its rows carry the member count.
  */
 export function useDecideJoinRequest(
   kind: 'space' | 'channel',
@@ -107,8 +116,14 @@ export function useDecideJoinRequest(
           ? inviteKeys.spaceRequests(parentUuid)
           : inviteKeys.channelRequests(parentUuid);
       void client.invalidateQueries({ queryKey: key });
-      void client.invalidateQueries({ queryKey: ['space', parentUuid] });
-      void client.invalidateQueries({ queryKey: ['channel', parentUuid] });
+      if (kind === 'space') {
+        void client.invalidateQueries({ queryKey: spacesQueries.detailsOf(parentUuid) });
+        void client.invalidateQueries({ queryKey: spacesQueries.membersOf(parentUuid) });
+        void client.invalidateQueries({ queryKey: spacesQueries.lists() });
+        return;
+      }
+      void client.invalidateQueries({ queryKey: channelsQueries.detailsOf(parentUuid) });
+      void client.invalidateQueries({ queryKey: channelsQueries.membersOf(parentUuid) });
     },
   });
 }

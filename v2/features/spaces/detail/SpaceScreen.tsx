@@ -96,13 +96,14 @@ import {
  * ── ONE SPACE, FOUR TABS (Spaces F2, 11 October 2026) ──────────────────────
  * Stay decided that one Space holds chats, folders and files for every
  * member, and that channels stay with team spaces, for researchers and above.
- * So under the identity block the page is a tab strip: Chats, Folders and
- * Files for every member, read-only lists until F3 and F4 add to them, and
- * first of all a Channels tab holding the lobby above (the activity digest,
+ * So under the identity block the page is a tab strip: Conversations, Folders
+ * and Files for every member (F3 lets the Owner and Contributors add to them,
+ * see `SpaceContentPanel`), and first of all a Channels tab holding the lobby
+ * above (the activity digest,
  * the people, the facts) wherever the space shows its channels to this viewer
  * (`scope.showsChannels`, the frame's answer, so the tab and the rail can
  * never disagree). A team space seen by a researcher opens on Channels, so
- * nothing changes for the team; everyone else opens on Chats.
+ * nothing changes for the team; everyone else opens on Conversations.
  *
  * THE TAB IS IN THE URL, QUIETLY (`?tab=`, the radar screen's idiom): read
  * once from the address, then held here and written back with a quiet

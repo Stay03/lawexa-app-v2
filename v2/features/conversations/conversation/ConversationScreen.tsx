@@ -210,9 +210,10 @@ export function ConversationScreen({
         {controller.isConfidential && (
           <ConfidentialBanner onDelete={controller.deleteConfidential} />
         )}
-        {/* The owner's "Share chat" and "Delete chat" rows in the header menu.
-            Not inside another route (the case side chat has its own header).
-            Share is never on a confidential or redacted chat; delete is never
+        {/* The owner's "Share chat", "Move to space" and "Delete chat" rows in
+            the header menu, and the space line under the title. Not inside
+            another route (the case side chat has its own header). Share and
+            Move are never on a confidential or redacted chat; delete is never
             on a confidential one, whose banner owns the device-only delete. */}
         {!embed ? (
           <ConversationActions
@@ -224,6 +225,13 @@ export function ConversationScreen({
               !controller.isConfidential &&
               !controller.isRedacted
             }
+            canMove={
+              controller.isOwnerResolved &&
+              controller.isOwner &&
+              !controller.isConfidential &&
+              !controller.isRedacted
+            }
+            canShowPlace={controller.isOwnerResolved && !controller.isConfidential}
             canDelete={
               controller.isOwnerResolved &&
               controller.isOwner &&

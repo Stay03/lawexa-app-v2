@@ -25,9 +25,16 @@ import type { UploadEntry, UploadQueue } from './use-upload-queue';
  *    An indeterminate shimmer, because there is genuinely nothing left to
  *    measure, and a bar parked at 100 % reads as a hang;
  *  - `failed`    — the server's own sentence, with Retry and Dismiss;
- *  - `rejected`  — refused before it was sent (wrong type, over 15 MB), so it
- *    gets the reason and Dismiss but NO Retry: retrying an unsupported file
+ *  - `rejected`  — refused before it was sent (wrong type, over 15 MB), or by
+ *    a server rule that will answer the same again (a space's 422 or 403), so
+ *    it gets the reason and Dismiss but NO Retry: retrying an unsupported file
  *    spends a round trip to be told exactly the same thing.
+ *
+ * ── TWO PLACEMENTS ─────────────────────────────────────────────────────────
+ * `docked` (the default) is the channel panel's strip along the bottom edge.
+ * `inline` is a space's Files tab (Spaces F3), where the pane scrolls and
+ * there is no bottom edge to dock to: the same rows in a bordered card at the
+ * top of the list, so the file being added sits where it is about to appear.
  *
  * ── FAILURE IS NOT AN ALARM ────────────────────────────────────────────────
  * The destructive tint colours the GLYPH and nothing else; the sentence stays
@@ -153,7 +160,13 @@ function UploadRow({
   );
 }
 
-export function UploadTray({ queue }: { queue: UploadQueue }) {
+export function UploadTray({
+  queue,
+  placement = 'docked',
+}: {
+  queue: UploadQueue;
+  placement?: 'docked' | 'inline';
+}) {
   const { entries } = queue;
   const visible = entries.length > 0;
   const settledCount = entries.filter(
@@ -173,7 +186,13 @@ export function UploadTray({ queue }: { queue: UploadQueue }) {
       )}
     >
       <div className="overflow-hidden">
-        <div className="border-t bg-background/95 px-4 py-2 backdrop-blur">
+        <div
+          className={
+            placement === 'docked'
+              ? 'border-t bg-background/95 px-4 py-2 backdrop-blur'
+              : 'mb-3 rounded-xl border bg-card px-3 py-2'
+          }
+        >
           <div className="mx-auto w-full max-w-3xl">
             <div className="flex items-center justify-between gap-2 pb-1">
               <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

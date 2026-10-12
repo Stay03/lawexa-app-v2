@@ -1,0 +1,279 @@
+import type {
+  ContentSpaceStub,
+  CreateSpaceFolderPayload,
+  MoveToSpacePayload,
+  Space,
+  SpaceItemRef,
+} from '@/types/collab';
+import {
+  ACCEPTED_FILE_TYPES,
+  ALLOWED_FILE_TYPES,
+  MAX_DOCUMENT_SIZE,
+} from '@/v2/features/conversations/attachment-rules';
+import { canAddContent, type SpaceTab } from './model';
+
+/**
+ * content-model — the pure rules of writing to a space's contents (Spaces F3,
+ * 12 October 2026, backend B3 cb0fae8): who may add, take out and move, the
+ * exact request bodies, and the sentences each refusal is answered with. No
+ * JSX, no hooks, so the Files tab, the row menus and the move dialog all read
+ * the same answers, and the tests pin them without a browser.
+ *
+ * ── THREE ROLES, THREE VERBS ───────────────────────────────────────────────
+ *  - ADD (a folder, a file): the space's Owner and Contributors
+ *    (`canAddContent`, F2). A Viewer gets no button, because the server
+ *    answers 403.
+ *  - TAKE OUT ("Remove from space"): the space's Owner only, on anyone's
+ *    item. It never deletes the item: it goes back to the person who owns it.
+ *  - MOVE (into a space, or back out): the item's own owner, into a space
+ *    where they are Owner or Contributor.
+ */
+
+/** The three kinds of item a space holds. */
+export type SpaceItemKind = SpaceItemRef['type'];
+
+/** The space's content tabs; `channels` is the lobby and holds no items. */
+export type SpaceContentTab = Exclude<SpaceTab, 'channels'>;
+
+/** Whether the viewer may take items out of this space: its content Owner. */
+export function canRemoveFromSpace(space: Pick<Space, 'my_content_role'>): boolean {
+  return space.my_content_role === 'owner';
+}
+
+/** Whether the viewer owns an item, read off the owner id the row carries
+ *  (a chat's author, a folder's user, a file's uploader). An unknown viewer
+ *  or an unknown owner is "no", so no menu offers a move that would 403. */
+export function ownsItem(
+  ownerId: number | null | undefined,
+  viewerId: number | null,
+): boolean {
+  return viewerId !== null && ownerId === viewerId;
+}
+
+/**
+ * The spaces a move may go into: those where the viewer may add (Owner or
+ * Contributor). The space the item is already in stays in the list, so the
+ * picker can mark it rather than leave the reader wondering where it went.
+ */
+export function moveTargets(spaces: readonly Space[]): Space[] {
+  return spaces.filter((space) => canAddContent(space));
+}
+
+/* ── Request bodies, exactly the documented keys ──────────────────────────── */
+
+/** `POST /spaces/{uuid}/folders`: the name, private, and the parent when the
+ *  folder is made inside another one. */
+export function spaceFolderPayload(
+  name: string,
+  parentUuid: string | null,
+): CreateSpaceFolderPayload {
+  return parentUuid
+    ? { name: name.trim(), is_private: true, parent_id: parentUuid }
+    : { name: name.trim(), is_private: true };
+}
+
+/** `DELETE /spaces/{uuid}/items`: `type` and `id`, copied key by key so
+ *  nothing else the caller's object carries can ride along. */
+export function spaceItemRef(item: SpaceItemRef): SpaceItemRef {
+  switch (item.type) {
+    case 'conversation':
+      return { type: 'conversation', id: item.id };
+    case 'folder':
+      return { type: 'folder', id: item.id };
+    case 'file':
+      return { type: 'file', id: item.id };
+  }
+}
+
+/** Every move's body: the space to go into, or `null` to come back out. */
+export function movePayload(spaceUuid: string | null): MoveToSpacePayload {
+  return { space_uuid: spaceUuid };
+}
+
+/* ── The item a menu acts on ──────────────────────────────────────────────── */
+
+/**
+ * What the move dialog and the remove confirm need about an item: how to
+ * address it, what to call it, and the space it sits in. `space` is `null`
+ * when the item is known to be its owner's alone, and `undefined` when the
+ * payload did not say (the folder page: `GET /folders/{uuid}` carries no
+ * space), which the dialog treats as "may be in one".
+ */
+export type SpaceItemTarget = SpaceItemRef & {
+  name: string;
+  space?: ContentSpaceStub | null;
+};
+
+/** The noun each kind is called in a sentence. */
+export const SPACE_ITEM_NOUN: Readonly<Record<SpaceItemKind, string>> = {
+  conversation: 'conversation',
+  folder: 'folder',
+  file: 'file',
+};
+
+/* ── Refusals, in plain words ─────────────────────────────────────────────── */
+
+/**
+ * Why a move was refused, for the dialog to show in place. Keyed on the
+ * status and the kind, because the same status means different things per
+ * route (B3): a chat's 422 is a confidential or redacted chat (or a space
+ * that does not exist, which the picker never offers); a folder's 422 is a
+ * parent in another space, which the server's sentence names best.
+ */
+export function moveRefusal(
+  kind: SpaceItemKind,
+  status: number,
+  serverMessage: string | null,
+): string {
+  if (status === 422 && kind === 'conversation') {
+    return 'Confidential chats can’t go into a space.';
+  }
+  if (status === 422) {
+    return serverMessage?.trim() || 'This can’t go into that space.';
+  }
+  if (status === 403) {
+    return 'You can only move your own items, into a space where you are an Owner or Contributor.';
+  }
+  if (status === 404) {
+    return `This ${SPACE_ITEM_NOUN[kind]} is no longer available to move.`;
+  }
+  return 'Couldn’t move it. Please try again.';
+}
+
+/** Why a Remove from Space was refused (B3: 403 for anyone but the space's
+ *  Owner, 404 when the item is no longer in the space). */
+export function removeRefusal(status: number): string {
+  if (status === 403) return 'Only the space’s Owner can remove items from it.';
+  if (status === 404) return 'This is no longer in the space.';
+  return 'Couldn’t remove it. Please try again.';
+}
+
+/** Why a new folder was refused: a Viewer (403), or the server's own reason
+ *  for a name or parent it would not take (422). */
+export function createFolderRefusal(status: number, serverMessage: string | null): string {
+  if (status === 403) return 'Only the Owner and Contributors can add folders here.';
+  if (status === 422) return serverMessage?.trim() || 'That folder can’t be made here.';
+  return 'Couldn’t make the folder. Please try again.';
+}
+
+/**
+ * What an upload's row says when the server refused it, and whether Retry
+ * could help. The rules refusal (422) carries its reason under
+ * `errors.file`, which names the problem better than the envelope's generic
+ * message; it and a Viewer's 403 would be answered the same again, so they
+ * get no Retry. A dropped connection or a 5xx keeps one.
+ */
+export function uploadRefusal(
+  status: number,
+  fieldMessage: string | null,
+  serverMessage: string | null,
+): { message: string; retryable: boolean } {
+  if (status === 422) {
+    return {
+      message: fieldMessage?.trim() || serverMessage?.trim() || 'This file can’t be added.',
+      retryable: false,
+    };
+  }
+  if (status === 413) return { message: 'This file is too large to upload.', retryable: false };
+  if (status === 403) {
+    return {
+      message: 'Only the Owner and Contributors can add files here.',
+      retryable: false,
+    };
+  }
+  return { message: 'The upload didn’t finish. Please try again.', retryable: true };
+}
+
+/** The extensions the document upload rules take, from the one `accept`
+ *  string the chat composer already uses, so the two cannot drift. */
+const ACCEPTED_EXTENSIONS: readonly string[] = ACCEPTED_FILE_TYPES.split(',').map(
+  (extension) => extension.replace('.', '').toLowerCase(),
+);
+
+/**
+ * Check a file against the document upload rules before it is sent (B3:
+ * "the document upload rules", the ones `POST /files/documents` runs). The
+ * server stays the judge and its 422 is shown in place too; this only spares
+ * the reader a wait to be told something knowable now. The extension is
+ * checked as well as the type, because some systems send `.rtf` with no type.
+ */
+export function uploadPrecheck(file: Pick<File, 'name' | 'type' | 'size'>): string | null {
+  const extension = file.name.toLowerCase().split('.').pop() ?? '';
+  const typeKnown = file.type !== '' && ALLOWED_FILE_TYPES.includes(file.type);
+  if (!typeKnown && !ACCEPTED_EXTENSIONS.includes(extension)) {
+    return `“${file.name}” can’t be added. A space takes PDF, Word, RTF and image files (JPG, PNG, WebP).`;
+  }
+  if (file.size > MAX_DOCUMENT_SIZE) {
+    return `“${file.name}” is larger than 10 MB, the most a space takes.`;
+  }
+  return null;
+}
+
+/* ── Labels ───────────────────────────────────────────────────────────────── */
+
+/** A file's type in one word, for its row: what the reader would call it. */
+export function fileTypeLabel(file: { mime_type: string; original_name: string }): string {
+  const extension = file.original_name.toLowerCase().split('.').pop() ?? '';
+  const mime = file.mime_type.toLowerCase();
+  if (extension === 'pdf' || mime === 'application/pdf') return 'PDF';
+  if (['doc', 'docx'].includes(extension) || mime.includes('word')) return 'Word';
+  if (extension === 'rtf' || mime.includes('rtf')) return 'RTF';
+  if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension)) {
+    return 'Image';
+  }
+  return extension && extension !== file.original_name.toLowerCase()
+    ? extension.toUpperCase()
+    : 'File';
+}
+
+/**
+ * What an empty content tab says (design round 0, 12 October 2026). An Owner
+ * or Contributor gets Stay's lines, adapted per tab, with the way to add
+ * beside them. A Viewer cannot add, so "Members can add" would point at
+ * something they cannot do: they get a plain line about who fills it, and no
+ * button.
+ */
+export function spaceEmptyCopy(
+  tab: SpaceContentTab,
+  canAdd: boolean,
+): { title: string; description: string } {
+  if (canAdd) {
+    switch (tab) {
+      case 'chats':
+        return {
+          title: 'Members can add to this space',
+          description:
+            'What’s here is organised for the whole team. Open one of your conversations and choose Move to space.',
+        };
+      case 'folders':
+        return {
+          title: 'Members can add to this space',
+          description:
+            'What’s here is organised for the whole team. Folders you add here are shared with everyone in this space.',
+        };
+      case 'files':
+        return {
+          title: 'Members can add to this space',
+          description:
+            'What’s here is organised for the whole team. Files you add here are shared with everyone in this space.',
+        };
+    }
+  }
+  switch (tab) {
+    case 'chats':
+      return {
+        title: 'Nothing here yet',
+        description: 'Members who can add will put shared conversations here.',
+      };
+    case 'folders':
+      return {
+        title: 'Nothing here yet',
+        description: 'Members who can add will put shared folders here.',
+      };
+    case 'files':
+      return {
+        title: 'Nothing here yet',
+        description: 'Members who can add will put shared files here.',
+      };
+  }
+}

@@ -37,15 +37,24 @@ import { folderCountsLabel, type FolderRowModel } from '../folder-row-model';
  * memoises at the list level.
  *
  * A SPACE'S FOLDERS TAB (Spaces F2, 11 October 2026) draws the same row with
- * no `onRename`: those folders may belong to other members, renaming and
- * deleting stay with each folder's owner, and the space list is read-only
- * until F3. No `onRename`, no actions menu.
+ * no `onRename`: those folders may belong to other members, and renaming and
+ * deleting stay with each folder's owner.
+ *
+ * ── IN A SPACE, THE ROW OPENS A LEVEL (Spaces F3, 12 October 2026) ────────
+ * The space's tab browses its folders one level at a time (`parent_id`), so
+ * there it passes `onOpen` and the identity block becomes a BUTTON that goes
+ * down a level inside the tab, instead of a link away to the folder page. The
+ * menu carries the space rows its host passes: `onMove` (the folder's owner)
+ * and `onRemoveFromSpace` (the space's Owner). No actions, no menu.
  */
 export const FolderRow = memo(function FolderRow({
   row,
   index,
   now,
   onRename,
+  onMove,
+  onRemoveFromSpace,
+  onOpen,
 }: {
   row: FolderRowModel;
   /** Staggers the entrance for the first screenful only. */
@@ -54,10 +63,66 @@ export const FolderRow = memo(function FolderRow({
    *  `useState` so no `Date.now()` runs in render (React Compiler lint). */
   now: number;
   /** Opens the list's rename dialog for this folder. MUST be stable, or the
-   *  `memo` above stops holding. Absent = no actions menu. */
+   *  `memo` above stops holding. Present = Rename and Delete in the menu. */
   onRename?: (row: FolderRowModel) => void;
+  /** Opens the move-to-space dialog for this folder. Stable, like `onRename`. */
+  onMove?: (row: FolderRowModel) => void;
+  /** Opens the Remove from Space confirm. Stable, like `onRename`. */
+  onRemoveFromSpace?: (row: FolderRowModel) => void;
+  /** Goes down into this folder inside the host (a space's tab) instead of
+   *  linking to its page. Stable, like `onRename`. */
+  onOpen?: (row: FolderRowModel) => void;
 }) {
   const trail = formatRelativeTime(row.trailAt, now);
+  const hasMenu =
+    onRename !== undefined || onMove !== undefined || onRemoveFromSpace !== undefined;
+  const identityClass = cn(
+    'v2-interactive flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-secondary/50',
+    FOCUS_RING,
+  );
+  const identity = (
+    <>
+      <FolderTile tint={row.tint} />
+
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            'block truncate text-[15px] font-medium transition-colors group-hover:text-primary',
+            // An unnamed folder wears its fallback in a quieter voice: the
+            // word is the absence of a name, not a name.
+            row.hasName ? 'text-foreground' : 'italic text-muted-foreground',
+          )}
+          title={row.name}
+        >
+          {row.name}
+        </span>
+
+        <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+          {/* LEAD — what the folder holds. */}
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="min-w-0 truncate tabular-nums">
+              {folderCountsLabel(row.itemsCount, row.childrenCount)}
+            </span>
+            {row.isPublic ? (
+              <>
+                <span aria-hidden className="shrink-0 text-muted-foreground/40">
+                  ·
+                </span>
+                <FolderPublicMark />
+              </>
+            ) : null}
+          </span>
+
+          {/* TRAIL — right-anchored, and honest about which time it is. */}
+          {trail ? (
+            <span className="shrink-0 tabular-nums">
+              {row.trailKind} {trail}
+            </span>
+          ) : null}
+        </span>
+      </span>
+    </>
+  );
 
   return (
     <li
@@ -66,59 +131,21 @@ export const FolderRow = memo(function FolderRow({
       style={{ animationDelay: `${Math.min(index, 14) * 25}ms` }}
     >
       <div className="group relative flex min-w-0 items-start gap-2">
-        <Link
-          href={row.href}
-          className={cn(
-            'v2-interactive flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50',
-            FOCUS_RING,
-          )}
-        >
-          <FolderTile tint={row.tint} />
-
-          <span className="min-w-0 flex-1">
-            <span
-              className={cn(
-                'block truncate text-[15px] font-medium transition-colors group-hover:text-primary',
-                // An unnamed folder wears its fallback in a quieter voice: the
-                // word is the absence of a name, not a name.
-                row.hasName ? 'text-foreground' : 'italic text-muted-foreground',
-              )}
-              title={row.name}
-            >
-              {row.name}
-            </span>
-
-            <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
-              {/* LEAD — what the folder holds. */}
-              <span className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="min-w-0 truncate tabular-nums">
-                  {folderCountsLabel(row.itemsCount, row.childrenCount)}
-                </span>
-                {row.isPublic ? (
-                  <>
-                    <span aria-hidden className="shrink-0 text-muted-foreground/40">
-                      ·
-                    </span>
-                    <FolderPublicMark />
-                  </>
-                ) : null}
-              </span>
-
-              {/* TRAIL — right-anchored, and honest about which time it is. */}
-              {trail ? (
-                <span className="shrink-0 tabular-nums">
-                  {row.trailKind} {trail}
-                </span>
-              ) : null}
-            </span>
-          </span>
-        </Link>
+        {onOpen ? (
+          <button type="button" onClick={() => onOpen(row)} className={identityClass}>
+            {identity}
+          </button>
+        ) : (
+          <Link href={row.href} className={identityClass}>
+            {identity}
+          </Link>
+        )}
 
         {/* Outside the link. `mt-3.5` = the link's `py-3` plus the tile's
             `mt-0.5`, so the trigger and the tile sit on the same baseline and
             the row reads as one bar between two anchors (the arithmetic
             `BookmarkRow` and `NoteRow` both document). */}
-        {onRename ? (
+        {hasMenu ? (
           <FolderActionsMenu
             folder={{
               uuid: row.uuid,
@@ -126,7 +153,9 @@ export const FolderRow = memo(function FolderRow({
               itemsCount: row.itemsCount,
               childrenCount: row.childrenCount,
             }}
-            onRename={() => onRename(row)}
+            onRename={onRename ? () => onRename(row) : undefined}
+            onMove={onMove ? () => onMove(row) : undefined}
+            onRemoveFromSpace={onRemoveFromSpace ? () => onRemoveFromSpace(row) : undefined}
             className="mt-3.5"
           />
         ) : null}

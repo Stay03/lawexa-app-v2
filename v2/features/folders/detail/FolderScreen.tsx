@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Boxes, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ import {
 } from '../folder-mutations';
 import { FolderPublicMark, FolderTile } from '../folder-bits';
 import { FolderNameDialog } from '../FolderNameDialog';
+import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { FolderRow } from '../list/FolderRow';
 import { FoldersSignedOutState } from '../list/states';
 import { FolderBreadcrumb } from './FolderBreadcrumb';
@@ -153,6 +154,9 @@ function FolderBody({ uuid }: { uuid: string }) {
     uuid: string;
     name: string;
   } | null>(null);
+  // Move to space (Spaces F3). Held after closing so the dialog's exit plays;
+  // each open bumps the key, so it starts clean.
+  const [move, setMove] = useState({ open: false, key: 0 });
 
   const folderQuery = useQuery({
     ...foldersQueries.detail({ uuid, viewerId }),
@@ -302,6 +306,10 @@ function FolderBody({ uuid }: { uuid: string }) {
    * opens BEFORE the request, so nothing has been sent while it is open. The
    * list row keeps the menu component unchanged; only this page folds.
    *
+   * MOVE TO SPACE JOINS THEM FOR THE FOLDER'S OWNER (Spaces F3). A member of a
+   * space can open another member's folder here, and moving it is not theirs
+   * to do, so the row waits for `folder.user` to name the viewer.
+   *
    * THE WAY BACK IS PUBLISHED WITH THEM, because a nested folder's parent is a
    * fact about the payload and not about the address. `null` until the folder
    * lands, which leaves the route default (`/folders`) standing rather than
@@ -330,6 +338,7 @@ function FolderBody({ uuid }: { uuid: string }) {
     // The dialog opens on the REAL name, so a folder saved blank offers an
     // empty field to type into rather than the words "Untitled folder".
     const editableName = headerRow.hasName ? headerRow.name : '';
+    const owned = viewerId !== null && folder.user?.id === viewerId;
     return [
       {
         id: 'rename',
@@ -338,6 +347,16 @@ function FolderBody({ uuid }: { uuid: string }) {
         onSelect: () =>
           setRenameTarget({ uuid: target.uuid, name: editableName }),
       },
+      ...(owned
+        ? [
+            {
+              id: 'move-to-space',
+              label: 'Move to space',
+              icon: Boxes,
+              onSelect: () => setMove((previous) => ({ open: true, key: previous.key + 1 })),
+            },
+          ]
+        : []),
       {
         id: 'delete',
         label: 'Delete folder',
@@ -351,7 +370,7 @@ function FolderBody({ uuid }: { uuid: string }) {
         },
       },
     ];
-  }, [folder, headerRow, parentFolder, deleteFolder, router]);
+  }, [folder, headerRow, parentFolder, deleteFolder, router, viewerId]);
 
   useEffect(() => {
     setScreenContext({ pathname, back, actions });
@@ -699,6 +718,16 @@ function FolderBody({ uuid }: { uuid: string }) {
             if (!open) setRenameTarget(null);
           }}
           intent={{ mode: 'rename', folder: renameTarget }}
+        />
+      ) : null}
+      {move.key > 0 ? (
+        <MoveToSpaceDialog
+          key={move.key}
+          // `GET /folders/{uuid}` carries no space (backend B3), so `space` is
+          // left unknown and the dialog offers "Remove from space" as well.
+          item={{ type: 'folder', id: folder.uuid, name: row.name }}
+          open={move.open}
+          onOpenChange={(open) => setMove((previous) => ({ ...previous, open }))}
         />
       ) : null}
     </div>

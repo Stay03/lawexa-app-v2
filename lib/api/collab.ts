@@ -25,6 +25,7 @@ import type {
   CreateInviteLinkPayload,
   CreateListPayload,
   CreateOrganizationPayload,
+  CreateSpaceFolderPayload,
   CreateSpacePayload,
   CreateThreadPayload,
   DiscoverSpacesParams,
@@ -43,6 +44,8 @@ import type {
   MessageListResponse,
   MessageRepliesResponse,
   MessageResponse,
+  MoveToSpacePayload,
+  MoveToSpaceResponse,
   MyOrganizationResponse,
   Organization,
   NotifyLevelPayload,
@@ -61,8 +64,11 @@ import type {
   SpaceConversationListResponse,
   SpaceFileListParams,
   SpaceFileListResponse,
+  SpaceFileResponse,
   SpaceFolderListParams,
   SpaceFolderListResponse,
+  SpaceFolderResponse,
+  SpaceItemRef,
   SpaceInvitationListResponse,
   SpaceListParams,
   SpaceListResponse,
@@ -202,6 +208,7 @@ export const spacesApi = {
       {
         params: {
           search: params.search || undefined,
+          status: params.status || undefined,
           sort_by: params.sort_by || undefined,
           sort_order: params.sort_order || undefined,
           per_page: params.per_page ?? 15,
@@ -221,6 +228,9 @@ export const spacesApi = {
       {
         params: {
           parent_id: params.parent_id || undefined,
+          search: params.search || undefined,
+          sort: params.sort || undefined,
+          order: params.order || undefined,
           per_page: params.per_page ?? 20,
           page: params.page ?? 1,
         },
@@ -243,6 +253,80 @@ export const spacesApi = {
           page: params.page ?? 1,
         },
       }
+    );
+    return response.data;
+  },
+
+  /**
+   * ── ADDING TO A SPACE, AND TAKING OUT (backend B3, cb0fae8) ───────────────
+   * Spaces F3, 12 October 2026. The Owner and Contributors add; a Viewer is
+   * refused with 403. Only the space's Owner takes an item out (403 for
+   * anyone else, 404 when it is not in the space), and taking out never
+   * deletes the item: it goes back to the person who owns it.
+   */
+
+  /**
+   * Make a folder in the space (`201`). `parent_id` names a folder in the same
+   * space; one in another space answers 422.
+   */
+  createFolder: async (
+    spaceUuid: string,
+    payload: CreateSpaceFolderPayload
+  ): Promise<SpaceFolderResponse> => {
+    const response = await apiClient.post<SpaceFolderResponse>(
+      `/spaces/${spaceUuid}/folders`,
+      payload
+    );
+    return response.data;
+  },
+
+  /**
+   * Upload one file into the space (multipart, field `file`, the document
+   * upload rules; `201` with `space` and `uploader`). A file the rules refuse
+   * (type or size) answers 422 with the reason under `errors.file`.
+   *
+   * `onProgress(sent, total)` reports bytes put on the wire, as the channel
+   * upload's does: at `sent === total` the server is still storing the file,
+   * so the caller waits for the promise before calling it done. `signal`
+   * aborts the request (the upload tray's Cancel).
+   */
+  uploadFile: async (
+    spaceUuid: string,
+    file: File,
+    options: {
+      onProgress?: (sent: number, total: number) => void;
+      signal?: AbortSignal;
+    } = {}
+  ): Promise<SpaceFileResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<SpaceFileResponse>(
+      `/spaces/${spaceUuid}/files`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        signal: options.signal,
+        onUploadProgress: options.onProgress
+          ? (event) => {
+              // `event.total` is absent on some transports; the file's own
+              // size is the honest denominator.
+              options.onProgress?.(event.loaded, event.total ?? file.size);
+            }
+          : undefined,
+      }
+    );
+    return response.data;
+  },
+
+  /** Take one item out of the space (`200`, `data: null`). The item itself is
+   *  untouched. The body travels on a DELETE, as `foldersApi.removeItem`'s does. */
+  removeItem: async (
+    spaceUuid: string,
+    item: SpaceItemRef
+  ): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(
+      `/spaces/${spaceUuid}/items`,
+      { data: item }
     );
     return response.data;
   },
@@ -312,6 +396,50 @@ export const spacesApi = {
   ): Promise<MemberResponse> => {
     const response = await apiClient.post<MemberResponse>(
       `/spaces/${uuid}/transfer-ownership`,
+      payload
+    );
+    return response.data;
+  },
+};
+
+/**
+ * Moving an item the viewer owns into a space, or back out (`space_uuid:
+ * null`), backend B3. Each lives on the item's own route, so each answers
+ * with the item and the space block it now sits in. The refusals the move
+ * dialog explains: a confidential or redacted chat 422; someone else's chat
+ * 404, someone else's folder or file 403; a space the viewer may not add to
+ * 403; a folder under a parent in another space 422.
+ */
+export const spaceMovesApi = {
+  moveConversation: async (
+    conversationId: string,
+    payload: MoveToSpacePayload
+  ): Promise<MoveToSpaceResponse> => {
+    const response = await apiClient.patch<MoveToSpaceResponse>(
+      `/conversations/${conversationId}`,
+      payload
+    );
+    return response.data;
+  },
+
+  moveFolder: async (
+    folderUuid: string,
+    payload: MoveToSpacePayload
+  ): Promise<MoveToSpaceResponse> => {
+    const response = await apiClient.put<MoveToSpaceResponse>(
+      `/folders/${encodeURIComponent(folderUuid)}`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** NEW in B3. `space_uuid` is required on this route, `null` included. */
+  moveFile: async (
+    fileId: number,
+    payload: MoveToSpacePayload
+  ): Promise<MoveToSpaceResponse> => {
+    const response = await apiClient.patch<MoveToSpaceResponse>(
+      `/files/${fileId}`,
       payload
     );
     return response.data;

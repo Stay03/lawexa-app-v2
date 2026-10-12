@@ -162,7 +162,7 @@ const KIND_CHOICES: readonly Choice<SpaceKind>[] = [
     value: 'shared',
     icon: FolderOpen,
     title: 'Shared space',
-    description: 'Chats, folders and files you share with the people you invite. Always private.',
+    description: 'Conversations, folders and files you share with the people you invite. Always private.',
   },
   {
     value: 'team',

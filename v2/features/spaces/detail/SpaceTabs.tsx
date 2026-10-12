@@ -6,7 +6,7 @@ import { TabRow } from '@/v2/shell/TabRow';
 import { SPACE_TAB_LABELS, spaceTabs, type SpaceTab } from '../model';
 
 /**
- * SpaceTabs — Channels / Chats / Folders / Files on a space's page (Spaces F2,
+ * SpaceTabs — Channels / Conversations / Folders / Files on a space's page (Spaces F2,
  * 11 October 2026), on the shared `TabRow` so the strip keeps the one APG
  * tablist contract every v2 tab row keeps (roving tabindex, manual activation,
  * arrows, Home/End). No keyboard or aria logic lives here.
@@ -65,7 +65,7 @@ export function SpaceTabsSkeleton({ showsChannels }: { showsChannels: boolean })
   return (
     <Skeleton
       aria-hidden
-      className={cn('h-9 rounded-full', showsChannels ? 'w-72' : 'w-52')}
+      className={cn('h-9 rounded-full', showsChannels ? 'w-80' : 'w-64')}
     />
   );
 }

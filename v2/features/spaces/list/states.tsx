@@ -99,7 +99,7 @@ const EMPTY_COPY: Record<
     icon: Boxes,
     title: 'Create your first space',
     description:
-      'A space is a shared workroom — channels for messages, task lists, files, and Lawexa on call. Start one for your team or your study group, or accept an invitation to join someone else’s.',
+      'A space holds conversations, folders and files for everyone in it. Start one for your team or your study group, or accept an invitation to join someone else’s.',
   },
   work: {
     icon: Briefcase,

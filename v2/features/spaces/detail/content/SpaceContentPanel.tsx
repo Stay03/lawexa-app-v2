@@ -1,44 +1,90 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import { ChevronLeft, FolderOpen, Plus, Upload } from 'lucide-react';
 
+import { cn, stripPastedTags } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { SpaceConversation, SpaceFile, SpaceFolder } from '@/types/collab';
+import { UploadTray } from '@/v2/features/channels/files/UploadTray';
+import {
+  useUploadQueueFor,
+  type UploadFailureNote,
+} from '@/v2/features/channels/files/use-upload-queue';
 import { collabAccessState } from '@/v2/features/collab/model';
+import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
+import { ACCEPTED_FILE_TYPES } from '@/v2/features/conversations/attachment-rules';
 import { ConversationRow } from '@/v2/features/conversations/list/ConversationRow';
-import { folderRow } from '@/v2/features/folders/folder-row-model';
+import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
+import {
+  folderHref,
+  folderRow,
+  type FolderRowModel,
+} from '@/v2/features/folders/folder-row-model';
 import { FolderRow } from '@/v2/features/folders/list/FolderRow';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { SearchField } from '@/v2/shell/SearchField';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
-import { spaceChatByline, uniqueRowsById } from '../../model';
+import { useUploadSpaceFile } from '../../content-mutations';
+import {
+  canRemoveFromSpace,
+  ownsItem,
+  uploadPrecheck,
+  uploadRefusal,
+  type SpaceItemTarget,
+} from '../../content-model';
+import { canAddContent, spaceChatByline, uniqueRowsById } from '../../model';
+import { MoveToSpaceDialog } from '../../move/MoveToSpaceDialog';
 import { spacesQueries } from '../../queries';
+import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SpaceFileRow } from './SpaceFileRow';
 import {
   SpaceContentEmptyState,
   SpaceContentErrorState,
   SpaceContentMoreErrorState,
   SpaceContentNextPageSkeleton,
+  SpaceContentNoMatchState,
   SpaceContentSkeleton,
+  SpaceFolderLevelEmptyState,
   type SpaceContentTab,
 } from './states';
 
 /**
- * SpaceContentPanel — the body of a space's Chats, Folders or Files tab
- * (Spaces F2, 11 October 2026). Read-only lists of what members have put in
- * the space, for every member, Viewer included. Adding, moving and removing
- * arrive in F3 and F4.
+ * SpaceContentPanel — the body of a space's Conversations, Folders or Files
+ * tab (Spaces F2, 11 October 2026; writing added in F3, 12 October 2026).
+ * Every member reads all three; what else a reader may do comes from the two
+ * content-role rulings on the space (`canAddContent`, `canRemoveFromSpace`)
+ * and from owning the item (`ownsItem`).
+ *
+ * ── WHAT EACH TAB OFFERS (F3) ──────────────────────────────────────────────
+ *  - Every tab: a search the endpoint runs (title, folder name, file name),
+ *    and an empty state that teaches (`spaceEmptyCopy`).
+ *  - Conversations: each row names who started it; its owner may move it to
+ *    another space or back out, the space's Owner may remove it.
+ *  - Folders: browsed one level at a time inside the tab (`parent_id`), with
+ *    a way back up and a way to the folder's own page for what is filed in
+ *    it; "New folder" at the current level for the Owner and Contributors.
+ *  - Files: "Upload" and drag and drop for the Owner and Contributors, with
+ *    progress and each refusal in place (the shared upload queue and tray);
+ *    the uploader may move a file, the space's Owner may remove it.
+ * A Viewer sees no add control at all: the server would answer 403.
  *
  * ── EACH TAB IS ITS OWN QUERY, MOUNTED ONLY WHILE IT IS SHOWING ────────────
  * A reader who never opens Files never pays for it, and each list keeps its
  * own 30-minute cache entry (`spacesQueries`), so going back to a tab already
- * seen paints its rows at once and refreshes behind them.
+ * seen paints its rows at once and refreshes behind them. A new search keeps
+ * the rows on screen, dimmed, until its answer lands (`keepPreviousData`);
+ * a new folder level does not, because the old level's rows under the new
+ * level's name would be wrong, so it shows its skeleton.
  *
  * ── THE ROWS ARE THE SOURCE LISTS' OWN ─────────────────────────────────────
  * A chat in a space is the same object as a chat in `/conversations`, and a
- * folder the same as one in `/folders`, so they wear the same rows (with no
- * actions menu, and a chat says whose it is). Files get `SpaceFileRow`, the
- * channel library's row anatomy without the channel (see that file for why).
+ * folder the same as one in `/folders`, so they wear the same rows. Files get
+ * `SpaceFileRow`, the channel library's row anatomy without the channel.
  *
  * ── THE PANE IS THE SCROLLER ───────────────────────────────────────────────
  * Inside a space the collab frame's pane scrolls, not the shell (`CollabFrame`
@@ -55,14 +101,34 @@ export function SpaceContentPanel({
   tab: SpaceContentTab;
   spaceUuid: string;
 }) {
+  // The space has loaded before any tab mounts (`SpaceScreen` renders tabs
+  // only then), so the rulings read real roles. A missing scope reads as the
+  // most careful answer: nothing to add, nothing to remove.
+  const space = useCollabSpaceScope()?.space ?? null;
+  const access: ContentAccess = {
+    spaceUuid,
+    spaceName: space?.name ?? '',
+    canAdd: space !== null && canAddContent(space),
+    canRemove: space !== null && canRemoveFromSpace(space),
+  };
   switch (tab) {
     case 'chats':
-      return <SpaceChatsList spaceUuid={spaceUuid} />;
+      return <SpaceChatsList access={access} />;
     case 'folders':
-      return <SpaceFoldersList spaceUuid={spaceUuid} />;
+      return <SpaceFoldersList access={access} />;
     case 'files':
-      return <SpaceFilesList spaceUuid={spaceUuid} />;
+      return <SpaceFilesList access={access} />;
   }
+}
+
+/** What a tab may offer this viewer, decided once by the panel. */
+interface ContentAccess {
+  spaceUuid: string;
+  spaceName: string;
+  /** Owner or Contributor: New folder, Upload. */
+  canAdd: boolean;
+  /** The space's Owner: Remove from space on any item. */
+  canRemove: boolean;
 }
 
 /** Stable empty rows, so a pending list does not mint a new array per render. */
@@ -89,11 +155,104 @@ function useContentReadGate() {
   };
 }
 
-function SpaceChatsList({ spaceUuid }: { spaceUuid: string }) {
+/** How long a tab's search waits after the last keystroke before it asks. */
+const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * A tab's search box: what the box shows now (`value`), and the term the list
+ * asks the server for (`term`), committed 300ms after the last keystroke from
+ * the change handler itself, the cited-by panel's idiom (no effect, so no
+ * state is set in one). Clearing applies at once: no wait to see everything
+ * again.
+ */
+function useTabSearch() {
+  const [value, setValueState] = useState('');
+  const [term, setTerm] = useState('');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const timer = timerRef;
+    return () => {
+      if (timer.current !== null) clearTimeout(timer.current);
+    };
+  }, []);
+
+  const setValue = useCallback((next: string) => {
+    setValueState(next);
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    if (next.trim() === '') {
+      setTerm('');
+      return;
+    }
+    timerRef.current = setTimeout(() => setTerm(next.trim()), SEARCH_DEBOUNCE_MS);
+  }, []);
+  const clear = useCallback(() => setValue(''), [setValue]);
+
+  return { value, setValue, term, clear };
+}
+
+interface DialogState {
+  item: SpaceItemTarget;
+  open: boolean;
+  key: number;
+}
+
+/**
+ * The move and Remove from Space dialogs a tab's rows open. Each stays
+ * mounted after it closes so its exit plays, and a fresh open bumps its key,
+ * so every open still starts clean (no error or pick left from the last one).
+ */
+function useItemDialogs(access: ContentAccess) {
+  const [moving, setMoving] = useState<DialogState | null>(null);
+  const [removing, setRemoving] = useState<DialogState | null>(null);
+
+  const openMove = useCallback((item: SpaceItemTarget) => {
+    setMoving((previous) => ({ item, open: true, key: (previous?.key ?? 0) + 1 }));
+  }, []);
+  const openRemove = useCallback((item: SpaceItemTarget) => {
+    setRemoving((previous) => ({ item, open: true, key: (previous?.key ?? 0) + 1 }));
+  }, []);
+
+  const dialogs = (
+    <>
+      {moving ? (
+        <MoveToSpaceDialog
+          key={moving.key}
+          item={moving.item}
+          open={moving.open}
+          onOpenChange={(open) =>
+            setMoving((previous) => (previous ? { ...previous, open } : previous))
+          }
+        />
+      ) : null}
+      {removing ? (
+        <RemoveFromSpaceDialog
+          key={removing.key}
+          spaceUuid={access.spaceUuid}
+          spaceName={access.spaceName}
+          item={removing.item}
+          open={removing.open}
+          onOpenChange={(open) =>
+            setRemoving((previous) => (previous ? { ...previous, open } : previous))
+          }
+        />
+      ) : null}
+    </>
+  );
+
+  return { openMove, openRemove, dialogs };
+}
+
+/* ── Conversations ────────────────────────────────────────────────────────── */
+
+function SpaceChatsList({ access }: { access: ContentAccess }) {
+  const { spaceUuid, spaceName, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
+  const search = useTabSearch();
   const query = useInfiniteQuery({
-    ...spacesQueries.conversations(spaceUuid, { viewerId }),
+    ...spacesQueries.conversations(spaceUuid, { viewerId, search: search.term }),
     enabled,
+    placeholderData: keepPreviousData,
   });
   const pages = query.data?.pages;
   // Each chat once across pages (`uniqueRowsById`: offset paging under other
@@ -107,31 +266,107 @@ function SpaceChatsList({ spaceUuid }: { spaceUuid: string }) {
   // Rows fade in only on a first load; a list that mounts from cache shows
   // them in place (the conversations list's rule, 8 October 2026).
   const [reveal] = useState(() => query.isPending);
+  const { openMove, openRemove, dialogs } = useItemDialogs(access);
+
+  const targetOf = (conversation: SpaceConversation): SpaceItemTarget => ({
+    type: 'conversation',
+    id: conversation.id,
+    name: stripPastedTags(conversation.title),
+    space: { uuid: spaceUuid, name: spaceName },
+  });
 
   return (
-    <PagedContent tab="chats" query={query} count={rows.length}>
-      <ul className="flex flex-col">
-        {rows.map((conversation, index) => (
-          <ConversationRow
-            key={conversation.id}
-            conversation={conversation}
-            now={now}
-            index={index}
-            exiting={false}
-            reveal={reveal}
-            byline={spaceChatByline(conversation.author, viewerId)}
-          />
-        ))}
-      </ul>
-    </PagedContent>
+    <>
+      <ContentToolbar
+        search={search}
+        label="Search this space's conversations"
+        placeholder="Search conversations"
+        busy={query.isPlaceholderData}
+      />
+      <PagedContent
+        tab="chats"
+        query={query}
+        count={rows.length}
+        dim={query.isPlaceholderData}
+        empty={
+          search.term ? (
+            <SpaceContentNoMatchState
+              query={search.term}
+              action={<ClearSearchButton onClear={search.clear} />}
+            />
+          ) : (
+            <SpaceContentEmptyState
+              tab="chats"
+              canAdd={access.canAdd}
+              action={
+                <Button asChild size="sm">
+                  <Link href="/conversations">Go to your conversations</Link>
+                </Button>
+              }
+            />
+          )
+        }
+      >
+        <ul className="flex flex-col">
+          {rows.map((conversation, index) => (
+            <ConversationRow
+              key={conversation.id}
+              conversation={conversation}
+              now={now}
+              index={index}
+              exiting={false}
+              reveal={reveal}
+              byline={spaceChatByline(conversation.author, viewerId)}
+              onMove={
+                ownsItem(conversation.user_id, viewerId)
+                  ? () => openMove(targetOf(conversation))
+                  : undefined
+              }
+              onRemoveFromSpace={
+                canRemove ? () => openRemove(targetOf(conversation)) : undefined
+              }
+            />
+          ))}
+        </ul>
+      </PagedContent>
+      {dialogs}
+    </>
   );
 }
 
-function SpaceFoldersList({ spaceUuid }: { spaceUuid: string }) {
+/* ── Folders ──────────────────────────────────────────────────────────────── */
+
+/** One step down the tab's folder trail. */
+interface FolderLevel {
+  uuid: string;
+  name: string;
+}
+
+const NO_LEVELS: readonly FolderLevel[] = [];
+
+function SpaceFoldersList({ access }: { access: ContentAccess }) {
+  const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
+  const search = useTabSearch();
+  // The levels the reader went down, root first. Local to the tab: it is a
+  // way of browsing, not an address (each folder's address is its own page).
+  const [trail, setTrail] = useState<readonly FolderLevel[]>(NO_LEVELS);
+  const level = trail.length > 0 ? trail[trail.length - 1] : null;
+  const levelUuid = level?.uuid ?? null;
+
   const query = useInfiniteQuery({
-    ...spacesQueries.folders(spaceUuid, { viewerId }),
+    ...spacesQueries.folders(spaceUuid, {
+      viewerId,
+      parentId: levelUuid,
+      search: search.term,
+    }),
     enabled,
+    // A new search at the SAME level keeps its rows on screen until the
+    // answer lands; a new level does not (see the docblock).
+    placeholderData: (previous, previousQuery) =>
+      previousQuery && (previousQuery.queryKey[4].parent_id ?? null) === levelUuid
+        ? previous
+        : undefined,
   });
   const pages = query.data?.pages;
   const records = useMemo(
@@ -140,39 +375,432 @@ function SpaceFoldersList({ spaceUuid }: { spaceUuid: string }) {
   );
   // One row model per folder, the mapping the folders list itself runs.
   const rows = useMemo(() => records.map(folderRow), [records]);
+  const recordByUuid = useMemo(
+    () => new Map(records.map((record) => [record.uuid, record])),
+    [records],
+  );
   const [now] = useState(() => Date.now());
+  const [creating, setCreating] = useState(false);
+  const { openMove, openRemove, dialogs } = useItemDialogs(access);
+
+  const clearSearch = search.clear;
+  const openLevel = useCallback(
+    (row: FolderRowModel) => {
+      clearSearch();
+      setTrail((previous) => [...previous, { uuid: row.uuid, name: row.name }]);
+    },
+    [clearSearch],
+  );
+  const goUp = () => {
+    clearSearch();
+    setTrail((previous) => previous.slice(0, -1));
+  };
+
+  const targetOf = useCallback(
+    (row: FolderRowModel): SpaceItemTarget => ({
+      type: 'folder',
+      id: row.uuid,
+      name: row.name,
+      space: { uuid: spaceUuid, name: spaceName },
+    }),
+    [spaceUuid, spaceName],
+  );
+  // Stable across renders, so `FolderRow`'s `memo` holds. The move is
+  // offered on the reader's own folders only (`ownsItem`, at the row).
+  const moveRow = useCallback(
+    (row: FolderRowModel) => openMove(targetOf(row)),
+    [openMove, targetOf],
+  );
+  const removeRow = useCallback(
+    (row: FolderRowModel) => openRemove(targetOf(row)),
+    [openRemove, targetOf],
+  );
+
+  const newFolderButton = canAdd ? (
+    <PillButton icon={Plus} onClick={() => setCreating(true)}>
+      New folder
+    </PillButton>
+  ) : null;
 
   return (
-    <PagedContent tab="folders" query={query} count={rows.length}>
-      <ul className="flex flex-col">
-        {rows.map((row, index) => (
-          <FolderRow key={row.uuid} row={row} index={index} now={now} />
-        ))}
-      </ul>
-    </PagedContent>
+    <>
+      <ContentToolbar
+        search={search}
+        label={level ? `Search the folders in ${level.name}` : "Search this space's folders"}
+        placeholder="Search folders"
+        busy={query.isPlaceholderData}
+        action={newFolderButton}
+      />
+
+      {level ? (
+        <FolderLevelBar
+          // The parent's name when there is one, else the space's root.
+          upLabel={trail.length > 1 ? trail[trail.length - 2].name : 'All folders'}
+          level={level}
+          onUp={goUp}
+        />
+      ) : null}
+
+      <PagedContent
+        // A new level is a new list: a fresh mount, so its rows enter once.
+        key={levelUuid ?? 'root'}
+        tab="folders"
+        query={query}
+        count={rows.length}
+        dim={query.isPlaceholderData}
+        empty={
+          search.term ? (
+            <SpaceContentNoMatchState
+              query={search.term}
+              action={<ClearSearchButton onClear={search.clear} />}
+            />
+          ) : level ? (
+            <SpaceFolderLevelEmptyState
+              action={
+                <Button asChild size="sm" variant="outline">
+                  <Link href={folderHref(level.uuid)}>Open folder</Link>
+                </Button>
+              }
+            />
+          ) : (
+            <SpaceContentEmptyState tab="folders" canAdd={canAdd} action={newFolderButton} />
+          )
+        }
+      >
+        <ul className="flex flex-col">
+          {rows.map((row, index) => (
+            <FolderRow
+              key={row.uuid}
+              row={row}
+              index={index}
+              now={now}
+              onOpen={openLevel}
+              onMove={
+                ownsItem(recordByUuid.get(row.uuid)?.user?.id, viewerId) ? moveRow : undefined
+              }
+              onRemoveFromSpace={canRemove ? removeRow : undefined}
+            />
+          ))}
+        </ul>
+      </PagedContent>
+
+      {creating ? (
+        <FolderNameDialog
+          open={creating}
+          onOpenChange={setCreating}
+          intent={{
+            mode: 'create',
+            space: { uuid: spaceUuid, name: spaceName },
+            parent: level
+              ? { uuid: level.uuid, name: level.name, depth: trail.length }
+              : undefined,
+          }}
+        />
+      ) : null}
+      {dialogs}
+    </>
   );
 }
 
-function SpaceFilesList({ spaceUuid }: { spaceUuid: string }) {
+/**
+ * Where the reader is in the space's folders, and the two ways out of it: up
+ * one level, and to the folder's own page, where its cases, notes and files
+ * are listed (this endpoint lists folders only).
+ */
+function FolderLevelBar({
+  upLabel,
+  level,
+  onUp,
+}: {
+  upLabel: string;
+  level: FolderLevel;
+  onUp: () => void;
+}) {
+  return (
+    <div className="mb-2 flex min-w-0 items-center gap-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onUp}
+        aria-label={`Back to ${upLabel}`}
+        className="v2-interactive -ml-2 min-w-0 max-w-[40%] shrink text-muted-foreground hover:text-foreground"
+      >
+        <ChevronLeft aria-hidden className="size-4 shrink-0" />
+        <span className="truncate">{upLabel}</span>
+      </Button>
+      <span aria-hidden className="shrink-0 text-muted-foreground/50">
+        /
+      </span>
+      <h3 className="min-w-0 flex-1 truncate px-1 text-sm font-medium text-foreground">
+        {level.name}
+      </h3>
+      <Button asChild variant="outline" size="sm" className="shrink-0">
+        <Link href={folderHref(level.uuid)}>
+          <FolderOpen aria-hidden className="size-4" />
+          <span className="sr-only sm:not-sr-only">Open folder</span>
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+/* ── Files ────────────────────────────────────────────────────────────────── */
+
+/**
+ * How a refused upload's row reads: the rules refusal's own reason (under
+ * `errors.file`), and no Retry for a refusal the server would repeat
+ * (`uploadRefusal`). Module-level, so the queue's callbacks stay stable.
+ */
+function describeUploadFailure(error: unknown): UploadFailureNote {
+  const apiError = extractApiError(error);
+  return uploadRefusal(apiError.status, apiError.errors?.file?.[0] ?? null, apiError.message);
+}
+
+function SpaceFilesList({ access }: { access: ContentAccess }) {
+  const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
+  const search = useTabSearch();
   const query = useInfiniteQuery({
-    ...spacesQueries.files(spaceUuid, { viewerId }),
+    ...spacesQueries.files(spaceUuid, { viewerId, name: search.term }),
     enabled,
+    placeholderData: keepPreviousData,
   });
   const pages = query.data?.pages;
   const rows = useMemo(
     () => (pages ? uniqueRowsById(pages, fileId) : NO_FILES),
     [pages],
   );
+  const { openMove, openRemove, dialogs } = useItemDialogs(access);
+
+  // The shared upload queue (the channel panel's), driven by the space's own
+  // upload: `mutateAsync`, the one call that keeps a promise per file.
+  const upload = useUploadSpaceFile(spaceUuid);
+  const queue = useUploadQueueFor(upload.mutateAsync, uploadPrecheck, describeUploadFailure);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pickFiles = () => inputRef.current?.click();
+
+  const targetOf = useCallback(
+    (file: SpaceFile): SpaceItemTarget => ({
+      type: 'file',
+      id: file.id,
+      name: file.original_name,
+      space: { uuid: spaceUuid, name: spaceName },
+    }),
+    [spaceUuid, spaceName],
+  );
+  const moveFile = useCallback((file: SpaceFile) => openMove(targetOf(file)), [openMove, targetOf]);
+  const removeFile = useCallback(
+    (file: SpaceFile) => openRemove(targetOf(file)),
+    [openRemove, targetOf],
+  );
+
+  const uploadButton = canAdd ? (
+    <PillButton icon={Upload} onClick={pickFiles}>
+      Upload
+    </PillButton>
+  ) : null;
+
+  const body = (
+    <>
+      <ContentToolbar
+        search={search}
+        label="Search this space's files by name"
+        placeholder="Search files"
+        busy={query.isPlaceholderData}
+        action={uploadButton}
+      />
+      {canAdd ? (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            accept={ACCEPTED_FILE_TYPES}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(event) => {
+              if (event.target.files) queue.add(event.target.files);
+              // Cleared so choosing the same file again still fires a change.
+              event.target.value = '';
+            }}
+          />
+          <UploadTray queue={queue} placement="inline" />
+        </>
+      ) : null}
+      <PagedContent
+        tab="files"
+        query={query}
+        count={rows.length}
+        dim={query.isPlaceholderData}
+        empty={
+          search.term ? (
+            <SpaceContentNoMatchState
+              query={search.term}
+              action={<ClearSearchButton onClear={search.clear} />}
+            />
+          ) : (
+            <SpaceContentEmptyState tab="files" canAdd={canAdd} action={uploadButton} />
+          )
+        }
+      >
+        <ul className="flex flex-col">
+          {rows.map((file, index) => (
+            <SpaceFileRow
+              key={file.id}
+              file={file}
+              index={index}
+              onMove={ownsItem(file.uploader.id, viewerId) ? moveFile : undefined}
+              onRemoveFromSpace={canRemove ? removeFile : undefined}
+            />
+          ))}
+        </ul>
+      </PagedContent>
+      {dialogs}
+    </>
+  );
+
+  // A Viewer gets the list and nothing to drop onto.
+  return canAdd ? (
+    <FileDropZone spaceName={spaceName} onDrop={queue.add}>
+      {body}
+    </FileDropZone>
+  ) : (
+    body
+  );
+}
+
+/**
+ * FileDropZone — files dragged from the desktop onto the Files tab join the
+ * upload queue, exactly as if they were picked (Spaces F3). Only a drag that
+ * carries FILES lights it up, so dragging text or a link across the page does
+ * nothing. Enter and leave fire for every child the pointer crosses, so the
+ * zone counts them and lets go only when the pointer has left the zone
+ * itself, rather than flickering at each row. The cue fades in and out.
+ */
+function FileDropZone({
+  spaceName,
+  onDrop,
+  children,
+}: {
+  spaceName: string;
+  onDrop: (files: FileList) => void;
+  children: ReactNode;
+}) {
+  const [over, setOver] = useState(false);
+  const depth = useRef(0);
+  const carriesFiles = (event: React.DragEvent) =>
+    Array.from(event.dataTransfer.types).includes('Files');
 
   return (
-    <PagedContent tab="files" query={query} count={rows.length}>
-      <ul className="flex flex-col">
-        {rows.map((file, index) => (
-          <SpaceFileRow key={file.id} file={file} index={index} />
-        ))}
-      </ul>
-    </PagedContent>
+    <div
+      className="relative"
+      onDragEnter={(event) => {
+        if (!carriesFiles(event)) return;
+        event.preventDefault();
+        depth.current += 1;
+        setOver(true);
+      }}
+      onDragOver={(event) => {
+        if (!carriesFiles(event)) return;
+        // Without this the browser opens the file instead of dropping it here.
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+      }}
+      onDragLeave={(event) => {
+        if (!carriesFiles(event)) return;
+        depth.current = Math.max(0, depth.current - 1);
+        if (depth.current === 0) setOver(false);
+      }}
+      onDrop={(event) => {
+        if (!carriesFiles(event)) return;
+        event.preventDefault();
+        depth.current = 0;
+        setOver(false);
+        if (event.dataTransfer.files.length > 0) onDrop(event.dataTransfer.files);
+      }}
+    >
+      {children}
+      <div
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-background/85 backdrop-blur-sm transition-opacity duration-150 motion-reduce:transition-none',
+          over ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <Upload aria-hidden className="size-4 text-primary" />
+          {`Drop files to add them to ${spaceName}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Shared parts ─────────────────────────────────────────────────────────── */
+
+/** The row above a tab's list: its search, and the tab's add control. */
+function ContentToolbar({
+  search,
+  label,
+  placeholder,
+  busy,
+  action = null,
+}: {
+  search: ReturnType<typeof useTabSearch>;
+  label: string;
+  placeholder: string;
+  busy: boolean;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <SearchField
+        className="min-w-0 flex-1"
+        value={search.value}
+        onChange={search.setValue}
+        onClear={search.clear}
+        placeholder={placeholder}
+        label={label}
+        busy={busy}
+      />
+      {action}
+    </div>
+  );
+}
+
+/** The add control, the folders list's own "New folder" pill: the label on a
+ *  desktop, the icon alone on a phone with the word kept for screen readers. */
+function PillButton({
+  icon: Icon,
+  onClick,
+  children,
+}: {
+  icon: typeof Plus;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+        FOCUS_RING,
+      )}
+    >
+      <Icon aria-hidden className="size-4" />
+      <span className="sr-only sm:not-sr-only">{children}</span>
+    </button>
+  );
+}
+
+function ClearSearchButton({ onClear }: { onClear: () => void }) {
+  return (
+    <Button type="button" size="sm" variant="outline" onClick={onClear}>
+      Clear search
+    </Button>
   );
 }
 
@@ -189,21 +817,29 @@ interface PagedQuery {
 }
 
 /**
- * The one body all three tabs share, so their four states cannot drift:
- * skeleton on a first load, the failure panel when nothing loaded, the empty
- * state, or the rows with the next-page sentinel under them.
+ * The one body all three tabs share, so their states cannot drift: skeleton
+ * on a first load, the failure panel when nothing loaded, the tab's empty
+ * state (`empty`, which the tab picks: teaching, no match, or an empty
+ * level), or the rows with the next-page sentinel under them, dimmed while a
+ * new search is on its way.
  */
 function PagedContent({
   tab,
   query,
   count,
+  dim,
+  empty,
   children,
 }: {
   tab: SpaceContentTab;
   query: PagedQuery;
   /** How many rows are loaded: every state decision reads this. */
   count: number;
-  children: React.ReactNode;
+  /** A new search is loading behind the rows on screen. */
+  dim: boolean;
+  /** What the tab shows with no rows. */
+  empty: ReactNode;
+  children: ReactNode;
 }) {
   // The pane this panel scrolls in, found from the panel's own element. Set in
   // an effect declared BEFORE the sentinel's, so it is in place when that
@@ -245,9 +881,14 @@ function PagedContent({
           onRetry={() => void refetch()}
         />
       ) : count === 0 ? (
-        <SpaceContentEmptyState tab={tab} />
+        empty
       ) : (
-        <>
+        <div
+          className={cn(
+            'transition-opacity duration-200 motion-reduce:transition-none',
+            dim && 'pointer-events-none opacity-60',
+          )}
+        >
           {children}
           <div ref={sentinelRef} className="pt-1">
             {query.isFetchingNextPage ? (
@@ -261,7 +902,7 @@ function PagedContent({
               }
             />
           ) : null}
-        </>
+        </div>
       )}
     </div>
   );

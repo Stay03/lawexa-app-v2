@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronLeft, Menu, ShieldCheck } from 'lucide-react';
+import { Boxes, ChevronLeft, Menu, ShieldCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,8 @@ import { V2HeaderMenu } from './V2HeaderMenu';
 import { HomeTabs } from './HomeTabs';
 import { homeTabForPath } from './home-tabs';
 import { useHeaderContext } from './header-context';
+import { useHeaderPlace, type HeaderPlace } from './header-place';
+import { FOCUS_RING } from './designs/modules';
 import { pushedScreenFor, type PushedScreen } from './pushed-route';
 import { isTopLevelRoute } from './top-level-route';
 import { useScreenContext } from './screen-context';
@@ -182,6 +185,9 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   // conversation screen sets {title, confidential} once its history resolves, and
   // may update the title later (async name generation). `title` is null until then.
   const { title, confidential } = useHeaderContext();
+  // The place under the title (header-place.ts): a chat in a space names the
+  // space there, as a link to it. `null` everywhere else.
+  const place = useHeaderPlace();
   // Present only inside a space (`/spaces/{uuid}`, `/channels/{uuid}`), where
   // the collab frame publishes it. `null` everywhere else, and every branch
   // below falls back to exactly what it did before.
@@ -354,6 +360,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         expectsContext={expectsContext}
         title={title}
         confidential={confidential}
+        place={place}
         collab={collab}
       />
 
@@ -468,6 +475,7 @@ function HeaderCenter({
   expectsContext,
   title,
   confidential,
+  place,
   collab,
 }: {
   isHome: boolean;
@@ -478,6 +486,8 @@ function HeaderCenter({
   expectsContext: boolean;
   title: string | null;
   confidential: boolean;
+  /** The quiet line under the title: the place the screen's thing is in. */
+  place: HeaderPlace | null;
   /** Inside a space the centre carries the place, not just the title. */
   collab: CollabHeaderContext | null;
 }) {
@@ -504,6 +514,7 @@ function HeaderCenter({
             title={title}
             confidential={confidential}
             expectsContext={expectsContext}
+            place={place}
           />
         )}
       </div>
@@ -564,10 +575,13 @@ function RouteContext({
   title,
   confidential,
   expectsContext,
+  place = null,
 }: {
   title: string | null;
   confidential: boolean;
   expectsContext: boolean;
+  /** The line under the title, when the screen published one. */
+  place?: HeaderPlace | null;
 }) {
   const showTitle = title !== null;
   const showSkeleton = !showTitle && expectsContext;
@@ -588,15 +602,62 @@ function RouteContext({
       >
         <div className="mx-auto h-4 w-3/4 animate-pulse rounded-full bg-muted" />
       </div>
-      {/* Resolved title + optional confidential badge. */}
+      {/* Resolved title + optional confidential badge, and the place under
+          them when there is one. */}
       <div
         data-active={showTitle}
-        className="col-start-1 row-start-1 flex w-full min-w-0 items-center justify-center transition-opacity duration-200 motion-reduce:transition-none data-[active=false]:opacity-0"
+        className="col-start-1 row-start-1 flex w-full min-w-0 flex-col items-center transition-opacity duration-200 motion-reduce:transition-none data-[active=false]:opacity-0"
       >
-        <span className="min-w-0 truncate text-sm font-medium text-foreground">
-          {title}
-        </span>
-        <ConfidentialBadge on={confidential} />
+        <div className="flex w-full min-w-0 items-center justify-center">
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">
+            {title}
+          </span>
+          <ConfidentialBadge on={confidential} />
+        </div>
+        <HeaderPlaceLine place={showTitle ? place : null} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * HeaderPlaceLine — the space a chat is in, under its title, as a link to the
+ * space (Spaces F3). It opens and closes on the grid-rows collapse the upload
+ * tray and the confidential badge's siblings use, so the title eases up by
+ * half a line instead of jumping when the chat's record lands.
+ *
+ * The LAST place is held while the line closes (adjusted during render, the
+ * sanctioned reset), so its text does not vanish a frame before its height
+ * does. Closed, it is `inert` and `aria-hidden`: nothing invisible takes focus.
+ */
+function HeaderPlaceLine({ place }: { place: HeaderPlace | null }) {
+  const [shown, setShown] = useState<HeaderPlace | null>(place);
+  if (place !== null && place !== shown) setShown(place);
+  const open = place !== null;
+
+  return (
+    <div
+      aria-hidden={!open}
+      inert={!open || undefined}
+      className={cn(
+        'grid w-full transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none',
+        open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+      )}
+    >
+      <div className="flex min-h-0 justify-center overflow-hidden">
+        {shown ? (
+          <Link
+            href={shown.href}
+            aria-label={`Open the space ${shown.label}`}
+            className={cn(
+              'v2-interactive inline-flex min-w-0 max-w-full items-center gap-1 rounded text-[11px] leading-4 text-muted-foreground transition-colors hover:text-foreground',
+              FOCUS_RING,
+            )}
+          >
+            <Boxes aria-hidden className="size-3 shrink-0" />
+            <span className="min-w-0 truncate">{shown.label}</span>
+          </Link>
+        ) : null}
       </div>
     </div>
   );

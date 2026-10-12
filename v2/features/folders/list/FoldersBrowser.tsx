@@ -21,6 +21,9 @@ import { foldersQueries } from '../queries';
 import { folderRow, type FolderRowModel } from '../folder-row-model';
 import { useHiddenFolderUuids } from '../folder-mutations';
 import { FolderNameDialog, type FolderNameDialogIntent } from '../FolderNameDialog';
+import type { FolderRecord } from '../types';
+import type { SpaceItemTarget } from '@/v2/features/spaces/content-model';
+import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { FolderRow } from './FolderRow';
 import {
   FoldersEmptyState,
@@ -95,6 +98,13 @@ export function FoldersBrowser() {
 
   const [creating, setCreating] = useState(false);
   const [renameTarget, setRenameTarget] = useState<FolderRowModel | null>(null);
+  // MOVE TO SPACE (Spaces F3): every folder here is the reader's own. Held
+  // after closing so the dialog's exit plays; each open bumps the key.
+  const [moveTarget, setMoveTarget] = useState<{
+    item: SpaceItemTarget;
+    open: boolean;
+    key: number;
+  } | null>(null);
 
   const query = useInfiniteQuery({
     ...foldersQueries.level({
@@ -114,8 +124,9 @@ export function FoldersBrowser() {
   const hidden = useHiddenFolderUuids();
 
   const pages = query.data?.pages;
-  const { rows, hiddenLoaded } = useMemo(() => {
-    if (!pages) return { rows: NO_ROWS, hiddenLoaded: 0 };
+  const { rows, hiddenLoaded, spaceOf } = useMemo(() => {
+    const spaces = new Map<string, FolderRecord['space']>();
+    if (!pages) return { rows: NO_ROWS, hiddenLoaded: 0, spaceOf: spaces };
     const mapped: FolderRowModel[] = [];
     let dropped = 0;
     for (const page of pages) {
@@ -125,9 +136,12 @@ export function FoldersBrowser() {
           continue;
         }
         mapped.push(folderRow(record));
+        // The space each folder is in, for the move dialog: the row model
+        // carries no space, and absent stays absent ("not known").
+        spaces.set(record.uuid, record.space);
       }
     }
-    return { rows: mapped, hiddenLoaded: dropped };
+    return { rows: mapped, hiddenLoaded: dropped, spaceOf: spaces };
   }, [pages, hidden]);
 
   const scrollRootRef = useShellScrollRoot();
@@ -146,6 +160,16 @@ export function FoldersBrowser() {
   const openRename = useCallback(
     (row: FolderRowModel) => setRenameTarget(row),
     [setRenameTarget],
+  );
+  // Stable per page of rows, so `FolderRow`'s `memo` holds.
+  const openMove = useCallback(
+    (row: FolderRowModel) =>
+      setMoveTarget((previous) => ({
+        item: { type: 'folder', id: row.uuid, name: row.name, space: spaceOf.get(row.uuid) },
+        open: true,
+        key: (previous?.key ?? 0) + 1,
+      })),
+    [spaceOf, setMoveTarget],
   );
 
   // The API's own reason, read once. A 4xx is a REFUSAL the server explained; a
@@ -279,6 +303,7 @@ export function FoldersBrowser() {
                 index={index}
                 now={now}
                 onRename={openRename}
+                onMove={openMove}
               />
             ))}
           </ul>
@@ -305,6 +330,16 @@ export function FoldersBrowser() {
           open
           onOpenChange={setCreating}
           intent={CREATE_ROOT_FOLDER}
+        />
+      ) : null}
+      {moveTarget ? (
+        <MoveToSpaceDialog
+          key={moveTarget.key}
+          item={moveTarget.item}
+          open={moveTarget.open}
+          onOpenChange={(open) =>
+            setMoveTarget((previous) => (previous ? { ...previous, open } : previous))
+          }
         />
       ) : null}
       {renameTarget ? (

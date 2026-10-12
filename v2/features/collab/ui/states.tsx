@@ -26,7 +26,7 @@ export function CollabSignedOutState() {
       icon={MessagesSquare}
       tone="accent"
       title="Sign in to open Spaces"
-      description="Spaces are shared workrooms for your team or study group — channels for messages, task lists, files, and Lawexa on call. Sign in to pick up where your group left off."
+      description="Shared spaces for your team or study group: conversations, folders and files. Sign in to pick up where your group left off."
       action={
         <Button asChild size="sm">
           <Link href="/login">Sign in</Link>
@@ -47,7 +47,7 @@ export function CollabCreateAccountState() {
       icon={MessagesSquare}
       tone="accent"
       title="Create a free account to join Spaces"
-      description="Spaces are shared workrooms for teams and study groups — channels, task lists, files, and Lawexa on call. They belong to the registered experience: create an account to join or start one."
+      description="Shared spaces for teams and study groups: conversations, folders and files. Create an account to join one or start your own."
       action={
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button asChild size="sm">

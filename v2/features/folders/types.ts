@@ -81,6 +81,13 @@ export interface FolderRecord extends FolderNode {
   parent?: FolderNode | null;
   /** DETAIL only, UNPAGINATED — the server sends every child in one array. */
   children?: FolderNode[];
+  /**
+   * The space the folder sits in, `null` when it is the owner's alone (backend
+   * B3). Carried by the space's folder list and by a move's answer. The folder
+   * view (`GET /folders/{uuid}`) does NOT carry it (backend, 12 October 2026),
+   * so absent means "not known here", never "not in a space".
+   */
+  space?: { uuid: string; name: string } | null;
 }
 
 /**

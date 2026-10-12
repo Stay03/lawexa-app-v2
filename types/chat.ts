@@ -657,6 +657,8 @@ export interface ConversationData {
   author?: ConversationAuthor;
   agent?: ConversationAgentSummary;
   references?: ConversationReference[];
+  /** See {@link ConversationListItem.space}. */
+  space?: ConversationSpaceRef | null;
   created_at: string;
   updated_at: string;
 }
@@ -699,8 +701,19 @@ export interface ConversationListItem {
   first_message?: ConversationMessagePreview | null;
   last_message?: ConversationMessagePreview | null;
   messages_count: number;
+  /** The space the chat sits in, or `null` when it is the owner's alone
+   *  (backend B3). Absent on an API before B3 and on payloads that do not
+   *  carry it, which reads the same as `null`. */
+  space?: ConversationSpaceRef | null;
   created_at: string;
   updated_at: string;
+}
+
+/** The two keys of a space a chat payload carries (backend B3). Declared here
+ *  rather than imported from `types/collab`, which already imports this file. */
+export interface ConversationSpaceRef {
+  uuid: string;
+  name: string;
 }
 
 // List conversations response

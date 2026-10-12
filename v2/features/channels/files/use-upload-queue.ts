@@ -101,12 +101,48 @@ export interface UploadQueue {
   dismissSettled: () => void;
 }
 
+/** One attempt the queue hands to its upload function. */
+export interface UploadAttempt {
+  file: File;
+  signal: AbortSignal;
+  onProgress: (sent: number, total: number) => void;
+}
+
+/** What a failed attempt's row says, and whether Retry could help. A refusal
+ *  that will be repeated word for word (a file the server's rules refuse) is
+ *  not retryable, for the reason the docblock gives for client rejections. */
+export interface UploadFailureNote {
+  message: string;
+  retryable: boolean;
+}
+
+/** A failed attempt when the surface has no better words: the server's own
+ *  sentence, and a Retry (the channel panel's rule since it shipped). */
+function serverSentence(error: unknown): UploadFailureNote {
+  return { message: extractApiError(error).message, retryable: true };
+}
+
+/** A channel's Files panel: its upload mutation and its 15 MB / type rule. */
 export function useUploadQueue(channelUuid: string): UploadQueue {
   const uploadFile = useUploadChannelFile(channelUuid);
   // `mutateAsync`, never `mutate` — one observer cannot hold per-call callbacks
   // for concurrent uploads. See the docblock.
-  const uploadAsync = uploadFile.mutateAsync;
+  return useUploadQueueFor(uploadFile.mutateAsync, validateChannelFile);
+}
 
+/**
+ * The queue itself, for any surface that uploads (Spaces F3, 12 October 2026:
+ * a space's Files tab is the second). The surface brings three things: the
+ * upload (a `mutateAsync`, for the reason in the docblock), the check run
+ * before a file is sent, and optionally how a failure is put into words.
+ * Pass stable functions (a module-level function, or `mutateAsync`, which
+ * TanStack keeps stable), or every callback below is rebuilt on each render.
+ */
+export function useUploadQueueFor(
+  uploadAsync: (attempt: UploadAttempt) => Promise<unknown>,
+  validate: (file: File) => string | null,
+  describeFailure: (error: unknown) => UploadFailureNote = serverSentence,
+): UploadQueue {
   const [entries, setEntries] = useState<UploadEntry[]>([]);
   const nextId = useRef(0);
   /** The bytes of each entry that can still be retried, and its abort handle.
@@ -174,15 +210,16 @@ export function useUploadQueue(channelUuid: string): UploadQueue {
         // A cancellation lands here too, and correctly does nothing: `cancel`
         // already removed the row, and `patch` only touches a row still present.
         controllers.current.delete(id);
+        const note = describeFailure(error);
         patch(id, {
-          status: 'failed',
-          message: extractApiError(error).message,
-          retryable: true,
+          status: note.retryable ? 'failed' : 'rejected',
+          message: note.message,
+          retryable: note.retryable,
           cancellable: false,
         });
       }
     },
-    [forget, patch, uploadAsync],
+    [describeFailure, forget, patch, uploadAsync],
   );
 
   const add = useCallback(
@@ -195,7 +232,7 @@ export function useUploadQueue(channelUuid: string): UploadQueue {
 
       for (const file of list) {
         const id = (nextId.current += 1);
-        const rejection = validateChannelFile(file);
+        const rejection = validate(file);
         if (rejection) {
           rows.push({
             id,
@@ -227,7 +264,7 @@ export function useUploadQueue(channelUuid: string): UploadQueue {
       // `void`: each attempt owns its own promise and reports through state.
       for (const attempt of starts) void start(attempt.id, attempt.file);
     },
-    [start],
+    [start, validate],
   );
 
   const cancel = useCallback(

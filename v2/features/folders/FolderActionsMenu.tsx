@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Boxes, FolderOutput, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -33,16 +33,29 @@ import { useDeleteFolderWithUndo, type DeletableFolder } from './folder-mutation
  *
  * NO CONFIRM DIALOG, deliberately (decision 6). The undo window is the safety
  * net, and it is a real one: nothing has been sent while it is open.
+ *
+ * ── THE SPACE ROWS (Spaces F3, 12 October 2026) ────────────────────────────
+ * "Move to space" (`onMove`, the folder's owner) and "Remove from space"
+ * (`onRemoveFromSpace`, the space's Owner, in its Folders tab) open their
+ * host's dialogs. Rename and Delete are the owner's pair and appear together,
+ * exactly when the host passes `onRename`: a space's tab lists other members'
+ * folders, and renaming or deleting those is not the viewer's to do.
  */
 export function FolderActionsMenu({
   folder,
   onRename,
+  onMove,
+  onRemoveFromSpace,
   onDeleted,
   className,
 }: {
   folder: DeletableFolder;
-  /** Opens the host's rename dialog. */
-  onRename: () => void;
+  /** Opens the host's rename dialog. Present = Rename and Delete are offered. */
+  onRename?: () => void;
+  /** Opens the host's move-to-space dialog. */
+  onMove?: () => void;
+  /** Opens the host's Remove from Space confirm. */
+  onRemoveFromSpace?: () => void;
   /** Where to go once the delete is queued — the folder page's route is about
    *  to stop existing. Omitted on the list, which simply loses a row. */
   onDeleted?: () => void;
@@ -67,21 +80,39 @@ export function FolderActionsMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={onRename}>
-          <Pencil />
-          Rename
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          onSelect={() => {
-            deleteFolder(folder);
-            onDeleted?.();
-          }}
-        >
-          <Trash2 />
-          Delete folder
-        </DropdownMenuItem>
+        {onRename ? (
+          <DropdownMenuItem onSelect={onRename}>
+            <Pencil />
+            Rename
+          </DropdownMenuItem>
+        ) : null}
+        {onMove ? (
+          <DropdownMenuItem onSelect={onMove}>
+            <Boxes />
+            Move to space
+          </DropdownMenuItem>
+        ) : null}
+        {onRemoveFromSpace ? (
+          <DropdownMenuItem onSelect={onRemoveFromSpace}>
+            <FolderOutput />
+            Remove from space
+          </DropdownMenuItem>
+        ) : null}
+        {onRename ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => {
+                deleteFolder(folder);
+                onDeleted?.();
+              }}
+            >
+              <Trash2 />
+              Delete folder
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
