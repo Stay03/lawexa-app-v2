@@ -74,13 +74,17 @@ function LinkRow({
     >
       <InviteLinkField code={link.code} dead={dead} />
 
-      <div className="mt-2 flex items-center justify-between gap-3">
+      {/* The row wraps as a whole (design round 2): the facts keep one line and
+          Stop link drops under them, right-aligned, when the two do not fit
+          side by side. Wrapping inside the facts left "approve" alone on a
+          line in the 384px desktop sheet. */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         {/* WHICH CHANNEL, WHEN THERE IS ONE. Channel-scoped links are made from
             the invite dialog now, so this list holds two kinds of link whose
             addresses look identical. Without the name an admin cannot tell the
             link that opens the whole space from the one that also drops people
             into a single channel — and those hand out different access. */}
-        <p className="text-xs text-muted-foreground">
+        <p className="min-w-0 text-xs text-muted-foreground">
           {link.channel ? `#${link.channel.name} · ` : ''}
           {contentRoles && link.content_role_label
             ? `${link.content_role_label} · `
@@ -92,7 +96,7 @@ function LinkRow({
           <Button
             variant="ghost"
             size="sm"
-            className="text-destructive"
+            className="ml-auto text-destructive"
             disabled={revoking}
             onClick={() => onRevoke(link.id)}
           >

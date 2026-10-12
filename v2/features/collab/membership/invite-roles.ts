@@ -37,6 +37,6 @@ export const SHARED_INVITE_ROLES: readonly InviteRoleOption<InvitableContentRole
   {
     value: 'editor',
     label: 'Contributor',
-    description: 'Can also add and continue conversations',
+    description: 'Can also add conversations, folders and files',
   },
 ];

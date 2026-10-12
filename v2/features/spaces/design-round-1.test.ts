@@ -339,12 +339,15 @@ test('a role is a name in the closed select and a meaning in the open list', () 
     SHARED_INVITE_ROLES.map((option) => [option.label, option.description]),
     [
       ['Viewer', 'Can read everything in the space'],
-      ['Contributor', 'Can also add and continue conversations'],
+      ['Contributor', 'Can also add conversations, folders and files'],
     ],
   );
   assert.deepEqual(TEAM_INVITE_ROLES.map((option) => option.label), ['Member', 'Admin']);
+  // No dashes anywhere, and no comma in a name: a comma there meant the meaning
+  // was riding in the label again. A meaning may list things.
   for (const option of [...SHARED_INVITE_ROLES, ...TEAM_INVITE_ROLES]) {
-    assert.doesNotMatch(`${option.label}${option.description ?? ''}`, /[—–,]/, option.label);
+    assert.doesNotMatch(option.label, /[—–,]/, option.label);
+    assert.doesNotMatch(option.description ?? '', /[—–]/, option.label);
   }
   const select = read('v2', 'features', 'collab', 'membership', 'RoleSelect.tsx');
   assert.match(select, /<SelectValue>\{current\?\.label\}<\/SelectValue>/);
