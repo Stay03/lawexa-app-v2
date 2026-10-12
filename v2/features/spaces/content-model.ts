@@ -8,7 +8,10 @@ import type {
 import {
   ACCEPTED_FILE_TYPES,
   ALLOWED_FILE_TYPES,
+  isImageAttachment,
   MAX_DOCUMENT_SIZE,
+  MAX_IMAGE_SIZE,
+  PICTURE_EXTENSIONS,
 } from '@/v2/features/conversations/attachment-rules';
 import { canAddContent, type SpaceTab } from './model';
 
@@ -215,16 +218,25 @@ const ACCEPTED_EXTENSIONS: readonly string[] = ACCEPTED_FILE_TYPES.split(',').ma
 
 /**
  * Check a file against the document upload rules before it is sent (B3:
- * "the document upload rules", the ones `POST /files/documents` runs). The
- * server stays the judge and its 422 is shown in place too; this only spares
- * the reader a wait to be told something knowable now. The extension is
- * checked as well as the type, because some systems send `.rtf` with no type.
+ * "the document upload rules", the ones `POST /files/documents` runs; the
+ * space's `POST /spaces/{uuid}/files` request extends that one, backend
+ * bd76241, so the two take the same files). The server stays the judge and
+ * its 422 is shown in place too; this only spares the reader a wait to be
+ * told something knowable now. The extension is checked as well as the
+ * type, because some systems send `.rtf` with no type.
  */
 export function uploadPrecheck(file: Pick<File, 'name' | 'type' | 'size'>): string | null {
   const extension = file.name.toLowerCase().split('.').pop() ?? '';
   const typeKnown = file.type !== '' && ALLOWED_FILE_TYPES.includes(file.type);
   if (!typeKnown && !ACCEPTED_EXTENSIONS.includes(extension)) {
     return `“${file.name}” can’t be added. A space takes PDF, Word, RTF and image files (JPG, PNG, WebP).`;
+  }
+  // A picture is capped at 5 MB, as the server's rule caps it. A file the
+  // system sent with no type is judged a picture by its name.
+  const picture =
+    isImageAttachment(file) || (file.type === '' && PICTURE_EXTENSIONS.includes(extension));
+  if (picture && file.size > MAX_IMAGE_SIZE) {
+    return `“${file.name}” is larger than 5 MB, the most a space takes for a picture.`;
   }
   if (file.size > MAX_DOCUMENT_SIZE) {
     return `“${file.name}” is larger than 10 MB, the most a space takes.`;

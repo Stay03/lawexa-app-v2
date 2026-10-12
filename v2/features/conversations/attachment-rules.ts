@@ -72,16 +72,16 @@ export const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 export const MAX_FILES_PER_TURN = 10;
 
 /** True for a file this composer treats as a picture rather than a document. */
-export function isImageAttachment(file: File): boolean {
+export function isImageAttachment(file: Pick<File, 'type'>): boolean {
   return (ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type);
 }
 
 /** The cap that applies to THIS file, because the two genuinely differ. */
-export function maxSizeFor(file: File): number {
+export function maxSizeFor(file: Pick<File, 'type'>): number {
   return isImageAttachment(file) ? MAX_IMAGE_SIZE : MAX_DOCUMENT_SIZE;
 }
 
-const PICTURE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+export const PICTURE_EXTENSIONS: readonly string[] = ['jpg', 'jpeg', 'png', 'webp'];
 
 /**
  * True for a SENT file the thread shows as a picture.

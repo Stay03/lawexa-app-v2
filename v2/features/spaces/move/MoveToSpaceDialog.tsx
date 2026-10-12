@@ -239,9 +239,11 @@ export function MoveToSpaceDialog({
                       {isSending ? (
                         <Loader2 aria-hidden className="size-4 shrink-0 text-muted-foreground motion-safe:animate-spin" />
                       ) : isCurrent ? (
+                        // Below sm the check stands alone, so the row the
+                        // item is in keeps its whole name on a phone.
                         <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                           <Check aria-hidden className="size-3.5" />
-                          In it now
+                          <span className="sr-only sm:not-sr-only">In it now</span>
                         </span>
                       ) : null}
                     </button>

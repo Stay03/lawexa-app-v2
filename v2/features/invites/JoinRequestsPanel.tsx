@@ -4,8 +4,8 @@ import { Loader2, UserCheck, UserX } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { JoinRequest } from '@/types/collab';
+import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
 import {
   useChannelJoinRequests,
   useDecideJoinRequest,
@@ -46,12 +46,7 @@ function RequestRow({
   return (
     <li className="rounded-xl border border-border/60 p-3">
       <div className="flex min-w-0 items-center gap-3">
-        <Avatar className="size-8 shrink-0">
-          {request.user.avatar_url ? (
-            <AvatarImage src={request.user.avatar_url} alt="" />
-          ) : null}
-          <AvatarFallback>{request.user.name.slice(0, 1).toUpperCase()}</AvatarFallback>
-        </Avatar>
+        <MemberAvatar user={request.user} className="size-8 shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">
             {request.user.name}
