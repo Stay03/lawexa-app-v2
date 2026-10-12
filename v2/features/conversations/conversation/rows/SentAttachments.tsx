@@ -331,12 +331,17 @@ function DocumentChip({ document }: { document: MessageAttachment }) {
     );
   }
 
+  // Named, so an installed iPhone app saves it through the share sheet; a
+  // second tap there offers the bytes already fetched (`useShareSheetSave`).
+  const openIt = () =>
+    openInTab.open(document.file_id, { name: document.file_name, type: document.mime_type });
+
   return (
     <button
       type="button"
-      onClick={() => openInTab.open(document.file_id)}
+      onClick={openInTab.ready ? openInTab.save : openIt}
       disabled={openInTab.opening}
-      aria-label={`Open ${document.file_name}`}
+      aria-label={`${openInTab.ready ? 'Save' : 'Open'} ${document.file_name}`}
       className={cn(
         'v2-interactive flex w-fit items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground',
         'transition-colors duration-150 hover:bg-muted hover:text-foreground motion-reduce:transition-none',
@@ -348,9 +353,11 @@ function DocumentChip({ document }: { document: MessageAttachment }) {
       <span>
         {openInTab.opening
           ? 'Opening…'
-          : openInTab.failed
-            ? 'Couldn’t open. Try again'
-            : formatFileSize(document.file_size)}
+          : openInTab.ready
+            ? 'Ready, tap to save'
+            : openInTab.failed
+              ? 'Couldn’t open. Try again'
+              : formatFileSize(document.file_size)}
       </span>
     </button>
   );

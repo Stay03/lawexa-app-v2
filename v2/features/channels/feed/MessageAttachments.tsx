@@ -310,6 +310,28 @@ function AttachmentFailure({ text, onRetry }: { text: string; onRetry: () => voi
   );
 }
 
+/**
+ * The file is fetched and the share sheet wants a fresh tap: an installed
+ * iPhone app whose first tap ran out while the bytes downloaded (see
+ * `useShareSheetSave`). This tap offers the bytes already here.
+ */
+function AttachmentReady({ onSave }: { onSave: () => void }) {
+  return (
+    <p role="status" className="mt-1 text-[11px]">
+      <button
+        type="button"
+        onClick={onSave}
+        className={cn(
+          'rounded font-medium text-foreground underline underline-offset-2',
+          FOCUS_RING,
+        )}
+      >
+        Ready, tap to save
+      </button>
+    </p>
+  );
+}
+
 /** A picture, shown. */
 function ImageAttachment({
   attachment,
@@ -474,16 +496,20 @@ function ImageAttachment({
  * is; the full string is one hover (or one screen-reader pass) away in `title`.
  */
 function FileAttachment({ attachment }: { attachment: MessageAttachment }) {
-  const { open, opening, failed } = useOpenFileInNewTab();
+  const { open, opening, failed, ready, save } = useOpenFileInNewTab();
   const isArchive = isArchiveFile(attachment.mime_type, attachment.original_name);
+  // Named, so an installed iPhone app saves it through the share sheet under
+  // its real name and type instead of opening a tab that cannot save.
+  const openIt = () =>
+    open(attachment.id, { name: attachment.original_name, type: attachment.mime_type });
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => open(attachment.id)}
+        onClick={ready ? save : openIt}
         disabled={opening}
-        aria-label={`Open ${attachment.original_name}`}
+        aria-label={`${ready ? 'Save' : 'Open'} ${attachment.original_name}`}
         className={cn(
           'v2-interactive group/att flex w-full max-w-sm items-center gap-2.5 rounded-xl border bg-background px-2 py-2 text-left',
           'transition-colors duration-150 hover:bg-secondary/50 motion-reduce:transition-none',
@@ -529,9 +555,10 @@ function FileAttachment({ attachment }: { attachment: MessageAttachment }) {
       {failed && (
         <AttachmentFailure
           text="Couldn't open it."
-          onRetry={() => open(attachment.id)}
+          onRetry={openIt}
         />
       )}
+      {ready && <AttachmentReady onSave={save} />}
     </div>
   );
 }

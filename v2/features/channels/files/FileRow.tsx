@@ -20,6 +20,7 @@ import { formatBytes } from '@/lib/utils/format-bytes';
 import type { Channel, ChannelFile } from '@/types/collab';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { useFileShareSheetSave } from '../feed/use-file-url';
 import {
   useDeleteChannelFile,
   useDownloadChannelFile,
@@ -63,9 +64,19 @@ export function FileRow({
   // Per-row mutations, deliberately: one instance shared by the list would put
   // every row's spinner on at once the moment any row was downloaded.
   const download = useDownloadChannelFile();
+  /** An installed iPhone app's tabs cannot save, so there the download goes
+   *  through the share sheet, pictures included: Download means keep it. */
+  const shareSheet = useFileShareSheetSave();
   const deleteFile = useDeleteChannelFile(channel.uuid);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const downloading = download.isPending;
+  const downloading = download.isPending || shareSheet.saving;
+  const downloadFailed = download.isError || shareSheet.failed;
+  const startDownload = () => {
+    download.reset();
+    shareSheet.saveOr(file.id, { name: file.original_name, type: file.mime_type }, () =>
+      download.mutate(file.id),
+    );
+  };
   const deleting = deleteFile.isPending;
   const isArchive = isArchiveFile(file.mime_type, file.original_name);
   const canDelete =
@@ -98,7 +109,7 @@ export function FileRow({
             because a blocked new tab is a tap that does nothing: the retry is
             a fresh gesture, which is exactly what an engine that refused the
             first one will honour. */}
-        {download.isError && (
+        {downloadFailed && (
           <p
             role="status"
             className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground"
@@ -106,13 +117,29 @@ export function FileRow({
             <span>Couldn&rsquo;t open it.</span>
             <button
               type="button"
-              onClick={() => download.mutate(file.id)}
+              onClick={startDownload}
               className={cn(
                 'rounded font-medium text-foreground underline underline-offset-2',
                 FOCUS_RING,
               )}
             >
               Try again
+            </button>
+          </p>
+        )}
+        {/* The installed iPhone app's second tap: the bytes are here, and the
+            first tap ran out while they downloaded. */}
+        {shareSheet.ready && (
+          <p role="status" className="mt-1 text-[11px]">
+            <button
+              type="button"
+              onClick={shareSheet.save}
+              className={cn(
+                'rounded font-medium text-foreground underline underline-offset-2',
+                FOCUS_RING,
+              )}
+            >
+              Ready, tap to save
             </button>
           </p>
         )}
@@ -129,9 +156,9 @@ export function FileRow({
           type="button"
           variant="ghost"
           size="icon"
-          onClick={() => download.mutate(file.id)}
+          onClick={shareSheet.ready ? shareSheet.save : startDownload}
           disabled={downloading}
-          aria-label={`Download ${file.original_name}`}
+          aria-label={`${shareSheet.ready ? 'Save' : 'Download'} ${file.original_name}`}
           title="Download"
           className="v2-interactive size-8 text-muted-foreground hover:text-foreground"
         >

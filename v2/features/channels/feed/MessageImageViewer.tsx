@@ -33,7 +33,7 @@ import {
   type ViewerImage,
 } from './image-target';
 import { CHANNEL_FILE_SOURCE, type PictureSource } from './picture-source';
-import { useOpenUrlInNewTab } from './use-file-url';
+import { useFileShareSheetSave, useOpenUrlInNewTab } from './use-file-url';
 
 /**
  * MessageImageViewer — a picture opens IN the conversation, over it.
@@ -732,6 +732,7 @@ function ViewerChrome({
    *  be a state write in a place that cannot have one. */
   const pressedHere = image !== null && pressedId === image.id;
   const saving = pressedHere && download.saving;
+  const readyHere = pressedHere && download.ready;
   const opening = pressedHere && openOriginal.opening;
   const failedHere = pressedHere && (download.failed || openOriginal.failed);
 
@@ -769,11 +770,15 @@ function ViewerChrome({
               <button
                 type="button"
                 onClick={() => {
+                  if (readyHere) {
+                    download.saveReady();
+                    return;
+                  }
                   onPress(image.id);
                   download.save(image);
                 }}
                 disabled={saving}
-                aria-label={`Download ${image.original_name}`}
+                aria-label={`${readyHere ? 'Save' : 'Download'} ${image.original_name}`}
                 title="Download"
                 className={VIEWER_BUTTON}
               >
@@ -815,6 +820,22 @@ function ViewerChrome({
             : "Couldn't open this picture. Try again."}
         </p>
       )}
+      {/* The installed iPhone app's second tap: the picture is fetched, and the
+          first tap ran out while it downloaded. */}
+      {readyHere && (
+        <p role="status" className="px-4 pb-2 text-xs">
+          <button
+            type="button"
+            onClick={download.saveReady}
+            className={cn(
+              'v2-interactive rounded font-medium text-white underline underline-offset-2',
+              VIEWER_FOCUS,
+            )}
+          >
+            Ready, tap to save
+          </button>
+        </p>
+      )}
     </div>
   );
 }
@@ -830,8 +851,14 @@ function ViewerChrome({
  * Files tab's Download button has always opened: the verb never changes its
  * meaning, it only does the best available version of it. Only when BOTH are
  * refused does the bar say so.
+ *
+ * AN INSTALLED iPHONE APP SAVES THROUGH THE SHARE SHEET instead, whose "Save
+ * Image" puts the picture in Photos: neither the anchor nor the tab can save a
+ * file there (`./save-file.ts`). Open original keeps its tab in every case,
+ * because that verb is for looking, and the in-app view shows a picture.
  */
 function usePictureDownload() {
+  const shareSheet = useFileShareSheetSave();
   const [failed, setFailed] = useState(false);
   const mutation = useMutation({
     mutationFn: async (image: ViewerImage) => {
@@ -867,9 +894,17 @@ function usePictureDownload() {
 
   const save = (image: ViewerImage) => {
     setFailed(false);
-    mutation.mutate(image, { onError: () => setFailed(true) });
+    shareSheet.saveOr(image.id, { name: image.original_name }, () =>
+      mutation.mutate(image, { onError: () => setFailed(true) }),
+    );
   };
-  return { save, saving: mutation.isPending, failed };
+  return {
+    save,
+    saving: mutation.isPending || shareSheet.saving,
+    failed: failed || shareSheet.failed,
+    ready: shareSheet.ready,
+    saveReady: shareSheet.save,
+  };
 }
 
 /**

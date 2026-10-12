@@ -10,7 +10,14 @@ import { join } from 'node:path';
  * so these pin its wiring by source: tab first, request second, no noopener. */
 const source = readFileSync(join(process.cwd(), 'v2', 'features', 'channels', 'feed', 'use-file-url.ts'), 'utf8');
 const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-const openBody = code.slice(code.indexOf('const open = (target: T) =>'), code.indexOf('return { open, opening'));
+// The tab path is `openInTab` since the installed iPhone app's share-sheet path
+// was added beside it (12 October 2026); its body is pinned exactly as before.
+const openBody = code.slice(code.indexOf('const openInTab = (target: T) =>'), code.indexOf('const open = (target: T, saveAs?: SaveAs) =>'));
+
+test('the tab path is found where these pins look for it', () => {
+  assert.ok(code.indexOf('const openInTab = (target: T) =>') >= 0);
+  assert.ok(openBody.length > 0);
+});
 
 test('the tab opens in the tap, before the URL is requested', () => {
   const tabAt = openBody.indexOf("window.open('', '_blank')");
