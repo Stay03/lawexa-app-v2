@@ -5,6 +5,7 @@ import { PanelRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 import type { ConversationComposerHandle } from '@/v2/features/conversations/conversation/ConversationComposer';
 import {
   CaseChatBar,
@@ -128,6 +129,27 @@ export function CaseAskDock({
     return () => chrome.forEach((element) => element.removeAttribute('inert'));
   }, [screenMounted]);
 
+  // WHILE THE PHONE CHAT IS OPEN THE PAGE UNDER IT CANNOT SCROLL. The card is
+  // fixed but still a DOM child of the shell's scroller, and iOS hands a drag
+  // that the chat cannot use (a short list, the bar, the composer, a scroller
+  // at its end) to that ancestor: the judgment moved under a still chat
+  // (Arthur's iPhone, after 16b19dd). `overflow: hidden` on a scroller that
+  // is not the document stops iOS too, and it keeps the offset, so closing
+  // returns to the same paragraph; the offset is put back only if something
+  // moved it meanwhile.
+  useEffect(() => {
+    if (!screenMounted) return;
+    const scroller = document.getElementById(V2_SHELL_CONTENT_ID);
+    if (!scroller) return;
+    const readingTop = scroller.scrollTop;
+    const previousOverflow = scroller.style.overflowY;
+    scroller.style.overflowY = 'hidden';
+    return () => {
+      scroller.style.overflowY = previousOverflow;
+      if (scroller.scrollTop !== readingTop) scroller.scrollTop = readingTop;
+    };
+  }, [screenMounted]);
+
   // CLOSING ON A PHONE puts the keyboard away. The box still has focus when
   // the chat closes (X, Escape, Back), and a focused box keeps the keyboard up
   // over a page with no chat on it. Focus moves to the card, one Tab from the
@@ -193,14 +215,16 @@ export function CaseAskDock({
             : undefined
         }
         className={cn(
-          'outline-none transition-[background-color,box-shadow,border-color] duration-300 motion-reduce:transition-none',
+          'outline-none',
           screenMounted
-            ? // The phone screen: the visible viewport, edge to edge. The
-              // status bar's inset pads the bar, not the card, so the card's
-              // colour reaches the top edge.
+            ? // The phone screen: the visible viewport, edge to edge, and
+              // opaque from its first frame. A colour that faded in let the
+              // page show through the opening card, which read as a card part
+              // way open over the judgment. The status bar's inset pads the
+              // bar, not the card, so the card's colour reaches the top edge.
               'fixed inset-x-0 z-40 flex flex-col bg-popover pt-[env(safe-area-inset-top,0px)]'
             : cn(
-                'mx-auto w-full max-w-[26rem] rounded-2xl border',
+                'mx-auto w-full max-w-[26rem] rounded-2xl border transition-[background-color,box-shadow,border-color] duration-300 motion-reduce:transition-none',
                 panelMounted
                   ? 'border-border bg-popover shadow-[0_28px_70px_-28px_rgba(0,0,0,0.75)]'
                   : 'border-transparent',
@@ -211,7 +235,9 @@ export function CaseAskDock({
             ? {
                 // The visible rectangle, by definition: when iOS pans the
                 // page to reveal the box, `--visual-top` follows the pan, so
-                // the card never hangs above the screen (use-keyboard-inset).
+                // the card never hangs above the screen; with the keyboard
+                // down it is 0, so the card's own bar is the top of the
+                // screen (use-keyboard-inset).
                 top: 'var(--visual-top, 0px)',
                 height: 'var(--visual-height, 100dvh)',
               }

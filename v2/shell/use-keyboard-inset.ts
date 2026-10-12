@@ -117,6 +117,32 @@ export function useKeyboardInset(): void {
      */
     const settled = (): boolean => viewport.offsetTop === 0;
 
+    /**
+     * The visible rectangle, for a screen fixed to it (the phone case chat).
+     *
+     * THE TOP IS CLAMPED TO WHERE A VISIBLE RECTANGLE CAN BE. The visual
+     * viewport lies inside the layout viewport, so its offset is never more
+     * than `innerHeight - height`. iOS breaks that when the keyboard goes
+     * down: the resize reports the full height while `offsetTop` still holds
+     * the keyboard's pan, and no later event corrects it. Published raw, that
+     * stale pan pushed the full-screen chat down the screen with the page's
+     * own bar above it (Arthur's iPhone, after 16b19dd), and the next open
+     * started from it: the card drew part way down the page and snapped up
+     * when the keyboard's events came in.
+     *
+     * It is also read on `focusin`. The reader's tap on the chat's box is a
+     * focus, so the card's first frame is sized from the viewport as it is at
+     * the tap, never from whatever a keyboard before it left behind.
+     */
+    const publishVisible = (): void => {
+      const top = Math.max(
+        0,
+        Math.min(viewport.offsetTop, window.innerHeight - viewport.height),
+      );
+      root.style.setProperty('--visual-height', `${viewport.height}px`);
+      root.style.setProperty('--visual-top', `${top}px`);
+    };
+
     const update = (): void => {
       // Height occluded at the bottom of the layout viewport (keyboard + any
       // accessory bar). Reads ≈0 when the browser resized the layout viewport
@@ -128,11 +154,10 @@ export function useKeyboardInset(): void {
         window.innerHeight - viewport.height - viewport.offsetTop,
       );
       root.style.setProperty('--keyboard-inset', `${occlusion}px`);
-      // The visible viewport (11 October 2026): its height caps a sheet riding
-      // the keyboard, so nothing sized from it can grow past the top, and its
-      // offset says how far iOS has panned the page under the keyboard.
-      root.style.setProperty('--visual-height', `${viewport.height}px`);
-      root.style.setProperty('--visual-top', `${viewport.offsetTop}px`);
+      // The visible viewport (11 October 2026): its height caps a screen
+      // riding the keyboard, so nothing sized from it can grow past the top,
+      // and its offset says how far iOS has panned the page under the keyboard.
+      publishVisible();
       // Zero occlusion AND an unpanned visual viewport. The second term is what
       // separates "the keyboard has gone" from "the keyboard is up and the pan
       // has run to the bottom" — see `settled`.
@@ -158,8 +183,7 @@ export function useKeyboardInset(): void {
           window.innerHeight - viewport.height - viewport.offsetTop,
         );
         root.style.setProperty('--keyboard-inset', `${occlusion}px`);
-        root.style.setProperty('--visual-height', `${viewport.height}px`);
-        root.style.setProperty('--visual-top', `${viewport.offsetTop}px`);
+        publishVisible();
         if (occlusion === 0) restoreDocumentScroll();
       });
     };
@@ -168,11 +192,13 @@ export function useKeyboardInset(): void {
     viewport.addEventListener('resize', update);
     viewport.addEventListener('scroll', update);
     document.addEventListener('focusout', onFocusOut);
+    document.addEventListener('focusin', publishVisible);
 
     return () => {
       viewport.removeEventListener('resize', update);
       viewport.removeEventListener('scroll', update);
       document.removeEventListener('focusout', onFocusOut);
+      document.removeEventListener('focusin', publishVisible);
       root.style.removeProperty('--keyboard-inset');
       root.style.removeProperty('--visual-height');
       root.style.removeProperty('--visual-top');

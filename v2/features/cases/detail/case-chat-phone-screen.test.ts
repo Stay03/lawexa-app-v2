@@ -85,12 +85,69 @@ test('the phone chat is a modal dialog that Escape closes and a status line anno
 });
 
 test('the keyboard hook publishes the visible height and offset beside the inset, and clears them', () => {
+  // One writer for both, called on every update, on the blur path and on focusin
+  // (12 October 2026: the two inline copies became `publishVisible`).
   const heights = keyboard.match(/setProperty\('--visual-height', `\$\{viewport\.height\}px`\)/g) ?? [];
-  const tops = keyboard.match(/setProperty\('--visual-top', `\$\{viewport\.offsetTop\}px`\)/g) ?? [];
-  assert.equal(heights.length, 2, 'height set on every update and on the blur path');
-  assert.equal(tops.length, 2, 'offset set on every update and on the blur path');
+  const tops = keyboard.match(/setProperty\('--visual-top', `\$\{top\}px`\)/g) ?? [];
+  assert.equal(heights.length, 1, 'height written in one place');
+  assert.equal(tops.length, 1, 'offset written in one place');
+  assert.equal(keyboard.match(/publishVisible\(\);/g)?.length, 2, 'every update and the blur path publish it');
   assert.match(keyboard, /removeProperty\('--visual-height'\)/);
   assert.match(keyboard, /removeProperty\('--visual-top'\)/);
+});
+
+test('with the keyboard down the published top is 0, so the chat covers the page bar', () => {
+  // iOS can report the full height while offsetTop still holds the keyboard's pan;
+  // the published top is clamped to where a visible rectangle can be.
+  assert.match(
+    keyboard,
+    /const top = Math\.max\(\s*0,\s*Math\.min\(viewport\.offsetTop, window\.innerHeight - viewport\.height\),\s*\);/,
+  );
+  assert.doesNotMatch(keyboard, /setProperty\('--visual-top', `\$\{viewport\.offsetTop\}px`\)/);
+  // The tap is a focus: the card's first frame is sized from the viewport at the tap.
+  assert.match(keyboard, /document\.addEventListener\('focusin', publishVisible\);/);
+  assert.match(keyboard, /document\.removeEventListener\('focusin', publishVisible\);/);
+  // And the dialog's own layer is above the shell's bar (z-30 at most).
+  assert.match(ask, /screenMounted \? 'z-40' : 'z-10'/);
+});
+
+test('the open card is full size and opaque from its first frame, whatever is loading inside', () => {
+  // Its size comes from the viewport alone: the fixed card's style reads only the two
+  // viewport variables, and nothing in the screen branch depends on a query state.
+  const styles = [...ask.matchAll(/style=\{\s*screenMounted\s*\?\s*\{([\s\S]*?)\}\s*:\s*undefined\s*\}/g)].map((m) => m[1]);
+  const card = styles.find((body) => body.includes('--visual-top'));
+  assert.ok(card, 'the fixed card has a style of its own');
+  const keys = [...card.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]);
+  assert.deepEqual(keys, ['top', 'height']);
+  assert.match(card, /top: 'var\(--visual-top, 0px\)'/);
+  assert.match(card, /height: 'var\(--visual-height, 100dvh\)'/);
+  assert.doesNotMatch(ask, /isPending|isLoading|isFetching/);
+  // The loading rows sit in the middle, which fills the card and scrolls by itself.
+  assert.match(core, /className="min-h-0 flex-1 motion-safe:animate-in/);
+  assert.match(core, /className="v2-quiet-scroll h-full min-h-0 overflow-y-auto overscroll-contain px-4 py-4"/);
+  // No colour fade on the phone card: the page never shows through it.
+  assert.match(ask, /'fixed inset-x-0 z-40 flex flex-col bg-popover pt-\[env\(safe-area-inset-top,0px\)\]'/);
+  assert.match(ask, /'mx-auto w-full max-w-\[26rem\] rounded-2xl border transition-\[background-color,box-shadow,border-color\] duration-300/);
+  assert.equal(ask.match(/transition-\[background-color/g)?.length, 1, "the colour transition is the floating card's only");
+});
+
+test('while the phone chat is open the page under it cannot scroll, and closing keeps the reading place', () => {
+  assert.match(ask, /import \{ V2_SHELL_CONTENT_ID \} from '@\/v2\/shell\/shell-content';/);
+  const lock = ask.match(/useEffect\(\(\) => \{\s*if \(!screenMounted\) return;\s*const scroller = document\.getElementById\(V2_SHELL_CONTENT_ID\);[\s\S]*?\}, \[screenMounted\]\);/)?.[0];
+  assert.ok(lock, 'an effect keyed on the open screen locks the shell scroller');
+  assert.match(lock, /const readingTop = scroller\.scrollTop;/);
+  assert.match(lock, /scroller\.style\.overflowY = 'hidden';/);
+  // Removed on close (the effect's cleanup) and the offset is the one the reader left.
+  assert.match(
+    lock,
+    /return \(\) => \{\s*scroller\.style\.overflowY = previousOverflow;\s*if \(scroller\.scrollTop !== readingTop\) scroller\.scrollTop = readingTop;\s*\};\s*\}, \[screenMounted\]\);/,
+  );
+  // The chat's own scrollers keep their drags (both contain their overscroll).
+  assert.match(core, /overflow-y-auto overscroll-contain/);
+  assert.match(
+    strip(read('v2', 'features', 'conversations', 'conversation', 'MessageList.tsx')),
+    /overflow-y-auto overscroll-contain/,
+  );
 });
 
 test('the keyboard inset itself is unchanged for every other screen', () => {
