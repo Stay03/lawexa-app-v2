@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Member, Space } from '@/types/collab';
 import { InvitePeopleDialog } from '@/v2/features/collab/membership/InvitePeopleDialog';
+import type { InviteIdentifier } from '@/v2/features/collab/membership/invite-identifier';
 import { MembersSheetFrame } from '@/v2/features/collab/membership/MembersSheetFrame';
 import {
   RosterErrorState,
@@ -176,11 +177,12 @@ export function SpaceMembersSheet({
 
   // The roles this space speaks in, and the request each one becomes: Viewer
   // or Contributor as `content_role` on a shared space, today's role on a team one.
+  // Either kind invites by email or by username, one of the two per request.
   const kind = spaceKind(space);
   const inviteRoles = inviteRoleOptions(kind);
-  const handleInvite = ({ email, role }: { email: string; role: string }) =>
+  const handleInvite = ({ invitee, role }: { invitee: InviteIdentifier; role: string }) =>
     new Promise<void>((resolve, reject) => {
-      const payload = invitePayload(kind, email, role);
+      const payload = invitePayload(kind, invitee, role);
       if (payload === null) {
         // Only a role the list above offered can arrive here.
         reject(new Error('Choose a role for them first.'));
@@ -339,6 +341,7 @@ export function SpaceMembersSheet({
         title={`Invite to ${space.name}`}
         description="They get an invitation they can accept from their own Invitations page."
         roles={inviteRoles}
+        identifier="email-or-username"
         onInvite={handleInvite}
         linkScope={{ spaceUuid: space.uuid, contentRoles: shared }}
       />

@@ -190,7 +190,9 @@ export function OrganizationMembersSheet({
         title={`Invite to ${organization.name}`}
         description="They get an invitation they can accept from their own Invitations page."
         roles={TEAM_INVITE_ROLES}
-        onInvite={({ email, role }) => handleInvite({ email, role })}
+        // The organization endpoint takes an email, never a username.
+        identifier="email"
+        onInvite={({ invitee, role }) => handleInvite({ email: invitee.email, role })}
       />
 
       <AlertDialog

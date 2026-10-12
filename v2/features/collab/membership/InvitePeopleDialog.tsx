@@ -17,11 +17,35 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { InviteLinkSection } from '@/v2/features/invites/InviteLinkSection';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { isInvitableContentRole } from './content-role';
+import {
+  INVITE_IDENTIFIER_HINT,
+  inviteRefusalMessage,
+  parseInviteIdentifier,
+  type InviteIdentifier,
+} from './invite-identifier';
 
 /**
- * InvitePeopleDialog — invite by email, with a role. Shared by the space and
- * organization members sheets; both endpoints take `email` XOR `user_uuid`,
- * and neither has a "people already inside" set to pick from the way a channel
+ * Which identifier the field takes, and so what `onInvite` receives. A space
+ * names `email-or-username` and gets either key; an organization names
+ * `email` and only ever gets an email.
+ */
+type InviteeProps<Role extends string> =
+  | {
+      identifier: 'email';
+      /** Rejects on failure so the dialog can surface the server line inline. */
+      onInvite: (invite: { invitee: { email: string }; role: Role }) => Promise<void>;
+    }
+  | {
+      identifier: 'email-or-username';
+      /** Rejects on failure so the dialog can surface the server line inline. */
+      onInvite: (invite: { invitee: InviteIdentifier; role: Role }) => Promise<void>;
+    };
+
+/**
+ * InvitePeopleDialog — invite by email or username, with a role. Shared by
+ * the space and organization members sheets. The space endpoint takes exactly
+ * one of `email`, `user_uuid` or `username` (backend 6d11c84); the
+ * organization one takes `email` or `user_uuid`. Neither has a "people already inside" set to pick from the way a channel
  * does (a channel's invitees must already be space members — digest §F.15 —
  * which is why the channel feature keeps its own picker variant).
  *
@@ -33,6 +57,7 @@ import { isInvitableContentRole } from './content-role';
  * which is the "quiet disable, not an error" shape the research asks for.
  * Every OTHER refusal — duplicate → 409, unknown email → 422 — is shown in the
  * server's own words, inline, because those ARE answers the inviter can act on.
+ * An unknown username (422 under `errors.username`) names the handle instead.
  *
  * The caller owns the mutation and rejects on failure so this dialog can read
  * the reason. Phase-5 W4, 2026-08-04.
@@ -44,6 +69,11 @@ import { isInvitableContentRole } from './content-role';
  * the request (`invitePayload` for spaces), so this file never decides which
  * field a role travels in. On a shared space the link half follows the same
  * choice, so a link made here gives the role the reader picked.
+ *
+ * THE FIELD IS TOLD WHAT IT TAKES (12 October 2026). `identifier` comes from
+ * the caller, never from the text: a space reads "email or @username"
+ * (`parseInviteIdentifier`), an organization keeps the email field it had. A
+ * value that is neither is caught here and never sent.
  */
 export function InvitePeopleDialog<Role extends string>({
   open,
@@ -51,31 +81,31 @@ export function InvitePeopleDialog<Role extends string>({
   title,
   description,
   roles,
+  identifier,
   onInvite,
   linkScope,
-}: {
+}: InviteeProps<Role> & {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
   /** The roles to offer, first one selected. Never empty. */
   roles: readonly { value: Role; label: string }[];
-  /** Rejects on failure so the dialog can surface the server line inline. */
-  onInvite: (invite: { email: string; role: Role }) => Promise<void>;
   /** A SPACE, so it can also offer a link. Organizations pass nothing: invite
    *  links are a spaces feature and there is no organization equivalent.
    *  `contentRoles` (a shared space) makes the link give the chosen role. */
   linkScope?: { spaceUuid: string; contentRoles?: boolean };
 }) {
   const defaultRole = roles[0].value;
-  const [email, setEmail] = useState('');
+  const byEmail = identifier === 'email';
+  const [value, setValue] = useState('');
   const [role, setRole] = useState<Role>(defaultRole);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [throttled, setThrottled] = useState(false);
 
   const reset = () => {
-    setEmail('');
+    setValue('');
     setRole(defaultRole);
     setError(null);
     setThrottled(false);
@@ -92,10 +122,10 @@ export function InvitePeopleDialog<Role extends string>({
     onOpenChange(false);
   };
 
-  const handleEmailChange = (next: string) => {
-    setEmail(next);
-    // Editing the address clears the last answer — including the throttle
-    // rest, so the reader is never stuck behind a stale disable.
+  const handleValueChange = (next: string) => {
+    setValue(next);
+    // Editing the address or handle clears the last answer — including the
+    // throttle rest, so the reader is never stuck behind a stale disable.
     if (error || throttled) {
       setError(null);
       setThrottled(false);
@@ -103,13 +133,21 @@ export function InvitePeopleDialog<Role extends string>({
   };
 
   const submit = async () => {
-    const trimmed = email.trim();
+    const trimmed = value.trim();
     if (!trimmed || submitting) return;
+    const invitee =
+      identifier === 'email' ? { email: trimmed } : parseInviteIdentifier(trimmed);
+    if (!invitee) {
+      setError(INVITE_IDENTIFIER_HINT);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     setThrottled(false);
     try {
-      await onInvite({ email: trimmed, role });
+      await (identifier === 'email'
+        ? onInvite({ invitee: { email: trimmed }, role })
+        : onInvite({ invitee, role }));
       reset();
       onOpenChange(false);
     } catch (failure) {
@@ -117,7 +155,7 @@ export function InvitePeopleDialog<Role extends string>({
       if (apiError.status === 429) {
         setThrottled(true);
       } else {
-        setError(apiError.message);
+        setError(inviteRefusalMessage(apiError, invitee));
       }
     } finally {
       setSubmitting(false);
@@ -146,7 +184,7 @@ export function InvitePeopleDialog<Role extends string>({
           </Button>
           <Button
             onClick={() => void submit()}
-            disabled={submitting || throttled || !email.trim()}
+            disabled={submitting || throttled || !value.trim()}
           >
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
             Send invitation
@@ -156,14 +194,20 @@ export function InvitePeopleDialog<Role extends string>({
     >
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="invite-email">Email address</Label>
+          <Label htmlFor="invite-email">
+            {byEmail ? 'Email address' : 'Email or username'}
+          </Label>
           <Input
             id="invite-email"
-            type="email"
+            // A handle is not an email, so a space's field is plain text; the
+            // email keyboard still has the `@` a handle starts with.
+            type={byEmail ? 'email' : 'text'}
+            inputMode={byEmail ? undefined : 'email'}
+            autoCapitalize={byEmail ? undefined : 'off'}
             autoComplete="off"
-            placeholder="name@example.com"
-            value={email}
-            onChange={(event) => handleEmailChange(event.target.value)}
+            placeholder={byEmail ? 'name@example.com' : 'name@example.com or @username'}
+            value={value}
+            onChange={(event) => handleValueChange(event.target.value)}
             onKeyDown={(event) => {
               // IME Enter confirms the composition; it must never submit.
               if (event.key === 'Enter' && !event.nativeEvent.isComposing) {

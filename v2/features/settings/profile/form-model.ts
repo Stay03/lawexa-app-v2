@@ -69,6 +69,18 @@ export const PROFILE_LIMITS = {
 const USERNAME_ALLOWED = /^[a-z0-9_]+$/;
 const USERNAME_START = /^[a-z0-9]/;
 
+/** Whether `handle` (already normalised, no `@`) has a username's shape. The
+ *  space invite reads a typed `@handle` with it; the profile form keeps its
+ *  own checks below because it names which rule was broken. */
+export function isUsernameShape(handle: string): boolean {
+  return (
+    handle.length >= PROFILE_LIMITS.usernameMin &&
+    handle.length <= PROFILE_LIMITS.usernameMax &&
+    USERNAME_ALLOWED.test(handle) &&
+    USERNAME_START.test(handle)
+  );
+}
+
 /**
  * The form's values. Every one is a string (or a list of ids) because every
  * one is what a control holds: numbers are parsed at the payload boundary, so

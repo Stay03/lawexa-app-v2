@@ -1204,15 +1204,24 @@ export interface MarkReadResponse {
   };
 }
 
-/** Invite by email OR user_uuid (required-without each other); owner rejected. */
-export interface InviteMemberPayload {
-  email?: string;
-  user_uuid?: string;
+/**
+ * Who an invite is for: EXACTLY ONE of `email`, `user_uuid` or `username`. Two
+ * or none is a 422, so the type allows one only. Organizations and channels
+ * take `email` or `user_uuid`; `username` is a SPACE invite only (backend
+ * 6d11c84), and an unknown one answers 422 under `errors.username`.
+ */
+export type InviteMemberTarget =
+  | { email: string; user_uuid?: never; username?: never }
+  | { user_uuid: string; email?: never; username?: never }
+  | { username: string; email?: never; user_uuid?: never };
+
+/** An invite request; the owner role is rejected. */
+export type InviteMemberPayload = InviteMemberTarget & {
   role: 'admin' | 'member';
   /** SHARED spaces only (backend B2): the role the invitee gets. `role` is
    *  then always `member`, the old column the backend writes beside it. */
   content_role?: Exclude<ContentRole, 'owner'>;
-}
+};
 
 export interface UpdateMemberRolePayload {
   role: 'admin' | 'member';

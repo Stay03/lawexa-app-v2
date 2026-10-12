@@ -75,15 +75,43 @@ test('role options: Viewer and Contributor on a shared space, Member and Admin o
 });
 
 test('content_role travels only on a shared space; a role from the other kind is refused', () => {
-  assert.deepEqual(invitePayload('shared', 'a@b.c', 'editor'), {
+  assert.deepEqual(invitePayload('shared', { email: 'a@b.c' }, 'editor'), {
     email: 'a@b.c',
     role: 'member',
     content_role: 'editor',
   });
-  assert.deepEqual(invitePayload('team', 'a@b.c', 'admin'), { email: 'a@b.c', role: 'admin' });
-  assert.equal(invitePayload('shared', 'a@b.c', 'admin'), null);
-  assert.equal(invitePayload('team', 'a@b.c', 'viewer'), null);
+  assert.deepEqual(invitePayload('team', { email: 'a@b.c' }, 'admin'), {
+    email: 'a@b.c',
+    role: 'admin',
+  });
+  assert.equal(invitePayload('shared', { email: 'a@b.c' }, 'admin'), null);
+  assert.equal(invitePayload('team', { email: 'a@b.c' }, 'viewer'), null);
   assert.deepEqual(contentRoleChangePayload('viewer'), { content_role: 'viewer' });
+});
+
+test('a space invite names its invitee by exactly one key, email or username', () => {
+  // Backend 6d11c84: two identifiers or none is a 422, on both kinds of space.
+  assert.deepEqual(invitePayload('shared', { username: 'ada_obi' }, 'viewer'), {
+    username: 'ada_obi',
+    role: 'member',
+    content_role: 'viewer',
+  });
+  assert.deepEqual(invitePayload('team', { username: 'ada_obi' }, 'member'), {
+    username: 'ada_obi',
+    role: 'member',
+  });
+  for (const kind of ['shared', 'team'] as const) {
+    const role = kind === 'shared' ? 'editor' : 'admin';
+    for (const invitee of [{ email: 'a@b.c' }, { username: 'ada_obi' }]) {
+      const payload = invitePayload(kind, invitee, role);
+      assert.ok(payload);
+      const keys = ['email', 'username', 'user_uuid'].filter((key) => key in payload);
+      assert.deepEqual(keys, Object.keys(invitee), `${kind} ${keys.join(',')}`);
+    }
+  }
+  // Only the identifier is copied, so a stray field cannot ride along.
+  const stray = { email: 'a@b.c', username: 'ada_obi' };
+  assert.deepEqual(invitePayload('team', stray, 'member'), { email: 'a@b.c', role: 'member' });
 });
 
 test('a shared invite link names its role and never a channel', () => {
@@ -154,7 +182,8 @@ test('the members sheet reads content roles on a shared space and keeps team rul
   const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceMembersSheet.tsx');
   assert.match(sheet, /const isOwner = isMembershipOwner\(membership\);/);
   assert.match(sheet, /const canManage = canManageMembership\(membership\);/);
-  assert.match(sheet, /const payload = invitePayload\(kind, email, role\);/);
+  assert.match(sheet, /const payload = invitePayload\(kind, invitee, role\);/);
+  assert.match(sheet, /identifier="email-or-username"/);
   assert.match(sheet, /roles=\{inviteRoles\}/);
   assert.match(sheet, /linkScope=\{\{ spaceUuid: space\.uuid, contentRoles: shared \}\}/);
   assert.match(sheet, /contentRoles=\{shared\}/);

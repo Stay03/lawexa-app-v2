@@ -13,6 +13,7 @@ import {
   isInvitableContentRole,
   type InvitableContentRole,
 } from '@/v2/features/collab/membership/content-role';
+import type { InviteIdentifier } from '@/v2/features/collab/membership/invite-identifier';
 import {
   SHARED_INVITE_ROLES,
   TEAM_INVITE_ROLES,
@@ -380,18 +381,24 @@ export function inviteRoleOptions(kind: SpaceKind): readonly InviteRoleOption[] 
  * a Viewer (design 2.1); a TEAM space sends today's `role` and nothing else.
  * Returns `null` for a role this kind of space does not have, so a stale form
  * value can never send a mixed request.
+ *
+ * The invitee travels as EXACTLY ONE key, `email` or `username`, on both kinds
+ * (backend 6d11c84 answers 422 to two). It is copied key by key rather than
+ * spread, so nothing else the caller's object carries can ride along.
  */
 export function invitePayload(
   kind: SpaceKind,
-  email: string,
+  invitee: InviteIdentifier,
   role: string,
 ): InviteMemberPayload | null {
+  const target =
+    'email' in invitee ? { email: invitee.email } : { username: invitee.username };
   if (kind === 'shared') {
     return isInvitableContentRole(role)
-      ? { email, role: 'member', content_role: role }
+      ? { ...target, role: 'member', content_role: role }
       : null;
   }
-  return role === 'admin' || role === 'member' ? { email, role } : null;
+  return role === 'admin' || role === 'member' ? { ...target, role } : null;
 }
 
 /** A shared space's role change: the content role only (backend B2). */
