@@ -52,8 +52,11 @@ import type { SpaceActivity } from './space-activity';
  * The approved row carries the viewer's role, and a space you own and a space
  * you only view looked identical. "You're the owner", "You're a contributor",
  * "You're a viewer" (`spaceRoleLabel`) is the line's FIRST fact and never
- * shrinks, because on a phone the lead runs out of room and the role is what
- * decides what the reader can do inside: the counts after it truncate first.
+ * shrinks, because the role is what decides what the reader can do inside.
+ * On a phone that left the chips and counts after it no room at all (three
+ * gold dots and "more"), so below `sm:` the meta runs on two lines: the role
+ * with the members and age, then the chips or counts with the owner (design
+ * round 2, 12 October 2026). The lane grows by one 16px line on phones only.
  * The lock appears only where it can differ
  * (`showsPrivateMark`): a shared space is always private.
  *
@@ -154,6 +157,22 @@ export const SpaceRow = memo(function SpaceRow({
   const faces = space.members
     ? space.members.filter((member) => member.is_active).map((member) => member.user)
     : NO_FACES;
+  // What is inside, then whose it is: the chips when the viewer has channels
+  // here, else what the space holds or what it is.
+  const inside = [
+    hasChips ? <ChannelChips key="chips" activity={activity} /> : (holds ?? space.type_label),
+    spaceOwnerLabel(space),
+  ];
+  const trail = [
+    <PresenceStack
+      key="members"
+      members={faces}
+      total={space.active_members_count}
+      countLabel={memberWords}
+      label={`${memberWords} in ${space.name}`}
+    />,
+    age,
+  ];
 
   return (
     <li
@@ -200,27 +219,20 @@ export const SpaceRow = memo(function SpaceRow({
             ) : null}
           </div>
 
+          {/* A phone splits the meta onto two lines (design round 2): the
+              role with the members and age, then what is inside. On one line
+              the role, which never shrinks, left the chips no room for a
+              letter. From `sm:` up the one line has the width it needs. */}
+          {role ? (
+            <div className="sm:hidden">
+              <MetaLine className="mt-1.5" lead={[role]} trail={trail} />
+              <MetaLine className="mt-0.5" lead={inside} />
+            </div>
+          ) : null}
           <MetaLine
-            className="mt-1.5"
-            lead={
-              hasChips
-                ? [
-                    role,
-                    <ChannelChips key="chips" activity={activity} />,
-                    spaceOwnerLabel(space),
-                  ]
-                : [role, holds ?? space.type_label, spaceOwnerLabel(space)]
-            }
-            trail={[
-              <PresenceStack
-                key="members"
-                members={faces}
-                total={space.active_members_count}
-                countLabel={memberWords}
-                label={`${memberWords} in ${space.name}`}
-              />,
-              age,
-            ]}
+            className={cn('mt-1.5', role && 'hidden sm:flex')}
+            lead={[role, ...inside]}
+            trail={trail}
           />
         </div>
 

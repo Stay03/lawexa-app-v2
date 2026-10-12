@@ -260,8 +260,9 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
    * Members and Leave, so a Viewer who wants out no longer has to guess that
    * the faces are a button. The Owner (and a team space's admin) adds Invite
    * links and Waiting to join, which open those steps of the members sheet,
-   * and Rename. Delete is the Owner's alone. The destructive two sit under
-   * the menu's separator.
+   * and Rename. Delete is the Owner's alone. The bar draws a rule before
+   * Rename, so the people rows read as one group, and one before Leave, the
+   * first destructive row (`ruledAbove`).
    *
    * LEAVE IS NEVER A DEAD END: where it could only be refused, for the last
    * Owner of a space nobody else is in, it is not offered, and Delete is the
@@ -316,7 +317,13 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
         icon: Hourglass,
         onSelect: openJoinRequests,
       },
-      rename: { id: 'rename', label: 'Rename', icon: Pencil, onSelect: openRename },
+      rename: {
+        id: 'rename',
+        label: 'Rename',
+        icon: Pencil,
+        separatorBefore: true,
+        onSelect: openRename,
+      },
       leave: {
         id: 'leave',
         label: 'Leave space',

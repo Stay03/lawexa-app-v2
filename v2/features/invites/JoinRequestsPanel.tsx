@@ -93,7 +93,7 @@ function RequestRow({
           onClick={() => onDecide(false)}
         >
           <UserX aria-hidden className="size-4" />
-          No
+          Decline
         </Button>
       </div>
     </li>

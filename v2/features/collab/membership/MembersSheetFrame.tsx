@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,14 @@ import {
  * `onBack` turns the header into a step inside the sheet (the space sheet's
  * invite links and waiting list, design round 1): a back control before the
  * title returns to the roster without closing the panel.
+ *
+ * ── FOCUS LANDS ON THE BODY, NOT ON A CONTROL (design round 2) ─────────────
+ * Radix moves focus to the first tabbable element on open. For a Viewer, who
+ * has no invite button and no row menus, that was the footer's "Leave space",
+ * so a keyboard reader was one Enter away from the leave confirm on every
+ * open. The panel is named by its title, so focus goes to the scrolling body
+ * instead (`tabIndex={-1}`, reached by script only), on open and again on each
+ * step change, whose old control has just left the page.
  */
 export function MembersSheetFrame({
   open,
@@ -53,6 +62,14 @@ export function MembersSheetFrame({
   /** Its accessible name, e.g. "Back to members". */
   backLabel?: string;
 }) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // A new step replaces the control that opened it, so focus would fall to
+  // the document; it goes to the step's body, as it does on open. `title` is
+  // what names the step, so it is what re-runs this.
+  useEffect(() => {
+    if (open) bodyRef.current?.focus();
+  }, [open, title]);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       {/* Variant-matched width, or these are dead classes — see `SpaceDrawer`.
@@ -61,6 +78,10 @@ export function MembersSheetFrame({
       <SheetContent
         side="right"
         className="flex flex-col gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-sm"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          bodyRef.current?.focus();
+        }}
       >
         <SheetHeader className="border-b">
           {onBack ? (
@@ -86,7 +107,11 @@ export function MembersSheetFrame({
           <SheetDescription>{subtitle}</SheetDescription>
         </SheetHeader>
 
-        <div className="v2-quiet-scroll min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        <div
+          ref={bodyRef}
+          tabIndex={-1}
+          className="v2-quiet-scroll min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 outline-none"
+        >
           {children}
         </div>
 

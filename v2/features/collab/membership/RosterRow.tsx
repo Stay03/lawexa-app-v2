@@ -62,6 +62,7 @@ export function RosterRow({
   onSetContentRole,
   onTransferOwnership,
   onRemove,
+  showPending = true,
 }: {
   member: Member;
   isSelf?: boolean;
@@ -74,6 +75,9 @@ export function RosterRow({
   /** Space rosters only — organizations have no ownership-transfer route. */
   onTransferOwnership?: (member: Member) => void;
   onRemove?: (member: Member) => void;
+  /** `false` under a heading that already says "Invited", where the chip
+   *  would say it a second time (design round 2). */
+  showPending?: boolean;
 }) {
   const contentRole = contentRoles ? contentRoleOf(member) : null;
   const isOwner = contentRole !== null ? contentRole === 'owner' : member.role === 'owner';
@@ -127,7 +131,7 @@ export function RosterRow({
           <span className="shrink-0 text-xs capitalize text-muted-foreground">
             {roleLabel}
           </span>
-          {member.is_pending && (
+          {member.is_pending && showPending && (
             <Badge variant="outline" className="h-4 px-1 text-[10px] font-medium">
               Pending
             </Badge>

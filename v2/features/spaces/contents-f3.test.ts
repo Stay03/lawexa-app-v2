@@ -274,7 +274,13 @@ test('a file row names its type', () => {
   assert.equal(fileTypeLabel({ mime_type: 'application/octet-stream', original_name: 'notes.txt' }), 'TXT');
   assert.equal(fileTypeLabel({ mime_type: 'application/octet-stream', original_name: 'README' }), 'File');
   const row = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
-  assert.match(row, /lead=\{\[fileTypeLabel\(file\), formatBytes\(file\.size\), file\.uploader\.name\]\}/);
+  // Design round 2: type and size are one element that holds its width, and
+  // only the uploader truncates (was
+  // `lead={[fileTypeLabel(file), formatBytes(file.size), file.uploader.name]}`).
+  assert.match(
+    row,
+    /<span key="kind" className="flex shrink-0 items-center gap-2">\s*<span>\{fileTypeLabel\(file\)\}<\/span>\s*<MetaSeparator \/>\s*<span>\{formatBytes\(file\.size\)\}<\/span>\s*<\/span>,\s*file\.uploader\.name,/,
+  );
 });
 
 /* ── Invalidations ───────────────────────────────────────────────────────── */

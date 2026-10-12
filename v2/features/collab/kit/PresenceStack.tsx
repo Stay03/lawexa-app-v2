@@ -54,13 +54,16 @@ import { MemberAvatar } from '../membership/MemberAvatar';
 interface StackGeometry {
   /** How many faces before the overflow chip takes over. */
   faces: number;
-  avatar: 'sm' | 'default';
+  avatar: 'sm' | 'default' | 'lg';
   text: string;
 }
 
 const GEOMETRY = {
   sm: { faces: 3, avatar: 'sm', text: 'text-xs' },
   md: { faces: 4, avatar: 'default', text: 'text-sm' },
+  // The space header from `md:` up, where the faces sit beside a 24px title
+  // and the 32px ones read as small (design round 2).
+  lg: { faces: 4, avatar: 'lg', text: 'text-sm' },
 } satisfies Record<string, StackGeometry>;
 
 type PresenceStackSize = keyof typeof GEOMETRY;

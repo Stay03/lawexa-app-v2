@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
 import { useMounted } from './use-mounted';
-import { useScreenActions } from './screen-context';
+import { ruledAbove, useScreenActions } from './screen-context';
 
 /**
  * V2HeaderMenu — the header's right-cluster overflow menu (owner #28). The theme
@@ -64,6 +65,9 @@ import { useScreenActions } from './screen-context';
  *
  * They lead rather than trail because they are what the reader came for; Theme
  * and "Switch to classic Lawexa" are app furniture and belong under the rule.
+ * Inside the screen's rows, a rule goes before the first destructive verb and
+ * wherever a row asks for one (`ruledAbove`), so a space's Leave and Delete
+ * never run on from Rename (design round 2, 12 October 2026).
  * The rows are guarded by the pathname they were published for, so a menu
  * opened a frame into a new screen can never run the last screen's Delete.
  */
@@ -102,16 +106,18 @@ export function V2HeaderMenu({
           // The separator rides the GROUP, not the last row, so a screen with
           // no actions never opens this menu on a rule with nothing above it.
           <DropdownMenuGroup>
-            {screenActions.map((action) => (
-              <DropdownMenuItem
-                key={action.id}
-                className="min-h-11 md:min-h-8"
-                variant={action.destructive ? 'destructive' : 'default'}
-                onSelect={action.onSelect}
-              >
-                <action.icon aria-hidden className="size-4" />
-                <span>{action.label}</span>
-              </DropdownMenuItem>
+            {screenActions.map((action, index) => (
+              <Fragment key={action.id}>
+                {ruledAbove(screenActions, index) ? <DropdownMenuSeparator /> : null}
+                <DropdownMenuItem
+                  className="min-h-11 md:min-h-8"
+                  variant={action.destructive ? 'destructive' : 'default'}
+                  onSelect={action.onSelect}
+                >
+                  <action.icon aria-hidden className="size-4" />
+                  <span>{action.label}</span>
+                </DropdownMenuItem>
+              </Fragment>
             ))}
             <DropdownMenuSeparator />
           </DropdownMenuGroup>

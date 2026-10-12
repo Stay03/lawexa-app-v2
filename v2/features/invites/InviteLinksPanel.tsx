@@ -96,7 +96,7 @@ function LinkRow({
             disabled={revoking}
             onClick={() => onRevoke(link.id)}
           >
-            <Trash2 aria-hidden className="size-4" /> Stop it
+            <Trash2 aria-hidden className="size-4" /> Stop link
           </Button>
         )}
       </div>

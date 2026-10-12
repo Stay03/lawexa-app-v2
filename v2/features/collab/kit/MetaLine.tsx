@@ -38,6 +38,13 @@ import { cn } from '@/lib/utils';
  * content, so a whole-row link still nests correctly; a `<p>` does not, so a
  * meta line must be a SIBLING of a paragraph, never inside one.
  *
+ * `as="span"` is for a meta line inside a `<button>` (a file row whose body
+ * opens the file, design round 2), whose content must be phrasing: the line
+ * and its zones become `<span>`s, so no fact passed there may be a `<div>`.
+ *
+ * `MetaSeparator` is the dot itself, for a caller that joins two facts into
+ * one element so they hold their width together (a file's type and size).
+ *
  * No skeleton ships with this: a meta line is text inside a row, and the row's
  * own skeleton already reserves its two bars at the right widths.
  */
@@ -47,28 +54,38 @@ function isRendered(fact: ReactNode): boolean {
   return fact !== null && fact !== undefined && fact !== false && fact !== '';
 }
 
+/** The one separator dot every meta line joins its facts with. */
+export function MetaSeparator() {
+  return (
+    <span aria-hidden className="shrink-0 text-muted-foreground/40">
+      ·
+    </span>
+  );
+}
+
+/** The element the line and its zones render as. */
+type MetaTag = 'div' | 'span';
+
 function Zone({
   facts,
+  as: Tag,
   className,
   factClassName,
 }: {
   facts: readonly ReactNode[];
+  as: MetaTag;
   className: string;
   factClassName: string;
 }) {
   const shown = facts.filter(isRendered);
   if (shown.length === 0) return null;
   return (
-    <div className={className}>
+    <Tag className={className}>
       {shown.map((fact, index) => (
         // Positional by nature: the facts are a fixed-shape list per row, never
         // reordered, so the index IS the identity.
         <Fragment key={index}>
-          {index > 0 ? (
-            <span aria-hidden className="shrink-0 text-muted-foreground/40">
-              ·
-            </span>
-          ) : null}
+          {index > 0 ? <MetaSeparator /> : null}
           {typeof fact === 'string' ? (
             <span className={factClassName}>{fact}</span>
           ) : (
@@ -76,23 +93,26 @@ function Zone({
           )}
         </Fragment>
       ))}
-    </div>
+    </Tag>
   );
 }
 
 export function MetaLine({
   lead,
   trail,
+  as: Tag = 'div',
   className,
 }: {
   /** The facts that identify the row. Truncates first. */
   lead: readonly ReactNode[];
   /** The facts that measure it — counts, ages. Holds its width. */
   trail?: readonly ReactNode[];
+  /** `span` inside a button; see the docblock. */
+  as?: MetaTag;
   className?: string;
 }) {
   return (
-    <div
+    <Tag
       className={cn(
         'flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground',
         className,
@@ -100,16 +120,18 @@ export function MetaLine({
     >
       <Zone
         facts={lead}
+        as={Tag}
         className="flex min-w-0 flex-1 items-center gap-2"
         factClassName="min-w-0 truncate"
       />
       {trail ? (
         <Zone
           facts={trail}
+          as={Tag}
           className="flex shrink-0 items-center gap-2 tabular-nums"
           factClassName="shrink-0"
         />
       ) : null}
-    </div>
+    </Tag>
   );
 }

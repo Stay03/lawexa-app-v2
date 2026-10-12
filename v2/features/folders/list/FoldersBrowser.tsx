@@ -223,7 +223,7 @@ export function FoldersBrowser() {
     <PageShell>
       {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
 
-      <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
+      <div className="mb-3 flex min-h-11 items-center justify-between gap-3">
         <p className="min-w-0 truncate text-xs text-muted-foreground tabular-nums">
           {total === null
             ? ''
@@ -236,7 +236,9 @@ export function FoldersBrowser() {
           type="button"
           onClick={() => setCreating(true)}
           className={cn(
-            'v2-interactive inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+            // 44px, the touch floor and the height of the same pill on a
+            // space's tabs (design round 2).
+            'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
             FOCUS_RING,
           )}
         >

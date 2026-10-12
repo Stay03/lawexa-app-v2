@@ -264,7 +264,19 @@ export function MoveToSpaceDialog({
           </p>
         ) : null}
 
-        <DialogFooter className="gap-2 sm:justify-between">
+        {/* Cancel first in the DOM, outlined, as in the New folder dialog:
+            the footer reverses on a phone, so "Remove from space" sits on
+            top and Cancel under it, and on a desktop the row is reversed
+            back, Remove on the left and Cancel on the right (design round 2). */}
+        <DialogFooter className="gap-2 sm:flex-row-reverse sm:justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={move.isPending}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
           {inSpace ? (
             <Button
               type="button"
@@ -279,17 +291,7 @@ export function MoveToSpaceDialog({
               )}
               Remove from space
             </Button>
-          ) : (
-            <span aria-hidden />
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={move.isPending}
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -40,8 +40,8 @@ export function FoldersFallback() {
       <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
         <ScreenTitle />
         {searchAtTop ? <SearchFieldShape className="mb-3" /> : null}
-        <div className="mb-3 flex min-h-9 items-center justify-end">
-          <div className="h-9 w-9 rounded-full bg-primary/60 sm:w-32" />
+        <div className="mb-3 flex min-h-11 items-center justify-end">
+          <div className="h-11 w-11 rounded-full bg-primary/60 sm:w-32" />
         </div>
         <FoldersListSkeleton />
         {searchAtTop ? null : (

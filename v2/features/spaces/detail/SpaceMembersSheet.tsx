@@ -337,10 +337,13 @@ export function SpaceMembersSheet({
     });
   };
 
-  const rosterRow = (member: Member) => (
+  // `underInvited`: the row sits under the "Invited" heading, so it drops the
+  // Pending chip that would repeat it.
+  const rosterRow = (member: Member, underInvited = false) => (
     <RosterRow
       key={member.user.uuid}
       member={member}
+      showPending={!underInvited}
       isSelf={member.user.uuid === viewerUuid}
       contentRoles={shared}
       onPromote={
@@ -482,7 +485,9 @@ export function SpaceMembersSheet({
               <RosterErrorState onRetry={() => void membersQuery.refetch()} />
             ) : (
               <>
-                <div className="divide-y divide-border/60">{joined.map(rosterRow)}</div>
+                <div className="divide-y divide-border/60">
+                  {joined.map((member) => rosterRow(member))}
+                </div>
                 {invited.length > 0 ? (
                   <section aria-labelledby="space-roster-invited">
                     <h3
@@ -492,7 +497,7 @@ export function SpaceMembersSheet({
                       Invited
                     </h3>
                     <div className="divide-y divide-border/60">
-                      {invited.map(rosterRow)}
+                      {invited.map((member) => rosterRow(member, true))}
                     </div>
                   </section>
                 ) : null}

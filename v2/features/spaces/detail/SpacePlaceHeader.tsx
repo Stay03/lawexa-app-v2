@@ -104,6 +104,8 @@ export function SpacePlaceHeader({
       />
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
+        {/* One stack per width: 40px faces from `md:` up, beside the 24px
+            title, and the 32px ones on a phone (design round 2). */}
         <PresenceStack
           members={faces}
           total={space.active_members_count}
@@ -112,6 +114,17 @@ export function SpacePlaceHeader({
           size="md"
           withCount
           onClick={onOpenRoster}
+          className="md:hidden"
+        />
+        <PresenceStack
+          members={faces}
+          total={space.active_members_count}
+          countLabel={countLabel}
+          label={`${countLabel} in ${space.name}. Open the members list`}
+          size="lg"
+          withCount
+          onClick={onOpenRoster}
+          className="hidden md:inline-flex"
         />
         {canCreateChannel ? (
           <Button size="sm" className="v2-interactive lg:hidden" onClick={onCreateChannel}>

@@ -55,6 +55,22 @@ export interface ScreenAction {
   onSelect: () => void;
   /** Destructive verbs are styled as such and sit under a separator. */
   destructive?: boolean;
+  /** Draws a separator above this row, for a screen whose rows fall into
+   *  more than one group (the space menu's Rename, after the people rows). */
+  separatorBefore?: boolean;
+}
+
+/**
+ * Whether the bar's menu draws a separator above the row at `index`: where
+ * the row asks for one, and before the first destructive row of a run, so
+ * Delete never sits flush against Rename. Never above the first row, which
+ * would open the menu on a rule with nothing over it.
+ */
+export function ruledAbove(actions: readonly ScreenAction[], index: number): boolean {
+  if (index <= 0 || index >= actions.length) return false;
+  const action = actions[index];
+  if (action.separatorBefore) return true;
+  return (action.destructive ?? false) && !(actions[index - 1].destructive ?? false);
 }
 
 /** Overrides the route's default "up". Address and label always travel together. */
@@ -114,7 +130,8 @@ function sameActions(
       action.label === other.label &&
       action.icon === other.icon &&
       action.onSelect === other.onSelect &&
-      (action.destructive ?? false) === (other.destructive ?? false)
+      (action.destructive ?? false) === (other.destructive ?? false) &&
+      (action.separatorBefore ?? false) === (other.separatorBefore ?? false)
     );
   });
 }

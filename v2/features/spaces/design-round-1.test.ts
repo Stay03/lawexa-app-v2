@@ -167,12 +167,16 @@ test('the page publishes the menu from the one rule and opens the frame’s dial
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   assert.match(screen, /spaceMenuItems\(\{ canManage, isOwner, leaveRoute \}\)\.map\(\(item\) => verbs\[item\]\)/);
   assert.match(screen, /label: 'Members', icon: Users, onSelect: openRoster/);
-  assert.match(screen, /label: 'Rename', icon: Pencil, onSelect: openRename/);
+  // Design round 2: Rename asks for the rule above it (was one line,
+  // `label: 'Rename', icon: Pencil, onSelect: openRename`).
+  assert.match(screen, /label: 'Rename',\s*icon: Pencil,\s*separatorBefore: true,\s*onSelect: openRename/);
   assert.match(screen, /label: 'Leave space',\s*icon: LogOut,\s*destructive: true,\s*onSelect: openLeave/);
   assert.doesNotMatch(screen, /if \(!canManage\) return NO_SCREEN_ACTIONS;/);
   assert.doesNotMatch(screen, /Invite by link|Edit space|You decide who actually gets in/);
   const frame = read('v2', 'features', 'collab', 'shell', 'CollabFrame.tsx');
-  assert.match(frame, /<DeleteSpaceDialog\s+key=\{space\.uuid\}/);
+  // Design round 2: the key carries a prefix, apart from the sheet's (was
+  // `key={space.uuid}`, the same key as its sibling).
+  assert.match(frame, /<DeleteSpaceDialog\s+key=\{`delete-\$\{space\.uuid\}`\}/);
   assert.match(frame, /leaveOpen=\{leaveOpen\}\s*onLeaveOpenChange=\{setLeaveOpen\}\s*onDeleteSpace=\{openDelete\}/);
   // The Owner steps of the sheet are gated like the create param.
   assert.match(frame, /\{ links: canManage, requests: canManage, invite: canManage \}/);

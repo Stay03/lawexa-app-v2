@@ -269,7 +269,14 @@ test('the spaces list marks team spaces and asks for channels only for researche
   assert.match(row, />\s*Team\s*</);
   // Design round 1: the viewer's role leads the line (was
   // `[holds ?? space.type_label, spaceOwnerLabel(space)]`).
-  assert.match(row, /\[role, holds \?\? space\.type_label, spaceOwnerLabel\(space\)\]/);
+  // Design round 2: the facts after the role are one list, shared by the
+  // phone's second line and the single line from sm: up (was
+  // `[role, holds ?? space.type_label, spaceOwnerLabel(space)]`).
+  assert.match(
+    row,
+    /hasChips \? <ChannelChips key="chips" activity=\{activity\} \/> : \(holds \?\? space\.type_label\),\s*spaceOwnerLabel\(space\),/,
+  );
+  assert.match(row, /lead=\{\[role, \.\.\.inside\]\}/);
   const browser = read('v2', 'features', 'spaces', 'list', 'SpacesBrowser.tsx');
   assert.match(
     browser,

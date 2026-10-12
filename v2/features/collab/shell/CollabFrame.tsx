@@ -732,10 +732,12 @@ function CollabPlaceFrame({
             in the docblock). Its own query is `enabled: open`, so mounting it
             here costs nothing until someone asks for it. ────────────────── */}
       {/* Keyed by the space, so nothing the sheet holds about one space (a
-          hand-over in progress, a refusal) is carried into the next. */}
+          hand-over in progress, a refusal) is carried into the next. The
+          prefix keeps the key apart from the delete dialog's: both are
+          children of the same provider. */}
       {isSpaceRoute && space !== null ? (
         <SpaceMembersSheet
-          key={space.uuid}
+          key={`members-${space.uuid}`}
           space={space}
           viewerId={viewerId}
           viewerUuid={viewerUuid}
@@ -754,7 +756,7 @@ function CollabPlaceFrame({
           Keyed by the space for the same reason as the sheet. */}
       {isSpaceRoute && space !== null && isOwner ? (
         <DeleteSpaceDialog
-          key={space.uuid}
+          key={`delete-${space.uuid}`}
           space={space}
           open={deleteOpen}
           onOpenChange={setDeleteOpen}

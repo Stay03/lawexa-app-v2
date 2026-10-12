@@ -174,6 +174,8 @@ interface DialogState {
  * The move and Remove from Space dialogs a tab's rows open. Each stays
  * mounted after it closes so its exit plays, and a fresh open bumps its key,
  * so every open still starts clean (no error or pick left from the last one).
+ * The two counters both start at 1 and the dialogs are siblings, so each key
+ * carries its dialog's name: two siblings keyed `1` is a duplicate key.
  */
 function useItemDialogs(access: ContentAccess) {
   const [moving, setMoving] = useState<DialogState | null>(null);
@@ -190,7 +192,7 @@ function useItemDialogs(access: ContentAccess) {
     <>
       {moving ? (
         <MoveToSpaceDialog
-          key={moving.key}
+          key={`move-${moving.key}`}
           item={moving.item}
           open={moving.open}
           onOpenChange={(open) =>
@@ -200,7 +202,7 @@ function useItemDialogs(access: ContentAccess) {
       ) : null}
       {removing ? (
         <RemoveFromSpaceDialog
-          key={removing.key}
+          key={`remove-${removing.key}`}
           spaceUuid={access.spaceUuid}
           spaceName={access.spaceName}
           item={removing.item}
@@ -390,8 +392,9 @@ function SpaceFoldersList({ access }: { access: ContentAccess }) {
     [openRemove, targetOf],
   );
 
+  const startFolder = () => setCreating(true);
   const newFolderButton = canAdd ? (
-    <PillButton icon={Plus} onClick={() => setCreating(true)}>
+    <PillButton icon={Plus} onClick={startFolder}>
       New folder
     </PillButton>
   ) : null;
@@ -440,7 +443,11 @@ function SpaceFoldersList({ access }: { access: ContentAccess }) {
             <SpaceContentEmptyState
               tab="folders"
               canAdd={canAdd}
-              action={newFolderButton}
+              action={
+                <EmptyStateAddButton icon={Plus} onClick={startFolder}>
+                  New folder
+                </EmptyStateAddButton>
+              }
               onInvite={access.onInvite ?? undefined}
             />
           )
@@ -517,7 +524,12 @@ function FolderLevelBar({
       <Button asChild variant="outline" size="sm" className="shrink-0">
         <Link href={folderHref(level.uuid)}>
           <FolderOpen aria-hidden className="size-4" />
-          <span className="sr-only sm:not-sr-only">Open folder</span>
+          {/* "Open" at every width, so a phone does not show a bare folder
+              glyph that reads as "a folder"; "folder" joins it from `sm:`
+              and for screen readers (design round 2). */}
+          <span>
+            Open<span className="sr-only sm:not-sr-only">{' folder'}</span>
+          </span>
         </Link>
       </Button>
     </div>
@@ -623,7 +635,11 @@ function SpaceFilesList({ access }: { access: ContentAccess }) {
             <SpaceContentEmptyState
               tab="files"
               canAdd={canAdd}
-              action={uploadButton}
+              action={
+                <EmptyStateAddButton icon={Upload} onClick={pickFiles}>
+                  Upload
+                </EmptyStateAddButton>
+              }
               onInvite={access.onInvite ?? undefined}
             />
           )
@@ -754,8 +770,10 @@ function ContentToolbar({
   );
 }
 
-/** The add control, the folders list's own "New folder" pill: the label on a
- *  desktop, the icon alone on a phone with the word kept for screen readers. */
+/** The toolbar's add control, the folders list's own "New folder" pill: the
+ *  label on a desktop, the icon alone on a phone with the word kept for
+ *  screen readers. Beside the search field the icon reads; alone in an empty
+ *  state it would not, so the empty state has `EmptyStateAddButton`. */
 function PillButton({
   icon: Icon,
   onClick,
@@ -777,6 +795,27 @@ function PillButton({
       <Icon aria-hidden className="size-4" />
       <span className="sr-only sm:not-sr-only">{children}</span>
     </button>
+  );
+}
+
+/** The empty state's add control: the same action, with its word at every
+ *  width, in the shape the other empty-state actions take ("Go to your
+ *  conversations"). A bare "+" or upload glyph centred under "No folders in
+ *  this space yet" was a guess on a phone (design round 2). */
+function EmptyStateAddButton({
+  icon: Icon,
+  onClick,
+  children,
+}: {
+  icon: typeof Plus;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <Button type="button" size="sm" onClick={onClick}>
+      <Icon aria-hidden className="size-4" />
+      {children}
+    </Button>
   );
 }
 
