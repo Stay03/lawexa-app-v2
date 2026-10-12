@@ -1,4 +1,4 @@
-import { FoldersFallback } from '@/v2/features/folders/list/FoldersScreen';
+import { FoldersFallback } from '@/v2/features/folders/list/FoldersFallback';
 
 /**
  * Route-level loading boundary for `/folders` — the SAME component as the

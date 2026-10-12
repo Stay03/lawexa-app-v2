@@ -153,24 +153,3 @@ export function NoteScreen({ slug }: { slug: string }) {
     </div>
   );
 }
-
-/**
- * The route fallback — identical to what `app/v2/notes/loading.tsx` renders,
- * so segment boundary → live document is one continuous shape and nothing
- * moves at the hand-off.
- */
-export function NoteFallback() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading note
-      </span>
-      {/* `aria-hidden` + `inert` per standards §8ii: a route fallback is
-          DELETED, not reconciled, when content arrives, so anything focusable
-          in here would lose focus mid-interaction. */}
-      <div aria-hidden inert className={NOTE_COLUMN}>
-        <NoteDocumentSkeleton />
-      </div>
-    </>
-  );
-}

@@ -17,6 +17,7 @@ import { casesQueries } from '../queries';
 import { CaseAskDock } from './CaseAsk';
 import { useStartCaseChat, type CaseChatStart } from './CaseChatCore';
 import { CaseChatDocked } from './CaseChatPanel';
+import { CaseFallback } from './CaseFallback';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
 import { ReadingProgress } from './ReadingProgress';
@@ -319,19 +320,5 @@ function CaseBody({ slug }: { slug: string }) {
 
       {keyboardDebug ? <KeyboardDebugReadout /> : null}
     </div>
-  );
-}
-
-/** The Suspense fallback — identical to `app/v2/cases/[slug]/loading.tsx`. */
-export function CaseFallback() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading case
-      </span>
-      <div aria-hidden inert className={CASE_COLUMN}>
-        <CaseDocumentSkeleton />
-      </div>
-    </>
   );
 }

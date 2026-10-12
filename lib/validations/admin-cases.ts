@@ -230,17 +230,10 @@ export function isValidFileSize(file: File, maxSizeBytes: number): boolean {
 }
 
 /**
- * Format file size for display
+ * Format file size for display. Defined in the zod-free `format-bytes` so a
+ * screen can show a size without downloading the validation library.
  */
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
-}
+export { formatFileSize } from '@/lib/utils/format-bytes';
 
 /**
  * Get file type icon name based on MIME type

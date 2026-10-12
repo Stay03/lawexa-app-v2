@@ -1,4 +1,4 @@
-import { FolderDetailFallback } from '@/v2/features/folders/detail/FolderScreen';
+import { FolderDetailFallback } from '@/v2/features/folders/detail/FolderDetailFallback';
 
 /**
  * Route-level loading boundary for a single folder.

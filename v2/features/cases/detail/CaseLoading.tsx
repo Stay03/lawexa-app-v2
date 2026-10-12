@@ -4,7 +4,8 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { casesQueries } from '../queries';
 import { drawableCase } from '../case-prefetch';
-import { CaseFallback, CaseScreen } from './CaseScreen';
+import { CaseFallback } from './CaseFallback';
+import { CaseScreen } from './CaseScreen';
 
 /**
  * The case route's loading boundary. While page.tsx waits on its server read

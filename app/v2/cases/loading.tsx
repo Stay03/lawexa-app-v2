@@ -1,6 +1,6 @@
 import { DestinationFallback } from '@/v2/runtime/destination-fallback';
-import { CaseFallback } from '@/v2/features/cases/detail/CaseScreen';
-import { CasesFallback } from '@/v2/features/cases/list/CasesScreen';
+import { CaseFallback } from '@/v2/features/cases/detail/CaseFallback';
+import { CasesFallback } from '@/v2/features/cases/list/CasesFallback';
 
 /**
  * The `cases` SEGMENT boundary — the fallback for whatever child is being

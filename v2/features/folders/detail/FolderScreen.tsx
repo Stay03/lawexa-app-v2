@@ -45,6 +45,7 @@ import { FolderNameDialog } from '../FolderNameDialog';
 import { FolderRow } from '../list/FolderRow';
 import { FoldersSignedOutState } from '../list/states';
 import { FolderBreadcrumb } from './FolderBreadcrumb';
+import { FolderDetailFallback } from './FolderDetailFallback';
 import { FolderItemRow } from './FolderItemRow';
 import { ItemTypeTabs } from './ItemTypeTabs';
 import { parseFolderItemTab, type FolderItemTab } from './item-tabs';
@@ -710,30 +711,5 @@ function Dot() {
     <span aria-hidden className="text-muted-foreground/40">
       ·
     </span>
-  );
-}
-
-/**
- * The route fallback — the folder page's own skeleton, pulsing exactly as it
- * does on the live screen (standards §8i), in the shared column. A wait is a
- * wait: the reader cannot tell an RSC payload from a query, so one wait gets
- * one appearance. `app/v2/folders/loading.tsx` (the SEGMENT boundary, which is
- * what covers every list → folder click) imports this component rather than
- * redrawing it, so the two can never drift. The `[uuid]` segment needs no
- * boundary of its own: the one above it is already this exact shape.
- */
-export function FolderDetailFallback() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading this folder
-      </span>
-      {/* `aria-hidden` + `inert` per standards §8ii: a Suspense fallback is
-          DELETED, not reconciled, when content arrives — so anything focusable
-          in here would lose focus and caret mid-interaction. */}
-      <div aria-hidden inert className={LIST_COLUMN}>
-        <FolderDetailSkeleton />
-      </div>
-    </>
   );
 }

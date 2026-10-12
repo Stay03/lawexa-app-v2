@@ -1,6 +1,6 @@
 import { DestinationFallback } from '@/v2/runtime/destination-fallback';
-import { StatuteFallback } from '@/v2/features/statutes/reader/StatuteScreen';
-import { StatutesFallback } from '@/v2/features/statutes/list/StatutesScreen';
+import { StatuteFallback } from '@/v2/features/statutes/reader/StatuteFallback';
+import { StatutesFallback } from '@/v2/features/statutes/list/StatutesFallback';
 
 /**
  * The `statutes` SEGMENT boundary — it paints the shape of the DESTINATION.

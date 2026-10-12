@@ -1,11 +1,28 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Building2, MapPin, LinkedinIcon, Briefcase } from 'lucide-react';
-import { ConnectionRequestDialog } from './ConnectionRequestDialog';
+
+/**
+ * The "Connect with" form loads when a reader first reaches for the button,
+ * never with the chat. It carries react-hook-form and zod, and every answer
+ * renderer (and so every conversation) imports this card; the form is opened
+ * on a small share of them.
+ */
+const loadConnectionRequestDialog = () => import('./ConnectionRequestDialog');
+const ConnectionRequestDialog = dynamic(
+  () => loadConnectionRequestDialog().then((module) => module.ConnectionRequestDialog),
+  { ssr: false },
+);
+
+/** Fetch the form's code on hover or focus, so the click rarely waits for it. */
+function preloadConnectionRequestDialog() {
+  void loadConnectionRequestDialog();
+}
 
 export interface LawyerInfo {
   /** Lawyer's unique UUID identifier */
@@ -39,6 +56,9 @@ function getFirstName(name: string): string {
 
 export function LawyerCard({ lawyer }: { lawyer: LawyerInfo }) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Mounted on the first open and kept afterwards, so the dialog's own exit
+  // animation still plays when it closes.
+  const [dialogMounted, setDialogMounted] = useState(false);
 
   const hasFirm = lawyer.firmName && lawyer.firmName.trim() !== '';
   const hasLocation = lawyer.location && lawyer.location.trim() !== '';
@@ -123,7 +143,12 @@ export function LawyerCard({ lawyer }: { lawyer: LawyerInfo }) {
             <Button
               size="xs"
               className="mt-2"
-              onClick={() => setDialogOpen(true)}
+              onPointerEnter={preloadConnectionRequestDialog}
+              onFocus={preloadConnectionRequestDialog}
+              onClick={() => {
+                setDialogMounted(true);
+                setDialogOpen(true);
+              }}
             >
               {`Connect with ${getFirstName(lawyer.name)}`}
             </Button>
@@ -131,11 +156,13 @@ export function LawyerCard({ lawyer }: { lawyer: LawyerInfo }) {
         </CardContent>
       </Card>
 
-      <ConnectionRequestDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        lawyer={lawyer}
-      />
+      {dialogMounted ? (
+        <ConnectionRequestDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          lawyer={lawyer}
+        />
+      ) : null}
     </>
   );
 }

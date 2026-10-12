@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,13 +14,14 @@ import type { MessageAttachment } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
-import { startConversation } from '@/v2/features/conversations/start-conversation';
-import { ConversationScreen, ViewOnlyPill } from '@/v2/features/conversations/conversation/ConversationScreen';
+import { ViewOnlyPill } from '@/v2/features/conversations/conversation/ViewOnlyPill';
 import {
   ConversationComposer,
   type ConversationComposerHandle,
 } from '@/v2/features/conversations/conversation/ConversationComposer';
 import { useEmbeddedComposerSurface } from '@/v2/features/conversations/conversation/embedded-composer';
+import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
+import { TranscriptSkeleton } from '@/v2/features/conversations/conversation/skeletons';
 import { casesQueries } from '../queries';
 
 /**
@@ -50,7 +52,65 @@ import { casesQueries } from '../queries';
  * The three presentations arrange these pieces but never reimplement them; the
  * only geometry a presentation owns is its own frame (the card's grow/collapse,
  * the sheet's rise, the column's width reveal).
+ *
+ * WHAT LOADS WITH THE CASE, AND WHAT WAITS FOR THE CHAT. The case page loads
+ * the bar, the new-chat content and THE composer with the judgment; the
+ * transcript (`ConversationScreen`, with the message list, its renderers and
+ * the streaming engine behind it) and the create flow (`startConversation`)
+ * load when the chat opens. The composer must stay in the first part: on a
+ * phone, WebKit raises the keyboard only for a focus inside the reader's tap,
+ * and the full-screen chat grows around the very box they tapped
+ * (`CaseAskDock`). A composer behind a lazy boundary would not exist yet when
+ * the tap lands. What is lazy here sits only in the middle, above it.
  */
+
+/** The transcript and the create flow — the chat's heavy half. */
+const loadConversationScreen = () =>
+  import('@/v2/features/conversations/conversation/ConversationScreen');
+const loadStartConversation = () =>
+  import('@/v2/features/conversations/start-conversation');
+
+/**
+ * Starts fetching the chat's heavy half. {@link CaseChatMiddle} calls it as it
+ * mounts, which is the moment the chat opens, so by the time the reader picks
+ * a thread or sends a first message the code is usually already here.
+ */
+function preloadCaseChat() {
+  void loadConversationScreen();
+  void loadStartConversation();
+}
+
+/**
+ * The embedded transcript while its code is still on the way (a direct
+ * `?chat={id}` link, or a pick faster than the preload). It is the screen's own
+ * transcript skeleton in the screen's own embedded geometry (`pt-6`, and the
+ * `1rem` bottom gap over an external composer's `0px` dock height), and it
+ * carries `RouteSkeletonMark`, so the screen that replaces it shows its own
+ * identical skeleton at once instead of holding a blank first
+ * (route-skeleton-state.ts).
+ */
+function CaseChatTranscriptFallback() {
+  return (
+    <div className="relative flex h-full min-h-0 flex-col">
+      <RouteSkeletonMark />
+      <span role="status" className="sr-only">
+        Loading this conversation
+      </span>
+      <div aria-hidden inert className="min-h-0 flex-1 overflow-hidden">
+        <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pb-4 pt-6">
+          <TranscriptSkeleton />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Client only: the chat never renders on the server (which presentation owns
+// it is decided by a viewport breakpoint the server cannot know).
+const ConversationScreen = dynamic(
+  () => loadConversationScreen().then((module) => module.ConversationScreen),
+  { ssr: false, loading: CaseChatTranscriptFallback },
+);
 
 export const CASE_PROMPTS = [
   'Explain this case in plain language',
@@ -96,6 +156,7 @@ export function useStartCaseChat(
     setError(null);
     setIsSubmitting(true);
     try {
+      const { startConversation } = await loadStartConversation();
       const result = await startConversation(
         {
           message,
@@ -222,6 +283,10 @@ export function CaseChatMiddle({
   onStage: (text: string) => void;
 }) {
   const isConversation = view !== 'new';
+  // The middle mounts when the chat opens: fetch the transcript's code now.
+  useEffect(() => {
+    preloadCaseChat();
+  }, []);
   return (
     <div
       key={isConversation ? view : 'new'}

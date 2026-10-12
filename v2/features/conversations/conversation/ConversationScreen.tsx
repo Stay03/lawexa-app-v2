@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Eye, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { useV2Session } from '@/v2/runtime/session-context';
 import {
   useConversationController,
@@ -11,6 +11,7 @@ import { MessageList } from './MessageList';
 import { ConversationComposer } from './ConversationComposer';
 import { ComposerSkeleton } from './skeletons';
 import { ConfidentialBanner } from './ConfidentialBanner';
+import { ViewOnlyPill } from './ViewOnlyPill';
 import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider } from './chat-context';
 import { DocumentExportScope } from './markdown/document-export';
@@ -311,20 +312,6 @@ export function ConversationScreen({
         )}
       </div>
     </V2ChatProvider>
-  );
-}
-
-/** Read-only footer for a shared conversation the viewer doesn't own (§C KEEP).
- *  Matches the pill's compact width so the floating bar keeps one silhouette.
- *  Exported for external-composer hosts, which render it in their own dock. */
-export function ViewOnlyPill() {
-  return (
-    <div className="mx-auto w-full max-w-xs px-4 pb-3 pt-2 sm:max-w-md">
-      <div className="bg-muted/80 text-muted-foreground flex items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-center text-sm backdrop-blur">
-        <Eye className="h-4 w-4 shrink-0" />
-        View only — this is a shared conversation
-      </div>
-    </div>
   );
 }
 

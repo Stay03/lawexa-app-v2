@@ -1,6 +1,6 @@
 import { DestinationFallback } from '@/v2/runtime/destination-fallback';
-import { FolderDetailFallback } from '@/v2/features/folders/detail/FolderScreen';
-import { FoldersFallback } from '@/v2/features/folders/list/FoldersScreen';
+import { FolderDetailFallback } from '@/v2/features/folders/detail/FolderDetailFallback';
+import { FoldersFallback } from '@/v2/features/folders/list/FoldersFallback';
 
 /**
  * The `folders` SEGMENT boundary — it paints the shape of the DESTINATION.

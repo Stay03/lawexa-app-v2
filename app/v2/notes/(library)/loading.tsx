@@ -1,4 +1,4 @@
-import { NotesFallback } from '@/v2/features/notes/library/NotesScreen';
+import { NotesFallback } from '@/v2/features/notes/library/NotesFallback';
 
 /**
  * Route-level loading boundary for `/notes` — the SAME component as the page's

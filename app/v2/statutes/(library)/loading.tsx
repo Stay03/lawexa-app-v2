@@ -1,4 +1,4 @@
-import { StatutesFallback } from '@/v2/features/statutes/list/StatutesScreen';
+import { StatutesFallback } from '@/v2/features/statutes/list/StatutesFallback';
 
 /**
  * Route-level loading boundary for `/statutes` — the SAME component as the

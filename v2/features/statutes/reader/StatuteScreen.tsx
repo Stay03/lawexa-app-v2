@@ -126,17 +126,3 @@ export function StatuteScreen({
     </StatuteNotesProvider>
   );
 }
-
-/** The Suspense/route fallback — identical to `app/v2/statutes/[slug]/loading.tsx`. */
-export function StatuteFallback() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading statute
-      </span>
-      <div aria-hidden inert className={STATUTE_COLUMN}>
-        <StatuteDocumentSkeleton />
-      </div>
-    </>
-  );
-}

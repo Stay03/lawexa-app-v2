@@ -2,13 +2,8 @@
 
 import { Suspense } from 'react';
 
-import { useSearchPosition } from '@/v2/search-position';
-import { SearchFieldShape } from '@/v2/shell/SearchField';
-import { LIST_COLUMN_DOCKED } from '@/v2/shell/page-columns';
-import { ScreenDock, ScreenDockSearch } from '@/v2/shell/ScreenDock';
-import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { CasesBrowser } from './CasesBrowser';
-import { CasesListSkeleton } from './states';
+import { CasesFallback } from './CasesFallback';
 
 /**
  * CasesScreen — the `/cases` client root.
@@ -40,54 +35,5 @@ export function CasesScreen() {
     <Suspense fallback={<CasesFallback />}>
       <CasesBrowser />
     </Suspense>
-  );
-}
-
-/**
- * Suspense fallback — the title, the view tabs and the search field as reserved
- * chrome shapes (furniture, not content placeholders), over the real list
- * skeleton. Identical to `app/v2/cases/loading.tsx`, which imports the same
- * pieces.
- *
- * The title is drawn by the SAME component the live screen uses, so the words
- * and the scale cannot drift; it is chrome the address already knows, so it
- * needs no reservation and no shimmer.
- *
- * The search field is reserved WHERE IT WILL LAND — in the floating dock by
- * default, in the flow if the developer switch says so — which is why this
- * fallback reads the position store too. Reserving it in the wrong place would
- * be worse than not reserving it: the hand-off would move it across the screen.
- *
- * The list skeleton pulses here exactly as it does inside the live screen
- * (standards §8i). A wait is a wait: the reader cannot tell an RSC payload from
- * a query, so giving the two waits different appearances only prints a seam
- * into the middle of the load.
- */
-export function CasesFallback() {
-  const searchAtTop = useSearchPosition() === 'top';
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading cases
-      </span>
-      {/* `aria-hidden` + `inert` per standards §8ii: a Suspense fallback is
-          DELETED (not reconciled) when content arrives, so anything focusable
-          in here would lose focus and caret mid-interaction. */}
-      <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
-        <ScreenTitle />
-        {searchAtTop ? <SearchFieldShape className="mb-3" /> : null}
-        <div className="mb-3 flex items-center">
-          <div className="h-9 w-40 rounded-full bg-secondary/60" />
-        </div>
-        <CasesListSkeleton />
-        {searchAtTop ? null : (
-          <ScreenDock>
-            <ScreenDockSearch>
-              <SearchFieldShape />
-            </ScreenDockSearch>
-          </ScreenDock>
-        )}
-      </div>
-    </>
   );
 }

@@ -1,7 +1,8 @@
 /**
  * Whether a conversation skeleton is on screen: the route's own
- * (`app/v2/c/[conversationId]/loading.tsx`) or the move-first layer's frame
- * (`v2/shell/move-first.tsx`). The route skeleton and the screen's skeleton are
+ * (`app/v2/c/[conversationId]/loading.tsx`), the move-first layer's frame
+ * (`v2/shell/move-first.tsx`), or the case chat's while the transcript's code
+ * loads (`CaseChatCore`). The route skeleton and the screen's skeleton are
  * the same picture, so when the route skeleton is showing, the screen must take
  * over with its skeleton AT ONCE: holding it (skeleton-hold.ts) there would put
  * a blank gap between two identical skeletons. The hold is only for a screen

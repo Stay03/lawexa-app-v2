@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { filesApi } from '@/lib/api/files';
 import { cn } from '@/lib/utils';
 import { isNotFoundError } from '@/lib/utils/api-error';
-import { formatFileSize } from '@/lib/validations/admin-cases';
+import { formatFileSize } from '@/lib/utils/format-bytes';
 import type { MessageAttachment } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { PictureViewer } from '@/v2/features/channels/feed/MessageImageViewer';

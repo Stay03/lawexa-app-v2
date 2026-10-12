@@ -1,6 +1,6 @@
 import { DestinationFallback } from '@/v2/runtime/destination-fallback';
-import { NoteFallback } from '@/v2/features/notes/reader/NoteScreen';
-import { NotesFallback } from '@/v2/features/notes/library/NotesScreen';
+import { NoteFallback } from '@/v2/features/notes/reader/NoteFallback';
+import { NotesFallback } from '@/v2/features/notes/library/NotesFallback';
 
 /**
  * The `notes` SEGMENT boundary — it paints the shape of the DESTINATION.

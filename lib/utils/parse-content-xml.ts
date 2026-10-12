@@ -1,5 +1,5 @@
-import { LawyerInfo } from '@/components/chat/lawyer-card';
-import { QuizInfo } from './parse-quiz-xml';
+import type { LawyerInfo } from '@/components/chat/lawyer-card';
+import type { QuizInfo } from './parse-quiz-xml';
 
 export interface DeepResearchPromptInfo {
   title: string;

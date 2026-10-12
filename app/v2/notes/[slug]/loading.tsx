@@ -1,4 +1,4 @@
-import { NoteFallback } from '@/v2/features/notes/reader/NoteScreen';
+import { NoteFallback } from '@/v2/features/notes/reader/NoteFallback';
 
 /**
  * Route-level loading boundary for a single note — the same component the

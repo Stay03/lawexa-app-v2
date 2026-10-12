@@ -1,4 +1,4 @@
-import { CasesFallback } from '@/v2/features/cases/list/CasesScreen';
+import { CasesFallback } from '@/v2/features/cases/list/CasesFallback';
 
 /**
  * Route-level loading boundary for `/cases`.

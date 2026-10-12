@@ -1,4 +1,4 @@
-import { StatuteFallback } from '@/v2/features/statutes/reader/StatuteScreen';
+import { StatuteFallback } from '@/v2/features/statutes/reader/StatuteFallback';
 
 /**
  * Route-level loading boundary for `/statutes/[slug]` — and, sitting above
