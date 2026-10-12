@@ -262,9 +262,10 @@ test('with no leading control every composer host keeps the full-width pill it h
   // shimmer box, which shrank to its content when the row was added (pixel compare
   // of 9237bf3: /c/{id} pill 416 px to 207 px at 1280). The box around the pill is
   // the flex item and takes the row's free width, and the pill's own className is
-  // unchanged from d720169.
+  // unchanged from d720169. Line ends match \r?\n: a Windows checkout (autocrlf)
+  // gives this file CRLF endings, and a bare \n never matches there.
   assert.match(composer, /<div className="min-w-0 flex-1">\s*<PromptInput\b/);
-  assert.match(composer, /\n\s*className="shadow-\[0_6px_16px_-8px_rgba\(0,0,0,0\.28\)\]"\n/);
+  assert.match(composer, /\r?\n\s*className="shadow-\[0_6px_16px_-8px_rgba\(0,0,0,0\.28\)\]"\r?\n/);
   assert.doesNotMatch(composer, /className="min-w-0 flex-1 shadow-/);
 });
 
