@@ -7,8 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { InviteLink } from '@/types/collab';
+import type { InvitableContentRole } from '@/v2/features/collab/membership/content-role';
+import { SHARED_INVITE_ROLES } from '@/v2/features/collab/membership/invite-roles';
+import { inviteLinkPayload } from '@/v2/features/spaces/model';
 import { CopyLinkButton } from './link';
 import {
   useCreateInviteLink,
@@ -47,10 +57,13 @@ function usesLabel(link: InviteLink): string {
  */
 function LinkRow({
   link,
+  contentRoles,
   onRevoke,
   revoking,
 }: {
   link: InviteLink;
+  /** A shared space: say which role the link gives. */
+  contentRoles: boolean;
   onRevoke: (id: number) => void;
   revoking: boolean;
 }) {
@@ -79,6 +92,9 @@ function LinkRow({
             into a single channel — and those hand out different access. */}
         <p className="text-xs text-muted-foreground">
           {link.channel ? `#${link.channel.name} · ` : ''}
+          {contentRoles && link.content_role_label
+            ? `${link.content_role_label} · `
+            : ''}
           {dead ? 'Stopped working' : usesLabel(link)}
           {link.requires_approval ? ' · you approve' : ' · straight in'}
         </p>
@@ -98,11 +114,24 @@ function LinkRow({
   );
 }
 
-export function InviteLinksPanel({ spaceUuid }: { spaceUuid: string }) {
+/**
+ * ON A SHARED SPACE (`contentRoles`; Spaces F7, 12 October 2026) the form also
+ * asks which role the link gives, Viewer or Editor, and each row says it. The
+ * request names that role and never a channel (`inviteLinkPayload`; backend B2
+ * refuses a channel on a shared space with a 422).
+ */
+export function InviteLinksPanel({
+  spaceUuid,
+  contentRoles = false,
+}: {
+  spaceUuid: string;
+  contentRoles?: boolean;
+}) {
   const links = useInviteLinks(spaceUuid);
   const create = useCreateInviteLink(spaceUuid);
   const revoke = useRevokeInviteLink(spaceUuid);
   const [requiresApproval, setRequiresApproval] = useState(true);
+  const [contentRole, setContentRole] = useState<InvitableContentRole>('viewer');
   const [showDead, setShowDead] = useState(false);
 
   const rows = links.data?.data ?? [];
@@ -141,10 +170,43 @@ export function InviteLinksPanel({ spaceUuid }: { spaceUuid: string }) {
           />
         </div>
 
+        {contentRoles ? (
+          <div className="mt-4 space-y-2">
+            <Label htmlFor="invite-link-role" className="text-sm font-medium">
+              People who join get
+            </Label>
+            <Select
+              value={contentRole}
+              onValueChange={(value) => {
+                const chosen = SHARED_INVITE_ROLES.find((option) => option.value === value);
+                if (chosen) setContentRole(chosen.value);
+              }}
+            >
+              <SelectTrigger id="invite-link-role" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SHARED_INVITE_ROLES.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
         <Button
           className="mt-4 w-full"
           disabled={create.isPending}
-          onClick={() => create.mutate({ requires_approval: requiresApproval })}
+          onClick={() =>
+            create.mutate(
+              inviteLinkPayload(contentRoles ? 'shared' : 'team', {
+                requiresApproval,
+                contentRole,
+              }),
+            )
+          }
         >
           {create.isPending ? (
             <Loader2 aria-hidden className="size-4 animate-spin" />
@@ -182,6 +244,7 @@ export function InviteLinksPanel({ spaceUuid }: { spaceUuid: string }) {
                 <LinkRow
                   key={link.id}
                   link={link}
+                  contentRoles={contentRoles}
                   onRevoke={(id) => revoke.mutate(id)}
                   revoking={revoke.isPending}
                 />
@@ -213,6 +276,7 @@ export function InviteLinksPanel({ spaceUuid }: { spaceUuid: string }) {
                     <LinkRow
                       key={link.id}
                       link={link}
+                      contentRoles={contentRoles}
                       onRevoke={(id) => revoke.mutate(id)}
                       revoking={revoke.isPending}
                     />

@@ -1,10 +1,23 @@
 import type {
+  CreateInviteLinkPayload,
+  InviteMemberPayload,
   Member,
   Space,
   SpaceContentAuthor,
   SpaceKind,
   SpaceType,
+  UpdateSpaceMemberRolePayload,
 } from '@/types/collab';
+import {
+  contentRoleOf,
+  isInvitableContentRole,
+  type InvitableContentRole,
+} from '@/v2/features/collab/membership/content-role';
+import {
+  SHARED_INVITE_ROLES,
+  TEAM_INVITE_ROLES,
+  type InviteRoleOption,
+} from '@/v2/features/collab/membership/invite-roles';
 import { canOpenTeamChannels } from '@/v2/features/collab/model';
 import {
   QUIET_GRAMMAR,
@@ -314,4 +327,125 @@ export function memberCountLabel(count: number): string {
  */
 export function isOwnerMustTransferError(status: number): boolean {
   return status === 400;
+}
+
+/* ── Membership on a shared space (Spaces F7, 12 October 2026) ────────────── */
+
+/**
+ * The fields a membership ruling reads: the kind, and both role columns.
+ * `my_role` may come from the roster rather than the row (see `roleInRoster`),
+ * which is why this is a shape and not the whole `Space`.
+ */
+export type MembershipSubject = Pick<Space, 'kind' | 'my_role' | 'my_content_role'>;
+
+/**
+ * Who may invite, change roles, make invite links, see the waiting list and
+ * remove members. On a SHARED space only the content Owner (backend B2: an
+ * Editor or Viewer gets 403), read off `my_content_role`. On a TEAM space,
+ * exactly today's rule: owner or admin off the old `my_role`.
+ */
+export function canManageMembership(space: MembershipSubject): boolean {
+  return isSharedSpace(space)
+    ? space.my_content_role === 'owner'
+    : canManageSpace(space);
+}
+
+/** The member who may transfer ownership and delete: the content Owner on a
+ *  shared space, the old owner on a team space. */
+export function isMembershipOwner(space: MembershipSubject): boolean {
+  return isSharedSpace(space)
+    ? space.my_content_role === 'owner'
+    : isSpaceOwner(space);
+}
+
+/** The viewer's content role read off a roster, for the first frame before or
+ *  instead of the row's own stamp; `null` when the viewer is not on it. */
+export function contentRoleInRoster(
+  members: readonly Member[],
+  viewerUuid: string | null,
+): Member['content_role'] | null {
+  if (!viewerUuid) return null;
+  const self = members.find((member) => member.user.uuid === viewerUuid);
+  return self ? contentRoleOf(self) : null;
+}
+
+/** The roles the invite dialog offers for this kind of space. */
+export function inviteRoleOptions(kind: SpaceKind): readonly InviteRoleOption[] {
+  return kind === 'shared' ? SHARED_INVITE_ROLES : TEAM_INVITE_ROLES;
+}
+
+/**
+ * The invite request for a chosen role. A SHARED space sends `content_role`
+ * beside `role: 'member'`, the old column the backend writes for an Editor or
+ * a Viewer (design 2.1); a TEAM space sends today's `role` and nothing else.
+ * Returns `null` for a role this kind of space does not have, so a stale form
+ * value can never send a mixed request.
+ */
+export function invitePayload(
+  kind: SpaceKind,
+  email: string,
+  role: string,
+): InviteMemberPayload | null {
+  if (kind === 'shared') {
+    return isInvitableContentRole(role)
+      ? { email, role: 'member', content_role: role }
+      : null;
+  }
+  return role === 'admin' || role === 'member' ? { email, role } : null;
+}
+
+/** A shared space's role change: the content role only (backend B2). */
+export function contentRoleChangePayload(
+  next: InvitableContentRole,
+): UpdateSpaceMemberRolePayload {
+  return { content_role: next };
+}
+
+/**
+ * An invite link request. A SHARED space names the content role and NEVER a
+ * channel (backend B2 answers 422 to one); a TEAM space keeps today's request,
+ * with its channel when the link is for one.
+ */
+export function inviteLinkPayload(
+  kind: SpaceKind,
+  options: {
+    requiresApproval: boolean;
+    channelUuid?: string;
+    contentRole?: InvitableContentRole;
+  },
+): CreateInviteLinkPayload {
+  if (kind === 'shared') {
+    return {
+      requires_approval: options.requiresApproval,
+      content_role: options.contentRole ?? 'viewer',
+    };
+  }
+  return {
+    requires_approval: options.requiresApproval,
+    ...(options.channelUuid ? { channel_uuid: options.channelUuid } : {}),
+  };
+}
+
+/**
+ * Whether the viewer is the LAST content Owner of a shared space. Backend B2
+ * refuses that leave with a 409 (delete the space or transfer first), so the
+ * sheet says so before the request instead of after it. Team spaces keep their
+ * own rule (`isOwnerMustTransferError`), so this is always `false` there.
+ */
+export function isLastSharedOwner(
+  space: Pick<Space, 'kind'>,
+  members: readonly Member[],
+  viewerUuid: string | null,
+): boolean {
+  if (!isSharedSpace(space) || !viewerUuid) return false;
+  const owners = members.filter(
+    (member) => member.is_active && contentRoleOf(member) === 'owner',
+  );
+  return owners.length > 0 && owners.every((member) => member.user.uuid === viewerUuid);
+}
+
+/** The shared-space leave refusal (backend B2): the last Owner, 409. Keyed on
+ *  the status, like the team rule above. */
+export function isLastOwnerLeaveError(status: number): boolean {
+  return status === 409;
 }

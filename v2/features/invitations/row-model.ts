@@ -148,6 +148,19 @@ export function organizationInvitationRow(
   };
 }
 
+/**
+ * The role a space invitation names. A SHARED space speaks in content roles
+ * (Spaces F7, 12 October 2026; backend B2), so it shows `content_role_label`
+ * ("Editor", "Viewer"); a team space keeps the old role label it always
+ * showed, even though B2 also derives a content role for it. The one `space`
+ * row kind stays: a shared space's invitation is still a space invitation.
+ */
+export function spaceInvitationRoleLabel(invitation: SpaceInvitation): string {
+  const contentLabel = invitation.content_role_label?.trim();
+  if (invitation.space.kind === 'shared' && contentLabel) return contentLabel;
+  return invitation.role_label || invitation.role;
+}
+
 export function spaceInvitationRow(invitation: SpaceInvitation): InvitationRowModel {
   const space = invitation.space;
   return {
@@ -159,7 +172,7 @@ export function spaceInvitationRow(invitation: SpaceInvitation): InvitationRowMo
     titleMark: null,
     crest: { kind: 'space', uuid: space.uuid, name: space.name, type: space.type },
     facts: factsOf(spaceKindLabel(space.type), shortFact(space.description)),
-    roleLabel: invitation.role_label || invitation.role,
+    roleLabel: spaceInvitationRoleLabel(invitation),
     invitedBy: invitation.invited_by,
     memberFaces: NO_FACES,
     memberCount: null,

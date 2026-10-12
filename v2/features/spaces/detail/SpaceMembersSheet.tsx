@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { InviteMemberPayload, Member, Space } from '@/types/collab';
+import type { Member, Space } from '@/types/collab';
 import { InvitePeopleDialog } from '@/v2/features/collab/membership/InvitePeopleDialog';
 import { MembersSheetFrame } from '@/v2/features/collab/membership/MembersSheetFrame';
 import {
@@ -27,9 +27,19 @@ import {
 } from '@/v2/features/collab/membership/RosterRow';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
+  canManageMembership,
+  contentRoleChangePayload,
+  contentRoleInRoster,
+  inviteRoleOptions,
+  invitePayload,
+  isLastOwnerLeaveError,
+  isLastSharedOwner,
+  isMembershipOwner,
   isOwnerMustTransferError,
+  isSharedSpace,
   memberCountLabel,
   roleInRoster,
+  spaceKind,
 } from '../model';
 import {
   useInviteSpaceMember,
@@ -73,6 +83,18 @@ import { spacesQueries } from '../queries';
  *
  * Rows key on `member.user.uuid` — the member surface is uuid-only (§F.4).
  * Phase-5 W4, 2026-08-04.
+ *
+ * ── A SHARED SPACE (Spaces F7, 12 October 2026; backend B2) ────────────────
+ * Its people are Owner, Editor and Viewer, and only the Owner manages them:
+ * invites (as Editor or Viewer), role changes, removals and links, all read
+ * off the CONTENT role (`canManageMembership`), never the old `my_role`. A
+ * team space keeps everything above exactly. Two things change in what the
+ * sheet SAYS: transferring a shared space makes the old Owner an Editor, and
+ * leaving keeps what the leaver added in the space (design 2.5), so the leave
+ * confirmation promises nothing goes with them. The LAST Owner cannot leave a
+ * shared space (the backend answers 409: delete the space or transfer first),
+ * so the sheet answers before the request, with the same designed refusal the
+ * team owner's 400 gets, and still reads a 409 if one arrives anyway.
  */
 export function SpaceMembersSheet({
   space,
@@ -112,10 +134,34 @@ export function SpaceMembersSheet({
 
   const members = membersQuery.data?.data ?? [];
   // The roster is the honest source while the sheet is open; the row's own
-  // `my_role` stamp is the fallback for the first frame before it lands.
+  // stamps are the fallback for the first frame before it lands.
   const myRole = roleInRoster(members, viewerUuid) ?? space.my_role ?? null;
-  const isOwner = myRole === 'owner';
-  const canManage = isOwner || myRole === 'admin';
+  const myContentRole =
+    contentRoleInRoster(members, viewerUuid) ?? space.my_content_role ?? null;
+  const shared = isSharedSpace(space);
+  const membership = {
+    kind: space.kind,
+    my_role: myRole,
+    my_content_role: myContentRole,
+  };
+  const isOwner = isMembershipOwner(membership);
+  const canManage = canManageMembership(membership);
+  // Known only once the roster has landed: before that the sheet cannot say
+  // who else owns the space, so it lets the server decide (and reads its 409).
+  const lastSharedOwner =
+    membersQuery.isSuccess && isLastSharedOwner(space, members, viewerUuid);
+  /**
+   * The designed refusal for the last Owner of a shared space (backend B2:
+   * 409, whether or not others remain). It leads with transferring ownership,
+   * the way out backend names; with nobody else active in the space there is
+   * no one to transfer to, so it names deleting the space instead.
+   */
+  const othersActive = members.some(
+    (member) => member.is_active && member.user.uuid !== viewerUuid,
+  );
+  const lastOwnerSentence = othersActive
+    ? `You're the only owner of ${space.name}. Transfer ownership first: open another member's menu in this list and choose "Transfer ownership". Then you can leave.`
+    : `You're the only owner of ${space.name}, and nobody else is in it. Delete the space from the menu at the top of the space page instead.`;
 
   /**
    * Invite gets its OWN param rather than a value of the screen's `?panel=`,
@@ -128,8 +174,18 @@ export function SpaceMembersSheet({
    */
   const invitePanel = useUrlOverlay('invite', { canOpen: canManage });
 
-  const handleInvite = (payload: InviteMemberPayload) =>
+  // The roles this space speaks in, and the request each one becomes: Viewer
+  // or Editor as `content_role` on a shared space, today's role on a team one.
+  const kind = spaceKind(space);
+  const inviteRoles = inviteRoleOptions(kind);
+  const handleInvite = ({ email, role }: { email: string; role: string }) =>
     new Promise<void>((resolve, reject) => {
+      const payload = invitePayload(kind, email, role);
+      if (payload === null) {
+        // Only a role the list above offered can arrive here.
+        reject(new Error('Choose a role for them first.'));
+        return;
+      }
       invite.mutate(payload, {
         onSuccess: () => resolve(),
         onError: (error) => reject(error),
@@ -158,6 +214,11 @@ export function SpaceMembersSheet({
       },
       onError: (error) => {
         const apiError = extractApiError(error);
+        if (shared && isLastOwnerLeaveError(apiError.status)) {
+          // Our sentence, not the server's: it names the way out here.
+          setMustTransfer(lastOwnerSentence);
+          return;
+        }
         if (isOwnerMustTransferError(apiError.status)) {
           setMustTransfer(
             apiError.message.trim() ||
@@ -184,7 +245,10 @@ export function SpaceMembersSheet({
             variant="ghost"
             className="v2-interactive w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={() => {
-              setMustTransfer(null);
+              // The last Owner of a shared space meets the refusal before any
+              // request: it is already known, and a confirm that only 409s
+              // would be a button that lies.
+              setMustTransfer(lastSharedOwner ? lastOwnerSentence : null);
               setLeaveOpen(true);
             }}
           >
@@ -215,21 +279,31 @@ export function SpaceMembersSheet({
                 key={member.user.uuid}
                 member={member}
                 isSelf={member.user.uuid === viewerUuid}
+                contentRoles={shared}
                 onPromote={
-                  canManage
+                  canManage && !shared
                     ? (target) =>
                         updateRole.mutate({
                           userUuid: target.user.uuid,
-                          role: 'admin',
+                          payload: { role: 'admin' },
                         })
                     : undefined
                 }
                 onDemote={
-                  canManage
+                  canManage && !shared
                     ? (target) =>
                         updateRole.mutate({
                           userUuid: target.user.uuid,
-                          role: 'member',
+                          payload: { role: 'member' },
+                        })
+                    : undefined
+                }
+                onSetContentRole={
+                  canManage && shared
+                    ? (target, next) =>
+                        updateRole.mutate({
+                          userUuid: target.user.uuid,
+                          payload: contentRoleChangePayload(next),
                         })
                     : undefined
                 }
@@ -264,8 +338,9 @@ export function SpaceMembersSheet({
         onOpenChange={invitePanel.setOpen}
         title={`Invite to ${space.name}`}
         description="They get an invitation they can accept from their own Invitations page."
+        roles={inviteRoles}
         onInvite={handleInvite}
-        linkScope={{ spaceUuid: space.uuid }}
+        linkScope={{ spaceUuid: space.uuid, contentRoles: shared }}
       />
 
       <AlertDialog
@@ -283,8 +358,9 @@ export function SpaceMembersSheet({
               Make {transferTarget?.user.name} the owner?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              They take over {space.name}, and you become an admin. Only the new
-              owner can hand it back.
+              {shared
+                ? `They take over ${space.name}, and you become an Editor. Only the new owner can hand it back.`
+                : `They take over ${space.name}, and you become an admin. Only the new owner can hand it back.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {transferError && (
@@ -321,10 +397,15 @@ export function SpaceMembersSheet({
           {mustTransfer ? (
             <>
               <AlertDialogHeader>
-                <AlertDialogTitle>Transfer ownership first</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {shared && !othersActive ? 'You are the only owner' : 'Transfer ownership first'}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  {mustTransfer} Open a member&rsquo;s menu in this list and choose
-                  “Transfer ownership”, then you can leave.
+                  {/* A shared space's sentence already names both ways out;
+                      the team one adds where the transfer lives. */}
+                  {shared
+                    ? mustTransfer
+                    : `${mustTransfer} Open a member’s menu in this list and choose “Transfer ownership”, then you can leave.`}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -338,8 +419,12 @@ export function SpaceMembersSheet({
               <AlertDialogHeader>
                 <AlertDialogTitle>Leave {space.name}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  You lose access to this space and every channel in it. Someone
-                  can invite you back.
+                  {/* What a member added stays when they go (design 2.5), so a
+                      shared space's confirmation says that rather than
+                      implying their chats, folders and files leave with them. */}
+                  {shared
+                    ? 'You lose access to this space. The chats, folders and files you added stay in it for the other members. Someone can invite you back.'
+                    : 'You lose access to this space and every channel in it. Someone can invite you back.'}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

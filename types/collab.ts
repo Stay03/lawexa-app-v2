@@ -123,6 +123,14 @@ export interface Member {
   user: SlimUser;
   role: MemberRole;
   role_label: string;
+  /**
+   * The content role (backend B2): what this member may do with a space's
+   * chats, folders and files, and on a SHARED space everything about its
+   * membership. Optional so the app runs before B2; derived from `role` on
+   * team spaces. Space rosters only.
+   */
+  content_role?: ContentRole;
+  content_role_label?: string;
   is_active: boolean;
   is_pending: boolean;
   notify_level?: NotifyLevel;
@@ -206,6 +214,9 @@ export interface SpaceRef {
   name: string;
   type: SpaceType;
   description: string | null;
+  /** Assumed from backend B1/B2 (unconfirmed on this nested ref): lets an
+   *  invitation say which roles it speaks in. Absent reads as `team`. */
+  kind?: SpaceKind;
 }
 
 export interface Space {
@@ -1198,11 +1209,22 @@ export interface InviteMemberPayload {
   email?: string;
   user_uuid?: string;
   role: 'admin' | 'member';
+  /** SHARED spaces only (backend B2): the role the invitee gets. `role` is
+   *  then always `member`, the old column the backend writes beside it. */
+  content_role?: Exclude<ContentRole, 'owner'>;
 }
 
 export interface UpdateMemberRolePayload {
   role: 'admin' | 'member';
 }
+
+/**
+ * A SPACE member's role change. A team space changes the old role, as every
+ * roster does; a SHARED space sends the content role instead (backend B2).
+ */
+export type UpdateSpaceMemberRolePayload =
+  | UpdateMemberRolePayload
+  | { content_role: Exclude<ContentRole, 'owner'> };
 
 export interface NotifyLevelPayload {
   notify_level: NotifyLevel;
@@ -1318,6 +1340,9 @@ export interface SpaceInvitation {
   space: SpaceRef;
   role: MemberRole;
   role_label: string;
+  /** Backend B2; optional so the app runs before it. */
+  content_role?: ContentRole;
+  content_role_label?: string;
   invited_by: SlimUser | null;
   created_at: string;
 }
@@ -1483,8 +1508,13 @@ export type SpaceResponse = ItemResponse<Space>;
  * The space an item is in, stamped on every row of the three listings (and,
  * from B3, on the item's own resource). The usual paginated envelope carries
  * the rows: `LengthAwareResponse`, confirmed by backend on 11 October 2026.
+ *
+ * ITS OWN NAME, NOT `SpaceRef` (fixed 12 October 2026): it was first declared
+ * as a second `SpaceRef`, which TypeScript MERGES with the invitation's
+ * `SpaceRef` above, so these two-key stubs silently required `type` and
+ * `description` as well.
  */
-export interface SpaceRef {
+export interface ContentSpaceStub {
   uuid: string;
   name: string;
 }
@@ -1505,7 +1535,7 @@ export interface SpaceContentAuthor {
 /** One chat in a space: the conversations-list row, plus its owner. */
 export interface SpaceConversation extends ConversationListItem {
   author?: SpaceContentAuthor | null;
-  space?: SpaceRef | null;
+  space?: ContentSpaceStub | null;
 }
 
 /**
@@ -1529,13 +1559,13 @@ export interface SpaceFolder {
   created_at: string;
   updated_at?: string;
   user?: { id: number; name: string; avatar_url: string | null };
-  space?: SpaceRef | null;
+  space?: ContentSpaceStub | null;
 }
 
 /** One file in a space: the `FileResource`, with its uploader (design 4.2). */
 export interface SpaceFile extends UserFile {
   uploader: FileUploader;
-  space?: SpaceRef | null;
+  space?: ContentSpaceStub | null;
 }
 
 export type SpaceConversationListResponse = LengthAwareResponse<SpaceConversation>;
@@ -1678,6 +1708,9 @@ export interface InviteLink {
   code: string;
   role: Exclude<MemberRole, 'owner'>;
   role_label: string;
+  /** Backend B2: the content role the link gives. Optional before B2. */
+  content_role?: ContentRole;
+  content_role_label?: string;
   requires_approval: boolean;
   channel: { uuid: string; name: string } | null;
   max_uses: number | null;
@@ -1692,8 +1725,11 @@ export interface InviteLink {
 }
 
 export interface CreateInviteLinkPayload {
+  /** TEAM spaces only. Sending one on a SHARED space is a 422 (backend B2). */
   channel_uuid?: string;
   role?: Exclude<MemberRole, 'owner'>;
+  /** SHARED spaces only (backend B2): the role people joining by it get. */
+  content_role?: Exclude<ContentRole, 'owner'>;
   /** Defaults to TRUE server-side — an unattended link lets strangers in. */
   requires_approval?: boolean;
   max_uses?: number;
@@ -1714,6 +1750,9 @@ export interface JoinRequest {
   /** How they arrived, when it was a link. */
   invite_code: string | null;
   created_at: string;
+  /** Backend B2: the content role approving gives. Optional before B2. */
+  content_role?: ContentRole;
+  content_role_label?: string;
   /**
    * PRESENT = approving this ALSO grants that channel. It has to be said on
    * the approve control: an admin reading "join request" would otherwise hand

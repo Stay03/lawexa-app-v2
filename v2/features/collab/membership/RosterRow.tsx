@@ -13,6 +13,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Member } from '@/types/collab';
+import {
+  CONTENT_ROLE_LABELS,
+  contentRoleLabelOf,
+  contentRoleOf,
+  type InvitableContentRole,
+} from './content-role';
 import { MemberAvatar } from './MemberAvatar';
 
 /**
@@ -39,32 +45,57 @@ import { MemberAvatar } from './MemberAvatar';
  * indistinguishable here. It goes AFTER the crown so the owner mark keeps the
  * line's first position, is the same muted size as the role beside it, and is
  * simply absent on a member with no handle yet.
+ *
+ * ── A SHARED SPACE SPEAKS IN CONTENT ROLES (Spaces F7, 12 October 2026) ─────
+ * With `contentRoles`, the row reads the member's content role (Owner,
+ * Editor, Viewer; `content-role.ts`) for the crown, the label and who may be
+ * managed, and its role actions are "Change to Editor" and "Change to Viewer"
+ * through `onSetContentRole`. Without it, everything is exactly as before:
+ * team spaces and organizations keep owner, admin and member.
  */
 export function RosterRow({
   member,
   isSelf = false,
+  contentRoles = false,
   onPromote,
   onDemote,
+  onSetContentRole,
   onTransferOwnership,
   onRemove,
 }: {
   member: Member;
   isSelf?: boolean;
+  /** A shared space's roster: read and change CONTENT roles. */
+  contentRoles?: boolean;
   onPromote?: (member: Member) => void;
   onDemote?: (member: Member) => void;
+  /** Shared spaces only: give this member the Editor or Viewer role. */
+  onSetContentRole?: (member: Member, role: InvitableContentRole) => void;
   /** Space rosters only — organizations have no ownership-transfer route. */
   onTransferOwnership?: (member: Member) => void;
   onRemove?: (member: Member) => void;
 }) {
-  const isOwner = member.role === 'owner';
-  const canPromote = !isSelf && !isOwner && !!onPromote && member.role === 'member';
-  const canDemote = !isSelf && !isOwner && !!onDemote && member.role === 'admin';
+  const contentRole = contentRoles ? contentRoleOf(member) : null;
+  const isOwner = contentRole !== null ? contentRole === 'owner' : member.role === 'owner';
+  const canPromote =
+    !contentRoles && !isSelf && !isOwner && !!onPromote && member.role === 'member';
+  const canDemote =
+    !contentRoles && !isSelf && !isOwner && !!onDemote && member.role === 'admin';
+  // The one content role this member does not hold, offered as the change.
+  const nextContentRole: InvitableContentRole | null =
+    contentRole === 'viewer' ? 'editor' : contentRole === 'editor' ? 'viewer' : null;
+  const canSetContentRole =
+    !isSelf && !isOwner && !!onSetContentRole && nextContentRole !== null;
+  const roleLabel = contentRoles
+    ? contentRoleLabelOf(member)
+    : member.role_label || member.role;
   // Ownership may only pass to an ACTIVE member — a pending invitee has not
   // accepted yet, and the server would refuse.
   const canTransfer =
     !isSelf && !isOwner && !!onTransferOwnership && member.is_active && !member.is_pending;
   const canRemove = !isSelf && !isOwner && !!onRemove;
-  const hasMenu = canPromote || canDemote || canTransfer || canRemove;
+  const hasMenu =
+    canPromote || canDemote || canSetContentRole || canTransfer || canRemove;
 
   return (
     <div className="flex min-h-11 items-center gap-3 py-2">
@@ -94,7 +125,7 @@ export function RosterRow({
             </>
           )}
           <span className="shrink-0 text-xs capitalize text-muted-foreground">
-            {member.role_label || member.role}
+            {roleLabel}
           </span>
           {member.is_pending && (
             <Badge variant="outline" className="h-4 px-1 text-[10px] font-medium">
@@ -127,6 +158,13 @@ export function RosterRow({
                 Change to member
               </DropdownMenuItem>
             )}
+            {canSetContentRole && nextContentRole !== null && (
+              <DropdownMenuItem
+                onClick={() => onSetContentRole?.(member, nextContentRole)}
+              >
+                Change to {CONTENT_ROLE_LABELS[nextContentRole]}
+              </DropdownMenuItem>
+            )}
             {canTransfer && (
               <DropdownMenuItem onClick={() => onTransferOwnership?.(member)}>
                 Transfer ownership
@@ -134,7 +172,9 @@ export function RosterRow({
             )}
             {canRemove && (
               <>
-                {(canPromote || canDemote || canTransfer) && <DropdownMenuSeparator />}
+                {(canPromote || canDemote || canSetContentRole || canTransfer) && (
+                  <DropdownMenuSeparator />
+                )}
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => onRemove?.(member)}

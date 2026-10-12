@@ -80,6 +80,7 @@ import type {
   UpdateListItemPayload,
   UpdateListPayload,
   UpdateMemberRolePayload,
+  UpdateSpaceMemberRolePayload,
   UpdateMessagePayload,
   UpdateOrganizationPayload,
   UpdateSpacePayload,
@@ -274,10 +275,11 @@ export const spacesApi = {
     return response.data;
   },
 
+  /** `role` on a team space; `content_role` on a shared one (backend B2). */
   updateMemberRole: async (
     uuid: string,
     userUuid: string,
-    payload: UpdateMemberRolePayload
+    payload: UpdateSpaceMemberRolePayload
   ): Promise<MemberResponse> => {
     const response = await apiClient.put<MemberResponse>(
       `/spaces/${uuid}/members/${userUuid}`,

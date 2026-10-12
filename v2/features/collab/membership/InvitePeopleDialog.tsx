@@ -14,9 +14,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { InviteMemberPayload } from '@/types/collab';
 import { InviteLinkSection } from '@/v2/features/invites/InviteLinkSection';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
+import { isInvitableContentRole } from './content-role';
 
 /**
  * InvitePeopleDialog — invite by email, with a role. Shared by the space and
@@ -36,12 +36,21 @@ import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
  *
  * The caller owns the mutation and rejects on failure so this dialog can read
  * the reason. Phase-5 W4, 2026-08-04.
+ *
+ * THE ROLES ARE THE CALLER'S (Spaces F7, 12 October 2026). A team space and an
+ * organization offer Member and Admin; a SHARED space offers Viewer and
+ * Editor (backend B2). The dialog draws whichever list it is given, opens on
+ * its first entry, and hands back the chosen value; the caller turns it into
+ * the request (`invitePayload` for spaces), so this file never decides which
+ * field a role travels in. On a shared space the link half follows the same
+ * choice, so a link made here gives the role the reader picked.
  */
-export function InvitePeopleDialog({
+export function InvitePeopleDialog<Role extends string>({
   open,
   onOpenChange,
   title,
   description,
+  roles,
   onInvite,
   linkScope,
 }: {
@@ -49,21 +58,25 @@ export function InvitePeopleDialog({
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  /** The roles to offer, first one selected. Never empty. */
+  roles: readonly { value: Role; label: string }[];
   /** Rejects on failure so the dialog can surface the server line inline. */
-  onInvite: (payload: InviteMemberPayload) => Promise<void>;
+  onInvite: (invite: { email: string; role: Role }) => Promise<void>;
   /** A SPACE, so it can also offer a link. Organizations pass nothing: invite
-   *  links are a spaces feature and there is no organization equivalent. */
-  linkScope?: { spaceUuid: string };
+   *  links are a spaces feature and there is no organization equivalent.
+   *  `contentRoles` (a shared space) makes the link give the chosen role. */
+  linkScope?: { spaceUuid: string; contentRoles?: boolean };
 }) {
+  const defaultRole = roles[0].value;
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'member'>('member');
+  const [role, setRole] = useState<Role>(defaultRole);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [throttled, setThrottled] = useState(false);
 
   const reset = () => {
     setEmail('');
-    setRole('member');
+    setRole(defaultRole);
     setError(null);
     setThrottled(false);
   };
@@ -165,14 +178,22 @@ export function InvitePeopleDialog({
           <Label htmlFor="invite-role">Role</Label>
           <Select
             value={role}
-            onValueChange={(value) => setRole(value as 'admin' | 'member')}
+            onValueChange={(value) => {
+              // Only values this list offers can arrive; read them back off it
+              // rather than casting the string.
+              const chosen = roles.find((option) => option.value === value);
+              if (chosen) setRole(chosen.value);
+            }}
           >
             <SelectTrigger id="invite-role" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="admin">Admin — can invite and manage</SelectItem>
+              {roles.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -210,7 +231,14 @@ export function InvitePeopleDialog({
         {/* UNDER the address field, not beside it. Typing an email is the
             thing most people came to do; the link is what they need when the
             person they are inviting has no Lawexa account to address. */}
-        {linkScope && <InviteLinkSection spaceUuid={linkScope.spaceUuid} />}
+        {linkScope && (
+          <InviteLinkSection
+            spaceUuid={linkScope.spaceUuid}
+            contentRole={
+              linkScope.contentRoles && isInvitableContentRole(role) ? role : undefined
+            }
+          />
+        )}
       </div>
     </ResponsiveOverlay>
   );

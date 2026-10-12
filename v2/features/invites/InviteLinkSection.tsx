@@ -5,6 +5,8 @@ import { Link2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { InviteLink } from '@/types/collab';
+import type { InvitableContentRole } from '@/v2/features/collab/membership/content-role';
+import { inviteLinkPayload } from '@/v2/features/spaces/model';
 import { approvalLabel, CopyLinkButton, inviteUrl } from './link';
 import { useCreateInviteLink, useInviteLinks } from './queries';
 
@@ -40,20 +42,29 @@ import { useCreateInviteLink, useInviteLinks } from './queries';
  * refuses. A refusal they cannot act on is not worth a red line under a form
  * that otherwise works, so the section simply is not there for them. The email
  * half is unaffected, which is the half they can actually use.
+ *
+ * ── ON A SHARED SPACE THE LINK CARRIES THE CHOSEN ROLE (Spaces F7) ─────────
+ * With `contentRole` (the Editor or Viewer picked in the dialog above), the
+ * link shown is the usable one that gives THAT role, and a new one is made
+ * with it and with no channel ever (backend B2 refuses a channel on a shared
+ * space with a 422; `inviteLinkPayload`). Switching the role in the dialog
+ * switches the link, so nobody copies a Viewer link thinking it makes Editors.
  */
 
 /** The usable link for this scope, or `null`. A channel-scoped dialog wants the
  *  link that names THAT channel; a space-scoped one wants the link that names
  *  no channel at all, never a channel link that would drop people somewhere
- *  they were not invited. */
+ *  they were not invited. On a shared space it must also give `contentRole`. */
 function linkForScope(
   rows: readonly InviteLink[],
   channelUuid: string | undefined,
+  contentRole: InvitableContentRole | undefined,
 ): InviteLink | null {
   const match = rows.find(
     (link) =>
       link.is_usable &&
-      (channelUuid ? link.channel?.uuid === channelUuid : link.channel === null),
+      (channelUuid ? link.channel?.uuid === channelUuid : link.channel === null) &&
+      (contentRole === undefined || link.content_role === contentRole),
   );
   return match ?? null;
 }
@@ -61,6 +72,7 @@ function linkForScope(
 export function InviteLinkSection({
   spaceUuid,
   channelUuid,
+  contentRole,
   /** `section` sits under a form and introduces itself; `standalone` fills a
    *  tab that has already been labelled, so it repeats neither the rule nor the
    *  heading. */
@@ -68,6 +80,8 @@ export function InviteLinkSection({
 }: {
   spaceUuid: string;
   channelUuid?: string;
+  /** A SHARED space: the role the link gives. Never with `channelUuid`. */
+  contentRole?: InvitableContentRole;
   framing?: 'section' | 'standalone';
 }) {
   const links = useInviteLinks(spaceUuid);
@@ -75,7 +89,9 @@ export function InviteLinkSection({
 
   if (links.isError) return null;
 
-  const link = links.data ? linkForScope(links.data.data, channelUuid) : null;
+  const link = links.data
+    ? linkForScope(links.data.data, channelUuid, contentRole)
+    : null;
 
   return (
     <div className={framing === 'section' ? 'space-y-2 border-t pt-4' : 'space-y-2'}>
@@ -98,7 +114,12 @@ export function InviteLinkSection({
             </code>
             <CopyLinkButton code={link.code} variant="outline" className="shrink-0" />
           </div>
-          <p className="text-xs text-muted-foreground">{approvalLabel(link)}</p>
+          <p className="text-xs text-muted-foreground">
+            {contentRole && link.content_role_label
+              ? `People join as ${link.content_role_label}. `
+              : ''}
+            {approvalLabel(link)}
+          </p>
         </>
       ) : (
         <>
@@ -119,10 +140,13 @@ export function InviteLinkSection({
             className="w-full min-w-0"
             disabled={create.isPending}
             onClick={() =>
-              create.mutate({
-                requires_approval: true,
-                ...(channelUuid ? { channel_uuid: channelUuid } : {}),
-              })
+              create.mutate(
+                inviteLinkPayload(contentRole ? 'shared' : 'team', {
+                  requiresApproval: true,
+                  channelUuid,
+                  contentRole,
+                }),
+              )
             }
           >
             {create.isPending ? (

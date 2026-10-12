@@ -8,7 +8,7 @@ import type {
   InviteMemberPayload,
   SpaceResponse,
   TransferOwnershipPayload,
-  UpdateMemberRolePayload,
+  UpdateSpaceMemberRolePayload,
   UpdateSpacePayload,
 } from '@/types/collab';
 import { channelsQueries } from '@/v2/features/channels/queries';
@@ -130,11 +130,13 @@ export function useInviteSpaceMember(spaceUuid: string) {
   });
 }
 
+/** Change a member's role. The caller builds the payload: today's `role` on a
+ *  team space, `content_role` on a shared one (Spaces F7, backend B2). */
 export function useUpdateSpaceMemberRole(spaceUuid: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { userUuid: string; role: UpdateMemberRolePayload['role'] }) =>
-      spacesApi.updateMemberRole(spaceUuid, vars.userUuid, { role: vars.role }),
+    mutationFn: (vars: { userUuid: string; payload: UpdateSpaceMemberRolePayload }) =>
+      spacesApi.updateMemberRole(spaceUuid, vars.userUuid, vars.payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: spacesQueries.membersOf(spaceUuid) });
     },

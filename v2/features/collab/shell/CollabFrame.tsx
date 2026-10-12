@@ -19,8 +19,9 @@ import { useCachedSpaceIdentity } from '@/v2/features/spaces/detail/cached-ident
 import { ChannelFormDialog } from '@/v2/features/spaces/dialogs/ChannelFormDialog';
 import { SpaceMembersSheet } from '@/v2/features/spaces/detail/SpaceMembersSheet';
 import {
-  canManageSpace,
-  isSpaceOwner,
+  canManageMembership,
+  contentRoleInRoster,
+  isMembershipOwner,
   roleInRoster,
   spaceShowsChannels,
 } from '@/v2/features/spaces/model';
@@ -289,8 +290,18 @@ function CollabPlaceFrame({
   // `my_role`, and a missing answer degrades to "no manage actions" rather
   // than to a button that would 403.
   const myRole = space?.my_role ?? roleInRoster(members, viewerUuid);
-  const canManage = canManageSpace({ my_role: myRole });
-  const isOwner = isSpaceOwner({ my_role: myRole });
+  // On a SHARED space governance is the CONTENT Owner's (Spaces F7, backend
+  // B2), read the same way: the row's stamp, then the roster. A team space
+  // keeps today's `my_role` rule exactly (`canManageMembership`).
+  const myContentRole =
+    space?.my_content_role ?? contentRoleInRoster(members, viewerUuid);
+  const membership = {
+    kind: space?.kind,
+    my_role: myRole,
+    my_content_role: myContentRole,
+  };
+  const canManage = canManageMembership(membership);
+  const isOwner = isMembershipOwner(membership);
 
   const isMembersPending = isSpaceRoute && membersQuery.isPending;
 

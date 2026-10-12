@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { InviteMemberPayload, Organization } from '@/types/collab';
 import { InvitePeopleDialog } from '@/v2/features/collab/membership/InvitePeopleDialog';
+import { TEAM_INVITE_ROLES } from '@/v2/features/collab/membership/invite-roles';
 import { MembersSheetFrame } from '@/v2/features/collab/membership/MembersSheetFrame';
 import {
   RosterErrorState,
@@ -188,7 +189,8 @@ export function OrganizationMembersSheet({
         onOpenChange={invitePanel.setOpen}
         title={`Invite to ${organization.name}`}
         description="They get an invitation they can accept from their own Invitations page."
-        onInvite={handleInvite}
+        roles={TEAM_INVITE_ROLES}
+        onInvite={({ email, role }) => handleInvite({ email, role })}
       />
 
       <AlertDialog

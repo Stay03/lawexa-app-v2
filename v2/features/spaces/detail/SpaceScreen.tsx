@@ -469,7 +469,10 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
             </SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-6">
-            <InviteLinksPanel spaceUuid={space.uuid} />
+            <InviteLinksPanel
+              spaceUuid={space.uuid}
+              contentRoles={isSharedSpace(space)}
+            />
           </div>
         </SheetContent>
       </Sheet>
@@ -486,7 +489,10 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
             </SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-6">
-            <SpaceJoinRequestsPanel spaceUuid={space.uuid} />
+            <SpaceJoinRequestsPanel
+              spaceUuid={space.uuid}
+              contentRoles={isSharedSpace(space)}
+            />
           </div>
         </SheetContent>
       </Sheet>

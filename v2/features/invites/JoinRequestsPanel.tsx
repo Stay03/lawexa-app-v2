@@ -31,14 +31,18 @@ import {
 
 function RequestRow({
   request,
+  contentRoles,
   deciding,
   onDecide,
 }: {
   request: JoinRequest;
+  /** A shared space: say which role saying yes gives (Spaces F7). */
+  contentRoles: boolean;
   deciding: boolean;
   onDecide: (approve: boolean) => void;
 }) {
   const channel = request.also_joins_channel;
+  const joinsAs = contentRoles ? request.content_role_label?.trim() : undefined;
   return (
     <li className="rounded-xl border border-border/60 p-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -48,9 +52,16 @@ function RequestRow({
           ) : null}
           <AvatarFallback>{request.user.name.slice(0, 1).toUpperCase()}</AvatarFallback>
         </Avatar>
-        <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-          {request.user.name}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">
+            {request.user.name}
+          </p>
+          {joinsAs ? (
+            <p className="truncate text-xs text-muted-foreground">
+              Joins as {joinsAs}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       {/* SAID BEFORE THE PRESS, NEVER AFTER. See the docblock. */}
@@ -91,12 +102,14 @@ function RequestRow({
 
 function Panel({
   rows,
+  contentRoles = false,
   pending,
   deciding,
   onDecide,
   emptyLine,
 }: {
   rows: readonly JoinRequest[];
+  contentRoles?: boolean;
   pending: boolean;
   deciding: boolean;
   onDecide: (id: number, approve: boolean) => void;
@@ -121,6 +134,7 @@ function Panel({
         <RequestRow
           key={request.id}
           request={request}
+          contentRoles={contentRoles}
           deciding={deciding}
           onDecide={(approve) => onDecide(request.id, approve)}
         />
@@ -129,12 +143,21 @@ function Panel({
   );
 }
 
-export function SpaceJoinRequestsPanel({ spaceUuid }: { spaceUuid: string }) {
+/** `contentRoles` on a SHARED space: each request says the role approving
+ *  gives, from `content_role_label` (backend B2). */
+export function SpaceJoinRequestsPanel({
+  spaceUuid,
+  contentRoles = false,
+}: {
+  spaceUuid: string;
+  contentRoles?: boolean;
+}) {
   const query = useSpaceJoinRequests(spaceUuid);
   const decide = useDecideJoinRequest('space', spaceUuid);
   return (
     <Panel
       rows={query.data?.data ?? []}
+      contentRoles={contentRoles}
       pending={query.isPending}
       deciding={decide.isPending}
       onDecide={(id, approve) => decide.mutate({ id, approve })}
