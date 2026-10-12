@@ -84,6 +84,21 @@ export interface V2NavItem extends V2NavLeaf {
   teamChannels?: true;
   /** Optional live unread signal on this row. See {@link V2NavSignalId}. */
   signalId?: V2NavSignalId;
+  /**
+   * Other addresses that belong to this row although they sit outside its
+   * `href`, so the nav keeps its place there (Spaces: `/invitations`, reached
+   * from the spaces list, design round 1, 12 October 2026).
+   */
+  alsoActiveOn?: readonly string[];
+}
+
+/** Whether a row is the reader's current place: its own address, or one it
+ *  claims through `alsoActiveOn`. Both the sidebar and the drawer ask this. */
+export function isNavItemActive(
+  item: Pick<V2NavItem, 'href' | 'alsoActiveOn'>,
+  isActive: (href: string) => boolean,
+): boolean {
+  return isActive(item.href) || (item.alsoActiveOn ?? []).some(isActive);
 }
 
 /** What the nav needs to know about the viewer: the server-verified role and
@@ -155,6 +170,9 @@ export const v2NavItems: V2NavItem[] = [
     label: 'Spaces',
     href: '/spaces',
     icon: Boxes,
+    // The invitations screen is opened from the spaces list's pill, so the
+    // row stays lit there instead of the nav losing its place.
+    alsoActiveOn: ['/invitations'],
     // The v1 soft-launch gate (`canAccessSpaces`: researcher/admin/superadmin)
     // came OFF here at the phase-5 ship — owner decision D1, every registered
     // account. It only ever existed because v1's `SpacesGuard` REDIRECTED

@@ -40,7 +40,12 @@ import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
 import { V2UserFooter } from './V2UserFooter';
-import { v2NewChat, visibleNavItems, type V2NavItem } from './nav.config';
+import {
+  isNavItemActive,
+  v2NewChat,
+  visibleNavItems,
+  type V2NavItem,
+} from './nav.config';
 import { MoveFirstLink } from './move-first';
 
 /**
@@ -231,7 +236,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                 );
               }
 
-              const active = isActive(item.href);
+              const active = isNavItemActive(item, isActive);
               // The unread grammar on the nav row: bold + gold dot = unread, a
               // number is ONLY ever mentions, no red. The label bolds here and
               // the mark renders in the trailing slot.

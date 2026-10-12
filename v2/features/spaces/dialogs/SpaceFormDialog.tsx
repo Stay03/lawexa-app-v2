@@ -277,8 +277,10 @@ export function SpaceFormDialog({
       ]
     : [];
 
+  // The organisation the space will belong to, or nothing: "Personal" beside
+  // "Shared" read as a second kind of space (design round 1).
   const ownerLabel =
-    owner === 'personal' ? 'Personal' : (organization?.name ?? 'Organization');
+    owner === 'personal' ? null : (organization?.name ?? 'Organization');
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -342,10 +344,10 @@ export function SpaceFormDialog({
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title={isEdit ? 'Edit space' : 'Create a space'}
+      title={isEdit ? 'Rename space' : 'Create a space'}
       description={
         isEdit
-          ? 'Update this space’s details. Everyone in it sees the change.'
+          ? 'Change its name and details. Everyone in it sees the change.'
           : 'A space holds chats, folders and files for the people you invite.'
       }
       className="md:max-w-2xl"
@@ -475,7 +477,8 @@ function SpacePreview({
   type: SpaceType;
   kind: SpaceKind;
   isPrivate: boolean;
-  ownerLabel: string;
+  /** The organisation, or `null` for a space that belongs to none. */
+  ownerLabel: string | null;
 }) {
   const trimmed = name.trim();
   return (
@@ -502,8 +505,10 @@ function SpacePreview({
       <span className="flex flex-wrap items-center justify-center gap-1">
         <PreviewChip>{kind === 'team' ? 'Team' : 'Shared'}</PreviewChip>
         <PreviewChip>{type === 'study' ? 'Study' : 'Work'}</PreviewChip>
-        <PreviewChip>{isPrivate ? 'Private' : 'Open'}</PreviewChip>
-        <PreviewChip>{ownerLabel}</PreviewChip>
+        {/* A shared space is always private, so the chip only says
+            something on a team space (`showsPrivateMark`'s rule). */}
+        {kind === 'team' ? <PreviewChip>{isPrivate ? 'Private' : 'Open'}</PreviewChip> : null}
+        {ownerLabel ? <PreviewChip>{ownerLabel}</PreviewChip> : null}
       </span>
     </div>
   );

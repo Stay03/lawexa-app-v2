@@ -40,6 +40,7 @@ import {
 import { canAddContent, spaceChatByline, uniqueRowsById } from '../../model';
 import { MoveToSpaceDialog } from '../../move/MoveToSpaceDialog';
 import { spacesQueries } from '../../queries';
+import { useServerSearch, type ServerSearch } from '../../use-server-search';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SpaceFileRow } from './SpaceFileRow';
 import {
@@ -104,12 +105,18 @@ export function SpaceContentPanel({
   // The space has loaded before any tab mounts (`SpaceScreen` renders tabs
   // only then), so the rulings read real roles. A missing scope reads as the
   // most careful answer: nothing to add, nothing to remove.
-  const space = useCollabSpaceScope()?.space ?? null;
+  const scope = useCollabSpaceScope();
+  const space = scope?.space ?? null;
   const access: ContentAccess = {
     spaceUuid,
     spaceName: space?.name ?? '',
     canAdd: space !== null && canAddContent(space),
     canRemove: space !== null && canRemoveFromSpace(space),
+    // An Owner alone in the space: the empty tabs offer to bring people in.
+    onInvite:
+      scope !== null && scope.canManage && space !== null && space.active_members_count <= 1
+        ? scope.openInvite
+        : null,
   };
   switch (tab) {
     case 'chats':
@@ -129,6 +136,8 @@ interface ContentAccess {
   canAdd: boolean;
   /** The space's Owner: Remove from space on any item. */
   canRemove: boolean;
+  /** Opens the invite dialog, for an Owner alone in the space; else `null`. */
+  onInvite: (() => void) | null;
 }
 
 /** Stable empty rows, so a pending list does not mint a new array per render. */
@@ -153,42 +162,6 @@ function useContentReadGate() {
     viewerId: session.userId,
     enabled: collabAccessState(session) === 'eligible',
   };
-}
-
-/** How long a tab's search waits after the last keystroke before it asks. */
-const SEARCH_DEBOUNCE_MS = 300;
-
-/**
- * A tab's search box: what the box shows now (`value`), and the term the list
- * asks the server for (`term`), committed 300ms after the last keystroke from
- * the change handler itself, the cited-by panel's idiom (no effect, so no
- * state is set in one). Clearing applies at once: no wait to see everything
- * again.
- */
-function useTabSearch() {
-  const [value, setValueState] = useState('');
-  const [term, setTerm] = useState('');
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const timer = timerRef;
-    return () => {
-      if (timer.current !== null) clearTimeout(timer.current);
-    };
-  }, []);
-
-  const setValue = useCallback((next: string) => {
-    setValueState(next);
-    if (timerRef.current !== null) clearTimeout(timerRef.current);
-    if (next.trim() === '') {
-      setTerm('');
-      return;
-    }
-    timerRef.current = setTimeout(() => setTerm(next.trim()), SEARCH_DEBOUNCE_MS);
-  }, []);
-  const clear = useCallback(() => setValue(''), [setValue]);
-
-  return { value, setValue, term, clear };
 }
 
 interface DialogState {
@@ -248,7 +221,7 @@ function useItemDialogs(access: ContentAccess) {
 function SpaceChatsList({ access }: { access: ContentAccess }) {
   const { spaceUuid, spaceName, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
-  const search = useTabSearch();
+  const search = useServerSearch();
   const query = useInfiniteQuery({
     ...spacesQueries.conversations(spaceUuid, { viewerId, search: search.term }),
     enabled,
@@ -298,6 +271,7 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
             <SpaceContentEmptyState
               tab="chats"
               canAdd={access.canAdd}
+              onInvite={access.onInvite ?? undefined}
               action={
                 <Button asChild size="sm">
                   <Link href="/conversations">Go to your conversations</Link>
@@ -347,7 +321,7 @@ const NO_LEVELS: readonly FolderLevel[] = [];
 function SpaceFoldersList({ access }: { access: ContentAccess }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
-  const search = useTabSearch();
+  const search = useServerSearch();
   // The levels the reader went down, root first. Local to the tab: it is a
   // way of browsing, not an address (each folder's address is its own page).
   const [trail, setTrail] = useState<readonly FolderLevel[]>(NO_LEVELS);
@@ -463,7 +437,12 @@ function SpaceFoldersList({ access }: { access: ContentAccess }) {
               }
             />
           ) : (
-            <SpaceContentEmptyState tab="folders" canAdd={canAdd} action={newFolderButton} />
+            <SpaceContentEmptyState
+              tab="folders"
+              canAdd={canAdd}
+              action={newFolderButton}
+              onInvite={access.onInvite ?? undefined}
+            />
           )
         }
       >
@@ -560,7 +539,7 @@ function describeUploadFailure(error: unknown): UploadFailureNote {
 function SpaceFilesList({ access }: { access: ContentAccess }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
-  const search = useTabSearch();
+  const search = useServerSearch();
   const query = useInfiniteQuery({
     ...spacesQueries.files(spaceUuid, { viewerId, name: search.term }),
     enabled,
@@ -641,7 +620,12 @@ function SpaceFilesList({ access }: { access: ContentAccess }) {
               action={<ClearSearchButton onClear={search.clear} />}
             />
           ) : (
-            <SpaceContentEmptyState tab="files" canAdd={canAdd} action={uploadButton} />
+            <SpaceContentEmptyState
+              tab="files"
+              canAdd={canAdd}
+              action={uploadButton}
+              onInvite={access.onInvite ?? undefined}
+            />
           )
         }
       >
@@ -748,7 +732,7 @@ function ContentToolbar({
   busy,
   action = null,
 }: {
-  search: ReturnType<typeof useTabSearch>;
+  search: ServerSearch;
   label: string;
   placeholder: string;
   busy: boolean;

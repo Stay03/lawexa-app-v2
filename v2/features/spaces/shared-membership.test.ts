@@ -189,17 +189,24 @@ test('the members sheet reads content roles on a shared space and keeps team rul
   assert.match(sheet, /contentRoles=\{shared\}/);
   assert.match(sheet, /canManage && !shared\s*\?\s*\(target\) =>\s*updateRole\.mutate\(\{\s*userUuid: target\.user\.uuid,\s*payload: \{ role: 'admin' \}/);
   assert.match(sheet, /canManage && shared\s*\?\s*\(target, next\) =>\s*updateRole\.mutate\(\{\s*userUuid: target\.user\.uuid,\s*payload: contentRoleChangePayload\(next\)/);
-  // The last Owner is refused before the request, and a 409 is still read.
-  assert.match(sheet, /setMustTransfer\(lastSharedOwner \? lastOwnerSentence : null\);/);
+  // The last Owner's way out is decided before the request (design round 1,
+  // was a refusal before the request): the route is read off the roster, and
+  // a 409 (or a team owner's 400) still lands in the same designed state.
   assert.match(
     sheet,
-    /if \(shared && isLastOwnerLeaveError\(apiError\.status\)\) \{[\s\S]*?setMustTransfer\(lastOwnerSentence\);/,
+    /: spaceLeaveRoute\(space, members, viewerUuid, membersQuery\.isSuccess\);/,
   );
-  // The designed message leads with transferring ownership (backend B2).
-  assert.match(sheet, /Transfer ownership first: open another member's menu/);
+  assert.match(
+    sheet,
+    /\(shared && isLastOwnerLeaveError\(apiError\.status\)\) \|\|\s*isOwnerMustTransferError\(apiError\.status\)[\s\S]*?setLeaveRefused\(true\);/,
+  );
+  // The designed message names the way forward, once (backend B2).
+  assert.match(sheet, /Choose a new owner first/);
+  assert.match(sheet, /Make another member the owner, then you can leave\./);
+  assert.doesNotMatch(sheet, /Got it/);
   // What the sheet promises on a shared space.
   assert.match(sheet, /and you become a Contributor\./);
-  assert.match(sheet, /The chats, folders and files you added stay in it for the other members\./);
+  assert.match(sheet, /The conversations, folders and files you added stay in it for the other members\./);
 });
 
 test('the frame governs a shared space by its content role', () => {
@@ -215,11 +222,17 @@ test('links and the waiting list speak content roles on a shared space, never a 
   const panel = read('v2', 'features', 'invites', 'InviteLinksPanel.tsx');
   assert.match(panel, /inviteLinkPayload\(contentRoles \? 'shared' : 'team', \{/);
   assert.doesNotMatch(panel, /channel_uuid/);
-  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.equal(screen.match(/contentRoles=\{isSharedSpace\(space\)\}/g)?.length, 2);
+  // Both panels are steps of the members sheet since design round 1 (they
+  // were two sheets on the space page, each passed `isSharedSpace(space)`).
+  const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceMembersSheet.tsx');
+  assert.match(sheet, /<InviteLinksPanel spaceUuid=\{space\.uuid\} contentRoles=\{shared\} \/>/);
+  assert.match(sheet, /<SpaceJoinRequestsPanel spaceUuid=\{space\.uuid\} contentRoles=\{shared\} \/>/);
   const requests = read('v2', 'features', 'invites', 'JoinRequestsPanel.tsx');
   assert.match(requests, /const joinsAs = contentRoles \? request\.content_role_label\?\.trim\(\) : undefined;/);
   const dialog = read('v2', 'features', 'collab', 'membership', 'InvitePeopleDialog.tsx');
   assert.doesNotMatch(dialog, /[—–]\s*can invite/);
-  assert.match(dialog, /roles\.map\(\(option\) =>/);
+  // The list is drawn by the shared RoleSelect since design round 1.
+  assert.match(dialog, /<RoleSelect id="invite-role" value=\{role\} roles=\{roles\} onChange=\{setRole\} \/>/);
+  const select = read('v2', 'features', 'collab', 'membership', 'RoleSelect.tsx');
+  assert.match(select, /roles\.map\(\(option\) =>/);
 });

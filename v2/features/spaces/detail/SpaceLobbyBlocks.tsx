@@ -10,7 +10,6 @@ import type { Channel, Member, MemberRole, Space } from '@/types/collab';
 import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
 import type { RailSections } from '@/v2/features/collab/shell/collab-route';
 import { CONTENT_FADE } from '@/v2/shell/designs/modules';
-import { spaceOwnerLabel } from '../model';
 import { buildActivityDigest } from './activity-digest';
 import { LobbyFact, LobbyPeopleSkeleton, LobbySection } from './lobby-parts';
 import { SpaceChannelRow } from './SpaceChannelRow';
@@ -153,7 +152,14 @@ export function SpaceActivityBlock({
             row.kind === 'channel' ? (
               <SpaceChannelRow key={row.row.channel.uuid} row={row.row} now={now} />
             ) : (
-              <SpaceThreadRow key={row.thread.uuid} row={row} now={now} />
+              <SpaceThreadRow
+                key={row.thread.uuid}
+                row={row}
+                now={now}
+                // With one channel every thread is in it, so the row need not
+                // say so (design round 1: one truncation per line at most).
+                showProvenance={sections.total > 1}
+              />
             ),
           )}
         </ul>
@@ -285,14 +291,18 @@ export function SpaceAboutBlock({ space }: { space: Space }) {
           </span>
         </LobbyFact>
         <LobbyFact term="Kind">{space.type_label}</LobbyFact>
-        <LobbyFact term="Owner">
-          <span className="inline-flex items-center gap-1.5">
-            {space.organization ? (
+        {/* ONLY WHEN THERE IS AN ORGANISATION (design round 1). The row read
+            "Owner ... Personal" over "Created by <name>", as if the owner were
+            a person called Personal; a space that belongs to no organisation
+            has nothing to say here. */}
+        {space.organization ? (
+          <LobbyFact term="Belongs to">
+            <span className="inline-flex items-center gap-1.5">
               <Building2 aria-hidden className="size-3 text-muted-foreground" />
-            ) : null}
-            {spaceOwnerLabel(space)}
-          </span>
-        </LobbyFact>
+              {space.organization.name}
+            </span>
+          </LobbyFact>
+        ) : null}
         <LobbyFact term="Created by">{space.creator.name}</LobbyFact>
         {created ? <LobbyFact term="Created">{created}</LobbyFact> : null}
       </dl>

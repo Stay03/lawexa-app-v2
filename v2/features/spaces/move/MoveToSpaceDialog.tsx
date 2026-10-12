@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Check, FolderOutput, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -22,18 +22,23 @@ import type { Space } from '@/types/collab';
 import { CONTENT_ROLE_LABELS } from '@/v2/features/collab/membership/content-role';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
-import { collabAccessState } from '@/v2/features/collab/model';
+import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
+import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { SearchField } from '@/v2/shell/SearchField';
 import { useMoveToSpace } from '../content-mutations';
 import {
+  movePickerCutLine,
   moveRefusal,
   moveTargets,
+  offersRemoveFromSpace,
   SPACE_ITEM_NOUN,
   type SpaceItemTarget,
 } from '../content-model';
-import { spaceOwnerLabel } from '../model';
+import { spaceKindMark, spaceOwnerLabel } from '../model';
 import { SPACES_BASELINE_PARAMS, spacesQueries } from '../queries';
+import { useServerSearch } from '../use-server-search';
 
 /**
  * MoveToSpaceDialog — put an item the viewer owns into one of their spaces,
@@ -43,11 +48,22 @@ import { SPACES_BASELINE_PARAMS, spacesQueries } from '../queries';
  *
  * ── WHICH SPACES ARE OFFERED ───────────────────────────────────────────────
  * The viewer's spaces where they may add: Owner or Contributor
- * (`moveTargets`). A space where they only view would answer 403, so it is
- * not on the list at all. The rows come from the `/spaces` list's own
- * baseline entry (`SPACES_BASELINE_PARAMS`), so a reader who has seen their
- * spaces opens this on rows already in hand. The space the item is in now
- * stays on the list, marked, and cannot be picked again.
+ * (`moveTargets`), team spaces included (techlead decision 1, 12 October
+ * 2026), each named by its kind in the badge style the spaces list uses
+ * (`spaceKindMark`: "Shared", or "Team" for a viewer with Team Channels). A
+ * space where they only view would answer 403, so it is not on the list at
+ * all. The unsearched rows come from the `/spaces` list's own baseline entry
+ * (`SPACES_BASELINE_PARAMS`), so a reader who has seen their spaces opens this
+ * on rows already in hand. The space the item is in now stays on the list,
+ * marked, and cannot be picked again.
+ *
+ * ── NO SILENT CUT (techlead decision 2) ────────────────────────────────────
+ * The server sends a page of 30. A search box asks the server (`/spaces`
+ * `search`), so a space beyond the first page can be found by name, and when
+ * the server says it holds more than the page it sent, a line under the list
+ * says so: "Showing 30. Search to find more." (`movePickerCutLine`). The rows
+ * on screen stay while a new search is on its way, dimmed, rather than
+ * dropping to a skeleton on every keystroke.
  *
  * ── ONE TAP MOVES ──────────────────────────────────────────────────────────
  * Picking a space is the decision, so the tap sends it; a second "Move"
@@ -64,9 +80,10 @@ import { SPACES_BASELINE_PARAMS, spacesQueries } from '../queries';
  *
  * ── BACK OUT ───────────────────────────────────────────────────────────────
  * "Remove from space" sends `space_uuid: null`: the item comes back to the
- * owner's own items and nothing is deleted. It is offered whenever the item
- * is in a space, or may be (a folder page cannot tell: `GET /folders/{uuid}`
- * carries no space), and not when it is known to be the owner's alone.
+ * owner's own items and nothing is deleted. It is offered only when the item
+ * names the space it is in (`offersRemoveFromSpace`); a `null` or absent space
+ * means the item is the owner's alone, the folder page included since
+ * `GET /folders/{uuid}` carries the block (techlead decision 3).
  *
  * Hosts mount this only while it is open, so every open starts clean.
  */
@@ -85,16 +102,28 @@ export function MoveToSpaceDialog({
   // The row the reader picked, so its spinner shows on it and not on all.
   const [pickedUuid, setPickedUuid] = useState<string | null | undefined>(undefined);
 
+  const search = useServerSearch();
+  const teamChannelsOpen = canOpenTeamChannels(session);
+
   const spacesQuery = useQuery({
-    ...spacesQueries.list({ viewerId: session.userId, ...SPACES_BASELINE_PARAMS }),
+    ...spacesQueries.list({
+      viewerId: session.userId,
+      ...(search.term ? { search: search.term } : SPACES_BASELINE_PARAMS),
+    }),
     enabled: collabAccessState(session) === 'eligible',
+    placeholderData: keepPreviousData,
   });
   const rows = spacesQuery.data?.data;
+  const pagination = spacesQuery.data?.pagination;
   const targets = useMemo(() => (rows ? moveTargets(rows) : []), [rows]);
+  const cutLine = movePickerCutLine(
+    targets.length,
+    rows && pagination ? { rows: rows.length, total: pagination.total } : null,
+  );
 
   const noun = SPACE_ITEM_NOUN[item.type];
   const currentUuid = item.space?.uuid ?? null;
-  const mayBeInSpace = item.space !== null;
+  const inSpace = offersRemoveFromSpace(item);
 
   const send = (to: Space | null) => {
     setError(null);
@@ -120,7 +149,7 @@ export function MoveToSpaceDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (move.isPending ? undefined : onOpenChange(next))}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={cn('sm:max-w-md', COLLAB_DIALOG_SURFACE)}>
         <DialogHeader>
           <DialogTitle>Move to a space</DialogTitle>
           <DialogDescription>
@@ -128,7 +157,22 @@ export function MoveToSpaceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="-mx-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain">
+        <SearchField
+          value={search.value}
+          onChange={search.setValue}
+          onClear={search.clear}
+          placeholder="Search your spaces"
+          label="Search your spaces"
+          busy={spacesQuery.isPlaceholderData}
+        />
+
+        <div
+          className={cn(
+            '-mx-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain',
+            'transition-opacity duration-150 motion-reduce:transition-none',
+            spacesQuery.isPlaceholderData && 'opacity-60',
+          )}
+        >
           {spacesQuery.isPending ? (
             <MoveTargetsSkeleton />
           ) : spacesQuery.isError ? (
@@ -137,7 +181,16 @@ export function MoveToSpaceDialog({
               message="Couldn’t load your spaces."
               onRetry={() => void spacesQuery.refetch()}
             />
-          ) : targets.length === 0 ? (
+          ) : targets.length === 0 && search.term ? (
+            <div className="px-2 py-6 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
+              <p className="text-sm font-medium text-foreground">
+                {`No space you can add to matches “${search.term}”`}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try another word, or clear the search.
+              </p>
+            </div>
+          ) : targets.length === 0 && cutLine === null ? (
             <div className="px-2 py-6 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
               <p className="text-sm font-medium text-foreground">No space to move it to</p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -155,6 +208,7 @@ export function MoveToSpaceDialog({
                 const role = space.my_content_role
                   ? CONTENT_ROLE_LABELS[space.my_content_role]
                   : null;
+                const kind = spaceKindMark(space, teamChannelsOpen);
                 return (
                   <li key={space.uuid}>
                     <button
@@ -170,8 +224,15 @@ export function MoveToSpaceDialog({
                     >
                       <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="md" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-foreground">
-                          {space.name}
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                            {space.name}
+                          </span>
+                          {kind ? (
+                            <span className="shrink-0 rounded-md border border-border px-1.5 text-[10px] font-medium leading-4 text-muted-foreground">
+                              {kind}
+                            </span>
+                          ) : null}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {[role, spaceOwnerLabel(space)].filter(Boolean).join(' · ')}
@@ -193,6 +254,10 @@ export function MoveToSpaceDialog({
           )}
         </div>
 
+        {cutLine ? (
+          <p className="-mt-3 text-xs text-muted-foreground">{cutLine}</p>
+        ) : null}
+
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -200,7 +265,7 @@ export function MoveToSpaceDialog({
         ) : null}
 
         <DialogFooter className="gap-2 sm:justify-between">
-          {mayBeInSpace ? (
+          {inSpace ? (
             <Button
               type="button"
               variant="outline"

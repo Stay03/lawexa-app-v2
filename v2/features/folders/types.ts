@@ -83,9 +83,10 @@ export interface FolderRecord extends FolderNode {
   children?: FolderNode[];
   /**
    * The space the folder sits in, `null` when it is the owner's alone (backend
-   * B3). Carried by the space's folder list and by a move's answer. The folder
-   * view (`GET /folders/{uuid}`) does NOT carry it (backend, 12 October 2026),
-   * so absent means "not known here", never "not in a space".
+   * B3). Carried by the space's folder list, by a move's answer and by the
+   * folder view (`GET /folders/{uuid}`, being added by backend; techlead
+   * decision 3, 12 October 2026). Optional because the view ships before the
+   * block does: absent reads as "not in a space", the same as `null`.
    */
   space?: { uuid: string; name: string } | null;
 }

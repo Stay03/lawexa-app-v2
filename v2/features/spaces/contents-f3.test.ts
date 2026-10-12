@@ -214,14 +214,19 @@ test('the channel panel keeps its own queue rules through the shared queue', () 
 /* ── Empty states and labels ─────────────────────────────────────────────── */
 
 test('empty tabs teach the Owner and Contributors, and tell a Viewer who fills them', () => {
+  // Design round 1: Stay's lines moved to the header of every shared space,
+  // so the empty state names what is missing and how it gets filled instead
+  // of repeating them.
+  const nouns = { chats: 'conversations', folders: 'folders', files: 'files' } as const;
   for (const tab of ['chats', 'folders', 'files'] as const) {
     const adder = spaceEmptyCopy(tab, true);
-    assert.equal(adder.title, 'Members can add to this space', tab);
-    assert.match(adder.description, /^What’s here is organised for the whole team\./, tab);
+    assert.equal(adder.title, `No ${nouns[tab]} in this space yet`, tab);
+    assert.doesNotMatch(adder.title + adder.description, /Members can add|organised for the whole team/, tab);
     const viewer = spaceEmptyCopy(tab, false);
-    assert.doesNotMatch(viewer.title + viewer.description, /Members can add/, tab);
-    assert.match(viewer.description, /^Members who can add will put shared /, tab);
+    assert.equal(viewer.title, `No ${nouns[tab]} in this space yet`, tab);
+    assert.equal(viewer.description, `Contributors and the owner add ${nouns[tab]} here.`, tab);
   }
+  assert.equal(spaceEmptyCopy('chats', true).description, 'Open one of your conversations and choose Move to space.');
   assert.match(spaceEmptyCopy('folders', true).description, /Folders you add here are shared with everyone in this space\./);
   assert.match(spaceEmptyCopy('files', true).description, /Files you add here are shared with everyone in this space\./);
 });
@@ -340,8 +345,10 @@ test('the move dialog lists the spaces the viewer can add to and explains refusa
   const dialog = read('v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx');
   assert.match(dialog, /const targets = useMemo\(\(\) => \(rows \? moveTargets\(rows\) : \[\]\), \[rows\]\);/);
   assert.match(dialog, /setError\(moveRefusal\(item\.type, apiError\.status, apiError\.message\)\);/);
-  // Back out is offered unless the item is known to be its owner's alone.
-  assert.match(dialog, /const mayBeInSpace = item\.space !== null;/);
+  // Back out is offered only for an item that names its space (techlead
+  // decision 3, 12 October 2026; was: unless known to be the owner's alone).
+  assert.match(dialog, /const inSpace = offersRemoveFromSpace\(item\);/);
+  assert.match(dialog, /\{inSpace \? \(/);
   assert.match(dialog, /disabled=\{isCurrent \|\| move\.isPending\}/);
 });
 

@@ -4,35 +4,15 @@ import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import type { InviteLink } from '@/types/collab';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { inviteUrl } from './link-model';
 
 /**
- * The address of an invite, and the one control that copies it.
- *
- * ── THE SERVER DOES NOT SEND A URL ─────────────────────────────────────────
- * Measured against production: the row carries `code` and nothing else, so the
- * address is ours to compose. It is composed from `window.location.origin`
- * rather than a constant, because a link copied on staging that points at
- * production quietly invites somebody into the wrong place.
- *
- * ── AND IT IS COMPOSED IN EXACTLY ONE PLACE ────────────────────────────────
- * Two surfaces now offer a link — the admin panel and the invite dialog — and a
- * second copy of this three-line function is how they start disagreeing about
- * what an invite address looks like. Today's other repair was twelve copies of
- * a two-line ternary.
+ * The one control that copies an invite's address, and the field that shows
+ * it. The address and the sentence about it are composed in `./link-model`,
+ * which has no JSX, so the tests can pin them.
  */
-export function inviteUrl(code: string): string {
-  const origin =
-    typeof window === 'undefined' ? 'https://lawexa.com' : window.location.origin;
-  return `${origin}/join/${code}`;
-}
-
-/** How the link behaves, in the reader's terms rather than the flag's. */
-export function approvalLabel(link: Pick<InviteLink, 'requires_approval'>): string {
-  return link.requires_approval
-    ? 'Anyone using it asks first, and you decide.'
-    : 'Anyone with it walks straight in.';
-}
 
 /**
  * Copy, with its own confirmation.
@@ -43,17 +23,20 @@ export function approvalLabel(link: Pick<InviteLink, 'requires_approval'>): stri
 export function CopyLinkButton({
   code,
   variant = 'ghost',
+  size = 'sm',
   className,
 }: {
   code: string;
   variant?: 'ghost' | 'outline' | 'secondary';
+  /** `default` stands at an `Input`'s height, beside the link field. */
+  size?: 'sm' | 'default';
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
       variant={variant}
-      size="sm"
+      size={size}
       className={className}
       onClick={() => {
         void navigator.clipboard?.writeText(inviteUrl(code));
@@ -71,5 +54,39 @@ export function CopyLinkButton({
         </>
       )}
     </Button>
+  );
+}
+
+/**
+ * The address itself, in a read-only field at the email field's height and
+ * radius, so the invite dialog and the links panel show a link one way: the
+ * full address, with Copy beside it (design round 1). It used to be a 28px
+ * code chip with 4px corners in the dialog and a bare `/join/{code}` in the
+ * panel. Focusing it selects the whole address, for anyone who copies by hand.
+ */
+export function InviteLinkField({
+  code,
+  dead = false,
+}: {
+  code: string;
+  /** A revoked or used-up link: struck through, and no Copy. */
+  dead?: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <Input
+        readOnly
+        aria-label="Invite link"
+        value={inviteUrl(code)}
+        onFocus={(event) => event.currentTarget.select()}
+        className={cn(
+          'min-w-0 flex-1 font-mono text-xs md:text-xs',
+          dead && 'text-muted-foreground line-through',
+        )}
+      />
+      {dead ? null : (
+        <CopyLinkButton code={code} variant="outline" size="default" className="shrink-0" />
+      )}
+    </div>
   );
 }

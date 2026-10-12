@@ -8,13 +8,9 @@ import { channelVisibilityFace } from '@/lib/collab/visibility';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
-import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
-import type { Member, SlimUser } from '@/types/collab';
-import { memberCountLabel, spaceOwnerLabel } from '@/v2/features/spaces/model';
 import {
   CONTENT_FADE,
   CountBadge,
@@ -79,11 +75,6 @@ import type { CollabSpaceScope } from './space-scope';
  *  transcript and every pixel the rail takes comes out of that. It docks at
  *  `lg:` and not `md:`: see `CollabFrame`, where the 272px arithmetic is. */
 export const SPACE_RAIL_WIDTH = 'w-60';
-
-/** The faces a `PresenceStack` shows, in roster order. */
-function facesOf(members: readonly Member[]): readonly SlimUser[] {
-  return members.map((member) => member.user);
-}
 
 /* ── One row ──────────────────────────────────────────────────────────────── */
 
@@ -329,15 +320,22 @@ export const SpaceRail = memo(function SpaceRail({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* ── Identity ─────────────────────────────────────────────────────
-            The crest and the name paint from `identity`, which on a channel
-            route arrives with the channel itself — a whole round trip before
-            the space detail. The facts only the detail carries (privacy, the
-            owner, the roster) hold their shape until it lands, so the block
-            resolves in place instead of shimmering as a whole. ───────────── */}
+            The way home: the crest and the name, linking to the space's own
+            page. They paint from `identity`, which on a channel route arrives
+            with the channel itself — a whole round trip before the space
+            detail.
+
+            NAME ONLY, NO FACTS (design round 1, 12 October 2026). The block
+            used to repeat the page header's kind line and faces too, so on
+            the space page at `lg:` the same five things were printed twice,
+            250px apart. The space's facts and people belong to its page; the
+            rail keeps only what it needs to be the way back there. The lock
+            stays: on a channel route it is the one fact about the place the
+            pane does not print. ───────────────────────────────────────── */}
       {identity === null ? (
         <RailHeaderSkeleton />
       ) : (
-        <div className={cn('px-2 pt-2', CONTENT_FADE)}>
+        <div className={cn('p-2', CONTENT_FADE)}>
           <Link
             href={`/spaces/${identity.uuid}`}
             aria-current={atLobby ? 'page' : undefined}
@@ -355,55 +353,21 @@ export const SpaceRail = memo(function SpaceRail({
               type={identity.type}
               size="md"
             />
-            <span className="min-w-0 flex-1">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span
-                  title={identity.name}
-                  className="min-w-0 truncate text-sm font-semibold text-foreground"
-                >
-                  {identity.name}
-                </span>
-                {space?.is_private ? (
-                  <Lock
-                    aria-label="Private space"
-                    className="size-3 shrink-0 text-muted-foreground"
-                  />
-                ) : null}
+            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span
+                title={identity.name}
+                className="min-w-0 truncate text-sm font-semibold text-foreground"
+              >
+                {identity.name}
               </span>
-              {space ? (
-                <span className="block truncate text-[11px] text-muted-foreground">
-                  {`${space.type_label} · ${spaceOwnerLabel(space)}`}
-                </span>
-              ) : (
-                <Skeleton aria-hidden className="mt-1 h-2.5 w-2/5 rounded" />
-              )}
+              {space?.is_private ? (
+                <Lock
+                  aria-label="Private space"
+                  className="size-3 shrink-0 text-muted-foreground"
+                />
+              ) : null}
             </span>
           </Link>
-
-          {/* WHO IS IN THE SPACE — a glance, deliberately NOT a door.
-              `onClick` is omitted (the kit then renders a plain element rather
-              than a button), because the roster it would open is a lobby
-              concern: `?roster=1` exists on the space route only, so that the
-              `?invite=` param nested in that sheet has exactly one owner at
-              every address. On a channel route the reader's "who is here" is
-              the CHANNEL's roster, which the channel screen owns — two
-              presence stacks with two doors on one screen was the redundancy
-              this removes. It sits OUTSIDE the link above either way: a button
-              nested in an anchor is invalid, and the browser's repair swallows
-              one of the two activations. */}
-          <div className="px-2 pb-2 pt-1.5">
-            {space ? (
-              <PresenceStack
-                members={facesOf(scope.members)}
-                total={space.active_members_count}
-                countLabel={memberCountLabel(space.active_members_count)}
-                label={`${memberCountLabel(space.active_members_count)} in ${space.name}`}
-                size="sm"
-              />
-            ) : (
-              <Skeleton aria-hidden className="h-5 w-24 rounded-full" />
-            )}
-          </div>
         </div>
       )}
 

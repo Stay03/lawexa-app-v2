@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { collabAccessState } from '@/v2/features/collab/model';
@@ -200,9 +201,16 @@ export function InvitationsScreen() {
           without this the document had no `h1` at all, so anyone navigating by
           headings arrived at a page that would not say what it was. Measured
           at 390px on 15 August 2026, before this line existed: zero `h1`
-          elements. `sr-only` rather than visible, because the bar already
-          prints it and printing it twice is the thing this pass removes. */}
-      <h1 className="sr-only">Invitations</h1>
+          elements.
+
+          VISIBLE FROM `md:` (design round 1, 12 October 2026). Only the phone
+          bar prints the screen's name; on a desktop the page began with the
+          first section's label and said nowhere what it was. So the heading
+          is drawn from `md:` up, in the top-level screens' title style, and
+          stays stated for assistive tech below it, where the bar has it. */}
+      <h1 className="sr-only md:not-sr-only md:mb-3 md:block md:text-3xl md:font-semibold md:leading-tight md:tracking-tight md:text-foreground">
+        Invitations
+      </h1>
 
 
       {/* The ONE live region for this surface: the loading state and the
@@ -287,6 +295,8 @@ export function InvitationsFallback() {
         Checking for invitations
       </span>
       <div aria-hidden inert className={LIST_COLUMN}>
+        {/* The live heading's place from `md:` (see the screen above). */}
+        <Skeleton className="mb-3 hidden h-9 w-48 rounded md:block" />
         <InvitationsSkeleton />
       </div>
     </>

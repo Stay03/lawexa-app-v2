@@ -3,6 +3,10 @@
 import { createContext, useContext } from 'react';
 
 import type { Member, Space, SpaceType } from '@/types/collab';
+import type {
+  MembershipSubject,
+  SpaceLeaveRoute,
+} from '@/v2/features/spaces/model';
 import type { RailSections } from './collab-route';
 
 /**
@@ -27,6 +31,13 @@ import type { RailSections } from './collab-route';
  * (`?create=channel`) is the only shape in which those four cannot drift; the
  * page therefore asks the frame to open it rather than mounting a second copy
  * at a second address. Same for the roster.
+ *
+ * ── AND THE SPACE'S OWN VERBS (design round 1, 12 October 2026) ────────────
+ * The space menu is Members, Rename, Leave and Delete as the role allows, and
+ * Leave and Delete are also the members sheet's footer. The sheet lives in the
+ * frame and the menu in the page, so the two confirmations live in the frame
+ * too, and both doors open the same one. Invite links and the waiting list
+ * are views of the members sheet now, opened the same way.
  *
  * A page rendered outside a space (the `/spaces` list, `/channels` index) gets
  * `null`, and its consumers must handle that — the hook returns the scope or
@@ -77,6 +88,15 @@ export interface CollabSpaceScope {
 
   canManage: boolean;
   isOwner: boolean;
+  /**
+   * The viewer's two roles, each read the frame's one way (the row's stamp,
+   * then the roster), so the header's "You're a viewer" and the menu's rows
+   * can never disagree with `canManage`.
+   */
+  membership: MembershipSubject;
+  /** What Leave leads to for this viewer (`spaceLeaveRoute`): the menu hides
+   *  Leave where it could only be refused and offers Delete instead. */
+  leaveRoute: SpaceLeaveRoute;
 
   /**
    * Whether this place shows its channels to this viewer (Spaces F2, 11
@@ -98,6 +118,20 @@ export interface CollabSpaceScope {
    * the lobby calls this, and only the lobby renders the sheet.
    */
   openRoster: () => void;
+  /** Opens the members sheet on its invite links (`?roster=links`). Owner
+   *  only: the param is refused for anyone else. */
+  openInviteLinks: () => void;
+  /** Opens the members sheet on its waiting list (`?roster=requests`). */
+  openJoinRequests: () => void;
+  /** Opens the members sheet with the invite dialog over it
+   *  (`?roster=invite`), for an empty space's "Invite people". */
+  openInvite: () => void;
+  /** Opens the leave confirmation, the same one the sheet's footer opens. Not
+   *  in the URL: a link that re-opens a destructive confirm is an armed
+   *  trigger. */
+  openLeave: () => void;
+  /** Opens the delete confirmation (Owner only), likewise. */
+  openDelete: () => void;
   /** Opens the space drawer (`?rail=1`) — the channel list below `lg:`. */
   openRail: () => void;
 }

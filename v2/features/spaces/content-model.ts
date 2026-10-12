@@ -94,15 +94,38 @@ export function movePayload(spaceUuid: string | null): MoveToSpacePayload {
 
 /**
  * What the move dialog and the remove confirm need about an item: how to
- * address it, what to call it, and the space it sits in. `space` is `null`
- * when the item is known to be its owner's alone, and `undefined` when the
- * payload did not say (the folder page: `GET /folders/{uuid}` carries no
- * space), which the dialog treats as "may be in one".
+ * address it, what to call it, and the space it sits in. `space` is the stub
+ * the item's payload carries (the folder page's `GET /folders/{uuid}` too,
+ * techlead decision 3, 12 October 2026); `null` or absent means the item is
+ * its owner's alone.
  */
 export type SpaceItemTarget = SpaceItemRef & {
   name: string;
   space?: ContentSpaceStub | null;
 };
+
+/**
+ * Whether the move dialog offers "Remove from space": only for an item that
+ * names the space it is in. An absent block reads as "not in a space", never
+ * as "may be in one", so the dialog never offers a way out of a space the item
+ * is not in (techlead decision 3).
+ */
+export function offersRemoveFromSpace(item: Pick<SpaceItemTarget, 'space'>): boolean {
+  return item.space !== null && item.space !== undefined;
+}
+
+/**
+ * The line under the move picker when the server holds more spaces than the
+ * page it sent (techlead decision 2: no silent cut). `shown` is the rows the
+ * picker draws; `null` when the page is the whole list.
+ */
+export function movePickerCutLine(
+  shown: number,
+  page: { rows: number; total: number } | null,
+): string | null {
+  if (page === null || page.total <= page.rows) return null;
+  return `Showing ${shown}. Search to find more.`;
+}
 
 /** The noun each kind is called in a sentence. */
 export const SPACE_ITEM_NOUN: Readonly<Record<SpaceItemKind, string>> = {
@@ -226,54 +249,44 @@ export function fileTypeLabel(file: { mime_type: string; original_name: string }
     : 'File';
 }
 
+/** Each content tab's plural noun, the word its empty state uses. */
+const SPACE_TAB_NOUN: Readonly<Record<SpaceContentTab, string>> = {
+  chats: 'conversations',
+  folders: 'folders',
+  files: 'files',
+};
+
 /**
- * What an empty content tab says (design round 0, 12 October 2026). An Owner
- * or Contributor gets Stay's lines, adapted per tab, with the way to add
- * beside them. A Viewer cannot add, so "Members can add" would point at
- * something they cannot do: they get a plain line about who fills it, and no
- * button.
+ * What an empty content tab says. Since design round 1 Stay's two lines sit
+ * in a shared space's header whether it is full or empty, so the empty state
+ * no longer repeats them: it names what is missing and how it gets filled. An
+ * Owner or Contributor reads how to add, with the way to add beside it; a
+ * Viewer cannot add, so they read who does, and get no button.
  */
 export function spaceEmptyCopy(
   tab: SpaceContentTab,
   canAdd: boolean,
 ): { title: string; description: string } {
-  if (canAdd) {
-    switch (tab) {
-      case 'chats':
-        return {
-          title: 'Members can add to this space',
-          description:
-            'What’s here is organised for the whole team. Open one of your conversations and choose Move to space.',
-        };
-      case 'folders':
-        return {
-          title: 'Members can add to this space',
-          description:
-            'What’s here is organised for the whole team. Folders you add here are shared with everyone in this space.',
-        };
-      case 'files':
-        return {
-          title: 'Members can add to this space',
-          description:
-            'What’s here is organised for the whole team. Files you add here are shared with everyone in this space.',
-        };
-    }
+  const noun = SPACE_TAB_NOUN[tab];
+  const title = `No ${noun} in this space yet`;
+  if (!canAdd) {
+    return { title, description: `Contributors and the owner add ${noun} here.` };
   }
   switch (tab) {
     case 'chats':
       return {
-        title: 'Nothing here yet',
-        description: 'Members who can add will put shared conversations here.',
+        title,
+        description: 'Open one of your conversations and choose Move to space.',
       };
     case 'folders':
       return {
-        title: 'Nothing here yet',
-        description: 'Members who can add will put shared folders here.',
+        title,
+        description: 'Folders you add here are shared with everyone in this space.',
       };
     case 'files':
       return {
-        title: 'Nothing here yet',
-        description: 'Members who can add will put shared files here.',
+        title,
+        description: 'Files you add here are shared with everyone in this space.',
       };
   }
 }

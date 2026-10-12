@@ -7,19 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { InviteLink } from '@/types/collab';
 import type { InvitableContentRole } from '@/v2/features/collab/membership/content-role';
 import { SHARED_INVITE_ROLES } from '@/v2/features/collab/membership/invite-roles';
+import { RoleSelect } from '@/v2/features/collab/membership/RoleSelect';
 import { inviteLinkPayload } from '@/v2/features/spaces/model';
-import { CopyLinkButton } from './link';
+import { InviteLinkField } from './link';
 import {
   useCreateInviteLink,
   useInviteLinks,
@@ -42,8 +36,14 @@ import {
  *
  * ── APPROVAL IS ON BY DEFAULT, DELIBERATELY ────────────────────────────────
  * The server defaults `requires_approval` to true and this form starts there
- * too. Turning it off means anybody holding the link walks straight in, so the
- * switch says that in those words rather than naming the flag.
+ * too. Turning it off means anybody holding the link joins without asking, so
+ * the switch says that in plain words rather than naming the flag.
+ *
+ * ── ONE ADDRESS, SHOWN ONE WAY (design round 1, 12 October 2026) ──────────
+ * Each row shows the full address in the same read-only field the invite
+ * dialog uses (`InviteLinkField`), with Copy beside it. It used to print a
+ * bare `/join/{code}` here while the dialog printed the whole URL, so the same
+ * link looked like two different things in two places.
  */
 
 function usesLabel(link: InviteLink): string {
@@ -72,17 +72,7 @@ function LinkRow({
     <li
       className={cn('rounded-xl border border-border/60 p-3', dead && 'opacity-60')}
     >
-      <div className="flex items-center gap-2">
-        <code
-          className={cn(
-            'min-w-0 flex-1 truncate rounded bg-secondary px-2 py-1 text-xs',
-            dead && 'line-through',
-          )}
-        >
-          /join/{link.code}
-        </code>
-        {dead ? null : <CopyLinkButton code={link.code} className="shrink-0" />}
-      </div>
+      <InviteLinkField code={link.code} dead={dead} />
 
       <div className="mt-2 flex items-center justify-between gap-3">
         {/* WHICH CHANNEL, WHEN THERE IS ONE. Channel-scoped links are made from
@@ -96,7 +86,7 @@ function LinkRow({
             ? `${link.content_role_label} · `
             : ''}
           {dead ? 'Stopped working' : usesLabel(link)}
-          {link.requires_approval ? ' · you approve' : ' · straight in'}
+          {link.requires_approval ? ' · you approve' : ' · no approval'}
         </p>
         {dead ? null : (
           <Button
@@ -159,8 +149,8 @@ export function InviteLinksPanel({
             </Label>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               {requiresApproval
-                ? 'Anyone using the link asks first, and you decide.'
-                : 'Anyone with the link walks straight in, without asking.'}
+                ? 'People who use the link join after you approve them.'
+                : 'Anyone with the link joins without your approval.'}
             </p>
           </div>
           <Switch
@@ -175,24 +165,12 @@ export function InviteLinksPanel({
             <Label htmlFor="invite-link-role" className="text-sm font-medium">
               People who join get
             </Label>
-            <Select
+            <RoleSelect
+              id="invite-link-role"
               value={contentRole}
-              onValueChange={(value) => {
-                const chosen = SHARED_INVITE_ROLES.find((option) => option.value === value);
-                if (chosen) setContentRole(chosen.value);
-              }}
-            >
-              <SelectTrigger id="invite-link-role" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SHARED_INVITE_ROLES.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              roles={SHARED_INVITE_ROLES}
+              onChange={setContentRole}
+            />
           </div>
         ) : null}
 

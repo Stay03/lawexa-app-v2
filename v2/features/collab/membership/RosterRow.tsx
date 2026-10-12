@@ -175,11 +175,13 @@ export function RosterRow({
                 {(canPromote || canDemote || canSetContentRole || canTransfer) && (
                   <DropdownMenuSeparator />
                 )}
+                {/* An invitee is not in yet, so taking them off cancels the
+                    invitation, and the item says that (design round 1). */}
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => onRemove?.(member)}
                 >
-                  Remove
+                  {member.is_pending ? 'Cancel invitation' : 'Remove'}
                 </DropdownMenuItem>
               </>
             )}

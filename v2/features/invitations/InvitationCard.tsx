@@ -147,8 +147,23 @@ export const InvitationCard = memo(function InvitationCard({
                 </span>
               </p>
 
+              {/* The first fact is the kind ("Study space") and holds its
+                  width; the description after it is what truncates. On a
+                  phone the line used to cut the kind first ("Study s...")
+                  and keep the long description (design round 1). */}
               {row.facts.length > 0 ? (
-                <MetaLine className="mt-1.5" lead={row.facts} />
+                <MetaLine
+                  className="mt-1.5"
+                  lead={row.facts.map((fact, index) =>
+                    index === 0 ? (
+                      <span key="kind" className="shrink-0">
+                        {fact}
+                      </span>
+                    ) : (
+                      fact
+                    ),
+                  )}
+                />
               ) : null}
             </div>
           </div>

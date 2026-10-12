@@ -6,17 +6,12 @@ import { Loader2, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { extractApiError } from '@/lib/utils/api-error';
 import { InviteLinkSection } from '@/v2/features/invites/InviteLinkSection';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { isInvitableContentRole } from './content-role';
+import type { InviteRoleOption } from './invite-roles';
+import { RoleSelect } from './RoleSelect';
 import {
   INVITE_IDENTIFIER_HINT,
   inviteRefusalMessage,
@@ -90,7 +85,7 @@ export function InvitePeopleDialog<Role extends string>({
   title: string;
   description?: string;
   /** The roles to offer, first one selected. Never empty. */
-  roles: readonly { value: Role; label: string }[];
+  roles: readonly InviteRoleOption<Role>[];
   /** A SPACE, so it can also offer a link. Organizations pass nothing: invite
    *  links are a spaces feature and there is no organization equivalent.
    *  `contentRoles` (a shared space) makes the link give the chosen role. */
@@ -220,26 +215,7 @@ export function InvitePeopleDialog<Role extends string>({
 
         <div className="space-y-2">
           <Label htmlFor="invite-role">Role</Label>
-          <Select
-            value={role}
-            onValueChange={(value) => {
-              // Only values this list offers can arrive; read them back off it
-              // rather than casting the string.
-              const chosen = roles.find((option) => option.value === value);
-              if (chosen) setRole(chosen.value);
-            }}
-          >
-            <SelectTrigger id="invite-role" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {roles.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <RoleSelect id="invite-role" value={role} roles={roles} onChange={setRole} />
         </div>
 
         {/* The throttle rest is POLITE, and a polite region has to already

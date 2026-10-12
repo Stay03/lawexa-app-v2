@@ -89,10 +89,34 @@ const CREATE_PANEL = 'new';
  *
  * The screen's `h1` is drawn here, so every state carries exactly one heading.
  */
-function PageShell({ children }: { children: React.ReactNode }) {
+/**
+ * The column and its title row. On a phone the title row also carries a
+ * compact "New" (design round 1, 12 October 2026): with the tabs and the
+ * invitations pill filling the toolbar, "New space" used to sit alone on a
+ * second row, 72px of height for one button. From `sm:` it is back at the end
+ * of the toolbar, where there is room for its full name.
+ */
+function PageShell({
+  onCreate,
+  children,
+}: {
+  onCreate: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <div className={LIST_COLUMN}>
-      <ScreenTitle />
+      <div className="flex items-start justify-between gap-3">
+        <ScreenTitle />
+        <button
+          type="button"
+          onClick={onCreate}
+          className={cn(CREATE_PILL, FOCUS_RING, 'mt-0.5 sm:hidden')}
+        >
+          <Plus aria-hidden className="size-4" />
+          New
+          <span className="sr-only">space</span>
+        </button>
+      </div>
       {children}
     </div>
   );
@@ -173,7 +197,7 @@ export function SpacesBrowser() {
   const showInlineError = query.isError && spaces.length > 0;
 
   return (
-    <PageShell>
+    <PageShell onCreate={openCreate}>
       {/* "New space" is back at the end of this row after a day as a floating
           button the owner turned down ("Remove the floating button from the
           bottom. It looks very messy"). It is a `<button>`, not a link:
@@ -182,7 +206,8 @@ export function SpacesBrowser() {
           nowhere would be a lie to everyone who inspects where it points.
           `ml-auto` is what keeps it pinned right, so the conditional
           invitations pill expands into the gap after the tabs and the primary
-          action never moves. */}
+          action never moves. Below `sm:` it moves up to the title row
+          (`PageShell`). */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SpaceTypeTabs value={filter} onChange={setFilter} panelId={PANEL_ID} />
         <PendingPill count={pendingInvitations} />
@@ -190,7 +215,7 @@ export function SpacesBrowser() {
         <button
           type="button"
           onClick={openCreate}
-          className={cn(CREATE_PILL, FOCUS_RING, 'ml-auto')}
+          className={cn(CREATE_PILL, FOCUS_RING, 'ml-auto hidden sm:inline-flex')}
         >
           <Plus aria-hidden className="size-4" />
           New space

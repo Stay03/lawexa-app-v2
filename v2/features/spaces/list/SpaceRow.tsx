@@ -18,9 +18,11 @@ import {
 import {
   isSharedSpace,
   memberCountLabel,
+  showsPrivateMark,
   showsTeamMark,
   spaceContentCountsLabel,
   spaceOwnerLabel,
+  spaceRoleLabel,
   spaceUnreadGrammar,
 } from '../model';
 import type { SpaceActivity } from './space-activity';
@@ -33,17 +35,27 @@ import type { SpaceActivity } from './space-activity';
  * the same outline is read rather than recognised.
  *
  * ── THE ANATOMY ────────────────────────────────────────────────────────────
- *   [ crest 48 ]  name · unread dot · lock                    [ mentions ]
- *                 •#general #matter-4471 more · Acme  12 members · 2h
+ *   [ crest 48 ]  name · unread dot · Team · lock              [ mentions ]
+ *                 You're the owner · •#general #matter-4471 more · Acme
+ *                                                        12 members · 2h
  *
  * The DESCRIPTION is gone from the lane on purpose. It swung the row between
  * two and four lines against a two-line skeleton, and it answers a question
  * ("what is this space for") that belongs on the space's own page, not in a
  * list being scanned for activity. The OWNER is not gone: on an account that
  * belongs to an organization, WHOSE space this is changes what it means, so
- * the org name stays on the meta line whether or not chips are there too.
- * "Personal" appears only in the no-chips fallback — it is the ABSENCE of an
- * owner, and it does not earn width beside live channel names.
+ * the org name stays on the meta line whether or not chips are there too. A
+ * space with no organisation says nothing there: the word "Personal" read as a
+ * kind of space next to the type (design round 1, 12 October 2026).
+ *
+ * ── YOUR ROLE LEADS THE META LINE (design round 1) ─────────────────────────
+ * The approved row carries the viewer's role, and a space you own and a space
+ * you only view looked identical. "You're the owner", "You're a contributor",
+ * "You're a viewer" (`spaceRoleLabel`) is the line's FIRST fact and never
+ * shrinks, because on a phone the lead runs out of room and the role is what
+ * decides what the reader can do inside: the counts after it truncate first.
+ * The lock appears only where it can differ
+ * (`showsPrivateMark`): a shared space is always private.
  *
  * ── THE UNREAD GRAMMAR, UNCHANGED (DIRECTION 2, backend Ruling A) ───────────
  *   `unread_channels_count > 0` → the name goes SEMIBOLD with a gold dot
@@ -130,6 +142,14 @@ export const SpaceRow = memo(function SpaceRow({
   const hasChips = activity.chips.length > 0;
   const shared = isSharedSpace(space);
   const holds = shared ? spaceContentCountsLabel(space) : null;
+  const roleWords = spaceRoleLabel(space);
+  // Gated here, not inside: `MetaLine` decides presence, so an element that
+  // could render nothing would leave a dangling separator.
+  const role = roleWords ? (
+    <span key="role" className="shrink-0">
+      {roleWords}
+    </span>
+  ) : null;
   const memberWords = memberCountLabel(space.active_members_count);
   const faces = space.members
     ? space.members.filter((member) => member.is_active).map((member) => member.user)
@@ -172,7 +192,7 @@ export const SpaceRow = memo(function SpaceRow({
                 Team
               </span>
             ) : null}
-            {space.is_private ? (
+            {showsPrivateMark(space) ? (
               <Lock
                 aria-label="Private space"
                 className="size-3.5 shrink-0 text-muted-foreground"
@@ -185,10 +205,11 @@ export const SpaceRow = memo(function SpaceRow({
             lead={
               hasChips
                 ? [
+                    role,
                     <ChannelChips key="chips" activity={activity} />,
-                    space.organization?.name ?? null,
+                    spaceOwnerLabel(space),
                   ]
-                : [holds ?? space.type_label, spaceOwnerLabel(space)]
+                : [role, holds ?? space.type_label, spaceOwnerLabel(space)]
             }
             trail={[
               <PresenceStack

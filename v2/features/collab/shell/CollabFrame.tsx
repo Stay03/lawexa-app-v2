@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
@@ -17,13 +17,19 @@ import { useCachedChannelIdentity } from '@/v2/features/channels/screen/cached-i
 import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { useCachedSpaceIdentity } from '@/v2/features/spaces/detail/cached-identity';
 import { ChannelFormDialog } from '@/v2/features/spaces/dialogs/ChannelFormDialog';
+import { DeleteSpaceDialog } from '@/v2/features/spaces/detail/DeleteSpaceDialog';
 import { SpaceMembersSheet } from '@/v2/features/spaces/detail/SpaceMembersSheet';
 import {
   canManageMembership,
   contentRoleInRoster,
   isMembershipOwner,
+  MEMBERS_SHEET_PARAM,
+  parseMembersSheetView,
   roleInRoster,
+  spaceLeaveRoute,
   spaceShowsChannels,
+  type MembershipSubject,
+  type MembersSheetView,
 } from '@/v2/features/spaces/model';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -138,6 +144,18 @@ import {
  * one `?invite=` owner at every address. It also settles the design question
  * underneath: a channel screen's "who is here" is the CHANNEL's roster, which
  * that screen already owns; the SPACE's people belong to the space's own page.
+ *
+ * `?roster=` CARRIES THE SHEET'S STEP (design round 1, 12 October 2026): `1`
+ * for the roster, `links` and `requests` for the invite links and the waiting
+ * list that moved into it, and `invite` for the roster with the invite dialog
+ * already open. The three Owner steps are gated on `canManage` like the
+ * create param, so a copied link cannot open them for anyone else.
+ *
+ * ── AND TWO CONFIRMATIONS THAT ARE NOT IN THE URL ──────────────────────────
+ * Leave and Delete each have two doors since design round 1: the space menu
+ * (the page) and the members sheet's footer (here). One dialog each, mounted
+ * here, opened by both. Their open state is local, never a param: a link that
+ * re-opens a destructive confirm on refresh is an armed trigger.
  *
  * ── WHAT IT DELIBERATELY DOES NOT DO ───────────────────────────────────────
  * It never wraps `/spaces` or `/channels` — those index routes keep scrolling
@@ -302,6 +320,13 @@ function CollabPlaceFrame({
   };
   const canManage = canManageMembership(membership);
   const isOwner = isMembershipOwner(membership);
+  // The page reads the same answers (its header's role line, its menu), so
+  // the object it gets is stable while none of the three facts moves.
+  const membershipKind = space?.kind;
+  const stableMembership: MembershipSubject = useMemo(
+    () => ({ kind: membershipKind, my_role: myRole, my_content_role: myContentRole }),
+    [membershipKind, myRole, myContentRole],
+  );
 
   const isMembersPending = isSpaceRoute && membersQuery.isPending;
 
@@ -390,7 +415,14 @@ function CollabPlaceFrame({
   // Space-route only, so the `?invite=` param nested inside the sheet has
   // exactly one owner at every address (see the docblock). A refused value is
   // stripped, so a copied `/channels/{uuid}?roster=1` degrades to the channel.
-  const roster = useUrlOverlay('roster', { canOpen: isSpaceRoute });
+  const roster = useUrlOverlay('roster', {
+    canOpen: !isSpaceRoute
+      ? false
+      : roleSettled
+        ? { links: canManage, requests: canManage, invite: canManage }
+        : undefined,
+  });
+  const rosterView = parseMembersSheetView(roster.value);
   const create = useUrlOverlay('create', {
     // The same `canManage` the affordances are gated on, so a copied
     // `?create=channel` link cannot hand a plain member a form that would 403.
@@ -407,13 +439,43 @@ function CollabPlaceFrame({
   // dispatchers are what these depend on — `openRail` in particular must keep
   // one identity forever, because it rides the header store's snapshot.
   const { show: showRail, closeInPlace: closeRailInPlace } = rail;
-  const { show: showRoster } = roster;
+  const { show: showRoster, swap: swapRoster } = roster;
   const { show: showCreate, closeInPlace: closeCreateInPlace } = create;
 
   const openRail = useCallback(() => showRail(), [showRail]);
   // What the header gets: the opener, or nothing where there is no drawer.
   const headerOpenRail = railShown ? openRail : null;
   const openRoster = useCallback(() => showRoster(), [showRoster]);
+  const openInviteLinks = useCallback(
+    () => showRoster(MEMBERS_SHEET_PARAM.links),
+    [showRoster],
+  );
+  const openJoinRequests = useCallback(
+    () => showRoster(MEMBERS_SHEET_PARAM.requests),
+    [showRoster],
+  );
+  const openInvite = useCallback(
+    () => showRoster(MEMBERS_SHEET_PARAM.invite),
+    [showRoster],
+  );
+  // Steps inside the open sheet REPLACE the entry, so Back closes the sheet
+  // from any of them rather than walking back through each.
+  const changeRosterView = useCallback(
+    (next: MembersSheetView) => swapRoster(MEMBERS_SHEET_PARAM[next]),
+    [swapRoster],
+  );
+
+  /* The two confirmations with two doors each (see the docblock). */
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const openLeave = useCallback(() => setLeaveOpen(true), []);
+  const openDelete = useCallback(() => setDeleteOpen(true), []);
+  const leaveRoute = spaceLeaveRoute(
+    { kind: membershipKind },
+    members,
+    viewerUuid,
+    isSpaceRoute && membersQuery.isSuccess,
+  );
   const openCreateChannel = useCallback(() => showCreate('channel'), [showCreate]);
 
   // `refetch` is stable across renders; the query OBJECT is not, so depending
@@ -526,9 +588,16 @@ function CollabPlaceFrame({
       isMembersPending,
       canManage,
       isOwner,
+      membership: stableMembership,
+      leaveRoute,
       showsChannels,
       openCreateChannel,
       openRoster,
+      openInviteLinks,
+      openJoinRequests,
+      openInvite,
+      openLeave,
+      openDelete,
       openRail,
     }),
     [
@@ -548,9 +617,16 @@ function CollabPlaceFrame({
       isMembersPending,
       canManage,
       isOwner,
+      stableMembership,
+      leaveRoute,
       showsChannels,
       openCreateChannel,
       openRoster,
+      openInviteLinks,
+      openJoinRequests,
+      openInvite,
+      openLeave,
+      openDelete,
       openRail,
     ],
   );
@@ -655,13 +731,33 @@ function CollabPlaceFrame({
       {/* ── The space roster — the SPACE route only (see the `?invite=` rule
             in the docblock). Its own query is `enabled: open`, so mounting it
             here costs nothing until someone asks for it. ────────────────── */}
+      {/* Keyed by the space, so nothing the sheet holds about one space (a
+          hand-over in progress, a refusal) is carried into the next. */}
       {isSpaceRoute && space !== null ? (
         <SpaceMembersSheet
+          key={space.uuid}
           space={space}
           viewerId={viewerId}
           viewerUuid={viewerUuid}
           open={roster.open}
           onOpenChange={roster.setOpen}
+          view={rosterView}
+          onViewChange={changeRosterView}
+          inviteArrivalKey={roster.keyFor(MEMBERS_SHEET_PARAM.invite)}
+          leaveOpen={leaveOpen}
+          onLeaveOpenChange={setLeaveOpen}
+          onDeleteSpace={openDelete}
+        />
+      ) : null}
+
+      {/* The ONE delete confirmation, for the Owner only (see the docblock).
+          Keyed by the space for the same reason as the sheet. */}
+      {isSpaceRoute && space !== null && isOwner ? (
+        <DeleteSpaceDialog
+          key={space.uuid}
+          space={space}
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
         />
       ) : null}
     </CollabSpaceScopeProvider>

@@ -96,6 +96,8 @@ test('the lobby: no digest and no "New channel" without the flag, in the page an
   );
   assert.match(cached, /tab=\{defaultSpaceTab\(showsChannels\)\}/);
   const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
-  assert.match(states, /\{showsChannels \? <Skeleton className="h-8 w-32 rounded-md" \/> : null\}/);
+  // Design round 1: the header's "New channel" (and so its place) is shown
+  // below `lg:` only, where no docked rail carries the same action.
+  assert.match(states, /\{showsChannels \? <Skeleton className="h-8 w-32 rounded-md lg:hidden" \/> : null\}/);
   assert.match(states, /\{tab === 'channels' \? \(\s*<div className=\{SPACE_LOBBY_GRID\}>[\s\S]*?<ChannelListSkeleton \/>/);
 });

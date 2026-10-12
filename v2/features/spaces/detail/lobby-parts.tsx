@@ -6,19 +6,33 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * lobby-parts — the two pieces of furniture the space lobby's regions share:
- * the column it is laid out in, and the section heading every block wears.
+ * lobby-parts — the pieces of furniture the space page's regions share: the
+ * column it is laid out in, and the section heading every block wears.
  *
- * The lobby is NOT a list page, so it does not take `LIST_COLUMN`. A list is
- * one stack of rows and reads best at `max-w-3xl`; a lobby is an identity block
- * over a digest that wants a second column on a wide screen, and it sits beside
- * a 240px rail that has already taken its share of the viewport. `xl:` rather
- * than `lg:` is where the split happens for exactly that reason — at 1024px the
- * pane is only 784px wide, and a 288px aside would leave the main column
- * narrower than the rows inside it want to be.
+ * ── TWO COLUMNS, CHOSEN PER SPACE (design round 1, 12 October 2026) ────────
+ * A space that shows its channels opens on the Channels tab, the LOBBY: an
+ * identity block over a digest that wants a second column on a wide screen,
+ * beside a 240px rail that has already taken its share of the viewport. It
+ * keeps `max-w-5xl`, and `xl:` rather than `lg:` is where its split happens —
+ * at 1024px the pane is only 784px wide, and a 288px aside would leave the
+ * main column narrower than the rows inside it want to be.
+ *
+ * Every other space is a stack of rows (its conversations, folders and files)
+ * and takes the list column, `max-w-3xl`, the width the `/spaces` list and the
+ * Conversations and Folders screens use. It used to take the lobby's too, so
+ * going from the list into a space moved the content 128px left and made it
+ * 256px wider, and a chat's time sat 900px from its title.
+ *
+ * The choice is per SPACE and not per tab, so switching tabs never moves the
+ * header.
  */
-export const SPACE_LOBBY_COLUMN =
-  'mx-auto w-full max-w-5xl px-4 pb-16 pt-5 sm:pt-6';
+const SPACE_COLUMN_BASE = 'mx-auto w-full px-4 pb-16 pt-5 sm:pt-6';
+
+/** The page's column: the lobby's width where the space shows its channels,
+ *  the list's everywhere else. */
+export function spacePageColumn(showsChannels: boolean): string {
+  return `${SPACE_COLUMN_BASE} ${showsChannels ? 'max-w-5xl' : 'max-w-3xl'}`;
+}
 
 /** The lobby's two-column grid: the digest, then the facts about the place.
  *  Since Spaces F2 it is the Channels TAB's panel, so the gap above it is the

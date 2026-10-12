@@ -174,8 +174,10 @@ export function parseSpaceTab(
 }
 
 /**
- * "3 chats · 1 folder · 2 files": what a space holds, for its row in the
- * list. Zeros are left out, so a space with only files says only that.
+ * "3 conversations · 1 folder · 2 files": what a space holds, for its row in
+ * the list, in the tab's own words (design round 1: the tab is Conversations,
+ * so the count is too). Zeros are left out, so a space with only files says
+ * only that.
  * `"Nothing added yet"` when every count is known and zero, and `null` when
  * the payload carries none of them (an API before B1), so the row falls back
  * to what it showed before rather than claiming an empty space.
@@ -184,7 +186,7 @@ export function spaceContentCountsLabel(
   space: Pick<Space, 'conversations_count' | 'folders_count' | 'files_count'>,
 ): string | null {
   const counts: readonly [number | undefined, string, string][] = [
-    [space.conversations_count, 'chat', 'chats'],
+    [space.conversations_count, 'conversation', 'conversations'],
     [space.folders_count, 'folder', 'folders'],
     [space.files_count, 'file', 'files'],
   ];
@@ -220,6 +222,21 @@ export function showsTeamMark(
   canOpenTeamChannels: boolean,
 ): boolean {
   return space.kind === 'team' && canOpenTeamChannels;
+}
+
+/**
+ * The kind a space is named by in the Move to space picker (techlead, 12
+ * October 2026: team spaces stay in the picker, and each row says which kind
+ * it is). The word "Team" follows `showsTeamMark`: an explicit kind and a
+ * viewer with Team Channels, so a regular user's own Work space is never named
+ * after something they cannot open. An absent kind says nothing.
+ */
+export function spaceKindMark(
+  space: Pick<Space, 'kind'>,
+  canOpenTeamChannels: boolean,
+): 'Team' | 'Shared' | null {
+  if (space.kind === 'shared') return 'Shared';
+  return showsTeamMark(space, canOpenTeamChannels) ? 'Team' : null;
 }
 
 /**
@@ -311,14 +328,100 @@ export const CHANNEL_DESCRIPTION_MAX = 5000;
 
 /* ── Labels ───────────────────────────────────────────────────────────────── */
 
-/** Who owns the space: the organization's name, or "Personal". */
-export function spaceOwnerLabel(space: Pick<Space, 'organization'>): string {
-  return space.organization?.name ?? 'Personal';
+/**
+ * The organisation a space belongs to, or `null` when it belongs to none.
+ * It used to fall back to the word "Personal", which sat beside the type as a
+ * second kind ("Work · Personal") and contradicted "shared" on a space of four
+ * people (design round 1, 12 October 2026). A space with no organisation now
+ * says nothing here; `MetaLine` drops the `null`.
+ */
+export function spaceOwnerLabel(space: Pick<Space, 'organization'>): string | null {
+  return space.organization?.name ?? null;
+}
+
+/**
+ * Whether a space's lock means anything. A SHARED space is always private (the
+ * backend refuses anything else), so a lock on every one of them says nothing;
+ * only a team space, which may be open, shows it.
+ */
+export function showsPrivateMark(space: Pick<Space, 'kind' | 'is_private'>): boolean {
+  return !isSharedSpace(space) && space.is_private;
+}
+
+/**
+ * The viewer's place in a space, in words, for the list row and the space
+ * header (design round 1: the approved row carries "your role", and a Viewer
+ * should not learn they cannot add only by trying). A SHARED space speaks its
+ * content roles; a TEAM space the roles it has always had. `null` when the
+ * role is not known, so the line says nothing rather than guessing.
+ */
+export function spaceRoleLabel(space: MembershipSubject): string | null {
+  if (isSharedSpace(space)) {
+    switch (space.my_content_role) {
+      case 'owner':
+        return 'You’re the owner';
+      case 'editor':
+        return 'You’re a contributor';
+      case 'viewer':
+        return 'You’re a viewer';
+      default:
+        return null;
+    }
+  }
+  switch (space.my_role) {
+    case 'owner':
+      return 'You’re the owner';
+    case 'admin':
+      return 'You’re an admin';
+    case 'member':
+      return 'You’re a member';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Stay's two lines for a shared space, shown under its description whether or
+ * not it holds anything yet (design round 1). The first line is false for a
+ * Viewer, who cannot add, so a Viewer reads who does instead. `null` on a team
+ * space, which keeps the lobby it had.
+ */
+export function spacePrincipleLine(
+  space: Pick<Space, 'kind' | 'my_content_role'>,
+): string | null {
+  if (!isSharedSpace(space)) return null;
+  return space.my_content_role === 'viewer'
+    ? 'Contributors and the owner add to this space. What’s here is organised for the whole team.'
+    : 'Members can add to this space. What’s here is organised for the whole team.';
 }
 
 /** "1 member" / "4 members" — pluralised once, everywhere. */
 export function memberCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'member' : 'members'}`;
+}
+
+/**
+ * A roster in two groups: the people who are in, and the people invited who
+ * have not accepted yet. The members sheet draws them under two headings and
+ * counts each, so the number it prints is the number of rows the owner sees
+ * (design round 1: "4 members" over five rows read as a counting bug).
+ */
+export function splitRoster(members: readonly Member[]): {
+  joined: Member[];
+  invited: Member[];
+} {
+  const joined: Member[] = [];
+  const invited: Member[] = [];
+  for (const member of members) {
+    (member.is_pending ? invited : joined).push(member);
+  }
+  return { joined, invited };
+}
+
+/** "4 members" / "4 members · 1 invited": the members sheet's count line. */
+export function rosterCountLabel(joined: number, invited: number): string {
+  const members = memberCountLabel(joined);
+  return invited > 0 ? `${members} · ${invited} invited` : members;
 }
 
 /**
@@ -457,4 +560,104 @@ export function isLastSharedOwner(
  *  the status, like the team rule above. */
 export function isLastOwnerLeaveError(status: number): boolean {
   return status === 409;
+}
+
+/**
+ * What "Leave space" leads to for this viewer (design round 1), so neither the
+ * menu nor the members sheet offers a Leave that can only be refused:
+ *  - `leave`: the plain confirmation;
+ *  - `choose-new-owner`: the last Owner of a shared space with others in it,
+ *    who must make one of them the owner first;
+ *  - `delete-instead`: the last Owner with nobody else in it, who has no one to
+ *    hand it to. Delete is what they are offered in Leave's place.
+ * Known only once the roster has landed (`rosterKnown`); before that it is
+ * `leave`, and the server's 409 is still read.
+ */
+export type SpaceLeaveRoute = 'leave' | 'choose-new-owner' | 'delete-instead';
+
+export function spaceLeaveRoute(
+  space: Pick<Space, 'kind'>,
+  members: readonly Member[],
+  viewerUuid: string | null,
+  rosterKnown: boolean,
+): SpaceLeaveRoute {
+  if (!rosterKnown || !isLastSharedOwner(space, members, viewerUuid)) return 'leave';
+  return othersInSpace(members, viewerUuid).length > 0
+    ? 'choose-new-owner'
+    : 'delete-instead';
+}
+
+/** The other people in the space: joined, active, not the viewer. The ones a
+ *  sole Owner may hand the space to. */
+export function othersInSpace(
+  members: readonly Member[],
+  viewerUuid: string | null,
+): Member[] {
+  return members.filter(
+    (member) =>
+      member.is_active && !member.is_pending && member.user.uuid !== viewerUuid,
+  );
+}
+
+/* ── The space menu (design round 1) ──────────────────────────────────────── */
+
+/** One row of the space's menu in the shell bar. */
+export type SpaceMenuItem =
+  | 'members'
+  | 'invite-links'
+  | 'waiting'
+  | 'rename'
+  | 'leave'
+  | 'delete';
+
+/**
+ * The space menu, in order, for this viewer: the approved Members, Rename,
+ * Leave, Delete as the role allows (design round 1, 12 October 2026).
+ *  - every member: Members, and Leave unless it could only be refused (the
+ *    last Owner of a space nobody else is in, `delete-instead`);
+ *  - whoever manages membership adds Invite links, Waiting to join and
+ *    Rename;
+ *  - the Owner adds Delete.
+ */
+export function spaceMenuItems(viewer: {
+  canManage: boolean;
+  isOwner: boolean;
+  leaveRoute: SpaceLeaveRoute;
+}): SpaceMenuItem[] {
+  const items: SpaceMenuItem[] = ['members'];
+  if (viewer.canManage) items.push('invite-links', 'waiting', 'rename');
+  if (viewer.leaveRoute !== 'delete-instead') items.push('leave');
+  if (viewer.isOwner) items.push('delete');
+  return items;
+}
+
+/* ── The members sheet's views (design round 1) ───────────────────────────── */
+
+/**
+ * What the members sheet shows, carried by its `?roster=` value so Back closes
+ * it: the roster (`1`, the plain open), the invite links, the waiting list, or
+ * the roster with the invite dialog already open over it (`invite`, from an
+ * empty space's "Invite people"). Invite links and the waiting list moved in
+ * here from sheets of their own, so the Owner finds them where the people are.
+ */
+export type MembersSheetView = 'members' | 'links' | 'requests' | 'invite';
+
+/** The `?roster=` value each view is written as. */
+export const MEMBERS_SHEET_PARAM: Readonly<Record<MembersSheetView, string>> = {
+  members: '1',
+  links: 'links',
+  requests: 'requests',
+  invite: 'invite',
+};
+
+/** Read `?roster=` back. Anything unknown is the roster itself. */
+export function parseMembersSheetView(raw: string | null): MembersSheetView {
+  switch (raw) {
+    case 'links':
+    case 'requests':
+    case 'invite':
+      return raw;
+    default:
+      return 'members';
+  }
 }

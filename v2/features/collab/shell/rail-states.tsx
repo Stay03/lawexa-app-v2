@@ -42,19 +42,14 @@ export function RailListSkeleton() {
 }
 
 /** The rail's identity block while the space itself is resolving. Same box,
- *  same paddings, same two text lines as the live header. */
+ *  same paddings, and the one name line the live block has (design round 1:
+ *  the kind line and the faces left the rail). */
 export function RailHeaderSkeleton() {
   return (
-    <div aria-hidden className="px-2 pt-2">
+    <div aria-hidden className="p-2">
       <div className="flex items-center gap-2.5 px-2 py-1.5">
         <CrestSkeleton size="md" />
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <Skeleton className="h-3.5 w-3/5 rounded" />
-          <Skeleton className="h-2.5 w-2/5 rounded" />
-        </div>
-      </div>
-      <div className="px-2 pb-2 pt-1.5">
-        <Skeleton className="h-5 w-24 rounded-full" />
+        <Skeleton className="h-3.5 w-3/5 rounded" />
       </div>
     </div>
   );

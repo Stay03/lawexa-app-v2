@@ -1,8 +1,16 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Folder, MessageSquare, Paperclip, SearchX, type LucideIcon } from 'lucide-react';
+import {
+  Folder,
+  MessageSquare,
+  Paperclip,
+  SearchX,
+  UserPlus,
+  type LucideIcon,
+} from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FileMarkSkeleton } from '@/v2/features/channels/files/FileMark';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
@@ -24,12 +32,18 @@ import { spaceEmptyCopy, type SpaceContentTab } from '../../content-model';
  * chats and folders skeletons ARE the source lists' own, because the rows are
  * the source lists' own.
  *
- * EMPTY IS NOT A FAILURE, AND IT TEACHES (Spaces F3, design round 0, 12
- * October 2026). An Owner or Contributor reads Stay's lines, adapted per tab,
- * with the way to add right under them (the host passes it as `action`). A
- * Viewer cannot add, so they read who fills the tab instead, and get no
- * button. The words are `spaceEmptyCopy`'s, where the tests pin them. A
- * failure keeps its retry.
+ * EMPTY IS NOT A FAILURE, AND IT SAYS WHAT COMES NEXT (Spaces F3; design
+ * rounds 0 and 1, 12 October 2026). An Owner or Contributor reads how the tab
+ * gets filled, with the way to add right under it (the host passes it as
+ * `action`). A Viewer cannot add, so they read who fills the tab instead, and
+ * get no button. Stay's two lines are in the space's header now, so they are
+ * not repeated here. The words are `spaceEmptyCopy`'s, where the tests pin
+ * them. A failure keeps its retry.
+ *
+ * AN OWNER ALONE IN THE SPACE IS OFFERED PEOPLE (design round 1). With nobody
+ * else in it, "shared with everyone in this space" shares with no one, and
+ * the only way to invite was a single face to tap. `onInvite` adds a quiet
+ * "Invite people" under the add action, straight into the invite dialog.
  */
 
 export type { SpaceContentTab };
@@ -105,15 +119,18 @@ const EMPTY_ICON: Readonly<Record<SpaceContentTab, LucideIcon>> = {
 };
 
 /** A tab with nothing in it. `action` is the way to add, passed only for a
- *  viewer who may add (see the docblock). */
+ *  viewer who may add; `onInvite` only for an Owner alone in the space (see
+ *  the docblock). */
 export function SpaceContentEmptyState({
   tab,
   canAdd,
   action,
+  onInvite,
 }: {
   tab: SpaceContentTab;
   canAdd: boolean;
   action?: ReactNode;
+  onInvite?: () => void;
 }) {
   const { title, description } = spaceEmptyCopy(tab, canAdd);
   return (
@@ -122,6 +139,14 @@ export function SpaceContentEmptyState({
       title={title}
       description={description}
       action={canAdd ? action : undefined}
+      footnote={
+        onInvite ? (
+          <Button type="button" variant="outline" size="sm" onClick={onInvite}>
+            <UserPlus aria-hidden className="size-4" />
+            Invite people
+          </Button>
+        ) : undefined
+      }
     />
   );
 }
@@ -159,7 +184,7 @@ export function SpaceFolderLevelEmptyState({ action }: { action: ReactNode }) {
 }
 
 const FAILURE_TITLE: Readonly<Record<SpaceContentTab, string>> = {
-  chats: 'Couldn’t load the chats',
+  chats: 'Couldn’t load the conversations',
   folders: 'Couldn’t load the folders',
   files: 'Couldn’t load the files',
 };

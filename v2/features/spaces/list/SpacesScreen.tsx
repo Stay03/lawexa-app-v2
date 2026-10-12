@@ -51,7 +51,11 @@ export function SpacesFallback() {
         Loading your spaces
       </span>
       <div aria-hidden inert className={LIST_COLUMN}>
-        <ScreenTitle />
+        {/* The title row, with the phone's compact "New" (`PageShell`). */}
+        <div className="flex items-start justify-between gap-3">
+          <ScreenTitle />
+          <Skeleton className="mt-0.5 h-9 w-[4.5rem] rounded-full sm:hidden" />
+        </div>
         {/* Only "New space" is reserved on the right — it is back in the
             toolbar from the floating action, and it is unconditional. The
             invitations pill is not reserved: it is conditional chrome, absent
@@ -59,7 +63,7 @@ export function SpacesFallback() {
             a shape that usually never arrives. */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Skeleton className="h-9 w-44 rounded-full" />
-          <Skeleton className="ml-auto h-9 w-28 rounded-full" />
+          <Skeleton className="ml-auto hidden h-9 w-28 rounded-full sm:block" />
         </div>
         <SpacesListSkeleton />
       </div>

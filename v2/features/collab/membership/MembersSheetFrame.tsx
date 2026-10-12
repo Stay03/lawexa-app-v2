@@ -1,5 +1,8 @@
 'use client';
 
+import { ChevronLeft } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
@@ -22,6 +25,10 @@ import {
  * purpose: "Leave" must stay reachable without scrolling a hundred-person
  * roster, and it must never sit between two member rows. Phase-5 W4,
  * study A2/A8 KEEP — 2026-08-04.
+ *
+ * `onBack` turns the header into a step inside the sheet (the space sheet's
+ * invite links and waiting list, design round 1): a back control before the
+ * title returns to the roster without closing the panel.
  */
 export function MembersSheetFrame({
   open,
@@ -30,6 +37,8 @@ export function MembersSheetFrame({
   subtitle,
   children,
   footer,
+  onBack,
+  backLabel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,6 +48,10 @@ export function MembersSheetFrame({
   children: React.ReactNode;
   /** Pinned bottom slot — the self-action (leave), never a roster row. */
   footer?: React.ReactNode;
+  /** A step inside the sheet: the back control's action. */
+  onBack?: () => void;
+  /** Its accessible name, e.g. "Back to members". */
+  backLabel?: string;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -50,7 +63,22 @@ export function MembersSheetFrame({
         className="flex flex-col gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-sm"
       >
         <SheetHeader className="border-b">
-          <SheetTitle>{title}</SheetTitle>
+          {onBack ? (
+            <div className="-ml-2 flex min-w-0 items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="v2-interactive shrink-0 text-muted-foreground"
+                aria-label={backLabel ?? 'Back'}
+                onClick={onBack}
+              >
+                <ChevronLeft aria-hidden className="size-4" />
+              </Button>
+              <SheetTitle className="min-w-0 truncate">{title}</SheetTitle>
+            </div>
+          ) : (
+            <SheetTitle>{title}</SheetTitle>
+          )}
           {/* A real `SheetDescription`, not a styled `<p>`: Radix wires it to
               the dialog's `aria-describedby`, so the panel announces "Members
               — 4 members in Firm HQ" instead of a bare title, and Radix stops

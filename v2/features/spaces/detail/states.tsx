@@ -17,11 +17,12 @@ import { SpaceContentSkeleton } from './content/states';
 import {
   LobbyFactsSkeleton,
   LobbyPeopleSkeleton,
-  SPACE_LOBBY_COLUMN,
+  spacePageColumn,
   SPACE_LOBBY_GRID,
   SPACE_TAB_PANEL,
   SPACE_TABS_ROW,
 } from './lobby-parts';
+import { SpaceAbout, SpaceHeading } from './SpacePlaceHeader';
 import { SpaceTabsSkeleton } from './SpaceTabs';
 
 /**
@@ -82,9 +83,15 @@ export interface SpaceFrameIdentity {
   type: SpaceType;
   /** "Work" / "Study" — the kicker's first fact. */
   typeLabel: string;
-  /** `spaceOwnerLabel` of the row: the organisation, or "Personal". */
-  ownerLabel: string;
+  /** `spaceOwnerLabel` of the row: the organisation, or `null`. */
+  ownerLabel: string | null;
+  /** `spaceRoleLabel` of the row ("You're a viewer"), or `null`. A fact
+   *  about the viewer that the row states, not a permission. */
+  roleLabel: string | null;
+  /** `showsPrivateMark` of the row: a private TEAM space. */
   isPrivate: boolean;
+  /** `spacePrincipleLine` of the row: Stay's lines on a shared space. */
+  principle: string | null;
   /** The row's own description, or `null`. NOT "not yet loaded" — a space with
    *  no description prints nothing here, and so does this. */
   description: string | null;
@@ -102,9 +109,10 @@ export interface SpaceFrameIdentity {
  * Owner, 15 August 2026: "for spaces the first skeleton is a full skeleton, the
  * second one has some text and images and stuff". Two loading states that do
  * not look alike read as two pages, not one page arriving. The row the reader
- * tapped carries the crest, the kicker, the name, whether it is private and its
- * description — so with `identity` supplied the first state IS the second one,
- * and only the channel digest and the roster resolve later.
+ * tapped carries the crest, the kicker (with the viewer's role), the name,
+ * whether it is private, its description and so Stay's lines — so with
+ * `identity` supplied the first state IS the second one, and only the channel
+ * digest and the roster resolve later.
  *
  * THE ACTION ROW IS NEVER SEEDED. Whether this reader may create a channel is a
  * ruling off `my_role`, and the presence stack needs a roster that arrives on
@@ -132,7 +140,7 @@ export function SpaceScreenFrame({
   tab: SpaceTab;
 }) {
   return (
-    <div className={SPACE_LOBBY_COLUMN}>
+    <div className={spacePageColumn(showsChannels)}>
       <div className="border-b pb-5">
         <div className="flex items-start gap-4">
           {identity ? (
@@ -147,29 +155,17 @@ export function SpaceScreenFrame({
           )}
           {identity ? (
             <div className="min-w-0 flex-1">
-              <MetaLine lead={[identity.typeLabel, identity.ownerLabel]} />
-              {/* The live header's heading rule, exactly (phase 7): the shell's
-                  bar carries the name below `md:`, so it is stated for assistive
-                  tech and drawn only from `md:` up. If these two drift, the
-                  boundary moves the lobby when it hands over. */}
-              <h1 className="sr-only md:not-sr-only md:mt-1 md:flex md:min-w-0 md:items-center md:gap-2 md:text-2xl md:font-semibold md:tracking-tight md:text-foreground">
-                <span className="min-w-0 md:truncate">{identity.name}</span>
-                {identity.isPrivate ? (
-                  <>
-                    <Lock
-                      aria-hidden
-                      className="hidden size-4 shrink-0 text-muted-foreground md:block"
-                    />
-                    <span className="sr-only">Private space</span>
-                  </>
-                ) : null}
-              </h1>
+              <MetaLine
+                lead={[identity.typeLabel, identity.ownerLabel, identity.roleLabel]}
+              />
+              {/* The live header's own heading, so the hand-off moves nothing
+                  and the shell bar's title steps back from the first frame. */}
+              <SpaceHeading name={identity.name} privateMark={identity.isPrivate} />
             </div>
           ) : (
             <div className="min-w-0 flex-1 space-y-2.5">
               <Skeleton className="h-3 w-40 rounded" />
-              {/* No title bar below `md:`: there is no title there to reserve. */}
-              <Skeleton className="hidden h-7 w-2/5 rounded md:block" />
+              <Skeleton className="h-6 w-3/5 rounded md:h-7 md:w-2/5" />
             </div>
           )}
         </div>
@@ -177,11 +173,7 @@ export function SpaceScreenFrame({
           // A space with no description prints nothing, exactly as the live
           // header does. Reserving a bar for prose that is not coming is how
           // the block below ends up moving when it arrives empty.
-          identity.description ? (
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              {identity.description}
-            </p>
-          ) : null
+          <SpaceAbout description={identity.description} principle={identity.principle} />
         ) : (
           <Skeleton className="mt-3 h-3.5 w-3/5 rounded" />
         )}
@@ -191,8 +183,8 @@ export function SpaceScreenFrame({
             landed and took the whole lobby down with it — measured, 15 August
             2026. The `New channel` button beside it is the shorter 32px. */}
         <div className="mt-4 flex items-center gap-3">
-          <Skeleton className="h-9 w-24 rounded-full" />
-          {showsChannels ? <Skeleton className="h-8 w-32 rounded-md" /> : null}
+          <Skeleton className="h-9 w-44 rounded-full" />
+          {showsChannels ? <Skeleton className="h-8 w-32 rounded-md lg:hidden" /> : null}
         </div>
       </div>
 

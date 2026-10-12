@@ -71,6 +71,7 @@ export function PresenceStack({
   countLabel,
   label,
   size = 'sm',
+  withCount = false,
   onClick,
   className,
 }: {
@@ -83,6 +84,12 @@ export function PresenceStack({
   /** The accessible name — the same count, plus what it is a count OF. */
   label: string;
   size?: PresenceStackSize;
+  /**
+   * Also print the count in words after the faces ("4 members"), so a stack
+   * that opens the roster reads as a control and not as decoration (the space
+   * header, design round 1). With no faces the words are printed anyway.
+   */
+  withCount?: boolean;
   /** Supplied ⇒ renders a button that opens the roster. Omit inside a `<Link>`. */
   onClick?: () => void;
   className?: string;
@@ -94,20 +101,13 @@ export function PresenceStack({
   const body =
     faces.length === 0 ? (
       <span className={cn('text-muted-foreground', geometry.text)}>{countLabel}</span>
+    ) : withCount ? (
+      <div className="inline-flex items-center gap-2">
+        <Faces faces={faces} overflow={overflow} avatar={geometry.avatar} />
+        <span className={cn('text-muted-foreground', geometry.text)}>{countLabel}</span>
+      </div>
     ) : (
-      <AvatarGroup>
-        {faces.map((member) => (
-          <MemberAvatar key={member.uuid} user={member} size={geometry.avatar} />
-        ))}
-        {overflow > 0 ? (
-          // No text size here: `AvatarGroupCount` sizes its own type off the
-          // group's avatars, and a bare `text-xs` would lose to that variant's
-          // specificity anyway — a dead class pretending to be a decision.
-          <AvatarGroupCount className="font-medium tabular-nums">
-            {`+${overflow > 99 ? 99 : overflow}`}
-          </AvatarGroupCount>
-        ) : null}
-      </AvatarGroup>
+      <Faces faces={faces} overflow={overflow} avatar={geometry.avatar} />
     );
 
   if (!onClick) {
@@ -125,6 +125,9 @@ export function PresenceStack({
       onClick={onClick}
       className={cn(
         'v2-interactive inline-flex items-center rounded-full px-1 py-0.5',
+        // The words end the pill, so they get the same breathing room the
+        // first face has on the left.
+        withCount && 'pr-2.5',
         'transition-colors duration-150 hover:bg-secondary motion-reduce:transition-none',
         FOCUS_RING,
         className,
@@ -132,5 +135,32 @@ export function PresenceStack({
     >
       {body}
     </button>
+  );
+}
+
+/** The overlapping faces and their `+N` disc. */
+function Faces({
+  faces,
+  overflow,
+  avatar,
+}: {
+  faces: readonly SlimUser[];
+  overflow: number;
+  avatar: StackGeometry['avatar'];
+}) {
+  return (
+    <AvatarGroup>
+      {faces.map((member) => (
+        <MemberAvatar key={member.uuid} user={member} size={avatar} />
+      ))}
+      {overflow > 0 ? (
+        // No text size here: `AvatarGroupCount` sizes its own type off the
+        // group's avatars, and a bare `text-xs` would lose to that variant's
+        // specificity anyway — a dead class pretending to be a decision.
+        <AvatarGroupCount className="font-medium tabular-nums">
+          {`+${overflow > 99 ? 99 : overflow}`}
+        </AvatarGroupCount>
+      ) : null}
+    </AvatarGroup>
   );
 }

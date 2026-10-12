@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { extractApiError } from '@/lib/utils/api-error';
+import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
 import { useRemoveFromSpace } from '../../content-mutations';
 import {
   removeRefusal,
@@ -74,7 +75,7 @@ export function RemoveFromSpaceDialog({
       open={open}
       onOpenChange={(next) => (remove.isPending ? undefined : onOpenChange(next))}
     >
-      <AlertDialogContent>
+      <AlertDialogContent className={COLLAB_DIALOG_SURFACE}>
         <AlertDialogHeader>
           <AlertDialogTitle>{`Remove “${item.name}” from this space?`}</AlertDialogTitle>
           <AlertDialogDescription>

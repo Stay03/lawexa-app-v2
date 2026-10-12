@@ -6,9 +6,11 @@ import { ChevronLeft, PanelLeft } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import { CrestSkeleton, SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import {
   SPACE_DRAWER_TRIGGER_ID,
+  useSpaceTitleOnScreen,
   type CollabHeaderContext,
 } from './collab-header';
 
@@ -134,6 +136,15 @@ const CLUSTER = 'flex w-full min-w-0 items-center gap-2 px-1.5 py-1';
  * `max-md:hidden` because the channel screen wears its own (`screenOwnsPhoneBar`
  * in `V2Header`) — so the two rules together left the button on no screen at
  * all. It went with the second trigger id, which had nothing left to sit on.
+ *
+ * ── ON THE SPACE PAGE IT WAITS FOR THE PAGE'S OWN NAME TO SCROLL AWAY ───────
+ * Since design round 1 the space page prints the space's full name at every
+ * width, on up to two lines, because the bar cut a law firm's matter names to
+ * about 190px. With both visible the crest and the name were printed twice, so
+ * on a space address the cluster fades out while the page's heading is on
+ * screen (`useSpaceTitleOnScreen`) and fades back once it has scrolled away.
+ * It keeps its width while hidden, so the bell and the menu never move, and it
+ * leaves the accessibility tree with it: the page's `h1` says the same thing.
  */
 export function CollabHeaderTitle({
   context,
@@ -145,9 +156,18 @@ export function CollabHeaderTitle({
   // repeat it under.
   const title = channelName ?? spaceName;
   const kicker = channelName === null ? null : spaceName;
+  const titleOnScreen = useSpaceTitleOnScreen();
+  const stepBack = channelName === null && titleOnScreen;
 
   return (
-    <div className="flex w-36 min-w-0 items-center min-[400px]:w-52 sm:w-64 md:hidden">
+    <div
+      aria-hidden={stepBack || undefined}
+      className={cn(
+        'flex w-36 min-w-0 items-center min-[400px]:w-52 sm:w-64 md:hidden',
+        'transition-opacity duration-200 motion-reduce:transition-none',
+        stepBack ? 'opacity-0' : 'opacity-100',
+      )}
+    >
       {/* No focus ring, no hover tint, no tab stop: it is not a control. */}
       <span className={CLUSTER}>
         {spaceUuid !== null && spaceType !== null && spaceName !== null ? (

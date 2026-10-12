@@ -18,13 +18,17 @@ import { crestMonogram, crestStyle } from './crest-model';
  * warm-the-tile-to-gold behaviour put a second gold object next to the badge
  * that carries the real number.
  *
- * ── THE CORNER MARK SITS INSIDE THE TILE ───────────────────────────────────
- * Work / Study / Organization as a small disc in the crest's bottom-right
- * corner, in the page colour so it reads as a notch punched out of the tile.
- * It is INSIDE the tile's bounds and carries no ring, deliberately: a ring in
- * the surface colour is only correct while the surface holds still, and a lane
- * that tints on hover would leave the notch floating as a page-coloured disc
- * on a tinted row. Nothing about this mark depends on what is behind the crest.
+ * ── THE CORNER MARK SITS ON THE CORNER, OFF THE LETTERS ────────────────────
+ * Work / Study / Organization as a small disc on the crest's bottom-right
+ * corner. It used to sit INSIDE the tile, and there it covered the lower right
+ * of the monogram's second letter on every crest: "MW", "KC" and "MC" read as
+ * "M", "K" and "M" (design round 1, 12 October 2026). It now straddles the
+ * corner, so its top edge sits below the letters' baseline at every size.
+ *
+ * The disc is in the page colour with a ring of the same colour, so it reads as
+ * a notch cut out of the tile's corner. On a lane that tints on hover, the half
+ * outside the tile keeps the page colour against the tint. That is the price
+ * of a mark that no longer covers the letters, and a small one.
  *
  * It is omitted at `sm`: below ~14px the glyph is a smudge, and every `sm` site
  * (breadcrumbs, chips, previews) already names the kind in adjacent text.
@@ -58,19 +62,19 @@ const GEOMETRY = {
   md: {
     box: 'size-9 rounded-lg',
     text: 'text-[13px]',
-    mark: 'size-3.5 bottom-0.5 right-0.5',
+    mark: 'size-3.5 -bottom-1 -right-1',
     glyph: 'size-2',
   },
   lg: {
     box: 'size-12 rounded-xl',
     text: 'text-[17px]',
-    mark: 'size-[18px] bottom-1 right-1',
+    mark: 'size-[18px] -bottom-1 -right-1',
     glyph: 'size-3',
   },
   xl: {
     box: 'size-16 rounded-2xl',
     text: 'text-2xl',
-    mark: 'size-6 bottom-1.5 right-1.5',
+    mark: 'size-6 -bottom-1.5 -right-1.5',
     glyph: 'size-3.5',
   },
 } satisfies Record<string, CrestGeometry>;
@@ -115,7 +119,7 @@ function Crest({
       {geometry.mark && Glyph ? (
         <span
           className={cn(
-            'absolute flex items-center justify-center rounded-full bg-background text-muted-foreground',
+            'absolute flex items-center justify-center rounded-full bg-background text-muted-foreground ring-2 ring-background',
             geometry.mark,
           )}
         >

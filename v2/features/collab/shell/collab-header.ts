@@ -178,3 +178,45 @@ export function clearCollabHeader(): void {
 export function useCollabHeader(): CollabHeaderContext | null {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+/* ── Whether the space page's own name is on screen (design round 1) ──────── */
+
+/**
+ * On a phone the space page now prints the space's full name in its header
+ * (it used to live only in the bar, cut to about 190px). With both on screen
+ * the name and the crest were printed twice, 100px apart, so the bar's title
+ * steps back while the page's heading is visible and returns once it scrolls
+ * out: `SpacePlaceHeader` reports, `CollabHeaderTitle` listens. A separate
+ * store from the context above because it changes on scroll, and the context
+ * is published by the frame, which knows nothing about where the page is.
+ */
+let spaceTitleOnScreen = false;
+const titleListeners = new Set<() => void>();
+
+function subscribeTitle(onStoreChange: () => void): () => void {
+  titleListeners.add(onStoreChange);
+  return () => {
+    titleListeners.delete(onStoreChange);
+  };
+}
+
+function getTitleSnapshot(): boolean {
+  return spaceTitleOnScreen;
+}
+
+function getTitleServerSnapshot(): boolean {
+  return false;
+}
+
+/** Report whether the space page's heading is visible. Equal values are a
+ *  no-op. The page reports `false` when it unmounts. */
+export function setSpaceTitleOnScreen(next: boolean): void {
+  if (spaceTitleOnScreen === next) return;
+  spaceTitleOnScreen = next;
+  for (const listener of titleListeners) listener();
+}
+
+/** Whether the space page's own heading is on screen right now. */
+export function useSpaceTitleOnScreen(): boolean {
+  return useSyncExternalStore(subscribeTitle, getTitleSnapshot, getTitleServerSnapshot);
+}

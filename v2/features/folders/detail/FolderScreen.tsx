@@ -723,9 +723,15 @@ function FolderBody({ uuid }: { uuid: string }) {
       {move.key > 0 ? (
         <MoveToSpaceDialog
           key={move.key}
-          // `GET /folders/{uuid}` carries no space (backend B3), so `space` is
-          // left unknown and the dialog offers "Remove from space" as well.
-          item={{ type: 'folder', id: folder.uuid, name: row.name }}
+          // `GET /folders/{uuid}` carries the folder's `space` block
+          // (techlead decision 3, 12 October 2026). `null` or absent means it
+          // is in no space, so the dialog offers no "Remove from space".
+          item={{
+            type: 'folder',
+            id: folder.uuid,
+            name: row.name,
+            space: folder.space ?? null,
+          }}
           open={move.open}
           onOpenChange={(open) => setMove((previous) => ({ ...previous, open }))}
         />

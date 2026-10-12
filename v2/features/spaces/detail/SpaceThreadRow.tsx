@@ -59,8 +59,11 @@ import type { ThreadDigestRow } from './activity-digest';
 export const SpaceThreadRow = memo(function SpaceThreadRow({
   row,
   now,
+  showProvenance,
 }: {
   row: ThreadDigestRow;
+  /** Whether to name the parent channel: not when the space has only one. */
+  showProvenance: boolean;
   /**
    * The shared minute clock. `0` is its pre-hydration value and means "no age
    * yet" - handing it to the formatter would date every row as "now".
@@ -139,10 +142,15 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
               ) : null}
             </div>
 
+            {/* ONE TRUNCATION PER LINE (design round 1). On a phone the line
+                read "Thread in gene... · 1 followi... · No messages ...": three
+                facts cut three times. The channel name is the only fact that
+                may be long, so it alone sits in the lead and ellipsizes; the
+                short counted facts sit in the trail, which holds its width. */}
             <MetaLine
               className="mt-0.5"
-              lead={[
-                provenance,
+              lead={[showProvenance ? provenance : null]}
+              trail={[
                 followerLabel(thread.active_members_count),
                 thread.last_message_at === null ? 'No messages yet' : null,
               ]}

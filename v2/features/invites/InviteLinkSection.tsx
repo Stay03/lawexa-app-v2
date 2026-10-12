@@ -7,7 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { InviteLink } from '@/types/collab';
 import type { InvitableContentRole } from '@/v2/features/collab/membership/content-role';
 import { inviteLinkPayload } from '@/v2/features/spaces/model';
-import { approvalLabel, CopyLinkButton, inviteUrl } from './link';
+import { InviteLinkField } from './link';
+import { approvalLabel } from './link-model';
 import { useCreateInviteLink, useInviteLinks } from './queries';
 
 /**
@@ -105,20 +106,15 @@ export function InviteLinkSection({
       )}
 
       {links.isPending ? (
-        <Skeleton className="h-9 w-full rounded-lg" />
+        <Skeleton className="h-9 w-full rounded-4xl" />
       ) : link ? (
         <>
-          <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded bg-secondary px-2 py-1.5 text-xs">
-              {inviteUrl(link.code)}
-            </code>
-            <CopyLinkButton code={link.code} variant="outline" className="shrink-0" />
-          </div>
+          {/* The email field's own shape (design round 1): one field height,
+              one radius and a Copy button of the same height, rather than a
+              code chip and a pill of two other sizes under a pill input. */}
+          <InviteLinkField code={link.code} />
           <p className="text-xs text-muted-foreground">
-            {contentRole && link.content_role_label
-              ? `People join as ${link.content_role_label}. `
-              : ''}
-            {approvalLabel(link)}
+            {approvalLabel(link, contentRole ? link.content_role_label : null)}
           </p>
         </>
       ) : (
@@ -161,7 +157,7 @@ export function InviteLinkSection({
               an expiry, gets them in the panel that manages links — this half
               exists to produce one good link in one press. */}
           <p className="text-xs text-muted-foreground">
-            Anyone using it asks first, and you decide.
+            People who use it join after you approve them.
           </p>
           {create.isError && (
             <p role="alert" className="text-xs font-medium text-destructive">

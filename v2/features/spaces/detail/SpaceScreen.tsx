@@ -1,21 +1,10 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Link2, Loader2, Pencil, Trash2, UserPlus } from 'lucide-react';
+import { Hourglass, Link2, LogOut, Pencil, Trash2, Users } from 'lucide-react';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { extractApiError } from '@/lib/utils/api-error';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
 import { collabAccessState } from '@/v2/features/collab/model';
@@ -28,29 +17,20 @@ import {
   setScreenContext,
   type ScreenAction,
 } from '@/v2/shell/screen-context';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { InviteLinksPanel } from '@/v2/features/invites/InviteLinksPanel';
-import { SpaceJoinRequestsPanel } from '@/v2/features/invites/JoinRequestsPanel';
 import { SpaceFormDialog } from '../dialogs/SpaceFormDialog';
 import {
   defaultSpaceTab,
-  isSharedSpace,
   parseSpaceTab,
+  spaceMenuItems,
   spaceShowsChannels,
+  type SpaceMenuItem,
   type SpaceTab,
 } from '../model';
-import { useDeleteSpace } from '../mutations';
 import { NO_SPACE_THREADS } from './activity-digest';
 import { CachedSpaceFrame } from './CachedSpaceFrame';
 import { SpaceContentPanel } from './content/SpaceContentPanel';
 import {
-  SPACE_LOBBY_COLUMN,
+  spacePageColumn,
   SPACE_LOBBY_GRID,
   SPACE_TAB_PANEL,
   SPACE_TABS_ROW,
@@ -87,11 +67,9 @@ import {
  * drift from the rail's. It also means arriving here from a channel paints
  * from queries that never unmounted.
  *
- * What stays local is what is genuinely this page's: the edit dialog's URL
- * overlay, and the delete confirmation — which is DELIBERATELY NOT in the URL,
- * because a shareable, refresh-surviving link that re-opens "Delete this
- * space?" is an armed trigger, and this dialog carries the server's sentence
- * from the last failed attempt, which a restored URL cannot reproduce.
+ * What stays local is what is genuinely this page's: the rename dialog's URL
+ * overlay. The leave and delete confirmations moved to the frame in design
+ * round 1, because the members sheet's footer opens them too.
  *
  * ── ONE SPACE, FOUR TABS (Spaces F2, 11 October 2026) ──────────────────────
  * Stay decided that one Space holds chats, folders and files for every
@@ -136,14 +114,9 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
      takes over. Identity only: every ruling still waits for the detail. */
   const cachedIdentity = useCachedSpaceIdentity(spaceUuid);
   const session = useV2Session();
-  const router = useRouter();
-  const deleteSpace = useDeleteSpace(spaceUuid);
   // The shared minute clock, so the digest's ages stay true while the reader
   // sits here. `0` before hydration; the rows treat that as "no age yet".
   const now = useMinuteNow();
-
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const space = scope?.space ?? null;
   const canManage = scope?.canManage ?? false;
@@ -247,19 +220,20 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   }, [retryChannels, refetchThreads]);
 
   /**
-   * The edit dialog is the ONE overlay this page still owns — creating a
+   * The rename dialog is the ONE overlay this page still owns — creating a
    * channel and opening the roster moved to the frame, because they have to
-   * work from the channel routes too.
+   * work from the channel routes too, and invite links and the waiting list
+   * became steps of the frame's members sheet in design round 1.
    *
    * `canOpen` carries the same `canManage` the menu item is gated on, so a
    * copied `?panel=edit` link cannot hand a plain member the admin form. It is
    * `undefined` until the space lands: gating on a role that has not resolved
-   * would strip a real admin's deep link before it could work.
+   * would strip a real admin's deep link before it could work. The two values
+   * that moved into the sheet are refused, so an old `?panel=invites` link is
+   * stripped rather than left in the address opening nothing.
    */
   const panel = useUrlOverlay('panel', {
-    canOpen: space
-      ? { edit: canManage, invites: canManage, requests: canManage }
-      : undefined,
+    canOpen: space ? { edit: canManage, invites: false, requests: false } : undefined,
   });
 
   /**
@@ -277,59 +251,100 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
    * They were a kebab at y183, in the lobby's header block, under a shell bar
    * that already had one at the top right. On a 390px phone that screen spent
    * 225px on chrome before the first word and offered three ways out and two
-   * overflow menus. `screen-context.ts` folds these four rows into the bar's
-   * single menu, above a separator, and `SpacePlaceHeader` lost its trigger.
+   * overflow menus. `screen-context.ts` folds these rows into the bar's single
+   * menu, above a separator, and `SpacePlaceHeader` lost its trigger.
    *
-   * THE ROWS FOLLOW THE SAME RULES THEY ALWAYS DID: nothing at all for a reader
-   * who cannot manage the space (a menu that only 403s is worse than none), and
-   * Delete for the OWNER only. `panel`'s own `canOpen` map is the second gate,
-   * so a copied `?panel=edit` still cannot hand a plain member the admin form.
+   * ── AND THEY ARE THE APPROVED MENU (design round 1, 12 October 2026) ─────
+   * Members, Rename, Leave, Delete, as the role allows (`spaceMenuItems`, where
+   * the order and the rules are pinned). Every member gets
+   * Members and Leave, so a Viewer who wants out no longer has to guess that
+   * the faces are a button. The Owner (and a team space's admin) adds Invite
+   * links and Waiting to join, which open those steps of the members sheet,
+   * and Rename. Delete is the Owner's alone. The destructive two sit under
+   * the menu's separator.
    *
-   * Every callback is `useCallback`-stable, which is what makes the publish a
-   * genuine no-op between renders rather than a new snapshot each time. They
-   * close over `panel.show` and NOT over `panel`: the dispatchers are stable but
-   * the object around them is a fresh literal on every render, so depending on
-   * it would mint a new action set each time and re-publish for nothing.
+   * LEAVE IS NEVER A DEAD END: where it could only be refused, for the last
+   * Owner of a space nobody else is in, it is not offered, and Delete is the
+   * way out (`scope.leaveRoute`). The last Owner with others in it keeps
+   * Leave, which asks them to choose a new owner first.
+   *
+   * `panel`'s own `canOpen` map is the second gate, so a copied `?panel=edit`
+   * still cannot hand a plain member the admin form.
+   *
+   * Every callback is `useCallback`-stable or comes from the frame's memoised
+   * scope, which is what makes the publish a genuine no-op between renders
+   * rather than a new snapshot each time. They close over `panel.show` and NOT
+   * over `panel`: the dispatchers are stable but the object around them is a
+   * fresh literal on every render.
    */
   const pathname = usePathname() ?? '';
   const showPanel = panel.show;
-  const openEdit = useCallback(() => showPanel('edit'), [showPanel]);
-  const openInvites = useCallback(() => showPanel('invites'), [showPanel]);
-  const openRequests = useCallback(() => showPanel('requests'), [showPanel]);
-  const openDelete = useCallback(() => {
-    setDeleteError(null);
-    setDeleteOpen(true);
-  }, []);
+  const openRename = useCallback(() => showPanel('edit'), [showPanel]);
 
   const isOwner = scope?.isOwner ?? false;
+  const leaveRoute = scope?.leaveRoute ?? 'leave';
+  const openRoster = scope?.openRoster;
+  const openInviteLinks = scope?.openInviteLinks;
+  const openJoinRequests = scope?.openJoinRequests;
+  const openLeave = scope?.openLeave;
+  const openDelete = scope?.openDelete;
+  const hasSpace = space !== null;
   const actions = useMemo<readonly ScreenAction[]>(() => {
-    if (!canManage) return NO_SCREEN_ACTIONS;
-    const rows: ScreenAction[] = [
-      {
-        id: 'invites',
-        label: 'Invite by link',
+    // Nothing until the space has landed: before that there is no membership
+    // to offer verbs about.
+    if (
+      !hasSpace ||
+      !openRoster ||
+      !openInviteLinks ||
+      !openJoinRequests ||
+      !openLeave ||
+      !openDelete
+    ) {
+      return NO_SCREEN_ACTIONS;
+    }
+    const verbs: Record<SpaceMenuItem, ScreenAction> = {
+      members: { id: 'members', label: 'Members', icon: Users, onSelect: openRoster },
+      'invite-links': {
+        id: 'invite-links',
+        label: 'Invite links',
         icon: Link2,
-        onSelect: openInvites,
+        onSelect: openInviteLinks,
       },
-      {
-        id: 'requests',
+      waiting: {
+        id: 'waiting',
         label: 'Waiting to join',
-        icon: UserPlus,
-        onSelect: openRequests,
+        icon: Hourglass,
+        onSelect: openJoinRequests,
       },
-      { id: 'edit', label: 'Edit space', icon: Pencil, onSelect: openEdit },
-    ];
-    if (isOwner) {
-      rows.push({
+      rename: { id: 'rename', label: 'Rename', icon: Pencil, onSelect: openRename },
+      leave: {
+        id: 'leave',
+        label: 'Leave space',
+        icon: LogOut,
+        destructive: true,
+        onSelect: openLeave,
+      },
+      delete: {
         id: 'delete',
         label: 'Delete space',
         icon: Trash2,
         destructive: true,
         onSelect: openDelete,
-      });
-    }
-    return rows;
-  }, [canManage, isOwner, openInvites, openRequests, openEdit, openDelete]);
+      },
+    };
+    return spaceMenuItems({ canManage, isOwner, leaveRoute }).map((item) => verbs[item]);
+  }, [
+    hasSpace,
+    canManage,
+    isOwner,
+    leaveRoute,
+    openRoster,
+    openInviteLinks,
+    openJoinRequests,
+    openRename,
+    openLeave,
+    openDelete,
+  ]);
 
   useEffect(() => {
     setScreenContext({ pathname, back: null, actions });
@@ -362,7 +377,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   if (scope.isSpaceError || space === null) {
     const status = scope.spaceErrorStatus ?? 0;
     return (
-      <div className={SPACE_LOBBY_COLUMN}>
+      <div className={spacePageColumn(false)}>
         {status === 403 || status === 404 ? (
           <SpaceAccessDeniedState />
         ) : (
@@ -377,22 +392,12 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
     );
   }
 
-  const handleDelete = () => {
-    setDeleteError(null);
-    deleteSpace.mutate(undefined, {
-      onSuccess: () => {
-        setDeleteOpen(false);
-        router.push('/spaces');
-      },
-      onError: (error) => setDeleteError(extractApiError(error).message),
-    });
-  };
-
   return (
-    <div className={SPACE_LOBBY_COLUMN}>
+    <div className={spacePageColumn(showsChannels)}>
       <SpacePlaceHeader
         space={space}
         members={scope.members}
+        membership={scope.membership}
         canCreateChannel={canManage && showsChannels}
         onCreateChannel={scope.openCreateChannel}
         onOpenRoster={scope.openRoster}
@@ -451,103 +456,12 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
         )}
       </div>
 
-      {/* INVITE LINKS AND THE WAITING LIST — admin surfaces, on the same
-          url-overlay mechanism as Edit so Back closes them (W1 rule). */}
-      {/* BOTH SHEETS FILL A PHONE, and both have to say it in the variant shape:
-          `SheetContent` sets `data-[side=right]:w-3/4`, and an attribute
-          selector beats a bare `w-full` however late it is written. Left plain,
-          these two admin queues opened at three quarters of the screen with the
-          space page showing down one side (mobile overhaul, phase 7). */}
-      <Sheet {...panel.bind('invites')}>
-        <SheetContent
-          side="right"
-          className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md"
-        >
-          <SheetHeader>
-            <SheetTitle>Invite by link</SheetTitle>
-            <SheetDescription>
-              Share a link with anybody. You decide who actually gets in.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            <InviteLinksPanel
-              spaceUuid={space.uuid}
-              contentRoles={isSharedSpace(space)}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet {...panel.bind('requests')}>
-        <SheetContent
-          side="right"
-          className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md"
-        >
-          <SheetHeader>
-            <SheetTitle>Waiting to join</SheetTitle>
-            <SheetDescription>
-              People who used a link that needs your approval.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            <SpaceJoinRequestsPanel
-              spaceUuid={space.uuid}
-              contentRoles={isSharedSpace(space)}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-
       <SpaceFormDialog
         key={panel.keyFor('edit')}
         space={space}
         viewerId={session.userId}
         {...panel.bind('edit')}
       />
-
-      <AlertDialog
-        open={deleteOpen}
-        onOpenChange={(next) => {
-          setDeleteOpen(next);
-          if (!next) setDeleteError(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {space.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {/* A shared space has no channels, so it does not promise to
-                  delete any (Spaces F2). */}
-              {isSharedSpace(space)
-                ? 'This deletes the space for everyone. It can’t be undone.'
-                : 'This deletes the space and every channel in it, for everyone. It can’t be undone.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {deleteError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {deleteError}
-            </p>
-          ) : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteSpace.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                handleDelete();
-              }}
-              disabled={deleteSpace.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleteSpace.isPending ? (
-                <Loader2 aria-hidden className="size-4 animate-spin" />
-              ) : null}
-              Delete space
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Boxes, Download, FolderOutput, Loader2, MoreHorizontal } from 'lucide-react';
+import { Boxes, ExternalLink, FolderOutput, Loader2, MoreHorizontal } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -141,7 +141,9 @@ export const SpaceFileRow = memo(function SpaceFileRow({
             {opening ? (
               <Loader2 aria-hidden className="size-4 animate-spin" />
             ) : (
-              <Download aria-hidden className="size-4" />
+              // It opens the file in a new tab, so its glyph says that and not
+              // "download" (design round 1).
+              <ExternalLink aria-hidden className="size-4" />
             )}
           </Button>
         )}

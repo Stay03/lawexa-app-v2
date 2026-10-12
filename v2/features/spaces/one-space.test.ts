@@ -131,7 +131,8 @@ test('a shared space is never offered as open; a create sends a kind only for re
 test('a shared space says what it holds; no counts on the payload means no claim', () => {
   assert.equal(
     spaceContentCountsLabel({ conversations_count: 3, folders_count: 1, files_count: 2 }),
-    '3 chats · 1 folder · 2 files',
+    // The tab's own word since design round 1 (was "3 chats").
+    '3 conversations · 1 folder · 2 files',
   );
   assert.equal(
     spaceContentCountsLabel({ conversations_count: 0, folders_count: 0, files_count: 1 }),
@@ -266,7 +267,9 @@ test('the spaces list marks team spaces and asks for channels only for researche
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
   assert.match(row, /\{showsTeamMark\(space, canOpenTeamChannels\) \? \(/);
   assert.match(row, />\s*Team\s*</);
-  assert.match(row, /\[holds \?\? space\.type_label, spaceOwnerLabel\(space\)\]/);
+  // Design round 1: the viewer's role leads the line (was
+  // `[holds ?? space.type_label, spaceOwnerLabel(space)]`).
+  assert.match(row, /\[role, holds \?\? space\.type_label, spaceOwnerLabel\(space\)\]/);
   const browser = read('v2', 'features', 'spaces', 'list', 'SpacesBrowser.tsx');
   assert.match(
     browser,
