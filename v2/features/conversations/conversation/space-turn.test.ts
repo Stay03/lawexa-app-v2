@@ -330,8 +330,16 @@ test('the composer gives a refused message back, with its pasted cards and files
   assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot\);/);
   assert.match(
     composer,
-    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*showError\(outcome\.refused\);/,
+    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*showError\(outcome\.refused, 'notice'\);/,
   );
+  // A held send is a wait, not a fault: a muted status with a clock, never the red
+  // alert (Stay, 13 October 2026). File errors keep the red box.
+  assert.match(composer, /role=\{errorTone === 'notice' \? 'status' : 'alert'\}/);
+  assert.match(composer, /errorTone === 'notice'\s*\? 'text-muted-foreground px-1 text-xs'\s*: 'border-destructive\/40 bg-destructive\/10 text-destructive rounded-xl border px-3 py-2 text-sm',/);
+  assert.match(composer, /errorTone === 'notice' \? \(\s*<Clock className="mt-px size-3\.5 shrink-0" aria-hidden \/>\s*\) : \(\s*<AlertCircle/);
+  assert.match(composer, /const showError = \(message: string, tone: 'error' \| 'notice' = 'error'\) => \{/);
+  // Every file error still calls showError with the default (red) tone.
+  assert.equal(composer.match(/showError\([^)]*'notice'\)/g)?.length, 1, 'only the refused send passes notice');
   // A sent tray's thumbnails are released only once the send was taken.
   assert.match(composer, /if \(!outcome\) for \(const u of draft\.uploads\) if \(u\.preview\) URL\.revokeObjectURL\(u\.preview\);/);
   // The case dock passes the refusal through.
@@ -419,7 +427,7 @@ test('a refused follow-up (409 or 403) comes back to the composer with the compo
   );
   assert.match(screen, /draftScopeId=\{conversationId\}\s*stageRef=\{composerRef\}/);
   const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /refuse: \(text, sentence\) => \{\s*updateInput\(\(current\) => draftWithRefused\(current, text\)\);\s*setErrorText\(sentence\);\s*setErrorOpen\(true\);/);
+  assert.match(composer, /refuse: \(text, sentence\) => \{\s*updateInput\(\(current\) => draftWithRefused\(current, text\)\);\s*setErrorText\(sentence\);\s*setErrorTone\('notice'\);\s*setErrorOpen\(true\);/);
   // The draft keeps what the reader typed, and the follow-up after it.
   assert.equal(draftWithRefused('', 'Explain the next step'), 'Explain the next step');
   assert.equal(draftWithRefused('  ', 'Explain the next step'), 'Explain the next step');
@@ -475,7 +483,7 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
     /const outcome = await regenerate\(\);\s*if \(!outcome\) return;\s*if \(externalComposer\) \{\s*reportFollowUpRefusal\(\{ conversationId, text: null, sentence: outcome\.refused \}\);\s*\} else \{\s*composerRef\.current\?\.explain\(outcome\.refused\);/,
   );
   assert.match(screen, /onRegenerate=\{askAgain\}/);
-  assert.match(readHere('ConversationComposer.tsx'), /explain: \(sentence\) => \{\s*setErrorText\(sentence\);\s*setErrorOpen\(true\);/);
+  assert.match(readHere('ConversationComposer.tsx'), /explain: \(sentence\) => \{\s*setErrorText\(sentence\);\s*setErrorTone\('notice'\);\s*setErrorOpen\(true\);/);
 });
 
 /* ── The activity row sits above the answer being written, not a finished one ─ */

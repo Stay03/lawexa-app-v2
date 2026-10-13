@@ -4,6 +4,7 @@ import { useCallback, useImperativeHandle, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowUp,
+  Clock,
   FileText,
   FileUp,
   Loader2,
@@ -244,10 +245,12 @@ export function ConversationComposer({
       refuse: (text, sentence) => {
         updateInput((current) => draftWithRefused(current, text));
         setErrorText(sentence);
+        setErrorTone('notice');
         setErrorOpen(true);
       },
       explain: (sentence) => {
         setErrorText(sentence);
+        setErrorTone('notice');
         setErrorOpen(true);
       },
     }),
@@ -263,6 +266,12 @@ export function ConversationComposer({
   // animates out with its own words still in place.
   const [errorText, setErrorText] = useState('');
   const [errorOpen, setErrorOpen] = useState(false);
+  // How the banner reads: `error` (red, an alert) for what the reader must fix,
+  // a file refused; `notice` (muted, a status) for a send the server held
+  // because a colleague is asking, which is a wait, not a fault (Stay, 13
+  // October 2026: the red banner "seems trying to sabotage the beauty of the
+  // page"). Kept with the text, so a dismiss animates out in its own tone.
+  const [errorTone, setErrorTone] = useState<'error' | 'notice'>('error');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // The reader's own turn locks the pill; any other (a colleague's, or one
@@ -270,8 +279,9 @@ export function ConversationComposer({
   // with Send held.
   const ownTurnRunning = isStreaming && canStop;
 
-  const showError = (message: string) => {
+  const showError = (message: string, tone: 'error' | 'notice' = 'error') => {
     setErrorText(message);
+    setErrorTone(tone);
     setErrorOpen(true);
   };
   const hideError = () => setErrorOpen(false);
@@ -458,7 +468,7 @@ export function ConversationComposer({
     updateInput((current) => (current.trim() === '' ? draft.input : current));
     for (const text of draft.pasted) addPasted(text);
     setUploads((current) => [...draft.uploads, ...current]);
-    showError(outcome.refused);
+    showError(outcome.refused, 'notice');
   };
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
@@ -565,7 +575,9 @@ export function ConversationComposer({
         {/* Error banner — the SAME persistent-node collapse. `errorText` persists
             through the exit (it only changes when a new error is shown), so the height +
             opacity animate BOTH ways rather than the box vanishing. Inert + aria-hidden
-            when collapsed; `role="alert"` announces when it opens. */}
+            when collapsed. An error is a red box and `role="alert"`; a notice (a send
+            held for a colleague's turn) is muted text like the confidential notice
+            above, with a clock, and `role="status"`, announced politely. */}
         <div
           className={cn(
             'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
@@ -574,14 +586,21 @@ export function ConversationComposer({
         >
           <div className="overflow-hidden">
             <div
-              role="alert"
+              role={errorTone === 'notice' ? 'status' : 'alert'}
               aria-hidden={!errorOpen}
               className={cn(
-                'border-destructive/40 bg-destructive/10 text-destructive mb-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                'mb-2 flex items-start gap-2 transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                errorTone === 'notice'
+                  ? 'text-muted-foreground px-1 text-xs'
+                  : 'border-destructive/40 bg-destructive/10 text-destructive rounded-xl border px-3 py-2 text-sm',
                 errorOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
               )}
             >
-              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              {errorTone === 'notice' ? (
+                <Clock className="mt-px size-3.5 shrink-0" aria-hidden />
+              ) : (
+                <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              )}
               <span className="flex-1">{errorText}</span>
             </div>
           </div>
