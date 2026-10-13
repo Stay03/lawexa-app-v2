@@ -566,10 +566,22 @@ function PushedCentre({
  * (skeleton-first — never empty-then-pop, never a placeholder string), and a
  * compact confidential badge when flagged. Skeleton and title are grid-stacked in
  * a FIXED-width box, so the null→title resolve is a jank-free opacity cross-fade
- * (the box never changes width) and the title truncates rather than shoving the
- * side clusters. A later title→title update (async name generation) swaps in place
- * inside that stable, truncating box — no layout shift. Widths step up per
- * breakpoint and stay inside the 320px centre budget the HomeTabs docblock reserves.
+ * (the box never changes width) and the title wraps or truncates rather than
+ * shoving the side clusters. A later title→title update (async name generation)
+ * swaps in place inside that stable box — no layout shift.
+ *
+ * ── BELOW `md:` THE BOX IS THE WHOLE CENTRE TRACK (design round 4) ────────
+ * The box was 96px wide below 400px, the 320px floor's budget, so on a 390px
+ * phone a chat read "In one sente..." over "Contract Revie..." with 70px of
+ * the track unused. Below `md:` the side clusters are fixed: the 88px nav
+ * cluster and the 92px actions cluster (the HomeTabs docblock), and equal
+ * `1fr` sides make each track as wide as the wider one. So the centre is the
+ * viewport less the bar's 24px padding, its two 8px gaps and two 92px tracks:
+ * `100vw - 14rem`, 96px at 320px as before, 136px at 360px, 166px at 390px.
+ * The title takes up to two lines there, at 13px, which the 56px bar holds
+ * with the place line under it (2 × 16 + 16); a title longer than two lines
+ * ends in an ellipsis. From `md:` up it stays one line, and the box steps up
+ * at `lg:` and `xl:` so a desktop chat's title reads whole as well.
  */
 function RouteContext({
   title,
@@ -591,7 +603,9 @@ function RouteContext({
     <div
       className={cn(
         'grid place-items-center',
-        hasContent ? 'w-24 min-[400px]:w-44 sm:w-60 md:w-72' : 'w-0',
+        hasContent
+          ? 'w-[calc(100vw-14rem)] md:w-72 lg:w-[26rem] xl:w-[32rem]'
+          : 'w-0',
       )}
     >
       {/* Title-shaped shimmer (skeleton-first). */}
@@ -609,7 +623,7 @@ function RouteContext({
         className="col-start-1 row-start-1 flex w-full min-w-0 flex-col items-center transition-opacity duration-200 motion-reduce:transition-none data-[active=false]:opacity-0"
       >
         <div className="flex w-full min-w-0 items-center justify-center">
-          <span className="min-w-0 truncate text-sm font-medium text-foreground">
+          <span className="min-w-0 text-center font-medium text-foreground max-md:line-clamp-2 max-md:text-balance max-md:text-[13px] max-md:leading-4 md:truncate md:text-sm">
             {title}
           </span>
           <ConfidentialBadge on={confidential} />

@@ -19,8 +19,8 @@ import {
   isSharedSpace,
   memberCountLabel,
   showsPrivateMark,
-  showsTeamMark,
   spaceContentCountsLabel,
+  spaceKindMark,
   spaceOwnerLabel,
   spaceRoleLabel,
   spaceUnreadGrammar,
@@ -35,7 +35,7 @@ import type { SpaceActivity } from './space-activity';
  * the same outline is read rather than recognised.
  *
  * ── THE ANATOMY ────────────────────────────────────────────────────────────
- *   [ crest 48 ]  name · unread dot · Team · lock              [ mentions ]
+ *   [ crest 48 ]  name · unread dot · Team or Shared · lock    [ mentions ]
  *                 You're the owner · •#general #matter-4471 more · Acme
  *                                                        12 members · 2h
  *
@@ -106,19 +106,27 @@ import type { SpaceActivity } from './space-activity';
  * moves, because that is precisely when the chips must change.
  *
  * ── THE KIND, QUIETLY (Spaces F2, 11 October 2026) ─────────────────────────
- * One Space now comes in two kinds, and the list says which only where it
- * matters: a small "Team" mark beside the name of a team space (the old kind,
- * the one with channels). A shared space, the new default, needs no mark. Its
- * second line, when it has no channel chips, says what it HOLDS ("3 chats ·
- * 1 file") from the counts the backend stamps from B1, which is the question
- * a shared space's lane answers; an API without the counts keeps the line it
- * had. The starter Work and Study spaces are rows like any other.
+ * One Space now comes in two kinds, and the row names its kind in the small
+ * mark beside the name: "Team" for a team space (the old kind, the one with
+ * channels), "Shared" for a shared space (`spaceKindMark`). Its second line,
+ * when it has no channel chips, says what it HOLDS ("3 chats · 1 file") from
+ * the counts the backend stamps from B1, which is the question a shared
+ * space's lane answers; an API without the counts keeps the line it had. The
+ * starter Work and Study spaces are rows like any other.
  *
- * THE MARK NEEDS AN EXPLICIT `team`, AND A VIEWER WHO HAS TEAM CHANNELS (fix
- * after review, 11 October 2026; `showsTeamMark`). Before B1 every row comes
- * without a kind, and a regular user must never see "Team" on their own Work
- * or Study space: below researcher a team space shows no channels, so the
- * word would name something they cannot open.
+ * THE LIST AND THE MOVE PICKER SPEAK ONE WORD (design round 4, 12 October
+ * 2026). The picker names every row's kind, because its rows carry no counts
+ * and no chips to tell the kinds apart. The list used to mark only a team
+ * space, so a reader met the word "Shared" first in a dialog, and a regular
+ * user saw no kind on any row. Both now call `spaceKindMark`, so one space
+ * wears one mark wherever it is listed.
+ *
+ * "TEAM" NEEDS AN EXPLICIT `team`, AND A VIEWER WHO HAS TEAM CHANNELS (fix
+ * after review, 11 October 2026; `showsTeamMark`, which `spaceKindMark`
+ * follows). Before B1 every row comes without a kind, and a regular user must
+ * never see "Team" on their own Work or Study space: below researcher a team
+ * space shows no channels, so the word would name something they cannot open.
+ * An absent kind wears no mark.
  */
 
 /** One frozen empty roster. `GET /api/spaces` attaches `members` only on
@@ -152,6 +160,7 @@ export const SpaceRow = memo(function SpaceRow({
   const age = formatRelativeTime(activity.lastMessageAt, now);
   const hasChips = activity.chips.length > 0;
   const shared = isSharedSpace(space);
+  const kind = spaceKindMark(space, canOpenTeamChannels);
   const holds = shared ? spaceContentCountsLabel(space) : null;
   const roleWords = spaceRoleLabel(space);
   // Gated here, not inside: `MetaLine` decides presence, so an element that
@@ -219,9 +228,9 @@ export const SpaceRow = memo(function SpaceRow({
               {space.name}
             </span>
             {unread ? <UnreadDot /> : null}
-            {showsTeamMark(space, canOpenTeamChannels) ? (
+            {kind ? (
               <span className="shrink-0 rounded-md border border-border px-1.5 text-[10px] font-medium leading-4 text-muted-foreground">
-                Team
+                {kind}
               </span>
             ) : null}
             {showsPrivateMark(space) ? (

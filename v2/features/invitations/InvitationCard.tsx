@@ -26,7 +26,7 @@ import type { InvitationCrest, InvitationRowModel } from './row-model';
  * ── THE ANATOMY ────────────────────────────────────────────────────────────
  *   (40) Ada Nwosu invited you to [crest] Firm HQ
  *        Work space · A shared workroom for the litigation team
- *        [Member]  2d                        Decline   [ Accept ]
+ *        [Member] Can read and post in the channel  2d  Decline [ Accept ]
  *
  * The inviter leads, at a size you can recognise a face at, because WHO is
  * asking is most of the decision. The headline is a sentence rather than a
@@ -34,6 +34,12 @@ import type { InvitationCrest, InvitationRowModel } from './row-model';
  * truthfully say about the destination (see `row-model.ts` — the three
  * endpoints answer to three different depths, and none of them carries the
  * channel count the design would have liked).
+ *
+ * THE ROLE SAYS WHAT IT MEANS (design round 4, 12 October 2026). A bare
+ * "Viewer" chip named the role and left the invitee to guess what it lets
+ * them do, so the meaning sits beside it in plain words
+ * (`invitationRoleMeaning`). On a phone a long meaning wraps onto a second
+ * line rather than truncating, and the age follows it when the line is full.
  *
  * ── THE ACTIONS ARE DELIBERATELY UNEQUAL ───────────────────────────────────
  * Two same-size buttons say the two outcomes are equally likely. They are not:
@@ -169,8 +175,15 @@ export const InvitationCard = memo(function InvitationCard({
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 sm:ml-13">
-            <span className="inline-flex shrink-0 items-center rounded-full border border-border px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
-              {row.roleLabel}
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="inline-flex shrink-0 items-center rounded-full border border-border px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
+                {row.roleLabel}
+              </span>
+              {row.roleMeaning ? (
+                <span className="min-w-0 text-pretty text-xs text-muted-foreground">
+                  {row.roleMeaning}
+                </span>
+              ) : null}
             </span>
             {row.memberCount ? (
               <PresenceStack

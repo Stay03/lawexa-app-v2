@@ -265,8 +265,10 @@ test('the "Team" mark needs an explicit team kind and a viewer with Team Channel
 
 test('the spaces list marks team spaces and asks for channels only for researcher+', () => {
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
-  assert.match(row, /\{showsTeamMark\(space, canOpenTeamChannels\) \? \(/);
-  assert.match(row, />\s*Team\s*</);
+  // Design round 4: the row's mark is the move picker's `spaceKindMark`
+  // (was `showsTeamMark` and a literal "Team"), which keeps the Team rule.
+  assert.match(row, /const kind = spaceKindMark\(space, canOpenTeamChannels\);/);
+  assert.match(row, /\{kind \? \(/);
   // Design round 1: the viewer's role leads the line (was
   // `[holds ?? space.type_label, spaceOwnerLabel(space)]`).
   // Design round 2: the facts after the role are one list, shared by the

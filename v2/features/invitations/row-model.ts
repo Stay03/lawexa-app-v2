@@ -1,8 +1,14 @@
 import { type LucideIcon } from 'lucide-react';
 
 import { channelVisibilityFace } from '@/lib/collab/visibility';
+import {
+  SHARED_INVITE_ROLES,
+  TEAM_INVITE_ROLES,
+  type InviteRoleOption,
+} from '@/v2/features/collab/membership/invite-roles';
 import type {
   ChannelInvitation,
+  MemberRole,
   OrganizationInvitation,
   SlimUser,
   SpaceInvitation,
@@ -67,6 +73,9 @@ export interface InvitationRowModel {
   facts: readonly string[];
   /** The role being offered ("Member", "Admin"). */
   roleLabel: string;
+  /** What that role lets the invitee do, beside its name, or `null` where the
+   *  product defines no meaning for it (see `invitationRoleMeaning`). */
+  roleMeaning: string | null;
   invitedBy: SlimUser | null;
   /** Faces for the presence stack — empty whenever the payload omits a roster. */
   memberFaces: readonly SlimUser[];
@@ -106,6 +115,58 @@ function factsOf(...values: (string | null)[]): readonly string[] {
   return values.filter((value): value is string => value !== null);
 }
 
+/**
+ * ── WHAT THE ROLE MEANS (round 0 critique 27, design round 4) ─────────────
+ * A bare "Viewer" or "Member" chip named a role and said nothing about what
+ * it lets the invitee do, which is half of what they are deciding. The card
+ * now says it beside the name. The invite dialog's meanings are reused where
+ * they read alone ("Can read everything in the space", "Can invite people and
+ * manage them"), so the inviter and the invitee read one sentence. The
+ * dialog's Contributor line ("Can also add ...") leans on the Viewer row above
+ * it, and the dialog gives a Member no line at all, so those are said here in
+ * full. An organization's Member has no meaning the product defines, so its
+ * chip stays a name: the card says nothing it cannot vouch for.
+ */
+const CONTRIBUTOR_MEANING = 'Can read and add conversations, folders and files';
+const TEAM_SPACE_MEMBER_MEANING = 'Can read and join the space’s open channels';
+const CHANNEL_MEMBER_MEANING = 'Can read and post in the channel';
+
+/** The invite dialog's own line for a role, when it gives one. */
+function dialogMeaning(options: readonly InviteRoleOption[], value: string): string | null {
+  return options.find((option) => option.value === value)?.description ?? null;
+}
+
+/**
+ * The meaning beside an invitation's role, keyed by the role's VALUE, never
+ * its label (a label is the server's words and may change). A shared space's
+ * invitation is read off its content role, as its label is
+ * (`spaceInvitationRoleLabel`); one without a content role says nothing
+ * rather than guess one.
+ */
+export function invitationRoleMeaning(
+  invitation:
+    | { kind: 'space'; invitation: Pick<SpaceInvitation, 'role' | 'content_role' | 'space'> }
+    | { kind: 'channel' | 'organization'; invitation: { role: MemberRole } },
+): string | null {
+  const { role } = invitation.invitation;
+  if (invitation.kind === 'space' && invitation.invitation.space.kind === 'shared') {
+    const contentRole = invitation.invitation.content_role;
+    if (contentRole === 'viewer') return dialogMeaning(SHARED_INVITE_ROLES, 'viewer');
+    if (contentRole === 'editor') return CONTRIBUTOR_MEANING;
+    return null;
+  }
+  if (role === 'admin') return dialogMeaning(TEAM_INVITE_ROLES, 'admin');
+  if (role !== 'member') return null;
+  switch (invitation.kind) {
+    case 'space':
+      return TEAM_SPACE_MEMBER_MEANING;
+    case 'channel':
+      return CHANNEL_MEMBER_MEANING;
+    case 'organization':
+      return null;
+  }
+}
+
 /** The count with the words that make it a fact rather than a numeral. */
 function memberCountOf(total: number | undefined): { total: number; words: string } | null {
   if (total === undefined) return null;
@@ -134,6 +195,7 @@ export function organizationInvitationRow(
       shortFact(organization.bio ?? organization.description),
     ),
     roleLabel: invitation.role_label || invitation.role,
+    roleMeaning: invitationRoleMeaning({ kind: 'organization', invitation }),
     invitedBy: invitation.invited_by,
     // Server-gated to active members, so normally absent for an invitee —
     // rendered when present rather than promised.
@@ -173,6 +235,7 @@ export function spaceInvitationRow(invitation: SpaceInvitation): InvitationRowMo
     crest: { kind: 'space', uuid: space.uuid, name: space.name, type: space.type },
     facts: factsOf(spaceKindLabel(space.type), shortFact(space.description)),
     roleLabel: spaceInvitationRoleLabel(invitation),
+    roleMeaning: invitationRoleMeaning({ kind: 'space', invitation }),
     invitedBy: invitation.invited_by,
     memberFaces: NO_FACES,
     memberCount: null,
@@ -204,6 +267,7 @@ export function channelInvitationRow(
       shortFact(channel.description),
     ),
     roleLabel: invitation.role_label || invitation.role,
+    roleMeaning: invitationRoleMeaning({ kind: 'channel', invitation }),
     invitedBy: invitation.invited_by,
     memberFaces: NO_FACES,
     memberCount: null,
