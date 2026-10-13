@@ -885,8 +885,11 @@ export function useConversationController(
       // the timestamp again when the turn settles.
       conversationsCache.touch(queryClient, conversationId);
       // The last status read is from before this send: dropped, so a stale
-      // "pending, by a colleague" can never label the reader's own turn.
+      // "pending, by a colleague" can never label the reader's own turn, and
+      // forgotten as seen, so the first read after this turn is not taken for
+      // a new one (`onCompleted` already re-reads the transcript).
       queryClient.removeQueries({ queryKey: statusKey, exact: true });
+      seenStatusRef.current = null;
       setRefusedTurn(null);
       const fileIds = attachments.map((a) => a.file_id);
       const refusal = await send(message, {
@@ -981,6 +984,7 @@ export function useConversationController(
   const regenerate = useCallback(async (): Promise<SendRefused | undefined> => {
     if (isStreaming || !lastUserContent) return undefined;
     queryClient.removeQueries({ queryKey: statusKey, exact: true });
+    seenStatusRef.current = null;
     setRefusedTurn(null);
     const refusal = await send(lastUserContent, {
       conversationId,

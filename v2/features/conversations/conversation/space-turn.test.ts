@@ -304,7 +304,7 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
   const controller = readHere('useConversationController.ts');
   assert.match(
     controller,
-    /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*setRefusedTurn\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
+    /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*seenStatusRef\.current = null;\s*setRefusedTurn\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
   );
   assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{ refused: sendRefusal\(refusal, serverUserId\) \};/);
   assert.match(controller, /\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
@@ -522,4 +522,16 @@ test('a send while a stream is live returns a held refusal, so the words come ba
   assert.doesNotMatch(engine, /if \(eventSource\) return null;/);
   // Following the execution already followed stays quiet.
   assert.match(engine, /if \(eventSource\) \{\s*if \(execId !== executionId\) \{\s*console\.warn\(/);
+});
+
+/* ── No second transcript read after the reader's own turn (review N4) ────── */
+
+test('a send and a re-ask forget the last status as seen, so their own turn is not read as a new one', () => {
+  const controller = readHere('useConversationController.ts');
+  const resets = controller.match(
+    /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*seenStatusRef\.current = null;\s*setRefusedTurn\(null\);/g,
+  );
+  assert.equal(resets?.length, 2, 'submit and regenerate');
+  // The first read with nothing seen never refetches the transcript.
+  assert.match(controller, /if \(previous !== null && turnChanged\(previous, statusData\)\) \{/);
 });
