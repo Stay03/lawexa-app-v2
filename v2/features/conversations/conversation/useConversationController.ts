@@ -26,6 +26,7 @@ import { ConfidentialConversationError, conversationsQueries } from '../queries'
 import {
   canSendIn,
   hasSpaceContract,
+  isOwnTurn,
   sendRefusal,
   stopsPolling,
   turnChanged,
@@ -876,13 +877,16 @@ export function useConversationController(
   // rather than faking an in-place regenerate). Guarded to completed, non-streaming,
   // and to the owner: a viewer of a shared chat cannot add a turn to it (the
   // server answers 404 for a conversation that is not theirs), so they are not
-  // offered the button.
-  const lastUserContent = useMemo(() => {
+  // offered the button. In a space chat the last question may be a colleague's
+  // (Spaces F4): asking it again would put their words under the owner's name,
+  // so it is offered only on the owner's own question.
+  const lastUserTurn = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
-      if (messages[i].role === 'user') return messages[i].content;
+      if (messages[i].role === 'user') return messages[i];
     }
     return null;
   }, [messages]);
+  const lastUserContent = lastUserTurn?.content ?? null;
 
   const lastIsCompletedAssistant = useMemo(() => {
     const last = messages[messages.length - 1];
@@ -894,7 +898,13 @@ export function useConversationController(
     );
   }, [messages]);
 
-  const canRegenerate = isOwner && !isStreaming && lastIsCompletedAssistant && !!lastUserContent;
+  const canRegenerate =
+    isOwner &&
+    !isStreaming &&
+    lastIsCompletedAssistant &&
+    lastUserTurn !== null &&
+    !!lastUserTurn.content &&
+    isOwnTurn(lastUserTurn.author, serverUserId);
 
   const regenerate = useCallback(() => {
     if (isStreaming || !lastUserContent) return;

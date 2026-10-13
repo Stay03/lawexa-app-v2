@@ -93,10 +93,20 @@ export function authorLine(
   viewerId: number | null,
 ): AuthorLine | null {
   if (author === null) return null;
-  if (author === undefined || (viewerId !== null && author.id === viewerId)) {
+  if (author === undefined || isOwnTurn(author, viewerId)) {
     return { label: 'You', spoken: 'Asked by you', person: null };
   }
   return { label: author.name, spoken: `Asked by ${author.name}`, person: author };
+}
+
+/** Whether a user turn is the reader's own: theirs by id, or drawn by this
+ *  client (no `author` key). A withheld writer (`null`) is never assumed to be. */
+export function isOwnTurn(
+  author: ConversationAuthor | null | undefined,
+  viewerId: number | null,
+): boolean {
+  if (author === undefined) return true;
+  return author !== null && viewerId !== null && author.id === viewerId;
 }
 
 /** How often an open space chat reads its status: one small request every

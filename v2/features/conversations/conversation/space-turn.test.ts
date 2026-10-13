@@ -19,6 +19,7 @@ import {
   authorLine,
   canSendIn,
   hasSpaceContract,
+  isOwnTurn,
   SPACE_CHAT_POLL_MS,
   sendRefusal,
   stopsPolling,
@@ -343,4 +344,16 @@ test('a send moves its chat to the top of the owner’s lists once, with no seco
   conversationsCache.touch(client, 'zz');
   assert.equal(client.getQueryData(flatKey), flat);
   client.clear();
+});
+
+/* ── Ask again re-asks only the reader's own question ─────────────────────── */
+
+test('Ask again is offered on the owner’s own last question, never on a colleague’s', () => {
+  assert.equal(isOwnTurn(undefined, 7), true, 'a row this client drew');
+  assert.equal(isOwnTurn({ id: 7, name: 'Me', avatar_url: null }, 7), true);
+  assert.equal(isOwnTurn(ada, 7), false);
+  assert.equal(isOwnTurn(null, 7), false, 'a withheld writer');
+  assert.equal(isOwnTurn({ id: 7, name: 'Me', avatar_url: null }, null), false);
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /lastUserTurn !== null &&\s*!!lastUserTurn\.content &&\s*isOwnTurn\(lastUserTurn\.author, serverUserId\);/);
 });
