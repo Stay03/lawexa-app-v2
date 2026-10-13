@@ -1932,6 +1932,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         // persist nothing; `rememberAuthoredIds` ignores that.
         const userMessageId = response.data.user_message_id;
         if (userMessageId !== undefined) rememberAuthoredIds([userMessageId]);
+        handlers.onAccepted?.();
 
         // Redacted response carries the canonical (redacted) form of the user turn
         // so the local store stays in sync without a refetch.

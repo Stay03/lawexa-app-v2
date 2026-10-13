@@ -407,6 +407,15 @@ export function useConversationController(
     // belongs. This fires for every connect — the home handoff's first turn, a
     // `submit`, "ask again", a retry, and a recovery reconnect — so no route into a
     // turn can leave a stale entry behind if the user navigates away mid-answer.
+    // The server took the reader's question (a send or Ask again, 2xx): it is the
+    // chat's newest message, so the chat moves to the top of every list, its
+    // space's chats too. Only now: a refused (403, 409) or failed send saved
+    // nothing, so it moves nothing, and no refetch puts the row back down.
+    onAccepted: () => {
+      conversationsCache.touch(queryClient, conversationId, {
+        spaceUuid: queryClient.getQueryData(detailKey)?.space?.uuid ?? null,
+      });
+    },
     onConnected: () => {
       // A connect is the mount flow's recovery decision made (the handoff's
       // attach, or the recovery's): the space chat's poll may run from now.
@@ -954,8 +963,6 @@ export function useConversationController(
     (refusal: SendRefusal) => {
       if (refusal.kind === 'held') {
         setRefusedTurn({ by: refusal.by, since: refusal.since });
-        // A colleague's question is running, so it is the chat's newest message.
-        conversationsCache.touch(queryClient, conversationId, { spaceUuid });
         // The follow waits on a transcript read: it attaches only if this
         // screen still shows this chat when the read lands.
         void followTurn(refusal.executionId, () => liveRef.current === conversationId, true);
@@ -963,16 +970,11 @@ export function useConversationController(
         void queryClient.invalidateQueries({ queryKey: detailKey });
       }
     },
-    [queryClient, detailKey, followTurn, conversationId, spaceUuid],
+    [queryClient, detailKey, followTurn, conversationId],
   );
 
   const submit = useCallback(
     async (message: string, attachments: MessageAttachment[]) => {
-      // Optimistically bump this conversation to the top of the recents caches the
-      // instant the user sends — the sidebar/drawer reorder with NO refetch (wave-4
-      // acceptance a). No-op-stable when the row isn't cached; `onCompleted` refreshes
-      // the timestamp again when the turn settles.
-      conversationsCache.touch(queryClient, conversationId, { spaceUuid });
       // The last status read is from before this send: dropped, so a stale
       // "pending, by a colleague" can never label the reader's own turn, and
       // forgotten as seen, so the first read after this turn is not taken for
@@ -991,7 +993,7 @@ export function useConversationController(
       takeRefusal(refusal);
       return { refused: sendRefusal(refusal, serverUserId) };
     },
-    [send, conversationId, jurisdiction, queryClient, statusKey, takeRefusal, serverUserId, spaceUuid],
+    [send, conversationId, jurisdiction, queryClient, statusKey, takeRefusal, serverUserId],
   );
 
   const stop = useCallback(() => cancelStream(), [cancelStream]);
@@ -1072,8 +1074,6 @@ export function useConversationController(
   // the composer's banner, as a refused send is; there is nothing to give back.
   const regenerate = useCallback(async (): Promise<SendRefused | undefined> => {
     if (isStreaming || !lastUserContent) return undefined;
-    // A re-ask is a new question: the chat moves up, as on a send.
-    conversationsCache.touch(queryClient, conversationId, { spaceUuid });
     queryClient.removeQueries({ queryKey: statusKey, exact: true });
     seenStatusRef.current = null;
     setRefusedTurn(null);
@@ -1085,7 +1085,7 @@ export function useConversationController(
     if (refusal === null) return undefined;
     takeRefusal(refusal);
     return { refused: askAgainRefusal(refusal, serverUserId) };
-  }, [isStreaming, lastUserContent, queryClient, statusKey, send, conversationId, jurisdiction, takeRefusal, serverUserId, spaceUuid]);
+  }, [isStreaming, lastUserContent, queryClient, statusKey, send, conversationId, jurisdiction, takeRefusal, serverUserId]);
 
   return {
     stream,

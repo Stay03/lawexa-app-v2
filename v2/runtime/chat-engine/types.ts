@@ -188,6 +188,10 @@ export interface ChatEngineHandlers {
 
   // ── Lifecycle callbacks (v1 UseChatStreamOptions parity) ──
   onConnected?: () => void;
+  /** The server took this engine's send (`send()` started a turn, 2xx): the
+   *  question is saved, so the chat has a new message. Not called for a refused
+   *  or failed send, nor for a turn this engine only attaches to. */
+  onAccepted?: () => void;
   onIteration?: (event: IterationEvent) => void;
   onToolCalling?: (event: ToolCallingEvent) => void;
   onToolComplete?: (event: ToolCompleteEvent) => void;

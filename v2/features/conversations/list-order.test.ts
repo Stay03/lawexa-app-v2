@@ -21,7 +21,8 @@ import { conversationsQueries } from './queries';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..', '..');
-const read = (...parts: string[]) => readFileSync(join(root, ...parts), 'utf8');
+const read = (...parts: string[]) =>
+  readFileSync(join(root, ...parts), 'utf8').replace(/\r\n/g, '\n');
 
 const row = (id: string, at = '2026-10-13T10:00:00.000Z'): ConversationListItem => ({
   ...makeOptimisticConversation(id, id),
@@ -158,27 +159,59 @@ test('the rail, the drawer and the list page draw each chat once', () => {
 
 /* ── The chat screen moves its chat on each message it sees ────────────────── */
 
-test('the chat screen moves its chat up on a send, an answer, a colleague’s turn and a held send', () => {
+/** The source from `start` up to the first `end` after it (one handler or
+ *  callback, cut at the next one). */
+function block(source: string, start: string, end: string): string {
+  const from = source.indexOf(start);
+  assert.notEqual(from, -1, start);
+  const to = source.indexOf(end, from + start.length);
+  assert.notEqual(to, -1, end);
+  return source.slice(from, to);
+}
+
+const TOUCH_WITH_CACHED_SPACE =
+  /conversationsCache\.touch\(queryClient, conversationId, \{\s*spaceUuid: queryClient\.getQueryData\(detailKey\)\?\.space\?\.uuid \?\? null,\s*\}\);/;
+
+test('a send moves its chat only once the server took it', () => {
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  const sendFn = block(engine, '  async function send(', '\n  }\n');
+  // Called once, in the 2xx branch, before the stream opens.
+  assert.equal(sendFn.match(/handlers\.onAccepted\?\.\(\)/g)?.length, 1);
+  const accepted = block(sendFn, 'if (response.success) {', '} else {');
+  assert.match(accepted, /handlers\.onAccepted\?\.\(\);[\s\S]*connectToStream\(response\.data\.execution_id\);/);
+  // The engine's other turns (an attach, a recovery) never call it.
+  assert.equal(engine.match(/onAccepted/g)?.length, 1);
+
   const controller = read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
-  // submit and Ask again (the reader's question), the status poll (a
-  // colleague's question or answer) and a 409 (a colleague's question running)
-  // name the space.
-  assert.equal(
-    controller.match(/conversationsCache\.touch\(queryClient, conversationId, \{ spaceUuid \}\);/g)?.length,
-    4,
-  );
-  // An answer completing reads the space off the cached record when it ends.
-  assert.match(
-    controller,
-    /conversationsCache\.touch\(queryClient, conversationId, \{\s*spaceUuid: queryClient\.getQueryData\(detailKey\)\?\.space\?\.uuid \?\? null,\s*\}\);/,
-  );
-  // The poll moves it once per new turn, never on its first read.
+  assert.match(block(controller, '    onAccepted: () => {', '    onConnected: () => {'), TOUCH_WITH_CACHED_SPACE);
+});
+
+test('a refused or failed send leaves the chat where it was', () => {
+  const controller = read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
+  // submit and Ask again move nothing themselves (the engine's onAccepted
+  // does, on a 2xx), and a refusal (403, 409) moves nothing either.
+  for (const [start, end] of [
+    ['  const submit = useCallback(', '  const regenerate = '],
+    ['  const regenerate = useCallback(', '  return {'],
+    ['  const takeRefusal = useCallback(', '  const submit = useCallback('],
+  ] as const) {
+    assert.doesNotMatch(block(controller, start, end), /conversationsCache\.touch/, start.trim());
+  }
+});
+
+test('the chat screen moves its chat up on an answer and on a turn the poll sees', () => {
+  const controller = read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
+  // An answer completing (the reader's, or a colleague's this screen followed
+  // after a 409) reads the space off the cached record when it ends.
+  assert.match(block(controller, '    onCompleted: () => {', '    onError: '), TOUCH_WITH_CACHED_SPACE);
+  // The poll moves it once per new turn (a colleague's question or answer),
+  // never on its first read.
   assert.match(
     controller,
     /const changed = previous !== null && turnChanged\(previous, statusData\);\s*if \(changed\) conversationsCache\.touch\(queryClient, conversationId, \{ spaceUuid \}\);/,
   );
-  // Nothing else in the screen moves a chat.
-  assert.equal(controller.match(/conversationsCache\.touch\(/g)?.length, 5);
+  // Nothing else in the screen moves a chat: accepted, completed, the poll.
+  assert.equal(controller.match(/conversationsCache\.touch\(/g)?.length, 3);
 });
 
 test('the case page’s own chats ask for the same order', () => {
