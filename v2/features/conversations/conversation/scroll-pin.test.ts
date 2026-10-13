@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { clampedToBottom, followOnResize, readsAtBottom } from './scroll-pin';
+import { clampedToBottom, followOnResize, nearBottom, readsAtBottom } from './scroll-pin';
 
 // Spaces F4 review S2: a chat stayed away from its newest message after the
 // page under it grew (the dock's height on open, the composer growing a line).
@@ -95,9 +95,13 @@ test('a fraction of a pixel short of the bottom still counts as the bottom', () 
   assert.equal(readsAtBottom(view(163.5, 952), 300, false, T, 500), false);
 });
 
-test('a pinned view the reader moved is left to the reader', () => {
-  // Not at the bottom and not where the list put it: the reader's event decides.
-  assert.deepEqual(followOnResize(view(100, 1070), 282, true, T), { ownTop: 282, snapTo: null, ease: false });
+test('a pinned view away from the list\'s own position is still followed', () => {
+  // A reader's nudge of 22 px, under the threshold, leaves the view pinned at 240
+  // while the list last wrote 262; growth under it must still be followed (the
+  // release re-review found the follow dropped here).
+  assert.deepEqual(followOnResize(view(240, 1070), 262, true, T), { ownTop: 262, snapTo: null, ease: true });
+  // The pill's smooth scroll landing short because the page grew during it.
+  assert.deepEqual(followOnResize(view(190, 1070), 150, true, T), { ownTop: 150, snapTo: 282, ease: false });
 });
 
 test('the observer follows through followOnResize, its snap through scrollOwn', () => {
@@ -116,6 +120,16 @@ test('the scroll handler reads the pin through readsAtBottom', () => {
   assert.match(list, /el\.scrollTo\(\{ top: el\.scrollHeight, behavior: 'smooth' \}\)/);
 });
 
+test('the pill re-attaches a reader already at the bottom, where a scroll fires no event', () => {
+  // A detached reader a shrink clamped to the bottom: scrollTo moves nothing.
+  assert.match(
+    list,
+    /if \(nearBottom\(el\)\) \{\s*atBottomRef\.current = true;\s*ownScrollTopRef\.current = el\.scrollTop;\s*lastScrollTopRef\.current = el\.scrollTop;\s*if \(detachedAt !== null\) onScrolledUpChange\?\.\(false\);\s*setDetachedAt\(null\);\s*return;\s*\}\s*\/\/[^\n]*\n\s*el\.scrollTo\(/,
+  );
+  assert.equal(nearBottom(view(163.5, 952)), true);
+  assert.equal(nearBottom(view(160, 952)), false);
+});
+
 test('the follower watches the border box, where the dock height lands', () => {
   assert.match(list, /observer\.observe\(content, \{ box: 'border-box' \}\);/);
   // The dock's height reaches the list only as this bottom padding.
@@ -123,11 +137,15 @@ test('the follower watches the border box, where the dock height lands', () => {
   assert.match(screen, /observer\.observe\(dock\)/);
 });
 
-test('an empty dock keeps the fallback padding instead of measuring 0', () => {
-  // On a cold open the dock holds nothing for the skeleton hold; measured, it
-  // read 0 and the page later grew by the composer's height under a landed view.
+test('an empty dock keeps the fallback padding, whatever its safe-area padding measures', () => {
+  // On a cold open the dock holds nothing for the skeleton hold. It is tested by
+  // its children, not its height: in the iPhone home-screen app its safe-area
+  // padding alone measures 34 px, so a height of 0 never came (release re-review).
   assert.match(
     screen,
-    /const height = dock\.offsetHeight;[\s\S]*?if \(height === 0\) screen\.style\.removeProperty\('--v2-conv-dock-h'\);\s*else screen\.style\.setProperty\('--v2-conv-dock-h', `\$\{height\}px`\);/,
+    /if \(dock\.childElementCount === 0\) screen\.style\.removeProperty\('--v2-conv-dock-h'\);\s*else screen\.style\.setProperty\('--v2-conv-dock-h', `\$\{dock\.offsetHeight\}px`\);/,
   );
+  assert.doesNotMatch(screen, /offsetHeight === 0/);
+  // The dock carries that padding, which is why its height is not the test.
+  assert.match(screen, /ref=\{dockRef\}\s*className="pointer-events-auto v2-safe-bottom/);
 });

@@ -76,10 +76,8 @@ export interface ResizeFollow {
  * open's estimated rows are drawn at their real height on the first frame)
  * sits at the page's bottom, a position the list never wrote. A clamp can
  * only end at the bottom, so that position becomes the list's own, and the
- * scroll event the clamp fires reads as the list's (`readsAtBottom`). A pinned
- * view anywhere but its own position was moved by the reader, whose scroll
- * event decides. Growth past the threshold snaps here, before paint; smaller
- * growth glides.
+ * scroll event the clamp fires reads as the list's (`readsAtBottom`). Growth
+ * past the threshold snaps here, before paint; smaller growth glides.
  */
 export function followOnResize(
   reading: ScrollReading,
@@ -92,7 +90,10 @@ export function followOnResize(
   // The position as read, not `bottom`: the scroll event that follows reads
   // the same value, and `readsAtBottom` compares the two exactly.
   const own = nearBottom(reading) ? reading.scrollTop : ownTop;
-  if (own !== null && reading.scrollTop !== own) return { ownTop: own, snapTo: null, ease: false };
+  // A pinned view is followed wherever it sits: the scroll handler already
+  // read it as pinned (a reader's nudge under the threshold, a smooth scroll
+  // that landed short of a page that grew during it), and a reader's scroll
+  // away is dispatched before this observer, so it has already detached.
   const gap = bottom - reading.scrollTop;
   if (gap > threshold) return { ownTop: own, snapTo: bottom, ease: false };
   return { ownTop: own, snapTo: null, ease: gap > 1 };

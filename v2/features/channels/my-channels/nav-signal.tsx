@@ -19,9 +19,10 @@ import { channelsQueries } from '../queries';
  *
  * ── IT COSTS NOTHING ───────────────────────────────────────────────────────
  * Both halves are DERIVED from cache entries the realtime spine already mounts
- * app-wide for every eligible viewer (`v2/runtime/realtime/spine.tsx`, its "two
- * baseline queries"): the cross-space channel list for the dot, and the
- * baseline spaces list for the number. Subscribing here adds observers, never
+ * app-wide (`v2/runtime/realtime/spine.tsx`, its "two baseline queries"): the
+ * cross-space channel list for the dot, for a viewer with Team Channels, and
+ * the baseline spaces list for the number, for every eligible viewer. Each is
+ * read here under the spine's own gate, so subscribing adds observers, never
  * requests, and the spine's `.channel.unread` writers keep both live while the
  * reader is anywhere in the app.
  *

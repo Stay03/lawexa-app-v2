@@ -34,7 +34,7 @@ import { ReferenceChips } from './ReferenceChips';
 import { TranscriptSkeleton } from './skeletons';
 import { openDefersBlocks } from './markdown/defer-plan';
 import { ScrollKeepContext, type ScrollKeep } from './markdown/scroll-keep-context';
-import { followOnResize, readsAtBottom } from './scroll-pin';
+import { followOnResize, nearBottom, readsAtBottom } from './scroll-pin';
 
 /**
  * MessageList — the natively-virtualized, memoized transcript with chat scroll
@@ -432,17 +432,18 @@ export function MessageList({
     }
   }, [messages]);
 
-  // Keep pinned to the newest content while at the bottom. The observer now has ONE
-  // job — the eased bottom-follow — because the pill is derived from render state
-  // (see `detachedAt`) instead of being pushed from here. It sets no state at all.
+  // Keep pinned to the newest content while at the bottom. The observer follows a
+  // pinned view's growth and adopts a clamp as the list's own position
+  // (followOnResize); the pill is derived from render state (see `detachedAt`)
+  // instead of being pushed from here, so it sets no state at all.
   //
   // EASED BOTTOM-FOLLOW (owner "jumpy on new line", smoothing pass 2): the old
   // instantaneous `scrollTop = scrollHeight` yanked the viewport a full line-height
   // in one frame every time the streaming text WRAPPED — smooth horizontal reveal,
-  // discrete vertical hops. The follower lerps toward the bottom over a few frames
-  // instead, so vertical follow matches the text's butter. It only ever scrolls
-  // DOWN while pinned; the ease's transient gap stays under BOTTOM_THRESHOLD_PX,
-  // so it can never self-detach. Pin/detach/pill logic is unchanged.
+  // discrete vertical hops. Growth within BOTTOM_THRESHOLD_PX lerps toward the
+  // bottom over a few frames instead, so vertical follow matches the text's
+  // butter; bigger growth snaps before paint. The follow only scrolls DOWN, and
+  // the ease's transient gap stays under the threshold, so it never self-detaches.
   useEffect(() => {
     const content = contentRef.current;
     const scroller = scrollRef.current;
@@ -533,8 +534,19 @@ export function MessageList({
 
   const jumpToLatest = () => {
     const el = scrollRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    // The resulting scroll event runs handleScroll, which resets the pill.
+    if (!el) return;
+    // A detached reader a shrink clamped to the bottom is already there, so a
+    // scroll to it moves nothing and fires no event: re-attach here instead.
+    if (nearBottom(el)) {
+      atBottomRef.current = true;
+      ownScrollTopRef.current = el.scrollTop;
+      lastScrollTopRef.current = el.scrollTop;
+      if (detachedAt !== null) onScrolledUpChange?.(false);
+      setDetachedAt(null);
+      return;
+    }
+    // Otherwise the scroll's events run handleScroll, which resets the pill.
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
 
   return (
