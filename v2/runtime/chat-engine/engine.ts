@@ -1059,9 +1059,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       handlers.onError?.(error);
       return;
     }
-    // Prevent multiple simultaneous connections.
+    // Prevent multiple simultaneous connections. Asking again for the execution
+    // already followed is a no-op (a host following a turn it is already on).
     if (eventSource) {
-      console.warn('Already connected to a stream, ignoring duplicate connection');
+      if (execId !== executionId) {
+        console.warn('Already connected to a stream, ignoring duplicate connection');
+      }
       return;
     }
 
@@ -1834,7 +1837,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     message: string,
     options: SendMessageOptions = {},
   ): Promise<SendRefusal | null> {
-    if (eventSource) return null; // prevent concurrent sends
+    // A turn is already streaming here: this message cannot go. It used to
+    // resolve as if sent, after the composer had cleared it, so a send in the
+    // one render between attaching to a colleague's turn and the commit that
+    // holds Send lost its words (Spaces F4 review N2). As a held refusal the
+    // host gives them back; following the turn again is a no-op.
+    if (eventSource) return { kind: 'held', by: null, executionId, since: null };
     dedupKeys = new Set(); // fresh send — no history to dedup against
 
     const convId = options.conversationId || conversationId;

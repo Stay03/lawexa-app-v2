@@ -513,3 +513,13 @@ test('the row’s clock runs from the turn’s own start, and the name stays in 
   const row = readHere('ActivityStatus.tsx');
   assert.match(row, /restingLabel !== undefined && narration\s*\? `\$\{restingLabel\} · \$\{narration\}`/);
 });
+
+/* ── A send while a turn already streams is refused, not lost (review N2) ─── */
+
+test('a send while a stream is live returns a held refusal, so the words come back', () => {
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(engine, /if \(eventSource\) return \{ kind: 'held', by: null, executionId, since: null \};/);
+  assert.doesNotMatch(engine, /if \(eventSource\) return null;/);
+  // Following the execution already followed stays quiet.
+  assert.match(engine, /if \(eventSource\) \{\s*if \(execId !== executionId\) \{\s*console\.warn\(/);
+});
